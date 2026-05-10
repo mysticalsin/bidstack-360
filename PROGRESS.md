@@ -224,4 +224,33 @@ Per-route chunks (loaded on demand):
 
 ---
 
+## 2026-05-10 — Sprint 17a: Playwright smoke suite
+
+**Branch:** `feat/sprint-0-foundation`
+
+**Done:**
+- `apps/web/playwright.config.ts` — chromium-desktop project, baseURL configurable via `E2E_BASE_URL`, retains traces/screenshots/video on failure
+- `pnpm preview` boots automatically as `webServer` (skipped when `E2E_BASE_URL` is provided so CI can target a deployed URL)
+- `apps/web/vite.config.ts` — added matching `preview.proxy` for `/api` and `/webhooks` so the production-mode preview hits the live API
+- `apps/web/e2e/smoke.spec.ts` — 5 critical-path tests:
+  1. Dashboard loads with KPI cards
+  2. Opportunities list renders seeded MAHLE row
+  3. Opportunity detail shows Intel ribbon
+  4. Command palette opens on Ctrl+K and navigates
+  5. Dark-mode toggle persists across reload
+- Health-check guard skips the entire suite when the API is unreachable, so CI without docker stays green
+
+**Verified:**
+- `pnpm --filter @bidstack/web e2e` — **5/5 pass in 12.3s** against live local API + Postgres + seeded data
+
+**Not verified (deferred to sprint 17b):**
+- Lighthouse CI (separate config + npm script + thresholds)
+- Mobile viewport project (chromium-mobile / webkit-mobile)
+- Visual regression
+- Network-throttled run
+
+**Next:** Sprint 17b — Lighthouse CI script + thresholds
+
+---
+
 <!-- New entries appended above this marker. -->

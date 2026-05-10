@@ -22,6 +22,14 @@ export default defineConfig(({ mode }) => {
         '/webhooks': { target: apiUrl, changeOrigin: true },
       },
     },
+    preview: {
+      port: 4173,
+      strictPort: true,
+      proxy: {
+        '/api': { target: apiUrl, changeOrigin: true },
+        '/webhooks': { target: apiUrl, changeOrigin: true },
+      },
+    },
     build: {
       sourcemap: true,
       target: 'es2022',
