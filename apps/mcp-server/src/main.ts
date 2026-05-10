@@ -1,4 +1,9 @@
-import 'dotenv-flow/config';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import dotenvFlow from 'dotenv-flow';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenvFlow.config({ path: path.resolve(__dirname, '../../..'), silent: true });
+
 import { buildMcpServer } from './server.js';
 
 const port = Number(process.env.PORT_MCP ?? 4001);

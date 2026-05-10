@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { Badge, stageTone } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { OpportunityTabs } from '@/components/opportunity/OpportunityTabs';
 import { useOpportunity } from '@/hooks/useOpportunities';
 import { formatDate, formatMoney, formatStage } from '@/lib/format';
 
@@ -23,6 +24,14 @@ interface IntelPayload {
   news?: Array<{ id: string; headline: string; source: string; publishedAt: string; sentiment: string }>;
   hiring?: { openings: Array<{ title: string; urgency: string }>; trendDirection: string };
   winPrediction?: { probability: number; modelVersion: string; drivers: Array<{ label: string; contribution: number }> };
+  decisionUnit?: Array<{
+    contactId: string;
+    name: string;
+    role: string;
+    influence: number;
+    sentiment: 'hot' | 'warm' | 'neutral' | 'cold';
+    power: 'decision' | 'champion' | 'influencer' | 'gatekeeper' | 'approver';
+  }>;
 }
 
 export function OpportunityDetailPage() {
@@ -84,6 +93,13 @@ export function OpportunityDetailPage() {
       </div>
 
       <NewsCard intel={intel} />
+
+      <OpportunityTabs
+        oppId={data.id}
+        customer={data.customer}
+        intelDecisionUnit={intel.decisionUnit ?? []}
+        documents={data.documents}
+      />
     </div>
   );
 }

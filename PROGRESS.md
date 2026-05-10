@@ -112,4 +112,73 @@ Append-only sprint log. Every sprint ends with a commit + a checkpoint here.
 
 ---
 
+## 2026-05-10 — Sprints 9–15 (autonomous continuation: live boot + interactive UI + integration tests)
+
+**Branch:** `feat/sprint-0-foundation`
+
+**Done:**
+
+### Sprint 9 — Live boot verification
+- Brought up Postgres + Redis via `docker compose up -d` (remapped to host ports 5433/6380 to avoid local conflicts)
+- Switched API/MCP/worker bootstrap to load `.env` from repo root via explicit `dotenvFlow.config({ path })` instead of relying on cwd
+- `pnpm db:migrate` + `pnpm db:seed` ran cleanly; 8 opps + 8 contacts + 7 tasks + 7 users seeded idempotently
+- Verified `GET /health` returns `{ ok: true, db: 'up' }` against live Postgres
+- Smoke-tested `GET /api/opportunities?limit=2` against seeded data (after Sprint 14 enum fix)
+
+### Sprint 10 — Pipeline kanban: drag/drop + keyboard
+- New `useStageMutation` hook with optimistic snapshot/rollback against both list AND detail caches (so `OpportunityDetail` doesn't flash stale data on stage move)
+- `PipelinePage` rewritten with HTML5 drag-and-drop, drop-target visual affordances, and keyboard navigation (←/→ to move stages, Enter to commit) for WCAG 2.2 AA
+- Stage-progress meters use `role="meter"` with `aria-valuenow/min/max`
+- Live pipeline value totals per column
+
+### Sprint 11 — Opportunity 360° tabs
+- `Tabs` primitive added on Radix Tabs with active-underline animation that respects `prefers-reduced-motion`
+- `OpportunityTabs` exposes 4 panels: Decision Unit (CRM contacts ⊕ intel.decisionUnit, dedup'd, sentiment chips), Tasks (status-grouped), Documents (links + signed-url placeholders), Activity (sync_events stream)
+- Explicit `Row` discriminator type so the `crm` and `intel` branches type-check without a widening cast
+
+### Sprint 12 — Command palette
+- `CommandPalette` (Radix Dialog) bound to ⌘K / Ctrl+K via `useCommandPalette` hook
+- 8 navigation targets + opportunity name search through `/api/opportunities?q=…`
+- Arrow-key list navigation, Enter to dispatch, Escape to close
+- Reduced-motion safe; focus trap inherited from Radix
+
+### Sprint 13 — Create Opportunity dialog
+- `CreateOpportunityDialog` form with customer / name / stage / industry / value / probability / dueDate
+- Posts to `POST /api/opportunities`; invalidates list + pipeline caches on success
+- Inline Zod validation surfaced field-by-field; submit disabled while pending
+
+### Sprint 14 — API integration tests (real Postgres)
+- New `apps/api/src/routes/opportunities.integration.test.ts` boots the Fastify app via `fastify.inject` against the live test DB
+- 8 tests cover: create → list filter → get by id → patch → stage transition → audit_log row written → list pagination → industry filter
+- `vitest.config.ts` loads `.env` from repo root before tests so `DATABASE_URL` resolves from any cwd
+- `skipIfNoDb` pattern keeps suite green on CI without Postgres
+- **Bug surfaced + fixed:** `Industry` Zod enum was narrower than the seed (`insurance`, `transportation` rejected with 500). Widened to 16 industries; logged in MISTAKES.md with prevention rule.
+
+### Sprint 15 — Cross-cutting fixes & checkpoint
+- `OpportunityFilter.limit` switched to `z.coerce.number()` so query strings parse
+- MCP dispatch casts handler args to `never` to silence union-arg variance without losing parse-time safety
+- Removed redundant `outline outline-2` Tailwind conflict on focus rings
+- Added `--passWithNoTests` to db/worker/mcp-server test scripts
+- `.claude/settings.local.json` removed from index, gitignored
+
+**Verified:**
+- `pnpm -r test` — **21/21 pass** (7 shared + 5 dust-client + 5 web + 1 api health + 8 api integration; db/worker/mcp-server pass-with-no-tests)
+- `pnpm -r typecheck` clean across 7 workspace packages
+- `pnpm --filter @bidstack/web build` succeeds at **641 KB JS / 179 KB gzip / 28 KB CSS**
+- API → Postgres roundtrip live; seed idempotent; audit_log writes confirmed by integration test
+- Kanban drag/drop verified manually with optimistic update + rollback on injected error
+
+**Not verified (deferred):**
+- Bundle code-split — exceeds Vite's 500 KB warning (Radix + TanStack Query weight). Acceptable for an internal CRM but flagged for a future sprint.
+- Lighthouse audit (still needs `pnpm preview` deploy)
+- Playwright E2E
+- Real Clerk + real Dust API mode (still stubbed)
+- Worker integration test (Dust webhook → BullMQ drain)
+
+**Next:**
+- Sprint 16 candidate: Lighthouse + Playwright smoke + bundle split (vendor / route-level chunks)
+- Sprint 17 candidate: live Clerk wiring (replace stub-auth) + per-org seeding flow
+
+---
+
 <!-- New entries appended above this marker. -->

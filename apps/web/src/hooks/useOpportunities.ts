@@ -23,14 +23,24 @@ export function useOpportunities(filter: Partial<OpportunityFilter> = {}) {
   });
 }
 
+// Full 360° payload — see apps/api/src/serializers/opportunity.ts
+export interface OpportunityFull extends Opportunity {
+  intel: Record<string, unknown>;
+  tasks: Array<{ id: string; title: string; status: string; dueDate: string | null }>;
+  documents: Array<{
+    id: string;
+    name: string;
+    kind: string;
+    bytes: number | null;
+    createdAt: string;
+  }>;
+}
+
 export function useOpportunity(id: string | undefined) {
   return useQuery({
     enabled: !!id,
     queryKey: ['opportunity', id],
     queryFn: ({ signal }) =>
-      api<Opportunity & { intel: Record<string, unknown> }>(
-        `/api/opportunities/${id}`,
-        { signal },
-      ),
+      api<OpportunityFull>(`/api/opportunities/${id}`, { signal }),
   });
 }

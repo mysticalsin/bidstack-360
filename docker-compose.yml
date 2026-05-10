@@ -8,7 +8,9 @@ services:
       POSTGRES_PASSWORD: bidstack
       POSTGRES_DB: bidstack
     ports:
-      - '5432:5432'
+      # 5433 to avoid colliding with a host-installed Postgres on 5432.
+      # The container still listens internally on 5432; only the host port shifts.
+      - '5433:5432'
     volumes:
       - bidstack_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -22,7 +24,8 @@ services:
     container_name: bidstack-redis
     restart: unless-stopped
     ports:
-      - '6379:6379'
+      # 6380 to avoid colliding with a host-installed Redis on 6379.
+      - '6380:6379'
     volumes:
       - bidstack_redisdata:/data
     healthcheck:

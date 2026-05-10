@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 
+import { CommandPalette } from '@/components/command/CommandPalette';
 import { AppShell } from '@/components/layout/AppShell';
+import { useCommandPalette } from '@/hooks/useCommandPalette';
 import { ContactsPage } from '@/pages/ContactsPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { IntegrationsPage } from '@/pages/IntegrationsPage';
@@ -12,6 +14,7 @@ import { SettingsPage } from '@/pages/SettingsPage';
 import { TasksPage } from '@/pages/TasksPage';
 
 export function App() {
+  const palette = useCommandPalette();
   return (
     <AppShell>
       <Routes>
@@ -26,6 +29,7 @@ export function App() {
         <Route path="/integrations" element={<IntegrationsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Routes>
+      <CommandPalette open={palette.open} onOpenChange={palette.setOpen} />
     </AppShell>
   );
 }

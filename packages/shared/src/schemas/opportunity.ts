@@ -10,8 +10,12 @@ export const OpportunityStage = z.enum([
 ]);
 export type OpportunityStage = z.infer<typeof OpportunityStage>;
 
+// Industry values are normalized snake_case. Update this list whenever a new
+// vertical lands in the seed or via Dust enrichment — the response serializer
+// rejects unknown values (we'd rather see the failure than silently coerce).
 export const Industry = z.enum([
   'financial_services',
+  'insurance',
   'healthcare',
   'manufacturing',
   'retail',
@@ -20,6 +24,11 @@ export const Industry = z.enum([
   'government',
   'education',
   'telecom',
+  'transportation',
+  'logistics',
+  'media',
+  'real_estate',
+  'professional_services',
   'other',
 ]);
 export type Industry = z.infer<typeof Industry>;
@@ -55,13 +64,15 @@ export const OpportunityPatch = Opportunity.partial().omit({
 });
 export type OpportunityPatch = z.infer<typeof OpportunityPatch>;
 
+// Filter is consumed from query strings — coerce numerics so callers can pass
+// `?limit=20` without manual casting.
 export const OpportunityFilter = z.object({
   stage: OpportunityStage.optional(),
   owner: z.string().optional(),
   industry: Industry.optional(),
   search: z.string().optional(),
   cursor: z.string().optional(),
-  limit: z.number().int().min(1).max(200).default(50),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 export type OpportunityFilter = z.infer<typeof OpportunityFilter>;
 

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/Card';
 import { Badge, stageTone } from '@/components/ui/Badge';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { CreateOpportunityDialog } from '@/components/opportunity/CreateOpportunityDialog';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { formatDate, formatMoney, formatStage } from '@/lib/format';
 
@@ -11,13 +12,16 @@ export function OpportunitiesPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
-          Opportunities
-        </h1>
-        <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          {data?.items.length ?? 0} bids in flight.
-        </p>
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
+            Opportunities
+          </h1>
+          <p className="mt-1 text-sm text-[var(--fg-secondary)]">
+            {data?.items.length ?? 0} bids in flight.
+          </p>
+        </div>
+        <CreateOpportunityDialog />
       </header>
 
       <Card className="overflow-hidden">
