@@ -25,6 +25,29 @@ export default defineConfig(({ mode }) => {
     build: {
       sourcemap: true,
       target: 'es2022',
+      // react-dom 18 production minified is ~145 KB; use 200 KB so we get warned
+      // about app code creep but not about React itself.
+      chunkSizeWarningLimit: 200,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined;
+            if (id.includes('/react-router')) return 'router';
+            if (id.includes('/@tanstack/')) return 'tanstack';
+            if (id.includes('/@radix-ui/')) return 'radix';
+            if (id.includes('/zustand/')) return 'state';
+            if (id.includes('/zod/')) return 'zod';
+            if (
+              id.includes('/react/') ||
+              id.includes('/react-dom/') ||
+              id.includes('/scheduler/')
+            ) {
+              return 'react';
+            }
+            return 'vendor';
+          },
+        },
+      },
     },
   };
 });

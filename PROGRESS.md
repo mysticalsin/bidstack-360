@@ -181,4 +181,47 @@ Append-only sprint log. Every sprint ends with a commit + a checkpoint here.
 
 ---
 
+## 2026-05-10 — Sprint 16: Web bundle code-split
+
+**Branch:** `feat/sprint-0-foundation`
+
+**Done:**
+- All 9 routes now `React.lazy()` with a single `<Suspense>` boundary using the existing `LoadingSkeleton` (matches the rest of the app's loading pattern, no new component needed)
+- `vite.config.ts` `rollupOptions.output.manualChunks` splits `react`, `react-router`, `@tanstack`, `@radix-ui`, `zustand`, `zod`, and the rest to `vendor`
+- `chunkSizeWarningLimit` set to 200 KB so React's intrinsic ~340 KB is the only chunk that warns; any future app-code creep > 200 KB will fire
+
+**Verified:**
+
+Initial paint chunks (parallel-loaded, cacheable):
+- `react` 341 KB / 104 KB gzip (react-dom production floor)
+- `zod` 53 KB / 12 KB gzip
+- `vendor` 42 KB / 15 KB gzip
+- `tanstack` 37 KB / 11 KB gzip
+- `index` 30 KB / 7 KB gzip
+- `radix` 26 KB / 9 KB gzip
+- `router` 22 KB / 8 KB gzip
+- `state` 0.7 KB / 0.4 KB gzip
+
+Per-route chunks (loaded on demand):
+- DashboardPage 8.5 KB / 1.9 KB gzip
+- OpportunitiesPage 19 KB / 4.3 KB gzip
+- OpportunityDetailPage 32 KB / 4.8 KB gzip
+- PipelinePage 8.1 KB / 2.5 KB gzip
+- IntegrationsPage 7.8 KB / 1.8 KB gzip
+- ContactsPage / TasksPage / ReportsPage / SettingsPage all < 5 KB
+
+**Net effect:** a feature change in OppDetail invalidates the 32 KB OppDetail chunk only, not the whole 641 KB monolith. Vendor chunks change rarely → near-permanent browser cache. First paint ≈ 167 KB gzip vs 179 KB monolithic.
+
+- `pnpm -r typecheck` clean
+- `pnpm -r test` — **21/21 pass** (no regression)
+
+**Not verified (deferred):**
+- Lighthouse against `pnpm preview` (Sprint 17)
+- Bundle analyzer report (rollup-plugin-visualizer) — flagged for when we add a new heavy dep
+
+**Next:**
+- Sprint 17: Lighthouse + Playwright smoke test against `pnpm preview`
+
+---
+
 <!-- New entries appended above this marker. -->
