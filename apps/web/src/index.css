@@ -1,0 +1,206 @@
+/* BidStack 360° — design tokens + Tailwind 4
+   Source: src/tokens.css (prototype) + dark-mode peer + Apple HIG spacing.
+   ============================================================ */
+@import 'tailwindcss';
+
+/* ---------- Light theme (default) ---------- */
+:root,
+[data-theme='light'] {
+  /* Brand */
+  --brand-primary: #2c4bff;
+  --brand-primary-hover: #2540e0;
+  --brand-primary-press: #1f38c7;
+  --brand-primary-tint: #eaeefe;
+  --brand-deep: #1b2c7a;
+
+  /* Surface */
+  --surface-page: #fafbfd;
+  --surface-card: #ffffff;
+  --surface-sidebar: #f4f6fa;
+  --surface-sunken: #edeff5;
+  --surface-overlay: rgba(16, 24, 40, 0.32);
+
+  /* Foreground */
+  --fg-primary: #1a1f36;
+  --fg-secondary: #5a6478;
+  --fg-tertiary: #8a93a6;
+  --fg-muted: #b8bfcc;
+  --fg-inverted: #ffffff;
+  --fg-on-brand: #ffffff;
+
+  /* Borders */
+  --border-subtle: #edeff5;
+  --border-default: #dde1eb;
+  --border-strong: #c2c8d6;
+  --border-focus: #2c4bff;
+
+  /* Semantic */
+  --success: #1f8a5b;
+  --success-tint: #e4f4ec;
+  --warning: #d08a00;
+  --warning-tint: #fbf1dc;
+  --danger: #d93849;
+  --danger-tint: #fbe5e8;
+  --info: #6e59ff;
+  --info-tint: #ece8ff;
+
+  /* Tag palette */
+  --tag-blue-bg: #e5ecff;
+  --tag-blue-fg: #2540e0;
+  --tag-jade-bg: #def2e5;
+  --tag-jade-fg: #1a7a4d;
+  --tag-amber-bg: #fbf1dc;
+  --tag-amber-fg: #9a6500;
+  --tag-tomato-bg: #fbe0d6;
+  --tag-tomato-fg: #c0381f;
+  --tag-purple-bg: #ece0fb;
+  --tag-purple-fg: #6232c2;
+  --tag-gray-bg: #eceef3;
+  --tag-gray-fg: #4b5366;
+
+  /* Elevation */
+  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-sm: 0 2px 6px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 8px 24px rgba(16, 24, 40, 0.08);
+  --shadow-lg: 0 20px 48px rgba(16, 24, 40, 0.12);
+  --focus-ring: 0 0 0 3px rgba(44, 75, 255, 0.18);
+}
+
+/* ---------- Dark theme — peer of light, all states supported ---------- */
+[data-theme='dark'] {
+  --brand-primary: #6e85ff;
+  --brand-primary-hover: #8398ff;
+  --brand-primary-press: #5870ff;
+  --brand-primary-tint: rgba(110, 133, 255, 0.18);
+  --brand-deep: #c8d3ff;
+
+  --surface-page: #0f1320;
+  --surface-card: #181d2c;
+  --surface-sidebar: #131826;
+  --surface-sunken: #0b0f1a;
+  --surface-overlay: rgba(0, 0, 0, 0.6);
+
+  --fg-primary: #f1f3f9;
+  --fg-secondary: #b6bdcf;
+  --fg-tertiary: #828aa0;
+  --fg-muted: #5b6379;
+  --fg-inverted: #0f1320;
+  --fg-on-brand: #ffffff;
+
+  --border-subtle: #232a3d;
+  --border-default: #2c3448;
+  --border-strong: #3b455c;
+  --border-focus: #6e85ff;
+
+  --success: #4cc38a;
+  --success-tint: rgba(76, 195, 138, 0.16);
+  --warning: #f0b04a;
+  --warning-tint: rgba(240, 176, 74, 0.16);
+  --danger: #ff6b7c;
+  --danger-tint: rgba(255, 107, 124, 0.16);
+  --info: #a09bff;
+  --info-tint: rgba(160, 155, 255, 0.16);
+
+  --tag-blue-bg: rgba(101, 132, 255, 0.18);
+  --tag-blue-fg: #a8b9ff;
+  --tag-jade-bg: rgba(76, 195, 138, 0.16);
+  --tag-jade-fg: #7fdcad;
+  --tag-amber-bg: rgba(240, 176, 74, 0.16);
+  --tag-amber-fg: #f6c97a;
+  --tag-tomato-bg: rgba(255, 107, 124, 0.16);
+  --tag-tomato-fg: #ff9aa7;
+  --tag-purple-bg: rgba(160, 155, 255, 0.16);
+  --tag-purple-fg: #c5c1ff;
+  --tag-gray-bg: rgba(166, 173, 191, 0.12);
+  --tag-gray-fg: #b6bdcf;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.55);
+  --focus-ring: 0 0 0 3px rgba(110, 133, 255, 0.35);
+}
+
+/* ---------- Tailwind theme — bridge tokens into utilities ---------- */
+@theme {
+  --color-brand: var(--brand-primary);
+  --color-brand-hover: var(--brand-primary-hover);
+  --color-brand-press: var(--brand-primary-press);
+  --color-brand-tint: var(--brand-primary-tint);
+  --color-brand-deep: var(--brand-deep);
+
+  --color-surface-page: var(--surface-page);
+  --color-surface-card: var(--surface-card);
+  --color-surface-sidebar: var(--surface-sidebar);
+  --color-surface-sunken: var(--surface-sunken);
+
+  --color-fg-primary: var(--fg-primary);
+  --color-fg-secondary: var(--fg-secondary);
+  --color-fg-tertiary: var(--fg-tertiary);
+  --color-fg-muted: var(--fg-muted);
+
+  --color-border-subtle: var(--border-subtle);
+  --color-border-default: var(--border-default);
+  --color-border-strong: var(--border-strong);
+
+  --color-success: var(--success);
+  --color-success-tint: var(--success-tint);
+  --color-warning: var(--warning);
+  --color-warning-tint: var(--warning-tint);
+  --color-danger: var(--danger);
+  --color-danger-tint: var(--danger-tint);
+  --color-info: var(--info);
+  --color-info-tint: var(--info-tint);
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --font-display: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+}
+
+/* ---------- Base ---------- */
+html,
+body {
+  font-family: var(--font-sans);
+  background: var(--surface-page);
+  color: var(--fg-primary);
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  transition:
+    background-color 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Apple HIG focus ring — 2px outline w/ 3:1 contrast */
+*:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: 6px;
+}
+
+/* Honor reduced motion (Rule of design-standards.md) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* Min 44×44 touch targets on interactive elements (Rule WCAG 2.5.5 AA) */
+button,
+[role='button'],
+a {
+  min-height: 32px;
+  min-width: 32px;
+}

@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+.next/
+out/
+.turbo/
+.vite/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# IDE
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Claude local state
+CLAUDE.local.md
+.claude/local/
+.claude/cache/
+.claude/settings.local.json
+
+# Prisma generated client (regenerate on install)
+packages/db/generated/
+
+# Vercel
+.vercel/
+
+# Sentry source maps
+.sentryclirc
+
+# Conductor harness state (auto-generated locally)
+.conductor/
+
+# Large source bundles (kept out of repo; the unpacked tree under handoff/ is canonical)
+*.zip

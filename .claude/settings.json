@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(pnpm:*)",
+      "Bash(node:*)",
+      "Bash(npx:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git checkout:*)",
+      "Bash(git branch:*)",
+      "Bash(git push -u origin*)",
+      "Bash(prisma:*)",
+      "Bash(vitest:*)",
+      "Bash(playwright:*)",
+      "Bash(curl:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(echo:*)",
+      "Bash(test:*)",
+      "Bash(which:*)",
+      "Bash(mkdir:*)",
+      "Bash(touch:*)",
+      "Read(**)",
+      "Write(**)",
+      "Edit(**)",
+      "Glob(**)",
+      "Grep(**)"
+    ],
+    "deny": [
+      "Bash(git push -f*)",
+      "Bash(git push --force*)",
+      "Bash(git reset --hard origin*)",
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf ~/*)",
+      "Bash(curl * | bash)",
+      "Bash(curl * | sh)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)"
+    ]
+  },
+  "env": {
+    "BIDCRM_TOKEN_BUDGET_PER_TASK": "15000",
+    "BIDCRM_TOKEN_BUDGET_PER_SESSION": "100000"
+  }
+}

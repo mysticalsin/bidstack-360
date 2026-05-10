@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bidstack-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bidstack
+      POSTGRES_PASSWORD: bidstack
+      POSTGRES_DB: bidstack
+    ports:
+      - '5432:5432'
+    volumes:
+      - bidstack_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U bidstack']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: bidstack-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - bidstack_redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  bidstack_pgdata:
+  bidstack_redisdata:

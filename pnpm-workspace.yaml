@@ -1,0 +1,8 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+  # twenty-bidstack is preserved verbatim from the handoff zip as a future
+  # migration target. Its dependencies (twenty-shared, twenty-server, etc.)
+  # only resolve when this package is dropped into the upstream Twenty fork
+  # at packages/twenty-bidstack. Excluded from the standalone workspace.
+  - '!packages/twenty-bidstack'

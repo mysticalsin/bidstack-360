@@ -1,0 +1,47 @@
+{
+  "name": "bidstack-360",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BidStack 360° — Mantu's bid & presales CRM. Standalone build with future Twenty overlay path preserved under packages/twenty-bidstack.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel --stream dev",
+    "dev:web": "pnpm --filter @bidstack/web dev",
+    "dev:api": "pnpm --filter @bidstack/api dev",
+    "dev:worker": "pnpm --filter @bidstack/worker dev",
+    "dev:mcp": "pnpm --filter @bidstack/mcp-server dev",
+    "build": "pnpm -r --stream build",
+    "lint": "pnpm -r --stream lint",
+    "typecheck": "pnpm -r --stream typecheck",
+    "test": "pnpm -r --stream test",
+    "test:watch": "pnpm -r --parallel --stream test:watch",
+    "e2e": "pnpm --filter @bidstack/web e2e",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\" --ignore-path .gitignore",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\" --ignore-path .gitignore",
+    "db:migrate": "pnpm --filter @bidstack/db migrate",
+    "db:seed": "pnpm --filter @bidstack/db seed",
+    "db:reset": "pnpm --filter @bidstack/db reset",
+    "db:studio": "pnpm --filter @bidstack/db studio",
+    "clean": "pnpm -r exec rimraf dist build .turbo .vite"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "prettier": "^3.4.2",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.7.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "esbuild",
+      "msgpackr-extract",
+      "prisma"
+    ]
+  }
+}
