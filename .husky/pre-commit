@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+
+# 1. Lint + format staged files (fast — only what changed).
+pnpm exec lint-staged || exit 1
+
+# 2. Block the commit if any staged change contains a likely secret.
+sh scripts/check-secrets.sh || exit 1

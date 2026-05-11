@@ -39,9 +39,9 @@ test('opportunity detail shows Intel ribbon panels', async ({ page }) => {
   const firstLink = page.locator('a[href^="/opportunities/"]').first();
   await firstLink.click();
   await expect(page.getByRole('main')).toBeVisible();
-  await expect(
-    page.getByText(/win prediction|financial health|triggers/i).first(),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(/win prediction|financial health|triggers/i).first()).toBeVisible({
+    timeout: 10_000,
+  });
 });
 
 test('command palette opens via Ctrl+K and navigates', async ({ page }) => {
@@ -60,9 +60,7 @@ test('dark mode toggle persists across reload', async ({ page }) => {
     test.skip(true, 'theme toggle not present in current settings page');
   }
   await toggle.click();
-  const themeAfter = await page.evaluate(() =>
-    document.documentElement.getAttribute('data-theme'),
-  );
+  const themeAfter = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
   await page.reload();
   await expect(page.getByRole('main')).toBeVisible();
   const themeAfterReload = await page.evaluate(() =>

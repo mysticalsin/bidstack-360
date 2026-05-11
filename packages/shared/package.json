@@ -12,7 +12,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
-    "lint": "echo 'shared: lint TBD'",
+    "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest"
   },

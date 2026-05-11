@@ -20,7 +20,7 @@ export const healthRoute: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async () => {
-      let db = false;
+      let db: boolean;
       try {
         await prisma.$queryRaw`SELECT 1`;
         db = true;

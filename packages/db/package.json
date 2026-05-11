@@ -16,7 +16,7 @@
     "studio": "prisma studio",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
-    "lint": "echo 'db: lint TBD'",
+    "lint": "eslint .",
     "test": "vitest run --passWithNoTests"
   },
   "prisma": {

@@ -27,13 +27,24 @@
     "db:seed": "pnpm --filter @bidstack/db seed",
     "db:reset": "pnpm --filter @bidstack/db reset",
     "db:studio": "pnpm --filter @bidstack/db studio",
-    "clean": "pnpm -r exec rimraf dist build .turbo .vite"
+    "clean": "pnpm -r exec rimraf dist build .turbo .vite",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.10.0",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.6.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.4",
     "prettier": "^3.4.2",
     "rimraf": "^6.0.1",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.59.2"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -42,6 +53,15 @@
       "esbuild",
       "msgpackr-extract",
       "prisma"
+    ]
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yaml,yml,css}": [
+      "prettier --write"
     ]
   }
 }
