@@ -1,0 +1,237 @@
+/* ============================================================
+   Stack360 — Mantu CRM Design Tokens
+   Source: Twenty CRM (twentyhq/twenty) + Mantu brand
+   ============================================================ */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap");
+
+:root {
+  /* ---------- Brand ---------- */
+  --brand-primary:        #2C4BFF;   /* Mantu blue — buttons, active states, links */
+  --brand-primary-hover:  #2540E0;
+  --brand-primary-press:  #1F38C7;
+  --brand-primary-tint:   #EAEEFE;   /* row tints, focus halos */
+  --brand-deep:           #1B2C7A;   /* dark navy — avatar tile, marketing */
+  --brand-gradient:       linear-gradient(135deg, #2C4BFF 0%, #1B2C7A 100%);
+
+  /* ---------- Neutral surface scale ---------- */
+  --surface-page:         #FAFBFD;
+  --surface-card:         #FFFFFF;
+  --surface-sidebar:      #F4F6FA;
+  --surface-sunken:       #EDEFF5;
+  --surface-overlay:      rgba(16, 24, 40, .32);
+
+  /* ---------- Foreground (text) ---------- */
+  --fg-primary:           #1A1F36;
+  --fg-secondary:         #5A6478;
+  --fg-tertiary:          #8A93A6;
+  --fg-muted:             #B8BFCC;
+  --fg-inverted:          #FFFFFF;
+  --fg-on-brand:          #FFFFFF;
+
+  /* ---------- Borders & dividers ---------- */
+  --border-subtle:        #EDEFF5;
+  --border-default:       #DDE1EB;
+  --border-strong:        #C2C8D6;
+  --border-focus:         #2C4BFF;
+
+  /* ---------- Semantic ---------- */
+  --success:              #1F8A5B;
+  --success-tint:         #E4F4EC;
+  --warning:              #D08A00;
+  --warning-tint:         #FBF1DC;
+  --danger:               #D93849;
+  --danger-tint:          #FBE5E8;
+  --info:                 #6E59FF;
+  --info-tint:            #ECE8FF;
+
+  /* ---------- Severity ladder (donut, bars, pills) ---------- */
+  --sev-strong:           #1F8A5B;
+  --sev-good:             #3DA47A;
+  --sev-attention:        #D08A00;
+  --sev-critical:         #D93849;
+
+  /* ---------- Tag palette (desaturated Radix P3 -10%) ---------- */
+  --tag-blue-bg:          #E5ECFF;  --tag-blue-fg:    #2540E0;
+  --tag-sky-bg:           #E0F1FB;  --tag-sky-fg:     #1F6FA8;
+  --tag-turquoise-bg:     #DDF2EF;  --tag-turquoise-fg:#137B6E;
+  --tag-jade-bg:          #DEF2E5;  --tag-jade-fg:    #1A7A4D;
+  --tag-grass-bg:         --success-tint;  --tag-grass-fg: #2D7A3D;
+  --tag-lime-bg:          #ECF3D9;  --tag-lime-fg:    #5A6E1F;
+  --tag-amber-bg:         #FBF1DC;  --tag-amber-fg:   #9A6500;
+  --tag-orange-bg:        #FCEAD6;  --tag-orange-fg:  #B25400;
+  --tag-tomato-bg:        #FBE0D6;  --tag-tomato-fg:  #C0381F;
+  --tag-crimson-bg:       #FBDDE5;  --tag-crimson-fg: #B61F44;
+  --tag-plum-bg:          #F2DCEC;  --tag-plum-fg:    #8E2A82;
+  --tag-purple-bg:        #ECE0FB;  --tag-purple-fg:  #6232C2;
+  --tag-gray-bg:          #ECEEF3;  --tag-gray-fg:    #4B5366;
+
+  /* ---------- Spacing (4px base) ---------- */
+  --space-0:    0;
+  --space-1:    2px;
+  --space-2:    4px;
+  --space-3:    8px;
+  --space-4:    12px;
+  --space-5:    16px;
+  --space-6:    20px;
+  --space-7:    24px;
+  --space-8:    32px;
+  --space-9:    48px;
+  --space-10:   64px;
+
+  /* ---------- Radii ---------- */
+  --radius-sm:    6px;
+  --radius-md:    8px;
+  --radius-lg:    10px;
+  --radius-xl:    14px;
+  --radius-pill:  999px;
+
+  /* ---------- Elevation ---------- */
+  --shadow-xs:    0 1px 2px rgba(16, 24, 40, .04);
+  --shadow-sm:    0 2px 6px rgba(16, 24, 40, .06);
+  --shadow-md:    0 8px 24px rgba(16, 24, 40, .08);
+  --shadow-lg:    0 20px 48px rgba(16, 24, 40, .12);
+  --focus-ring:   0 0 0 3px rgba(44, 75, 255, .18);
+
+  /* ---------- Typography — families ---------- */
+  --font-sans:    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-display: "Plus Jakarta Sans", "Inter", sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* ---------- Typography — sizes ---------- */
+  --fs-xxs:   10px;
+  --fs-xs:    12px;
+  --fs-sm:    13px;
+  --fs-md:    14px;
+  --fs-lg:    17px;
+  --fs-xl:    22px;
+  --fs-xxl:   28px;
+  --fs-display: 36px;
+  --fs-display-lg: 48px;
+
+  /* ---------- Typography — weights ---------- */
+  --fw-regular:  400;
+  --fw-medium:   500;
+  --fw-semibold: 600;
+  --fw-bold:     700;
+
+  /* ---------- Typography — line heights ---------- */
+  --lh-tight:   1.2;
+  --lh-snug:    1.35;
+  --lh-normal:  1.5;
+  --lh-relaxed: 1.65;
+
+  /* ---------- Tracking ---------- */
+  --tracking-tight:  -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide:   0.04em;
+  --tracking-eyebrow:0.08em;
+
+  /* ---------- Motion ---------- */
+  --ease:        cubic-bezier(.2, .8, .2, 1);
+  --dur-fast:    120ms;
+  --dur:         150ms;
+  --dur-menu:    220ms;
+  --dur-modal:   320ms;
+
+  /* ---------- Layout ---------- */
+  --topbar-h:     56px;
+  --sidebar-w:    240px;
+  --sidebar-w-collapsed: 64px;
+}
+
+/* ============================================================
+   Semantic role styles — apply directly with class names
+   ============================================================ */
+
+html, body {
+  font-family: var(--font-sans);
+  font-size: var(--fs-md);
+  line-height: var(--lh-normal);
+  color: var(--fg-primary);
+  background: var(--surface-page);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv11", "ss01", "ss03";
+}
+
+/* Headings — display family on big sizes only */
+h1, .t-display {
+  font-family: var(--font-display);
+  font-size: var(--fs-display);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tracking-tight);
+  color: var(--fg-primary);
+}
+h2, .t-h2 {
+  font-family: var(--font-display);
+  font-size: var(--fs-xxl);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tracking-tight);
+  color: var(--fg-primary);
+}
+h3, .t-h3 {
+  font-family: var(--font-sans);
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-snug);
+  color: var(--fg-primary);
+}
+h4, .t-h4 {
+  font-family: var(--font-sans);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-snug);
+  color: var(--fg-primary);
+}
+.t-card-title {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  color: var(--fg-primary);
+}
+p, .t-body {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-normal);
+  color: var(--fg-primary);
+}
+.t-body-secondary {
+  font-size: var(--fs-md);
+  color: var(--fg-secondary);
+}
+.t-small {
+  font-size: var(--fs-sm);
+  color: var(--fg-secondary);
+}
+.t-xs {
+  font-size: var(--fs-xs);
+  color: var(--fg-secondary);
+}
+.t-eyebrow {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--fg-tertiary);
+}
+.t-num {
+  font-feature-settings: "tnum", "lnum";
+}
+.t-mono, code, kbd {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+a, .t-link {
+  color: var(--brand-primary);
+  text-decoration: none;
+  font-weight: var(--fw-medium);
+  transition: color var(--dur) var(--ease);
+}
+a:hover, .t-link:hover {
+  color: var(--brand-primary-hover);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

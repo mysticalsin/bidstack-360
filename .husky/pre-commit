@@ -1,7 +1,11 @@
 #!/usr/bin/env sh
 
 # 1. Lint + format staged files (fast — only what changed).
-pnpm exec lint-staged || exit 1
+# MAX_ARG_LENGTH forces lint-staged to chunk argv batches under the
+# Windows ~8KB command-line limit. Without this, a sprint-sized commit
+# (200+ files) blows past `eslint <file1> <file2> ... <fileN>` length
+# and the hook fails with "The command line is too long."
+MAX_ARG_LENGTH=4096 pnpm exec lint-staged || exit 1
 
 # 2. Block the commit if any staged change contains a likely secret.
 sh scripts/check-secrets.sh || exit 1

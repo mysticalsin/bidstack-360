@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
 
@@ -6,6 +6,7 @@ import type {
   Opportunity,
   OpportunityFilter,
   OpportunityPage,
+  OpportunityPatch,
 } from '@bidstack/shared';
 
 export function useOpportunities(filter: Partial<OpportunityFilter> = {}) {
@@ -40,7 +41,59 @@ export function useOpportunity(id: string | undefined) {
   return useQuery({
     enabled: !!id,
     queryKey: ['opportunity', id],
-    queryFn: ({ signal }) =>
-      api<OpportunityFull>(`/api/opportunities/${id}`, { signal }),
+    queryFn: ({ signal }) => api<OpportunityFull>(`/api/opportunities/${id}`, { signal }),
+  });
+}
+
+// Inline-edit hook for a single opportunity. The route is PATCH-shaped on
+// the server (partial patches with full audit log) — we expose the same
+// shape here so call sites can save just the field that changed.
+//
+// Optimistic update: we mutate every cached `['opportunities', …]` page that
+// contains this id, plus the single ['opportunity', id] entry. Rollback on
+// error restores the snapshot. This makes inline edits feel instant — the
+// network round-trip happens after the UI has already updated.
+export function usePatchOpportunity(id: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: OpportunityPatch) => {
+      if (!id) throw new Error('Opportunity id required');
+      return api<Opportunity>(`/api/opportunities/${id}`, { method: 'PATCH', body: patch });
+    },
+    onMutate: async (patch) => {
+      if (!id) return undefined;
+      await qc.cancelQueries({ queryKey: ['opportunities'] });
+      await qc.cancelQueries({ queryKey: ['opportunity', id] });
+
+      // Snapshot every active list query so we can roll back on error.
+      const listSnapshots: Array<readonly [readonly unknown[], OpportunityPage | undefined]> = [];
+      qc.getQueriesData<OpportunityPage>({ queryKey: ['opportunities'] }).forEach(
+        ([key, value]) => {
+          listSnapshots.push([key, value]);
+          if (!value) return;
+          qc.setQueryData<OpportunityPage>(key, {
+            ...value,
+            items: value.items.map((o) => (o.id === id ? { ...o, ...patch } : o)),
+          });
+        },
+      );
+
+      const detailKey = ['opportunity', id] as const;
+      const detailSnap = qc.getQueryData<OpportunityFull>(detailKey);
+      if (detailSnap) {
+        qc.setQueryData<OpportunityFull>(detailKey, { ...detailSnap, ...patch });
+      }
+      return { listSnapshots, detailSnap };
+    },
+    onError: (_err, _vars, ctx) => {
+      ctx?.listSnapshots.forEach(([key, value]) => qc.setQueryData(key, value));
+      if (ctx?.detailSnap && id) qc.setQueryData(['opportunity', id], ctx.detailSnap);
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['opportunity', id] });
+      void qc.invalidateQueries({ queryKey: ['opportunities'] });
+      // Pipeline reports aggregate over opportunities; refresh.
+      void qc.invalidateQueries({ queryKey: ['pipeline-report'] });
+    },
   });
 }

@@ -1,18 +1,18 @@
 # Dust integration — implementation notes
 
-> Companion to `handoff/dust.integration.md`. This file documents *how* we wire Dust in this monorepo, not *what* the contract is.
+> Companion to `handoff/dust.integration.md`. This file documents _how_ we wire Dust in this monorepo, not _what_ the contract is.
 
 ## Where the code lives
 
-| Concern | File |
-|---|---|
-| HTTP client (auth, retry, timeout) | [`packages/dust-client/src/index.ts`](../packages/dust-client/src/index.ts) |
-| HMAC signature verification | [`packages/dust-client/src/index.ts`](../packages/dust-client/src/index.ts) → `verifyDustSignature` |
-| Webhook receiver | [`apps/api/src/routes/webhooks.ts`](../apps/api/src/routes/webhooks.ts) |
-| Sync status + force-resync API | [`apps/api/src/routes/dust-integration.ts`](../apps/api/src/routes/dust-integration.ts) |
-| 5-minute poll loop | [`apps/worker/src/queues/dust-poll.ts`](../apps/worker/src/queues/dust-poll.ts) |
-| Webhook event drainer | [`apps/worker/src/queues/webhook-processor.ts`](../apps/worker/src/queues/webhook-processor.ts) |
-| Dust agent panel (UI) | TODO — Sprint 9 |
+| Concern                            | File                                                                                                |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------- |
+| HTTP client (auth, retry, timeout) | [`packages/dust-client/src/index.ts`](../packages/dust-client/src/index.ts)                         |
+| HMAC signature verification        | [`packages/dust-client/src/index.ts`](../packages/dust-client/src/index.ts) → `verifyDustSignature` |
+| Webhook receiver                   | [`apps/api/src/routes/webhooks.ts`](../apps/api/src/routes/webhooks.ts)                             |
+| Sync status + force-resync API     | [`apps/api/src/routes/dust-integration.ts`](../apps/api/src/routes/dust-integration.ts)             |
+| 5-minute poll loop                 | [`apps/worker/src/queues/dust-poll.ts`](../apps/worker/src/queues/dust-poll.ts)                     |
+| Webhook event drainer              | [`apps/worker/src/queues/webhook-processor.ts`](../apps/worker/src/queues/webhook-processor.ts)     |
+| Dust agent panel (UI)              | TODO — Sprint 9                                                                                     |
 
 ## Setup checklist
 
@@ -32,13 +32,13 @@
 
 ## Failure modes + recovery
 
-| Symptom | Likely cause | Recovery |
-|---|---|---|
-| `dust.poll tick.stub` log entries | `DUST_API_KEY` or `DUST_WORKSPACE_ID` not set | set env, restart worker |
-| `401` on `dust-client.listDocuments` | rotated/expired key | mint new, update `.env`, restart |
-| `429` from Dust | over rate limit | client auto-retries with `Retry-After`; if persistent, lower poll cadence in `dust-poll.ts` |
-| Webhook 401 in production | signature mismatch | confirm `DUST_WEBHOOK_SECRET` matches Dust admin panel exactly |
-| Dust says "MCP server unreachable" | `DUST_MCP_PUBLIC_URL` wrong, TLS missing | URL must terminate TLS publicly; localhost won't work |
+| Symptom                              | Likely cause                                  | Recovery                                                                                    |
+| ------------------------------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `dust.poll tick.stub` log entries    | `DUST_API_KEY` or `DUST_WORKSPACE_ID` not set | set env, restart worker                                                                     |
+| `401` on `dust-client.listDocuments` | rotated/expired key                           | mint new, update `.env`, restart                                                            |
+| `429` from Dust                      | over rate limit                               | client auto-retries with `Retry-After`; if persistent, lower poll cadence in `dust-poll.ts` |
+| Webhook 401 in production            | signature mismatch                            | confirm `DUST_WEBHOOK_SECRET` matches Dust admin panel exactly                              |
+| Dust says "MCP server unreachable"   | `DUST_MCP_PUBLIC_URL` wrong, TLS missing      | URL must terminate TLS publicly; localhost won't work                                       |
 
 ## Stub mode
 

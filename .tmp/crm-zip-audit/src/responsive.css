@@ -1,0 +1,78 @@
+/* Responsive layout fixes — overlay dust at narrow widths, collapse topbar,
+   prevent KPI/hero overflow, hide FAB when overlays are open. */
+
+/* Dust panel becomes a fixed overlay on narrower screens (matches
+   `.app.dust-open` grid override at <=1380px in styles.css). */
+@media (max-width: 1380px) {
+  .dust-panel {
+    position: fixed !important;
+    top: 0; right: 0; bottom: 0;
+    width: min(380px, 92vw);
+    height: 100vh !important;
+    box-shadow: -16px 0 40px rgba(15, 18, 36, .18);
+    z-index: 80;
+    animation: dust-slide-in .22s cubic-bezier(.2,.8,.2,1);
+  }
+  @keyframes dust-slide-in {
+    from { transform: translateX(20px); opacity: 0; }
+    to   { transform: none; opacity: 1; }
+  }
+  /* Don't reserve right-margin for the panel since it floats above content. */
+  .app.dust-open .cmdk-fab,
+  .app.dust-open .toast-host { right: 24px; }
+}
+
+/* Topbar collapse — hide search and breadcrumb tail at narrower widths.
+   The ⌘K FAB and command palette already cover search. */
+@media (max-width: 1180px) {
+  .topbar .tb-search { display: none; }
+  .topbar .tb-user .who { display: none; }
+}
+@media (max-width: 880px) {
+  .crumbs span:not(.here) { display: none; }
+  .crumbs .sep { display: none; }
+  .dust-toggle-btn span { display: none; }
+}
+
+/* KPI tiles must never overflow. min-width:0 lets the value truncate cleanly. */
+.kpi { min-width: 0; }
+.kpi-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kpi-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kpi-trend { white-space: nowrap; }
+
+/* Opportunity hero — let the customer name shrink rather than overflow. */
+.cust-card { flex-wrap: wrap; gap: 16px; }
+.cust-meta { min-width: 0; flex: 1 1 320px; }
+.cust-name { word-break: break-word; }
+.cust-actions { flex: 0 0 auto; flex-wrap: wrap; }
+
+/* Tables — let cells truncate. */
+.opps-table td, .opps-table th { min-width: 0; }
+.opps-table .truncate {
+  display: block;
+  max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* CMDK FAB — hide when any blocking overlay is on screen. */
+body:has(.cmdk-overlay) .cmdk-fab,
+body:has(.dialog-overlay) .cmdk-fab { display: none; }
+
+/* Tighten FAB on narrow screens so it doesn't dominate. */
+@media (max-width: 720px) {
+  .cmdk-fab { right: 16px; bottom: 16px; padding: 9px 12px; }
+  .cmdk-fab span { display: none; }
+}
+
+/* Page padding shrinks on narrow screens for more usable width. */
+@media (max-width: 980px) {
+  .page { padding: 16px 16px 60px; }
+}
+
+/* Sidebar — switch to icons-only at the narrowest widths regardless of tweak. */
+@media (max-width: 760px) {
+  :root { --sidebar-w: 64px; }
+  .sb-item span, .sb-group-title { display: none; }
+  .sb-brand img { max-width: 40px; }
+  .sb-item { justify-content: center; }
+}

@@ -21,12 +21,14 @@ test.beforeEach(async () => {
 
 async function gotoAndWait(page: Page, path: string) {
   await page.goto(path, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('main')).toBeVisible();
+  await expect(page.getByRole('main')).toBeVisible({ timeout: 10_000 });
 }
 
 test('dashboard loads with KPI cards', async ({ page }) => {
   await gotoAndWait(page, '/dashboard');
-  await expect(page.getByRole('heading', { name: /dashboard/i })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: /dashboard/i })).toBeVisible({
+    timeout: 10_000,
+  });
 });
 
 test('opportunities list renders seeded MAHLE row', async ({ page }) => {

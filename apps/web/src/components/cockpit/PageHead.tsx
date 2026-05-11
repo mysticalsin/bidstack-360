@@ -1,0 +1,188 @@
+import { Fragment, useState } from 'react';
+import { useParams } from 'react-router-dom';
+
+import { CompanyLogo } from '@/components/company/CompanyLogo';
+import { BriefingDialog } from '@/components/opportunity/BriefingDialog';
+import { Icon } from '@/components/ui/Icon';
+import { SavedFlash } from '@/components/ui/SavedFlash';
+import { useEnrichCompany } from '@/hooks/useEnrichCompany';
+import { useOpportunities } from '@/hooks/useOpportunities';
+import { formatDate } from '@/lib/format';
+import { useAccountHistory } from '@/stores/accountHistory';
+
+import type { AccountCockpitSnapshot } from '@bidstack/shared';
+
+interface Props {
+  cockpit: AccountCockpitSnapshot;
+  accountView: boolean;
+}
+
+export function PageHead({ cockpit, accountView }: Props) {
+  const [briefOpen, setBriefOpen] = useState(false);
+  const enrich = useEnrichCompany();
+  // We use the most recent opportunity for this customer as the brief target.
+  // Briefs are scoped to a deal (the API endpoint is /opportunities/:id/brief)
+  // — if no deal exists yet, the button stays disabled with a helpful tooltip.
+  const opps = useOpportunities({ limit: 50 });
+  const linkedOpp = opps.data?.items.find(
+    (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
+  );
+
+  // Pulse a "Saved" chip whenever enrichment finishes. Tracking a counter
+  // lets the SavedFlash component re-trigger on each completion, even when
+  // the user enriches the same company multiple times in a session.
+  const [enrichSavedAt, setEnrichSavedAt] = useState(0);
+  const handleEnrich = () => {
+    enrich.mutate(
+      {
+        id: cockpit.company.id,
+        name: cockpit.company.name,
+        ...(cockpit.company.domain ? { domain: cockpit.company.domain } : {}),
+        ...(cockpit.company.website ? { website: cockpit.company.website } : {}),
+      },
+      {
+        onSuccess: () => setEnrichSavedAt((n) => n + 1),
+      },
+    );
+  };
+
+  // Star / favorite. Only meaningful on the account view (the /dashboard
+  // org view doesn't map to a single account). Subscribing to the favorites
+  // array — not isFavorite — re-renders the button when toggled elsewhere
+  // (e.g. via the sidebar).
+  const { accountId } = useParams<{ accountId?: string }>();
+  const favorites = useAccountHistory((s) => s.favorites);
+  const toggleFavorite = useAccountHistory((s) => s.toggleFavorite);
+  const isStarred = accountId ? favorites.some((f) => f.slug === accountId) : false;
+
+  return (
+    <div className="page-head">
+      <div style={{ display: 'flex', gap: 14, alignItems: 'center', minWidth: 0 }}>
+        <CompanyLogo
+          name={cockpit.company.name}
+          logo={cockpit.company.logo}
+          domain={cockpit.company.domain}
+          size={52}
+          priority
+          brief={<CompanyBrief cockpit={cockpit} />}
+        />
+        <div style={{ minWidth: 0 }}>
+          <h1 className="page-title">{accountView ? cockpit.company.name : 'Dashboard'}</h1>
+          <div className="page-sub">
+            {accountView
+              ? `${cockpit.company.industry ?? 'Industry n/a'} - ${cockpit.company.domain ?? 'no domain'}`
+              : `Today: ${formatDate(new Date().toISOString())} - ${cockpit.company.name} cockpit`}
+          </div>
+        </div>
+      </div>
+      <div className="page-actions">
+        {accountView && accountId ? (
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => toggleFavorite(accountId, cockpit.company.name)}
+            aria-pressed={isStarred}
+            title={isStarred ? 'Remove from favorites' : 'Add to favorites'}
+            style={{ color: isStarred ? 'var(--warning)' : undefined }}
+          >
+            <Icon name={isStarred ? 'starFilled' : 'star'} size={14} />
+            {isStarred ? 'Starred' : 'Star'}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={handleEnrich}
+          disabled={enrich.isPending}
+          title="Refresh enrichment via Apollo + Brandfetch"
+        >
+          {enrich.isPending ? (
+            <span
+              className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-r-transparent"
+              aria-hidden
+            />
+          ) : (
+            <Icon name="download" size={14} />
+          )}
+          {enrich.isPending ? 'Enriching…' : 'Enrich now'}
+          <SavedFlash trigger={enrichSavedAt} />
+        </button>
+        {accountView ? (
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => window.print()}
+            title="Print the cockpit as a one-page brief"
+          >
+            <Icon name="download" size={14} />
+            Print
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => setBriefOpen(true)}
+          disabled={!linkedOpp}
+          title={
+            linkedOpp
+              ? `Generate brief for ${linkedOpp.name}`
+              : 'No opportunity for this customer yet'
+          }
+        >
+          <Icon name="sparkle" size={14} />
+          Ask Dust
+        </button>
+      </div>
+
+      {linkedOpp ? (
+        <BriefingDialog
+          opportunityId={linkedOpp.id}
+          opportunityLabel={linkedOpp.name}
+          open={briefOpen}
+          onOpenChange={setBriefOpen}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+// Compact enrichment brief shown when hovering the company logo. Picks
+// from whichever fields the CRM enrichment surfaced; nullable fields are
+// quietly skipped rather than rendered as "Unknown" placeholders.
+function CompanyBrief({ cockpit }: { cockpit: AccountCockpitSnapshot }) {
+  const c = cockpit.company;
+  const rows: Array<[string, string]> = [];
+  if (c.industry) rows.push(['Industry', c.industry]);
+  if (c.employeeCount) rows.push(['Headcount', c.employeeCount.toLocaleString()]);
+  if (c.domain) rows.push(['Domain', c.domain]);
+  if (c.legalName && c.legalName !== c.name) rows.push(['Legal name', c.legalName]);
+  if (c.incorporationDate) rows.push(['Founded', c.incorporationDate.slice(0, 4)]);
+  return (
+    <div>
+      <div className="text-sm font-semibold text-[var(--fg-primary)]">{c.name}</div>
+      {c.website ? (
+        <a
+          href={c.website}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-[var(--brand-primary)] hover:underline"
+        >
+          {c.website.replace(/^https?:\/\//, '')}
+        </a>
+      ) : null}
+      {rows.length > 0 ? (
+        <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+          {rows.map(([k, v]) => (
+            <Fragment key={k}>
+              <dt className="text-[var(--fg-tertiary)]">{k}</dt>
+              <dd className="text-[var(--fg-primary)]">{v}</dd>
+            </Fragment>
+          ))}
+        </dl>
+      ) : null}
+      <div className="mt-3 text-[10px] uppercase tracking-wider text-[var(--fg-tertiary)]">
+        Confidence: {Math.round(c.confidence * 100)}%
+      </div>
+    </div>
+  );
+}

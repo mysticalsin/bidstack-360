@@ -30,9 +30,7 @@ export async function mcpAuth(req: FastifyRequest, prisma: PrismaClient): Promis
   }
 
   // Fire-and-forget update of lastUsedAt
-  prisma.apiKey
-    .update({ where: { id: key.id }, data: { lastUsedAt: new Date() } })
-    .catch(() => {});
+  prisma.apiKey.update({ where: { id: key.id }, data: { lastUsedAt: new Date() } }).catch(() => {});
 
   return { orgId: key.orgId, keyId: key.id, scopes: key.scopes };
 }

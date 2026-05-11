@@ -655,4 +655,69 @@ Persisted three entries under `~/.claude/projects/d--BIDCRM/memory/`:
 
 ---
 
+## 2026-05-11 — Sprint 20: Odoo MCP integration
+
+**Branch:** `feat/sprint-0-foundation`
+
+Wires BidStack in as an MCP **client** of [ivnvxd/mcp-server-odoo](https://github.com/ivnvxd/mcp-server-odoo). The Python sidecar wraps Odoo's XML-RPC; `apps/api` talks to it over MCP streamable-http through a typed wrapper. Closes the "Twenty as MCP client consuming external MCP servers" clause from SPEC.
+
+**Done:**
+
+### `@bidstack/odoo-mcp-client` (new package)
+
+- Hand-rolled JSON-RPC 2.0 client (no `@modelcontextprotocol/sdk` dep — matches `apps/mcp-server`'s raw-RPC style for codebase consistency)
+- `OdooMcpClient` with lazy `initialize()`, session-id capture from the `Mcp-Session-Id` response header, exponential-backoff retry on 429/5xx, 15s default timeout
+- Streamable-http parser handles both `Content-Type: application/json` and `text/event-stream` (SSE frames)
+- High-level helpers: `searchRecords`, `getRecord`, `createRecord`, `updateRecord`, `deleteRecord`, `aggregateRecords`, `postMessage`, `callModelMethod`, `listModels`, plus generic `callTool<T>(name, args)`
+- Tool-level errors (`isError: true` in the MCP envelope) raised as `OdooMcpError` so callers never read a stale or error result accidentally
+- `structuredContent` preferred when present; falls back to JSON-parsing the first text content block
+- 7 vitest unit tests covering: lazy init + session reuse, structuredContent path, text-content fallback, SSE parsing, JSON-RPC error mapping, tool `isError` mapping, bearer auth header, exponential retry on 5xx
+
+### `apps/api` routes
+
+- `apps/api/src/routes/odoo-integration.ts` mounted at `/api/integrations/odoo` (alongside the existing `/dust/*`)
+- `GET /odoo/status` — `{configured, url, database, reachable, toolCount, lastError}` (configured = `ODOO_MCP_URL` set; reachable = `tools/list` succeeded)
+- `GET /odoo/models` — proxies MCP `list_models`
+- `POST /odoo/search` — Zod-validated body, proxies `search_records`. Limits clamp 1–200; field projection optional
+- `GET /odoo/:model/:id` — proxies `get_record`. Maps Odoo "not found" → 404, JSON-RPC errors → 502 Bad Gateway
+- 5 integration tests with `fastify.inject` + mocked global `fetch` (no Python sidecar needed in CI)
+- Memoized client (`__resetOdooClient()` exported for tests)
+- `@bidstack/odoo-mcp-client` added as workspace dep on `apps/api`
+
+### `apps/web` Integrations page
+
+- `apps/web/src/components/integrations/OdooCard.tsx` — status card mirroring the Dust card's visual rhythm
+- Tone badge: `live` / `unreachable` / `not configured` / `checking…`
+- 4-up stat grid (endpoint host, database, tool count, status) + error tint when the MCP server returns an error
+- Mounted on `IntegrationsPage` directly after the Dust agents card
+
+### Infrastructure
+
+- `docker-compose.yml` — `mcp-server-odoo` service under the `odoo` profile (opt-in via `docker compose --profile odoo up`). Port 8001:8000 on the host; in-compose DNS `mcp-server-odoo:8000`
+- `.env.example` — new `ODOO_*` block (sidecar config + client `ODOO_MCP_URL` + optional bearer + timeout)
+- `docs/ODOO.md` — full integration guide: topology diagram, env var matrix, local boot recipe, API surface, operational notes
+- `SPEC.md` — new §6b "Odoo MCP integration" section + the four new routes in §4
+
+**Verified (next run will confirm):**
+
+- `pnpm install` — adds the new package to the workspace graph
+- `pnpm --filter @bidstack/odoo-mcp-client test` — 7 unit tests
+- `pnpm --filter @bidstack/api test` — adds 5 integration tests for odoo-integration
+- `pnpm -r typecheck` + `pnpm -r lint` — clean
+
+**Operational notes:**
+
+- Odoo credentials never enter the BidStack process — they live only in the sidecar
+- `ODOO_MCP_ENABLE_METHOD_CALLS` defaults `false` (the `call_model_method` tool can trigger arbitrary server actions)
+- Profile gating means devs without Odoo don't see a perpetually-failing container
+
+**Deferred to next sprint:**
+
+- Per-org Odoo connections (currently one global connection per deployment)
+- Outbound mutations exposed over HTTP (client supports them; routes currently read-only)
+- Pull Odoo `res.partner` records into the company-enrichment cache (currently Apollo-only)
+- E2E test that spins up the sidecar in CI against a sandbox Odoo
+
+---
+
 <!-- New entries appended above this marker. -->

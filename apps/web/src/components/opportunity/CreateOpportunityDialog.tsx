@@ -16,7 +16,14 @@ const STAGES = OpportunityStage.options;
 
 type FieldErrors = Partial<Record<keyof OpportunityCreate, string[]>>;
 
-export function CreateOpportunityDialog() {
+interface Props {
+  /** Optional override for the trigger button (defaults to "+ New opportunity"). */
+  trigger?: React.ReactNode;
+  /** Default customer to pre-fill (e.g. when launched from an account page). */
+  defaultCustomer?: string;
+}
+
+export function CreateOpportunityDialog({ trigger, defaultCustomer }: Props = {}) {
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +72,7 @@ export function CreateOpportunityDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm">+ New opportunity</Button>
+        {trigger ?? <Button size="sm">+ New opportunity</Button>}
       </DialogTrigger>
       <DialogContent
         title="New opportunity"
@@ -73,7 +80,14 @@ export function CreateOpportunityDialog() {
       >
         <form onSubmit={submit} className="space-y-4">
           <Field label="Customer" htmlFor="customer" error={fieldErrors.customer?.[0]}>
-            <Input id="customer" name="customer" required minLength={1} placeholder="Acme Corp" />
+            <Input
+              id="customer"
+              name="customer"
+              required
+              minLength={1}
+              placeholder="Acme Corp"
+              defaultValue={defaultCustomer}
+            />
           </Field>
           <Field label="Opportunity name" htmlFor="name" error={fieldErrors.name?.[0]}>
             <Input id="name" name="name" required placeholder="Acme — IT Modernization" />

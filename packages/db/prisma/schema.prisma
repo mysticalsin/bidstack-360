@@ -22,15 +22,28 @@ model Org {
   name      String
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  users         User[]
-  opportunities Opportunity[]
-  contacts      Contact[]
-  tasks         Task[]
-  documents     Document[]
-  syncEvents    SyncEvent[]
-  apiKeys       ApiKey[]
-  webhookSubs   WebhookSubscription[]
-  auditLogs     AuditLog[]
+  users              User[]
+  opportunities      Opportunity[]
+  contacts           Contact[]
+  tasks              Task[]
+  documents          Document[]
+  syncEvents         SyncEvent[]
+  apiKeys            ApiKey[]
+  webhookSubs        WebhookSubscription[]
+  auditLogs          AuditLog[]
+  notes              Note[]
+  fileAttachments    FileAttachment[]
+  companyEnrichments CompanyEnrichment[]
+  aiInsights         AiInsight[]
+  dustRuns           DustRun[]
+  dashboardWidgets   DashboardWidget[]
+  bidOpportunities   BidOpportunity[]
+  riskRegisterItems  RiskRegisterItem[]
+  complianceChecks   ComplianceCheck[]
+  proposalDocuments  ProposalDocument[]
+  providerHealth     ProviderHealth[]
+  queueHealth        QueueHealth[]
+  releaseScores      ReleaseScore[]
 
   @@map("orgs")
 }
@@ -44,10 +57,12 @@ model User {
   role      String   @default("member")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  org              Org           @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  ownedOpps        Opportunity[]
-  assignedTasks    Task[]
-  auditLogs        AuditLog[]
+  org           Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  ownedOpps     Opportunity[]
+  assignedTasks Task[]
+  auditLogs     AuditLog[]
+  authoredNotes Note[]
+  uploadedFiles FileAttachment[]
 
   @@index([orgId])
   @@map("users")
@@ -112,7 +127,7 @@ model Contact {
   customer  String
   name      String
   role      String?
-  email     String?  @db.Citext
+  email     String?    @db.Citext
   phone     String?
   influence Int?
   sentiment Sentiment?
@@ -253,4 +268,282 @@ model AuditLog {
 
   @@index([orgId, at(sort: Desc)])
   @@map("audit_log")
+}
+
+model CompanyEnrichment {
+  id                  String    @id @default(uuid()) @db.Uuid
+  orgId               String    @map("org_id") @db.Uuid
+  normalizedName      String    @map("normalized_name")
+  legalName           String    @map("legal_name")
+  tradeName           String?   @map("trade_name")
+  domain              String?
+  website             String?
+  logoUrl             String?   @map("logo_url")
+  logoSource          String?   @map("logo_source")
+  registryIds         Json      @default("{}") @map("registry_ids")
+  address             Json      @default("{}")
+  status              String?
+  incorporationDate   DateTime? @map("incorporation_date") @db.Date
+  formerNames         Json      @default("[]") @map("former_names")
+  industryCodes       Json      @default("[]") @map("industry_codes")
+  employeeCount       Int?      @map("employee_count")
+  annualRevenueMicros BigInt?   @map("annual_revenue_micros")
+  confidenceBps       Int       @default(0) @map("confidence_bps")
+  sourceAttribution   Json      @default("[]") @map("source_attribution")
+  providerMetadata    Json      @default("{}") @map("provider_metadata")
+  cacheExpiresAt      DateTime? @map("cache_expires_at") @db.Timestamptz(6)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, normalizedName], map: "company_enrichments_org_normalized_name_key")
+  @@index([orgId, domain], map: "company_enrichments_org_domain_idx")
+  @@index([orgId, updatedAt(sort: Desc)], map: "company_enrichments_org_updated_idx")
+  @@map("company_enrichments")
+}
+
+model AiInsight {
+  id                String   @id @default(uuid()) @db.Uuid
+  orgId             String   @map("org_id") @db.Uuid
+  kind              String
+  title             String
+  summary           String
+  companyName       String?  @map("company_name")
+  opportunityId     String?  @map("opportunity_id") @db.Uuid
+  confidenceBps     Int      @default(0) @map("confidence_bps")
+  sourceAttribution Json     @default("[]") @map("source_attribution")
+  status            String   @default("active")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, createdAt(sort: Desc)], map: "ai_insights_org_created_idx")
+  @@index([orgId, kind], map: "ai_insights_org_kind_idx")
+  @@map("ai_insights")
+}
+
+model DustRun {
+  id                String    @id @default(uuid()) @db.Uuid
+  orgId             String    @map("org_id") @db.Uuid
+  mode              String
+  appOrTool         String    @map("app_or_tool")
+  input             Json      @default("{}")
+  output            Json?
+  costMicros        BigInt?   @map("cost_micros")
+  sourceAttribution Json      @default("[]") @map("source_attribution")
+  status            String    @default("queued")
+  error             String?
+  startedAt         DateTime? @map("started_at") @db.Timestamptz(6)
+  finishedAt        DateTime? @map("finished_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, createdAt(sort: Desc)], map: "dust_runs_org_created_idx")
+  @@index([orgId, status], map: "dust_runs_org_status_idx")
+  @@map("dust_runs")
+}
+
+model DashboardWidget {
+  id        String   @id @default(uuid()) @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  kind      String
+  title     String
+  x         Int      @default(0)
+  y         Int      @default(0)
+  w         Int      @default(1)
+  h         Int      @default(1)
+  config    Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, kind], map: "dashboard_widgets_org_kind_key")
+  @@index([orgId, y, x], map: "dashboard_widgets_layout_idx")
+  @@map("dashboard_widgets")
+}
+
+model BidOpportunity {
+  id                   String    @id @default(uuid()) @db.Uuid
+  orgId                String    @map("org_id") @db.Uuid
+  source               String
+  externalId           String    @map("external_id")
+  title                String
+  buyer                String?
+  country              String?
+  region               String?
+  status               String
+  dueDate              DateTime? @map("due_date") @db.Timestamptz(6)
+  estimatedValueMicros BigInt?   @map("estimated_value_micros")
+  currencyCode         String?   @map("currency_code")
+  url                  String?
+  recommendation       String?
+  readinessScore       Int?      @map("readiness_score")
+  sourceAttribution    Json      @default("[]") @map("source_attribution")
+  providerMetadata     Json      @default("{}") @map("provider_metadata")
+  importedAt           DateTime  @default(now()) @map("imported_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, source, externalId], map: "bid_opportunities_org_source_external_key")
+  @@index([orgId, dueDate], map: "bid_opportunities_org_due_idx")
+  @@index([orgId, source], map: "bid_opportunities_org_source_idx")
+  @@map("bid_opportunities")
+}
+
+model RiskRegisterItem {
+  id            String    @id @default(uuid()) @db.Uuid
+  orgId         String    @map("org_id") @db.Uuid
+  opportunityId String?   @map("opportunity_id") @db.Uuid
+  companyName   String?   @map("company_name")
+  title         String
+  severity      String
+  owner         String?
+  mitigation    String?
+  dueDate       DateTime? @map("due_date") @db.Date
+  status        String    @default("open")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, status, severity], map: "risk_items_org_status_severity_idx")
+  @@map("risk_register_items")
+}
+
+model ComplianceCheck {
+  id                String   @id @default(uuid()) @db.Uuid
+  orgId             String   @map("org_id") @db.Uuid
+  opportunityId     String?  @map("opportunity_id") @db.Uuid
+  label             String
+  status            String
+  owner             String?
+  evidenceUrl       String?  @map("evidence_url")
+  sourceAttribution Json     @default("[]") @map("source_attribution")
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, status], map: "compliance_checks_org_status_idx")
+  @@map("compliance_checks")
+}
+
+model ProposalDocument {
+  id                String   @id @default(uuid()) @db.Uuid
+  orgId             String   @map("org_id") @db.Uuid
+  opportunityId     String?  @map("opportunity_id") @db.Uuid
+  name              String
+  kind              String
+  status            String
+  owner             String?
+  storageUrl        String?  @map("storage_url")
+  sourceAttribution Json     @default("[]") @map("source_attribution")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, status], map: "proposal_documents_org_status_idx")
+  @@map("proposal_documents")
+}
+
+model ProviderHealth {
+  id            String   @id @default(uuid()) @db.Uuid
+  orgId         String   @map("org_id") @db.Uuid
+  provider      String
+  status        String
+  latencyMs     Int?     @map("latency_ms")
+  lastCheckedAt DateTime @default(now()) @map("last_checked_at") @db.Timestamptz(6)
+  message       String?
+  metadata      Json     @default("{}")
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, provider], map: "provider_health_org_provider_key")
+  @@map("provider_health")
+}
+
+model QueueHealth {
+  id            String   @id @default(uuid()) @db.Uuid
+  orgId         String   @map("org_id") @db.Uuid
+  queueName     String   @map("queue_name")
+  waiting       Int      @default(0)
+  active        Int      @default(0)
+  failed        Int      @default(0)
+  completed     Int      @default(0)
+  lastCheckedAt DateTime @default(now()) @map("last_checked_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, queueName], map: "queue_health_org_queue_key")
+  @@map("queue_health")
+}
+
+model ReleaseScore {
+  id         String   @id @default(uuid()) @db.Uuid
+  orgId      String   @map("org_id") @db.Uuid
+  functional Int
+  code       Int
+  design     Int
+  infra      Int
+  notes      Json     @default("[]")
+  scoredAt   DateTime @default(now()) @map("scored_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, scoredAt(sort: Desc)], map: "release_scores_org_scored_idx")
+  @@map("release_scores")
+}
+
+// ─── Notes ───────────────────────────────────────────────────────────────
+// Freeform markdown notes attached to a customer account. `accountId` is a
+// free-form string, NOT a FK — companies (CrmCompany) are derived from
+// opportunities/contacts and aren't yet a first-class persisted table.
+// Pinned notes float to the top of the cockpit panel ahead of chronological
+// (createdAt desc) ordering — see notes_org_account_created_idx for the
+// scan path that backs the per-account list query.
+
+model Note {
+  id           String   @id @default(uuid()) @db.Uuid
+  orgId        String   @map("org_id") @db.Uuid
+  accountId    String   @map("account_id") @db.VarChar(255)
+  authorUserId String   @map("author_user_id") @db.Uuid
+  title        String   @db.VarChar(200)
+  bodyMd       String   @map("body_md")
+  pinned       Boolean  @default(false)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org    Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorUserId], references: [id])
+
+  @@index([orgId, accountId, createdAt(sort: Desc)], map: "notes_org_account_created_idx")
+  @@map("notes")
+}
+
+// ─── Files / attachments ─────────────────────────────────────────────────
+// Storage-agnostic attachments scoped to a customer account. The `storageKey`
+// is opaque (interpreted by the storage adapter — local FS path, S3 key, etc.).
+// `accountId` is a free-form string mirroring how `Contact.customer` is stored.
+
+model FileAttachment {
+  id               String   @id @default(uuid()) @db.Uuid
+  orgId            String   @map("org_id") @db.Uuid
+  accountId        String   @map("account_id") @db.VarChar(255)
+  name             String   @db.VarChar(255)
+  contentType      String   @map("content_type") @db.VarChar(100)
+  bytes            Int
+  storageKey       String   @map("storage_key") @db.VarChar(500)
+  uploadedByUserId String?  @map("uploaded_by_user_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org      Org   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  uploader User? @relation(fields: [uploadedByUserId], references: [id])
+
+  @@index([orgId, accountId, createdAt(sort: Desc)], map: "file_attachments_org_account_created_idx")
+  @@map("file_attachments")
 }

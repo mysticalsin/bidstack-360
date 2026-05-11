@@ -36,10 +36,7 @@ async function handleSingle(
   ctx: McpAuthCtx,
   log: FastifyBaseLogger,
 ): Promise<JsonRpcResponse> {
-  const reply = (
-    result?: unknown,
-    error?: JsonRpcResponse['error'],
-  ): JsonRpcResponse => ({
+  const reply = (result?: unknown, error?: JsonRpcResponse['error']): JsonRpcResponse => ({
     jsonrpc: '2.0',
     id: req?.id ?? null,
     ...(result !== undefined ? { result } : {}),

@@ -51,7 +51,9 @@ describe('opportunities routes', () => {
     expect(body.items[0]).toMatchObject({
       id: expect.any(String),
       code: expect.stringMatching(/^OP-\d{4}$/),
-      stage: expect.stringMatching(/^(discovery|qualified|proposal|negotiation|closed_won|closed_lost)$/),
+      stage: expect.stringMatching(
+        /^(discovery|qualified|proposal|negotiation|closed_won|closed_lost)$/,
+      ),
       probability: expect.any(Number),
     });
   });
@@ -67,9 +69,7 @@ describe('opportunities routes', () => {
   });
 
   skipIfNoDb('GET /api/opportunities/:id returns the full intel payload', async () => {
-    const list = (
-      await server.inject({ method: 'GET', url: '/api/opportunities?limit=1' })
-    ).json();
+    const list = (await server.inject({ method: 'GET', url: '/api/opportunities?limit=1' })).json();
     const id = list.items[0].id;
     const res = await server.inject({ method: 'GET', url: `/api/opportunities/${id}` });
     expect(res.statusCode).toBe(200);
@@ -79,46 +79,43 @@ describe('opportunities routes', () => {
     expect(body.documents).toBeDefined();
   });
 
-  skipIfNoDb(
-    'POST /api/opportunities/:id/stage moves the card and writes audit_log',
-    async () => {
-      const list = (
-        await server.inject({
-          method: 'GET',
-          url: '/api/opportunities?stage=discovery&limit=1',
-        })
-      ).json();
-      if (list.items.length === 0) {
-        console.warn('[skip] no discovery opps to move');
-        return;
-      }
-      const id = list.items[0].id;
-
-      const auditBefore = await prisma.auditLog.count({
-        where: { targetType: 'opportunity', targetId: id, action: 'opportunity.stage' },
-      });
-
-      const move = await server.inject({
-        method: 'POST',
-        url: `/api/opportunities/${id}/stage`,
-        payload: { stage: 'qualified' },
-      });
-      expect(move.statusCode).toBe(200);
-      expect(move.json()).toMatchObject({ id, stage: 'qualified' });
-
-      const auditAfter = await prisma.auditLog.count({
-        where: { targetType: 'opportunity', targetId: id, action: 'opportunity.stage' },
-      });
-      expect(auditAfter).toBe(auditBefore + 1);
-
-      // Restore (test is idempotent across runs)
+  skipIfNoDb('POST /api/opportunities/:id/stage moves the card and writes audit_log', async () => {
+    const list = (
       await server.inject({
-        method: 'POST',
-        url: `/api/opportunities/${id}/stage`,
-        payload: { stage: 'discovery' },
-      });
-    },
-  );
+        method: 'GET',
+        url: '/api/opportunities?stage=discovery&limit=1',
+      })
+    ).json();
+    if (list.items.length === 0) {
+      console.warn('[skip] no discovery opps to move');
+      return;
+    }
+    const id = list.items[0].id;
+
+    const auditBefore = await prisma.auditLog.count({
+      where: { targetType: 'opportunity', targetId: id, action: 'opportunity.stage' },
+    });
+
+    const move = await server.inject({
+      method: 'POST',
+      url: `/api/opportunities/${id}/stage`,
+      payload: { stage: 'qualified' },
+    });
+    expect(move.statusCode).toBe(200);
+    expect(move.json()).toMatchObject({ id, stage: 'qualified' });
+
+    const auditAfter = await prisma.auditLog.count({
+      where: { targetType: 'opportunity', targetId: id, action: 'opportunity.stage' },
+    });
+    expect(auditAfter).toBe(auditBefore + 1);
+
+    // Restore (test is idempotent across runs)
+    await server.inject({
+      method: 'POST',
+      url: `/api/opportunities/${id}/stage`,
+      payload: { stage: 'discovery' },
+    });
+  });
 });
 
 describe('contacts + tasks + reports routes', () => {

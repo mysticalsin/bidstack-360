@@ -1,11 +1,27 @@
+import { AnimatePresence, MotionConfig } from 'framer-motion';
 import { lazy, Suspense } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 import { useAuth } from '@/lib/auth';
 import { CommandPalette } from '@/components/command/CommandPalette';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { LiveAnnouncer } from '@/components/a11y/LiveAnnouncer';
+import { ConfettiHost } from '@/components/delight/Confetti';
+import { WebVitalsHud } from '@/components/dev/WebVitalsHud';
+import { HelpDrawer } from '@/components/help/HelpDrawer';
+import { useHelpDrawerHotkey } from '@/components/help/useHelpDrawer';
 import { AppShell } from '@/components/layout/AppShell';
+import { RouteProgress } from '@/components/layout/RouteProgress';
+import { PageTransition } from '@/components/motion/PageTransition';
+import { QuickAddMenu } from '@/components/quickadd/QuickAddMenu';
+import { ConfirmHost } from '@/components/ui/ConfirmDialog';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { Toaster } from '@/components/ui/Toast';
+import { useCmdDotClose } from '@/hooks/useCmdDotClose';
 import { useCommandPalette } from '@/hooks/useCommandPalette';
+import { useGlobalShortcuts } from '@/hooks/useGlobalShortcuts';
+import { usePreferences } from '@/stores/preferences';
+import { useGlobalUndoHotkey } from '@/stores/undoStack';
 
 const DashboardPage = lazy(() =>
   import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })),
@@ -33,6 +49,12 @@ const IntegrationsPage = lazy(() =>
 );
 const SettingsPage = lazy(() =>
   import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })),
+);
+const AuditLogPage = lazy(() =>
+  import('@/pages/AuditLogPage').then((m) => ({ default: m.AuditLogPage })),
+);
+const AccountsPage = lazy(() =>
+  import('@/pages/AccountsPage').then((m) => ({ default: m.AccountsPage })),
 );
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -77,16 +99,36 @@ const ClerkSignIn = lazy(() =>
   })),
 );
 
-export function App() {
-  const palette = useCommandPalette();
+function AnimatedRoutes() {
+  const location = useLocation();
+  // AnimatePresence drives an exit animation when routes swap. We key on the
+  // top-level segment so navigating between accounts (same segment) doesn't
+  // re-run the cross-fade — only true page swaps animate.
+  const segmentKey = '/' + (location.pathname.split('/')[1] ?? '');
   return (
-    <AppShell>
-      <Suspense fallback={<LoadingSkeleton rows={6} />}>
-        <Routes>
+    <AnimatePresence mode="wait" initial={false}>
+      <PageTransition pageKey={segmentKey || '/'}>
+        <Routes location={location}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route
             path="/dashboard"
+            element={
+              <RequireAuth>
+                <DashboardPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/accounts"
+            element={
+              <RequireAuth>
+                <AccountsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/accounts/:accountId"
             element={
               <RequireAuth>
                 <DashboardPage />
@@ -157,9 +199,58 @@ export function App() {
               </RequireAuth>
             }
           />
+          <Route
+            path="/audit-log"
+            element={
+              <RequireAuth>
+                <AuditLogPage />
+              </RequireAuth>
+            }
+          />
         </Routes>
-      </Suspense>
-      <CommandPalette open={palette.open} onOpenChange={palette.setOpen} />
-    </AppShell>
+      </PageTransition>
+    </AnimatePresence>
+  );
+}
+
+export function App() {
+  const palette = useCommandPalette();
+  useHelpDrawerHotkey();
+  useCmdDotClose();
+  useGlobalShortcuts();
+  useGlobalUndoHotkey();
+  // Map our 3-way motion pref onto framer-motion's MotionConfig contract.
+  // `system` is framer's `user` (read prefers-reduced-motion). `reduced`
+  // forces `always`, overriding the OS. `full` forces `never`. This makes
+  // the toggle in Settings authoritative.
+  const motion = usePreferences((s) => s.motion);
+  const reducedMotion = motion === 'reduced' ? 'always' : motion === 'full' ? 'never' : 'user';
+  return (
+    <MotionConfig reducedMotion={reducedMotion}>
+      <RouteProgress />
+      <AppShell>
+        {/* ErrorBoundary scoped inside AppShell so a render error in any page
+            falls back to the boundary card while the sidebar/topbar survive.
+            Mounting at the route level (vs. global at main.tsx) preserves the
+            shell so users can still navigate away from the broken page. */}
+        <ErrorBoundary>
+          <Suspense fallback={<LoadingSkeleton rows={6} />}>
+            <AnimatedRoutes />
+          </Suspense>
+        </ErrorBoundary>
+        <CommandPalette open={palette.open} onOpenChange={palette.setOpen} />
+        {/* Press N (outside an input) → quick-add menu → choose entity. */}
+        <QuickAddMenu />
+        {/* `?` (outside an input) → keyboard shortcut drawer. */}
+        <HelpDrawer />
+        {/* Global hosts — mount once at the root so any component can dispatch
+            toasts / open a confirm without prop-drilling. */}
+        <Toaster />
+        <ConfirmHost />
+        <ConfettiHost />
+        <LiveAnnouncer />
+        <WebVitalsHud />
+      </AppShell>
+    </MotionConfig>
   );
 }

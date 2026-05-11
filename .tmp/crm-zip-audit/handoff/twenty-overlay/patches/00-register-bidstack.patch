@@ -1,0 +1,24 @@
+--- a/packages/twenty-server/src/modules/modules.module.ts
++++ b/packages/twenty-server/src/modules/modules.module.ts
+@@
+ import { WorkflowModule } from './workflow/workflow.module';
+ import { WorkspaceMemberModule } from './workspace-member/workspace-member.module';
++import { BidStackModule } from 'twenty-bidstack/server';
+
+ @Module({
+   imports: [
+     // … existing modules unchanged …
+     WorkflowModule,
+     WorkspaceMemberModule,
++    BidStackModule,
+   ],
+ })
+ export class ModulesModule {}
+--- a/packages/twenty-front/src/modules/applications/registry.ts
++++ b/packages/twenty-front/src/modules/applications/registry.ts
+@@
+ import { registerApplication } from './register-application';
++import { BidStackApp } from 'twenty-bidstack/front';
+
+ // existing registrations stay above this line
++registerApplication(BidStackApp);

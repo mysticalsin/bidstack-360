@@ -52,6 +52,7 @@ pnpm dev
 ```
 
 Then open:
+
 - Web: http://localhost:5173
 - API: http://localhost:4000
 - MCP: http://localhost:4001
@@ -60,19 +61,19 @@ Then open:
 
 ## Scripts
 
-| Command | What it does |
-|---|---|
-| `pnpm dev` | Run web + api + worker + mcp-server in parallel |
-| `pnpm dev:web` | Web only |
-| `pnpm dev:api` | API only |
-| `pnpm db:migrate` | Apply Prisma migrations |
-| `pnpm db:seed` | Seed from prototype fixtures |
-| `pnpm db:reset` | **Destructive** — drop + recreate (confirms) |
-| `pnpm typecheck` | All packages |
-| `pnpm lint` | All packages |
-| `pnpm test` | Vitest across all packages |
-| `pnpm e2e` | Playwright on the web app |
-| `pnpm build` | Production build of every package |
+| Command           | What it does                                    |
+| ----------------- | ----------------------------------------------- |
+| `pnpm dev`        | Run web + api + worker + mcp-server in parallel |
+| `pnpm dev:web`    | Web only                                        |
+| `pnpm dev:api`    | API only                                        |
+| `pnpm db:migrate` | Apply Prisma migrations                         |
+| `pnpm db:seed`    | Seed from prototype fixtures                    |
+| `pnpm db:reset`   | **Destructive** — drop + recreate (confirms)    |
+| `pnpm typecheck`  | All packages                                    |
+| `pnpm lint`       | All packages                                    |
+| `pnpm test`       | Vitest across all packages                      |
+| `pnpm e2e`        | Playwright on the web app                       |
+| `pnpm build`      | Production build of every package               |
 
 ---
 

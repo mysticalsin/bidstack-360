@@ -9,8 +9,7 @@ interface ThemeStore {
 }
 
 const initial: Theme =
-  (typeof document !== 'undefined' && (document.documentElement.dataset.theme as Theme)) ||
-  'light';
+  (typeof document !== 'undefined' && (document.documentElement.dataset.theme as Theme)) || 'light';
 
 export const useThemeStore = create<ThemeStore>((set, get) => ({
   theme: initial,

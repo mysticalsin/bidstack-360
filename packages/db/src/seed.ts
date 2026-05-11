@@ -7,7 +7,14 @@
 //   lost        -> closed_lost
 
 import { type Prisma, PrismaClient } from '../generated/client/index.js';
-import { fixtureContacts, fixtureOpps, fixtureTasks, fixtureUsers, intelFor } from './seed-data.js';
+import {
+  fixtureCompanyEnrichments,
+  fixtureContacts,
+  fixtureOpps,
+  fixtureTasks,
+  fixtureUsers,
+  intelFor,
+} from './seed-data.js';
 
 const prisma = new PrismaClient();
 
@@ -72,6 +79,53 @@ async function main() {
     });
   }
   console.log(`  ✓ opps:  ${fixtureOpps.length}`);
+
+  for (const company of fixtureCompanyEnrichments) {
+    await prisma.companyEnrichment.upsert({
+      where: {
+        orgId_normalizedName: {
+          orgId: org.id,
+          normalizedName: company.normalizedName,
+        },
+      },
+      create: {
+        orgId: org.id,
+        normalizedName: company.normalizedName,
+        legalName: company.legalName,
+        tradeName: company.tradeName,
+        domain: company.domain,
+        website: company.website,
+        logoUrl: company.logoUrl,
+        logoSource: company.logoSource,
+        registryIds: {},
+        formerNames: [],
+        industryCodes: [],
+        status: company.status,
+        employeeCount: company.employeeCount,
+        annualRevenueMicros: company.annualRevenueMicros,
+        confidenceBps: company.confidenceBps,
+        sourceAttribution: company.sourceAttribution as Prisma.InputJsonValue,
+        providerMetadata: company.providerMetadata as Prisma.InputJsonValue,
+        cacheExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      },
+      update: {
+        legalName: company.legalName,
+        tradeName: company.tradeName,
+        domain: company.domain,
+        website: company.website,
+        logoUrl: company.logoUrl,
+        logoSource: company.logoSource,
+        status: company.status,
+        employeeCount: company.employeeCount,
+        annualRevenueMicros: company.annualRevenueMicros,
+        confidenceBps: company.confidenceBps,
+        sourceAttribution: company.sourceAttribution as Prisma.InputJsonValue,
+        providerMetadata: company.providerMetadata as Prisma.InputJsonValue,
+        cacheExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      },
+    });
+  }
+  console.log(`  ✓ company enrichments: ${fixtureCompanyEnrichments.length}`);
 
   // Contacts
   for (const c of fixtureContacts) {

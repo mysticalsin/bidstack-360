@@ -34,6 +34,36 @@ services:
       timeout: 5s
       retries: 5
 
+  # ─── Odoo MCP sidecar ────────────────────────────────────────────────
+  # ivnvxd/mcp-server-odoo exposes an Odoo instance as MCP tools (search,
+  # read, create, update, aggregate, chatter, workflow calls). BidStack
+  # consumes it as an MCP client via apps/api at /api/integrations/odoo/*.
+  #
+  # Profile-gated: starts with `docker compose --profile odoo up` so devs
+  # who don't run Odoo locally don't see a constantly-failing container.
+  # Production deploys override this with a managed sidecar.
+  mcp-server-odoo:
+    image: ivnvxd/mcp-server-odoo:latest
+    container_name: bidstack-mcp-odoo
+    restart: unless-stopped
+    profiles: ['odoo']
+    environment:
+      ODOO_URL: ${ODOO_URL:?ODOO_URL is required when starting the odoo profile}
+      ODOO_DB: ${ODOO_DB:?ODOO_DB is required when starting the odoo profile}
+      ODOO_API_KEY: ${ODOO_API_KEY:-}
+      ODOO_USER: ${ODOO_USER:-}
+      ODOO_PASSWORD: ${ODOO_PASSWORD:-}
+      ODOO_LOCALE: ${ODOO_LOCALE:-en_US}
+      ODOO_YOLO: ${ODOO_YOLO:-false}
+      ODOO_MCP_ENABLE_METHOD_CALLS: ${ODOO_MCP_ENABLE_METHOD_CALLS:-false}
+    command: ['mcp-server-odoo', '--transport', 'streamable-http']
+    ports:
+      # Host port 8001 → container 8000 to avoid colliding with anything
+      # else on 8000. apps/api inside the BIDCRM stack reaches the sidecar
+      # on http://mcp-server-odoo:8000/mcp (compose DNS); the host port is
+      # purely for ad-hoc curl during development.
+      - '8001:8000'
+
 volumes:
   bidstack_pgdata:
   bidstack_redisdata:

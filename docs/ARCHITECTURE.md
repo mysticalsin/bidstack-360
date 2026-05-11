@@ -51,15 +51,15 @@
 
 ## Module boundaries
 
-| Module | Talks to | Doesn't talk to |
-|---|---|---|
-| `apps/web` | `/api/*` only | DB, Redis, MCP, Dust API |
-| `apps/api` | DB, Redis (via worker queue), Dust client (rare — most reads happen in worker) | Browser DOM |
-| `apps/worker` | DB, Redis, Dust API | API HTTP |
-| `apps/mcp-server` | DB, Redis (rate limit) | Dust API directly (it serves Dust, not the reverse) |
-| `packages/db` | Postgres | nothing else |
-| `packages/dust-client` | Dust HTTP API | DB |
-| `packages/shared` | nothing — pure types/schemas | nothing |
+| Module                 | Talks to                                                                       | Doesn't talk to                                     |
+| ---------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------- |
+| `apps/web`             | `/api/*` only                                                                  | DB, Redis, MCP, Dust API                            |
+| `apps/api`             | DB, Redis (via worker queue), Dust client (rare — most reads happen in worker) | Browser DOM                                         |
+| `apps/worker`          | DB, Redis, Dust API                                                            | API HTTP                                            |
+| `apps/mcp-server`      | DB, Redis (rate limit)                                                         | Dust API directly (it serves Dust, not the reverse) |
+| `packages/db`          | Postgres                                                                       | nothing else                                        |
+| `packages/dust-client` | Dust HTTP API                                                                  | DB                                                  |
+| `packages/shared`      | nothing — pure types/schemas                                                   | nothing                                             |
 
 ## Data flow — the Dust loop
 

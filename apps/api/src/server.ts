@@ -11,9 +11,14 @@ import {
 
 import { authPlugin } from './plugins/auth.js';
 import { errorHandlerPlugin } from './plugins/error-handler.js';
+import { auditLogsRoutes } from './routes/audit-logs.js';
 import { contactsRoutes } from './routes/contacts.js';
+import { crmRoutes } from './routes/crm.js';
 import { dustRoutes } from './routes/dust-integration.js';
+import { filesRoutes } from './routes/files.js';
 import { healthRoute } from './routes/health.js';
+import { notesRoutes } from './routes/notes.js';
+import { odooRoutes } from './routes/odoo-integration.js';
 import { opportunityRoutes } from './routes/opportunities.js';
 import { reportsRoutes } from './routes/reports.js';
 import { tasksRoutes } from './routes/tasks.js';
@@ -77,7 +82,12 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(contactsRoutes, { prefix: '/api' });
   await server.register(tasksRoutes, { prefix: '/api' });
   await server.register(reportsRoutes, { prefix: '/api' });
+  await server.register(auditLogsRoutes, { prefix: '/api' });
+  await server.register(crmRoutes, { prefix: '/api' });
+  await server.register(notesRoutes, { prefix: '/api' });
+  await server.register(filesRoutes, { prefix: '/api' });
   await server.register(dustRoutes, { prefix: '/api/integrations' });
+  await server.register(odooRoutes, { prefix: '/api/integrations' });
   await server.register(webhooksRoutes); // mounted at /webhooks/*
 
   return server;

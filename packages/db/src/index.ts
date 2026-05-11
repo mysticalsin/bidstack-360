@@ -30,6 +30,19 @@ export type {
   ApiKey,
   WebhookSubscription,
   AuditLog,
+  Note,
+  FileAttachment,
+  CompanyEnrichment,
+  AiInsight,
+  DustRun,
+  DashboardWidget,
+  BidOpportunity,
+  RiskRegisterItem,
+  ComplianceCheck,
+  ProposalDocument,
+  ProviderHealth,
+  QueueHealth,
+  ReleaseScore,
 } from '../generated/client/index.js';
 
 // `Prisma` is exported as a value because we need its runtime classes

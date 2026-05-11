@@ -7,6 +7,12 @@
 **/playwright-report/**
 **/test-results/**
 **/.next/**
+**/.tmp/**
+**/.tmp-screens/**
+**/.audit-screens/**
+**/.codex/**
+**/.claude/**
+**/.conductor/**
 packages/db/generated/**
 packages/db/prisma/migrations/**
 packages/twenty-bidstack/**

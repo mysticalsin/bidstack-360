@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="t360-grad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2C4BFF"></stop>
+      <stop offset="1" stop-color="#1B2C7A"></stop>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#t360-grad)"></rect>
+  <text x="32" y="36" text-anchor="middle" font-family="Plus Jakarta Sans, Inter, sans-serif" font-weight="800" font-size="22" letter-spacing="-1" fill="#fff">T360</text>
+  <circle cx="48" cy="48" r="4" fill="#fff" opacity=".55"></circle>
+</svg>

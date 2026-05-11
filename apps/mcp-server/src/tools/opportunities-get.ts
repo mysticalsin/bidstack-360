@@ -7,12 +7,16 @@ import type { Tool } from './index.js';
 const Input = z
   .object({
     id: z.string().uuid().optional(),
-    code: z.string().regex(/^OP-\d{4}$/).optional(),
+    code: z
+      .string()
+      .regex(/^OP-\d{4}$/)
+      .optional(),
   })
   .refine((v) => v.id || v.code, { message: 'Provide either id or code' });
 
 export const opportunitiesGet: Tool<typeof Input> = {
-  description: 'Fetch one opportunity with full intel payload (financials, triggers, decision unit, competitors, news, hiring, win prediction).',
+  description:
+    'Fetch one opportunity with full intel payload (financials, triggers, decision unit, competitors, news, hiring, win prediction).',
   input: Input,
   inputJsonSchema: {
     type: 'object',

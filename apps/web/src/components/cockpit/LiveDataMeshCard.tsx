@@ -1,0 +1,165 @@
+import { Badge } from '@/components/ui/Badge';
+import { Card, SectionHeader } from '@/components/ui/Card';
+import { useOpenDataSignals } from '@/hooks/useOpenDataSignals';
+
+import type { AccountCockpitSnapshot, CrmConnector, OpenDataSignal } from '@bidstack/shared';
+
+import { tickerForCompany } from './_tokens';
+
+interface Props {
+  cockpit: AccountCockpitSnapshot;
+}
+
+export function LiveDataMeshCard({ cockpit }: Props) {
+  const ticker = tickerForCompany(cockpit.company.name);
+  const liveData = useOpenDataSignals({
+    query: cockpit.company.legalName ?? cockpit.company.name,
+    ticker,
+  });
+  const connectors = liveData.data?.connectors ?? [];
+  const visibleConnectors = connectors.length ? connectors : fallbackConnectors();
+  const signals = liveData.data?.signals ?? [];
+  const openConnectors = visibleConnectors.filter((c) => c.kind === 'open_api').length;
+  const enabledConnectors = visibleConnectors.filter((c) => c.status === 'healthy').length;
+
+  return (
+    <Card role="region" aria-label="Live data mesh">
+      <SectionHeader
+        title="Live Data Mesh"
+        caption="Verified APIs, widgets, and credentialed feeds"
+      />
+      <div className="data-mesh">
+        <div className="mesh-hero">
+          <div>
+            <div className="mesh-kicker">Real-time source posture</div>
+            <strong>
+              {enabledConnectors}/{visibleConnectors.length} online
+            </strong>
+          </div>
+          <div className="mesh-stat">
+            <span>{openConnectors}</span>
+            <small>open APIs</small>
+          </div>
+        </div>
+
+        <div className="mesh-connectors" aria-label="Connector status">
+          {visibleConnectors.slice(0, 6).map((connector) => (
+            <ConnectorPill key={connector.id} connector={connector} />
+          ))}
+        </div>
+
+        <div className="mesh-signals" aria-label="Live verified signals">
+          {liveData.isLoading ? (
+            <div className="mesh-empty">Checking live sources...</div>
+          ) : liveData.isError ? (
+            <div className="mesh-empty">
+              Connector registry loaded; live source check returned an error.
+            </div>
+          ) : signals.length === 0 ? (
+            <div className="mesh-empty">No public live signal returned for this account yet.</div>
+          ) : (
+            signals.slice(0, 3).map((signal) => <SignalRow key={signal.id} signal={signal} />)
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function ConnectorPill({ connector }: { connector: CrmConnector }) {
+  return (
+    <a
+      className="mesh-connector"
+      href={connector.docsUrl}
+      target="_blank"
+      rel="noreferrer"
+      aria-label={`${connector.name} is ${connector.status}`}
+      title={connector.message ?? connector.name}
+    >
+      <span className={`mesh-status status-${connector.status}`} aria-hidden />
+      <span>{connector.name}</span>
+    </a>
+  );
+}
+
+function SignalRow({ signal }: { signal: OpenDataSignal }) {
+  const attribution = signal.sourceAttribution[0];
+  const href = signal.url ?? attribution?.sourceUrl ?? undefined;
+  return (
+    <a
+      className="mesh-signal"
+      href={href}
+      target={href ? '_blank' : undefined}
+      rel={href ? 'noreferrer' : undefined}
+    >
+      <div>
+        <strong>{signal.title}</strong>
+        <span>{signal.summary}</span>
+      </div>
+      <Badge tone={signal.confidence >= 0.9 ? 'jade' : 'blue'}>
+        {Math.round(signal.confidence * 100)}%
+      </Badge>
+    </a>
+  );
+}
+
+// Connector fallbacks — used when the live /api/open-data endpoint returns
+// no rows (typically because the user hasn't credentialed Apollo/SAM yet).
+// Keeps the mesh visually populated with the open-data sources we publish.
+function fallbackConnectors(): CrmConnector[] {
+  const lastCheckedAt = new Date().toISOString();
+  return [
+    fallbackConnector('sec-edgar', 'SEC EDGAR', 'open_api', 'company', lastCheckedAt),
+    fallbackConnector('usaspending', 'USAspending', 'open_api', 'procurement', lastCheckedAt),
+    fallbackConnector(
+      'tradingview-widgets',
+      'TradingView',
+      'official_widget',
+      'market',
+      lastCheckedAt,
+    ),
+    fallbackConnector(
+      'apollo-organizations',
+      'Apollo',
+      'credentialed_api',
+      'people',
+      lastCheckedAt,
+    ),
+    fallbackConnector('sam-gov', 'SAM.gov', 'credentialed_api', 'procurement', lastCheckedAt),
+    fallbackConnector('brandfetch', 'Brandfetch', 'credentialed_api', 'logo', lastCheckedAt),
+  ];
+}
+
+function fallbackConnector(
+  id: string,
+  name: string,
+  kind: CrmConnector['kind'],
+  category: CrmConnector['category'],
+  lastCheckedAt: string,
+): CrmConnector {
+  const docsUrl = fallbackConnectorDocs(id);
+  return {
+    id,
+    name,
+    category,
+    kind,
+    status: kind === 'credentialed_api' ? 'disabled' : 'healthy',
+    requiresCredential: kind === 'credentialed_api',
+    sourceUrl: docsUrl,
+    docsUrl,
+    lastCheckedAt,
+    message: null,
+    capabilities: [],
+  };
+}
+
+function fallbackConnectorDocs(id: string): string {
+  if (id === 'sec-edgar')
+    return 'https://www.sec.gov/search-filings/edgar-application-programming-interfaces';
+  if (id === 'usaspending') return 'https://api.usaspending.gov/docs/';
+  if (id === 'tradingview-widgets') return 'https://www.tradingview.com/widget-docs/';
+  if (id === 'apollo-organizations')
+    return 'https://docs.apollo.io/reference/organization-enrichment';
+  if (id === 'sam-gov') return 'https://open.gsa.gov/api/get-opportunities-public-api/';
+  return 'https://docs.brandfetch.com/docs/logo-link';
+}

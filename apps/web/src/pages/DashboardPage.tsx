@@ -1,19 +1,72 @@
-import { Card, SectionHeader } from '@/components/ui/Card';
-import { Badge, stageTone } from '@/components/ui/Badge';
-import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
-import { Button } from '@/components/ui/Button';
+import { useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+
+import {
+  ActivityTimelineCard,
+  BusinessSnapshotCard,
+  KeyContactsCard,
+  KpiRow,
+  KpiSidebar,
+  LiveDataMeshCard,
+  OpenIssuesCard,
+  PageHead,
+  PipelineByStageCard,
+  RecentOpportunitiesCard,
+  TechStackCard,
+  UpsellFilesCard,
+} from '@/components/cockpit';
+import { FilesPanel } from '@/components/files/FilesPanel';
+import { Reveal } from '@/components/motion/Reveal';
+import { NotesPanel } from '@/components/notes/NotesPanel';
+import { DashboardSkeleton } from '@/components/skeletons/PageSkeletons';
+import { ErrorState } from '@/components/ui/StateMessages';
+import { useCrmDashboard } from '@/hooks/useCrmDashboard';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { useTasks } from '@/hooks/useTasks';
-import { formatMoney, formatStage, daysUntil } from '@/lib/format';
-import { useNavigate } from 'react-router-dom';
+import { daysUntil } from '@/lib/format';
+import { useAccountHistory } from '@/stores/accountHistory';
 
+// DashboardPage doubles as both the org-wide /dashboard view (no
+// accountId) and the per-customer /accounts/:accountId cockpit. The
+// useCrmDashboard hook switches its server query based on accountId, so
+// the cockpit snapshot in `dashboard.data.cockpit` is always pre-selected
+// for the right company — we only need to render the layout here.
 export function DashboardPage() {
-  const navigate = useNavigate();
+  const { accountId } = useParams<{ accountId?: string }>();
+  const dashboard = useCrmDashboard(accountId);
   const report = usePipelineReport();
   const opps = useOpportunities({ limit: 5 });
   const tasks = useTasks();
+  // Hooks must be called in the same order every render — including after
+  // any early returns below. The visit-tracker reads the resolved company
+  // name from the cockpit, but the cockpit isn't loaded yet on the first
+  // render, so we resolve the name *here* (before any conditional return)
+  // and let the effect itself guard on its presence.
+  const visit = useAccountHistory((s) => s.visit);
+  const visitName = dashboard.data?.cockpit.company.name ?? '';
+  useEffect(() => {
+    if (accountId && visitName) visit(accountId, visitName);
+  }, [accountId, visitName, visit]);
 
+  if (dashboard.isLoading) {
+    return <DashboardSkeleton />;
+  }
+  if (dashboard.isError || !dashboard.data) {
+    return (
+      <ErrorState
+        title="Couldn't load the CRM cockpit"
+        message={dashboard.error?.message ?? 'The CRM dashboard endpoint did not respond.'}
+      />
+    );
+  }
+
+  const snapshot = dashboard.data;
+  const cockpit = snapshot.cockpit;
+  const isAccountView = Boolean(accountId);
+
+  // Truly overdue (daysUntil < 0) only — matches the Sidebar badge so the two
+  // counts can't disagree. Tasks with no dueDate are excluded.
   const overdueCount =
     tasks.data?.items.filter((t) => {
       const d = daysUntil(t.dueDate);
@@ -21,144 +74,55 @@ export function DashboardPage() {
     }).length ?? 0;
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          A 360° view of your bid portfolio.
-        </p>
-      </header>
+    <>
+      <PageHead cockpit={cockpit} accountView={isAccountView} />
+      <KpiRow cockpit={cockpit} />
 
-      <section
-        aria-label="Key metrics"
-        className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
-      >
-        <KpiCard
-          label="Open opportunities"
-          value={report.data?.totalOpen.toString() ?? '—'}
-          loading={report.isLoading}
-        />
-        <KpiCard
-          label="Pipeline value"
-          value={report.data ? formatMoney(report.data.totalValueOpen, 'EUR') : '—'}
-          loading={report.isLoading}
-        />
-        <KpiCard
-          label="Weighted pipeline"
-          value={report.data ? formatMoney(report.data.weightedPipeline, 'EUR') : '—'}
-          loading={report.isLoading}
-        />
-        <KpiCard
-          label="Overdue tasks"
-          value={overdueCount.toString()}
-          tone={overdueCount > 0 ? 'tomato' : 'jade'}
-          loading={tasks.isLoading}
-        />
-      </section>
+      <section className="cockpit-grid" aria-label="Account cockpit">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+          <Reveal>
+            <BusinessSnapshotCard cockpit={cockpit} />
+          </Reveal>
 
-      <section className="grid gap-4 grid-cols-1 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <SectionHeader
-            title="Recent opportunities"
-            action={
-              <Button variant="secondary" size="sm" onClick={() => navigate('/opportunities')}>
-                View all
-              </Button>
-            }
-          />
-          {opps.isLoading ? (
-            <LoadingSkeleton />
-          ) : opps.isError ? (
-            <ErrorState
-              title="Couldn't load opportunities"
-              message={opps.error?.message ?? 'Unknown error'}
+          <Reveal delay={0.04}>
+            <div className="dash-row-3">
+              <OpenIssuesCard risks={cockpit.risks} compliance={cockpit.compliance} />
+              <TechStackCard cockpit={cockpit} />
+              <PipelineByStageCard report={report.data} />
+            </div>
+          </Reveal>
+
+          <Reveal delay={0.08}>
+            <RecentOpportunitiesCard opps={opps} />
+          </Reveal>
+
+          <Reveal delay={0.12}>
+            <ActivityTimelineCard cockpit={cockpit} />
+          </Reveal>
+        </div>
+
+        <aside className="cockpit-side" aria-label="Cockpit details">
+          <Reveal>
+            <KpiSidebar
+              snapshot={snapshot}
+              overdueCount={overdueCount}
+              tasksLoading={tasks.isLoading}
             />
-          ) : opps.data?.items.length === 0 ? (
-            <EmptyState title="No opportunities yet" />
-          ) : (
-            <ul className="divide-y divide-[var(--border-subtle)]">
-              {opps.data?.items.map((o) => (
-                <li
-                  key={o.id}
-                  className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-[var(--surface-sunken)] transition-colors"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs text-[var(--fg-tertiary)]">{o.code}</span>
-                      <Badge tone={stageTone(o.stage)}>{formatStage(o.stage)}</Badge>
-                    </div>
-                    <div className="mt-1 truncate text-sm font-medium text-[var(--fg-primary)]">
-                      {o.name}
-                    </div>
-                    <div className="text-xs text-[var(--fg-secondary)]">{o.customer}</div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-sm font-semibold text-[var(--fg-primary)] tabular-nums">
-                      {formatMoney(o.value, 'EUR')}
-                    </div>
-                    <div className="text-xs text-[var(--fg-tertiary)]">{o.probability}% likely</div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-
-        <Card>
-          <SectionHeader title="Pipeline by stage" />
-          <div className="p-5 space-y-3">
-            {report.data?.byStage.map((s) => (
-              <div key={s.stage} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Badge tone={stageTone(s.stage)}>{formatStage(s.stage)}</Badge>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-medium text-[var(--fg-primary)] tabular-nums">
-                    {s.count}
-                  </div>
-                  <div className="text-[10px] text-[var(--fg-tertiary)] tabular-nums">
-                    {formatMoney(s.valueSum, 'EUR')}
-                  </div>
-                </div>
-              </div>
-            ))}
-            {!report.data ? <LoadingSkeleton rows={6} /> : null}
-          </div>
-        </Card>
+          </Reveal>
+          <Reveal delay={0.04}>
+            <LiveDataMeshCard cockpit={cockpit} />
+          </Reveal>
+          <Reveal delay={0.08}>
+            <NotesPanel accountId={accountId} />
+          </Reveal>
+          <Reveal delay={0.12}>
+            {accountId ? <FilesPanel accountId={accountId} /> : <UpsellFilesCard />}
+          </Reveal>
+          <Reveal delay={0.16}>
+            <KeyContactsCard cockpit={cockpit} />
+          </Reveal>
+        </aside>
       </section>
-    </div>
-  );
-}
-
-function KpiCard({
-  label,
-  value,
-  tone = 'gray',
-  loading,
-}: {
-  label: string;
-  value: string;
-  tone?: 'gray' | 'tomato' | 'jade';
-  loading?: boolean;
-}) {
-  const valueColor =
-    tone === 'tomato'
-      ? 'text-[var(--danger)]'
-      : tone === 'jade'
-        ? 'text-[var(--success)]'
-        : 'text-[var(--fg-primary)]';
-  return (
-    <Card className="px-5 py-4">
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-        {label}
-      </div>
-      <div className={`mt-2 text-3xl font-bold tabular-nums ${valueColor}`}>
-        {loading ? (
-          <span className="inline-block h-7 w-20 rounded bg-[var(--surface-sunken)] animate-pulse" />
-        ) : (
-          value
-        )}
-      </div>
-    </Card>
+    </>
   );
 }

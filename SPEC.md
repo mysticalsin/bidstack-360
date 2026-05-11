@@ -16,6 +16,7 @@ BidStack 360° is a **bid & presales intelligence CRM** that augments standard o
 3. **Pipeline UX engineered for bid managers** — kanban that respects probability/value, decision-unit influence weighting, real-time data freshness ribbons, and a proposal composer that grounds output in the customer's intel + Mantu's reference library.
 
 The handoff package (delivered as `Open CRM (1).zip`) ships with:
+
 - A complete prototype frontend (React JSX, ~24 source files in `src/`)
 - An OpenAPI 3.1 contract (`handoff/openapi.yaml`)
 - A Postgres DDL (`handoff/db.schema.sql`)
@@ -57,23 +58,23 @@ BIDCRM/
 
 ### 2.2 Stack
 
-| Concern | Choice | Rationale |
-|---|---|---|
-| Runtime | Node 24 LTS | Already installed; Vercel Functions default |
-| Package manager | pnpm 10 workspaces | Already installed; superior monorepo perf |
-| Frontend framework | React 18 + Vite + TypeScript | Matches the prototype's JSX; no Next.js needed for an internal CRM |
-| Styling | Tailwind 4 + CSS variables | Prototype already uses tokens.css/styles.css; map them to Tailwind theme |
-| Component primitives | Radix UI + custom | A11y-first; matches Apple HIG spec |
-| Backend framework | Fastify 5 | Fast; first-class TypeScript; matches handoff prompt |
-| Validation | Zod | Generated from openapi.yaml |
-| ORM | Prisma 5 | Generates from db.schema.sql; type-safe |
-| Database | Postgres 16 | Per db.schema.sql |
-| Queue | BullMQ + Redis 7 | Per dust.integration.md |
-| Auth | Clerk (prod) / dev stub | Per .env.example; stub for local dev |
-| MCP SDK | `@modelcontextprotocol/sdk` ^1.0.0 | Per mcp.tools.md |
-| Logging | Pino + pino-pretty | Per handoff prompt |
-| Test runner | Vitest 2 | Faster than Jest; native ESM |
-| E2E | Playwright | Industry standard |
+| Concern              | Choice                             | Rationale                                                                |
+| -------------------- | ---------------------------------- | ------------------------------------------------------------------------ |
+| Runtime              | Node 24 LTS                        | Already installed; Vercel Functions default                              |
+| Package manager      | pnpm 10 workspaces                 | Already installed; superior monorepo perf                                |
+| Frontend framework   | React 18 + Vite + TypeScript       | Matches the prototype's JSX; no Next.js needed for an internal CRM       |
+| Styling              | Tailwind 4 + CSS variables         | Prototype already uses tokens.css/styles.css; map them to Tailwind theme |
+| Component primitives | Radix UI + custom                  | A11y-first; matches Apple HIG spec                                       |
+| Backend framework    | Fastify 5                          | Fast; first-class TypeScript; matches handoff prompt                     |
+| Validation           | Zod                                | Generated from openapi.yaml                                              |
+| ORM                  | Prisma 5                           | Generates from db.schema.sql; type-safe                                  |
+| Database             | Postgres 16                        | Per db.schema.sql                                                        |
+| Queue                | BullMQ + Redis 7                   | Per dust.integration.md                                                  |
+| Auth                 | Clerk (prod) / dev stub            | Per .env.example; stub for local dev                                     |
+| MCP SDK              | `@modelcontextprotocol/sdk` ^1.0.0 | Per mcp.tools.md                                                         |
+| Logging              | Pino + pino-pretty                 | Per handoff prompt                                                       |
+| Test runner          | Vitest 2                           | Faster than Jest; native ESM                                             |
+| E2E                  | Playwright                         | Industry standard                                                        |
 
 ### 2.3 Quality bars (non-negotiable)
 
@@ -91,18 +92,18 @@ BIDCRM/
 
 Source of truth: `handoff/db.schema.sql`. Prisma generates from this.
 
-| Table | Purpose | Notes |
-|---|---|---|
-| `orgs` | Tenant root | `clerk_org` UNIQUE |
-| `users` | Per-org users | scoped by `org_id` |
-| `opportunities` | Bids/deals | `intel jsonb` carries the 360° payload |
-| `contacts` | Decision-unit members | `influence` 1-5, `sentiment` enum |
-| `tasks` | Follow-ups | linked to `opp_id` |
-| `documents` | RFPs, proposals, refs | `kind` enum, optional `dust_doc_id` |
-| `sync_events` | Dust webhook + poll log | for the integration timeline UI |
-| `api_keys` | MCP / REST keys | `hashed_key`, `scopes[]` |
-| `webhook_subscriptions` | Outbound webhooks | with `secret` for HMAC |
-| `audit_log` | All mutations | for compliance + the audit log UI |
+| Table                   | Purpose                 | Notes                                  |
+| ----------------------- | ----------------------- | -------------------------------------- |
+| `orgs`                  | Tenant root             | `clerk_org` UNIQUE                     |
+| `users`                 | Per-org users           | scoped by `org_id`                     |
+| `opportunities`         | Bids/deals              | `intel jsonb` carries the 360° payload |
+| `contacts`              | Decision-unit members   | `influence` 1-5, `sentiment` enum      |
+| `tasks`                 | Follow-ups              | linked to `opp_id`                     |
+| `documents`             | RFPs, proposals, refs   | `kind` enum, optional `dust_doc_id`    |
+| `sync_events`           | Dust webhook + poll log | for the integration timeline UI        |
+| `api_keys`              | MCP / REST keys         | `hashed_key`, `scopes[]`               |
+| `webhook_subscriptions` | Outbound webhooks       | with `secret` for HMAC                 |
+| `audit_log`             | All mutations           | for compliance + the audit log UI      |
 
 **Multi-tenancy:** every query MUST be scoped by `org_id` via Clerk middleware. Org-scoping is a Sprint 4 unit-test requirement.
 
@@ -129,6 +130,11 @@ GET    /api/integrations/api-keys      List API keys
 POST   /api/integrations/api-keys      Mint key
 DELETE /api/integrations/api-keys/:id  Revoke
 GET    /api/integrations/webhooks      Recent events
+
+GET    /api/integrations/odoo/status   Odoo MCP sidecar status
+GET    /api/integrations/odoo/models   List Odoo models (proxies MCP list_models)
+POST   /api/integrations/odoo/search   search_records over MCP
+GET    /api/integrations/odoo/:model/:id  get_record over MCP
 
 POST   /webhooks/dust                  Dust webhook receiver (HMAC verified)
 ```
@@ -162,20 +168,37 @@ Source of truth: `handoff/dust.integration.md`. Three integration modes:
 
 ---
 
+## 6b. Odoo MCP integration
+
+BidStack acts as an **MCP client** of [ivnvxd/mcp-server-odoo](https://github.com/ivnvxd/mcp-server-odoo) — a Python MCP server that wraps Odoo's XML-RPC API. The sidecar runs in `docker-compose.yml` under the `odoo` profile; `apps/api` reaches it over MCP streamable-http via `@bidstack/odoo-mcp-client` and surfaces it on the Integrations page.
+
+Detailed setup, env vars, and operational notes: `docs/ODOO.md`.
+
+**Surface (v0.1, read-only over HTTP):**
+
+- `GET /api/integrations/odoo/status` — sidecar connection probe + tool count
+- `GET /api/integrations/odoo/models` — proxies MCP `list_models`
+- `POST /api/integrations/odoo/search` — proxies MCP `search_records`
+- `GET /api/integrations/odoo/:model/:id` — proxies MCP `get_record`
+
+The client wrapper also exposes `createRecord`, `updateRecord`, `deleteRecord`, `aggregateRecords`, `postMessage`, and `callModelMethod` for internal callers (workers, jobs, future Apollo-style enrichment from Odoo partners). Method calls are off by default at the sidecar — set `ODOO_MCP_ENABLE_METHOD_CALLS=true` to allow them.
+
+---
+
 ## 7. UI/UX scope (per prototype)
 
 The prototype defines:
 
-| Surface | Components |
-|---|---|
-| **Dashboard** | KPI strip (4 cards), pipeline chart, recent activity, intelligence ribbon |
-| **Pipeline (Kanban)** | 6 columns (discovery → closed_lost), drag to advance stage |
-| **Opportunity 360°** | Header (logo, name, stage, value), Intel ribbon, Financial Health card, Triggers list, Decision Unit panel, Win Prediction gauge, Competitor Radar, Account Brief, Tasks, Documents, Timeline, Dust sidebar |
-| **Contacts** | Searchable list, decision-unit graph |
-| **Tasks** | List + kanban by status |
-| **Reports** | Pipeline KPIs, win/loss, velocity |
-| **Integrations** | MCP status, Dust connection, API keys, webhooks |
-| **Settings** | Team, profile, theme tweaks |
+| Surface               | Components                                                                                                                                                                                                  |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Dashboard**         | KPI strip (4 cards), pipeline chart, recent activity, intelligence ribbon                                                                                                                                   |
+| **Pipeline (Kanban)** | 6 columns (discovery → closed_lost), drag to advance stage                                                                                                                                                  |
+| **Opportunity 360°**  | Header (logo, name, stage, value), Intel ribbon, Financial Health card, Triggers list, Decision Unit panel, Win Prediction gauge, Competitor Radar, Account Brief, Tasks, Documents, Timeline, Dust sidebar |
+| **Contacts**          | Searchable list, decision-unit graph                                                                                                                                                                        |
+| **Tasks**             | List + kanban by status                                                                                                                                                                                     |
+| **Reports**           | Pipeline KPIs, win/loss, velocity                                                                                                                                                                           |
+| **Integrations**      | MCP status, Dust connection, API keys, webhooks                                                                                                                                                             |
+| **Settings**          | Team, profile, theme tweaks                                                                                                                                                                                 |
 
 **Design tokens** carry over from the prototype's `src/tokens.css` (colors, spacing, motion, shadows). They are consolidated into Tailwind's theme + CSS variables for runtime dark-mode toggle.
 
@@ -183,17 +206,17 @@ The prototype defines:
 
 ## 8. Sprint plan
 
-| Sprint | Goal | Verify |
-|---|---|---|
-| **0** Foundation | SPEC, CLAUDE.md, .claude/, MISTAKES.md, PROGRESS.md | Files exist, hooks executable |
-| **1** Skeleton | Monorepo, pnpm workspaces, root configs, .env.example | `pnpm install` succeeds |
-| **2** Database | Prisma schema, migrations, seed from prototype `data.js` | `pnpm db:migrate && pnpm db:seed` succeeds |
-| **3** Web app | Vite + React + Tailwind + design tokens; ports prototype JSX; dark mode | `pnpm dev:web` boots; Lighthouse ≥ 90 perf, ≥ 95 a11y |
-| **4** API server | Fastify routes for every openapi.yaml path; org-scoped; Zod validation | `pnpm dev:api` boots; `curl /api/opportunities` returns 200 with seed data; vitest green |
-| **5** Dust + worker | dust-client package; BullMQ poll worker; `/webhooks/dust` HMAC | Mock Dust webhook produces a `sync_events` row |
-| **6** MCP server | 6 tools registered; rate-limited; per-key org scoping | MCP inspector shows 6 tools; rate limit returns 429 |
-| **7** Twenty overlay preserved | `packages/twenty-bidstack/` mirrors handoff verbatim | Files match handoff zip byte-for-byte |
-| **8** Quality gates | typecheck, lint, vitest, axe, README + ARCHITECTURE | All gates green; quality score ≥ 95/100 |
+| Sprint                         | Goal                                                                    | Verify                                                                                   |
+| ------------------------------ | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| **0** Foundation               | SPEC, CLAUDE.md, .claude/, MISTAKES.md, PROGRESS.md                     | Files exist, hooks executable                                                            |
+| **1** Skeleton                 | Monorepo, pnpm workspaces, root configs, .env.example                   | `pnpm install` succeeds                                                                  |
+| **2** Database                 | Prisma schema, migrations, seed from prototype `data.js`                | `pnpm db:migrate && pnpm db:seed` succeeds                                               |
+| **3** Web app                  | Vite + React + Tailwind + design tokens; ports prototype JSX; dark mode | `pnpm dev:web` boots; Lighthouse ≥ 90 perf, ≥ 95 a11y                                    |
+| **4** API server               | Fastify routes for every openapi.yaml path; org-scoped; Zod validation  | `pnpm dev:api` boots; `curl /api/opportunities` returns 200 with seed data; vitest green |
+| **5** Dust + worker            | dust-client package; BullMQ poll worker; `/webhooks/dust` HMAC          | Mock Dust webhook produces a `sync_events` row                                           |
+| **6** MCP server               | 6 tools registered; rate-limited; per-key org scoping                   | MCP inspector shows 6 tools; rate limit returns 429                                      |
+| **7** Twenty overlay preserved | `packages/twenty-bidstack/` mirrors handoff verbatim                    | Files match handoff zip byte-for-byte                                                    |
+| **8** Quality gates            | typecheck, lint, vitest, axe, README + ARCHITECTURE                     | All gates green; quality score ≥ 95/100                                                  |
 
 Each sprint ends with a **gate** (Tony's architect-protocol.md): commit, test, push, await approval before next sprint.
 

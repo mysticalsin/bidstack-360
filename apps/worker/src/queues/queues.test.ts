@@ -1,3 +1,5 @@
+import { Socket } from 'node:net';
+
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { type Queue, type Worker } from 'bullmq';
 import IORedis from 'ioredis';
@@ -8,12 +10,7 @@ import { startWebhookProcessor } from './webhook-processor.js';
 
 const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6380';
 
-let connection: IORedis;
-try {
-  connection = new IORedis(redisUrl, { maxRetriesPerRequest: null });
-} catch {
-  // handled in beforeAll
-}
+let connection: IORedis | null = null;
 
 const log = pino({ level: 'silent' });
 
@@ -23,11 +20,29 @@ describe('Worker queues', () => {
   let redisUp = false;
 
   beforeAll(async () => {
+    if (!process.env.DATABASE_URL) {
+      redisUp = false;
+      return;
+    }
+
+    if (!(await canReachRedis(redisUrl))) {
+      redisUp = false;
+      return;
+    }
+
+    connection = new IORedis(redisUrl, {
+      maxRetriesPerRequest: null,
+      lazyConnect: true,
+    });
+    connection.on('error', () => undefined);
+
     try {
+      await connection.connect();
       await connection.ping();
       redisUp = true;
     } catch {
       redisUp = false;
+      connection.disconnect();
       return;
     }
     await startDustPoller(connection, log, workers, queues);
@@ -35,9 +50,9 @@ describe('Worker queues', () => {
   });
 
   afterAll(async () => {
-    await Promise.all(workers.map((w) => w.close()));
-    await Promise.all(queues.map((q) => q.close()));
-    await connection.quit().catch(() => {});
+    await Promise.all(workers.map((w) => w.close().catch(() => undefined)));
+    await Promise.all(queues.map((q) => q.close().catch(() => undefined)));
+    connection?.disconnect();
   });
 
   it('creates dust-poll queue with repeat config', async () => {
@@ -65,3 +80,26 @@ describe('Worker queues', () => {
     }
   });
 });
+
+function canReachRedis(url: string): Promise<boolean> {
+  const parsed = new URL(url);
+  const host = parsed.hostname || 'localhost';
+  const port = Number(parsed.port || 6379);
+
+  return new Promise((resolve) => {
+    const socket = new Socket();
+    let settled = false;
+    const settle = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(value);
+    };
+
+    socket.setTimeout(500);
+    socket.once('connect', () => settle(true));
+    socket.once('timeout', () => settle(false));
+    socket.once('error', () => settle(false));
+    socket.connect(port, host);
+  });
+}

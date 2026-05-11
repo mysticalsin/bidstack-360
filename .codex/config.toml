@@ -1,0 +1,6 @@
+[shell_environment_policy]
+inherit = "core"
+
+[shell_environment_policy.set]
+BIDCRM_TOKEN_BUDGET_PER_SESSION = "100000"
+BIDCRM_TOKEN_BUDGET_PER_TASK = "15000"

@@ -1,6 +1,6 @@
 # MCP server — implementation notes
 
-> Companion to `handoff/mcp.tools.md`. This file documents *how* the server is built and how to test it locally.
+> Companion to `handoff/mcp.tools.md`. This file documents _how_ the server is built and how to test it locally.
 
 ## Transport
 
@@ -12,16 +12,17 @@ JSON-RPC 2.0 over plain HTTP. The MCP spec also allows SSE; we omit the SSE leg 
 
 ## Tools
 
-| Tool | Source file |
-|---|---|
-| `opportunities.list`  | [`apps/mcp-server/src/tools/opportunities-list.ts`](../apps/mcp-server/src/tools/opportunities-list.ts) |
-| `opportunities.get`   | [`apps/mcp-server/src/tools/opportunities-get.ts`](../apps/mcp-server/src/tools/opportunities-get.ts) |
-| `opportunity.update`  | [`apps/mcp-server/src/tools/opportunity-update.ts`](../apps/mcp-server/src/tools/opportunity-update.ts) |
-| `contacts.list`       | [`apps/mcp-server/src/tools/contacts-list.ts`](../apps/mcp-server/src/tools/contacts-list.ts) |
-| `tasks.create`        | [`apps/mcp-server/src/tools/tasks-create.ts`](../apps/mcp-server/src/tools/tasks-create.ts) |
-| `proposal.draft`      | [`apps/mcp-server/src/tools/proposal-draft.ts`](../apps/mcp-server/src/tools/proposal-draft.ts) |
+| Tool                 | Source file                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------- |
+| `opportunities.list` | [`apps/mcp-server/src/tools/opportunities-list.ts`](../apps/mcp-server/src/tools/opportunities-list.ts) |
+| `opportunities.get`  | [`apps/mcp-server/src/tools/opportunities-get.ts`](../apps/mcp-server/src/tools/opportunities-get.ts)   |
+| `opportunity.update` | [`apps/mcp-server/src/tools/opportunity-update.ts`](../apps/mcp-server/src/tools/opportunity-update.ts) |
+| `contacts.list`      | [`apps/mcp-server/src/tools/contacts-list.ts`](../apps/mcp-server/src/tools/contacts-list.ts)           |
+| `tasks.create`       | [`apps/mcp-server/src/tools/tasks-create.ts`](../apps/mcp-server/src/tools/tasks-create.ts)             |
+| `proposal.draft`     | [`apps/mcp-server/src/tools/proposal-draft.ts`](../apps/mcp-server/src/tools/proposal-draft.ts)         |
 
 Each tool exports a `Tool` object with:
+
 - `description` — surfaced in `tools/list`
 - `input` — Zod schema for runtime validation
 - `inputJsonSchema` — JSON Schema mirror for Dust's tool-discovery UI

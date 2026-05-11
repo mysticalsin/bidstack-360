@@ -17,7 +17,13 @@ import { describe, expect, it } from 'vitest';
 
 import { INDUSTRIES, OpportunityStage, Sentiment, TaskStatus } from '@bidstack/shared';
 
-import { fixtureContacts, fixtureOpps, fixtureTasks, fixtureUsers } from './seed-data.js';
+import {
+  fixtureCompanyEnrichments,
+  fixtureContacts,
+  fixtureOpps,
+  fixtureTasks,
+  fixtureUsers,
+} from './seed-data.js';
 
 describe('seed-data ↔ shared schema drift guard', () => {
   it('every fixtureOpp.industry appears in INDUSTRIES (UI dropdown source of truth)', () => {
@@ -66,5 +72,13 @@ describe('seed-data ↔ shared schema drift guard', () => {
     for (const u of fixtureUsers) {
       expect(emailRe.test(u.email), `fixture user "${u.name}" has bad email ${u.email}`).toBe(true);
     }
+  });
+
+  it('keeps the canonical Mantu enrichment and official logo source seeded', () => {
+    const mantu = fixtureCompanyEnrichments.find((company) => company.normalizedName === 'mantu');
+    expect(mantu?.website).toBe('https://mantu.com/');
+    expect(mantu?.logoUrl).toBe('https://mantu.com/favicon.ico');
+    expect(mantu?.logoSource).toBe('official_website');
+    expect(mantu?.confidenceBps).toBe(9900);
   });
 });

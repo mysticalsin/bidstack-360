@@ -68,10 +68,9 @@ function DecisionUnitPanel({
   const contacts = useQuery({
     queryKey: ['contacts', customer],
     queryFn: ({ signal }) =>
-      api<{ items: Contact[] }>(
-        `/api/contacts?customer=${encodeURIComponent(customer)}&limit=50`,
-        { signal },
-      ),
+      api<{ items: Contact[] }>(`/api/contacts?customer=${encodeURIComponent(customer)}&limit=50`, {
+        signal,
+      }),
   });
 
   type Row = {
@@ -116,7 +115,12 @@ function DecisionUnitPanel({
 
   if (contacts.isLoading) return <LoadingSkeleton />;
   if (rows.length === 0)
-    return <EmptyState title="No decision-unit members yet" message="Add a contact from the Contacts page or sync from Dust." />;
+    return (
+      <EmptyState
+        title="No decision-unit members yet"
+        message="Add a contact from the Contacts page or sync from Dust."
+      />
+    );
 
   return (
     <Card>
@@ -169,7 +173,9 @@ function TasksPanel({ oppId }: { oppId: string }) {
   if (all.isLoading) return <LoadingSkeleton />;
   const tasks = all.data?.items.filter((t) => t.oppId === oppId) ?? [];
   if (tasks.length === 0)
-    return <EmptyState title="No tasks yet" message="Create a follow-up to keep this bid moving." />;
+    return (
+      <EmptyState title="No tasks yet" message="Create a follow-up to keep this bid moving." />
+    );
   return (
     <Card>
       <SectionHeader title="Tasks" caption={`${tasks.length} active`} />
@@ -209,7 +215,9 @@ function DocumentsPanel({
   documents: NonNullable<OpportunityTabsProps['documents']>;
 }) {
   if (documents.length === 0)
-    return <EmptyState title="No documents attached" message="Upload an RFP, SoW, or proposal draft." />;
+    return (
+      <EmptyState title="No documents attached" message="Upload an RFP, SoW, or proposal draft." />
+    );
   return (
     <Card>
       <SectionHeader title="Documents" caption={`${documents.length} files`} />
@@ -217,9 +225,7 @@ function DocumentsPanel({
         {documents.map((d) => (
           <li key={d.id} className="flex items-center justify-between gap-3 px-5 py-3">
             <div className="min-w-0">
-              <div className="text-sm font-medium text-[var(--fg-primary)] truncate">
-                {d.name}
-              </div>
+              <div className="text-sm font-medium text-[var(--fg-primary)] truncate">{d.name}</div>
               <div className="text-xs text-[var(--fg-tertiary)]">
                 {d.kind} · {d.bytes ? `${(d.bytes / 1024).toFixed(1)} KB` : 'unknown size'}
               </div>
@@ -232,11 +238,7 @@ function DocumentsPanel({
   );
 }
 
-function ActivityPanel({
-  timeline,
-}: {
-  timeline: NonNullable<OpportunityTabsProps['timeline']>;
-}) {
+function ActivityPanel({ timeline }: { timeline: NonNullable<OpportunityTabsProps['timeline']> }) {
   if (timeline.length === 0)
     return (
       <EmptyState

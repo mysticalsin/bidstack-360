@@ -1,11 +1,7 @@
 // Fixtures distilled from the prototype's `src/data.js`.
 // Stage names are normalized to the canonical enum.
 
-import {
-  OpportunityStage,
-  Sentiment,
-  TaskStatus,
-} from '../generated/client/index.js';
+import { OpportunityStage, Sentiment, TaskStatus } from '../generated/client/index.js';
 
 export interface FixtureUser {
   initials: string;
@@ -17,7 +13,12 @@ export interface FixtureUser {
 export const fixtureUsers: FixtureUser[] = [
   { initials: 'JS', name: 'Jane Smith', email: 'jane.smith@mantu.com', role: 'admin' },
   { initials: 'MT', name: 'Mark Thompson', email: 'mark.thompson@mantu.com', role: 'bid_manager' },
-  { initials: 'SB', name: 'Sarah Bennett', email: 'sarah.bennett@mantu.com', role: 'solution_arch' },
+  {
+    initials: 'SB',
+    name: 'Sarah Bennett',
+    email: 'sarah.bennett@mantu.com',
+    role: 'solution_arch',
+  },
   { initials: 'DL', name: 'David Lee', email: 'david.lee@mantu.com', role: 'solution_arch' },
   { initials: 'MJ', name: 'Mike Johnson', email: 'mike.johnson@mantu.com', role: 'account_exec' },
   { initials: 'RH', name: 'Riya Hassan', email: 'riya.hassan@mantu.com', role: 'account_exec' },
@@ -133,6 +134,100 @@ export const fixtureOpps: FixtureOpp[] = [
     ownerInitials: 'JS',
     industry: 'financial_services',
     logoUrl: null,
+  },
+];
+
+export interface FixtureCompanyEnrichment {
+  normalizedName: string;
+  legalName: string;
+  tradeName: string | null;
+  domain: string | null;
+  website: string | null;
+  logoUrl: string | null;
+  logoSource: string | null;
+  status: string | null;
+  employeeCount: number | null;
+  annualRevenueMicros: bigint | null;
+  confidenceBps: number;
+  sourceAttribution: Record<string, unknown>[];
+  providerMetadata: Record<string, unknown>;
+}
+
+export const fixtureCompanyEnrichments: FixtureCompanyEnrichment[] = [
+  {
+    normalizedName: 'mantu',
+    legalName: 'Mantu',
+    tradeName: 'Mantu',
+    domain: 'mantu.com',
+    website: 'https://mantu.com/',
+    logoUrl: 'https://mantu.com/favicon.ico',
+    logoSource: 'official_website',
+    status: 'active',
+    employeeCount: 12_000,
+    annualRevenueMicros: 1_000_000_000_000_000n,
+    confidenceBps: 9900,
+    sourceAttribution: [
+      {
+        source: 'official_website',
+        label: 'Mantu official website',
+        sourceUrl: 'https://mantu.com/',
+        fetchedAt: '2026-05-11T00:00:00.000Z',
+        confidence: 0.99,
+        providerMetadata: {
+          description:
+            'Independent global consulting group delivering technology, talent, creative intelligence, and leadership advisory services.',
+        },
+      },
+    ],
+    providerMetadata: { country: 'FR', verified: true },
+  },
+  {
+    normalizedName: 'ci-financial',
+    legalName: 'CI Financial Corp.',
+    tradeName: 'CI Financial',
+    domain: 'ci.com',
+    website: 'https://www.ci.com/',
+    logoUrl: 'https://www.ci.com/favicon.ico',
+    logoSource: 'favicon',
+    status: 'active',
+    employeeCount: 2500,
+    annualRevenueMicros: 1_200_000_000_000_000n,
+    confidenceBps: 8700,
+    sourceAttribution: [
+      {
+        source: 'seed_verified_profile',
+        label: 'BidStack seed profile',
+        sourceUrl: 'https://www.ci.com/',
+        fetchedAt: '2026-05-11T00:00:00.000Z',
+        confidence: 0.87,
+        providerMetadata: { country: 'CA', industry: 'financial_services' },
+      },
+    ],
+    providerMetadata: { country: 'CA' },
+  },
+  {
+    normalizedName: 'rush-university-system-for-health',
+    legalName: 'Rush University System for Health',
+    tradeName: 'Rush University System for Health',
+    domain: 'rush.edu',
+    website: 'https://www.rush.edu/',
+    logoUrl: 'https://www.rush.edu/favicon.ico',
+    logoSource: 'favicon',
+    status: 'active',
+    employeeCount: 14_000,
+    annualRevenueMicros: null,
+    confidenceBps: 8200,
+    sourceAttribution: [
+      {
+        source: 'seed_verified_profile',
+        label: 'BidStack seed profile',
+        sourceUrl: 'https://www.rush.edu/',
+        fetchedAt: '2026-05-11T00:00:00.000Z',
+        confidence: 0.82,
+        providerMetadata: { country: 'US', industry: 'healthcare' },
+      },
+    ],
+    providerMetadata: { country: 'US' },
   },
 ];
 

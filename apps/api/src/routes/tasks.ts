@@ -2,7 +2,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
-import { Task, TaskCreate, TaskStatus } from '@bidstack/shared';
+import { Task, TaskCreate, TaskPatch, TaskStatus } from '@bidstack/shared';
 
 export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
@@ -77,6 +77,73 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
         assignee: created.assignee?.email ?? null,
         createdAt: created.createdAt.toISOString(),
       });
+    },
+  );
+
+  server.patch(
+    '/tasks/:id',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        body: TaskPatch,
+        response: { 200: Task },
+      },
+    },
+    async (req) => {
+      // Two-step find-then-update enforces multi-tenancy (Prisma's `update`
+      // only matches a unique key; we need orgId in the filter too).
+      const existing = await prisma.task.findFirst({
+        where: { id: req.params.id, orgId: req.auth.orgId },
+        select: { id: true },
+      });
+      if (!existing) throw server.httpErrors.notFound('Task not found');
+
+      // Resolve assignee email -> userId in the same org (or unset if null).
+      let assigneeId: string | null | undefined;
+      if (req.body.assignee !== undefined) {
+        if (req.body.assignee === null) {
+          assigneeId = null;
+        } else {
+          const user = await prisma.user.findFirst({
+            where: { orgId: req.auth.orgId, email: req.body.assignee },
+            select: { id: true },
+          });
+          if (!user) throw server.httpErrors.badRequest('Assignee not found in this org');
+          assigneeId = user.id;
+        }
+      }
+
+      const updated = await prisma.task.update({
+        where: { id: existing.id },
+        data: {
+          ...(req.body.title !== undefined ? { title: req.body.title } : {}),
+          ...(req.body.dueDate !== undefined
+            ? { dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null }
+            : {}),
+          ...(req.body.status !== undefined ? { status: req.body.status } : {}),
+          ...(assigneeId !== undefined ? { assigneeId } : {}),
+        },
+        include: { assignee: true },
+      });
+      await prisma.auditLog.create({
+        data: {
+          orgId: req.auth.orgId,
+          userId: req.auth.userId,
+          action: 'task.update',
+          targetType: 'task',
+          targetId: updated.id,
+          diff: req.body as object,
+        },
+      });
+      return {
+        id: updated.id,
+        oppId: updated.oppId,
+        title: updated.title,
+        dueDate: updated.dueDate ? updated.dueDate.toISOString().slice(0, 10) : null,
+        status: updated.status,
+        assignee: updated.assignee?.email ?? null,
+        createdAt: updated.createdAt.toISOString(),
+      };
     },
   );
 };

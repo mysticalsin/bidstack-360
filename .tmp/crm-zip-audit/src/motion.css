@@ -1,0 +1,85 @@
+/* Motion polish — micro-animations from modern component libraries */
+
+/* Card entrance */
+@keyframes card-rise { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: none; } }
+.card { animation: card-rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.intel-grid-a > *:nth-child(1) { animation-delay: 0.05s; }
+.intel-grid-a > *:nth-child(2) { animation-delay: 0.10s; }
+.intel-grid-b > *:nth-child(1) { animation-delay: 0.15s; }
+.intel-grid-b > *:nth-child(2) { animation-delay: 0.20s; }
+.intel-grid-c > *:nth-child(1) { animation-delay: 0.25s; }
+.intel-grid-c > *:nth-child(2) { animation-delay: 0.30s; }
+.intel-grid-c > *:nth-child(3) { animation-delay: 0.35s; }
+
+/* Sparkline draw-in */
+@keyframes spark-draw { from { stroke-dasharray: 0 600; } to { stroke-dasharray: 600 0; } }
+.spark path[stroke] { stroke-dasharray: 600 0; animation: spark-draw 1.4s cubic-bezier(0.4, 0, 0.2, 1) both; }
+
+/* Donut sweep */
+@keyframes donut-sweep { from { stroke-dashoffset: 100; opacity: 0; } to { opacity: 1; } }
+
+/* Trigger row stagger */
+.trigger { animation: card-rise 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.triggers li:nth-child(1) { animation-delay: 0.10s; }
+.triggers li:nth-child(2) { animation-delay: 0.16s; }
+.triggers li:nth-child(3) { animation-delay: 0.22s; }
+.triggers li:nth-child(4) { animation-delay: 0.28s; }
+.triggers li:nth-child(5) { animation-delay: 0.34s; }
+.tw-fill { transform-origin: left; animation: bar-grow 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: 0.4s; }
+@keyframes bar-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* Win bars */
+.win-bar { animation: bar-grow 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; transform-origin: left; }
+.win-row:nth-child(2) .win-bar { animation-delay: 0.20s; }
+.win-row:nth-child(3) .win-bar { animation-delay: 0.26s; }
+.win-row:nth-child(4) .win-bar { animation-delay: 0.32s; }
+.win-row:nth-child(5) .win-bar { animation-delay: 0.38s; }
+.win-row:nth-child(6) .win-bar { animation-delay: 0.44s; }
+.win-row:nth-child(7) .win-bar { animation-delay: 0.50s; }
+
+/* Radar polygons fade in */
+.radar polygon[fill]:not([fill="none"]) { animation: card-rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: 0.3s; }
+
+/* DU influence bar */
+.du-fill { animation: bar-grow 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; transform-origin: left; animation-delay: 0.3s; }
+.du-row { animation: card-rise 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.du-list .du-row:nth-child(1) { animation-delay: 0.10s; }
+.du-list .du-row:nth-child(2) { animation-delay: 0.16s; }
+.du-list .du-row:nth-child(3) { animation-delay: 0.22s; }
+.du-list .du-row:nth-child(4) { animation-delay: 0.28s; }
+.du-list .du-row:nth-child(5) { animation-delay: 0.34s; }
+
+/* News stagger */
+.newsfeed li { animation: card-rise 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.newsfeed li:nth-child(1) { animation-delay: 0.10s; }
+.newsfeed li:nth-child(2) { animation-delay: 0.16s; }
+.newsfeed li:nth-child(3) { animation-delay: 0.22s; }
+.newsfeed li:nth-child(4) { animation-delay: 0.28s; }
+
+/* Brief lines fade in sequentially after generation */
+.brief-line { animation: brief-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes brief-in { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+.brief-text .brief-line:nth-child(1) { animation-delay: 0.05s; }
+.brief-text .brief-line:nth-child(2) { animation-delay: 0.18s; }
+.brief-text .brief-line:nth-child(3) { animation-delay: 0.31s; }
+.brief-text .brief-line:nth-child(4) { animation-delay: 0.44s; }
+.brief-text .brief-line:nth-child(5) { animation-delay: 0.57s; }
+
+/* Hover lifts (21st.dev style) */
+.kpi { transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.18s; }
+.kpi:hover { transform: translateY(-2px); box-shadow: 0 8px 24px -10px rgba(0,0,0,0.18); }
+.trigger { transition: background 0.18s, transform 0.18s; }
+.trigger:hover { background: var(--brand-primary-tint); transform: translateX(2px); }
+.newsfeed li { transition: border-left-color 0.2s, transform 0.18s; }
+.newsfeed li:hover { transform: translateX(2px); border-left-color: var(--brand-primary); }
+.comp-row { transition: background 0.15s, transform 0.15s; }
+.comp-row:hover { transform: translateX(2px); }
+.dr-src { transition: transform 0.18s, box-shadow 0.18s; }
+.dr-src:hover { transform: translateY(-1px); box-shadow: 0 4px 10px -6px rgba(0,0,0,0.18); }
+
+/* Brief button shimmer when ready */
+.btn-primary:not(:disabled):hover { background: color-mix(in srgb, var(--brand-primary) 90%, white); }
+
+/* Logo subtle entrance */
+.company-logo { transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.company-logo:hover { transform: scale(1.06) rotate(-2deg); }

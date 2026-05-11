@@ -54,6 +54,13 @@ CLAUDE.local.md
 # Prisma generated client (regenerate on install)
 packages/db/generated/
 
+# Local file storage (apps/api writes uploaded attachments here when
+# STORAGE_DRIVER=local). Production runs use S3 — these bytes should
+# never enter git, full stop.
+apps/api/.uploads/
+apps/api/.uploads/**
+.uploads/
+
 # Vercel
 .vercel/
 

@@ -47,24 +47,49 @@ export default defineConfig(({ mode }) => {
     build: {
       sourcemap: process.env.NODE_ENV === 'development',
       target: 'es2022',
-      // react-dom 18 production minified is ~145 KB; use 200 KB so we get warned
-      // about app code creep but not about React itself.
-      chunkSizeWarningLimit: 200,
+      // React DOM is the largest legitimate vendor chunk in this app. Keep the
+      // limit tight enough to catch app-code creep without warning on framework
+      // bytes we intentionally isolate below.
+      chunkSizeWarningLimit: 300,
+      // Why both: gzip is what cloudflare/vercel/cloudfront serve today;
+      // brotli is what nginx-front-of-S3 and the visitor's modern browser
+      // can negotiate when configured. Surfacing both numbers in the build
+      // log lets us optimize for the smaller of the two without guessing.
+      reportCompressedSize: true,
       rollupOptions: {
         output: {
           manualChunks(id) {
-            if (!id.includes('node_modules')) return undefined;
-            if (id.includes('/react-router')) return 'router';
-            if (id.includes('/@tanstack/')) return 'tanstack';
-            if (id.includes('/@radix-ui/')) return 'radix';
-            if (id.includes('/zustand/')) return 'state';
-            if (id.includes('/zod/')) return 'zod';
-            // Exact-match React core packages only — avoid matching @clerk/clerk-react,
-            // react-router, @types/react, etc.
+            // Rollup hands us OS-native paths; Windows uses backslashes which
+            // break every `/foo/` substring check below. Normalize once.
+            const normalized = id.replaceAll('\\', '/');
+            if (!normalized.includes('node_modules')) return undefined;
+            if (normalized.includes('/react-router')) return 'router';
+            if (normalized.includes('/@tanstack/')) return 'tanstack';
+            if (normalized.includes('/@radix-ui/')) return 'radix';
+            if (normalized.includes('/zustand/')) return 'state';
+            if (normalized.includes('/zod/')) return 'zod';
+            // Isolate the entire @clerk/* family (clerk-react, clerk-js,
+            // shared, types) into one chunk so the `auth.tsx` dynamic
+            // import loads exactly one network request when a publishableKey
+            // is present, and contributes ZERO bytes to the eager bundle in
+            // stub mode. Audit B2 (2026-05-10) regression guard.
+            if (normalized.includes('/@clerk/')) return 'clerk';
+            // framer-motion ships ~50KB gzipped — isolate so the rest of
+            // vendor stays lean and motion can be cached separately across
+            // deploys where only app code changes.
             if (
-              id.includes('/node_modules/react/') ||
-              id.includes('/node_modules/react-dom/') ||
-              id.includes('/node_modules/scheduler/')
+              normalized.includes('/node_modules/framer-motion/') ||
+              normalized.includes('/node_modules/motion-utils/') ||
+              normalized.includes('/node_modules/motion-dom/')
+            ) {
+              return 'motion';
+            }
+            if (normalized.includes('/node_modules/react-dom/')) return 'react-dom';
+            // Exact-match React core packages only — avoid matching @clerk/clerk-react,
+            // react-router, react-dom, @types/react, etc.
+            if (
+              normalized.includes('/node_modules/react/') ||
+              normalized.includes('/node_modules/scheduler/')
             ) {
               return 'react';
             }

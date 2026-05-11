@@ -15,10 +15,10 @@ export function useStageMutation() {
 
   return useMutation({
     mutationFn: ({ id, stage }: MoveArgs) =>
-      api<{ id: string; stage: OpportunityStage }>(
-        `/api/opportunities/${id}/stage`,
-        { method: 'POST', body: { stage } },
-      ),
+      api<{ id: string; stage: OpportunityStage }>(`/api/opportunities/${id}/stage`, {
+        method: 'POST',
+        body: { stage },
+      }),
     onMutate: async ({ id, stage }) => {
       // Snapshot every active opportunities query so we can roll back.
       await qc.cancelQueries({ queryKey: ['opportunities'] });
@@ -43,8 +43,7 @@ export function useStageMutation() {
     },
     onError: (_err, vars, ctx) => {
       ctx?.snapshots.forEach(([key, value]) => qc.setQueryData(key, value));
-      if (ctx?.detailSnap)
-        qc.setQueryData(['opportunity', vars.id], ctx.detailSnap);
+      if (ctx?.detailSnap) qc.setQueryData(['opportunity', vars.id], ctx.detailSnap);
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['opportunities'] });

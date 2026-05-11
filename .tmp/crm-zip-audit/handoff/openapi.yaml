@@ -1,0 +1,139 @@
+openapi: 3.1.0
+info:
+  title: BidStack 360° API
+  version: 0.1.0
+  description: REST contract consumed by the BidStack 360° prototype.
+servers:
+  - url: https://api.bidstack.mantu.com
+security:
+  - bearerAuth: []
+paths:
+  /api/opportunities:
+    get:
+      summary: List opportunities
+      parameters:
+        - { in: query, name: stage,    schema: { type: string } }
+        - { in: query, name: owner,    schema: { type: string } }
+        - { in: query, name: industry, schema: { type: string } }
+        - { in: query, name: search,   schema: { type: string } }
+        - { in: query, name: cursor,   schema: { type: string } }
+        - { in: query, name: limit,    schema: { type: integer, default: 50, maximum: 200 } }
+      responses:
+        "200":
+          description: Page of opportunities
+          content: { application/json: { schema: { $ref: "#/components/schemas/OpportunityPage" } } }
+    post:
+      summary: Create opportunity
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/OpportunityCreate" } } } }
+      responses: { "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Opportunity" } } } } }
+
+  /api/opportunities/{id}:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string } } ]
+    get:
+      summary: Get opportunity (full 360° payload)
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/OpportunityFull" } } } } }
+    patch:
+      summary: Update opportunity
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/OpportunityPatch" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Opportunity" } } } } }
+
+  /api/opportunities/{id}/stage:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string } } ]
+    post:
+      summary: Move to next pipeline stage (kanban drag)
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { stage: { type: string } }, required: [stage] } } } }
+      responses: { "200": { description: ok } }
+
+  /api/opportunities/{id}/brief:
+    parameters: [ { in: path, name: id, required: true, schema: { type: string } } ]
+    post:
+      summary: Generate AI exec brief (calls Dust agent + falls back to Anthropic)
+      responses:
+        "200":
+          description: Markdown brief
+          content: { application/json: { schema: { type: object, properties: { brief: { type: string }, model: { type: string }, tokens: { type: integer } } } } }
+
+  /api/contacts:        { get: { summary: List contacts,   responses: { "200": { description: ok } } } }
+  /api/tasks:           { get: { summary: List tasks,      responses: { "200": { description: ok } } } }
+  /api/reports/pipeline:{ get: { summary: Pipeline KPIs,   responses: { "200": { description: ok } } } }
+
+  /api/integrations/dust/status:
+    get:
+      summary: Sync status (last pull, next pull, errors)
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/DustStatus" } } } } }
+  /api/integrations/dust/resync:
+    post:
+      summary: Force a sync now (enqueues BullMQ job, returns job id)
+      responses: { "202": { description: queued } }
+  /api/integrations/api-keys:
+    get:  { summary: List API keys,   responses: { "200": { description: ok } } }
+    post: { summary: Mint API key,    responses: { "201": { description: created } } }
+  /api/integrations/api-keys/{id}:
+    delete: { parameters: [ { in: path, name: id, required: true, schema: { type: string } } ], responses: { "204": { description: revoked } } }
+  /api/integrations/webhooks:
+    get: { summary: Recent webhook events, responses: { "200": { description: ok } } }
+
+  /webhooks/dust:
+    post:
+      summary: Dust webhook receiver (HMAC-validated)
+      security: []
+      parameters:
+        - { in: header, name: X-Dust-Signature, required: true, schema: { type: string } }
+        - { in: header, name: X-Dust-Event,     required: true, schema: { type: string } }
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: ack } }
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  schemas:
+    Opportunity:
+      type: object
+      required: [id, code, customer, name, stage, value, probability, dueDate]
+      properties:
+        id:           { type: string }
+        code:         { type: string, example: "OP-2041" }
+        customer:     { type: string }
+        name:         { type: string }
+        stage:        { type: string, enum: [discovery, qualified, proposal, negotiation, closed_won, closed_lost] }
+        value:        { type: number }
+        probability:  { type: integer }
+        dueDate:      { type: string, format: date }
+        owner:        { type: string }
+        industry:     { type: string }
+        logo:         { type: string }
+        updatedAt:    { type: string, format: date-time }
+    OpportunityPage:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Opportunity" } }
+        nextCursor: { type: string, nullable: true }
+    OpportunityCreate:
+      allOf: [ { $ref: "#/components/schemas/Opportunity" } ]
+    OpportunityPatch:
+      type: object
+      additionalProperties: true
+    OpportunityFull:
+      allOf:
+        - { $ref: "#/components/schemas/Opportunity" }
+        - type: object
+          properties:
+            financial:    { type: object }
+            triggers:     { type: array, items: { type: object } }
+            decisionUnit: { type: array, items: { type: object } }
+            competitors:  { type: array, items: { type: object } }
+            news:         { type: array, items: { type: object } }
+            hiring:       { type: object }
+            winPrediction:{ type: object }
+            documents:    { type: array, items: { type: object } }
+            timeline:     { type: array, items: { type: object } }
+    DustStatus:
+      type: object
+      properties:
+        workspace:   { type: string }
+        lastSyncAt:  { type: string, format: date-time }
+        nextSyncAt:  { type: string, format: date-time }
+        lastError:   { type: string, nullable: true }
+        pulled24h:   { type: integer }
+        pushed24h:   { type: integer }
+        agents:      { type: array, items: { type: object } }

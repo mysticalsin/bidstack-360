@@ -18,3 +18,17 @@ export const TaskCreate = Task.omit({ id: true, createdAt: true }).extend({
   status: TaskStatus.default('open'),
 });
 export type TaskCreate = z.infer<typeof TaskCreate>;
+
+// PATCH body — every field optional, at least one required. The audit log
+// captures the diff so the trail records intent (e.g. status flips).
+export const TaskPatch = z
+  .object({
+    title: z.string().min(1).optional(),
+    dueDate: z.string().date().nullable().optional(),
+    status: TaskStatus.optional(),
+    assignee: z.string().email().nullable().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, {
+    message: 'PATCH body must contain at least one field',
+  });
+export type TaskPatch = z.infer<typeof TaskPatch>;

@@ -10,18 +10,36 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { verifyDustSignature } from '@bidstack/dust-client';
 
-// In-memory dedup for dev (7-day TTL would use Redis in prod).
-const seen = new Map<string, number>();
-const DEDUP_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+import { redis } from '../redis.js';
 
-function rememberOrReject(eventId: string): boolean {
-  const now = Date.now();
-  for (const [k, expiry] of seen) {
-    if (expiry < now) seen.delete(k);
+// Webhook dedup. Redis is authoritative — `SET key 1 EX 7d NX` is the
+// atomic check-and-set. If Redis is unreachable we fall back to an in-memory
+// Map so dev still works, but the fallback is logged at warn level because
+// a clustered deploy without Redis can re-process Dust retries.
+const DEDUP_TTL_SECONDS = 7 * 24 * 60 * 60;
+const fallbackSeen = new Map<string, number>();
+const FALLBACK_TTL_MS = DEDUP_TTL_SECONDS * 1000;
+
+async function rememberOrReject(
+  eventId: string,
+  log: { warn: (a: object, msg?: string) => void },
+): Promise<boolean> {
+  // Try Redis NX first — the only durable option across replicas + restarts.
+  try {
+    const setResult = await redis.set(`dedup:dust:${eventId}`, '1', 'EX', DEDUP_TTL_SECONDS, 'NX');
+    return setResult === 'OK';
+  } catch (err) {
+    log.warn({ err }, 'webhook dedup: Redis unreachable, using process-local fallback');
+    // Fallback: per-process Map. Sweeps expired entries on each call so we
+    // don't leak memory if Redis stays down for hours.
+    const now = Date.now();
+    for (const [k, expiry] of fallbackSeen) {
+      if (expiry < now) fallbackSeen.delete(k);
+    }
+    if (fallbackSeen.has(eventId)) return false;
+    fallbackSeen.set(eventId, now + FALLBACK_TTL_MS);
+    return true;
   }
-  if (seen.has(eventId)) return false;
-  seen.set(eventId, now + DEDUP_TTL_MS);
-  return true;
 }
 
 export const webhooksRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -71,7 +89,7 @@ export const webhooksRoutes: FastifyPluginAsyncZod = async (server) => {
       }
 
       const eid = String(Array.isArray(eventId) ? eventId[0] : (eventId ?? ''));
-      if (eid && !rememberOrReject(eid)) {
+      if (eid && !(await rememberOrReject(eid, req.log))) {
         req.log.info({ eid }, 'webhook duplicate dropped');
         return { ok: true as const };
       }

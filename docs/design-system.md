@@ -6,20 +6,21 @@
 
 ### Color (light)
 
-| Token | Value | Used for |
-|---|---|---|
-| `--brand-primary` | `#2C4BFF` | Primary buttons, active nav, links |
-| `--brand-primary-tint` | `#EAEEFE` | Selected row tint, focus halos |
-| `--surface-page` | `#FAFBFD` | App background |
-| `--surface-card` | `#FFFFFF` | Card background |
-| `--surface-sidebar` | `#F4F6FA` | Left navigation surface |
-| `--fg-primary` | `#1A1F36` | Body copy |
-| `--fg-secondary` | `#5A6478` | Subtext, captions |
-| `--success` / `--warning` / `--danger` / `--info` | `#1F8A5B` / `#D08A00` / `#D93849` / `#6E59FF` | Semantic states |
+| Token                                             | Value                                         | Used for                           |
+| ------------------------------------------------- | --------------------------------------------- | ---------------------------------- |
+| `--brand-primary`                                 | `#2C4BFF`                                     | Primary buttons, active nav, links |
+| `--brand-primary-tint`                            | `#EAEEFE`                                     | Selected row tint, focus halos     |
+| `--surface-page`                                  | `#FAFBFD`                                     | App background                     |
+| `--surface-card`                                  | `#FFFFFF`                                     | Card background                    |
+| `--surface-sidebar`                               | `#F4F6FA`                                     | Left navigation surface            |
+| `--fg-primary`                                    | `#1A1F36`                                     | Body copy                          |
+| `--fg-secondary`                                  | `#5A6478`                                     | Subtext, captions                  |
+| `--success` / `--warning` / `--danger` / `--info` | `#1F8A5B` / `#D08A00` / `#D93849` / `#6E59FF` | Semantic states                    |
 
 ### Color (dark)
 
 Every token has a dark-mode peer. The pairing was tuned so:
+
 - Brand contrast against dark surfaces stays at ≥ 4.5:1 for text and ≥ 3:1 for UI controls (WCAG 2.2 AA).
 - Tinted surfaces use rgba opacity rather than fully different colors, so cards, badges and overlays read as the same component family in both themes.
 - Shadows are deeper (more black) in dark mode because soft elevation gets lost on dark surfaces.
@@ -47,15 +48,16 @@ Every token has a dark-mode peer. The pairing was tuned so:
 
 ## Components shipped
 
-| Component | File | Variants |
-|---|---|---|
-| Card | `components/ui/Card.tsx` | (single) + `SectionHeader` slot |
-| Badge | `components/ui/Badge.tsx` | tones: blue, jade, amber, tomato, purple, gray + `stageTone()` mapper |
-| Button | `components/ui/Button.tsx` | primary / secondary / ghost / destructive × sm / md / lg |
-| StateMessages | `components/ui/StateMessages.tsx` | EmptyState, ErrorState, LoadingSkeleton |
-| AppShell + Sidebar + Topbar | `components/layout/*.tsx` | responsive (sidebar collapses below md) |
+| Component                   | File                              | Variants                                                              |
+| --------------------------- | --------------------------------- | --------------------------------------------------------------------- |
+| Card                        | `components/ui/Card.tsx`          | (single) + `SectionHeader` slot                                       |
+| Badge                       | `components/ui/Badge.tsx`         | tones: blue, jade, amber, tomato, purple, gray + `stageTone()` mapper |
+| Button                      | `components/ui/Button.tsx`        | primary / secondary / ghost / destructive × sm / md / lg              |
+| StateMessages               | `components/ui/StateMessages.tsx` | EmptyState, ErrorState, LoadingSkeleton                               |
+| AppShell + Sidebar + Topbar | `components/layout/*.tsx`         | responsive (sidebar collapses below md)                               |
 
 Every interactive component has the **9 mandatory states** per `design-standards.md`:
+
 - Default, Hover, Focus (2px ring, 3:1 contrast), Active, Loading, Error, Empty, Disabled, Success.
 
 Where a state isn't yet visually implemented (e.g. Loading on Card), the data-fetching wrapper (`useOpportunities` etc.) feeds `LoadingSkeleton` as the fallback.

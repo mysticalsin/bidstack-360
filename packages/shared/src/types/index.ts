@@ -11,7 +11,7 @@ export type {
 } from '../schemas/opportunity.js';
 
 export type { Contact, ContactCreate, Sentiment } from '../schemas/contact.js';
-export type { Task, TaskCreate, TaskStatus } from '../schemas/task.js';
+export type { Task, TaskCreate, TaskPatch, TaskStatus } from '../schemas/task.js';
 export type {
   IntelPayload,
   Financial,

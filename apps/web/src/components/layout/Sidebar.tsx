@@ -1,103 +1,232 @@
 import { NavLink } from 'react-router-dom';
 
+import { Tooltip, TooltipProvider } from '@/components/ui/Tooltip';
+import { Icon, type IconName } from '@/components/ui/Icon';
+import { useOpportunities } from '@/hooks/useOpportunities';
+import { useTasks } from '@/hooks/useTasks';
+import { daysUntil } from '@/lib/format';
 import { cn } from '@/lib/cn';
+import { prefetchRoute } from '@/lib/prefetch';
+import { useAccountHistory, type AccountEntry } from '@/stores/accountHistory';
+import { useUiStore } from '@/stores/ui';
 
 interface NavItem {
   to: string;
   label: string;
-  icon: string;
-  group: 'workspace' | 'settings';
+  icon: IconName;
+  badgeKey?: 'openBids' | 'overdueTasks';
 }
 
-const NAV: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: '⌘', group: 'workspace' },
-  { to: '/opportunities', label: 'Opportunities', icon: '◎', group: 'workspace' },
-  { to: '/pipeline', label: 'Pipeline', icon: '◈', group: 'workspace' },
-  { to: '/contacts', label: 'Contacts', icon: '◯', group: 'workspace' },
-  { to: '/tasks', label: 'Tasks', icon: '✓', group: 'workspace' },
-  { to: '/reports', label: 'Reports', icon: '◊', group: 'workspace' },
-  { to: '/integrations', label: 'Integrations', icon: '⇄', group: 'settings' },
-  { to: '/settings', label: 'Settings', icon: '⚙', group: 'settings' },
+const WORKSPACE: NavItem[] = [
+  { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
+  { to: '/accounts', label: 'Accounts', icon: 'building' },
+  { to: '/opportunities', label: 'Opportunities', icon: 'briefcase', badgeKey: 'openBids' },
+  { to: '/pipeline', label: 'Pipeline', icon: 'pipeline' },
+  { to: '/contacts', label: 'Contacts', icon: 'contacts' },
+  { to: '/tasks', label: 'Tasks', icon: 'tasks', badgeKey: 'overdueTasks' },
+  { to: '/reports', label: 'Reports', icon: 'reports' },
+];
+
+const SETTINGS: NavItem[] = [
+  { to: '/integrations', label: 'Integrations', icon: 'link' },
+  { to: '/audit-log', label: 'Audit log', icon: 'reports' },
+  { to: '/settings', label: 'Settings', icon: 'settings' },
 ];
 
 export function Sidebar() {
-  const workspaceItems = NAV.filter((n) => n.group === 'workspace');
-  const settingsItems = NAV.filter((n) => n.group === 'settings');
+  const opps = useOpportunities({ limit: 200 });
+  const tasks = useTasks();
+  const collapsed = useUiStore((s) => s.sidebarCollapsed);
+  const toggle = useUiStore((s) => s.toggleSidebar);
+  // Account history — show top 5 recents + all favorites. Favorites can
+  // grow unbounded by design (users curate them), but recents are bounded
+  // by the store's LRU eviction cap.
+  const recents = useAccountHistory((s) => s.recents);
+  const favorites = useAccountHistory((s) => s.favorites);
+
+  const openBids =
+    opps.data?.items.filter((o) => o.stage !== 'closed_won' && o.stage !== 'closed_lost').length ??
+    0;
+  // Badge counts only truly overdue tasks (negative daysUntil) so its meaning
+  // matches the Dashboard KPI. A "due within 7 days" filter belongs to a
+  // separate upcoming surface; mixing the two confused what the count meant.
+  const overdueTasks =
+    tasks.data?.items.filter((t) => {
+      const d = daysUntil(t.dueDate);
+      return d !== null && d < 0 && t.status !== 'done';
+    }).length ?? 0;
+
+  const badges = { openBids, overdueTasks };
 
   return (
-    <aside
-      className="hidden md:flex w-[240px] flex-col border-r border-[var(--border-subtle)] bg-[var(--surface-sidebar)]"
-      aria-label="Primary navigation"
-    >
-      <div className="flex h-14 items-center px-5 border-b border-[var(--border-subtle)]">
-        <Logo />
-      </div>
-
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
-        <NavGroup label="Workspace" items={workspaceItems} />
-        <NavGroup label="Settings" items={settingsItems} />
-      </nav>
-
-      <div className="border-t border-[var(--border-subtle)] p-3">
-        <a
-          href="https://github.com/twentyhq/twenty"
-          target="_blank"
-          rel="noreferrer"
-          className="flex items-center gap-2 px-3 py-2 text-xs text-[var(--fg-tertiary)] hover:text-[var(--fg-secondary)] transition-colors"
-        >
-          <span>v0.1.0 · Mantu</span>
-        </a>
-      </div>
-    </aside>
-  );
-}
-
-function Logo() {
-  return (
-    <div className="flex items-center gap-2">
-      <div
-        className="flex h-7 w-7 items-center justify-center rounded-md text-white font-bold text-sm"
-        style={{ background: 'var(--brand-gradient, linear-gradient(135deg, var(--brand-primary), var(--brand-deep)))' }}
-        aria-hidden
+    <TooltipProvider delayDuration={300} disableHoverableContent>
+      <aside
+        className={cn('sidebar', collapsed && 'is-collapsed')}
+        role="navigation"
+        aria-label="Primary navigation"
+        style={{ position: 'relative' }}
       >
-        B
-      </div>
-      <div className="flex flex-col leading-tight">
-        <span className="text-sm font-semibold text-[var(--fg-primary)]">BidStack 360°</span>
-        <span className="text-[10px] uppercase tracking-wider text-[var(--fg-tertiary)]">Mantu</span>
-      </div>
+        <button
+          type="button"
+          onClick={toggle}
+          className="sb-toggle"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-expanded={!collapsed}
+        >
+          <Icon name="arrow" size={12} ariaHidden />
+        </button>
+
+        <div className="sb-brand">
+          <div className="sb-mark" aria-hidden>
+            B
+          </div>
+          <div>
+            <div className="sb-name">
+              BidStack<span className="deg">°</span>
+            </div>
+            <div className="sb-tag">Mantu · Bid &amp; presales</div>
+          </div>
+        </div>
+
+        <SidebarGroup title="Workspace">
+          {WORKSPACE.map((item) => (
+            <SidebarItem key={item.to} item={item} badges={badges} collapsed={collapsed} />
+          ))}
+        </SidebarGroup>
+
+        {/* Favorites first (intentional choice), then recents. Both groups
+            self-hide when empty so a brand-new user doesn't see two
+            confusing empty headers. */}
+        {favorites.length > 0 ? (
+          <SidebarGroup title="Starred">
+            {favorites.map((acc) => (
+              <AccountShortcut key={acc.slug} acc={acc} icon="starFilled" collapsed={collapsed} />
+            ))}
+          </SidebarGroup>
+        ) : null}
+
+        {recents.length > 0 ? (
+          <SidebarGroup title="Recent">
+            {recents.slice(0, 5).map((acc) => (
+              <AccountShortcut key={acc.slug} acc={acc} icon="clock" collapsed={collapsed} />
+            ))}
+          </SidebarGroup>
+        ) : null}
+
+        <SidebarGroup title="Settings">
+          {SETTINGS.map((item) => (
+            <SidebarItem key={item.to} item={item} badges={badges} collapsed={collapsed} />
+          ))}
+        </SidebarGroup>
+
+        <div style={{ flex: 1 }} />
+
+        <div className="sb-foot">
+          <div className="sb-sync">
+            <span className="cs-pulse" aria-hidden />
+            <span>Dust connected · synced 2m ago</span>
+          </div>
+        </div>
+      </aside>
+    </TooltipProvider>
+  );
+}
+
+function SidebarGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="sb-group">
+      <div className="sb-group-title">{title}</div>
+      {children}
     </div>
   );
 }
 
-function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
-  return (
-    <div>
-      <div className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-        {label}
-      </div>
-      <ul className="space-y-0.5">
-        {items.map((item) => (
-          <li key={item.to}>
-            <NavLink
-              to={item.to}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors',
-                  isActive
-                    ? 'bg-[var(--brand-primary-tint)] text-[var(--brand-primary)] font-medium'
-                    : 'text-[var(--fg-secondary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)]',
-                )
-              }
-            >
-              <span className="text-base w-4 text-center" aria-hidden>
-                {item.icon}
-              </span>
-              {item.label}
-            </NavLink>
-          </li>
-        ))}
-      </ul>
-    </div>
+function SidebarItem({
+  item,
+  badges,
+  collapsed,
+}: {
+  item: NavItem;
+  badges: { openBids: number; overdueTasks: number };
+  collapsed: boolean;
+}) {
+  const badge = item.badgeKey ? badges[item.badgeKey] : 0;
+  // Hover/focus prefetch — kicks off the route's lazy chunk before the
+  // click lands. Apple-style "make the next view feel pre-loaded" trick.
+  const prefetch = () => prefetchRoute(item.to);
+  const link = (
+    <NavLink
+      to={item.to}
+      className={({ isActive }) => cn('sb-item', isActive && 'active')}
+      title={collapsed ? undefined : item.label}
+      end={item.to === '/'}
+      onMouseEnter={prefetch}
+      onFocus={prefetch}
+      onTouchStart={prefetch}
+    >
+      <Icon name={item.icon} size={16} />
+      <span>{item.label}</span>
+      {badge > 0 && <span className="sb-badge">{badge}</span>}
+    </NavLink>
   );
+  // Tooltips only when the label is hidden (collapsed mode) — otherwise
+  // the label itself is the affordance and a tooltip would be redundant.
+  if (collapsed) {
+    return (
+      <Tooltip
+        side="right"
+        content={
+          <span className="flex items-center gap-2">
+            <span>{item.label}</span>
+            {badge > 0 ? (
+              <span className="rounded bg-[var(--brand-primary-tint)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--brand-primary)]">
+                {badge}
+              </span>
+            ) : null}
+          </span>
+        }
+      >
+        {link}
+      </Tooltip>
+    );
+  }
+  return link;
+}
+
+// Renders a single account entry (recent or starred) in the sidebar. We
+// reuse the sb-item styling for visual parity with primary nav, but with
+// no badge column.
+function AccountShortcut({
+  acc,
+  icon,
+  collapsed,
+}: {
+  acc: AccountEntry;
+  icon: IconName;
+  collapsed: boolean;
+}) {
+  const prefetch = () => prefetchRoute(`/accounts/${acc.slug}`);
+  const link = (
+    <NavLink
+      to={`/accounts/${acc.slug}`}
+      className={({ isActive }) => cn('sb-item', isActive && 'active')}
+      title={collapsed ? undefined : acc.name}
+      onMouseEnter={prefetch}
+      onFocus={prefetch}
+      onTouchStart={prefetch}
+    >
+      <Icon name={icon} size={14} />
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {acc.name}
+      </span>
+    </NavLink>
+  );
+  if (collapsed) {
+    return (
+      <Tooltip side="right" content={acc.name}>
+        {link}
+      </Tooltip>
+    );
+  }
+  return link;
 }

@@ -3,10 +3,44 @@
 // enqueue jobs. In v0.1 the queue is a stub if Redis is unreachable.
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
-import { randomBytes, createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
+import { DustClient } from '@bidstack/dust-client';
+
+import { enqueueDustResync } from '../queues/dust-poll.js';
+
+interface DustAgentStatus {
+  agents: Array<{ id: string; label: string; description: string | null }>;
+  error: string | null;
+}
+
+// Fetch the Dust workspace's assistant agents. Returns an empty list in local
+// stub mode, and captures provider errors as status metadata so the
+// integrations page can fail loud without breaking the whole route.
+async function listDustAgents(log: {
+  warn: (a: object, msg?: string) => void;
+}): Promise<DustAgentStatus> {
+  const apiKey = process.env.DUST_API_KEY;
+  const workspaceId = process.env.DUST_WORKSPACE_ID;
+  if (!apiKey || !workspaceId) return { agents: [], error: null };
+  try {
+    const dust = new DustClient({
+      apiKey,
+      workspaceId,
+      baseUrl: process.env.DUST_BASE_URL,
+      timeoutMs: 5_000,
+    });
+    return { agents: await dust.listAgents(), error: null };
+  } catch (err) {
+    log.warn({ err }, 'dust agents fetch error');
+    return {
+      agents: [],
+      error: err instanceof Error ? err.message : 'Dust agent list failed',
+    };
+  }
+}
 
 const DustStatus = z.object({
   workspace: z.string(),
@@ -15,7 +49,11 @@ const DustStatus = z.object({
   lastError: z.string().nullable(),
   pulled24h: z.number().int(),
   pushed24h: z.number().int(),
-  agents: z.array(z.object({ id: z.string(), label: z.string() })),
+  configured: z.boolean(),
+  agentsError: z.string().nullable(),
+  agents: z.array(
+    z.object({ id: z.string(), label: z.string(), description: z.string().nullable() }),
+  ),
 });
 
 const ApiKeySummary = z.object({
@@ -29,43 +67,54 @@ const ApiKeySummary = z.object({
 
 export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
   // GET /api/integrations/dust/status
-  server.get(
-    '/dust/status',
-    { schema: { response: { 200: DustStatus } } },
-    async (req) => {
-      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      const [pulled, pushed, lastErr] = await Promise.all([
-        prisma.syncEvent.count({
-          where: {
-            orgId: req.auth.orgId,
-            source: 'dust.poll',
-            receivedAt: { gte: since },
-          },
-        }),
-        prisma.syncEvent.count({
-          where: {
-            orgId: req.auth.orgId,
-            source: 'dust.push',
-            receivedAt: { gte: since },
-          },
-        }),
-        prisma.syncEvent.findFirst({
-          where: { orgId: req.auth.orgId, status: 'error' },
-          orderBy: { receivedAt: 'desc' },
-        }),
-      ]);
+  server.get('/dust/status', { schema: { response: { 200: DustStatus } } }, async (req) => {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [pulled, pushed, lastErr, lastSync, agentStatus] = await Promise.all([
+      prisma.syncEvent.count({
+        where: {
+          orgId: req.auth.orgId,
+          source: 'dust.poll',
+          receivedAt: { gte: since },
+        },
+      }),
+      prisma.syncEvent.count({
+        where: {
+          orgId: req.auth.orgId,
+          source: 'dust.push',
+          receivedAt: { gte: since },
+        },
+      }),
+      prisma.syncEvent.findFirst({
+        where: { orgId: req.auth.orgId, status: 'error' },
+        orderBy: { receivedAt: 'desc' },
+      }),
+      prisma.syncEvent.findFirst({
+        where: { orgId: req.auth.orgId, source: 'dust.poll', status: 'processed' },
+        orderBy: { receivedAt: 'desc' },
+      }),
+      listDustAgents(req.log),
+    ]);
 
-      return {
-        workspace: process.env.DUST_WORKSPACE_ID ?? 'mantu-presales',
-        lastSyncAt: null,
-        nextSyncAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-        lastError: lastErr?.error ?? null,
-        pulled24h: pulled,
-        pushed24h: pushed,
-        agents: [],
-      };
-    },
-  );
+    const configured = Boolean(process.env.DUST_API_KEY && process.env.DUST_WORKSPACE_ID);
+
+    return {
+      workspace: process.env.DUST_WORKSPACE_ID ?? 'mantu-presales',
+      lastSyncAt:
+        lastSync?.processedAt?.toISOString() ?? lastSync?.receivedAt.toISOString() ?? null,
+      // Best-effort next tick: the dust-poll worker's repeat interval is 5m,
+      // so we estimate from lastSync without coupling this route to BullMQ
+      // scheduler internals.
+      nextSyncAt: lastSync
+        ? new Date(lastSync.receivedAt.getTime() + 5 * 60 * 1000).toISOString()
+        : new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      lastError: lastErr?.error ?? null,
+      pulled24h: pulled,
+      pushed24h: pushed,
+      configured,
+      agentsError: agentStatus.error,
+      agents: agentStatus.agents,
+    };
+  });
 
   // POST /api/integrations/dust/resync
   server.post(
@@ -76,24 +125,31 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req, reply) => {
-      // The actual BullMQ enqueue will be wired in apps/worker.
-      // For v0.1 we synthesize a job id and log a sync_event so the UI gets
-      // a feedback loop.
-      const jobId = `manual-${Date.now()}`;
+      // Real enqueue into the dust-poll queue. The worker in apps/worker
+      // consumes the same shape its scheduled tick uses, so a manual resync
+      // runs the same code path as the cron-style poll. If Redis is
+      // unreachable, the helper returns null. We still record the request as a
+      // sync_event so the audit trail captures the attempt.
+      const queuedId = await enqueueDustResync({ source: 'manual', orgId: req.auth.orgId });
+      const jobId = queuedId ?? `manual-${Date.now()}`;
       await prisma.syncEvent.create({
         data: {
           orgId: req.auth.orgId,
           source: 'manual',
           eventType: 'dust.resync.requested',
-          payload: { jobId },
-          status: 'received',
+          payload: { jobId, queued: queuedId !== null },
+          status: queuedId ? 'received' : 'error',
+          error: queuedId ? null : 'Redis unreachable; resync was not enqueued',
         },
       });
+      if (!queuedId) {
+        req.log.warn({ orgId: req.auth.orgId }, 'dust resync: Redis unreachable, no real job');
+      }
       return reply.code(202).send({ jobId });
     },
   );
 
-  // ─── API keys ────────────────────────────────────────────────────────
+  // API keys
   server.get(
     '/api-keys',
     { schema: { response: { 200: z.object({ items: z.array(ApiKeySummary) }) } } },
@@ -150,7 +206,7 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
         scopes: created.scopes,
         lastUsedAt: null,
         createdAt: created.createdAt.toISOString(),
-        secret: raw, // shown ONCE — caller must store
+        secret: raw, // shown once; caller must store
       });
     },
   );

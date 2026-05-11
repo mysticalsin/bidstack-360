@@ -9,8 +9,9 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 import { DustClient } from '@bidstack/dust-client';
+import { DUST_POLL } from '@bidstack/shared';
 
-const QUEUE_NAME = 'dust-poll';
+const QUEUE_NAME = DUST_POLL.name;
 const REPEAT_EVERY_MS = 5 * 60 * 1000;
 
 const JobData = z.object({ source: z.string() });
@@ -29,12 +30,7 @@ export async function startDustPoller(
 ): Promise<void> {
   const queue = new Queue(QUEUE_NAME, {
     connection,
-    defaultJobOptions: {
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 5000 },
-      removeOnComplete: { count: 100 },
-      removeOnFail: { count: 50 },
-    },
+    defaultJobOptions: DUST_POLL.defaultJobOptions,
   });
   queues.push(queue);
 

@@ -8,8 +8,9 @@ import type IORedis from 'ioredis';
 import type pino from 'pino';
 
 import { prisma } from '@bidstack/db';
+import { DUST_WEBHOOK_PROCESSOR } from '@bidstack/shared';
 
-const QUEUE_NAME = 'dust-webhook';
+const QUEUE_NAME = DUST_WEBHOOK_PROCESSOR.name;
 const TICK_MS = 10_000;
 
 export async function startWebhookProcessor(
@@ -20,12 +21,7 @@ export async function startWebhookProcessor(
 ): Promise<void> {
   const queue = new Queue(QUEUE_NAME, {
     connection,
-    defaultJobOptions: {
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 5000 },
-      removeOnComplete: { count: 100 },
-      removeOnFail: { count: 50 },
-    },
+    defaultJobOptions: DUST_WEBHOOK_PROCESSOR.defaultJobOptions,
   });
   queues.push(queue);
 

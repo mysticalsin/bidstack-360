@@ -73,6 +73,10 @@ export default tseslint.config(
       'apps/web/playwright-report/**',
       'apps/web/test-results/**',
       'handoff/**',
+      '.tmp/**', // extracted prototype zips kept for cross-referencing only
+      '.audit-screens/**',
+      '.codex/**',
+      '.claude/worktrees/**', // ephemeral agent worktrees, not source
     ],
   },
 

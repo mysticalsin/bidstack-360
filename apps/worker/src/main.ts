@@ -8,6 +8,7 @@ import { type Queue, type Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import pino from 'pino';
 
+import { startCompanyEnrichApollo } from './queues/company-enrich-apollo.js';
 import { startDustPoller } from './queues/dust-poll.js';
 import { startWebhookProcessor } from './queues/webhook-processor.js';
 
@@ -35,9 +36,10 @@ const queues: Queue[] = [];
 await Promise.all([
   startDustPoller(connection, log, workers, queues),
   startWebhookProcessor(connection, log, workers, queues),
+  startCompanyEnrichApollo(connection, log, workers, queues),
 ]);
 
-log.info('BidStack worker ready (dust-poll + webhook-processor)');
+log.info('BidStack worker ready (dust-poll + webhook-processor + company-enrich-apollo)');
 
 const shutdown = async (signal: string) => {
   log.info({ signal }, 'shutting down worker');

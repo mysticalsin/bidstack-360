@@ -7,14 +7,22 @@
 // time. We expose ONE shared context (AuthCtx) and split the implementation
 // into two non-overlapping subtrees. Consumers always call the same hooks
 // in the same order — Rules of Hooks satisfied.
+//
+// Bundle safety: `@clerk/clerk-react` is **dynamically** imported only when
+// a `publishableKey` is provided. In stub mode (no key), nothing from
+// @clerk/* is pulled into the eager bundle — verified post-build by grepping
+// `dist/assets/index-*.js`. The lazy boundary is `LazyClerkBranch` below.
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import {
-  ClerkProvider,
-  useAuth as useClerkAuth,
-  useUser as useClerkUser,
-  useClerk,
-} from '@clerk/clerk-react';
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  Suspense,
+  lazy,
+  type ReactNode,
+  type ComponentType,
+} from 'react';
 
 interface AuthUser {
   id: string;
@@ -63,32 +71,72 @@ function StubAuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// Bridges Clerk's hook outputs into the unified AuthCtx. Mounted only when
-// a publishableKey is configured.
-function ClerkAuthBridge({ children }: { children: ReactNode }) {
-  const auth = useClerkAuth();
-  const { user } = useClerkUser();
-  const clerk = useClerk();
+// `React.lazy` requires a default-export module, so we wrap the dynamic
+// `import('@clerk/clerk-react')` in a component that closes over the loaded
+// hooks/components. Once the chunk has resolved, this subtree behaves
+// identically to a static-import version.
+//
+// Why this shape (and not `loadClerk()` returning hooks): hooks must be
+// called inside a component body, not from an async function. So we lazy-load
+// a *component* whose body uses the resolved Clerk hooks via closure.
+const LazyClerkBranch = lazy(async () => {
+  const mod = await import('@clerk/clerk-react');
+  const { ClerkProvider, useAuth: useClerkAuth, useUser: useClerkUser, useClerk } = mod;
 
+  function ClerkAuthBridge({ children }: { children: ReactNode }) {
+    const auth = useClerkAuth();
+    const { user } = useClerkUser();
+    const clerk = useClerk();
+
+    return (
+      <AuthContext.Provider
+        value={{
+          isLoaded: auth.isLoaded,
+          isSignedIn: auth.isSignedIn ?? false,
+          user: user
+            ? {
+                id: user.id,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                fullName: user.fullName,
+                primaryEmailAddress: user.primaryEmailAddress
+                  ? { emailAddress: user.primaryEmailAddress.emailAddress }
+                  : null,
+              }
+            : null,
+          signOut: (cb) => {
+            void clerk.signOut().then(() => cb?.());
+          },
+        }}
+      >
+        {children}
+      </AuthContext.Provider>
+    );
+  }
+
+  const ClerkBranch: ComponentType<{ publishableKey: string; children: ReactNode }> = ({
+    publishableKey,
+    children,
+  }) => (
+    <ClerkProvider publishableKey={publishableKey}>
+      <ClerkAuthBridge>{children}</ClerkAuthBridge>
+    </ClerkProvider>
+  );
+
+  return { default: ClerkBranch };
+});
+
+// Fallback shown while the @clerk/* chunk is fetched. We surface a minimal
+// `isLoaded: false` context so RequireAuth in App.tsx renders its skeleton
+// rather than redirecting to /login mid-load.
+function ClerkLoadingFallback({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider
       value={{
-        isLoaded: auth.isLoaded,
-        isSignedIn: auth.isSignedIn ?? false,
-        user: user
-          ? {
-              id: user.id,
-              firstName: user.firstName,
-              lastName: user.lastName,
-              fullName: user.fullName,
-              primaryEmailAddress: user.primaryEmailAddress
-                ? { emailAddress: user.primaryEmailAddress.emailAddress }
-                : null,
-            }
-          : null,
-        signOut: (cb) => {
-          void clerk.signOut().then(() => cb?.());
-        },
+        isLoaded: false,
+        isSignedIn: false,
+        user: null,
+        signOut: () => undefined,
       }}
     >
       {children}
@@ -107,9 +155,9 @@ export function AuthProvider({
     return <StubAuthProvider>{children}</StubAuthProvider>;
   }
   return (
-    <ClerkProvider publishableKey={publishableKey}>
-      <ClerkAuthBridge>{children}</ClerkAuthBridge>
-    </ClerkProvider>
+    <Suspense fallback={<ClerkLoadingFallback>{children}</ClerkLoadingFallback>}>
+      <LazyClerkBranch publishableKey={publishableKey}>{children}</LazyClerkBranch>
+    </Suspense>
   );
 }
 
@@ -121,16 +169,19 @@ function useAuthCtx(): AuthCtx {
   return ctx;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth(): { isLoaded: boolean; isSignedIn: boolean } {
   const ctx = useAuthCtx();
   return { isLoaded: ctx.isLoaded, isSignedIn: ctx.isSignedIn };
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useUser(): { user: AuthUser | null } {
   const ctx = useAuthCtx();
   return { user: ctx.user };
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useSignOut() {
   const ctx = useAuthCtx();
   return { signOut: ctx.signOut };

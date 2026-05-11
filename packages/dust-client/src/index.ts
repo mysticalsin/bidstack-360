@@ -40,6 +40,22 @@ export const DustAgentRun = z.object({
 });
 export type DustAgentRun = z.infer<typeof DustAgentRun>;
 
+const DustAgentConfiguration = z
+  .object({
+    sId: z.string().optional(),
+    id: z.string().optional(),
+    name: z.string().optional(),
+    description: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+export const DustAgent = z.object({
+  id: z.string(),
+  label: z.string(),
+  description: z.string().nullable(),
+});
+export type DustAgent = z.infer<typeof DustAgent>;
+
 export class DustError extends Error {
   constructor(
     message: string,
@@ -74,6 +90,26 @@ export class DustClient {
       `/v1/w/${this.workspaceId}/data_sources/${dataSourceId}/documents`,
     );
     return z.array(DustDocument).parse(data.documents);
+  }
+
+  async listAgents(
+    view: 'all' | 'list' | 'published' | 'global' | 'favorites' = 'list',
+  ): Promise<DustAgent[]> {
+    const data = await this.request<{ agentConfigurations?: unknown[] }>(
+      'GET',
+      `/v1/w/${this.workspaceId}/assistant/agent_configurations?view=${encodeURIComponent(view)}`,
+    );
+    const configurations = z.array(DustAgentConfiguration).parse(data.agentConfigurations ?? []);
+    return configurations
+      .map((agent) => {
+        const id = agent.sId ?? agent.id ?? '';
+        return {
+          id,
+          label: agent.name ?? agent.description ?? '(unnamed agent)',
+          description: agent.description ?? null,
+        };
+      })
+      .filter((agent): agent is DustAgent => DustAgent.safeParse(agent).success);
   }
 
   async upsertDocument(

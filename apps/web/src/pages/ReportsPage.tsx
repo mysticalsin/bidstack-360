@@ -32,7 +32,10 @@ export function ReportsPage() {
                     </span>
                   </div>
                   <div className="h-2 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
-                    <div className="h-full bg-[var(--brand-primary)]" style={{ width: `${pct}%` }} />
+                    <div
+                      className="h-full bg-[var(--brand-primary)]"
+                      style={{ width: `${pct}%` }}
+                    />
                   </div>
                 </div>
               );

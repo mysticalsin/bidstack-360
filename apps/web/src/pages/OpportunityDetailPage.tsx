@@ -1,11 +1,32 @@
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 
 import { Badge, stageTone } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { BriefingDialog } from '@/components/opportunity/BriefingDialog';
+import {
+  InlineEditDate,
+  InlineEditNumber,
+  InlineEditSelect,
+  InlineEditText,
+} from '@/components/opportunity/InlineEdit';
 import { OpportunityTabs } from '@/components/opportunity/OpportunityTabs';
-import { useOpportunity } from '@/hooks/useOpportunities';
+import { CreateTaskDialog } from '@/components/task/CreateTaskDialog';
+import { usePatchOpportunity, useOpportunity } from '@/hooks/useOpportunities';
 import { formatDate, formatMoney, formatStage } from '@/lib/format';
+
+import type { OpportunityStage } from '@bidstack/shared';
+
+const STAGE_OPTIONS: ReadonlyArray<{ value: OpportunityStage; label: string }> = [
+  { value: 'discovery', label: 'Discovery' },
+  { value: 'qualified', label: 'Qualified' },
+  { value: 'proposal', label: 'Proposal' },
+  { value: 'negotiation', label: 'Negotiation' },
+  { value: 'closed_won', label: 'Closed won' },
+  { value: 'closed_lost', label: 'Closed lost' },
+];
 
 interface IntelPayload {
   refreshedAt?: string;
@@ -54,6 +75,8 @@ interface IntelPayload {
 export function OpportunityDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading, isError, error } = useOpportunity(id);
+  const patch = usePatchOpportunity(id);
+  const [briefOpen, setBriefOpen] = useState(false);
   const intel = (data?.intel ?? {}) as IntelPayload;
 
   if (isLoading) return <LoadingSkeleton rows={8} />;
@@ -76,27 +99,91 @@ export function OpportunityDetailPage() {
           </ol>
         </nav>
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-bold tracking-tight text-[var(--fg-primary)]">
-              {data.name}
+              <InlineEditText
+                value={data.name}
+                onSave={(v) => patch.mutateAsync({ name: v })}
+                label="Edit opportunity name"
+                validate={(v) => (v.length < 1 ? 'Name is required' : null)}
+              />
             </h1>
             <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-              {data.customer} · {data.industry ?? '—'}
+              <InlineEditText
+                value={data.customer}
+                onSave={(v) => patch.mutateAsync({ customer: v })}
+                label="Edit customer name"
+                validate={(v) => (v.length < 1 ? 'Customer is required' : null)}
+              />
+              {' · '}
+              <InlineEditText
+                value={data.industry ?? ''}
+                onSave={(v) => patch.mutateAsync({ industry: v || null })}
+                label="Edit industry"
+                display={(v) => v || '—'}
+                placeholder="Industry"
+              />
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <Badge tone={stageTone(data.stage)}>{formatStage(data.stage)}</Badge>
+            <CreateTaskDialog
+              oppId={data.id}
+              trigger={
+                <Button variant="secondary" size="sm">
+                  + Task
+                </Button>
+              }
+            />
+            <Button size="sm" onClick={() => setBriefOpen(true)}>
+              Ask Dust
+            </Button>
+            <InlineEditSelect<OpportunityStage>
+              value={data.stage as OpportunityStage}
+              onSave={(v) => patch.mutateAsync({ stage: v })}
+              options={STAGE_OPTIONS}
+              label="Change stage"
+              display={(v) => <Badge tone={stageTone(v)}>{formatStage(v)}</Badge>}
+            />
             <div className="text-right">
               <div className="text-2xl font-bold tabular-nums text-[var(--fg-primary)]">
-                {formatMoney(data.value, 'EUR')}
+                <InlineEditNumber
+                  value={data.value}
+                  onSave={(v) => patch.mutateAsync({ value: v })}
+                  label="Edit deal value (EUR)"
+                  min={0}
+                  step={1000}
+                  display={(v) => formatMoney(v, 'EUR')}
+                />
               </div>
               <div className="text-xs text-[var(--fg-tertiary)]">
-                {data.probability}% likely · due {formatDate(data.dueDate)}
+                <InlineEditNumber
+                  value={data.probability}
+                  onSave={(v) => patch.mutateAsync({ probability: v })}
+                  label="Edit probability"
+                  min={0}
+                  max={100}
+                  step={5}
+                  suffix="%"
+                />
+                {' likely · due '}
+                <InlineEditDate
+                  value={data.dueDate}
+                  onSave={(v) => patch.mutateAsync({ dueDate: v })}
+                  label="Edit due date"
+                  display={(v) => formatDate(v)}
+                />
               </div>
             </div>
           </div>
         </div>
       </header>
+
+      <BriefingDialog
+        opportunityId={data.id}
+        opportunityLabel={data.name}
+        open={briefOpen}
+        onOpenChange={setBriefOpen}
+      />
 
       <DataFreshnessRibbon refreshedAt={intel.refreshedAt} />
 
