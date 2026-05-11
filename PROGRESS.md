@@ -587,4 +587,72 @@ phases now closed or explicitly declined.
 
 ---
 
+## 2026-05-10 — Sprint 19g: CI harmonization + compound engineering
+
+**Branch:** `feat/sprint-0-foundation`
+
+Closing the audit chapter with three high-value follow-ups: log the audit-introduced bugs in MISTAKES, document the AuthContext discriminator pattern, and restore the 3-job CI split.
+
+**Done:**
+
+### 19g-1 — Three new MISTAKES.md entries (audit aftermath)
+
+- BUG: Audit's auth abstraction violated Rules of Hooks (Clerk hooks called conditionally) — ⏤ prevention rule: gate the **provider tree**, not the hook call.
+- BUG: Audit used `require()` in a Vite ESM module — caught by `@typescript-eslint/no-require-imports`. Lazy-load with `lazy(() => import(...))` instead.
+- PROCESS: Audit pipeline ran in parallel without a coordination contract — 13 files modified mid-sprint, contradicting earlier work. Future audits MUST run on a separate branch.
+
+### 19g-2 — `docs/solutions/auth-context-discriminator.md`
+
+Compound-engineering doc for the AuthProvider/AuthContext pattern: gate the provider tree (StubAuthProvider XOR ClerkProvider+ClerkAuthBridge) so consumers always read the same shared `AuthContext` — same hooks, same order, every render. Where else this pattern applies: feature-flag SDKs, analytics SDKs, any "production vs dev shim" toggle with its own React hooks.
+
+### 19g-3 — CI workflow harmonized
+
+Restored the Sprint 18d 3-job split that the audit had collapsed into a single job:
+
+- `unit` — typecheck + lint + test + build + bundle-size guard. Every push and PR. No DB.
+- `integration` — Postgres 16 + Redis 7 services. Migrate + seed + run @bidstack/api, @bidstack/mcp-server, @bidstack/worker tests. PR-only, depends on `unit`.
+- `e2e` — Build web, boot API in background, run Playwright Chromium against `?E2E_API_URL=...`. PR-only, depends on `integration`. Uploads HTML report on failure.
+
+Plus: concurrency cancellation on rapid pushes, Playwright browser cache, `--with-deps` chromium install for missing system libs, `pnpm audit` continue-on-error so unrelated advisories don't block CI until triaged.
+
+### 19g-4 — Project memory entries
+
+Persisted three entries under `~/.claude/projects/d--BIDCRM/memory/`:
+
+- `project_bidstack-360.md` — stack, layout, quality bar, "import from `@bidstack/db` not `@prisma/client`" guidance.
+- `feedback_audit-pipeline.md` — never run a long pipeline in parallel with an active session on the same branch.
+- `feedback_tailwind4-canonical-classes.md` — IDE flags `bg-[var(--x)]` → `bg-(--x)` everywhere; codebase uses v3-style; don't change in isolation (Rule 3 + 11).
+
+**Verified:**
+
+- `pnpm -r typecheck` clean
+- `pnpm -r lint` clean
+- `pnpm -r test` — **47/47 still pass**
+
+**Audit + Sprint 19 final state:**
+
+| Metric                                | Sprint 8 (handoff) | Sprint 19 end                 |
+| ------------------------------------- | ------------------ | ----------------------------- |
+| Tests                                 | 13                 | 47                            |
+| Workspaces with real lint             | 0                  | 7                             |
+| Workspaces with tests                 | 4                  | 7                             |
+| CI jobs                               | 0                  | 3 (unit / integration / e2e)  |
+| Pre-commit hooks                      | 0                  | 2 (lint-staged + secret-scan) |
+| Solutions docs (compound engineering) | 0                  | 4                             |
+| MISTAKES entries                      | 0                  | 5                             |
+| Memory entries                        | 0                  | 3                             |
+| Audit phases closed                   | n/a                | 9/10 (P5.5 declined)          |
+
+**What's left for Sprint 20+:**
+
+- Run `pnpm db:migrate` to apply the GIN trigram migration locally (blocked because dev processes hold the Prisma engine DLL — needs a clean restart)
+- Lighthouse CI thresholds (separate from Playwright smoke)
+- Mobile viewport Playwright project (chromium-mobile / webkit-mobile)
+- Visual regression
+- Real Dust API integration test (live `DUST_API_KEY` mode)
+- Production deploy prep (Dockerfiles for API/MCP/worker/web, K8s/Compose-prod manifests, Terraform)
+- Sentry DSN + OTLP trace wiring (env vars exist; integrations not yet)
+
+---
+
 <!-- New entries appended above this marker. -->
