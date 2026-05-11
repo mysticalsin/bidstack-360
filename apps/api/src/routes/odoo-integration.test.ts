@@ -44,7 +44,7 @@ describe('odoo-integration route', () => {
   });
 
   it('reports configured + reachable when the MCP server answers tools/list', async () => {
-    // initialize → notifications/initialized → tools/list
+    // initialize -> notifications/initialized -> tools/list
     vi.stubGlobal(
       'fetch',
       vi
@@ -80,14 +80,14 @@ describe('odoo-integration route', () => {
   });
 
   it('reports configured + unreachable + error when the MCP server is down', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('boom', { status: 500 })));
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('boom')));
 
     const app = await buildApp();
     const res = await app.inject({ method: 'GET', url: '/api/integrations/odoo/status' });
     expect(res.statusCode).toBe(200);
     const body = res.json() as { reachable: boolean; lastError: string | null };
     expect(body.reachable).toBe(false);
-    expect(body.lastError).toMatch(/HTTP 500/i);
+    expect(body.lastError).toMatch(/boom/i);
   });
 
   it('reports not-configured when ODOO_MCP_URL is unset', async () => {

@@ -5,7 +5,7 @@
 //
 // Multi-tenancy note: v0.1 ships with a single global Odoo connection
 // (ODOO_MCP_URL + the credentials baked into the sidecar). Per-org Odoo
-// instances are tracked as a follow-up — for now every org in this BIDCRM
+// instances are tracked as a follow-up; for now every org in this BIDCRM
 // deployment sees the same Odoo backend.
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -228,18 +228,19 @@ export const odooRoutes: FastifyPluginAsyncZod = async (server) => {
         : ([] as Array<z.infer<typeof OdooCompanySuggestion>>);
 
       const items = mergeSuggestions(odooItems, localItems).slice(0, req.query.limit);
+      const source: z.infer<typeof OdooCompanyAutocompleteResponse>['source'] =
+        odooItems.length && localItems.length
+          ? 'mixed'
+          : odooItems.length
+            ? 'odoo'
+            : localItems.length
+              ? 'local'
+              : 'none';
       return {
         generatedAt: new Date().toISOString(),
         configured: Boolean(client),
         reachable,
-        source:
-          odooItems.length && localItems.length
-            ? 'mixed'
-            : odooItems.length
-              ? 'odoo'
-              : localItems.length
-                ? 'local'
-                : 'none',
+        source,
         items,
         warnings,
       };
