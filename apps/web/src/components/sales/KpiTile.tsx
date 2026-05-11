@@ -1,7 +1,8 @@
 // One KPI tile for the Sales Dashboard. Mirrors the Odoo tile shape:
 //   label    →   big number   →   ↑/↓ delta vs previous period
-// The tile is a `<button>` so the whole surface is clickable and reaches
-// 44×44 touch target without extra layout — matches code-quality.md.
+// When `onClick` is passed the tile renders as a `<button>` and drills into
+// a pre-filtered list. With no handler it stays a plain `<div>` (no
+// keyboard affordance, no focus ring — exactly what a static stat needs).
 
 import clsx from 'clsx';
 
@@ -33,6 +34,7 @@ export function KpiTile({ label, value, deltaPct, tone = 'gray', onClick }: Prop
   return (
     <Comp
       onClick={onClick}
+      type={onClick ? 'button' : undefined}
       className={clsx(
         'w-full min-h-[88px] rounded-lg border border-[var(--border-subtle)] p-4 text-left',
         'transition-shadow hover:shadow-[var(--shadow-sm)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]',

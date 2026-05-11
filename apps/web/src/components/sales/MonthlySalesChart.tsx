@@ -129,35 +129,50 @@ export function MonthlySalesChart({ points, currency, height = CHART_HEIGHT_DEFA
           strokeLinecap="round"
         />
 
-        {/* Dots + hit areas */}
-        {coords.map((c, i) => (
-          <g key={`${points[i]!.month}-${i}`}>
-            {hover === i ? (
-              <circle
-                cx={c.x}
-                cy={c.y}
-                r={4}
-                fill="var(--brand-primary)"
-                stroke="white"
-                strokeWidth={2}
-              />
-            ) : null}
-            <rect
-              x={c.x - stepX / 2}
-              y={MARGIN.top}
-              width={stepX}
-              height={innerH}
-              fill="transparent"
-              onMouseEnter={() => setHover(i)}
-              onMouseLeave={() => setHover(null)}
-              onFocus={() => setHover(i)}
-              onBlur={() => setHover(null)}
-              tabIndex={0}
-            >
-              <title>{`${points[i]!.label} · ${formatMoneyMicros(points[i]!.revenueMicros, currency)} · ${points[i]!.orders} orders`}</title>
-            </rect>
-          </g>
-        ))}
+        {/* Dots + hit areas. Each rect is focusable so a keyboard user can
+            tab through the months; the focus state mirrors the hover state
+            so the dot + outline appear and the <title> + aria-label
+            announce the data point. */}
+        {coords.map((c, i) => {
+          const p = points[i]!;
+          const label = `${p.label}: ${formatMoneyMicros(p.revenueMicros, currency)}, ${p.orders} orders`;
+          const focused = hover === i;
+          return (
+            <g key={`${p.month}-${i}`}>
+              {focused ? (
+                <circle
+                  cx={c.x}
+                  cy={c.y}
+                  r={4}
+                  fill="var(--brand-primary)"
+                  stroke="white"
+                  strokeWidth={2}
+                />
+              ) : null}
+              <rect
+                x={c.x - stepX / 2}
+                y={MARGIN.top}
+                width={stepX}
+                height={innerH}
+                fill="transparent"
+                onMouseEnter={() => setHover(i)}
+                onMouseLeave={() => setHover(null)}
+                onFocus={() => setHover(i)}
+                onBlur={() => setHover(null)}
+                tabIndex={0}
+                role="img"
+                aria-label={label}
+                style={
+                  focused
+                    ? { outline: '2px solid var(--focus-ring)', outlineOffset: '2px' }
+                    : undefined
+                }
+              >
+                <title>{label}</title>
+              </rect>
+            </g>
+          );
+        })}
 
         {/* X labels at each point */}
         {coords.map((c, i) => (

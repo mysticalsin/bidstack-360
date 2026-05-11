@@ -8,3 +8,4 @@ export * from './note.js';
 export * from './file.js';
 export * from './sales-dashboard.js';
 export * from './sales-orders.js';
+export * from './invoices.js';

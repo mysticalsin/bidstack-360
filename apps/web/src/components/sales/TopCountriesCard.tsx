@@ -115,19 +115,21 @@ export function TopCountriesCard({ data, isLoading }: Props) {
 // ─── Minimal SVG world tile grid (placeholder for full choropleth) ──────
 
 function MiniMap({ items, max }: { items: TopCountries['items']; max: number }) {
-  // We don't ship a true choropleth (would need topojson + a maps lib).
-  // The grid still gives a "spatial scan" feel: bigger + darker chip = more
-  // revenue. Each chip is the country code; hovering shows the full number.
+  // We don't ship a true choropleth (would need topojson + a maps lib). The
+  // grid still gives a "spatial scan" feel: bigger + darker chip = more
+  // revenue. Each tile is now a Link so keyboard users get the same drill-
+  // through as the list view (audit 2026-05-11 #4).
   return (
     <div className="grid grid-cols-3 gap-3 px-5 py-5 sm:grid-cols-4">
       {items.map((c) => {
         const v = Number(BigInt(c.revenueMicros) / BigInt(1_000_000));
         const intensity = max > 0 ? Math.min(1, v / max) : 0;
         return (
-          <div
+          <Link
             key={c.code}
-            title={`${c.name}: ${formatMoneyMicros(c.revenueMicros)}`}
-            className="flex flex-col items-center justify-center rounded-md border border-[var(--border-subtle)] p-3"
+            to={`/sales/orders?country=${c.code}&state=confirmed`}
+            aria-label={`${c.name}: ${formatMoneyMicros(c.revenueMicros, 'CAD')} across ${c.orders} confirmed orders`}
+            className="flex min-h-[88px] flex-col items-center justify-center rounded-md border border-[var(--border-subtle)] p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2"
             style={{ backgroundColor: `rgba(44, 75, 255, ${0.05 + intensity * 0.25})` }}
           >
             <span className="text-2xl leading-none" aria-hidden>
@@ -139,7 +141,7 @@ function MiniMap({ items, max }: { items: TopCountries['items']; max: number }) 
             <span className="mt-0.5 text-xs tabular-nums text-[var(--fg-primary)]">
               {formatMoneyMicros(c.revenueMicros, 'CAD')}
             </span>
-          </div>
+          </Link>
         );
       })}
     </div>

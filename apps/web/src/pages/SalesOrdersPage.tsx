@@ -8,6 +8,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { OrderStateBadge } from '@/components/sales/OrderStateBadge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { formatDate, formatMoneyMicros } from '@/lib/format';
 import { useSalesOrders, type SalesOrdersListFilter } from '@/hooks/useSalesOrders';
 
@@ -48,6 +49,45 @@ export function SalesOrdersPage() {
     setParams(next, { replace: true });
   };
 
+  const onExport = (): void => {
+    const items = list.data?.items ?? [];
+    if (items.length === 0) return;
+    // Convert wire-format (string micros, ISO dates) into spreadsheet-
+    // friendly columns. Amount stays raw-decimal so Excel can SUM() it;
+    // formatted display column comes alongside for human reading.
+    const csv = rowsToCsv(
+      items.map((row) => ({
+        number: row.number,
+        state: row.state,
+        customer: row.customerName,
+        salesperson: row.salespersonName ?? '',
+        country: row.countryCode ?? '',
+        date: row.orderDate.slice(0, 10),
+        confirmedAt: row.confirmedAt?.slice(0, 10) ?? '',
+        currency: row.currency,
+        total: Number(row.totalMicros) / 1_000_000,
+        totalFormatted: formatMoneyMicros(row.totalMicros, row.currency),
+        lineCount: row.lineCount,
+      })),
+      [
+        { key: 'number', label: 'Number' },
+        { key: 'state', label: 'State' },
+        { key: 'customer', label: 'Customer' },
+        { key: 'salesperson', label: 'Salesperson' },
+        { key: 'country', label: 'Country' },
+        { key: 'date', label: 'Date' },
+        { key: 'confirmedAt', label: 'Confirmed' },
+        { key: 'currency', label: 'Currency' },
+        { key: 'total', label: 'Total' },
+        { key: 'totalFormatted', label: 'Total (formatted)' },
+        { key: 'lineCount', label: 'Lines' },
+      ],
+    );
+    const stamp = new Date().toISOString().slice(0, 10);
+    const tag = filter.state ? `-${filter.state}` : '';
+    downloadCsv(`sales-orders${tag}-${stamp}.csv`, csv);
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -59,6 +99,14 @@ export function SalesOrdersPage() {
             Sales pipeline from draft quotation through confirmed order.
           </p>
         </div>
+        <button
+          type="button"
+          onClick={onExport}
+          disabled={!list.data || list.data.items.length === 0}
+          className="inline-flex min-h-9 items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-1.5 text-xs font-medium text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-11"
+        >
+          Export CSV
+        </button>
       </header>
 
       {/* Filter chips */}

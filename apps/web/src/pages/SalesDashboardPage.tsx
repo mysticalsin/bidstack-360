@@ -4,6 +4,8 @@
 // optional Odoo sale.order tables are migrated and automatically switches to
 // those tables when they exist.
 
+import { useNavigate } from 'react-router-dom';
+
 import { KpiTile } from '@/components/sales/KpiTile';
 import { MonthlySalesChart } from '@/components/sales/MonthlySalesChart';
 import { TopCategoriesTreemap } from '@/components/sales/TopCategoriesTreemap';
@@ -28,6 +30,16 @@ export function SalesDashboardPage() {
   const report = useSalesIntelligence();
   const data = report.data;
   const currency = data?.currencyCode ?? 'CAD';
+  const navigate = useNavigate();
+  // Each KPI tile drills into a pre-filtered orders list. "Quotations" =
+  // draft+sent (no single ?state can encode both, so we land on the union),
+  // "Orders" = confirmed, "Revenue"/"Average Order" = confirmed (the same
+  // set the metric was computed from).
+  const drill =
+    (state: 'draft' | 'sent' | 'confirmed' | 'all'): (() => void) =>
+    () => {
+      navigate(state === 'all' ? '/sales/orders' : `/sales/orders?state=${state}`);
+    };
 
   return (
     <div className="space-y-6">
@@ -56,24 +68,28 @@ export function SalesDashboardPage() {
           value={metricValue(data, 'quotations', currency)}
           deltaPct={metricDelta(data, 'quotations')}
           tone="blue"
+          onClick={drill('sent')}
         />
         <KpiTile
           label="Orders"
           value={metricValue(data, 'orders', currency)}
           deltaPct={metricDelta(data, 'orders')}
           tone="gray"
+          onClick={drill('confirmed')}
         />
         <KpiTile
           label="Revenue"
           value={metricValue(data, 'revenue', currency)}
           deltaPct={metricDelta(data, 'revenue')}
           tone="amber"
+          onClick={drill('confirmed')}
         />
         <KpiTile
           label="Average Order"
           value={metricValue(data, 'average_order', currency)}
           deltaPct={metricDelta(data, 'average_order')}
           tone="amber"
+          onClick={drill('confirmed')}
         />
       </section>
 
