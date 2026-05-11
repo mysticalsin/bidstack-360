@@ -807,4 +807,98 @@ The codebase has been deliberately chart-lib-free (Sparkline is hand-rolled). Re
 
 ---
 
+## 2026-05-11 — Sprint 22: Quotations & Orders CRUD + dashboard drill-down
+
+**Branch:** `feat/sprint-0-foundation`
+
+Sprint 21 shipped the read-only Sales Dashboard. Sprint 22 makes it _act_: every Top-N row drills into a real detail page, country chips deep-link to a pre-filtered list, and the full state machine (draft → sent → confirmed → done / cancelled / reopen) is wired with audit-log entries on every transition.
+
+**Done:**
+
+### Shared (`packages/shared`)
+
+- `src/schemas/sales-orders.ts` — Zod contracts for the new endpoints:
+  - `OrderState` enum (mirrors the Prisma enum) + `ORDER_STATE_TRANSITIONS` allow-list — the single source of truth for which moves are legal
+  - `SalesOrderFilter` (state / salespersonId / countryCode / search / cursor / limit)
+  - `SalesOrderSummary` + `SalesOrderPage` — list shape, BigInt money as string
+  - `SalesOrderLineDetail` + `SalesOrderAuditEntry` + `SalesOrderDetail` — detail shape with state machine, line items, and audit timeline
+  - `SalesOrderCreate` (with stringified decimal qty so float loss can't happen on the wire) + `SalesOrderCreateLine`
+  - `SalesOrderTransitionBody` — optional `reason` lands in the audit-log diff
+
+### API (`apps/api/src/routes/sales-orders.ts`)
+
+- `GET /api/sales/orders` — list with `state` / `salespersonId` / `countryCode` / `search` filters, cursor pagination, salesperson + line-count included
+- `GET /api/sales/orders/:id` — detail with lines (each carrying SKU + product name + category), audit timeline (last 50 events), and `nextStates` derived from `ORDER_STATE_TRANSITIONS`
+- `POST /api/sales/orders` — create quotation in `draft`; mints `Q-NNNNN` via Postgres-native scan; resolves line totals in BigInt (qty × 1000 → millis → divide back so 3-decimal quantities stay exact); writes `sales_order.create` audit
+- 5 state-transition endpoints — generated from one helper so the audit-log diff shape is uniform:
+  - `POST /:id/send` (draft → sent)
+  - `POST /:id/confirm` (sent → confirmed, sets `confirmedAt`)
+  - `POST /:id/done` (confirmed → done)
+  - `POST /:id/cancel` (any → cancelled)
+  - `POST /:id/reopen` (cancelled | sent → draft)
+- Every transition writes an `audit_log` row with `{from, to, reason}` diff so the detail timeline reads cleanly
+- Illegal transitions return `409 Conflict` with the allowed-next-states in the message body
+- Mounted at `/api` in `server.ts`
+- `loadDetail(orgId, id)` helper centralises the response shape — any mutation re-loads via this helper so the client always gets a single canonical representation
+
+### API tests (`apps/api/src/routes/sales-orders.integration.test.ts`)
+
+- 8 integration tests:
+  1. Skip-sentinel — `to_regclass()` probe so DBs without the new migration silently pass
+  2. List returns valid summaries
+  3. List filters by state
+  4. Detail returns lines + audit + nextStates
+  5. `send` transitions draft → sent and audits it
+  6. `confirm` sets `confirmedAt` and transitions to confirmed
+  7. Illegal transitions return `409`
+  8. `cancel` + `reopen` round-trip back to draft
+
+### Web (`apps/web`)
+
+- `pages/SalesOrdersPage.tsx` — `/sales/orders` list view:
+  - Filter chip row (All / Quotations: draft / Quotations: sent / Orders: confirmed / Orders: done / Cancelled) — chips are URL-bound via `useSearchParams` so deep-links work
+  - Search input bound to `?search=`
+  - Country + salesperson filter chips render only when present in the URL, with an inline `✕` to clear
+  - Cursor pagination ("Load older →" button)
+  - Row → detail page link on the number
+- `pages/SalesOrderDetailPage.tsx`:
+  - Breadcrumb: Sales › Quotations & Orders › Q-NNNNN
+  - Header card with state badge, customer, salesperson, country, dates, headline total
+  - State-action buttons — show only the _legal_ next states (driven by `nextStates`); cancel is `destructive`, confirm/send are `primary`, others `secondary`
+  - Line-items table with SKU + category + qty + unit price + subtotal + grand total in footer
+  - Audit timeline with `relativeTime` + actor + transition arrow (e.g. `draft → sent`)
+- `components/sales/OrderStateBadge.tsx` — per-state tone discipline (draft=gray, sent=blue, confirmed=jade, done=purple, cancelled=tomato)
+- `hooks/useSalesOrders.ts` — `useSalesOrders(filter)`, `useSalesOrder(id)`, `useCreateSalesOrder()`, `useTransitionSalesOrder(action)`. Each mutation invalidates the relevant dashboard queries (`sales:kpis`, `sales:monthly`, `sales:top-*`) so confirming a quotation in the detail page immediately updates the dashboard tiles
+- App.tsx — `/sales/orders` + `/sales/orders/:id` lazy routes
+- Sidebar — added "Quotations & Orders" entry under Sales
+
+### Dashboard drill-down
+
+- `TopList.tsx` — rows whose `id` looks like a UUID (real SalesOrder rows from Top Quotations / Top Orders) render as `<Link to="/sales/orders/:id">`. Customer-grouped rows (synthetic ids) stay inert — clicking a customer name does nothing surprising
+- `TopCountriesCard.tsx` — each country row becomes a `<Link to="/sales/orders?country=CA&state=confirmed">` so a click on Canada lands you on the filtered orders list
+
+### DB
+
+- `packages/db/src/index.ts` — re-export `OrderState` as a runtime value so route files can import the Prisma enum without reaching into `@prisma/client`
+
+**Quality verified:**
+
+- `pnpm -r typecheck` clean across 8 workspaces
+- `pnpm -r lint` 0 errors, 0 warnings
+- `pnpm -r test` **137/137 pass** (was 124; +8 sales-orders integration tests + 5 from other autonomous-agent improvements)
+
+**Operational notes:**
+
+- The `/sales/orders` page is fully usable today against the seed data — the only mutation gate is `pnpm db:migrate` (the migration was added in Sprint 21 and only needs to be applied once locally)
+- State-machine illegal-move errors land as `409 Conflict` so the UI can surface them inline if needed (today it logs and disables the button)
+
+**Deferred:**
+
+- Create-quotation dialog (the API endpoint and hook exist; UI form is the next obvious extension)
+- Edit line-item rows after creation (currently lines are immutable post-create)
+- PDF / share-link export of a quotation (would dovetail with the existing proposal-doc machinery)
+- Outbound mirror to Odoo `sale.order` via `@bidstack/odoo-mcp-client` (`createRecord` / `updateRecord` are ready; needs a small worker)
+
+---
+
 <!-- New entries appended above this marker. -->

@@ -59,6 +59,12 @@ const AccountsPage = lazy(() =>
 const SalesDashboardPage = lazy(() =>
   import('@/pages/SalesDashboardPage').then((m) => ({ default: m.SalesDashboardPage })),
 );
+const SalesOrdersPage = lazy(() =>
+  import('@/pages/SalesOrdersPage').then((m) => ({ default: m.SalesOrdersPage })),
+);
+const SalesOrderDetailPage = lazy(() =>
+  import('@/pages/SalesOrderDetailPage').then((m) => ({ default: m.SalesOrderDetailPage })),
+);
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { isLoaded, isSignedIn } = useAuth();
@@ -191,6 +197,22 @@ function AnimatedRoutes() {
             element={
               <RequireAuth>
                 <SalesDashboardPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/sales/orders"
+            element={
+              <RequireAuth>
+                <SalesOrdersPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/sales/orders/:id"
+            element={
+              <RequireAuth>
+                <SalesOrderDetailPage />
               </RequireAuth>
             }
           />

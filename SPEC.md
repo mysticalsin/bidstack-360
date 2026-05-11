@@ -145,6 +145,15 @@ GET    /api/sales-dashboard/top-products    Revenue + order count by product
 GET    /api/sales-dashboard/top-customers   Revenue grouped by customer name
 GET    /api/sales-dashboard/top-categories  Revenue rolled up to product category
 
+GET    /api/sales/orders                    List + filter + cursor pagination
+GET    /api/sales/orders/:id                Detail with lines + audit + nextStates
+POST   /api/sales/orders                    Create quotation (state=draft)
+POST   /api/sales/orders/:id/send           draft → sent
+POST   /api/sales/orders/:id/confirm        sent → confirmed (writes confirmedAt)
+POST   /api/sales/orders/:id/done           confirmed → done
+POST   /api/sales/orders/:id/cancel         any → cancelled
+POST   /api/sales/orders/:id/reopen         cancelled|sent → draft
+
 POST   /webhooks/dust                  Dust webhook receiver (HMAC verified)
 ```
 

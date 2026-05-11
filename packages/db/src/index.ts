@@ -55,4 +55,5 @@ export {
   TaskStatus,
   DocumentKind,
   SyncEventStatus,
+  OrderState,
 } from '../generated/client/index.js';

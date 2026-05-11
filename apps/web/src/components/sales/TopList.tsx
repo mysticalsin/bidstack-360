@@ -3,6 +3,11 @@
 //
 // Columns: Customer (or label), Salesperson (optional), Revenue.
 // Highlights the leading row with a tinted bar so a glance reads the leader.
+// Rows are clickable when the row's `id` looks like a UUID — that lets
+// quotations/orders (real SalesOrder rows) drill into the detail page,
+// while customer-grouped rows (synthetic ids like "Name-N") stay inert.
+
+import { Link } from 'react-router-dom';
 
 import { formatMoneyMicros } from '@/lib/format';
 
@@ -14,6 +19,8 @@ interface Props {
   /** Whether the bar tone is the cool one (quotations) or warm (orders). */
   variant?: 'quotation' | 'order' | 'customer';
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function TopList({ items, showSalesperson = true, variant = 'quotation' }: Props) {
   if (items.length === 0) {
@@ -61,9 +68,18 @@ export function TopList({ items, showSalesperson = true, variant = 'quotation' }
                     className={`absolute inset-y-1 left-1 -z-0 rounded ${barClass}`}
                     style={{ width: `calc(${pct.toFixed(2)}% - 8px)` }}
                   />
-                  <span className="relative z-10 truncate font-medium text-[var(--brand-primary)] underline-offset-2 hover:underline">
-                    {row.label}
-                  </span>
+                  {UUID_RE.test(row.id) ? (
+                    <Link
+                      to={`/sales/orders/${row.id}`}
+                      className="relative z-10 truncate font-medium text-[var(--brand-primary)] underline-offset-2 hover:underline"
+                    >
+                      {row.label}
+                    </Link>
+                  ) : (
+                    <span className="relative z-10 truncate font-medium text-[var(--fg-primary)]">
+                      {row.label}
+                    </span>
+                  )}
                 </td>
                 {showSalesperson ? (
                   <td className="px-4 py-2.5 text-[var(--fg-secondary)] whitespace-nowrap">

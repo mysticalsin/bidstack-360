@@ -20,6 +20,7 @@ interface NavItem {
 const WORKSPACE: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
   { to: '/sales', label: 'Sales', icon: 'reports' },
+  { to: '/sales/orders', label: 'Quotations & Orders', icon: 'briefcase' },
   { to: '/accounts', label: 'Accounts', icon: 'building' },
   { to: '/opportunities', label: 'Opportunities', icon: 'briefcase', badgeKey: 'openBids' },
   { to: '/pipeline', label: 'Pipeline', icon: 'pipeline' },

@@ -6,6 +6,7 @@
 // The header still toggles to a future "Map" view via the same query.
 
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
@@ -75,28 +76,33 @@ export function TopCountriesCard({ data, isLoading }: Props) {
             const v = Number(BigInt(c.revenueMicros) / BigInt(1_000_000));
             const pct = max > 0 ? (v / max) * 100 : 0;
             return (
-              <li key={c.code} className="flex items-center gap-3 px-5 py-2.5">
-                <span aria-hidden className="text-xl leading-none">
-                  {FLAGS[c.code] ?? '🏳️'}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="truncate text-sm font-medium text-[var(--fg-primary)]">
-                      {c.name}
-                    </span>
-                    <span className="tabular-nums text-sm text-[var(--fg-primary)] whitespace-nowrap">
-                      {formatMoneyMicros(c.revenueMicros, data?.currency ?? 'CAD')}
-                    </span>
+              <li key={c.code}>
+                <Link
+                  to={`/sales/orders?country=${c.code}&state=confirmed`}
+                  className="flex items-center gap-3 px-5 py-2.5 hover:bg-[var(--surface-subtle)] focus-visible:bg-[var(--surface-subtle)] focus-visible:outline-none"
+                >
+                  <span aria-hidden className="text-xl leading-none">
+                    {FLAGS[c.code] ?? '🏳️'}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="truncate text-sm font-medium text-[var(--fg-primary)]">
+                        {c.name}
+                      </span>
+                      <span className="tabular-nums text-sm text-[var(--fg-primary)] whitespace-nowrap">
+                        {formatMoneyMicros(c.revenueMicros, data?.currency ?? 'CAD')}
+                      </span>
+                    </div>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--surface-subtle)]">
+                      <div
+                        aria-hidden
+                        className="h-full rounded-full bg-[var(--brand-primary)]"
+                        style={{ width: `${pct.toFixed(1)}%`, opacity: 0.6 + 0.4 * (pct / 100) }}
+                      />
+                    </div>
                   </div>
-                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--surface-subtle)]">
-                    <div
-                      aria-hidden
-                      className="h-full rounded-full bg-[var(--brand-primary)]"
-                      style={{ width: `${pct.toFixed(1)}%`, opacity: 0.6 + 0.4 * (pct / 100) }}
-                    />
-                  </div>
-                </div>
-                <Badge tone="gray">{c.orders}</Badge>
+                  <Badge tone="gray">{c.orders}</Badge>
+                </Link>
               </li>
             );
           })}
