@@ -17,8 +17,7 @@ const VARIANT: Record<Variant, string> = {
     'bg-[var(--surface-card)] text-[var(--fg-primary)] border border-[var(--border-default)] hover:bg-[var(--surface-sunken)] hover:border-[var(--border-strong)]',
   ghost:
     'bg-transparent text-[var(--fg-secondary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)]',
-  destructive:
-    'bg-[var(--danger)] text-white hover:opacity-95 shadow-[var(--shadow-xs)]',
+  destructive: 'bg-[var(--danger)] text-white hover:opacity-95 shadow-[var(--shadow-xs)]',
 };
 
 const SIZE: Record<Size, string> = {
@@ -33,7 +32,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       ref={ref}
       type={type}
       className={cn(
-        'inline-flex items-center justify-center rounded-md font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60',
+        // Touch-target floor: visually compact on desktop (32–44px) but
+        // expands to the 44×44 Apple HIG / WCAG 2.2 AAA target on coarse
+        // pointer devices (touch). Keeps desktop density while staying
+        // tappable on phones and tablets.
+        'inline-flex items-center justify-center rounded-md font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 pointer-coarse:min-h-11 pointer-coarse:min-w-11',
         VARIANT[variant],
         SIZE[size],
         className,

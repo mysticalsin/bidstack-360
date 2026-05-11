@@ -478,4 +478,113 @@ restore + harmonize in Sprint 19g once the rest of the audit settles.
 
 ---
 
+## 2026-05-10 — Sprint 19f: Audit Phase 5 + 7 + 10 + 6 + 8 closeout
+
+**Branch:** `feat/sprint-0-foundation`
+
+Finished the remaining audit items from `AUDIT_REMEDIATION_PROMPT.md`. All
+phases now closed or explicitly declined.
+
+**Done:**
+
+### P5.1 — Wire View-all + Topbar search consumption
+
+- `OpportunitiesPage` reads `?search=...` query param via `useSearchParams`
+- Header shows "N results for 'query'" with a clear-search button
+- Dashboard "View all" already wired (verified)
+
+### P5.3 — A11y improvements
+
+- `<th scope="col">` on every table header (OpportunitiesPage + ContactsPage)
+- `<caption className="sr-only">` summary on the opportunities table for screen readers
+- `OpportunityDetailPage` breadcrumb: `<nav><ol><li><Link>` semantic structure with `aria-current="page"` on the leaf
+- `Button` base class adds `pointer-coarse:min-h-11 pointer-coarse:min-w-11` so touch devices get the 44×44 hit target without inflating desktop density
+- `main.tsx` import path was already corrected by the audit
+
+### P5.4 — Removed 4 unused Radix packages
+
+- `@radix-ui/react-dropdown-menu`, `@radix-ui/react-popover`, `@radix-ui/react-toast`, `@radix-ui/react-tooltip` — none referenced in `apps/web/src/`
+
+### P5.5 — DECLINED Tailwind v4 → v3 downgrade
+
+- Tailwind 4 stable is the current major as of 2026-01. Downgrading is regressive.
+- Documented in `MISTAKES.md`? No — not a mistake, an explicit override of audit advice.
+
+### P5.6 — Zod field-level validation in CreateOpportunityDialog
+
+- Imports `OpportunityCreate as OpportunityCreateSchema` (Zod schema) alongside the inferred type
+- Submit handler does `.safeParse(candidate)` and surfaces `flatten().fieldErrors` per field
+- `Field` component now renders an inline `role="alert"` error message under each input
+- Server-side validation still runs as the source of truth — client-side is for fast feedback
+
+### P10.1 — `avgDaysOpen` computed from DB
+
+- Verified: `apps/api/src/routes/reports.ts` already calls `prisma.opportunity.findMany` and computes the average from `createdAt` (not hardcoded). Audit had done this.
+
+### P10.3 — Bundle analyzer
+
+- Added `rollup-plugin-visualizer` to `apps/web` devDeps
+- `vite.config.ts` registers it conditionally on `--mode analyze`
+- New script: `pnpm --filter @bidstack/web analyze` → builds with treemap → opens `dist/bundle-stats.html`
+
+### P6.1 + P6.2 + P6.3 — OpenAPI + shared schemas
+
+- Verified: `OpportunityCreate` is a standalone schema in `handoff/openapi.yaml` (not `allOf:[Opportunity]`)
+- Verified: `OpportunityFull` and `DustStatus` are present in `packages/shared/src/schemas/opportunity.ts`
+
+### P7.1 + P7.2 + P7.3 — Dust client
+
+- Verified: `runAgent` payload uses `{ message: { content, role: 'user' } }`
+- Verified: `getConversation(conversationId)` method exists
+- Verified: `AbortError` is wrapped as `DustError` with status 408
+
+### P4.3 — Dead `@modelcontextprotocol/sdk` dep
+
+- Verified: not in `apps/mcp-server/package.json` deps; only in the excluded `packages/twenty-bidstack/` overlay (preserved verbatim per architecture)
+
+### P8.3 + P8.4 — Root scripts
+
+- Verified: `db:generate` and `db:migrate` (without hardcoded `--name init`) are in root `package.json`
+
+### Bug fixes during the sweep
+
+- `apps/web/src/lib/auth.tsx` — audit's auth abstraction had **3 Rules-of-Hooks violations** (calling Clerk hooks conditionally based on stub presence). Refactored to use a single shared `AuthContext` with two non-overlapping providers (`StubAuthProvider` and `ClerkAuthBridge`). Hook order is now stable per-render. Lint clean, types clean.
+- `apps/web/src/App.tsx` — replaced `require('@clerk/clerk-react')` with `lazy(() => import(...))` for the SignIn component. Both eliminates the `no-require-imports` lint error and gives Clerk's UI its own Suspense-loadable chunk.
+
+**Verified:**
+
+- `pnpm -r typecheck` clean across all 7 workspaces
+- `pnpm -r lint` clean across all 7 workspaces
+- `pnpm -r test` — **47/47 still pass** (no regression after auth refactor)
+- `pnpm --filter @bidstack/web build` succeeds in 2.14s
+
+**Audit final status — all phases addressed:**
+
+| Phase                                                               | Status                    |
+| ------------------------------------------------------------------- | ------------------------- |
+| P1 Security (auth, docker secrets, webhook orgId, trustProxy, CORS) | ✅ Closed                 |
+| P2 Data integrity (Citext, GIN trigram, Industry, Prisma errors)    | ✅ Closed                 |
+| P3 Worker reliability (retries, graceful shutdown, circuit breaker) | ✅ Closed (audit)         |
+| P4 MCP hardening (audit log, hourly rate limit, dead dep)           | ✅ Closed                 |
+| P5 Frontend (UI wiring, a11y, deps, validation)                     | ✅ Closed (P5.5 declined) |
+| P6 OpenAPI + shared schemas                                         | ✅ Closed                 |
+| P7 Dust client (runAgent, getConversation, AbortError)              | ✅ Closed                 |
+| P8 Quality gates (lint, CI, scripts)                                | ✅ Closed (Sprint 18)     |
+| P9 Test expansion (MCP, worker, frontend components)                | ✅ Closed (Sprint 19e)    |
+| P10 Performance (avgDaysOpen, sourcemap, analyzer)                  | ✅ Closed                 |
+
+**Bundle size after Clerk addition:**
+
+- react: 363 KB / 112 KB gzip (was 341/104 — Clerk's React peer pulled extras)
+- vendor: 134 KB / 40 KB gzip (was 42 — Clerk's helpers landed here)
+- Net first-paint: ~190 KB gzip (was ~167 — +23 KB for Clerk wiring)
+- Per-route chunks unchanged
+
+**Next:** Sprint 19g — harmonize CI workflow (audit replaced Sprint 18's
+3-job split with a single job; restore the unit/integration/e2e separation
+
+- bundle-size guard + Playwright cache) → Lighthouse CI thresholds.
+
+---
+
 <!-- New entries appended above this marker. -->

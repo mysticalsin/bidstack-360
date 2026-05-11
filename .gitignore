@@ -34,6 +34,8 @@ coverage/
 .nyc_output/
 playwright-report/
 test-results/
+trace_extracted/
+*.err
 
 # Logs
 logs/

@@ -19,11 +19,28 @@ interface IntelPayload {
     headcount: number | null;
     pricePoints?: number[];
   } | null;
-  triggers?: Array<{ id: string; label: string; weight: number; observedAt: string; source: string | null; kind: string }>;
+  triggers?: Array<{
+    id: string;
+    label: string;
+    weight: number;
+    observedAt: string;
+    source: string | null;
+    kind: string;
+  }>;
   competitors?: Array<{ vendor: string; score: number; strengths: string[]; weaknesses: string[] }>;
-  news?: Array<{ id: string; headline: string; source: string; publishedAt: string; sentiment: string }>;
+  news?: Array<{
+    id: string;
+    headline: string;
+    source: string;
+    publishedAt: string;
+    sentiment: string;
+  }>;
   hiring?: { openings: Array<{ title: string; urgency: string }>; trendDirection: string };
-  winPrediction?: { probability: number; modelVersion: string; drivers: Array<{ label: string; contribution: number }> };
+  winPrediction?: {
+    probability: number;
+    modelVersion: string;
+    drivers: Array<{ label: string; contribution: number }>;
+  };
   decisionUnit?: Array<{
     contactId: string;
     name: string;
@@ -41,20 +58,22 @@ export function OpportunityDetailPage() {
 
   if (isLoading) return <LoadingSkeleton rows={8} />;
   if (isError)
-    return (
-      <ErrorState title="Couldn't load this opportunity" message={error?.message ?? '—'} />
-    );
+    return <ErrorState title="Couldn't load this opportunity" message={error?.message ?? '—'} />;
   if (!data) return null;
 
   return (
     <div className="space-y-6">
       <header>
         <nav aria-label="Breadcrumb" className="text-xs text-[var(--fg-tertiary)] mb-2">
-          <Link to="/opportunities" className="hover:text-[var(--brand-primary)]">
-            Opportunities
-          </Link>
-          <span className="mx-2">/</span>
-          <span>{data.code}</span>
+          <ol className="flex items-center gap-2">
+            <li>
+              <Link to="/opportunities" className="hover:text-[var(--brand-primary)]">
+                Opportunities
+              </Link>
+            </li>
+            <li aria-hidden="true">/</li>
+            <li aria-current="page">{data.code}</li>
+          </ol>
         </nav>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -112,8 +131,8 @@ function DataFreshnessRibbon({ refreshedAt }: { refreshedAt?: string }) {
         aria-hidden
       />
       <span>
-        Intel refreshed {refreshedAt ? formatDate(refreshedAt) : '—'} · Sources: Crunchbase, LinkedIn,
-        EU register
+        Intel refreshed {refreshedAt ? formatDate(refreshedAt) : '—'} · Sources: Crunchbase,
+        LinkedIn, EU register
       </span>
     </div>
   );
@@ -126,7 +145,10 @@ function FinancialHealthCard({ intel }: { intel: IntelPayload }) {
       <SectionHeader title="Financial health" caption={f?.ticker ?? 'Private'} />
       <div className="p-5 space-y-3 text-sm">
         <Row label="Market cap" value={f?.marketCap ? formatMoney(f.marketCap, 'USD') : '—'} />
-        <Row label="Revenue (TTM)" value={f?.revenueAnnual ? formatMoney(f.revenueAnnual, 'USD') : '—'} />
+        <Row
+          label="Revenue (TTM)"
+          value={f?.revenueAnnual ? formatMoney(f.revenueAnnual, 'USD') : '—'}
+        />
         <Row
           label="Growth"
           value={f?.revenueGrowth != null ? `${(f.revenueGrowth * 100).toFixed(1)}%` : '—'}
@@ -144,7 +166,13 @@ function FinancialHealthCard({ intel }: { intel: IntelPayload }) {
 
 function WinPredictionCard({ intel }: { intel: IntelPayload }) {
   const wp = intel.winPrediction;
-  if (!wp) return <Card><SectionHeader title="Win prediction" /><div className="p-5 text-xs text-[var(--fg-tertiary)]">No prediction available.</div></Card>;
+  if (!wp)
+    return (
+      <Card>
+        <SectionHeader title="Win prediction" />
+        <div className="p-5 text-xs text-[var(--fg-tertiary)]">No prediction available.</div>
+      </Card>
+    );
   return (
     <Card>
       <SectionHeader title="Win prediction" caption={`Model ${wp.modelVersion}`} />
@@ -183,7 +211,9 @@ function HiringCard({ intel }: { intel: IntelPayload }) {
           h.openings.map((o, i) => (
             <div key={i} className="flex items-center justify-between text-xs">
               <span className="text-[var(--fg-primary)]">{o.title}</span>
-              <Badge tone={o.urgency === 'high' ? 'tomato' : o.urgency === 'medium' ? 'amber' : 'gray'}>
+              <Badge
+                tone={o.urgency === 'high' ? 'tomato' : o.urgency === 'medium' ? 'amber' : 'gray'}
+              >
                 {o.urgency}
               </Badge>
             </div>
@@ -218,9 +248,7 @@ function TriggersCard({ intel }: { intel: IntelPayload }) {
           </li>
         ))}
         {!intel.triggers?.length ? (
-          <li className="px-5 py-6 text-xs text-[var(--fg-tertiary)]">
-            No triggers detected yet.
-          </li>
+          <li className="px-5 py-6 text-xs text-[var(--fg-tertiary)]">No triggers detected yet.</li>
         ) : null}
       </ul>
     </Card>
@@ -236,15 +264,10 @@ function CompetitorRadarCard({ intel }: { intel: IntelPayload }) {
           <li key={c.vendor} className="px-5 py-3">
             <div className="flex items-center justify-between mb-1.5">
               <div className="text-sm font-medium text-[var(--fg-primary)]">{c.vendor}</div>
-              <div className="text-xs tabular-nums text-[var(--fg-tertiary)]">
-                {c.score}/100
-              </div>
+              <div className="text-xs tabular-nums text-[var(--fg-tertiary)]">{c.score}/100</div>
             </div>
             <div className="h-1.5 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
-              <div
-                className="h-full bg-[var(--brand-primary)]"
-                style={{ width: `${c.score}%` }}
-              />
+              <div className="h-full bg-[var(--brand-primary)]" style={{ width: `${c.score}%` }} />
             </div>
             <div className="mt-1.5 text-xs text-[var(--fg-tertiary)]">
               + {c.strengths.join(', ') || '—'} · − {c.weaknesses.join(', ') || '—'}
@@ -268,7 +291,15 @@ function NewsCard({ intel }: { intel: IntelPayload }) {
           <li key={n.id} className="px-5 py-3">
             <div className="flex items-center justify-between">
               <div className="text-sm text-[var(--fg-primary)]">{n.headline}</div>
-              <Badge tone={n.sentiment === 'positive' ? 'jade' : n.sentiment === 'negative' ? 'tomato' : 'gray'}>
+              <Badge
+                tone={
+                  n.sentiment === 'positive'
+                    ? 'jade'
+                    : n.sentiment === 'negative'
+                      ? 'tomato'
+                      : 'gray'
+                }
+              >
                 {n.sentiment}
               </Badge>
             </div>

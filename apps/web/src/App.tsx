@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { useAuth, SignIn } from '@clerk/clerk-react';
 
+import { useAuth } from '@/lib/auth';
 import { CommandPalette } from '@/components/command/CommandPalette';
 import { AppShell } from '@/components/layout/AppShell';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
@@ -51,12 +51,31 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 }
 
 function LoginPage() {
+  const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+
+  // Stub mode: auto-redirect to dashboard (no login UI needed)
+  if (!clerkKey) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Real Clerk mode: render SignIn component
+  // We dynamically import Clerk's SignIn to avoid bundling it in stub mode
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--surface-bg)]">
-      <SignIn routing="path" path="/login" signUpUrl="/login" afterSignInUrl="/dashboard" />
+      <ClerkSignIn />
     </div>
   );
 }
+
+// Lazy-load Clerk's SignIn so stub builds put it in its own chunk that's
+// only fetched when a real publishable key is present.
+const ClerkSignIn = lazy(() =>
+  import('@clerk/clerk-react').then((m) => ({
+    default: () => (
+      <m.SignIn routing="path" path="/login" signUpUrl="/login" afterSignInUrl="/dashboard" />
+    ),
+  })),
+);
 
 export function App() {
   const palette = useCommandPalette();

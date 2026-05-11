@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { useUser, useClerk } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
+import { useUser, useSignOut } from '@/lib/auth';
 import { useThemeStore } from '@/stores/theme';
 
 export function Topbar() {
   const { theme, toggle } = useThemeStore();
   const { user } = useUser();
-  const { signOut } = useClerk();
+  const { signOut } = useSignOut();
   const navigate = useNavigate();
 
   const initials = user

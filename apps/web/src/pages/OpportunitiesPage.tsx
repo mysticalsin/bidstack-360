@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { Card } from '@/components/ui/Card';
 import { Badge, stageTone } from '@/components/ui/Badge';
@@ -8,7 +8,13 @@ import { useOpportunities } from '@/hooks/useOpportunities';
 import { formatDate, formatMoney, formatStage } from '@/lib/format';
 
 export function OpportunitiesPage() {
-  const { data, isLoading, isError, error } = useOpportunities({ limit: 100 });
+  const [searchParams, setSearchParams] = useSearchParams();
+  const search = searchParams.get('search') ?? undefined;
+
+  const { data, isLoading, isError, error } = useOpportunities({
+    limit: 100,
+    ...(search ? { search } : {}),
+  });
 
   return (
     <div className="space-y-6">
@@ -18,7 +24,30 @@ export function OpportunitiesPage() {
             Opportunities
           </h1>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            {data?.items.length ?? 0} bids in flight.
+            {search ? (
+              <>
+                <span className="font-medium text-[var(--fg-primary)]">
+                  {data?.items.length ?? 0}
+                </span>{' '}
+                results for{' '}
+                <span className="rounded bg-[var(--surface-sunken)] px-1.5 py-0.5 font-mono text-xs">
+                  &ldquo;{search}&rdquo;
+                </span>{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = new URLSearchParams(searchParams);
+                    next.delete('search');
+                    setSearchParams(next);
+                  }}
+                  className="ml-2 text-xs text-[var(--fg-tertiary)] underline hover:text-[var(--brand-primary)]"
+                >
+                  clear
+                </button>
+              </>
+            ) : (
+              <>{data?.items.length ?? 0} bids in flight.</>
+            )}
           </p>
         </div>
         <CreateOpportunityDialog />
@@ -39,24 +68,41 @@ export function OpportunitiesPage() {
           />
         ) : (
           <table className="w-full text-left text-sm">
+            <caption className="sr-only">
+              {search
+                ? `Opportunities matching "${search}"`
+                : 'All opportunities, sorted by most recent activity'}
+            </caption>
             <thead className="bg-[var(--surface-sunken)] text-xs text-[var(--fg-tertiary)] uppercase tracking-wider">
               <tr>
-                <th className="px-5 py-3 font-semibold">Code</th>
-                <th className="px-5 py-3 font-semibold">Opportunity</th>
-                <th className="px-5 py-3 font-semibold">Stage</th>
-                <th className="px-5 py-3 font-semibold text-right">Value</th>
-                <th className="px-5 py-3 font-semibold text-right">Probability</th>
-                <th className="px-5 py-3 font-semibold">Due</th>
+                <th scope="col" className="px-5 py-3 font-semibold">
+                  Code
+                </th>
+                <th scope="col" className="px-5 py-3 font-semibold">
+                  Opportunity
+                </th>
+                <th scope="col" className="px-5 py-3 font-semibold">
+                  Stage
+                </th>
+                <th scope="col" className="px-5 py-3 font-semibold text-right">
+                  Value
+                </th>
+                <th scope="col" className="px-5 py-3 font-semibold text-right">
+                  Probability
+                </th>
+                <th scope="col" className="px-5 py-3 font-semibold">
+                  Due
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border-subtle)]">
               {data?.items.map((o) => (
-                <tr
-                  key={o.id}
-                  className="hover:bg-[var(--surface-sunken)] transition-colors"
-                >
+                <tr key={o.id} className="hover:bg-[var(--surface-sunken)] transition-colors">
                   <td className="px-5 py-3 font-mono text-xs text-[var(--fg-tertiary)]">
-                    <Link to={`/opportunities/${o.id}`} className="hover:text-[var(--brand-primary)]">
+                    <Link
+                      to={`/opportunities/${o.id}`}
+                      className="hover:text-[var(--brand-primary)]"
+                    >
                       {o.code}
                     </Link>
                   </td>
@@ -78,9 +124,7 @@ export function OpportunitiesPage() {
                   <td className="px-5 py-3 text-right tabular-nums text-[var(--fg-secondary)]">
                     {o.probability}%
                   </td>
-                  <td className="px-5 py-3 text-[var(--fg-secondary)]">
-                    {formatDate(o.dueDate)}
-                  </td>
+                  <td className="px-5 py-3 text-[var(--fg-secondary)]">{formatDate(o.dueDate)}</td>
                 </tr>
               ))}
             </tbody>

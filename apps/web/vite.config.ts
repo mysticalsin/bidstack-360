@@ -1,14 +1,28 @@
 import path from 'node:path';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, type PluginOption } from 'vite';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, path.resolve(__dirname, '../..'), 'VITE_');
   const apiUrl = env.VITE_API_URL ?? 'http://localhost:4000';
+  // Bundle analyzer fires only in `--mode analyze`; keeps prod builds clean.
+  const analyze = mode === 'analyze';
 
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      analyze &&
+        (visualizer({
+          filename: 'dist/bundle-stats.html',
+          template: 'treemap',
+          gzipSize: true,
+          brotliSize: true,
+          open: true,
+        }) as PluginOption),
+    ].filter(Boolean) as PluginOption[],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
@@ -45,10 +59,12 @@ export default defineConfig(({ mode }) => {
             if (id.includes('/@radix-ui/')) return 'radix';
             if (id.includes('/zustand/')) return 'state';
             if (id.includes('/zod/')) return 'zod';
+            // Exact-match React core packages only — avoid matching @clerk/clerk-react,
+            // react-router, @types/react, etc.
             if (
-              id.includes('/react/') ||
-              id.includes('/react-dom/') ||
-              id.includes('/scheduler/')
+              id.includes('/node_modules/react/') ||
+              id.includes('/node_modules/react-dom/') ||
+              id.includes('/node_modules/scheduler/')
             ) {
               return 'react';
             }

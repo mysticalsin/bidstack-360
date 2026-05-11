@@ -20,11 +20,21 @@ export function ContactsPage() {
           <table className="w-full text-left text-sm">
             <thead className="bg-[var(--surface-sunken)] text-xs uppercase tracking-wider text-[var(--fg-tertiary)]">
               <tr>
-                <th className="px-5 py-3 font-semibold">Name</th>
-                <th className="px-5 py-3 font-semibold">Role</th>
-                <th className="px-5 py-3 font-semibold">Customer</th>
-                <th className="px-5 py-3 font-semibold">Influence</th>
-                <th className="px-5 py-3 font-semibold">Sentiment</th>
+                <th scope="col" className="px-5 py-3 font-semibold">
+                  Name
+                </th>
+                <th scope="col" className="px-5 py-3 font-semibold">
+                  Role
+                </th>
+                <th scope="col" className="px-5 py-3 font-semibold">
+                  Customer
+                </th>
+                <th scope="col" className="px-5 py-3 font-semibold">
+                  Influence
+                </th>
+                <th scope="col" className="px-5 py-3 font-semibold">
+                  Sentiment
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border-subtle)]">

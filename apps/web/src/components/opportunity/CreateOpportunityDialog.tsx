@@ -8,15 +8,19 @@ import {
   INDUSTRIES,
   type Opportunity,
   type OpportunityCreate,
+  OpportunityCreate as OpportunityCreateSchema,
   OpportunityStage,
 } from '@bidstack/shared';
 
 const STAGES = OpportunityStage.options;
 
+type FieldErrors = Partial<Record<keyof OpportunityCreate, string[]>>;
+
 export function CreateOpportunityDialog() {
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   const create = useMutation({
     mutationFn: (body: OpportunityCreate) =>
@@ -26,6 +30,7 @@ export function CreateOpportunityDialog() {
       qc.invalidateQueries({ queryKey: ['report:pipeline'] });
       setOpen(false);
       setError(null);
+      setFieldErrors({});
     },
     onError: (err: Error) => setError(err.message),
   });
@@ -33,19 +38,28 @@ export function CreateOpportunityDialog() {
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
+    setFieldErrors({});
     const fd = new FormData(e.currentTarget);
-    const body: OpportunityCreate = {
+    const candidate = {
       customer: String(fd.get('customer') ?? '').trim(),
       name: String(fd.get('name') ?? '').trim(),
-      stage: fd.get('stage') as OpportunityCreate['stage'],
+      stage: fd.get('stage'),
       value: Number(fd.get('value') ?? 0),
       probability: Number(fd.get('probability') ?? 0),
       dueDate: (fd.get('dueDate') as string) || null,
       owner: null,
-      industry: (fd.get('industry') as OpportunityCreate['industry']) || null,
+      industry: (fd.get('industry') as string) || null,
       logo: null,
     };
-    create.mutate(body);
+
+    // Client-side validation against the canonical Zod schema. The server
+    // also re-validates — this is for fast inline feedback, not security.
+    const parsed = OpportunityCreateSchema.safeParse(candidate);
+    if (!parsed.success) {
+      setFieldErrors(parsed.error.flatten().fieldErrors as FieldErrors);
+      return;
+    }
+    create.mutate(parsed.data);
   };
 
   return (
@@ -58,14 +72,14 @@ export function CreateOpportunityDialog() {
         description="Add a bid to your pipeline. You can refine intel after Dust enrichment runs."
       >
         <form onSubmit={submit} className="space-y-4">
-          <Field label="Customer" htmlFor="customer">
+          <Field label="Customer" htmlFor="customer" error={fieldErrors.customer?.[0]}>
             <Input id="customer" name="customer" required minLength={1} placeholder="Acme Corp" />
           </Field>
-          <Field label="Opportunity name" htmlFor="name">
+          <Field label="Opportunity name" htmlFor="name" error={fieldErrors.name?.[0]}>
             <Input id="name" name="name" required placeholder="Acme — IT Modernization" />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Stage" htmlFor="stage">
+            <Field label="Stage" htmlFor="stage" error={fieldErrors.stage?.[0]}>
               <Select id="stage" name="stage" defaultValue="discovery">
                 {STAGES.map((s) => (
                   <option key={s} value={s}>
@@ -74,7 +88,7 @@ export function CreateOpportunityDialog() {
                 ))}
               </Select>
             </Field>
-            <Field label="Industry" htmlFor="industry">
+            <Field label="Industry" htmlFor="industry" error={fieldErrors.industry?.[0]}>
               <Select id="industry" name="industry" defaultValue="">
                 <option value="">—</option>
                 {INDUSTRIES.map((i) => (
@@ -86,10 +100,10 @@ export function CreateOpportunityDialog() {
             </Field>
           </div>
           <div className="grid grid-cols-3 gap-3">
-            <Field label="Value (EUR)" htmlFor="value">
+            <Field label="Value (EUR)" htmlFor="value" error={fieldErrors.value?.[0]}>
               <Input id="value" name="value" type="number" min={0} step="100" defaultValue="0" />
             </Field>
-            <Field label="Probability %" htmlFor="probability">
+            <Field label="Probability %" htmlFor="probability" error={fieldErrors.probability?.[0]}>
               <Input
                 id="probability"
                 name="probability"
@@ -100,7 +114,7 @@ export function CreateOpportunityDialog() {
                 defaultValue="20"
               />
             </Field>
-            <Field label="Due date" htmlFor="dueDate">
+            <Field label="Due date" htmlFor="dueDate" error={fieldErrors.dueDate?.[0]}>
               <Input id="dueDate" name="dueDate" type="date" />
             </Field>
           </div>
@@ -134,17 +148,29 @@ function Field({
   label,
   htmlFor,
   children,
+  error,
 }: {
   label: string;
   htmlFor: string;
   children: React.ReactNode;
+  error?: string;
 }) {
+  const errorId = error ? `${htmlFor}-error` : undefined;
   return (
     <label htmlFor={htmlFor} className="block">
       <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
         {label}
       </span>
       {children}
+      {error ? (
+        <span
+          id={errorId}
+          role="alert"
+          className="mt-1 block text-[10px] font-medium text-[var(--danger)]"
+        >
+          {error}
+        </span>
+      ) : null}
     </label>
   );
 }
