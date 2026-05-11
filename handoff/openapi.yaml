@@ -109,7 +109,19 @@ components:
         items: { type: array, items: { $ref: "#/components/schemas/Opportunity" } }
         nextCursor: { type: string, nullable: true }
     OpportunityCreate:
-      allOf: [ { $ref: "#/components/schemas/Opportunity" } ]
+      type: object
+      required: [code, customer, name, stage, value, probability]
+      properties:
+        code:         { type: string, example: "OP-2041" }
+        customer:     { type: string }
+        name:         { type: string }
+        stage:        { type: string, enum: [discovery, qualified, proposal, negotiation, closed_won, closed_lost] }
+        value:        { type: number }
+        probability:  { type: integer }
+        dueDate:      { type: string, format: date, nullable: true }
+        owner:        { type: string, nullable: true }
+        industry:     { type: string, nullable: true }
+        logo:         { type: string, nullable: true }
     OpportunityPatch:
       type: object
       additionalProperties: true

@@ -9,7 +9,7 @@
   },
   "scripts": {
     "generate": "prisma generate",
-    "migrate": "prisma migrate dev --name init",
+    "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "seed": "tsx src/seed.ts",
     "reset": "prisma migrate reset --force",
@@ -27,7 +27,6 @@
     "@prisma/client": "^5.22.0"
   },
   "devDependencies": {
-    "@bidstack/shared": "workspace:*",
     "@types/node": "^22.10.0",
     "prisma": "^5.22.0",
     "tsx": "^4.19.2",

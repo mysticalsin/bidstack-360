@@ -15,8 +15,19 @@ const TICK_MS = 10_000;
 export async function startWebhookProcessor(
   connection: IORedis,
   log: pino.Logger,
+  workers: Worker[],
+  queues: Queue[],
 ): Promise<void> {
-  const queue = new Queue(QUEUE_NAME, { connection });
+  const queue = new Queue(QUEUE_NAME, {
+    connection,
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 5000 },
+      removeOnComplete: { count: 100 },
+      removeOnFail: { count: 50 },
+    },
+  });
+  queues.push(queue);
 
   await queue.add(
     'drain',
@@ -28,7 +39,7 @@ export async function startWebhookProcessor(
     },
   );
 
-  new Worker(
+  const worker = new Worker(
     QUEUE_NAME,
     async () => {
       const batch = await prisma.syncEvent.findMany({
@@ -61,4 +72,5 @@ export async function startWebhookProcessor(
     },
     { connection },
   );
+  workers.push(worker);
 }

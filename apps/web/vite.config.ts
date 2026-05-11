@@ -31,7 +31,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
-      sourcemap: true,
+      sourcemap: process.env.NODE_ENV === 'development',
       target: 'es2022',
       // react-dom 18 production minified is ~145 KB; use 200 KB so we get warned
       // about app code creep but not about React itself.

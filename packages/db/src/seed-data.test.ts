@@ -1,27 +1,31 @@
 // Drift guard: every seed fixture must round-trip through the canonical Zod
-// enums in @bidstack/shared. Prevents the class of bug logged in
-// MISTAKES.md (TESTING category, 2026-05-10) where the Industry enum was
-// narrower than the seed and integration tests caught a 500 instead.
+// schemas (closed enums) AND the open-ended `INDUSTRIES` UI helper list in
+// @bidstack/shared. Prevents the class of bug logged in MISTAKES.md
+// (TESTING category, 2026-05-10) where the Industry enum was narrower than
+// the seed and integration tests caught a 500 instead.
 //
-// If you add a new fixture, the schema enum should already accept it OR you
-// need to widen the enum and update the API contract — not just the seed.
+// `Industry` was later widened to `z.string()` (audit P2.2) so Dust enrichment
+// can add new verticals without a schema change. The drift guard now uses the
+// `INDUSTRIES` UI helper list as the source of truth so dropdown options stay
+// consistent with seeded values — that's where drift would actually bite the
+// user (an industry on a row that the create form can't reproduce).
 //
 // Runs in pure-Node (no Prisma client startup), so it's cheap and runs in CI
 // without docker.
 
 import { describe, expect, it } from 'vitest';
 
-import { Industry, OpportunityStage, Sentiment, TaskStatus } from '@bidstack/shared';
+import { INDUSTRIES, OpportunityStage, Sentiment, TaskStatus } from '@bidstack/shared';
 
 import { fixtureContacts, fixtureOpps, fixtureTasks, fixtureUsers } from './seed-data.js';
 
-describe('seed-data ↔ shared enum drift guard', () => {
-  it('every fixtureOpp.industry parses against shared.Industry', () => {
+describe('seed-data ↔ shared schema drift guard', () => {
+  it('every fixtureOpp.industry appears in INDUSTRIES (UI dropdown source of truth)', () => {
+    const allowed = new Set<string>(INDUSTRIES);
     for (const o of fixtureOpps) {
-      const result = Industry.safeParse(o.industry);
       expect(
-        result.success,
-        `fixture ${o.code} (${o.customer}) industry "${o.industry}" not in Industry enum`,
+        allowed.has(o.industry),
+        `fixture ${o.code} (${o.customer}) industry "${o.industry}" not in INDUSTRIES — add it to packages/shared/src/schemas/opportunity.ts so the create form can reproduce it`,
       ).toBe(true);
     }
   });

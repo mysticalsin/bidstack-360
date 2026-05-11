@@ -1,11 +1,13 @@
 import { z } from 'zod';
 
-import { prisma, OpportunityStage as PrismaStage } from '@bidstack/db';
+import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 
 import type { Tool } from './index.js';
 
 const Input = z.object({
-  stage: z.enum(['discovery', 'qualified', 'proposal', 'negotiation', 'closed_won', 'closed_lost']).optional(),
+  stage: z
+    .enum(['discovery', 'qualified', 'proposal', 'negotiation', 'closed_won', 'closed_lost'])
+    .optional(),
   owner: z.string().email().optional(),
   industry: z.string().optional(),
   search: z.string().optional(),

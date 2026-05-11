@@ -10,10 +10,10 @@ export const OpportunityStage = z.enum([
 ]);
 export type OpportunityStage = z.infer<typeof OpportunityStage>;
 
-// Industry values are normalized snake_case. Update this list whenever a new
-// vertical lands in the seed or via Dust enrichment — the response serializer
-// rejects unknown values (we'd rather see the failure than silently coerce).
-export const Industry = z.enum([
+// Industry is stored as an unrestricted string in the database so Dust
+// enrichment and manual inserts can add new verticals without a schema
+// change. We provide a helper array for UI pickers but validate as string.
+export const INDUSTRIES = [
   'financial_services',
   'insurance',
   'healthcare',
@@ -30,8 +30,9 @@ export const Industry = z.enum([
   'real_estate',
   'professional_services',
   'other',
-]);
-export type Industry = z.infer<typeof Industry>;
+] as const;
+export const Industry = z.string();
+export type Industry = string;
 
 export const Opportunity = z.object({
   id: z.string().uuid(),
@@ -53,7 +54,10 @@ export const OpportunityCreate = Opportunity.omit({
   id: true,
   updatedAt: true,
 }).extend({
-  code: z.string().regex(/^OP-\d{4}$/).optional(),
+  code: z
+    .string()
+    .regex(/^OP-\d{4}$/)
+    .optional(),
 });
 export type OpportunityCreate = z.infer<typeof OpportunityCreate>;
 
@@ -81,3 +85,39 @@ export const OpportunityPage = z.object({
   nextCursor: z.string().nullable(),
 });
 export type OpportunityPage = z.infer<typeof OpportunityPage>;
+
+// Full 360° payload with nested intel, tasks, documents, and timeline.
+export const OpportunityFull = Opportunity.extend({
+  intel: z.record(z.unknown()),
+  tasks: z.array(
+    z.object({
+      id: z.string().uuid(),
+      title: z.string(),
+      status: z.string(),
+      dueDate: z.string().date().nullable(),
+    }),
+  ),
+  documents: z.array(
+    z.object({
+      id: z.string().uuid(),
+      name: z.string(),
+      kind: z.string(),
+      bytes: z.number().nullable(),
+      createdAt: z.string().datetime(),
+    }),
+  ),
+  timeline: z.array(z.record(z.unknown())).default([]),
+});
+export type OpportunityFull = z.infer<typeof OpportunityFull>;
+
+// Dust integration status response.
+export const DustStatus = z.object({
+  workspace: z.string(),
+  lastSyncAt: z.string().datetime().nullable(),
+  nextSyncAt: z.string().datetime().nullable(),
+  lastError: z.string().nullable(),
+  pulled24h: z.number().int(),
+  pushed24h: z.number().int(),
+  agents: z.array(z.record(z.unknown())),
+});
+export type DustStatus = z.infer<typeof DustStatus>;

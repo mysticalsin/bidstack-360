@@ -1,0 +1,20 @@
+# Generated / vendored — don't reformat
+**/node_modules/**
+**/dist/**
+**/build/**
+**/.vite/**
+**/coverage/**
+**/playwright-report/**
+**/test-results/**
+**/.next/**
+packages/db/generated/**
+packages/db/prisma/migrations/**
+packages/twenty-bidstack/**
+
+# Source-of-truth from upstream — preserve verbatim
+handoff/**
+
+# Lock files
+pnpm-lock.yaml
+package-lock.json
+yarn.lock

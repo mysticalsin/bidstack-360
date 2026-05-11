@@ -47,6 +47,22 @@ export const tasksCreate: Tool<typeof Input> = {
       },
     });
 
+    await prisma.auditLog.create({
+      data: {
+        orgId: ctx.orgId,
+        userId: null,
+        action: 'task.create',
+        targetType: 'task',
+        targetId: created.id,
+        diff: {
+          title: args.title,
+          dueDate: args.dueDate,
+          assignee: args.assignee,
+          oppId: args.oppId,
+        },
+      },
+    });
+
     return {
       id: created.id,
       oppId: created.oppId,

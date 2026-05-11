@@ -94,9 +94,16 @@ export class DustClient {
     const data = await this.request<unknown>(
       'POST',
       `/v1/w/${this.workspaceId}/assistant/agent_configurations/${agentId}/runs`,
-      { message },
+      { message: { content: message, role: 'user' } },
     );
     return DustAgentRun.parse(data);
+  }
+
+  async getConversation(conversationId: string): Promise<Record<string, unknown>> {
+    return this.request<Record<string, unknown>>(
+      'GET',
+      `/v1/w/${this.workspaceId}/assistant/conversations/${conversationId}`,
+    );
   }
 
   // Internal: fetch + retry + timeout + auth + structured logging.
@@ -114,7 +121,7 @@ export class DustClient {
       const res = await fetch(url, {
         method,
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
         body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -124,9 +131,8 @@ export class DustClient {
       // Retry on 429 + 5xx with exponential backoff (max 3 attempts).
       if ((res.status === 429 || res.status >= 500) && attempt < 3) {
         const retryAfter = Number(res.headers.get('Retry-After'));
-        const wait = Number.isFinite(retryAfter) && retryAfter > 0
-          ? retryAfter * 1000
-          : 250 * 2 ** attempt;
+        const wait =
+          Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 250 * 2 ** attempt;
         this.log.warn({ status: res.status, wait, attempt }, 'dust retry');
         await new Promise((r) => setTimeout(r, wait));
         return this.request<T>(method, path, body, attempt + 1);
@@ -136,15 +142,17 @@ export class DustClient {
       const data = text ? (JSON.parse(text) as unknown) : ({} as unknown);
 
       if (!res.ok) {
-        this.log.error({ status: res.status, path, body: data }, 'dust error');
-        throw new DustError(
-          `Dust ${method} ${path} failed with ${res.status}`,
-          res.status,
-          data,
-        );
+        this.log.error({ status: res.status, path }, 'dust error');
+        throw new DustError(`Dust ${method} ${path} failed with ${res.status}`, res.status, data);
       }
 
       return data as T;
+    } catch (err) {
+      if (err instanceof DustError) throw err;
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw new DustError(`Dust ${method} ${path} timed out`, 408, null);
+      }
+      throw err;
     } finally {
       clearTimeout(timeout);
     }

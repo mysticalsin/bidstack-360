@@ -6,7 +6,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import {
   serializerCompiler,
   validatorCompiler,
-  ZodTypeProvider,
+  type ZodTypeProvider,
 } from 'fastify-type-provider-zod';
 
 import { authPlugin } from './plugins/auth.js';
@@ -28,22 +28,36 @@ export async function buildServer(): Promise<FastifyInstance> {
           ? { target: 'pino-pretty', options: { colorize: true, singleLine: true } }
           : undefined,
     },
-    trustProxy: true,
+    trustProxy: process.env.TRUSTED_PROXIES
+      ? process.env.TRUSTED_PROXIES.split(',').map((s) => s.trim())
+      : false,
   }).withTypeProvider<ZodTypeProvider>();
 
   server.setValidatorCompiler(validatorCompiler);
   server.setSerializerCompiler(serializerCompiler);
 
-  await server.register(helmet, { contentSecurityPolicy: false });
+  await server.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+  });
   await server.register(cors, {
     origin: (origin, cb) => {
       // Dev: allow any localhost / vite dev server.
       if (!origin) return cb(null, true);
-      const allowed = [
-        process.env.PUBLIC_BASE_URL,
-        'http://localhost:5173',
-        'http://localhost:4173',
-      ].filter(Boolean);
+      const allowed = [process.env.PUBLIC_BASE_URL].filter(Boolean);
+      if (process.env.NODE_ENV === 'development') {
+        allowed.push('http://localhost:5173', 'http://localhost:4173');
+      }
       cb(null, allowed.includes(origin));
     },
     credentials: true,

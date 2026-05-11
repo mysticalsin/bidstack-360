@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 // Seeds the local Postgres with the prototype's fixtures so the API + web app
 // have realistic data on first boot. Idempotent: re-running upserts.
 //
@@ -7,14 +6,8 @@
 //   won         -> closed_won
 //   lost        -> closed_lost
 
-import { Prisma, PrismaClient } from '../generated/client/index.js';
-import {
-  fixtureContacts,
-  fixtureOpps,
-  fixtureTasks,
-  fixtureUsers,
-  intelFor,
-} from './seed-data.js';
+import { type Prisma, PrismaClient } from '../generated/client/index.js';
+import { fixtureContacts, fixtureOpps, fixtureTasks, fixtureUsers, intelFor } from './seed-data.js';
 
 const prisma = new PrismaClient();
 

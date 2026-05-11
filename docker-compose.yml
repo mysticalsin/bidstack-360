@@ -4,9 +4,9 @@ services:
     container_name: bidstack-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: bidstack
-      POSTGRES_PASSWORD: bidstack
-      POSTGRES_DB: bidstack
+      POSTGRES_USER: ${POSTGRES_USER:-bidstack}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-bidstack}
     ports:
       # 5433 to avoid colliding with a host-installed Postgres on 5432.
       # The container still listens internally on 5432; only the host port shifts.
@@ -14,7 +14,7 @@ services:
     volumes:
       - bidstack_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U bidstack']
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER"']
       interval: 5s
       timeout: 5s
       retries: 5

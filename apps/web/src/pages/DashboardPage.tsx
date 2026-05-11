@@ -6,8 +6,10 @@ import { useOpportunities } from '@/hooks/useOpportunities';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { useTasks } from '@/hooks/useTasks';
 import { formatMoney, formatStage, daysUntil } from '@/lib/format';
+import { useNavigate } from 'react-router-dom';
 
 export function DashboardPage() {
+  const navigate = useNavigate();
   const report = usePipelineReport();
   const opps = useOpportunities({ limit: 5 });
   const tasks = useTasks();
@@ -21,9 +23,7 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
-          Dashboard
-        </h1>
+        <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">Dashboard</h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
           A 360° view of your bid portfolio.
         </p>
@@ -40,16 +40,12 @@ export function DashboardPage() {
         />
         <KpiCard
           label="Pipeline value"
-          value={
-            report.data ? formatMoney(report.data.totalValueOpen, 'EUR') : '—'
-          }
+          value={report.data ? formatMoney(report.data.totalValueOpen, 'EUR') : '—'}
           loading={report.isLoading}
         />
         <KpiCard
           label="Weighted pipeline"
-          value={
-            report.data ? formatMoney(report.data.weightedPipeline, 'EUR') : '—'
-          }
+          value={report.data ? formatMoney(report.data.weightedPipeline, 'EUR') : '—'}
           loading={report.isLoading}
         />
         <KpiCard
@@ -65,7 +61,7 @@ export function DashboardPage() {
           <SectionHeader
             title="Recent opportunities"
             action={
-              <Button variant="secondary" size="sm">
+              <Button variant="secondary" size="sm" onClick={() => navigate('/opportunities')}>
                 View all
               </Button>
             }
@@ -88,9 +84,7 @@ export function DashboardPage() {
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs text-[var(--fg-tertiary)]">
-                        {o.code}
-                      </span>
+                      <span className="font-mono text-xs text-[var(--fg-tertiary)]">{o.code}</span>
                       <Badge tone={stageTone(o.stage)}>{formatStage(o.stage)}</Badge>
                     </div>
                     <div className="mt-1 truncate text-sm font-medium text-[var(--fg-primary)]">
@@ -102,9 +96,7 @@ export function DashboardPage() {
                     <div className="text-sm font-semibold text-[var(--fg-primary)] tabular-nums">
                       {formatMoney(o.value, 'EUR')}
                     </div>
-                    <div className="text-xs text-[var(--fg-tertiary)]">
-                      {o.probability}% likely
-                    </div>
+                    <div className="text-xs text-[var(--fg-tertiary)]">{o.probability}% likely</div>
                   </div>
                 </li>
               ))}
@@ -161,7 +153,11 @@ function KpiCard({
         {label}
       </div>
       <div className={`mt-2 text-3xl font-bold tabular-nums ${valueColor}`}>
-        {loading ? <span className="inline-block h-7 w-20 rounded bg-[var(--surface-sunken)] animate-pulse" /> : value}
+        {loading ? (
+          <span className="inline-block h-7 w-20 rounded bg-[var(--surface-sunken)] animate-pulse" />
+        ) : (
+          value
+        )}
       </div>
     </Card>
   );

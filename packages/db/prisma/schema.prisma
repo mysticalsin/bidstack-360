@@ -39,7 +39,7 @@ model User {
   id        String   @id @default(uuid()) @db.Uuid
   orgId     String   @map("org_id") @db.Uuid
   clerkUser String   @unique @map("clerk_user")
-  email     String   @unique
+  email     String   @unique @db.Citext
   name      String?
   role      String   @default("member")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -91,6 +91,9 @@ model Opportunity {
 
   @@unique([orgId, code])
   @@index([orgId, stage], map: "opps_org_stage_idx")
+  // opps_search_idx is a GIN trigram index on (customer || ' ' || name || ' ' || code)
+  // defined in a raw migration (Prisma can't express functional GIN indexes).
+  // See packages/db/prisma/migrations/*_search_index/migration.sql.
   @@map("opportunities")
 }
 
@@ -109,7 +112,7 @@ model Contact {
   customer  String
   name      String
   role      String?
-  email     String?
+  email     String?  @db.Citext
   phone     String?
   influence Int?
   sentiment Sentiment?

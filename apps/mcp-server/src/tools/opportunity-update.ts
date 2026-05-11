@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { prisma, OpportunityStage as PrismaStage } from '@bidstack/db';
+import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 
 import type { Tool } from './index.js';
 
@@ -29,7 +29,8 @@ const Input = z.object({
 });
 
 export const opportunityUpdate: Tool<typeof Input> = {
-  description: 'Patch an opportunity. Common use: agent updates stage, probability, or value. Writes audit_log.',
+  description:
+    'Patch an opportunity. Common use: agent updates stage, probability, or value. Writes audit_log.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -41,7 +42,14 @@ export const opportunityUpdate: Tool<typeof Input> = {
         properties: {
           stage: {
             type: 'string',
-            enum: ['discovery', 'qualified', 'proposal', 'negotiation', 'closed_won', 'closed_lost'],
+            enum: [
+              'discovery',
+              'qualified',
+              'proposal',
+              'negotiation',
+              'closed_won',
+              'closed_lost',
+            ],
           },
           probability: { type: 'integer', minimum: 0, maximum: 100 },
           value: { type: 'number', minimum: 0 },

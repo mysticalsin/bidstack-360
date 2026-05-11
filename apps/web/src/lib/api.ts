@@ -28,14 +28,22 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   });
 
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
+  let data: unknown;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    throw new ApiError('Invalid JSON response from server', res.status, text);
+  }
 
   if (!res.ok) {
-    throw new ApiError(
-      typeof data?.message === 'string' ? data.message : `Request failed (${res.status})`,
-      res.status,
-      data,
-    );
+    const message =
+      data !== null &&
+      typeof data === 'object' &&
+      'message' in data &&
+      typeof (data as { message: unknown }).message === 'string'
+        ? (data as { message: string }).message
+        : `Request failed (${res.status})`;
+    throw new ApiError(message, res.status, data);
   }
   return data as T;
 }

@@ -4,6 +4,7 @@ import dotenvFlow from 'dotenv-flow';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenvFlow.config({ path: path.resolve(__dirname, '../../..'), silent: true });
 
+import { type Queue, type Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import pino from 'pino';
 
@@ -28,14 +29,33 @@ const connection = new IORedis(redisUrl, {
 connection.on('error', (err) => log.error({ err }, 'redis error'));
 connection.on('connect', () => log.info({ redisUrl }, 'redis connected'));
 
-await Promise.all([startDustPoller(connection, log), startWebhookProcessor(connection, log)]);
+const workers: Worker[] = [];
+const queues: Queue[] = [];
+
+await Promise.all([
+  startDustPoller(connection, log, workers, queues),
+  startWebhookProcessor(connection, log, workers, queues),
+]);
 
 log.info('BidStack worker ready (dust-poll + webhook-processor)');
 
 const shutdown = async (signal: string) => {
   log.info({ signal }, 'shutting down worker');
-  await connection.quit();
-  process.exit(0);
+  const timeout = setTimeout(() => {
+    log.error('forced exit after timeout');
+    process.exit(1);
+  }, 10_000);
+  try {
+    await Promise.all(workers.map((w) => w.close()));
+    await Promise.all(queues.map((q) => q.close()));
+    await connection.quit();
+    clearTimeout(timeout);
+    process.exit(0);
+  } catch (err) {
+    log.error({ err }, 'shutdown error');
+    clearTimeout(timeout);
+    process.exit(1);
+  }
 };
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));

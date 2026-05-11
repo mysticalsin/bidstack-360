@@ -13,6 +13,7 @@ import { prisma } from '@bidstack/db';
 
 import { handleRpc } from './rpc.js';
 import { mcpAuth } from './auth.js';
+import { hourlyRateLimitPlugin } from './plugins/hourly-rate-limit.js';
 
 export async function buildMcpServer(): Promise<FastifyInstance> {
   const server = Fastify({
@@ -23,10 +24,13 @@ export async function buildMcpServer(): Promise<FastifyInstance> {
           ? { target: 'pino-pretty', options: { colorize: true, singleLine: true } }
           : undefined,
     },
-    trustProxy: true,
+    trustProxy: process.env.TRUSTED_PROXIES
+      ? process.env.TRUSTED_PROXIES.split(',').map((s) => s.trim())
+      : false,
   });
 
   await server.register(sensible);
+  await server.register(hourlyRateLimitPlugin);
   await server.register(rateLimit, {
     max: 60,
     timeWindow: '1 minute',
@@ -51,7 +55,7 @@ export async function buildMcpServer(): Promise<FastifyInstance> {
 
   // POST /mcp — JSON-RPC 2.0 over HTTP. The SSE leg is omitted from v0.1
   // (servers are allowed to support either; Dust accepts HTTP-only).
-  server.post('/mcp', async (req, reply) => {
+  server.post('/mcp', async (req, _reply) => {
     const ctx = await mcpAuth(req, prisma);
     return handleRpc(req.body, ctx, server.log);
   });

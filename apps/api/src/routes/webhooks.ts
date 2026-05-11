@@ -26,19 +26,15 @@ function rememberOrReject(eventId: string): boolean {
 
 export const webhooksRoutes: FastifyPluginAsyncZod = async (server) => {
   // Capture raw body for HMAC verification.
-  server.addContentTypeParser(
-    'application/json',
-    { parseAs: 'string' },
-    (req, body, done) => {
-      try {
-        const json = body.length ? JSON.parse(body as string) : {};
-        (req as unknown as { rawBody: string }).rawBody = body as string;
-        done(null, json);
-      } catch (err) {
-        done(err as Error);
-      }
-    },
-  );
+  server.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+    try {
+      const json = body.length ? JSON.parse(body as string) : {};
+      (req as unknown as { rawBody: string }).rawBody = body as string;
+      done(null, json);
+    } catch (err) {
+      done(err as Error);
+    }
+  });
 
   server.post(
     '/webhooks/dust',
@@ -49,7 +45,7 @@ export const webhooksRoutes: FastifyPluginAsyncZod = async (server) => {
         response: { 200: z.object({ ok: z.literal(true) }) },
       },
     },
-    async (req, reply) => {
+    async (req, _reply) => {
       const secret = process.env.DUST_WEBHOOK_SECRET;
       if (!secret) {
         req.log.warn('webhook dropped — DUST_WEBHOOK_SECRET unset');
@@ -62,7 +58,6 @@ export const webhooksRoutes: FastifyPluginAsyncZod = async (server) => {
       const sig = req.headers['x-dust-signature'];
       const eventType = req.headers['x-dust-event'];
       const eventId = req.headers['x-dust-event-id'];
-      const orgIdHeader = req.headers['x-bidstack-org'];
 
       const rawBody = (req as unknown as { rawBody: string }).rawBody ?? '';
       const ok = await verifyDustSignature(
@@ -75,27 +70,29 @@ export const webhooksRoutes: FastifyPluginAsyncZod = async (server) => {
         throw server.httpErrors.unauthorized('Invalid signature');
       }
 
-      const eid = String(Array.isArray(eventId) ? eventId[0] : eventId ?? '');
+      const eid = String(Array.isArray(eventId) ? eventId[0] : (eventId ?? ''));
       if (eid && !rememberOrReject(eid)) {
         req.log.info({ eid }, 'webhook duplicate dropped');
         return { ok: true as const };
       }
 
-      // Org resolution: in v0.1 we trust an x-bidstack-org header (single-tenant
-      // dev). Production will derive orgId from the API key bound to the
-      // webhook subscription.
-      const org = await prisma.org.findFirst({
-        where: orgIdHeader
-          ? { id: String(orgIdHeader) }
-          : { clerkOrg: 'org_seed_mantu' },
+      // Org resolution: derive from the WebhookSubscription whose secret
+      // matches DUST_WEBHOOK_SECRET. Never trust client-supplied headers
+      // (audit P1.3: x-bidstack-org spoofing). In dev with no subscription
+      // row, fall back to the seed org so local development stays smooth.
+      const subscription = await prisma.webhookSubscription.findFirst({
+        where: { secret, active: true },
       });
-      if (!org) throw server.httpErrors.notFound('Org not found for webhook');
+      const org = subscription
+        ? await prisma.org.findUnique({ where: { id: subscription.orgId } })
+        : await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
+      if (!org) throw server.httpErrors.notFound('Org not found for webhook subscription');
 
       await prisma.syncEvent.create({
         data: {
           orgId: org.id,
           source: 'dust.webhook',
-          eventType: String(Array.isArray(eventType) ? eventType[0] : eventType ?? 'unknown'),
+          eventType: String(Array.isArray(eventType) ? eventType[0] : (eventType ?? 'unknown')),
           payload: req.body as object,
           status: 'received',
         },

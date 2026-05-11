@@ -5,14 +5,13 @@ import { Button } from '@/components/ui/Button';
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from '@/components/ui/Dialog';
 import { api } from '@/lib/api';
 import {
-  Industry,
+  INDUSTRIES,
   type Opportunity,
   type OpportunityCreate,
   OpportunityStage,
 } from '@bidstack/shared';
 
 const STAGES = OpportunityStage.options;
-const INDUSTRIES = Industry.options;
 
 export function CreateOpportunityDialog() {
   const [open, setOpen] = useState(false);

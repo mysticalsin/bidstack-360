@@ -18,7 +18,7 @@ export function serializeOpportunity(o: WithOwner): ApiOpportunity {
     probability: o.probability,
     dueDate: o.dueDate ? o.dueDate.toISOString().slice(0, 10) : null,
     owner: o.owner?.email ?? null,
-    industry: (o.industry as ApiOpportunity['industry']) ?? null,
+    industry: o.industry ?? null,
     logo: o.logoUrl,
     updatedAt: o.updatedAt.toISOString(),
   };

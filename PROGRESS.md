@@ -384,4 +384,98 @@ lint-clean + tests-green by default.
 
 ---
 
+## 2026-05-10 — Sprint 19: Audit-remediation execution
+
+**Branch:** `feat/sprint-0-foundation`
+
+A separate audit pipeline produced `AUDIT_REMEDIATION_PROMPT.md` (635 lines,
+10 phases) and started executing partway through. I adopted the work,
+unblocked the cascading typecheck/lint/test failures it left, then drove
+the remaining items.
+
+**Done:**
+
+### 19a — Unblock typecheck + lint + tests after audit-injected drift
+
+- `apps/api/src/plugins/error-handler.ts` — `import { Prisma } from '@prisma/client'` → `from '@bidstack/db'` (matches our convention; Prisma client lives in our generated path)
+- `packages/db/src/index.ts` — re-export `Prisma` namespace as a value (not just type) so the error-handler can use `Prisma.PrismaClientKnownRequestError`
+- `apps/api/src/plugins/auth.ts` — Clerk auth + dev/test stub guard now also accepts `NODE_ENV=test` (was dev-only and broke the test suite)
+- `apps/api/src/plugins/auth.ts` — removed unused `createClerkClient` import
+- `apps/api/src/routes/webhooks.ts` — removed unused `createHash` import
+- `apps/web/src/App.tsx` — pruned unused Clerk re-exports (`useUser`, `SignedIn`, `SignedOut`, `useNavigate`)
+- `apps/web/src/lib/api.ts` — `let data: unknown` (no useless initial null assignment)
+- `apps/worker/src/queues/dust-poll.ts` — caller signature updated to accept `workers/queues` arrays for graceful shutdown (matches `webhook-processor.ts`)
+- `apps/worker` — added missing `zod` dep
+- `apps/api` — added missing `@clerk/backend` dep
+
+### 19b — Drift-guard test rewritten for widened Industry contract
+
+- `packages/db/src/seed-data.test.ts` — `Industry` was widened from `z.enum` to `z.string()` (audit P2.2: Dust enrichment can add new verticals). The drift guard now uses the `INDUSTRIES` UI helper list as the source of truth, ensuring every seeded industry value can be reproduced via the create-dialog dropdown.
+- Other 4 guards (Stage, Sentiment, TaskStatus, email shape) unchanged — those enums stay closed.
+
+### 19c — Phase 1 (Security) verified + closed
+
+- ✅ P1.1 Clerk auth wired in API + web (`<RequireAuth>`, `<SignIn>` LoginPage)
+- ✅ P1.2 docker-compose `${POSTGRES_PASSWORD:?…}` fail-fast + healthcheck now uses `$$POSTGRES_USER` instead of hardcoded `bidstack` (small bug fix while passing through)
+- ✅ P1.3 webhook org-injection vulnerability closed — derive `orgId` from the WebhookSubscription whose `secret` matches the verified HMAC; never trust `x-bidstack-org` header
+- ✅ P1.4 trustProxy gated on `TRUSTED_PROXIES` env + helmet CSP directives
+- ✅ P1.5 CORS localhost gated to `NODE_ENV=development`
+
+### 19d — Phase 2 (Data Integrity) verified + closed
+
+- ✅ P2.1 `users.email` and `contacts.email` are `@db.Citext` (case-insensitive uniqueness)
+- ✅ P2.1 GIN trigram search index — schema now defers it to a hand-written migration `packages/db/prisma/migrations/20260510235000_add_gin_index/migration.sql` (Prisma can't express functional GIN indexes). Drops the redundant btree.
+- ✅ P2.1 `tasks.status` is a Prisma enum aligned with shared.TaskStatus (no SQL drift; SQL handoff already used the enum)
+- ✅ P2.2 Industry → `z.string()` (already done by audit; Sprint 19b updated the test for this)
+- ✅ P2.3 Prisma error mapping (P2002 → 409, P2025 → 404, P2003 → 400) in `error-handler.ts`
+
+### 19e — Phase 4 (MCP) + Phase 9 (test expansion)
+
+- ✅ P4.1 `tasks.create` MCP tool writes `audit_log` (already done by audit; verified)
+- ✅ P9.1 MCP server has tests now: `apps/mcp-server/src/auth.test.ts` (5) + `apps/mcp-server/src/tools/tools.test.ts` (6) — added `vitest.config.ts` with repo-root .env loading and `skipIfNoDb` describe-skip pattern so CI without docker stays green
+- ✅ P9.1 Two test bugs the audit left in tools.test.ts: assumed `{ items: [...] }` wrapper but per `handoff/mcp.tools.md` the contract is a bare array → tests fixed to match canonical contract
+- ✅ P9.2 Worker queue tests at `apps/worker/src/queues/queues.test.ts` (3) — repeat config + retry config
+
+**Verified:**
+
+- `pnpm -r typecheck` clean across all 7 workspaces
+- `pnpm -r lint` clean across all 7 workspaces (0 errors, 0 warnings)
+- `pnpm -r test` — **47/47 pass** (was 30 pre-sprint; +17 new):
+  - 7 shared
+  - 5 dust-client
+  - 5 db (fixture guards)
+  - 8 web (was 5; audit added 3 more — to inventory)
+  - 8 api (1 health + 7 integration)
+  - 11 mcp-server (5 auth + 6 tools) ⭐ NEW
+  - 3 worker (queue config) ⭐ NEW
+
+**Audit work still remaining (deferred to Sprint 19f+):**
+
+- ⚠️ P4.2 600/hour MCP rate limit (60/min already in place; the second tier needs a custom store)
+- ⚠️ P4.3 remove dead `@modelcontextprotocol/sdk` dep (verify it's actually unused — bidstack-ops MCP outside the workspace uses it but the in-workspace mcp-server uses raw JSON-RPC)
+- ⚠️ P5.1 wire "View all" button + Topbar search
+- ⚠️ P5.3 a11y improvements (`scope="col"` on tables, breadcrumb `<ol><li>`, 44px touch targets, `'./App.js'` import)
+- ⚠️ P5.4 remove unused Radix packages (dropdown, popover, toast, tooltip)
+- ⛔ P5.5 Tailwind v4→v3 — **declined**: Tailwind 4 stable is current as of 2026-01; downgrade is regressive
+- ⚠️ P5.6 Zod validation in CreateOpportunityDialog with field-level errors
+- ⚠️ P6.1 OpenAPI `OpportunityCreate` cleanup
+- ⚠️ P7.x Dust client improvements (runAgent payload, getConversation, AbortError wrapping)
+- ⚠️ P10.1 compute `avgDaysOpen` from DB (currently hardcoded 42)
+- ⚠️ P10.3 bundle analyzer (rollup-plugin-visualizer)
+- ⚠️ Run `pnpm db:migrate` to apply the new search_index migration (blocked locally because dev processes hold the Prisma engine DLL)
+
+**Concern flagged:** `.github/workflows/ci.yml` was overwritten by the audit
+with a simpler single-job version. My Sprint 18d had three separate jobs
+(unit / integration / e2e) with bundle-size guard, Playwright cache, and
+upload-on-failure. The audit version is functional but loses safety. Will
+restore + harmonize in Sprint 19g once the rest of the audit settles.
+
+**Next:**
+
+- Sprint 19f: P4.2-P4.3, P5.x, P6.1, P7.x, P10.x
+- Sprint 19g: harmonize CI workflow + run Lighthouse against `pnpm preview`
+- Sprint 20+: production deploy prep (docker images, env management, monitoring)
+
+---
+
 <!-- New entries appended above this marker. -->

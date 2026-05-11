@@ -4,7 +4,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { prisma, OpportunityStage as PrismaStage } from '@bidstack/db';
+import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 import {
   Opportunity,
   OpportunityCreate,
