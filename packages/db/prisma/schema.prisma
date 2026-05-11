@@ -48,6 +48,9 @@ model Org {
   products           Product[]
   salesOrders        SalesOrder[]
   salesOrderLines    SalesOrderLine[]
+  invoices           Invoice[]
+  invoiceLines       InvoiceLine[]
+  payments           Payment[]
 
   @@map("orgs")
 }
@@ -68,6 +71,7 @@ model User {
   authoredNotes Note[]
   uploadedFiles FileAttachment[]
   salesOrders   SalesOrder[]
+  invoices      Invoice[]
 
   @@index([orgId])
   @@map("users")
@@ -601,9 +605,10 @@ model Product {
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  org      Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  category ProductCategory? @relation(fields: [categoryId], references: [id])
-  lines    SalesOrderLine[]
+  org          Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  category     ProductCategory? @relation(fields: [categoryId], references: [id])
+  lines        SalesOrderLine[]
+  invoiceLines InvoiceLine[]
 
   @@unique([orgId, sku], map: "products_org_sku_key")
   @@index([orgId, name], map: "products_org_name_idx")
@@ -630,6 +635,7 @@ model SalesOrder {
   org         Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
   salesperson User?            @relation(fields: [salespersonId], references: [id])
   lines       SalesOrderLine[]
+  invoices    Invoice[]
 
   @@unique([orgId, number], map: "sales_orders_org_number_key")
   @@index([orgId, state, orderDate(sort: Desc)], map: "sales_orders_org_state_date_idx")
@@ -657,5 +663,102 @@ model SalesOrderLine {
   @@index([orgId, orderId], map: "sales_order_lines_org_order_idx")
   @@index([orgId, productId], map: "sales_order_lines_org_product_idx")
   @@map("sales_order_lines")
+}
+
+// ─── Invoicing ────────────────────────────────────────────────────────────
+// Mirrors Odoo's `account.move` (move_type='out_invoice') + `account.payment`.
+// `paidMicros` is the cumulative sum of payment amounts; `state` flips to
+// `paid` when `paidMicros >= totalMicros`. `dueDate` powers the AR aging
+// buckets on the sales dashboard.
+
+enum InvoiceState {
+  draft
+  sent
+  paid
+  overdue
+  cancelled
+
+  @@map("invoice_state")
+}
+
+enum PaymentMethod {
+  bank_transfer
+  credit_card
+  cheque
+  cash
+  other
+
+  @@map("payment_method")
+}
+
+model Invoice {
+  id            String       @id @default(uuid()) @db.Uuid
+  orgId         String       @map("org_id") @db.Uuid
+  number        String
+  state         InvoiceState @default(draft)
+  salesOrderId  String?      @map("sales_order_id") @db.Uuid
+  customerName  String       @map("customer_name")
+  customerId    String?      @map("customer_id") @db.Uuid
+  salespersonId String?      @map("salesperson_id") @db.Uuid
+  countryCode   String?      @map("country_code") @db.VarChar(2)
+  currency      String       @default("CAD") @db.VarChar(3)
+  totalMicros   BigInt       @default(0) @map("total_micros")
+  paidMicros    BigInt       @default(0) @map("paid_micros")
+  invoiceDate   DateTime     @default(now()) @map("invoice_date") @db.Timestamptz(6)
+  dueDate       DateTime     @map("due_date") @db.Timestamptz(6)
+  paidAt        DateTime?    @map("paid_at") @db.Timestamptz(6)
+  notes         String?
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org         Org           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  salesOrder  SalesOrder?   @relation(fields: [salesOrderId], references: [id])
+  salesperson User?         @relation(fields: [salespersonId], references: [id])
+  lines       InvoiceLine[]
+  payments    Payment[]
+
+  @@unique([orgId, number], map: "invoices_org_number_key")
+  @@index([orgId, state, dueDate(sort: Asc)], map: "invoices_org_state_due_idx")
+  @@index([orgId, customerName], map: "invoices_org_customer_idx")
+  @@index([orgId, salesOrderId], map: "invoices_org_sales_order_idx")
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id              String   @id @default(uuid()) @db.Uuid
+  orgId           String   @map("org_id") @db.Uuid
+  invoiceId       String   @map("invoice_id") @db.Uuid
+  productId       String?  @map("product_id") @db.Uuid
+  description     String
+  quantity        Decimal  @default(1) @db.Decimal(12, 3)
+  unitPriceMicros BigInt   @map("unit_price_micros")
+  subtotalMicros  BigInt   @map("subtotal_micros")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org     Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  invoice Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id])
+
+  @@index([orgId, invoiceId], map: "invoice_lines_org_invoice_idx")
+  @@map("invoice_lines")
+}
+
+model Payment {
+  id          String        @id @default(uuid()) @db.Uuid
+  orgId       String        @map("org_id") @db.Uuid
+  invoiceId   String        @map("invoice_id") @db.Uuid
+  amountMicros BigInt       @map("amount_micros")
+  currency    String        @default("CAD") @db.VarChar(3)
+  method      PaymentMethod @default(bank_transfer)
+  reference   String?
+  receivedAt  DateTime      @default(now()) @map("received_at") @db.Timestamptz(6)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, invoiceId], map: "payments_org_invoice_idx")
+  @@index([orgId, receivedAt(sort: Desc)], map: "payments_org_received_idx")
+  @@map("payments")
 }
 

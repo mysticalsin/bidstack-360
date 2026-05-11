@@ -350,7 +350,9 @@ export class OdooMcpClient {
 
       if (!res.ok) {
         const text = await res.text().catch(() => '');
-        throw new OdooMcpError(`odoo-mcp: HTTP ${res.status} from ${this.url}`, res.status, text);
+        // Never echo `this.url` into the error message — it may contain inline
+        // credentials (`https://user:pass@host`) or a path-embedded token.
+        throw new OdooMcpError(`odoo-mcp: HTTP ${res.status} from upstream`, res.status, text);
       }
 
       const contentType = res.headers.get('Content-Type') ?? '';

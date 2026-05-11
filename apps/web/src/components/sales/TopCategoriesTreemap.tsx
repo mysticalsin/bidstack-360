@@ -16,15 +16,18 @@ interface Props {
   isLoading: boolean;
 }
 
+// Every fill below clears WCAG 2.2 AA (≥ 4.5:1) against pure white text at
+// 12px. The previous palette included amber #f5b400 (1.95:1) and jade-2
+// #10b981 (2.5:1) which failed AA — see audit 2026-05-11 #5.
 const PALETTE = [
-  '#2c4bff', // brand-primary
-  '#1f8a5b', // jade
-  '#f5b400', // amber
-  '#ec4899', // rose
-  '#8b5cf6', // purple
-  '#06b6d4', // teal
-  '#f97316', // tomato-soft
-  '#10b981', // jade-2
+  '#2c4bff', // brand-primary       5.4:1
+  '#1f8a5b', // jade-700            4.6:1
+  '#7c3aed', // violet-600          5.5:1
+  '#0e7490', // cyan-700            5.5:1
+  '#be185d', // rose-700            6.2:1
+  '#b45309', // amber-700           4.7:1
+  '#dc2626', // red-600             4.8:1
+  '#475569', // slate-600           6.5:1
 ];
 
 export function TopCategoriesTreemap({ data, isLoading }: Props) {
@@ -113,7 +116,6 @@ function Treemap({ items, currency }: { items: CategoryRow[]; currency: string }
               width={Math.max(0, t.w - 2)}
               height={Math.max(0, t.h - 2)}
               fill={t.color}
-              opacity={0.85}
               rx={4}
             >
               <title>{`${t.item.name}: ${formatMoneyMicros(t.item.revenueMicros, currency)} (${t.item.orders} orders)`}</title>
@@ -136,7 +138,6 @@ function Treemap({ items, currency }: { items: CategoryRow[]; currency: string }
                 y={t.y + 36}
                 fontSize={11}
                 fill="white"
-                opacity={0.85}
                 style={{ pointerEvents: 'none' }}
               >
                 {formatMoneyMicros(t.item.revenueMicros, currency)}

@@ -108,7 +108,11 @@ export function SalesOrderDetailPage() {
               <h1 className="font-mono text-2xl font-bold tracking-tight text-[var(--fg-primary)]">
                 {order.number}
               </h1>
-              <OrderStateBadge state={order.state} />
+              {/* aria-live so screen readers announce the new state when a
+                  transition (send/confirm/cancel/reopen) lands. */}
+              <span role="status" aria-live="polite" aria-atomic="true">
+                <OrderStateBadge state={order.state} />
+              </span>
             </div>
             <p className="mt-1 text-lg text-[var(--fg-primary)]">{order.customerName}</p>
             <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-[var(--fg-secondary)]">
@@ -141,15 +145,17 @@ export function SalesOrderDetailPage() {
                 if (!action) return null;
                 const isDanger = action === 'cancel';
                 const isPrimary = action === 'confirm' || action === 'send';
+                const isPending = pending === action;
                 return (
                   <Button
                     key={action}
                     size="sm"
                     variant={isPrimary ? 'primary' : isDanger ? 'destructive' : 'secondary'}
                     disabled={pending !== null}
+                    aria-busy={isPending}
                     onClick={() => onAction(action)}
                   >
-                    {pending === action ? '…' : ACTION_LABEL[action]}
+                    {ACTION_LABEL[action]}
                   </Button>
                 );
               })}

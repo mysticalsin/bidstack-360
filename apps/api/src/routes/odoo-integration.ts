@@ -107,8 +107,40 @@ const OdooCompanyAutocompleteResponse = z.object({
   warnings: z.array(z.string()),
 });
 
+// Models that BIDCRM is allowed to read through the Odoo MCP proxy. Anything
+// outside this list — `res.users`, `ir.config_parameter`, accounting moves,
+// HR data — is refused. This is the only thing standing between an
+// authenticated tenant and the entire Odoo backend until per-org Odoo
+// credentials are introduced.
+const ALLOWED_ODOO_MODELS = [
+  'res.partner',
+  'res.partner.industry',
+  'res.partner.title',
+  'res.country',
+  'res.country.state',
+  'res.currency',
+  'crm.lead',
+  'crm.stage',
+  'crm.team',
+  'crm.lost.reason',
+  'sale.order',
+  'sale.order.line',
+  'product.template',
+  'product.product',
+  'product.category',
+  'mail.activity',
+  'mail.message',
+  'calendar.event',
+  'documents.document',
+  'ir.attachment',
+  'project.project',
+  'project.task',
+  'helpdesk.ticket',
+] as const;
+const AllowedOdooModel = z.enum(ALLOWED_ODOO_MODELS);
+
 const SearchBody = z.object({
-  model: z.string().min(1).max(120),
+  model: AllowedOdooModel,
   // Domain is Odoo's polish-notation filter; we accept it raw and forward.
   domain: z.array(z.unknown()).optional(),
   fields: z.array(z.string()).max(64).optional(),
@@ -118,7 +150,7 @@ const SearchBody = z.object({
 });
 
 const RecordParams = z.object({
-  model: z.string().min(1).max(120),
+  model: AllowedOdooModel,
   id: z.coerce.number().int().positive(),
 });
 
@@ -156,7 +188,7 @@ export const odooRoutes: FastifyPluginAsyncZod = async (server) => {
         database,
         reachable: false,
         toolCount: null,
-        lastError: err instanceof Error ? err.message : 'Unknown error',
+        lastError: safeErrorMessage(err),
       };
     }
   });
@@ -189,7 +221,7 @@ export const odooRoutes: FastifyPluginAsyncZod = async (server) => {
           configured: true,
           reachable: false,
           tools: [],
-          lastError: err instanceof Error ? err.message : 'Unknown error',
+          lastError: safeErrorMessage(err),
         });
       }
     },
@@ -215,7 +247,7 @@ export const odooRoutes: FastifyPluginAsyncZod = async (server) => {
           odooItems = await searchOdooPartners(client, req.query);
           reachable = true;
         } catch (err) {
-          warnings.push(err instanceof Error ? err.message : 'Odoo autocomplete failed');
+          warnings.push(safeErrorMessage(err));
           req.log.warn({ err }, 'odoo company autocomplete failed');
         }
       } else {
@@ -257,15 +289,16 @@ export const odooRoutes: FastifyPluginAsyncZod = async (server) => {
         },
       },
     },
-    async () => {
+    async (req) => {
       const client = getClient();
       if (!client) throw server.httpErrors.serviceUnavailable('Odoo MCP not configured');
       try {
         const items = await client.listModels();
         return { items };
       } catch (err) {
+        req.log.warn({ err }, 'odoo list models failed');
         if (err instanceof OdooMcpError) {
-          throw server.httpErrors.badGateway(err.message);
+          throw server.httpErrors.badGateway('Odoo MCP unavailable');
         }
         throw err;
       }
@@ -288,8 +321,9 @@ export const odooRoutes: FastifyPluginAsyncZod = async (server) => {
         const rows = await client.searchRecords(req.body);
         return { rows };
       } catch (err) {
+        req.log.warn({ err, model: req.body.model }, 'odoo search failed');
         if (err instanceof OdooMcpError) {
-          throw server.httpErrors.badGateway(err.message);
+          throw server.httpErrors.badGateway('Odoo MCP unavailable');
         }
         throw err;
       }
@@ -315,12 +349,13 @@ export const odooRoutes: FastifyPluginAsyncZod = async (server) => {
         });
         return { record };
       } catch (err) {
+        req.log.warn({ err, model: req.params.model, id: req.params.id }, 'odoo get failed');
         if (err instanceof OdooMcpError) {
           // 404 if Odoo says the record doesn't exist; 502 otherwise.
           if (/not\s*found|does not exist/i.test(err.message)) {
-            throw server.httpErrors.notFound(err.message);
+            throw server.httpErrors.notFound('Record not found in Odoo');
           }
-          throw server.httpErrors.badGateway(err.message);
+          throw server.httpErrors.badGateway('Odoo MCP unavailable');
         }
         throw err;
       }
@@ -740,4 +775,15 @@ function normalizeName(value: string): string {
 
 function normalizeToken(value: string): string {
   return value.replace(/[^a-z0-9]/gi, '').toLowerCase();
+}
+
+// Sanitize an error message before sending it to the browser. We want the
+// caller to see "Odoo MCP unavailable" not the upstream URL (which may carry
+// inline creds or a path token) and not a bearer string.
+function safeErrorMessage(err: unknown): string {
+  if (!(err instanceof Error)) return 'Unknown error';
+  const upstream = process.env.ODOO_MCP_URL;
+  let msg = err.message;
+  if (upstream) msg = msg.split(upstream).join('[odoo]');
+  return msg.replace(/Bearer\s+[A-Za-z0-9._-]+/gi, 'Bearer [redacted]');
 }

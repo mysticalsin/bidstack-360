@@ -15,7 +15,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { prisma } from '@bidstack/db';
+import { prisma, Prisma } from '@bidstack/db';
 import type { OrderState as PrismaOrderState } from '@bidstack/db';
 import {
   ORDER_STATE_TRANSITIONS,
@@ -33,18 +33,26 @@ import type { OrderState } from '@bidstack/shared';
 const toPrismaState = (s: z.infer<typeof OrderState>): PrismaOrderState =>
   s as unknown as PrismaOrderState;
 
-async function mintNextNumber(orgId: string, prefix: 'Q' | 'SO'): Promise<string> {
-  // Postgres-native scan for the largest existing suffix in this prefix
-  // namespace. Avoids racing two simultaneous create calls — at worst we
-  // generate the same candidate, the unique constraint blocks one, and the
-  // caller retries. (Real-world prod would use a sequence.)
-  const last = await prisma.salesOrder.findFirst({
+async function mintNextNumber(
+  tx: Prisma.TransactionClient,
+  orgId: string,
+  prefix: 'Q' | 'SO',
+): Promise<string> {
+  // Take the largest existing suffix inside the active transaction so a
+  // concurrent create on the same prefix sees our row before deciding its
+  // own number. A unique violation can still happen on first-row-of-prefix
+  // contention; the caller retries up to 5 times.
+  const last = await tx.salesOrder.findFirst({
     where: { orgId, number: { startsWith: `${prefix}-` } },
     orderBy: { number: 'desc' },
     select: { number: true },
   });
   const nextSeq = last ? Number((last.number.split('-')[1] ?? '0').replace(/\D/g, '')) + 1 : 1;
   return `${prefix}-${String(nextSeq).padStart(5, '0')}`;
+}
+
+function isUniqueViolation(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
 }
 
 export const salesOrdersRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -233,36 +241,52 @@ export const salesOrdersRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       const total = resolvedLines.reduce((acc, l) => acc + l.subtotalMicros, BigInt(0));
 
-      const number = await mintNextNumber(req.auth.orgId, 'Q');
-      const created = await prisma.salesOrder.create({
-        data: {
-          orgId: req.auth.orgId,
-          number,
-          state: 'draft',
-          customerName,
-          countryCode,
-          currency,
-          salespersonId: salespersonId ?? null,
-          totalMicros: total,
-          orderDate: new Date(),
-          lines: { create: resolvedLines },
-        },
-      });
-
-      await prisma.auditLog.create({
-        data: {
-          orgId: req.auth.orgId,
-          userId: req.auth.userId,
-          action: 'sales_order.create',
-          targetType: 'sales_order',
-          targetId: created.id,
-          diff: { number, customerName, lineCount: resolvedLines.length },
-        },
-      });
+      // Order create + audit row land atomically. On a Q-NNNNN collision (two
+      // concurrent quote creates), retry up to 5 times — each retry re-mints
+      // the next free number inside a fresh transaction.
+      let createdId: string | null = null;
+      for (let attempt = 0; attempt < 5 && !createdId; attempt += 1) {
+        try {
+          createdId = await prisma.$transaction(async (tx) => {
+            const number = await mintNextNumber(tx, req.auth.orgId, 'Q');
+            const created = await tx.salesOrder.create({
+              data: {
+                orgId: req.auth.orgId,
+                number,
+                state: 'draft',
+                customerName,
+                countryCode,
+                currency,
+                salespersonId: salespersonId ?? null,
+                totalMicros: total,
+                orderDate: new Date(),
+                lines: { create: resolvedLines },
+              },
+            });
+            await tx.auditLog.create({
+              data: {
+                orgId: req.auth.orgId,
+                userId: req.auth.userId,
+                action: 'sales_order.create',
+                targetType: 'sales_order',
+                targetId: created.id,
+                diff: { number, customerName, lineCount: resolvedLines.length },
+              },
+            });
+            return created.id;
+          });
+        } catch (err) {
+          if (isUniqueViolation(err) && attempt < 4) continue;
+          throw err;
+        }
+      }
+      if (!createdId) {
+        throw server.httpErrors.conflict('Could not allocate a unique quotation number; retry.');
+      }
 
       // Re-load via the detail handler shape so the client gets a single canonical
       // representation back from any mutation.
-      return reply.code(201).send(await loadDetail(req.auth.orgId, created.id));
+      return reply.code(201).send(await loadDetail(req.auth.orgId, createdId));
     },
   );
 
@@ -298,20 +322,22 @@ export const salesOrdersRoutes: FastifyPluginAsyncZod = async (server) => {
           `Cannot reopen from state '${from}'. Allowed next states: ${ORDER_STATE_TRANSITIONS[from].join(', ')}.`,
         );
       }
-      await prisma.salesOrder.update({
-        where: { id: order.id },
-        data: { state: 'draft' },
-      });
-      await prisma.auditLog.create({
-        data: {
-          orgId: req.auth.orgId,
-          userId: req.auth.userId,
-          action: 'sales_order.reopen',
-          targetType: 'sales_order',
-          targetId: order.id,
-          diff: { from, to: 'draft', reason: req.body?.reason ?? null },
-        },
-      });
+      await prisma.$transaction([
+        prisma.salesOrder.update({
+          where: { id: order.id },
+          data: { state: 'draft' },
+        }),
+        prisma.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'sales_order.reopen',
+            targetType: 'sales_order',
+            targetId: order.id,
+            diff: { from, to: 'draft', reason: req.body?.reason ?? null },
+          },
+        }),
+      ]);
       return loadDetail(req.auth.orgId, order.id);
     },
   );
@@ -412,23 +438,25 @@ function registerTransition(
           `Cannot transition from '${from}' to '${to}'. Allowed: ${ORDER_STATE_TRANSITIONS[from].join(', ')}.`,
         );
       }
-      await prisma.salesOrder.update({
-        where: { id: order.id },
-        data: {
-          state: toPrismaState(to),
-          ...(opts.setConfirmedAt && !order.confirmedAt ? { confirmedAt: new Date() } : {}),
-        },
-      });
-      await prisma.auditLog.create({
-        data: {
-          orgId: req.auth.orgId,
-          userId: req.auth.userId,
-          action: `sales_order.${action}`,
-          targetType: 'sales_order',
-          targetId: order.id,
-          diff: { from, to, reason: req.body?.reason ?? null },
-        },
-      });
+      await prisma.$transaction([
+        prisma.salesOrder.update({
+          where: { id: order.id },
+          data: {
+            state: toPrismaState(to),
+            ...(opts.setConfirmedAt && !order.confirmedAt ? { confirmedAt: new Date() } : {}),
+          },
+        }),
+        prisma.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: `sales_order.${action}`,
+            targetType: 'sales_order',
+            targetId: order.id,
+            diff: { from, to, reason: req.body?.reason ?? null },
+          },
+        }),
+      ]);
       return loadDetail(req.auth.orgId, order.id);
     },
   );

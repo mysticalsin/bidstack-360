@@ -4,6 +4,65 @@ Append-only sprint log. Every sprint ends with a commit + a checkpoint here.
 
 ---
 
+## 2026-05-11 — Sprint 22a: QA hardening + Sprint 23a Invoicing groundwork
+
+**Branch:** `feat/sprint-0-foundation`
+
+**Done — QA sweep:**
+
+- Full typecheck (8/8 packages clean), lint (8/8 packages clean), test (137 → 138 with new allow-list test)
+- Production web build: 769 modules, 5.7s; SalesDashboardPage 6.4kB gzip, SalesOrderDetailPage 2.5kB gzip, SalesOrdersPage 2.0kB gzip
+- Parallel deep audits — security, accessibility, gap-analysis (Odoo/Twenty vs BidStack)
+
+**Done — QA fixes from audits:**
+
+- **Pino redact config** (`apps/api/src/server.ts`) — strip Authorization, cookies, x-api-key, x-clerk-session, bearer/api-key/password/secret fields from all logs
+- **Odoo MCP model allow-list** (`apps/api/src/routes/odoo-integration.ts`) — closed cross-tenant proxy hole; `SearchBody.model` / `RecordParams.model` now `z.enum(ALLOWED_ODOO_MODELS)`. Off-allow-list requests (e.g. `res.users`, `ir.config_parameter`, `account.move`) are refused 400 before any network egress.
+- **Error-message scrubbing** — `OdooMcpError` no longer echoes `this.url` (could carry inline creds); routes return fixed `"Odoo MCP unavailable"` instead of `err.message`; `safeErrorMessage()` replaces upstream URL and bearer tokens before sending to browser/lastError fields
+- **Transaction safety** (`apps/api/src/routes/sales-orders.ts`) — order create + audit row now atomic in `$transaction`; bounded retry loop (5 attempts) on `P2002` unique-violation when concurrent quote creates collide on `Q-NNNNN`. State-transition update + audit row also wrapped in `$transaction`.
+- **A11y — touch targets** (`apps/web/src/pages/SalesOrdersPage.tsx`) — filter chips, country/salesperson clear buttons, "Load older" pagination all gained `min-h-9 pointer-coarse:min-h-11` + `focus-visible:ring-2`. WCAG 2.5.8.
+- **A11y — live region** (`apps/web/src/pages/SalesOrderDetailPage.tsx`) — `OrderStateBadge` wrapped in `role="status" aria-live="polite"` so SR users hear state transitions; in-flight transition buttons use `aria-busy` instead of literal `…` glyph (WCAG 4.1.3).
+- **A11y — treemap contrast** (`apps/web/src/components/sales/TopCategoriesTreemap.tsx`) — palette swapped to AA-passing colors (≥ 4.5:1 with white text at 12px); dropped `opacity={0.85}` dilution. Was failing for amber (1.95:1), jade-2 (2.5:1), cyan (2.4:1).
+- New API test: rejects models off allow-list with 400 without invoking `fetch` (proves no network egress).
+
+**Done — Sprint 23a Invoicing groundwork:**
+
+- Prisma schema additions: `Invoice`, `InvoiceLine`, `Payment` models + `InvoiceState` (draft/sent/paid/overdue/cancelled) + `PaymentMethod` enums. Org-scoped FKs, unique `(orgId, number)`, `invoices_org_state_due_idx` index for AR aging queries.
+- Raw SQL migration `packages/db/prisma/migrations/20260511050000_add_invoicing/migration.sql` (3 tables, 2 enums, 6 indexes, all `IF NOT EXISTS` for idempotency)
+- `packages/db/src/index.ts` re-exports the new types + enums
+
+**Honest gap analysis (Odoo & Twenty vs BidStack):** Documented via parallel-agent. Top-3 next sprints:
+
+1. First-class `Company` entity + Contact FK + CSV import (de-duplication + analytics unlock)
+2. **Invoicing module — schema landed this sprint;** API + UI deferred (see Blocked below)
+3. Lead model + win/loss reasons + saved views
+
+**Blocked:**
+
+- `pnpm db:generate` fails with `EPERM rename query_engine-windows.dll.node` — Windows DLL file-lock held by a Prisma client loaded earlier in the session. Schema + migration are written and validate clean (`npx prisma validate` ✓), but the generated TS types can't refresh until the lock releases.
+- Sprint 23b (Invoice API routes, UI, integration tests) needs the regenerated client. Recommended user action:
+  1. Close any running `pnpm dev` / vitest / IDE Prisma extensions
+  2. Run `pnpm db:migrate` (applies the new migration)
+  3. Run `pnpm db:generate` (refreshes TS types for `prisma.invoice` etc)
+  4. Resume from this checkpoint to build the API + UI
+
+**Not done — deferred from audit findings (need design):**
+
+- Composite FKs `(org_id, X_id) → X(org_id, id)` for `SalesOrderLine.product` / `SalesOrder.salesperson` — DB-level multi-tenancy enforcement (currently enforced only at Prisma query layer)
+- Per-org Odoo credentials (currently single global Odoo backend visible to all tenants)
+- SVG chart hover-dot keyboard focus indicators (`MonthlySalesChart` — works for mouse, not yet for keyboard)
+
+**Verified:**
+
+- 8/8 packages typecheck clean
+- 8/8 packages lint clean
+- 64 API tests + 17 web tests + 8 odoo-mcp tests all pass (89 total in the slice exercised)
+- web production build clean (769 modules, 5.7s)
+
+**Next session:** Resume Sprint 23b once user runs `pnpm db:migrate && pnpm db:generate`. Then build `apps/api/src/routes/sales-invoices.ts` + `apps/web/src/pages/SalesInvoicesPage.tsx` + create-from-order action on SalesOrderDetailPage + AR-aging endpoint for dashboard.
+
+---
+
 ## 2026-05-10 — Sprint 0: Foundation
 
 **Branch:** `feat/sprint-0-foundation`

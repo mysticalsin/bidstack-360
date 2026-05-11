@@ -72,8 +72,8 @@ export function SalesOrdersPage() {
               onClick={() => setQueryParam('state', s.id === 'all' ? null : s.id)}
               className={
                 active
-                  ? 'rounded-full border border-[var(--brand-primary)] bg-[var(--brand-primary)] px-3 py-1.5 text-xs font-semibold text-white'
-                  : 'rounded-full border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-1.5 text-xs text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]'
+                  ? 'inline-flex min-h-9 items-center rounded-full border border-[var(--brand-primary)] bg-[var(--brand-primary)] px-3 py-1.5 text-xs font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 pointer-coarse:min-h-11'
+                  : 'inline-flex min-h-9 items-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-1.5 text-xs text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 pointer-coarse:min-h-11'
               }
             >
               {s.label}
@@ -93,7 +93,8 @@ export function SalesOrdersPage() {
             <button
               type="button"
               onClick={() => setQueryParam('country', null)}
-              className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-1.5 text-xs text-[var(--fg-secondary)]"
+              aria-label={`Clear country filter ${filter.countryCode}`}
+              className="inline-flex min-h-9 items-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-1.5 text-xs text-[var(--fg-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 pointer-coarse:min-h-11"
             >
               Country: {filter.countryCode} ✕
             </button>
@@ -102,7 +103,8 @@ export function SalesOrdersPage() {
             <button
               type="button"
               onClick={() => setQueryParam('salespersonId', null)}
-              className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-1.5 text-xs text-[var(--fg-secondary)]"
+              aria-label="Clear salesperson filter"
+              className="inline-flex min-h-9 items-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-1.5 text-xs text-[var(--fg-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 pointer-coarse:min-h-11"
             >
               Salesperson ✕
             </button>
@@ -189,7 +191,7 @@ export function SalesOrdersPage() {
             <button
               type="button"
               onClick={() => setQueryParam('cursor', list.data.nextCursor)}
-              className="text-xs text-[var(--brand-primary)] underline-offset-2 hover:underline"
+              className="inline-flex min-h-9 items-center rounded-md px-3 py-1.5 text-xs font-medium text-[var(--brand-primary)] underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 pointer-coarse:min-h-11"
             >
               Load older →
             </button>

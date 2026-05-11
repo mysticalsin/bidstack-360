@@ -244,7 +244,7 @@ describe('odoo-integration route', () => {
     });
   });
 
-  it('returns 502 Bad Gateway when the MCP server reports a JSON-RPC error', async () => {
+  it('returns 502 Bad Gateway when an allowed-model query fails upstream', async () => {
     vi.stubGlobal(
       'fetch',
       vi
@@ -259,7 +259,7 @@ describe('odoo-integration route', () => {
           jsonResponse({
             jsonrpc: '2.0',
             id: 2,
-            error: { code: -32602, message: 'Unknown model res.bogus' },
+            error: { code: -32603, message: 'upstream exploded' },
           }),
         ),
     );
@@ -268,8 +268,28 @@ describe('odoo-integration route', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/integrations/odoo/search',
-      payload: { model: 'res.bogus' },
+      payload: { model: 'res.partner' },
     });
     expect(res.statusCode).toBe(502);
+    // Error message must not echo internal Odoo URL or upstream detail.
+    const body = res.json() as { message?: string };
+    expect(body.message).toBe('Odoo MCP unavailable');
+  });
+
+  it('rejects models outside the allow-list with 400 before reaching Odoo', async () => {
+    // No fetch stub — if the route reaches the MCP client this test fails by
+    // calling un-mocked fetch and timing out. The body-validation gate must
+    // refuse `res.users` (off allow-list) before any network egress.
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/integrations/odoo/search',
+      payload: { model: 'res.users' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

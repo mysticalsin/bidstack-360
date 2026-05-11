@@ -43,6 +43,9 @@ export type {
   ProviderHealth,
   QueueHealth,
   ReleaseScore,
+  Invoice,
+  InvoiceLine,
+  Payment,
 } from '../generated/client/index.js';
 
 // `Prisma` is exported as a value because we need its runtime classes
@@ -56,4 +59,6 @@ export {
   DocumentKind,
   SyncEventStatus,
   OrderState,
+  InvoiceState,
+  PaymentMethod,
 } from '../generated/client/index.js';

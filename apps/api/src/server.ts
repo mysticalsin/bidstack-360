@@ -30,6 +30,27 @@ export async function buildServer(): Promise<FastifyInstance> {
   const server = Fastify({
     logger: {
       level: process.env.LOG_LEVEL ?? 'info',
+      // Strip bearer tokens, cookies, and any obvious credential fields before they
+      // ever hit stdout / log aggregation. The Odoo MCP client also has its own
+      // URL-scrubbing layer (see packages/odoo-mcp-client/src/index.ts).
+      redact: {
+        paths: [
+          'req.headers.authorization',
+          'req.headers.cookie',
+          'req.headers["x-api-key"]',
+          'req.headers["x-clerk-session"]',
+          'res.headers["set-cookie"]',
+          '*.bearerToken',
+          '*.bearer_token',
+          '*.apiKey',
+          '*.api_key',
+          '*.password',
+          '*.secret',
+          'err.config.headers.Authorization',
+          'err.config.headers.authorization',
+        ],
+        remove: true,
+      },
       transport:
         process.env.NODE_ENV === 'development'
           ? { target: 'pino-pretty', options: { colorize: true, singleLine: true } }
