@@ -12,6 +12,7 @@ import {
   PageHead,
   PipelineByStageCard,
   RecentOpportunitiesCard,
+  SalesIntelligencePanel,
   TechStackCard,
   UpsellFilesCard,
 } from '@/components/cockpit';
@@ -23,6 +24,7 @@ import { ErrorState } from '@/components/ui/StateMessages';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
+import { useSalesIntelligence } from '@/hooks/useSalesIntelligence';
 import { useTasks } from '@/hooks/useTasks';
 import { daysUntil } from '@/lib/format';
 import { useAccountHistory } from '@/stores/accountHistory';
@@ -36,6 +38,7 @@ export function DashboardPage() {
   const { accountId } = useParams<{ accountId?: string }>();
   const dashboard = useCrmDashboard(accountId);
   const report = usePipelineReport();
+  const salesIntelligence = useSalesIntelligence();
   const opps = useOpportunities({ limit: 5 });
   const tasks = useTasks();
   // Hooks must be called in the same order every render — including after
@@ -93,10 +96,14 @@ export function DashboardPage() {
           </Reveal>
 
           <Reveal delay={0.08}>
-            <RecentOpportunitiesCard opps={opps} />
+            <SalesIntelligencePanel report={salesIntelligence} />
           </Reveal>
 
           <Reveal delay={0.12}>
+            <RecentOpportunitiesCard opps={opps} />
+          </Reveal>
+
+          <Reveal delay={0.16}>
             <ActivityTimelineCard cockpit={cockpit} />
           </Reveal>
         </div>

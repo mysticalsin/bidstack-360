@@ -15,6 +15,12 @@ import {
   fixtureUsers,
   intelFor,
 } from './seed-data.js';
+import {
+  fixtureProductCategories,
+  fixtureProducts,
+  fixtureSalesCustomers,
+  fixtureSalesOrders,
+} from './sales-seed-data.js';
 
 const prisma = new PrismaClient();
 
@@ -186,6 +192,99 @@ async function main() {
     });
   }
   console.log(`  ✓ tasks: ${fixtureTasks.length}`);
+
+  // ─── Sales module — categories, products, orders ──────────────────────
+  const categoryIds = new Map<string, string>();
+  for (const name of fixtureProductCategories) {
+    const cat = await prisma.productCategory.upsert({
+      where: { orgId_name: { orgId: org.id, name } },
+      create: { orgId: org.id, name },
+      update: {},
+    });
+    categoryIds.set(name, cat.id);
+  }
+  console.log(`  ✓ product categories: ${fixtureProductCategories.length}`);
+
+  const productIdBySku = new Map<string, string>();
+  for (const p of fixtureProducts) {
+    const product = await prisma.product.upsert({
+      where: { orgId_sku: { orgId: org.id, sku: p.sku } },
+      create: {
+        orgId: org.id,
+        sku: p.sku,
+        name: p.name,
+        categoryId: categoryIds.get(p.category) ?? null,
+        listPriceMicros: BigInt(Math.round(p.listPrice * 1_000_000)),
+        currency: p.currency,
+      },
+      update: {
+        name: p.name,
+        categoryId: categoryIds.get(p.category) ?? null,
+        listPriceMicros: BigInt(Math.round(p.listPrice * 1_000_000)),
+        currency: p.currency,
+      },
+    });
+    productIdBySku.set(p.sku, product.id);
+  }
+  console.log(`  ✓ products: ${fixtureProducts.length}`);
+
+  // Quick lookups for orders
+  const userByEmail = new Map<string, string>();
+  for (const u of fixtureUsers) {
+    const userRow = await prisma.user.findUnique({ where: { email: u.email } });
+    if (userRow) userByEmail.set(u.email, userRow.id);
+  }
+  const customerByName = new Map(fixtureSalesCustomers.map((c) => [c.name, c]));
+
+  for (const so of fixtureSalesOrders) {
+    const customer = customerByName.get(so.customerName);
+    if (!customer) continue;
+    const orderDate = new Date(Date.now() - so.daysAgo * 24 * 60 * 60 * 1000);
+    const lines = so.lines
+      .filter((l) => productIdBySku.has(l.sku))
+      .map((l) => {
+        const unitMicros = BigInt(Math.round(l.unitPrice * 1_000_000));
+        const subtotal = unitMicros * BigInt(l.qty);
+        return {
+          orgId: org.id,
+          productId: productIdBySku.get(l.sku)!,
+          description: fixtureProducts.find((p) => p.sku === l.sku)?.name ?? l.sku,
+          quantity: l.qty,
+          unitPriceMicros: unitMicros,
+          subtotalMicros: subtotal,
+        };
+      });
+    const total = lines.reduce((acc, l) => acc + l.subtotalMicros, BigInt(0));
+
+    await prisma.salesOrder.upsert({
+      where: { orgId_number: { orgId: org.id, number: so.number } },
+      create: {
+        orgId: org.id,
+        number: so.number,
+        state: so.state,
+        customerName: so.customerName,
+        salespersonId: userByEmail.get(customer.salespersonEmail) ?? null,
+        countryCode: customer.countryCode,
+        currency: customer.currency,
+        totalMicros: total,
+        orderDate,
+        confirmedAt: so.state === 'confirmed' || so.state === 'done' ? orderDate : null,
+        lines: { create: lines },
+      },
+      update: {
+        state: so.state,
+        salespersonId: userByEmail.get(customer.salespersonEmail) ?? null,
+        countryCode: customer.countryCode,
+        currency: customer.currency,
+        totalMicros: total,
+        orderDate,
+        confirmedAt: so.state === 'confirmed' || so.state === 'done' ? orderDate : null,
+        // Replace lines deterministically on re-run so quantities stay aligned with the fixture.
+        lines: { deleteMany: {}, create: lines },
+      },
+    });
+  }
+  console.log(`  ✓ sales orders: ${fixtureSalesOrders.length}`);
 
   console.log('✅ Seed complete.');
 }

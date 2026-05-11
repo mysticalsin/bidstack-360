@@ -136,6 +136,15 @@ GET    /api/integrations/odoo/models   List Odoo models (proxies MCP list_models
 POST   /api/integrations/odoo/search   search_records over MCP
 GET    /api/integrations/odoo/:model/:id  get_record over MCP
 
+GET    /api/sales-dashboard/kpis            KPI tiles + previous-period delta
+GET    /api/sales-dashboard/monthly-sales   Area chart points (month → revenue)
+GET    /api/sales-dashboard/top-quotations  Top revenue quotations
+GET    /api/sales-dashboard/top-orders      Top revenue confirmed orders
+GET    /api/sales-dashboard/top-countries   Revenue by country (ISO-3166)
+GET    /api/sales-dashboard/top-products    Revenue + order count by product
+GET    /api/sales-dashboard/top-customers   Revenue grouped by customer name
+GET    /api/sales-dashboard/top-categories  Revenue rolled up to product category
+
 POST   /webhooks/dust                  Dust webhook receiver (HMAC verified)
 ```
 

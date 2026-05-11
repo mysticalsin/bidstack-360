@@ -27,6 +27,13 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 <!-- New entries appended at the top of this section. -->
 
+### 2026-05-11 TESTING: Odoo autocomplete response source widened to string
+
+- **What went wrong:** I returned an Odoo autocomplete `source` through a nested ternary without annotating it, so TypeScript widened the literal union to `string` and the Fastify Zod response type rejected the route handler.
+- **Root cause:** I trusted value inference inside a returned object instead of typing the public response discriminator.
+- **Prevention rule:** For route response discriminators, assign the value to a `z.infer<typeof ResponseSchema>['field']` variable before returning it.
+- **Files affected:** `apps/api/src/routes/odoo-integration.ts`.
+
 ### 2026-05-11 TOOLING: Prisma generate while API server locked Windows DLL
 
 - **What went wrong:** I ran the root `pnpm typecheck` while the local API dev server was still running, so `prisma generate` failed to rename `query_engine-windows.dll.node`.

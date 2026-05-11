@@ -21,6 +21,7 @@ import { notesRoutes } from './routes/notes.js';
 import { odooRoutes } from './routes/odoo-integration.js';
 import { opportunityRoutes } from './routes/opportunities.js';
 import { reportsRoutes } from './routes/reports.js';
+import { salesDashboardRoutes } from './routes/sales-dashboard.js';
 import { tasksRoutes } from './routes/tasks.js';
 import { webhooksRoutes } from './routes/webhooks.js';
 
@@ -82,6 +83,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(contactsRoutes, { prefix: '/api' });
   await server.register(tasksRoutes, { prefix: '/api' });
   await server.register(reportsRoutes, { prefix: '/api' });
+  await server.register(salesDashboardRoutes, { prefix: '/api' });
   await server.register(auditLogsRoutes, { prefix: '/api' });
   await server.register(crmRoutes, { prefix: '/api' });
   await server.register(notesRoutes, { prefix: '/api' });

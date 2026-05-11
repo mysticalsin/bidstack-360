@@ -140,4 +140,19 @@ describe('contacts + tasks + reports routes', () => {
     expect(body.weightedPipeline).toBeLessThanOrEqual(body.totalValueOpen);
     expect(body.byStage.length).toBeGreaterThan(0);
   });
+
+  skipIfNoDb('GET /api/reports/sales-intelligence returns countries and who is there', async () => {
+    const res = await server.inject({ method: 'GET', url: '/api/reports/sales-intelligence' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.kpis.some((kpi: { id: string }) => kpi.id === 'quotations')).toBe(true);
+    expect(body.topCountries.length).toBeGreaterThan(0);
+    expect(
+      body.topCountries.some(
+        (country: { topCustomers: string[]; people: { name: string }[] }) =>
+          country.topCustomers.length > 0 && country.people.length > 0,
+      ),
+    ).toBe(true);
+    expect(body.topProducts.length).toBeGreaterThan(0);
+  });
 });

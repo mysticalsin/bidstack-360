@@ -44,6 +44,10 @@ model Org {
   providerHealth     ProviderHealth[]
   queueHealth        QueueHealth[]
   releaseScores      ReleaseScore[]
+  productCategories  ProductCategory[]
+  products           Product[]
+  salesOrders        SalesOrder[]
+  salesOrderLines    SalesOrderLine[]
 
   @@map("orgs")
 }
@@ -63,6 +67,7 @@ model User {
   auditLogs     AuditLog[]
   authoredNotes Note[]
   uploadedFiles FileAttachment[]
+  salesOrders   SalesOrder[]
 
   @@index([orgId])
   @@map("users")
@@ -547,3 +552,110 @@ model FileAttachment {
   @@index([orgId, accountId, createdAt(sort: Desc)], map: "file_attachments_org_account_created_idx")
   @@map("file_attachments")
 }
+
+// ─── Sales module (Quotations + Orders + Products) ────────────────────────
+// Mirrors Odoo's sale.order/sale.order.line/product.template data model.
+// One `SalesOrder` row covers the full quotation→order lifecycle via `state`:
+//   draft / sent  → quotation
+//   confirmed     → sales order
+//   done          → locked / delivered
+//   cancelled     → cancelled
+// Money is stored in micros (integer × 1e6) per the rest of BidStack.
+
+enum OrderState {
+  draft
+  sent
+  confirmed
+  done
+  cancelled
+
+  @@map("order_state")
+}
+
+model ProductCategory {
+  id        String   @id @default(uuid()) @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  name      String
+  parentId  String?  @map("parent_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org      Org               @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  parent   ProductCategory?  @relation("ProductCategoryTree", fields: [parentId], references: [id])
+  children ProductCategory[] @relation("ProductCategoryTree")
+  products Product[]
+
+  @@unique([orgId, name], map: "product_categories_org_name_key")
+  @@index([orgId, parentId], map: "product_categories_org_parent_idx")
+  @@map("product_categories")
+}
+
+model Product {
+  id              String   @id @default(uuid()) @db.Uuid
+  orgId           String   @map("org_id") @db.Uuid
+  sku             String
+  name            String
+  categoryId      String?  @map("category_id") @db.Uuid
+  listPriceMicros BigInt   @default(0) @map("list_price_micros")
+  currency        String   @default("CAD") @db.VarChar(3)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org      Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  category ProductCategory? @relation(fields: [categoryId], references: [id])
+  lines    SalesOrderLine[]
+
+  @@unique([orgId, sku], map: "products_org_sku_key")
+  @@index([orgId, name], map: "products_org_name_idx")
+  @@index([orgId, categoryId], map: "products_org_category_idx")
+  @@map("products")
+}
+
+model SalesOrder {
+  id            String     @id @default(uuid()) @db.Uuid
+  orgId         String     @map("org_id") @db.Uuid
+  number        String
+  state         OrderState @default(draft)
+  customerName  String     @map("customer_name")
+  customerId    String?    @map("customer_id") @db.Uuid
+  salespersonId String?    @map("salesperson_id") @db.Uuid
+  countryCode   String?    @map("country_code") @db.VarChar(2)
+  currency      String     @default("CAD") @db.VarChar(3)
+  totalMicros   BigInt     @default(0) @map("total_micros")
+  orderDate     DateTime   @default(now()) @map("order_date") @db.Timestamptz(6)
+  confirmedAt   DateTime?  @map("confirmed_at") @db.Timestamptz(6)
+  createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org         Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  salesperson User?            @relation(fields: [salespersonId], references: [id])
+  lines       SalesOrderLine[]
+
+  @@unique([orgId, number], map: "sales_orders_org_number_key")
+  @@index([orgId, state, orderDate(sort: Desc)], map: "sales_orders_org_state_date_idx")
+  @@index([orgId, countryCode], map: "sales_orders_org_country_idx")
+  @@index([orgId, customerName], map: "sales_orders_org_customer_idx")
+  @@index([orgId, salespersonId], map: "sales_orders_org_salesperson_idx")
+  @@map("sales_orders")
+}
+
+model SalesOrderLine {
+  id              String   @id @default(uuid()) @db.Uuid
+  orgId           String   @map("org_id") @db.Uuid
+  orderId         String   @map("order_id") @db.Uuid
+  productId       String   @map("product_id") @db.Uuid
+  description     String
+  quantity        Decimal  @default(1) @db.Decimal(12, 3)
+  unitPriceMicros BigInt   @map("unit_price_micros")
+  subtotalMicros  BigInt   @map("subtotal_micros")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org     Org        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  order   SalesOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product    @relation(fields: [productId], references: [id])
+
+  @@index([orgId, orderId], map: "sales_order_lines_org_order_idx")
+  @@index([orgId, productId], map: "sales_order_lines_org_product_idx")
+  @@map("sales_order_lines")
+}
+

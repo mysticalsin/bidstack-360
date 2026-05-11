@@ -6,3 +6,4 @@ export * from './intel.js';
 export * from './audit-log.js';
 export * from './note.js';
 export * from './file.js';
+export * from './sales-dashboard.js';

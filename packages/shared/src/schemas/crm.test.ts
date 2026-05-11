@@ -8,6 +8,7 @@ import {
   DataQualityReport,
   DustCrmToolName,
   OpenDataSignalsResponse,
+  SalesIntelligenceReport,
 } from './crm.js';
 
 const fetchedAt = '2026-05-11T00:00:00.000Z';
@@ -131,5 +132,71 @@ describe('CRM schemas', () => {
       signals: [],
     });
     expect(signals.connectors[0]?.id).toBe('tradingview-widgets');
+  });
+
+  it('captures Odoo-style sales numbers with country and contact context', () => {
+    const report = SalesIntelligenceReport.parse({
+      generatedAt: fetchedAt,
+      currencyCode: 'CAD',
+      source: 'opportunities',
+      sourceAttribution: [
+        {
+          source: 'twenty_compatible_opportunities',
+          label: 'Twenty-compatible BidStack opportunity pipeline',
+          sourceUrl: null,
+          fetchedAt,
+          confidence: 0.78,
+          providerMetadata: { fallback: true },
+        },
+      ],
+      kpis: [
+        {
+          id: 'quotations',
+          label: 'Quotations',
+          kind: 'count',
+          value: 46,
+          currencyCode: null,
+          percentChange: 52,
+          trend: 'up',
+          tone: 'blue',
+        },
+      ],
+      monthlySales: [
+        {
+          month: '2026-04',
+          label: 'Apr 2026',
+          revenueMicros: 118_000_000_000,
+          quotationCount: 8,
+          orderCount: 5,
+        },
+      ],
+      topQuotations: [],
+      topOrders: [],
+      topCountries: [
+        {
+          countryCode: 'CA',
+          countryName: 'Canada',
+          revenueMicros: 118_000_000_000,
+          quotationCount: 8,
+          orderCount: 5,
+          customerCount: 3,
+          topCustomers: ['CI Financial'],
+          people: [
+            {
+              name: 'Michael Johnson',
+              title: 'Chief Information Officer',
+              email: 'mjohnson@ci.com',
+              customer: 'CI Financial',
+            },
+          ],
+          salespeople: ['Jane Smith'],
+          sharePct: 100,
+        },
+      ],
+      topProducts: [],
+      topCategories: [],
+    });
+
+    expect(report.topCountries[0]?.people[0]?.customer).toBe('CI Financial');
   });
 });

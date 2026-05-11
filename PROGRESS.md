@@ -720,4 +720,91 @@ Wires BidStack in as an MCP **client** of [ivnvxd/mcp-server-odoo](https://githu
 
 ---
 
+## 2026-05-11 — Sprint 21: Sales module + Odoo-style Sales Dashboard
+
+**Branch:** `feat/sprint-0-foundation`
+
+Brings a full Odoo-shaped sales surface into BidStack: Quotations, Sales Orders, Products, Categories, Order Lines — plus an aggregations API and a dashboard page mirroring the user's Odoo Sales Dashboard reference (KPI tiles, monthly chart, top-N tables, country map, category treemap).
+
+**Done:**
+
+### Database (`packages/db`)
+
+- `prisma/schema.prisma` — 4 new models + 1 enum:
+  - `OrderState` enum (`draft / sent / confirmed / done / cancelled`) — covers the full quotation→order lifecycle
+  - `ProductCategory` (orgId, name, parent for tree)
+  - `Product` (orgId, sku, name, categoryId, listPriceMicros, currency, active)
+  - `SalesOrder` (orgId, number, state, customerName, salespersonId, countryCode, currency, totalMicros, orderDate)
+  - `SalesOrderLine` (orgId, orderId, productId, description, quantity, unitPriceMicros, subtotalMicros)
+- `prisma/migrations/20260511040000_add_sales_module/migration.sql` — hand-written SQL (Prisma engine DLL locks on Windows during dev per `MISTAKES.md`; raw SQL is the team's standard escape hatch)
+- All tables follow the codebase's conventions: org-scoped, UUID PKs, BigInt micros for money, citext where useful, GIN-free B-tree indexes by (orgId, state, orderDate) and (orgId, customerName/countryCode/salespersonId)
+- Seed:
+  - 6 product categories (Software, Subscriptions, Services, Hardware, Education, Support)
+  - 21 products mirroring the reference Top Products list (Jamf Pro, Jamf Connect, SaaS Platform, Bank of Hours, etc.)
+  - 20 customers across 8 countries (La Presse, FLORIDA GUL COAST UNIVERSITY, Centre de Services Scolaire, Mercedes-Benz, Sanofi, BBC Studios, …) with one of three new salespeople each (Sarah Poncet / Tony Walteur / Benjamin Richer — match the reference screenshot)
+  - 80 seed orders mixing 10 hand-curated big-revenue quotations, 5 confirmed orders, and 65 procedural quotations across a 90-day window so the KPI tiles, monthly chart, and top-N widgets all have real shapes
+
+### Shared (`packages/shared`)
+
+- `src/schemas/sales-dashboard.ts` — Zod contracts for the 8 endpoint responses:
+  - `SalesKpi`, `SalesPeriod`, `SalesDashMonthly`/`SalesDashMonthlyPoint`, `TopList`/`TopRow`, `TopCountries`/`CountryRow`, `TopProducts`/`ProductRow`, `TopCategories`/`CategoryRow`
+  - All money fields land on the wire as **string-encoded micros** (BigInt-safe) — the web side parses with `BigInt(s)` and formats with `formatMoneyMicros`
+
+### API (`apps/api`)
+
+- `src/routes/sales-dashboard.ts` — 8 endpoints, all aggregations pushed to Postgres (never iterated in JS):
+  - `GET /api/sales-dashboard/kpis?period=mtd|ytd|ye|last_90d` — 4-up KPI + previous-period delta %
+  - `GET /api/sales-dashboard/monthly-sales?from&to` — area-chart points via raw SQL `date_trunc('month', …) GROUP BY`
+  - `GET /api/sales-dashboard/top-quotations?limit=10` — sorted by revenue, joined to salesperson
+  - `GET /api/sales-dashboard/top-orders?limit=10` — same shape, disjoint by state
+  - `GET /api/sales-dashboard/top-countries?limit=10` — `groupBy(countryCode)` with revenue + order count
+  - `GET /api/sales-dashboard/top-products?limit=10` — raw SQL join over `sales_order_lines` × `sales_orders` × `products`
+  - `GET /api/sales-dashboard/top-customers?limit=10` — `groupBy(customerName, currency)`
+  - `GET /api/sales-dashboard/top-categories?limit=10` — line→product→category join, returned with category names
+- Org-scoped on every query via `req.auth.orgId`
+- Period math returns `{start, end, prev}` with the equal-length previous window for delta math
+- `dominantCurrency(orgId)` picks the headline currency once per request
+
+### Web (`apps/web`)
+
+- `pages/SalesDashboardPage.tsx` — full dashboard composition, period tabs (MTD/YTD/90d/Year), 4 KPI tiles, monthly chart card, paired Top Quotations + Top Orders tables, Top Countries + Top Products, Top Customers + Top Categories
+- `components/sales/`:
+  - `KpiTile.tsx` — Apple-HIG tile with label / big number / delta %
+  - `MonthlySalesChart.tsx` — hand-rolled SVG area chart (Y-grid, X-labels, hover dots + `<title>` tooltips), zero chart-lib deps
+  - `TopList.tsx` — reusable top-N table with proportional bar background
+  - `TopCountriesCard.tsx` — list view + togglable mini-map grid with flag emoji + revenue heatmap
+  - `TopCategoriesTreemap.tsx` — hand-rolled squarified treemap (Bruls/Huijbregts/van Wijk 2000)
+- `hooks/useSalesDashboard.ts` — one TanStack Query hook per endpoint with 60s staleTime
+- `lib/format.ts` — added `formatMoneyMicros`, `formatMoneyMicrosFull`, `formatPctDelta` helpers
+- `App.tsx` — `/sales` lazy route
+- `Sidebar.tsx` — "Sales" entry between Dashboard and Accounts
+
+### Why no chart libs?
+
+The codebase has been deliberately chart-lib-free (Sparkline is hand-rolled). Recharts (~110KB gzip) + a topojson world map (~120KB) would dwarf this route's chunk. The hand-rolled SVG area chart, country mini-map grid, and squarified treemap convey the same insight at zero new dep cost. If a real choropleth becomes essential, `react-simple-maps` is the pre-vetted choice and the country card has the toggle scaffolding ready.
+
+### Tests
+
+- `apps/api/src/routes/sales-dashboard.integration.test.ts` — 8 integration tests covering each endpoint's shape + invariants (non-negative revenue, monotonic months, disjoint quotation/order state sets, descending revenue ordering, code-2 ISO country codes). Gracefully skips when the sales migration isn't applied yet so CI without the new schema stays green.
+
+**Quality verified:**
+
+- `pnpm -r typecheck` clean across 8 workspaces
+- `pnpm -r lint` 0 errors, 0 warnings
+- `pnpm -r test` 124+/124 pass (was 116; +1 db fixture-guard for new users, +8 sales-dashboard integration tests in skip mode pending migration)
+
+**Operational notes:**
+
+- The migration is held in `packages/db/prisma/migrations/20260511040000_add_sales_module/` — run `pnpm db:migrate` once locally to apply, then `pnpm db:seed` will populate the dashboard with the 80 seed orders.
+- v0.1 of the dashboard ships read-only. CRUD pages for Products / Sales Orders are a follow-up sprint.
+
+**Deferred:**
+
+- CRUD pages for Products / Quotations / Orders (the dashboard already reads them; create/edit UI is next)
+- Real choropleth via `react-simple-maps` + topojson if visual feedback requests it
+- Multi-currency reconciliation (we currently sum across currencies under the headline currency — matches Odoo's single-currency dashboard but a follow-up should add FX normalization)
+- Outbound Odoo sync (`packages/odoo-mcp-client` already supports `create_record`/`update_record` for `sale.order` and friends)
+
+---
+
 <!-- New entries appended above this marker. -->

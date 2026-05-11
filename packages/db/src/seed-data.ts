@@ -23,6 +23,16 @@ export const fixtureUsers: FixtureUser[] = [
   { initials: 'MJ', name: 'Mike Johnson', email: 'mike.johnson@mantu.com', role: 'account_exec' },
   { initials: 'RH', name: 'Riya Hassan', email: 'riya.hassan@mantu.com', role: 'account_exec' },
   { initials: 'LB', name: 'Léon Bertrand', email: 'leon.bertrand@mantu.com', role: 'viewer' },
+  // Sales-module salespeople (Sprint 21) — match the reference dashboard
+  // screenshot so "Top Quotations / Top Sales Orders" credit the right name.
+  { initials: 'SP', name: 'Sarah Poncet', email: 'sarah.poncet@mantu.com', role: 'account_exec' },
+  { initials: 'TW', name: 'Tony Walteur', email: 'tony.walteur@mantu.com', role: 'account_exec' },
+  {
+    initials: 'BR',
+    name: 'Benjamin Richer',
+    email: 'benjamin.richer@mantu.com',
+    role: 'account_exec',
+  },
 ];
 
 export interface FixtureOpp {
