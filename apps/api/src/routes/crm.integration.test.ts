@@ -160,6 +160,36 @@ describe('crm routes', () => {
   });
 
   skipIfNoDb(
+    'POST /api/crm/companies/autopopulate-from-sales enriches Twenty-compatible customers',
+    async () => {
+      const res = await server.inject({
+        method: 'POST',
+        url: '/api/crm/companies/autopopulate-from-sales',
+        payload: { limit: 3, source: 'opportunities' },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.requested).toBeGreaterThan(0);
+      expect(body.items.length).toBeGreaterThan(0);
+      expect(body.enriched + body.cached + body.skipped).toBe(body.requested);
+      expect(body.sourceAttribution).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ source: 'odoo_twenty_sales_autopopulate' }),
+          expect.objectContaining({ source: 'twenty_core_objects' }),
+        ]),
+      );
+      expect(body.items[0].company).toEqual(
+        expect.objectContaining({
+          name: expect.any(String),
+          source: 'enrichment',
+          sourceAttribution: expect.any(Array),
+        }),
+      );
+    },
+  );
+
+  skipIfNoDb(
     'GET /api/crm/open-data/signals returns connectors without fabricating data',
     async () => {
       const res = await server.inject({ method: 'GET', url: '/api/crm/open-data/signals' });

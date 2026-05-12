@@ -26,6 +26,18 @@ import { salesOrdersRoutes } from './routes/sales-orders.js';
 import { tasksRoutes } from './routes/tasks.js';
 import { webhooksRoutes } from './routes/webhooks.js';
 
+const CONNECT_SRC = [
+  "'self'",
+  'https://api.clerk.com',
+  'https://*.clerk.accounts.dev',
+  'https://dust.tt',
+  'https://*.dust.tt',
+  'https://*.sentry.io',
+  'https://api.apollo.io',
+];
+
+const FRAME_SRC = ["'self'", 'https://*.clerk.accounts.dev', 'https://challenges.cloudflare.com'];
+
 export async function buildServer(): Promise<FastifyInstance> {
   const server = Fastify({
     logger: {
@@ -71,9 +83,10 @@ export async function buildServer(): Promise<FastifyInstance> {
         scriptSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", 'data:', 'https:'],
-        connectSrc: ["'self'"],
+        connectSrc: CONNECT_SRC,
         fontSrc: ["'self'"],
         objectSrc: ["'none'"],
+        frameSrc: FRAME_SRC,
         frameAncestors: ["'none'"],
       },
     },

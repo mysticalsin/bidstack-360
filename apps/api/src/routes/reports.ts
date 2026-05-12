@@ -594,22 +594,50 @@ function buildCountryRows(
   }
 
   return [...buckets.entries()]
-    .map(([countryCode, bucket]) => ({
-      countryCode,
-      countryName: COUNTRY_META[countryCode]?.name ?? countryCode,
-      revenueMicros: bucket.revenueMicros,
-      quotationCount: bucket.quotationCount,
-      orderCount: bucket.orderCount,
-      customerCount: bucket.customers.size,
-      topCustomers: [...bucket.customers].slice(0, 4),
-      people: [...bucket.people.values()]
-        .sort((a, b) => a.customer.localeCompare(b.customer) || a.name.localeCompare(b.name))
-        .slice(0, 5),
-      salespeople: [...bucket.salespeople].slice(0, 4),
-      sharePct: pct(bucket.revenueMicros, totalRevenue),
-    }))
+    .map(([countryCode, bucket]) => {
+      const topCustomers = [...bucket.customers].slice(0, 4);
+      const salespeople = [...bucket.salespeople].slice(0, 4);
+      const contactPeople = [...bucket.people.values()].sort(
+        (a, b) => a.customer.localeCompare(b.customer) || a.name.localeCompare(b.name),
+      );
+      const salespersonPeople = salespeople.map<CountrySalesPerson>((name, index) => ({
+        name,
+        title: 'Sales owner',
+        email: null,
+        customer: topCustomers[index % Math.max(topCustomers.length, 1)] ?? 'Country portfolio',
+      }));
+      const people = mergePeople(contactPeople, salespersonPeople).slice(0, 5);
+
+      return {
+        countryCode,
+        countryName: COUNTRY_META[countryCode]?.name ?? countryCode,
+        revenueMicros: bucket.revenueMicros,
+        quotationCount: bucket.quotationCount,
+        orderCount: bucket.orderCount,
+        customerCount: bucket.customers.size,
+        topCustomers,
+        people,
+        salespeople,
+        sharePct: pct(bucket.revenueMicros, totalRevenue),
+      };
+    })
     .sort((a, b) => b.revenueMicros - a.revenueMicros)
     .slice(0, 10);
+}
+
+function mergePeople(
+  contacts: CountrySalesPerson[],
+  salespeople: CountrySalesPerson[],
+): CountrySalesPerson[] {
+  const seen = new Set<string>();
+  const merged: CountrySalesPerson[] = [];
+  for (const person of [...contacts, ...salespeople]) {
+    const key = `${person.customer}:${person.email ?? person.name}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(person);
+  }
+  return merged;
 }
 
 function buildOpportunityProductRows(

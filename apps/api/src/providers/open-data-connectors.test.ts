@@ -29,6 +29,11 @@ describe('open data connectors', () => {
       status: 'healthy',
       requiresCredential: false,
     });
+    expect(connectors.find((c) => c.id === 'wikidata-wikimedia')).toMatchObject({
+      kind: 'open_api',
+      status: 'healthy',
+      requiresCredential: false,
+    });
     expect(connectors.find((c) => c.id === 'tradingview-widgets')).toMatchObject({
       kind: 'official_widget',
       status: 'healthy',

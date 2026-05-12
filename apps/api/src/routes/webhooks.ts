@@ -20,6 +20,11 @@ const DEDUP_TTL_SECONDS = 7 * 24 * 60 * 60;
 const fallbackSeen = new Map<string, number>();
 const FALLBACK_TTL_MS = DEDUP_TTL_SECONDS * 1000;
 
+// Replay window. A captured signed body older than this is rejected even if
+// the signature is valid — defends against credential-replay months later.
+// 5 minutes matches Stripe / GitHub webhook conventions.
+const MAX_TIMESTAMP_SKEW_MS = 5 * 60 * 1000;
+
 async function rememberOrReject(
   eventId: string,
   log: { warn: (a: object, msg?: string) => void },
@@ -76,7 +81,38 @@ export const webhooksRoutes: FastifyPluginAsyncZod = async (server) => {
       const sig = req.headers['x-dust-signature'];
       const eventType = req.headers['x-dust-event'];
       const eventId = req.headers['x-dust-event-id'];
+      const timestampHeader = req.headers['x-dust-timestamp'];
 
+      // Audit S-M3: require event id + timestamp; without them, dedup and
+      // replay-window enforcement both collapse. Reject before HMAC verify so
+      // we don't burn cycles validating signatures on malformed envelopes.
+      const eid = String(Array.isArray(eventId) ? eventId[0] : (eventId ?? '')).trim();
+      if (!eid) {
+        req.log.warn({ eventType }, 'webhook rejected — missing x-dust-event-id');
+        throw server.httpErrors.badRequest('x-dust-event-id header required');
+      }
+      const tsRaw = String(
+        Array.isArray(timestampHeader) ? timestampHeader[0] : (timestampHeader ?? ''),
+      ).trim();
+      const tsMs = Number(tsRaw);
+      if (!tsRaw || !Number.isFinite(tsMs)) {
+        req.log.warn({ eventType, eid }, 'webhook rejected — missing/invalid x-dust-timestamp');
+        throw server.httpErrors.badRequest('x-dust-timestamp header required (epoch ms)');
+      }
+      if (Math.abs(Date.now() - tsMs) > MAX_TIMESTAMP_SKEW_MS) {
+        req.log.warn(
+          { eventType, eid, skewMs: Date.now() - tsMs },
+          'webhook rejected — replay window',
+        );
+        throw server.httpErrors.unauthorized('Webhook timestamp outside replay window');
+      }
+
+      // Verify HMAC over `rawBody` only — matches Dust's documented contract
+      // (handoff/dust.integration.md: `X-Dust-Signature: sha256=HMAC(body, secret)`).
+      // Replay defence comes from the timestamp-window check above + the
+      // event-id dedup below, not from a timestamp-prefixed HMAC. Binding
+      // the timestamp into the HMAC would be a spec change that requires
+      // coordination with Dust's signer.
       const rawBody = (req as unknown as { rawBody: string }).rawBody ?? '';
       const ok = await verifyDustSignature(
         rawBody,
@@ -84,12 +120,11 @@ export const webhooksRoutes: FastifyPluginAsyncZod = async (server) => {
         secret,
       );
       if (!ok) {
-        req.log.warn({ eventType }, 'webhook signature mismatch');
+        req.log.warn({ eventType, eid }, 'webhook signature mismatch');
         throw server.httpErrors.unauthorized('Invalid signature');
       }
 
-      const eid = String(Array.isArray(eventId) ? eventId[0] : (eventId ?? ''));
-      if (eid && !(await rememberOrReject(eid, req.log))) {
+      if (!(await rememberOrReject(eid, req.log))) {
         req.log.info({ eid }, 'webhook duplicate dropped');
         return { ok: true as const };
       }
@@ -100,10 +135,16 @@ export const webhooksRoutes: FastifyPluginAsyncZod = async (server) => {
       // row, fall back to the seed org so local development stays smooth.
       const subscription = await prisma.webhookSubscription.findFirst({
         where: { secret, active: true },
+        // Deterministic resolution if both old + new active rows ever coexist
+        // during a secret rotation. Pick the most recently created one.
+        orderBy: { createdAt: 'desc' },
       });
+      const isDevLike = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
       const org = subscription
         ? await prisma.org.findUnique({ where: { id: subscription.orgId } })
-        : await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
+        : isDevLike
+          ? await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } })
+          : null;
       if (!org) throw server.httpErrors.notFound('Org not found for webhook subscription');
 
       await prisma.syncEvent.create({

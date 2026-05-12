@@ -57,10 +57,19 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
             where: { orgId: req.auth.orgId, email: body.assignee },
           })
         : null;
+      let oppId: string | null = null;
+      if (body.oppId) {
+        const opportunity = await prisma.opportunity.findFirst({
+          where: { id: body.oppId, orgId: req.auth.orgId },
+          select: { id: true },
+        });
+        if (!opportunity) throw server.httpErrors.badRequest('Opportunity not found in this org');
+        oppId = opportunity.id;
+      }
       const created = await prisma.task.create({
         data: {
           orgId: req.auth.orgId,
-          oppId: body.oppId,
+          oppId,
           title: body.title,
           dueDate: body.dueDate ? new Date(body.dueDate) : null,
           status: body.status,

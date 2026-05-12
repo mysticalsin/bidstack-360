@@ -4,7 +4,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
+import { prisma, Prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 import {
   Opportunity,
   OpportunityCreate,
@@ -69,23 +69,53 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const body = req.body;
-      // Mint a code if the caller didn't supply one
-      const code = body.code ?? (await mintNextCode(req.auth.orgId));
-
-      const created = await prisma.opportunity.create({
-        data: {
-          orgId: req.auth.orgId,
-          code,
-          customer: body.customer,
-          name: body.name,
-          stage: body.stage as PrismaStage,
-          valueEur: body.value,
-          probability: body.probability,
-          dueDate: body.dueDate ? new Date(body.dueDate) : null,
-          industry: body.industry,
-          logoUrl: body.logo,
-          intel: {},
-        },
+      // Mint code + create + audit atomically; retry on Q-NNNN unique
+      // collision with bounded attempts (mirrors sales-orders pattern).
+      let createdId: string | null = null;
+      for (let attempt = 0; attempt < 5 && !createdId; attempt += 1) {
+        try {
+          createdId = await prisma.$transaction(async (tx) => {
+            const code = body.code ?? (await mintNextCode(tx, req.auth.orgId));
+            const created = await tx.opportunity.create({
+              data: {
+                orgId: req.auth.orgId,
+                code,
+                customer: body.customer,
+                name: body.name,
+                stage: body.stage as PrismaStage,
+                valueEur: body.value,
+                probability: body.probability,
+                dueDate: body.dueDate ? new Date(body.dueDate) : null,
+                industry: body.industry,
+                logoUrl: body.logo,
+                intel: {},
+              },
+            });
+            await tx.auditLog.create({
+              data: {
+                orgId: req.auth.orgId,
+                userId: req.auth.userId,
+                action: 'opportunity.create',
+                targetType: 'opportunity',
+                targetId: created.id,
+                diff: { code, customer: body.customer, name: body.name, stage: body.stage },
+              },
+            });
+            return created.id;
+          });
+        } catch (err) {
+          if (isUniqueViolation(err) && attempt < 4) continue;
+          throw err;
+        }
+      }
+      if (!createdId) {
+        throw server.httpErrors.conflict('Could not allocate a unique opportunity code; retry.');
+      }
+      // Re-fetch with `orgId` in the filter for defence-in-depth — the id was
+      // minted inside our tx so it's safe, but every other read in this file
+      // is org-scoped and we don't want to break that invariant.
+      const created = await prisma.opportunity.findFirstOrThrow({
+        where: { id: createdId, orgId: req.auth.orgId },
         include: { owner: true },
       });
       return reply.code(201).send(serializeOpportunity(created));
@@ -130,35 +160,81 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!before) throw server.httpErrors.notFound('Opportunity not found');
 
-      const updated = await prisma.opportunity.update({
-        where: { id: before.id },
-        data: {
-          ...(req.body.customer ? { customer: req.body.customer } : {}),
-          ...(req.body.name ? { name: req.body.name } : {}),
-          ...(req.body.stage ? { stage: req.body.stage as PrismaStage } : {}),
-          ...(req.body.value !== undefined ? { valueEur: req.body.value } : {}),
-          ...(req.body.probability !== undefined ? { probability: req.body.probability } : {}),
-          ...(req.body.dueDate !== undefined
-            ? { dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null }
-            : {}),
-          ...(req.body.industry !== undefined ? { industry: req.body.industry } : {}),
-          ...(req.body.logo !== undefined ? { logoUrl: req.body.logo } : {}),
-        },
-        include: { owner: true },
-      });
-
-      await prisma.auditLog.create({
-        data: {
-          orgId: req.auth.orgId,
-          userId: req.auth.userId,
-          action: 'opportunity.update',
-          targetType: 'opportunity',
-          targetId: updated.id,
-          diff: req.body as object,
-        },
-      });
+      // Update + audit atomic so a crash mid-mutation can't leave an opp
+      // changed without a paper trail (Arch-4).
+      const [updated] = await prisma.$transaction([
+        prisma.opportunity.update({
+          where: { id: before.id },
+          data: {
+            ...(req.body.customer ? { customer: req.body.customer } : {}),
+            ...(req.body.name ? { name: req.body.name } : {}),
+            ...(req.body.stage ? { stage: req.body.stage as PrismaStage } : {}),
+            ...(req.body.value !== undefined ? { valueEur: req.body.value } : {}),
+            ...(req.body.probability !== undefined ? { probability: req.body.probability } : {}),
+            ...(req.body.dueDate !== undefined
+              ? { dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null }
+              : {}),
+            ...(req.body.industry !== undefined ? { industry: req.body.industry } : {}),
+            ...(req.body.logo !== undefined ? { logoUrl: req.body.logo } : {}),
+          },
+          include: { owner: true },
+        }),
+        prisma.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'opportunity.update',
+            targetType: 'opportunity',
+            targetId: before.id,
+            diff: req.body as object,
+          },
+        }),
+      ]);
 
       return serializeOpportunity(updated);
+    },
+  );
+
+  // DELETE /api/opportunities/:id  (audit P-H5: bulk delete in OpportunitiesPage
+  // was hitting this missing route and silently 404'ing every row.)
+  server.delete(
+    '/opportunities/:id',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: { 204: z.null() },
+      },
+    },
+    async (req, reply) => {
+      const opp = await prisma.opportunity.findFirst({
+        where: { id: req.params.id, orgId: req.auth.orgId },
+        select: { id: true, code: true, customer: true, name: true, stage: true },
+      });
+      if (!opp) throw server.httpErrors.notFound('Opportunity not found');
+
+      // Tombstone in audit log first, then delete. Wrap in $transaction so
+      // either both land or neither does — never delete-without-record.
+      // Cascading FKs on Task / Document delete with the parent (Prisma onDelete: Cascade).
+      await prisma.$transaction([
+        prisma.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'opportunity.delete',
+            targetType: 'opportunity',
+            targetId: opp.id,
+            diff: {
+              code: opp.code,
+              customer: opp.customer,
+              name: opp.name,
+              stage: opp.stage,
+            },
+          },
+        }),
+        prisma.opportunity.delete({ where: { id: opp.id } }),
+      ]);
+
+      return reply.code(204).send(null);
     },
   );
 
@@ -180,20 +256,22 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
 
-      const updated = await prisma.opportunity.update({
-        where: { id: opp.id },
-        data: { stage: req.body.stage as PrismaStage },
-      });
-      await prisma.auditLog.create({
-        data: {
-          orgId: req.auth.orgId,
-          userId: req.auth.userId,
-          action: 'opportunity.stage',
-          targetType: 'opportunity',
-          targetId: opp.id,
-          diff: { from: opp.stage, to: req.body.stage },
-        },
-      });
+      const [updated] = await prisma.$transaction([
+        prisma.opportunity.update({
+          where: { id: opp.id },
+          data: { stage: req.body.stage as PrismaStage },
+        }),
+        prisma.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'opportunity.stage',
+            targetType: 'opportunity',
+            targetId: opp.id,
+            diff: { from: opp.stage, to: req.body.stage },
+          },
+        }),
+      ]);
       return { id: updated.id, stage: updated.stage as z.infer<typeof OpportunityStage> };
     },
   );
@@ -233,8 +311,11 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
   );
 };
 
-async function mintNextCode(orgId: string): Promise<string> {
-  const last = await prisma.opportunity.findFirst({
+async function mintNextCode(tx: Prisma.TransactionClient, orgId: string): Promise<string> {
+  // Reads inside the active transaction so a concurrent create's row is
+  // visible to whichever attempt wins. Unique violation on collision is
+  // caught by the caller's bounded retry loop.
+  const last = await tx.opportunity.findFirst({
     where: { orgId, code: { startsWith: 'OP-' } },
     orderBy: { code: 'desc' },
     select: { code: true },
@@ -242,4 +323,8 @@ async function mintNextCode(orgId: string): Promise<string> {
   if (!last) return 'OP-2001';
   const n = Number(last.code.slice(3));
   return `OP-${(n + 1).toString().padStart(4, '0')}`;
+}
+
+function isUniqueViolation(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
 }

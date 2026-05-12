@@ -65,6 +65,9 @@ const SalesOrdersPage = lazy(() =>
 const SalesOrderDetailPage = lazy(() =>
   import('@/pages/SalesOrderDetailPage').then((m) => ({ default: m.SalesOrderDetailPage })),
 );
+const BidNoBidPage = lazy(() =>
+  import('@/pages/BidNoBidPage').then((m) => ({ default: m.BidNoBidPage })),
+);
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { isLoaded, isSignedIn } = useAuth();
@@ -237,6 +240,14 @@ function AnimatedRoutes() {
             element={
               <RequireAuth>
                 <AuditLogPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/bid-matrix"
+            element={
+              <RequireAuth>
+                <BidNoBidPage />
               </RequireAuth>
             }
           />

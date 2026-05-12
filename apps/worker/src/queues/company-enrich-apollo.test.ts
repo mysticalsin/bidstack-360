@@ -3,8 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   ApolloEnrichJobData,
   callApolloEnrich,
+  createApolloEnrichJobSignature,
   mapApolloOrganization,
   normalizeName,
+  verifyApolloEnrichJobSignature,
 } from './company-enrich-apollo.js';
 
 describe('mapApolloOrganization', () => {
@@ -80,11 +82,12 @@ describe('normalizeName', () => {
 });
 
 describe('ApolloEnrichJobData', () => {
-  it('requires orgId (uuid) and companyName, allows optional domain', () => {
+  it('requires orgId (uuid) and companyName, allows optional domain/signature', () => {
     expect(
       ApolloEnrichJobData.safeParse({
         orgId: '11111111-2222-3333-4444-555555555555',
         companyName: 'Mantu',
+        signature: 'signed',
       }).success,
     ).toBe(true);
 
@@ -92,6 +95,46 @@ describe('ApolloEnrichJobData', () => {
       false,
     );
     expect(ApolloEnrichJobData.safeParse({ companyName: 'x' }).success).toBe(false);
+  });
+});
+
+describe('verifyApolloEnrichJobSignature', () => {
+  const job = {
+    orgId: '11111111-2222-3333-4444-555555555555',
+    companyName: 'Mantu',
+    domain: 'mantu.com',
+  };
+
+  it('accepts a valid signed job in production', () => {
+    const secret = 'test-secret';
+    const signature = createApolloEnrichJobSignature(job, secret);
+
+    expect(
+      verifyApolloEnrichJobSignature({ ...job, signature }, { secret, nodeEnv: 'production' }),
+    ).toBe(true);
+  });
+
+  it('rejects unsigned or tampered jobs in production', () => {
+    const secret = 'test-secret';
+    const signature = createApolloEnrichJobSignature(job, secret);
+
+    expect(verifyApolloEnrichJobSignature(job, { secret, nodeEnv: 'production' })).toBe(false);
+    expect(
+      verifyApolloEnrichJobSignature(
+        { ...job, companyName: 'Other Company', signature },
+        { secret, nodeEnv: 'production' },
+      ),
+    ).toBe(false);
+    expect(verifyApolloEnrichJobSignature(job, { secret: null, nodeEnv: 'production' })).toBe(
+      false,
+    );
+  });
+
+  it('keeps unsigned local/dev jobs working when no signing secret exists', () => {
+    expect(verifyApolloEnrichJobSignature(job, { secret: null, nodeEnv: 'development' })).toBe(
+      true,
+    );
+    expect(verifyApolloEnrichJobSignature(job, { secret: null, nodeEnv: 'test' })).toBe(true);
   });
 });
 

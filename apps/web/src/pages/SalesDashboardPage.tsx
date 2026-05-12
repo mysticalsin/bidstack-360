@@ -5,6 +5,7 @@
 // those tables when they exist.
 
 import { useNavigate } from 'react-router-dom';
+import { motion, useReducedMotion } from 'framer-motion';
 
 import { KpiTile } from '@/components/sales/KpiTile';
 import { MonthlySalesChart } from '@/components/sales/MonthlySalesChart';
@@ -12,9 +13,12 @@ import { TopCategoriesTreemap } from '@/components/sales/TopCategoriesTreemap';
 import { TopCountriesCard } from '@/components/sales/TopCountriesCard';
 import { TopList } from '@/components/sales/TopList';
 import { Card, SectionHeader } from '@/components/ui/Card';
+import { Icon } from '@/components/ui/Icon';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { useAutopopulateSalesCompanies } from '@/hooks/useAutopopulateSalesCompanies';
 import { useSalesIntelligence } from '@/hooks/useSalesIntelligence';
 import { formatMoneyMicros } from '@/lib/format';
+import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
 
 import type {
   CategoryRow,
@@ -28,8 +32,15 @@ import type {
 
 export function SalesDashboardPage() {
   const report = useSalesIntelligence();
+  const autopopulate = useAutopopulateSalesCompanies();
+  const reducedMotion = useReducedMotion();
   const data = report.data;
   const currency = data?.currencyCode ?? 'CAD';
+  const topProducts = data?.topProducts ?? [];
+  const topProductMax = topProducts.reduce(
+    (max, product) => Math.max(max, product.revenueMicros),
+    1,
+  );
   const navigate = useNavigate();
   // Each KPI tile drills into a pre-filtered orders list. "Quotations" =
   // draft+sent (no single ?state can encode both, so we land on the union),
@@ -42,8 +53,16 @@ export function SalesDashboardPage() {
     };
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+    <motion.div
+      className="space-y-6"
+      variants={reducedMotion ? undefined : staggerParent}
+      initial={reducedMotion ? false : 'initial'}
+      animate="animate"
+    >
+      <motion.header
+        variants={reducedMotion ? undefined : staggerChild}
+        className="flex flex-wrap items-end justify-between gap-3"
+      >
         <div>
           <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
             Sales Dashboard
@@ -52,14 +71,45 @@ export function SalesDashboardPage() {
             Quotations, orders, revenue, geography, products, and customer ownership.
           </p>
         </div>
-        {data ? (
-          <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-2 text-xs font-semibold text-[var(--fg-secondary)]">
-            {data.source === 'sales_orders' ? 'Odoo sale.order mirror' : 'Opportunity pipeline'}
-          </div>
-        ) : null}
-      </header>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {autopopulate.data ? (
+            <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-2 text-xs font-semibold text-[var(--fg-secondary)]">
+              {autopopulate.data.enriched} enriched / {autopopulate.data.cached} cached
+            </div>
+          ) : null}
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={autopopulate.isPending}
+            onClick={() => autopopulate.mutate({ limit: 8 })}
+            title="Auto-populate company logos, websites, and profiles for top sales accounts"
+          >
+            {autopopulate.isPending ? (
+              <span
+                className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-r-transparent"
+                aria-hidden
+              />
+            ) : (
+              <Icon name="building" size={14} />
+            )}
+            {autopopulate.isPending ? 'Populating...' : 'Auto-populate'}
+          </button>
+          {data ? (
+            <div className="inline-flex items-center gap-2 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-2 text-xs font-semibold text-[var(--fg-secondary)]">
+              <span
+                aria-hidden="true"
+                className={`h-1.5 w-1.5 rounded-full bg-[var(--success)] ${
+                  reducedMotion ? '' : 'animate-pulse'
+                }`}
+              />
+              {data.source === 'sales_orders' ? 'Odoo sale.order mirror' : 'Opportunity pipeline'}
+            </div>
+          ) : null}
+        </div>
+      </motion.header>
 
-      <section
+      <motion.section
+        variants={reducedMotion ? undefined : staggerChild}
         aria-label="Key performance indicators"
         className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
       >
@@ -91,20 +141,25 @@ export function SalesDashboardPage() {
           tone="amber"
           onClick={drill('confirmed')}
         />
-      </section>
+      </motion.section>
 
-      <Card>
-        <SectionHeader title="Monthly Sales" caption={`Currency: ${currency}`} />
-        <div className="px-5 pb-5">
-          {report.isLoading ? (
-            <LoadingSkeleton rows={3} />
-          ) : (
-            <MonthlySalesChart points={monthlyPoints(data)} currency={currency} />
-          )}
-        </div>
-      </Card>
+      <motion.div variants={reducedMotion ? undefined : staggerChild}>
+        <Card>
+          <SectionHeader title="Monthly Sales" caption={`Currency: ${currency}`} />
+          <div className="px-5 pb-5">
+            {report.isLoading ? (
+              <LoadingSkeleton rows={3} />
+            ) : (
+              <MonthlySalesChart points={monthlyPoints(data)} currency={currency} />
+            )}
+          </div>
+        </Card>
+      </motion.div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <motion.div
+        variants={reducedMotion ? undefined : staggerChild}
+        className="grid grid-cols-1 gap-6 lg:grid-cols-2"
+      >
         <Card>
           <SectionHeader title="Top Quotations" />
           {report.isLoading ? (
@@ -125,9 +180,12 @@ export function SalesDashboardPage() {
             <TopList items={toTopRows(data?.topOrders ?? [])} variant="order" />
           )}
         </Card>
-      </div>
+      </motion.div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <motion.div
+        variants={reducedMotion ? undefined : staggerChild}
+        className="grid grid-cols-1 gap-6 lg:grid-cols-2"
+      >
         <TopCountriesCard data={toCountries(data)} isLoading={report.isLoading} />
         <Card>
           <SectionHeader title="Top Products" />
@@ -151,29 +209,52 @@ export function SalesDashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {(data?.topProducts ?? []).map((product) => (
-                  <tr key={product.product} className="border-t border-[var(--border-subtle)]">
-                    <td className="px-4 py-2.5 text-[var(--fg-primary)]">
-                      <div className="truncate">{product.product}</div>
-                      <div className="text-[10px] uppercase tracking-wider text-[var(--fg-tertiary)]">
-                        {product.category}
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-[var(--fg-secondary)]">
-                      {product.orderCount}
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-[var(--fg-primary)] whitespace-nowrap">
-                      {formatMoneyMicros(product.revenueMicros, product.currencyCode)}
-                    </td>
-                  </tr>
-                ))}
+                {topProducts.map((product, index) => {
+                  const pct =
+                    topProductMax > 0
+                      ? Math.min(100, (product.revenueMicros / topProductMax) * 100)
+                      : 0;
+                  return (
+                    <motion.tr
+                      key={product.product}
+                      initial={reducedMotion ? false : { opacity: 0, x: -6 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      whileHover={reducedMotion ? undefined : { x: 2 }}
+                      transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.025 }}
+                      className="border-t border-[var(--border-subtle)]"
+                    >
+                      <td className="relative px-4 py-2.5 text-[var(--fg-primary)]">
+                        <motion.span
+                          aria-hidden="true"
+                          className="absolute inset-y-1 left-1 -z-0 rounded bg-[#eef4ff]"
+                          initial={reducedMotion ? false : { width: 0 }}
+                          animate={{ width: `calc(${pct.toFixed(2)}% - 8px)` }}
+                          transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.025 }}
+                        />
+                        <div className="relative z-10 truncate font-medium">{product.product}</div>
+                        <div className="relative z-10 text-[10px] uppercase tracking-wider text-[var(--fg-tertiary)]">
+                          {product.category}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-[var(--fg-secondary)]">
+                        {product.orderCount}
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-[var(--fg-primary)] whitespace-nowrap">
+                        {formatMoneyMicros(product.revenueMicros, product.currencyCode)}
+                      </td>
+                    </motion.tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
         </Card>
-      </div>
+      </motion.div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <motion.div
+        variants={reducedMotion ? undefined : staggerChild}
+        className="grid grid-cols-1 gap-6 lg:grid-cols-2"
+      >
         <Card>
           <SectionHeader title="Top Customers" />
           {report.isLoading ? (
@@ -185,8 +266,8 @@ export function SalesDashboardPage() {
           )}
         </Card>
         <TopCategoriesTreemap data={toCategories(data)} isLoading={report.isLoading} />
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 

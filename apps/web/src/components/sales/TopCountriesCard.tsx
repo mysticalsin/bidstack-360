@@ -7,10 +7,12 @@
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { motion, useReducedMotion } from 'framer-motion';
 
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { formatMoneyMicros } from '@/lib/format';
+import { springSnap, springSoft } from '@/lib/motion';
 
 import type { TopCountries } from '@bidstack/shared';
 
@@ -37,6 +39,7 @@ const FLAGS: Record<string, string> = {
 
 export function TopCountriesCard({ data, isLoading }: Props) {
   const [view, setView] = useState<'list' | 'map'>('list');
+  const reducedMotion = useReducedMotion();
   const items = data?.items ?? [];
   const max = items.reduce((acc, it) => {
     const v = Number(BigInt(it.revenueMicros) / BigInt(1_000_000));
@@ -51,7 +54,7 @@ export function TopCountriesCard({ data, isLoading }: Props) {
           <div className="flex items-center gap-2 text-xs text-[var(--fg-tertiary)]">
             <button
               type="button"
-              className="text-[var(--brand-primary)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+              className="text-[var(--brand-primary)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
               onClick={() => setView(view === 'list' ? 'map' : 'list')}
               aria-pressed={view === 'map'}
             >
@@ -63,23 +66,45 @@ export function TopCountriesCard({ data, isLoading }: Props) {
         }
       />
       {isLoading ? (
-        <div className="px-5 py-8 text-sm text-[var(--fg-tertiary)]">Loading…</div>
+        <motion.div
+          initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={springSoft}
+          className="px-5 py-8 text-sm text-[var(--fg-tertiary)]"
+        >
+          Loading…
+        </motion.div>
       ) : items.length === 0 ? (
-        <div className="px-5 py-8 text-sm text-[var(--fg-tertiary)]">
+        <motion.div
+          initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={springSoft}
+          className="px-5 py-8 text-sm text-[var(--fg-tertiary)]"
+        >
           No country data yet — confirmed orders without a country code are excluded.
-        </div>
+        </motion.div>
       ) : view === 'map' ? (
-        <MiniMap items={items} max={max} />
+        <MiniMap items={items} max={max} currency={data?.currency ?? 'CAD'} />
       ) : (
-        <ul className="divide-y divide-[var(--border-subtle)]">
-          {items.map((c) => {
+        <motion.ul
+          initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={springSoft}
+          className="divide-y divide-[var(--border-subtle)]"
+        >
+          {items.map((c, index) => {
             const v = Number(BigInt(c.revenueMicros) / BigInt(1_000_000));
             const pct = max > 0 ? (v / max) * 100 : 0;
             return (
-              <li key={c.code}>
+              <motion.li
+                key={c.code}
+                initial={reducedMotion ? false : { opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.03 }}
+              >
                 <Link
                   to={`/sales/orders?country=${c.code}&state=confirmed`}
-                  className="flex items-center gap-3 px-5 py-2.5 hover:bg-[var(--surface-subtle)] focus-visible:bg-[var(--surface-subtle)] focus-visible:outline-none"
+                  className="flex items-center gap-3 px-5 py-2.5 transition-colors hover:bg-[var(--surface-subtle)] focus-visible:bg-[var(--surface-subtle)] focus-visible:outline-none"
                 >
                   <span aria-hidden className="text-xl leading-none">
                     {FLAGS[c.code] ?? '🏳️'}
@@ -94,19 +119,22 @@ export function TopCountriesCard({ data, isLoading }: Props) {
                       </span>
                     </div>
                     <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--surface-subtle)]">
-                      <div
+                      <motion.div
                         aria-hidden
                         className="h-full rounded-full bg-[var(--brand-primary)]"
-                        style={{ width: `${pct.toFixed(1)}%`, opacity: 0.6 + 0.4 * (pct / 100) }}
+                        initial={reducedMotion ? false : { width: 0 }}
+                        animate={{ width: `${pct.toFixed(1)}%` }}
+                        transition={{ ...springSnap, delay: reducedMotion ? 0 : index * 0.03 }}
+                        style={{ opacity: 0.6 + 0.4 * (pct / 100) }}
                       />
                     </div>
                   </div>
                   <Badge tone="gray">{c.orders}</Badge>
                 </Link>
-              </li>
+              </motion.li>
             );
           })}
-        </ul>
+        </motion.ul>
       )}
     </Card>
   );
@@ -114,36 +142,57 @@ export function TopCountriesCard({ data, isLoading }: Props) {
 
 // ─── Minimal SVG world tile grid (placeholder for full choropleth) ──────
 
-function MiniMap({ items, max }: { items: TopCountries['items']; max: number }) {
+function MiniMap({
+  items,
+  max,
+  currency,
+}: {
+  items: TopCountries['items'];
+  max: number;
+  currency: string;
+}) {
+  const reducedMotion = useReducedMotion();
   // We don't ship a true choropleth (would need topojson + a maps lib). The
   // grid still gives a "spatial scan" feel: bigger + darker chip = more
   // revenue. Each tile is now a Link so keyboard users get the same drill-
   // through as the list view (audit 2026-05-11 #4).
   return (
-    <div className="grid grid-cols-3 gap-3 px-5 py-5 sm:grid-cols-4">
-      {items.map((c) => {
+    <motion.div
+      initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={springSoft}
+      className="grid grid-cols-3 gap-3 px-5 py-5 sm:grid-cols-4"
+    >
+      {items.map((c, index) => {
         const v = Number(BigInt(c.revenueMicros) / BigInt(1_000_000));
         const intensity = max > 0 ? Math.min(1, v / max) : 0;
         return (
-          <Link
+          <motion.div
             key={c.code}
-            to={`/sales/orders?country=${c.code}&state=confirmed`}
-            aria-label={`${c.name}: ${formatMoneyMicros(c.revenueMicros, 'CAD')} across ${c.orders} confirmed orders`}
-            className="flex min-h-[88px] flex-col items-center justify-center rounded-md border border-[var(--border-subtle)] p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2"
-            style={{ backgroundColor: `rgba(44, 75, 255, ${0.05 + intensity * 0.25})` }}
+            initial={reducedMotion ? false : { opacity: 0, scale: 0.96, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            whileHover={reducedMotion ? undefined : { y: -3 }}
+            transition={{ ...springSnap, delay: reducedMotion ? 0 : index * 0.035 }}
           >
-            <span className="text-2xl leading-none" aria-hidden>
-              {FLAGS[c.code] ?? '🏳️'}
-            </span>
-            <span className="mt-1 text-[10px] font-semibold text-[var(--fg-secondary)]">
-              {c.code}
-            </span>
-            <span className="mt-0.5 text-xs tabular-nums text-[var(--fg-primary)]">
-              {formatMoneyMicros(c.revenueMicros, 'CAD')}
-            </span>
-          </Link>
+            <Link
+              to={`/sales/orders?country=${c.code}&state=confirmed`}
+              aria-label={`${c.name}: ${formatMoneyMicros(c.revenueMicros, currency)} across ${c.orders} confirmed orders`}
+              className="flex min-h-[88px] w-full flex-col items-center justify-center rounded-md border border-[var(--border-subtle)] p-3 transition-colors hover:border-[var(--border-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] focus-visible:ring-offset-2"
+              style={{ backgroundColor: `rgba(44, 75, 255, ${0.05 + intensity * 0.25})` }}
+            >
+              <span className="text-2xl leading-none" aria-hidden>
+                {FLAGS[c.code] ?? '🏳️'}
+              </span>
+              <span className="mt-1 text-[10px] font-semibold text-[var(--fg-secondary)]">
+                {c.code}
+              </span>
+              <span className="mt-0.5 text-xs tabular-nums text-[var(--fg-primary)]">
+                {formatMoneyMicros(c.revenueMicros, currency)}
+              </span>
+            </Link>
+          </motion.div>
         );
       })}
-    </div>
+    </motion.div>
   );
 }

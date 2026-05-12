@@ -131,6 +131,23 @@ describe('contacts + tasks + reports routes', () => {
     expect(res.json().items.length).toBeGreaterThanOrEqual(7);
   });
 
+  skipIfNoDb('POST /api/tasks rejects opportunities outside the caller org', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/tasks',
+      payload: {
+        oppId: '11111111-2222-3333-4444-555555555555',
+        title: 'Do not attach across tenants',
+        dueDate: null,
+        status: 'open',
+        assignee: null,
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().message).toMatch(/Opportunity not found/i);
+  });
+
   skipIfNoDb('GET /api/reports/pipeline returns weighted KPIs', async () => {
     const res = await server.inject({ method: 'GET', url: '/api/reports/pipeline' });
     expect(res.statusCode).toBe(200);

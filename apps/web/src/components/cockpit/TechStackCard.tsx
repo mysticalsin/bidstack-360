@@ -1,8 +1,10 @@
+import { motion, useReducedMotion } from 'framer-motion';
 import { memo } from 'react';
 
 import { TechLogo } from '@/components/company/TechLogo';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/StateMessages';
+import { springSnap } from '@/lib/motion';
 
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
 
@@ -14,6 +16,7 @@ interface Props {
 // pure-renders from it — re-renders only when the snapshot changes, not
 // when sibling cards (notes, files) fetch.
 export const TechStackCard = memo(function TechStackCard({ cockpit }: Props) {
+  const reducedMotion = useReducedMotion();
   if (cockpit.technicalStack.length === 0) {
     return (
       <Card role="region" aria-label="Technical Stack Overview">
@@ -46,11 +49,19 @@ export const TechStackCard = memo(function TechStackCard({ cockpit }: Props) {
               {cat.label}
             </div>
             <div className="tech-pills">
-              {cat.items.slice(0, 6).map((item) => (
-                <span key={item.name} className="tech-pill">
+              {cat.items.slice(0, 6).map((item, index) => (
+                <motion.span
+                  key={item.name}
+                  className="tech-pill"
+                  initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 4, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  whileHover={reducedMotion ? undefined : { y: -2, scale: 1.02 }}
+                  whileTap={reducedMotion ? undefined : { scale: 0.98 }}
+                  transition={{ ...springSnap, delay: reducedMotion ? 0 : index * 0.025 }}
+                >
                   <TechLogo name={item.name} size={14} />
                   {item.name}
-                </span>
+                </motion.span>
               ))}
             </div>
           </div>

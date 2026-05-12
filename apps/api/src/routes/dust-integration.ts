@@ -189,14 +189,27 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
       const prefix = raw.slice(0, 12);
       const hashedKey = createHash('sha256').update(raw).digest('hex');
 
-      const created = await prisma.apiKey.create({
-        data: {
-          orgId: req.auth.orgId,
-          name: req.body.name,
-          hashedKey,
-          prefix,
-          scopes: req.body.scopes,
-        },
+      const created = await prisma.$transaction(async (tx) => {
+        const key = await tx.apiKey.create({
+          data: {
+            orgId: req.auth.orgId,
+            name: req.body.name,
+            hashedKey,
+            prefix,
+            scopes: req.body.scopes,
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'apikey.create',
+            targetType: 'api_key',
+            targetId: key.id,
+            diff: { name: req.body.name, scopes: req.body.scopes, prefix },
+          },
+        });
+        return key;
       });
 
       return reply.code(201).send({
@@ -219,10 +232,22 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId: req.auth.orgId, revokedAt: null },
       });
       if (!key) throw server.httpErrors.notFound('API key not found');
-      await prisma.apiKey.update({
-        where: { id: key.id },
-        data: { revokedAt: new Date() },
-      });
+      await prisma.$transaction([
+        prisma.apiKey.update({
+          where: { id: key.id },
+          data: { revokedAt: new Date() },
+        }),
+        prisma.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'apikey.revoke',
+            targetType: 'api_key',
+            targetId: key.id,
+            diff: { name: key.name, prefix: key.prefix },
+          },
+        }),
+      ]);
       return reply.code(204).send();
     },
   );

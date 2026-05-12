@@ -33,6 +33,8 @@ import type { OrderState } from '@bidstack/shared';
 const toPrismaState = (s: z.infer<typeof OrderState>): PrismaOrderState =>
   s as unknown as PrismaOrderState;
 
+const OptionalSalesOrderTransitionBody = SalesOrderTransitionBody.nullish();
+
 async function mintNextNumber(
   tx: Prisma.TransactionClient,
   orgId: string,
@@ -307,7 +309,7 @@ export const salesOrdersRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       schema: {
         params: z.object({ id: z.string().uuid() }),
-        body: SalesOrderTransitionBody.optional(),
+        body: OptionalSalesOrderTransitionBody,
         response: { 200: SalesOrderDetail },
       },
     },
@@ -416,7 +418,7 @@ function registerTransition(
     {
       schema: {
         params: z.object({ id: z.string().uuid() }),
-        body: SalesOrderTransitionBody.optional(),
+        body: OptionalSalesOrderTransitionBody,
         response: { 200: SalesOrderDetail },
       },
     },
@@ -424,7 +426,7 @@ function registerTransition(
       req: {
         params: { id: string };
         auth: { orgId: string; userId: string };
-        body?: z.infer<typeof SalesOrderTransitionBody>;
+        body?: z.infer<typeof SalesOrderTransitionBody> | null;
       },
       _reply: unknown,
     ) => {

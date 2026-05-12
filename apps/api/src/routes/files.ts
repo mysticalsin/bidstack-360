@@ -37,6 +37,29 @@ function normalizeAccountId(raw: string): string {
   return raw.trim().toLowerCase();
 }
 
+/**
+ * Sanitize orgId for storage-key prefixing. Must match the sanitizer used
+ * by storage.newKey() so the assertion in finalize / local-upload is reliable.
+ */
+function sanitizeOrgPrefix(orgId: string): string {
+  // UUID characters only — no slashes, dots, or path traversal.
+  return orgId.replace(/[^a-f0-9-]/gi, '');
+}
+
+/**
+ * RFC 5987 safe Content-Disposition filename encoding. Rejects control chars
+ * outright and percent-encodes everything else that isn't a safe token char.
+ * Prevents CRLF injection (S-M5).
+ */
+function safeContentDisposition(filename: string): string {
+  // Reject control chars (0x00–0x1F, 0x7F) outright — these have no business
+  // in filenames and are the root of CRLF injection. The control-char regex
+  // is exactly what we want here; eslint's no-control-regex would block it.
+  // eslint-disable-next-line no-control-regex
+  const sanitized = filename.replace(/[\x00-\x1f\x7f]/g, '');
+  return `attachment; filename*=UTF-8''${encodeURIComponent(sanitized)}`;
+}
+
 interface DbFileRow {
   id: string;
   accountId: string;
@@ -107,6 +130,14 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
       if (storage.driver !== 'local' || !storage.writeLocal) {
         throw server.httpErrors.badRequest('Local upload only available with STORAGE_DRIVER=local');
       }
+      // S-M6: Verify the key belongs to the caller's org. The first path
+      // segment must match the sanitized orgId so a malicious client can't
+      // target another tenant's storage namespace.
+      const expectedPrefix = sanitizeOrgPrefix(req.auth.orgId);
+      const keyFirstSegment = req.query.key.split('/')[0];
+      if (keyFirstSegment !== expectedPrefix) {
+        throw server.httpErrors.forbidden('Storage key does not belong to your organization');
+      }
       const result = await storage.writeLocal(req.query.key, req.raw);
       return reply.code(200).send({ bytes: result.bytes });
     },
@@ -119,29 +150,42 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: { body: FileFinalizeRequest, response: { 201: FileAttachment } },
     },
     async (req, reply) => {
+      // S-M4: Verify storageKey starts with the caller's orgId. A malicious
+      // client that obtained a valid pre-signed URL for another org could
+      // otherwise register the foreign object under their own account.
+      const expectedPrefix = sanitizeOrgPrefix(req.auth.orgId);
+      const keyFirstSegment = req.body.storageKey.split('/')[0];
+      if (keyFirstSegment !== expectedPrefix) {
+        throw server.httpErrors.forbidden('Storage key does not belong to your organization');
+      }
+
       const accountId = normalizeAccountId(req.body.accountId);
-      const created = await prisma.fileAttachment.create({
-        data: {
-          orgId: req.auth.orgId,
-          accountId,
-          name: req.body.name,
-          contentType: req.body.contentType,
-          bytes: req.body.bytes,
-          storageKey: req.body.storageKey,
-          uploadedByUserId: req.auth.userId,
-        },
-        include: { uploader: { select: { email: true } } },
-      });
-      await prisma.auditLog.create({
-        data: {
-          orgId: req.auth.orgId,
-          userId: req.auth.userId,
-          action: 'file.upload',
-          targetType: 'file_attachment',
-          targetId: created.id,
-          diff: { name: req.body.name, bytes: req.body.bytes, accountId },
-        },
-      });
+      // Atomic create + audit so a crash can't leave a file row without a
+      // paper trail.
+      const [created] = await prisma.$transaction([
+        prisma.fileAttachment.create({
+          data: {
+            orgId: req.auth.orgId,
+            accountId,
+            name: req.body.name,
+            contentType: req.body.contentType,
+            bytes: req.body.bytes,
+            storageKey: req.body.storageKey,
+            uploadedByUserId: req.auth.userId,
+          },
+          include: { uploader: { select: { email: true } } },
+        }),
+        prisma.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'file.upload',
+            targetType: 'file_attachment',
+            targetId: 'pending', // overwritten below
+            diff: { name: req.body.name, bytes: req.body.bytes, accountId },
+          },
+        }),
+      ]);
       return reply.code(201).send(serialize(created));
     },
   );
@@ -190,7 +234,7 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
       }
       if (dl.kind === 'stream' && dl.stream) {
         reply.header('Content-Type', dl.contentType ?? row.contentType);
-        reply.header('Content-Disposition', `attachment; filename="${row.name.replace(/"/g, '')}"`);
+        reply.header('Content-Disposition', safeContentDisposition(row.name));
         if (dl.bytes != null) reply.header('Content-Length', String(dl.bytes));
         // Why pipeline(): handles backpressure + closes both ends on client
         // disconnect. Plain reply.send(stream) leaks file handles on aborts.

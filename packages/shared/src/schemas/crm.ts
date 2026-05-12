@@ -17,6 +17,7 @@ export const CrmLogoSource = z.enum([
   'official_website',
   'logo_dev',
   'brandfetch',
+  'wikimedia',
   'favicon',
   'manual',
   'initials',
@@ -39,6 +40,7 @@ export const CrmCompany = z.object({
   domain: z.string().nullable(),
   website: z.string().url().nullable(),
   industry: z.string().nullable(),
+  imageUrl: z.string().url().nullable().optional(),
   employeeCount: z.number().int().nonnegative().nullable(),
   annualRevenueMicros: z.number().int().nonnegative().nullable(),
   status: z.string().nullable(),
@@ -444,6 +446,25 @@ export const CompanyLookupResponse = z.object({
   alternatives: z.array(CrmCompany),
 });
 export type CompanyLookupResponse = z.infer<typeof CompanyLookupResponse>;
+
+export const CompanyAutopopulateItem = z.object({
+  company: CrmCompany,
+  action: z.enum(['enriched', 'cached', 'skipped']),
+  reason: z.string().nullable(),
+});
+export type CompanyAutopopulateItem = z.infer<typeof CompanyAutopopulateItem>;
+
+export const CompanyAutopopulateResponse = z.object({
+  generatedAt: z.string().datetime(),
+  requested: z.number().int().nonnegative(),
+  enriched: z.number().int().nonnegative(),
+  cached: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
+  items: z.array(CompanyAutopopulateItem),
+  sourceAttribution: z.array(SourceAttribution).default([]),
+  warnings: z.array(z.string()).default([]),
+});
+export type CompanyAutopopulateResponse = z.infer<typeof CompanyAutopopulateResponse>;
 
 export const DataQualityIssue = z.object({
   id: z.string(),

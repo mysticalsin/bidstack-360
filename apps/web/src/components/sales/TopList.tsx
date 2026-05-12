@@ -8,8 +8,10 @@
 // while customer-grouped rows (synthetic ids like "Name-N") stay inert.
 
 import { Link } from 'react-router-dom';
+import { motion, useReducedMotion } from 'framer-motion';
 
 import { formatMoneyMicros } from '@/lib/format';
+import { springSoft } from '@/lib/motion';
 
 import type { TopRow } from '@bidstack/shared';
 
@@ -23,11 +25,18 @@ interface Props {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function TopList({ items, showSalesperson = true, variant = 'quotation' }: Props) {
+  const reducedMotion = useReducedMotion();
+
   if (items.length === 0) {
     return (
-      <div className="rounded-md bg-[var(--surface-subtle)] px-4 py-6 text-sm text-[var(--fg-tertiary)]">
+      <motion.div
+        initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={springSoft}
+        className="rounded-md bg-[var(--surface-subtle)] px-4 py-6 text-sm text-[var(--fg-tertiary)]"
+      >
         No records yet.
-      </div>
+      </motion.div>
     );
   }
   const max = items.reduce((acc, it) => {
@@ -56,17 +65,26 @@ export function TopList({ items, showSalesperson = true, variant = 'quotation' }
           </tr>
         </thead>
         <tbody>
-          {items.map((row) => {
+          {items.map((row, index) => {
             const v = Number(BigInt(row.revenueMicros) / BigInt(1_000_000));
             const pct = max > 0 ? Math.min(100, (v / max) * 100) : 0;
             return (
-              <tr key={row.id} className="relative border-t border-[var(--border-subtle)]">
+              <motion.tr
+                key={row.id}
+                initial={reducedMotion ? false : { opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                whileHover={reducedMotion ? undefined : { x: 2 }}
+                transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.025 }}
+                className="relative border-t border-[var(--border-subtle)]"
+              >
                 <td className="relative px-4 py-2.5 align-middle">
                   {/* Bar background scales with the row's share of the max. */}
-                  <span
+                  <motion.span
                     aria-hidden
                     className={`absolute inset-y-1 left-1 -z-0 rounded ${barClass}`}
-                    style={{ width: `calc(${pct.toFixed(2)}% - 8px)` }}
+                    initial={reducedMotion ? false : { width: 0 }}
+                    animate={{ width: `calc(${pct.toFixed(2)}% - 8px)` }}
+                    transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.025 }}
                   />
                   {UUID_RE.test(row.id) ? (
                     <Link
@@ -89,7 +107,7 @@ export function TopList({ items, showSalesperson = true, variant = 'quotation' }
                 <td className="px-4 py-2.5 text-right tabular-nums text-[var(--fg-primary)] whitespace-nowrap">
                   {formatMoneyMicros(row.revenueMicros, row.currency)}
                 </td>
-              </tr>
+              </motion.tr>
             );
           })}
         </tbody>

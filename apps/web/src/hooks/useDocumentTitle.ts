@@ -11,6 +11,10 @@ const ROUTE_TITLES: Record<string, string> = {
   '/integrations': 'Integrations',
   '/settings': 'Settings',
   '/login': 'Sign in',
+  '/bid-matrix': 'Bid/No-Bid Matrix',
+  '/sales': 'Sales',
+  '/accounts': 'Accounts',
+  '/audit-log': 'Audit Log',
 };
 
 // SPA navigations don't update <title>, leaving screen-reader users without

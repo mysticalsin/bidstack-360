@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import {
   ActivityTimelineCard,
   BusinessSnapshotCard,
+  HealthScoreCard,
   KeyContactsCard,
   KpiRow,
   KpiSidebar,
@@ -28,6 +29,7 @@ import { useSalesIntelligence } from '@/hooks/useSalesIntelligence';
 import { useTasks } from '@/hooks/useTasks';
 import { daysUntil } from '@/lib/format';
 import { useAccountHistory } from '@/stores/accountHistory';
+import { AccountsPage } from './AccountsPage';
 
 // DashboardPage doubles as both the org-wide /dashboard view (no
 // accountId) and the per-customer /accounts/:accountId cockpit. The
@@ -36,6 +38,11 @@ import { useAccountHistory } from '@/stores/accountHistory';
 // for the right company — we only need to render the layout here.
 export function DashboardPage() {
   const { accountId } = useParams<{ accountId?: string }>();
+  if (!accountId) return <AccountsPage />;
+  return <AccountCockpitPage accountId={accountId} />;
+}
+
+function AccountCockpitPage({ accountId }: { accountId: string }) {
   const dashboard = useCrmDashboard(accountId);
   const report = usePipelineReport();
   const salesIntelligence = useSalesIntelligence();
@@ -84,13 +91,13 @@ export function DashboardPage() {
       <section className="cockpit-grid" aria-label="Account cockpit">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
           <Reveal>
-            <BusinessSnapshotCard cockpit={cockpit} />
+            <TechStackCard cockpit={cockpit} />
           </Reveal>
 
           <Reveal delay={0.04}>
             <div className="dash-row-3">
+              <BusinessSnapshotCard cockpit={cockpit} />
               <OpenIssuesCard risks={cockpit.risks} compliance={cockpit.compliance} />
-              <TechStackCard cockpit={cockpit} />
               <PipelineByStageCard report={report.data} />
             </div>
           </Reveal>
@@ -110,23 +117,26 @@ export function DashboardPage() {
 
         <aside className="cockpit-side" aria-label="Cockpit details">
           <Reveal>
+            <HealthScoreCard cockpit={cockpit} />
+          </Reveal>
+          <Reveal delay={0.04}>
             <KpiSidebar
               snapshot={snapshot}
               overdueCount={overdueCount}
               tasksLoading={tasks.isLoading}
             />
           </Reveal>
-          <Reveal delay={0.04}>
+          <Reveal delay={0.08}>
             <LiveDataMeshCard cockpit={cockpit} />
           </Reveal>
-          <Reveal delay={0.08}>
-            <NotesPanel accountId={accountId} />
-          </Reveal>
           <Reveal delay={0.12}>
-            {accountId ? <FilesPanel accountId={accountId} /> : <UpsellFilesCard />}
+            <KeyContactsCard cockpit={cockpit} />
           </Reveal>
           <Reveal delay={0.16}>
-            <KeyContactsCard cockpit={cockpit} />
+            <NotesPanel accountId={accountId} />
+          </Reveal>
+          <Reveal delay={0.2}>
+            {accountId ? <FilesPanel accountId={accountId} /> : <UpsellFilesCard />}
           </Reveal>
         </aside>
       </section>

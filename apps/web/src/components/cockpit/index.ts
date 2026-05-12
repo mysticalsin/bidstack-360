@@ -4,6 +4,7 @@
 
 export { ActivityTimelineCard } from './ActivityTimelineCard';
 export { BusinessSnapshotCard } from './BusinessSnapshotCard';
+export { HealthScoreCard } from './HealthScoreCard';
 export { KeyContactsCard } from './KeyContactsCard';
 export { KpiRow } from './KpiRow';
 export { KpiSidebar } from './KpiSidebar';

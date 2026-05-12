@@ -6,6 +6,8 @@
 // audit log entry. When APOLLO_API_KEY is unset the job is a no-op (same
 // stub-mode pattern as dust-poll).
 
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
 import { Queue, Worker } from 'bullmq';
 import type IORedis from 'ioredis';
 import type pino from 'pino';
@@ -25,6 +27,7 @@ export const ApolloEnrichJobData = z.object({
   orgId: z.string().uuid(),
   companyName: z.string().min(1),
   domain: z.string().min(1).optional(),
+  signature: z.string().min(1).optional(),
 });
 
 export type ApolloEnrichJobData = z.infer<typeof ApolloEnrichJobData>;
@@ -65,6 +68,12 @@ export interface MappedEnrichment {
   formerNames: string[];
 }
 
+interface ApolloSignaturePayload {
+  orgId: string;
+  companyName: string;
+  domain?: string;
+}
+
 /**
  * Pure mapping from Apollo's response shape to CompanyEnrichment fields.
  * Exported so the test can verify mapping without spinning up Redis.
@@ -95,6 +104,44 @@ export function mapApolloOrganization(org: ApolloOrganization): MappedEnrichment
       (item): item is string => typeof item === 'string',
     ),
   };
+}
+
+function getJobSigningSecret(): string | null {
+  return process.env.BIDSTACK_JOB_SIGNING_SECRET ?? process.env.JOB_SIGNING_SECRET ?? null;
+}
+
+function canonicalApolloJobPayload(job: ApolloSignaturePayload): string {
+  return JSON.stringify({
+    orgId: job.orgId,
+    companyName: job.companyName,
+    domain: job.domain ?? null,
+  });
+}
+
+export function createApolloEnrichJobSignature(
+  job: ApolloSignaturePayload,
+  secret: string,
+): string {
+  return createHmac('sha256', secret).update(canonicalApolloJobPayload(job)).digest('hex');
+}
+
+export function verifyApolloEnrichJobSignature(
+  job: ApolloEnrichJobData,
+  options: { secret?: string | null; nodeEnv?: string } = {},
+): boolean {
+  const secret = Object.prototype.hasOwnProperty.call(options, 'secret')
+    ? (options.secret ?? null)
+    : getJobSigningSecret();
+  const nodeEnv = options.nodeEnv ?? process.env.NODE_ENV;
+  if (!secret) return nodeEnv !== 'production';
+  if (!job.signature) return false;
+
+  const expected = createApolloEnrichJobSignature(job, secret);
+  const actualBuffer = Buffer.from(job.signature, 'hex');
+  const expectedBuffer = Buffer.from(expected, 'hex');
+  return (
+    actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer)
+  );
 }
 
 function coerceNumber(value: unknown): number | null {
@@ -183,6 +230,10 @@ export async function startCompanyEnrichApollo(
     async (job) => {
       const data = ApolloEnrichJobData.parse(job.data);
       const jobLog = log.child({ queue: QUEUE_NAME, jobId: job.id, orgId: data.orgId });
+      if (!verifyApolloEnrichJobSignature(data)) {
+        jobLog.warn({ companyName: data.companyName }, 'apollo enrichment job signature rejected');
+        throw new Error('Invalid Apollo enrichment job signature');
+      }
 
       const apiKey = process.env.APOLLO_API_KEY;
       if (!apiKey) {

@@ -1,3 +1,4 @@
+import { motion, useReducedMotion } from 'framer-motion';
 import { Fragment, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
@@ -8,6 +9,7 @@ import { SavedFlash } from '@/components/ui/SavedFlash';
 import { useEnrichCompany } from '@/hooks/useEnrichCompany';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { formatDate } from '@/lib/format';
+import { springSoft } from '@/lib/motion';
 import { useAccountHistory } from '@/stores/accountHistory';
 
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
@@ -20,6 +22,7 @@ interface Props {
 export function PageHead({ cockpit, accountView }: Props) {
   const [briefOpen, setBriefOpen] = useState(false);
   const enrich = useEnrichCompany();
+  const reducedMotion = useReducedMotion();
   // We use the most recent opportunity for this customer as the brief target.
   // Briefs are scoped to a deal (the API endpoint is /opportunities/:id/brief)
   // — if no deal exists yet, the button stays disabled with a helpful tooltip.
@@ -56,8 +59,16 @@ export function PageHead({ cockpit, accountView }: Props) {
   const isStarred = accountId ? favorites.some((f) => f.slug === accountId) : false;
 
   return (
-    <div className="page-head">
-      <div style={{ display: 'flex', gap: 14, alignItems: 'center', minWidth: 0 }}>
+    <motion.div
+      className="page-head motion-page-head cockpit-page-head"
+      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, filter: 'blur(6px)' }}
+      animate={reducedMotion ? { opacity: 1 } : { opacity: 1, y: 0, filter: 'blur(0px)' }}
+      transition={springSoft}
+    >
+      <div
+        className="account-heading-cluster"
+        style={{ display: 'flex', gap: 14, alignItems: 'center', minWidth: 0 }}
+      >
         <CompanyLogo
           name={cockpit.company.name}
           logo={cockpit.company.logo}
@@ -94,7 +105,7 @@ export function PageHead({ cockpit, accountView }: Props) {
           className="btn btn-secondary"
           onClick={handleEnrich}
           disabled={enrich.isPending}
-          title="Refresh enrichment via Apollo + Brandfetch"
+          title="Refresh enrichment via open sources + Apollo"
         >
           {enrich.isPending ? (
             <span
@@ -142,7 +153,7 @@ export function PageHead({ cockpit, accountView }: Props) {
           onOpenChange={setBriefOpen}
         />
       ) : null}
-    </div>
+    </motion.div>
   );
 }
 
@@ -159,6 +170,15 @@ function CompanyBrief({ cockpit }: { cockpit: AccountCockpitSnapshot }) {
   if (c.incorporationDate) rows.push(['Founded', c.incorporationDate.slice(0, 4)]);
   return (
     <div>
+      {c.imageUrl ? (
+        <img
+          src={c.imageUrl}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="mb-3 h-24 w-full rounded-md border border-[var(--border-default)] object-cover"
+        />
+      ) : null}
       <div className="text-sm font-semibold text-[var(--fg-primary)]">{c.name}</div>
       {c.website ? (
         <a

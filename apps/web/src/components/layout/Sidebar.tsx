@@ -24,6 +24,7 @@ const WORKSPACE: NavItem[] = [
   { to: '/accounts', label: 'Accounts', icon: 'building' },
   { to: '/opportunities', label: 'Opportunities', icon: 'briefcase', badgeKey: 'openBids' },
   { to: '/pipeline', label: 'Pipeline', icon: 'pipeline' },
+  { to: '/bid-matrix', label: 'Bid/No-Bid Matrix', icon: 'target' },
   { to: '/contacts', label: 'Contacts', icon: 'contacts' },
   { to: '/tasks', label: 'Tasks', icon: 'tasks', badgeKey: 'overdueTasks' },
   { to: '/reports', label: 'Reports', icon: 'reports' },

@@ -8,8 +8,10 @@
 // Money on the wire is integer micros (string-encoded), formatted at the edge.
 
 import { useMemo, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 
 import { formatMoneyMicros } from '@/lib/format';
+import { easeStandard, springSoft } from '@/lib/motion';
 
 import type { SalesDashMonthlyPoint } from '@bidstack/shared';
 
@@ -24,6 +26,7 @@ const CHART_HEIGHT_DEFAULT = 280;
 
 export function MonthlySalesChart({ points, currency, height = CHART_HEIGHT_DEFAULT }: Props) {
   const [hover, setHover] = useState<number | null>(null);
+  const reducedMotion = useReducedMotion();
 
   const geometry = useMemo(() => {
     // Each point's micros come as a string-encoded bigint to survive JSON.
@@ -38,18 +41,24 @@ export function MonthlySalesChart({ points, currency, height = CHART_HEIGHT_DEFA
 
   if (points.length === 0) {
     return (
-      <div
+      <motion.div
+        initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={springSoft}
         className="grid place-items-center rounded-md bg-[var(--surface-subtle)] text-sm text-[var(--fg-tertiary)]"
         style={{ height }}
       >
         No confirmed orders in this window yet.
-      </div>
+      </motion.div>
     );
   }
   if (points.length === 1) {
     // A single bar visualises a one-month window — area chart needs ≥2 anchors.
     return (
-      <div
+      <motion.div
+        initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={springSoft}
         className="flex flex-col items-center justify-center gap-2 rounded-md bg-[var(--surface-subtle)] text-sm text-[var(--fg-secondary)]"
         style={{ height }}
       >
@@ -57,7 +66,7 @@ export function MonthlySalesChart({ points, currency, height = CHART_HEIGHT_DEFA
         <div className="text-2xl font-semibold tabular-nums text-[var(--fg-primary)]">
           {formatMoneyMicros(points[0]!.revenueMicros, currency)}
         </div>
-      </div>
+      </motion.div>
     );
   }
 
@@ -83,9 +92,22 @@ export function MonthlySalesChart({ points, currency, height = CHART_HEIGHT_DEFA
     value: geometry.niceMax * f,
     y: MARGIN.top + innerH - f * innerH,
   }));
+  const tooltip =
+    hover === null
+      ? null
+      : {
+          ...getTooltipFrame(coords[hover]!, width, height),
+          anchorX: coords[hover]!.x,
+          point: points[hover]!,
+        };
 
   return (
-    <div className="relative">
+    <motion.div
+      className="relative"
+      initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={springSoft}
+    >
       <svg
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="none"
@@ -119,15 +141,56 @@ export function MonthlySalesChart({ points, currency, height = CHART_HEIGHT_DEFA
         ))}
 
         {/* Area + line */}
-        <path d={areaPath} fill="var(--brand-primary)" fillOpacity={0.16} />
-        <path
+        <motion.path
+          d={areaPath}
+          fill="var(--brand-primary)"
+          fillOpacity={0.16}
+          initial={reducedMotion ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={easeStandard}
+        />
+        <motion.path
           d={linePath}
           fill="none"
           stroke="var(--brand-primary)"
           strokeWidth={2}
           strokeLinejoin="round"
           strokeLinecap="round"
+          initial={reducedMotion ? false : { pathLength: 0, opacity: 0.45 }}
+          animate={{ pathLength: 1, opacity: 1 }}
+          transition={springSoft}
         />
+
+        {hover !== null ? (
+          <motion.line
+            key={`hover-line-${hover}`}
+            x1={coords[hover]!.x}
+            x2={coords[hover]!.x}
+            y1={MARGIN.top}
+            y2={MARGIN.top + innerH}
+            stroke="var(--brand-primary)"
+            strokeOpacity={0.2}
+            strokeWidth={1}
+            initial={reducedMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={easeStandard}
+          />
+        ) : null}
+
+        {coords.map((c, i) => (
+          <motion.circle
+            key={`point-${points[i]!.month}`}
+            cx={c.x}
+            cy={c.y}
+            r={2.5}
+            fill="var(--brand-primary)"
+            fillOpacity={0.65}
+            initial={reducedMotion ? false : { opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ ...springSoft, delay: reducedMotion ? 0 : i * 0.035 }}
+            style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
+          />
+        ))}
 
         {/* Dots + hit areas. Each rect is focusable so a keyboard user can
             tab through the months; the focus state mirrors the hover state
@@ -140,13 +203,18 @@ export function MonthlySalesChart({ points, currency, height = CHART_HEIGHT_DEFA
           return (
             <g key={`${p.month}-${i}`}>
               {focused ? (
-                <circle
+                <motion.circle
+                  key={`focus-${i}`}
                   cx={c.x}
                   cy={c.y}
                   r={4}
                   fill="var(--brand-primary)"
                   stroke="white"
                   strokeWidth={2}
+                  initial={reducedMotion ? false : { scale: 0.65, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={springSoft}
+                  style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
                 />
               ) : null}
               <rect
@@ -174,6 +242,70 @@ export function MonthlySalesChart({ points, currency, height = CHART_HEIGHT_DEFA
           );
         })}
 
+        {tooltip ? (
+          <motion.g
+            key={`tooltip-${tooltip.point.month}`}
+            pointerEvents="none"
+            initial={reducedMotion ? false : { opacity: 0, y: tooltip.above ? 4 : -4, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={springSoft}
+            style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
+          >
+            <path
+              d={
+                tooltip.above
+                  ? `M ${tooltip.anchorX - 6} ${tooltip.y + tooltip.h - 1} L ${tooltip.anchorX} ${
+                      tooltip.y + tooltip.h + 7
+                    } L ${tooltip.anchorX + 6} ${tooltip.y + tooltip.h - 1} Z`
+                  : `M ${tooltip.anchorX - 6} ${tooltip.y + 1} L ${tooltip.anchorX} ${
+                      tooltip.y - 7
+                    } L ${tooltip.anchorX + 6} ${tooltip.y + 1} Z`
+              }
+              fill="var(--surface-card)"
+              stroke="var(--border-subtle)"
+              strokeWidth={1}
+            />
+            <rect
+              x={tooltip.x}
+              y={tooltip.y}
+              width={tooltip.w}
+              height={tooltip.h}
+              rx={8}
+              fill="var(--surface-card)"
+              stroke="var(--border-subtle)"
+              strokeWidth={1}
+              style={{ filter: 'drop-shadow(0 12px 24px rgba(16, 24, 40, 0.14))' }}
+            />
+            <text
+              x={tooltip.x + 12}
+              y={tooltip.y + 18}
+              fontSize={11}
+              fontWeight={600}
+              fill="var(--fg-secondary)"
+            >
+              {tooltip.point.label}
+            </text>
+            <text
+              x={tooltip.x + 12}
+              y={tooltip.y + 38}
+              fontSize={15}
+              fontWeight={700}
+              fill="var(--fg-primary)"
+            >
+              {formatMoneyMicros(tooltip.point.revenueMicros, currency)}
+            </text>
+            <text
+              x={tooltip.x + tooltip.w - 12}
+              y={tooltip.y + 38}
+              fontSize={11}
+              textAnchor="end"
+              fill="var(--fg-tertiary)"
+            >
+              {tooltip.point.orders} orders
+            </text>
+          </motion.g>
+        ) : null}
+
         {/* X labels at each point */}
         {coords.map((c, i) => (
           <text
@@ -181,14 +313,14 @@ export function MonthlySalesChart({ points, currency, height = CHART_HEIGHT_DEFA
             x={c.x}
             y={height - 8}
             fontSize={11}
-            textAnchor="middle"
+            textAnchor={i === 0 ? 'start' : i === coords.length - 1 ? 'end' : 'middle'}
             fill="var(--fg-tertiary)"
           >
             {points[i]!.label}
           </text>
         ))}
       </svg>
-    </div>
+    </motion.div>
   );
 }
 
@@ -212,6 +344,23 @@ function formatYTick(value: number): string {
   if (value >= 1000) return `${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)}M`;
   if (value === 0) return '0';
   return `${value.toLocaleString('en-US')}k`;
+}
+
+function getTooltipFrame(
+  point: { x: number; y: number },
+  chartWidth: number,
+  chartHeight: number,
+): { x: number; y: number; w: number; h: number; above: boolean } {
+  const w = 168;
+  const h = 54;
+  const above = point.y > MARGIN.top + h + 18;
+  const x = clamp(point.x - w / 2, MARGIN.left + 4, chartWidth - MARGIN.right - w - 4);
+  const y = above ? point.y - h - 14 : Math.min(point.y + 14, chartHeight - MARGIN.bottom - h - 2);
+  return { x, y, w, h, above };
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 /** Catmull-Rom-to-Bezier smoothing for the area chart. */

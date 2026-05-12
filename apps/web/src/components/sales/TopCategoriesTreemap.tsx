@@ -4,10 +4,12 @@
 // reads better than a 1D stacked bar.
 
 import { useMemo, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { formatMoneyMicros } from '@/lib/format';
+import { springSnap, springSoft } from '@/lib/motion';
 
 import type { CategoryRow, TopCategories } from '@bidstack/shared';
 
@@ -32,6 +34,7 @@ const PALETTE = [
 
 export function TopCategoriesTreemap({ data, isLoading }: Props) {
   const [view, setView] = useState<'treemap' | 'list'>('treemap');
+  const reducedMotion = useReducedMotion();
   const items = data?.items ?? [];
 
   return (
@@ -42,7 +45,7 @@ export function TopCategoriesTreemap({ data, isLoading }: Props) {
           <div className="flex items-center gap-2 text-xs text-[var(--fg-tertiary)]">
             <button
               type="button"
-              className="text-[var(--brand-primary)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+              className="text-[var(--brand-primary)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
               onClick={() => setView(view === 'treemap' ? 'list' : 'treemap')}
               aria-pressed={view === 'list'}
             >
@@ -54,20 +57,47 @@ export function TopCategoriesTreemap({ data, isLoading }: Props) {
         }
       />
       {isLoading ? (
-        <div className="px-5 py-8 text-sm text-[var(--fg-tertiary)]">Loading…</div>
+        <motion.div
+          initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={springSoft}
+          className="px-5 py-8 text-sm text-[var(--fg-tertiary)]"
+        >
+          Loading…
+        </motion.div>
       ) : items.length === 0 ? (
-        <div className="px-5 py-8 text-sm text-[var(--fg-tertiary)]">
+        <motion.div
+          initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={springSoft}
+          className="px-5 py-8 text-sm text-[var(--fg-tertiary)]"
+        >
           No category breakdown yet.
-        </div>
+        </motion.div>
       ) : view === 'treemap' ? (
         <Treemap items={items} currency={data?.currency ?? 'CAD'} />
       ) : (
-        <ul className="divide-y divide-[var(--border-subtle)]">
+        <motion.ul
+          initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={springSoft}
+          className="divide-y divide-[var(--border-subtle)]"
+        >
           {items.map((c, i) => (
-            <li key={c.id} className="flex items-center gap-3 px-5 py-2.5">
-              <span
+            <motion.li
+              key={c.id}
+              initial={reducedMotion ? false : { opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              whileHover={reducedMotion ? undefined : { x: 2 }}
+              transition={{ ...springSoft, delay: reducedMotion ? 0 : i * 0.03 }}
+              className="flex items-center gap-3 px-5 py-2.5"
+            >
+              <motion.span
                 aria-hidden
                 className="h-3 w-3 rounded-sm"
+                initial={reducedMotion ? false : { scale: 0.55 }}
+                animate={{ scale: 1 }}
+                transition={springSnap}
                 style={{ backgroundColor: PALETTE[i % PALETTE.length] }}
               />
               <span className="flex-1 truncate text-sm text-[var(--fg-primary)]">{c.name}</span>
@@ -75,9 +105,9 @@ export function TopCategoriesTreemap({ data, isLoading }: Props) {
                 {formatMoneyMicros(c.revenueMicros, data?.currency ?? 'CAD')}
               </span>
               <Badge tone="gray">{c.orders}</Badge>
-            </li>
+            </motion.li>
           ))}
-        </ul>
+        </motion.ul>
       )}
     </Card>
   );
@@ -98,9 +128,15 @@ const H = 240;
 
 function Treemap({ items, currency }: { items: CategoryRow[]; currency: string }) {
   const tiles = useMemo(() => squarify(items), [items]);
+  const reducedMotion = useReducedMotion();
 
   return (
-    <div className="px-5 pb-5">
+    <motion.div
+      className="px-5 pb-5"
+      initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={springSoft}
+    >
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="block w-full"
@@ -108,45 +144,55 @@ function Treemap({ items, currency }: { items: CategoryRow[]; currency: string }
         role="img"
         aria-label="Top categories treemap by revenue"
       >
-        {tiles.map((t) => (
+        {tiles.map((t, index) => (
           <g key={t.item.id}>
-            <rect
+            <motion.rect
               x={t.x + 1}
               y={t.y + 1}
               width={Math.max(0, t.w - 2)}
               height={Math.max(0, t.h - 2)}
               fill={t.color}
               rx={4}
+              initial={reducedMotion ? false : { opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ ...springSnap, delay: reducedMotion ? 0 : index * 0.03 }}
+              style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
             >
               <title>{`${t.item.name}: ${formatMoneyMicros(t.item.revenueMicros, currency)} (${t.item.orders} orders)`}</title>
-            </rect>
+            </motion.rect>
             {t.w > 80 && t.h > 36 ? (
-              <text
+              <motion.text
                 x={t.x + 10}
                 y={t.y + 18}
                 fontSize={12}
                 fontWeight={600}
                 fill="white"
+                initial={reducedMotion ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.035 + 0.08 }}
                 style={{ pointerEvents: 'none' }}
               >
                 {t.item.name}
-              </text>
+              </motion.text>
             ) : null}
             {t.w > 80 && t.h > 56 ? (
-              <text
+              <motion.text
                 x={t.x + 10}
                 y={t.y + 36}
                 fontSize={11}
                 fill="white"
+                initial={reducedMotion ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.035 + 0.12 }}
                 style={{ pointerEvents: 'none' }}
               >
                 {formatMoneyMicros(t.item.revenueMicros, currency)}
-              </text>
+              </motion.text>
             ) : null}
           </g>
         ))}
       </svg>
-    </div>
+    </motion.div>
   );
 }
 

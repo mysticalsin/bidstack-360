@@ -1,6 +1,9 @@
+import { motion, useReducedMotion } from 'framer-motion';
+
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { useOpenDataSignals } from '@/hooks/useOpenDataSignals';
+import { springSnap, springSoft } from '@/lib/motion';
 
 import type { AccountCockpitSnapshot, CrmConnector, OpenDataSignal } from '@bidstack/shared';
 
@@ -11,6 +14,7 @@ interface Props {
 }
 
 export function LiveDataMeshCard({ cockpit }: Props) {
+  const reducedMotion = useReducedMotion();
   const ticker = tickerForCompany(cockpit.company.name);
   const liveData = useOpenDataSignals({
     query: cockpit.company.legalName ?? cockpit.company.name,
@@ -43,8 +47,13 @@ export function LiveDataMeshCard({ cockpit }: Props) {
         </div>
 
         <div className="mesh-connectors" aria-label="Connector status">
-          {visibleConnectors.slice(0, 6).map((connector) => (
-            <ConnectorPill key={connector.id} connector={connector} />
+          {visibleConnectors.slice(0, 6).map((connector, index) => (
+            <ConnectorPill
+              key={connector.id}
+              connector={connector}
+              index={index}
+              reducedMotion={Boolean(reducedMotion)}
+            />
           ))}
         </div>
 
@@ -58,7 +67,16 @@ export function LiveDataMeshCard({ cockpit }: Props) {
           ) : signals.length === 0 ? (
             <div className="mesh-empty">No public live signal returned for this account yet.</div>
           ) : (
-            signals.slice(0, 3).map((signal) => <SignalRow key={signal.id} signal={signal} />)
+            signals
+              .slice(0, 3)
+              .map((signal, index) => (
+                <SignalRow
+                  key={signal.id}
+                  signal={signal}
+                  index={index}
+                  reducedMotion={Boolean(reducedMotion)}
+                />
+              ))
           )}
         </div>
       </div>
@@ -66,31 +84,55 @@ export function LiveDataMeshCard({ cockpit }: Props) {
   );
 }
 
-function ConnectorPill({ connector }: { connector: CrmConnector }) {
+function ConnectorPill({
+  connector,
+  index,
+  reducedMotion,
+}: {
+  connector: CrmConnector;
+  index: number;
+  reducedMotion: boolean;
+}) {
   return (
-    <a
+    <motion.a
       className="mesh-connector"
       href={connector.docsUrl}
       target="_blank"
       rel="noreferrer"
       aria-label={`${connector.name} is ${connector.status}`}
       title={connector.message ?? connector.name}
+      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={reducedMotion ? undefined : { y: -2 }}
+      whileTap={reducedMotion ? undefined : { scale: 0.98 }}
+      transition={{ ...springSnap, delay: reducedMotion ? 0 : index * 0.035 }}
     >
       <span className={`mesh-status status-${connector.status}`} aria-hidden />
       <span>{connector.name}</span>
-    </a>
+    </motion.a>
   );
 }
 
-function SignalRow({ signal }: { signal: OpenDataSignal }) {
+function SignalRow({
+  signal,
+  index,
+  reducedMotion,
+}: {
+  signal: OpenDataSignal;
+  index: number;
+  reducedMotion: boolean;
+}) {
   const attribution = signal.sourceAttribution[0];
   const href = signal.url ?? attribution?.sourceUrl ?? undefined;
   return (
-    <a
+    <motion.a
       className="mesh-signal"
       href={href}
       target={href ? '_blank' : undefined}
       rel={href ? 'noreferrer' : undefined}
+      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 8 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.04 }}
     >
       <div>
         <strong>{signal.title}</strong>
@@ -99,7 +141,7 @@ function SignalRow({ signal }: { signal: OpenDataSignal }) {
       <Badge tone={signal.confidence >= 0.9 ? 'jade' : 'blue'}>
         {Math.round(signal.confidence * 100)}%
       </Badge>
-    </a>
+    </motion.a>
   );
 }
 
@@ -109,6 +151,8 @@ function SignalRow({ signal }: { signal: OpenDataSignal }) {
 function fallbackConnectors(): CrmConnector[] {
   const lastCheckedAt = new Date().toISOString();
   return [
+    fallbackConnector('odoo-sales', 'Odoo', 'official_widget', 'company', lastCheckedAt),
+    fallbackConnector('twenty-core', 'Twenty', 'official_widget', 'company', lastCheckedAt),
     fallbackConnector('sec-edgar', 'SEC EDGAR', 'open_api', 'company', lastCheckedAt),
     fallbackConnector('usaspending', 'USAspending', 'open_api', 'procurement', lastCheckedAt),
     fallbackConnector(
@@ -154,6 +198,8 @@ function fallbackConnector(
 }
 
 function fallbackConnectorDocs(id: string): string {
+  if (id === 'odoo-sales') return 'https://github.com/mysticalsin/odoo';
+  if (id === 'twenty-core') return 'https://github.com/mysticalsin/twenty';
   if (id === 'sec-edgar')
     return 'https://www.sec.gov/search-filings/edgar-application-programming-interfaces';
   if (id === 'usaspending') return 'https://api.usaspending.gov/docs/';

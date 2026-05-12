@@ -103,7 +103,7 @@ export function SalesOrdersPage() {
           type="button"
           onClick={onExport}
           disabled={!list.data || list.data.items.length === 0}
-          className="inline-flex min-h-9 items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-1.5 text-xs font-medium text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-11"
+          className="inline-flex min-h-9 items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-1.5 text-xs font-medium text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-11"
         >
           Export CSV
         </button>
@@ -120,8 +120,8 @@ export function SalesOrdersPage() {
               onClick={() => setQueryParam('state', s.id === 'all' ? null : s.id)}
               className={
                 active
-                  ? 'inline-flex min-h-9 items-center rounded-full border border-[var(--brand-primary)] bg-[var(--brand-primary)] px-3 py-1.5 text-xs font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 pointer-coarse:min-h-11'
-                  : 'inline-flex min-h-9 items-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-1.5 text-xs text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 pointer-coarse:min-h-11'
+                  ? 'inline-flex min-h-9 items-center rounded-full border border-[var(--brand-primary)] bg-[var(--brand-primary)] px-3 py-1.5 text-xs font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] focus-visible:ring-offset-2 pointer-coarse:min-h-11'
+                  : 'inline-flex min-h-9 items-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-1.5 text-xs text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] focus-visible:ring-offset-2 pointer-coarse:min-h-11'
               }
             >
               {s.label}
@@ -135,14 +135,14 @@ export function SalesOrdersPage() {
             onChange={(e) => setQueryParam('search', e.target.value)}
             placeholder="Search number or customer…"
             aria-label="Search"
-            className="min-h-9 w-64 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 text-sm outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+            className="min-h-9 w-64 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 text-sm outline-none focus:ring-2 focus:ring-[var(--border-focus)]"
           />
           {filter.countryCode ? (
             <button
               type="button"
               onClick={() => setQueryParam('country', null)}
               aria-label={`Clear country filter ${filter.countryCode}`}
-              className="inline-flex min-h-9 items-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-1.5 text-xs text-[var(--fg-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 pointer-coarse:min-h-11"
+              className="inline-flex min-h-9 items-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-1.5 text-xs text-[var(--fg-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] focus-visible:ring-offset-2 pointer-coarse:min-h-11"
             >
               Country: {filter.countryCode} ✕
             </button>
@@ -152,7 +152,7 @@ export function SalesOrdersPage() {
               type="button"
               onClick={() => setQueryParam('salespersonId', null)}
               aria-label="Clear salesperson filter"
-              className="inline-flex min-h-9 items-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-1.5 text-xs text-[var(--fg-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 pointer-coarse:min-h-11"
+              className="inline-flex min-h-9 items-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-1.5 text-xs text-[var(--fg-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] focus-visible:ring-offset-2 pointer-coarse:min-h-11"
             >
               Salesperson ✕
             </button>
@@ -239,7 +239,7 @@ export function SalesOrdersPage() {
             <button
               type="button"
               onClick={() => setQueryParam('cursor', list.data.nextCursor)}
-              className="inline-flex min-h-9 items-center rounded-md px-3 py-1.5 text-xs font-medium text-[var(--brand-primary)] underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 pointer-coarse:min-h-11"
+              className="inline-flex min-h-9 items-center rounded-md px-3 py-1.5 text-xs font-medium text-[var(--brand-primary)] underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] focus-visible:ring-offset-2 pointer-coarse:min-h-11"
             >
               Load older →
             </button>

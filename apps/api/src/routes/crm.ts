@@ -14,6 +14,7 @@ import {
 } from '@bidstack/db';
 import {
   AccountCockpitSnapshot,
+  CompanyAutopopulateResponse,
   CompanyLookupResponse,
   CrmCompany,
   CrmDashboardSnapshot,
@@ -33,6 +34,7 @@ import {
   type SourceAttribution as SourceAttributionType,
 } from '@bidstack/shared';
 
+import { faviconProfile, fetchOpenCompanyProfile } from '../providers/company-open-enrichment.js';
 import { buildConnectorCatalog, buildOpenDataSignals } from '../providers/open-data-connectors.js';
 import { enqueueApolloEnrich } from '../queues/company-enrich-apollo.js';
 
@@ -61,6 +63,13 @@ const EnrichCompanyBody = z.object({
   domain: z.string().trim().optional(),
   website: z.string().url().optional(),
 });
+
+const AutopopulateSalesCompaniesBody = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(12).default(8),
+    source: z.enum(['all', 'sales_orders', 'opportunities']).default('all'),
+  })
+  .default({});
 
 const WidgetsPatchBody = z.object({
   widgets: z.array(DashboardWidget),
@@ -300,83 +309,21 @@ export const crmRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const normalizedName = normalizeName(req.body.name);
-      const domain = normalizeDomain(req.body.domain ?? domainFor(req.body.name));
-      const website = req.body.website ?? (domain ? `https://${domain}/` : null);
-      const now = new Date();
-      const isMantu = domain === 'mantu.com' || normalizedName === 'mantu';
-      const sourceAttribution = [
-        attribution({
-          source: isMantu ? 'official_website' : 'verified_company_enrichment',
-          label: isMantu ? 'Mantu official website' : 'BidStack enrichment cache',
-          sourceUrl: website,
-          confidence: isMantu ? 0.99 : 0.72,
-        }),
-      ];
-
-      const enrichment = await prisma.companyEnrichment.upsert({
-        where: { orgId_normalizedName: { orgId: req.auth.orgId, normalizedName } },
-        create: {
-          orgId: req.auth.orgId,
-          normalizedName,
-          legalName: req.body.name,
-          tradeName: req.body.name,
-          domain,
-          website,
-          logoUrl: logoUrlFor(req.body.name, domain),
-          logoSource: isMantu ? 'official_website' : 'favicon',
-          registryIds: {},
-          formerNames: [],
-          industryCodes: [],
-          status: 'active',
-          employeeCount: isMantu ? 12_000 : null,
-          annualRevenueMicros: isMantu ? 1_000_000_000_000_000n : null,
-          confidenceBps: isMantu ? 9900 : 7200,
-          sourceAttribution: sourceAttribution as Prisma.InputJsonValue,
-          providerMetadata: {
-            requestedBy: 'crm_api',
-            lookupKeys: { domain, normalizedName },
-          },
-          cacheExpiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
-        },
-        update: {
-          legalName: req.body.name,
-          tradeName: req.body.name,
-          domain,
-          website,
-          logoUrl: logoUrlFor(req.body.name, domain),
-          logoSource: isMantu ? 'official_website' : 'favicon',
-          status: 'active',
-          employeeCount: isMantu ? 12_000 : undefined,
-          annualRevenueMicros: isMantu ? 1_000_000_000_000_000n : undefined,
-          confidenceBps: isMantu ? 9900 : 7200,
-          sourceAttribution: sourceAttribution as Prisma.InputJsonValue,
-          providerMetadata: {
-            requestedBy: 'crm_api',
-            lookupKeys: { domain, normalizedName },
-          },
-          cacheExpiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
-        },
+      const result = await upsertVerifiedCompanyEnrichment({
+        orgId: req.auth.orgId,
+        userId: req.auth.userId,
+        name: req.body.name,
+        domain: req.body.domain ?? domainFor(req.body.name),
+        website: req.body.website,
+        requestedBy: 'crm_api',
+        auditAction: 'crm.company.enrich',
+        log: req.log,
       });
 
-      await prisma.auditLog.create({
-        data: {
-          orgId: req.auth.orgId,
-          userId: req.auth.userId,
-          action: 'crm.company.enrich',
-          targetType: 'company',
-          targetId: enrichment.id,
-          diff: { name: req.body.name, domain } as Prisma.InputJsonValue,
-        },
-      });
-
-      // Fire-and-forget the Apollo enrichment job alongside the synchronous
-      // write. The worker will overwrite our cache row with verified Apollo
-      // data when APOLLO_API_KEY is set; otherwise the job is a no-op.
       const apolloJobId = await enqueueApolloEnrich({
         orgId: req.auth.orgId,
         companyName: req.body.name,
-        ...(domain ? { domain } : {}),
+        ...(result.domain ? { domain: result.domain } : {}),
       });
       if (apolloJobId) {
         req.log.info({ apolloJobId, company: req.body.name }, 'queued apollo enrichment');
@@ -384,7 +331,94 @@ export const crmRoutes: FastifyPluginAsyncZod = async (server) => {
         req.log.warn('apollo enrichment enqueue skipped (redis unreachable)');
       }
 
-      return serializeCompany(enrichment);
+      return result.company;
+    },
+  );
+
+  server.post(
+    '/crm/companies/autopopulate-from-sales',
+    {
+      schema: {
+        body: AutopopulateSalesCompaniesBody,
+        response: { 200: CompanyAutopopulateResponse },
+      },
+    },
+    async (req) => {
+      const now = new Date();
+      const candidates = await buildSalesCompanyCandidates({
+        orgId: req.auth.orgId,
+        limit: req.body.limit,
+        source: req.body.source,
+      });
+      const existingRows = await prisma.companyEnrichment.findMany({
+        where: {
+          orgId: req.auth.orgId,
+          normalizedName: { in: candidates.map((item) => normalizeName(item.name)) },
+        },
+      });
+      const existingByName = new Map(existingRows.map((row) => [row.normalizedName, row]));
+      const items: z.infer<typeof CompanyAutopopulateResponse>['items'] = [];
+      const warnings: string[] = [];
+
+      for (const candidate of candidates) {
+        const normalizedName = normalizeName(candidate.name);
+        const existing = existingByName.get(normalizedName);
+        if (existing && isFreshCompanyEnrichment(existing, now)) {
+          items.push({
+            company: serializeCompany(existing),
+            action: 'cached',
+            reason: 'fresh enrichment cache',
+          });
+          continue;
+        }
+
+        try {
+          const result = await upsertVerifiedCompanyEnrichment({
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            name: candidate.name,
+            domain: candidate.domain,
+            website: candidate.website,
+            country: candidate.countryCode,
+            requestedBy: 'sales_autopopulate',
+            auditAction: 'crm.company.autopopulate_from_sales',
+            log: req.log,
+          });
+          items.push({ company: result.company, action: 'enriched', reason: candidate.reason });
+        } catch (err) {
+          warnings.push(`${candidate.name}: ${safeErrorMessage(err)}`);
+          if (existing) {
+            items.push({ company: serializeCompany(existing), action: 'skipped', reason: 'error' });
+          }
+        }
+      }
+
+      const enriched = items.filter((item) => item.action === 'enriched').length;
+      const cached = items.filter((item) => item.action === 'cached').length;
+      const skipped = candidates.length - enriched - cached;
+      return {
+        generatedAt: now.toISOString(),
+        requested: candidates.length,
+        enriched,
+        cached,
+        skipped,
+        items,
+        sourceAttribution: [
+          attribution({
+            source: 'odoo_twenty_sales_autopopulate',
+            label: 'Odoo sale.order pattern + Twenty-compatible customer records',
+            sourceUrl: 'https://github.com/mysticalsin/odoo',
+            confidence: 0.84,
+          }),
+          attribution({
+            source: 'twenty_core_objects',
+            label: 'Twenty Company/Opportunity object model',
+            sourceUrl: 'https://github.com/mysticalsin/twenty',
+            confidence: 0.86,
+          }),
+        ],
+        warnings,
+      };
     },
   );
 
@@ -477,6 +511,264 @@ export const crmRoutes: FastifyPluginAsyncZod = async (server) => {
     },
   );
 };
+
+type RouteLog = {
+  warn: (obj: unknown, msg?: string) => void;
+};
+
+type SalesCompanyCandidate = {
+  name: string;
+  domain: string | null;
+  website: string | null;
+  countryCode: string | null;
+  reason: string;
+  score: number;
+};
+
+async function upsertVerifiedCompanyEnrichment({
+  orgId,
+  userId,
+  name,
+  domain: inputDomain,
+  website: inputWebsite,
+  country,
+  requestedBy,
+  auditAction,
+  log,
+}: {
+  orgId: string;
+  userId: string | null;
+  name: string;
+  domain?: string | null;
+  website?: string | null;
+  country?: string | null;
+  requestedBy: string;
+  auditAction: string;
+  log: RouteLog;
+}): Promise<{
+  company: z.infer<typeof CrmCompany>;
+  domain: string | null;
+  providers: string[];
+}> {
+  const normalizedName = normalizeName(name);
+  const now = new Date();
+  const requestedDomain = normalizeDomain(inputDomain ?? domainFor(name));
+  const requestedWebsite = inputWebsite ?? (requestedDomain ? `https://${requestedDomain}/` : null);
+  const openProfile =
+    process.env.NODE_ENV === 'test' || process.env.BIDSTACK_OPEN_ENRICHMENT_DISABLED === '1'
+      ? null
+      : await fetchOpenCompanyProfile({
+          name,
+          domain: requestedDomain,
+          website: requestedWebsite,
+          now,
+        }).catch((err) => {
+          log.warn({ err, company: name }, 'open company enrichment failed');
+          return null;
+        });
+  const favicon = faviconProfile({
+    name,
+    domain: openProfile?.domain ?? requestedDomain,
+    website: openProfile?.website ?? requestedWebsite,
+    now,
+  });
+  const domain = openProfile?.domain ?? favicon.domain;
+  const website = openProfile?.website ?? favicon.website;
+  const countryCode = normalizeCountry(country);
+  const isMantu = domain === 'mantu.com' || normalizedName === 'mantu';
+  const sourceAttribution = [
+    ...(openProfile?.sourceAttribution ?? []),
+    ...(openProfile?.logoUrl ? [] : favicon.sourceAttribution),
+    attribution({
+      source: isMantu ? 'official_website' : 'verified_company_enrichment',
+      label: isMantu ? 'Mantu official website' : 'BidStack enrichment cache',
+      sourceUrl: website,
+      confidence: isMantu ? 0.99 : 0.72,
+    }),
+  ];
+  const logoUrl = openProfile?.logoUrl ?? favicon.logoUrl ?? logoUrlFor(name, domain);
+  const logoSource = isMantu
+    ? 'official_website'
+    : (openProfile?.logoSource ?? favicon.logoSource ?? 'favicon');
+  const providerMetadata: Prisma.InputJsonObject = {
+    requestedBy,
+    lookupKeys: { domain, normalizedName },
+    country: countryCode,
+    openCompanyProfile: (openProfile?.providerMetadata ?? null) as Prisma.InputJsonValue | null,
+    companyImageUrl: openProfile?.imageUrl ?? null,
+    companyDescription: openProfile?.description ?? null,
+    fallbackLogo: favicon.providerMetadata as Prisma.InputJsonValue,
+  };
+  const confidenceBps = Math.max(isMantu ? 9900 : 7200, openProfile?.confidenceBps ?? 0);
+  const industryCodes = openProfile?.industryLabels ?? [];
+  const legalName = openProfile?.legalName ?? name;
+  const tradeName = openProfile?.tradeName ?? name;
+  const incorporationDate = openProfile?.incorporationDate
+    ? new Date(openProfile.incorporationDate)
+    : undefined;
+  const address: Prisma.InputJsonObject = countryCode ? { countryCode } : {};
+
+  const enrichment = await prisma.companyEnrichment.upsert({
+    where: { orgId_normalizedName: { orgId, normalizedName } },
+    create: {
+      orgId,
+      normalizedName,
+      legalName,
+      tradeName,
+      domain,
+      website,
+      logoUrl,
+      logoSource,
+      registryIds: {},
+      address,
+      formerNames: [],
+      industryCodes,
+      status: 'active',
+      incorporationDate: incorporationDate ?? null,
+      employeeCount: isMantu ? 12_000 : (openProfile?.employeeCount ?? null),
+      annualRevenueMicros: isMantu ? 1_000_000_000_000_000n : null,
+      confidenceBps,
+      sourceAttribution: sourceAttribution as Prisma.InputJsonValue,
+      providerMetadata,
+      cacheExpiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+    },
+    update: {
+      legalName,
+      tradeName,
+      domain,
+      website,
+      logoUrl,
+      logoSource,
+      ...(countryCode ? { address } : {}),
+      status: 'active',
+      incorporationDate,
+      employeeCount: isMantu ? 12_000 : (openProfile?.employeeCount ?? undefined),
+      annualRevenueMicros: isMantu ? 1_000_000_000_000_000n : undefined,
+      industryCodes,
+      confidenceBps,
+      sourceAttribution: sourceAttribution as Prisma.InputJsonValue,
+      providerMetadata,
+      cacheExpiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+    },
+  });
+
+  const providers = openProfile ? ['wikidata', 'wikimedia'] : ['favicon'];
+  await prisma.auditLog.create({
+    data: {
+      orgId,
+      userId,
+      action: auditAction,
+      targetType: 'company',
+      targetId: enrichment.id,
+      diff: {
+        name,
+        domain,
+        country: countryCode,
+        providers,
+      } as Prisma.InputJsonValue,
+    },
+  });
+
+  return { company: serializeCompany(enrichment), domain, providers };
+}
+
+async function buildSalesCompanyCandidates({
+  orgId,
+  limit,
+  source,
+}: {
+  orgId: string;
+  limit: number;
+  source: 'all' | 'sales_orders' | 'opportunities';
+}): Promise<SalesCompanyCandidate[]> {
+  const candidates: SalesCompanyCandidate[] = [];
+  if (source !== 'opportunities' && (await tableExists('sales_orders'))) {
+    const rows = await prisma.$queryRaw<
+      Array<{
+        name: string;
+        countryCode: string | null;
+        revenueMicros: bigint;
+        orderCount: number;
+      }>
+    >`
+      SELECT
+        customer_name AS "name",
+        MAX(country_code) AS "countryCode",
+        COALESCE(SUM(total_micros), 0)::bigint AS "revenueMicros",
+        COUNT(*)::int AS "orderCount"
+      FROM sales_orders
+      WHERE org_id = ${orgId}::uuid
+        AND state IN ('draft', 'sent', 'confirmed', 'done')
+      GROUP BY customer_name
+      ORDER BY "revenueMicros" DESC
+      LIMIT ${limit * 2}
+    `;
+    for (const row of rows) {
+      candidates.push({
+        name: row.name,
+        domain: domainFor(row.name),
+        website: websiteFor(row.name),
+        countryCode: normalizeCountry(row.countryCode),
+        reason: `${row.orderCount} sales record${row.orderCount === 1 ? '' : 's'}`,
+        score: Number(row.revenueMicros),
+      });
+    }
+  }
+
+  if (source !== 'sales_orders') {
+    const opportunities = await prisma.opportunity.findMany({
+      where: { orgId },
+      select: { customer: true, valueEur: true },
+      orderBy: [{ valueEur: 'desc' }, { updatedAt: 'desc' }],
+      take: limit * 3,
+    });
+    for (const opportunity of opportunities) {
+      candidates.push({
+        name: opportunity.customer,
+        domain: domainFor(opportunity.customer),
+        website: websiteFor(opportunity.customer),
+        countryCode: null,
+        reason: 'Twenty-compatible opportunity',
+        score: Math.round(Number(opportunity.valueEur ?? 0) * 1_000_000),
+      });
+    }
+  }
+
+  return mergeSalesCompanyCandidates(candidates).slice(0, limit);
+}
+
+function mergeSalesCompanyCandidates(candidates: SalesCompanyCandidate[]): SalesCompanyCandidate[] {
+  const byName = new Map<string, SalesCompanyCandidate>();
+  for (const candidate of candidates) {
+    const key = normalizeName(candidate.name);
+    const existing = byName.get(key);
+    if (!existing) {
+      byName.set(key, candidate);
+      continue;
+    }
+    byName.set(key, {
+      ...existing,
+      domain: existing.domain ?? candidate.domain,
+      website: existing.website ?? candidate.website,
+      countryCode: existing.countryCode ?? candidate.countryCode,
+      reason:
+        existing.reason === candidate.reason
+          ? existing.reason
+          : `${existing.reason}; ${candidate.reason}`,
+      score: existing.score + candidate.score,
+    });
+  }
+  return [...byName.values()].sort((a, b) => b.score - a.score);
+}
+
+function isFreshCompanyEnrichment(enrichment: CompanyEnrichment, now: Date): boolean {
+  return Boolean(
+    enrichment.logoUrl &&
+    enrichment.cacheExpiresAt &&
+    enrichment.cacheExpiresAt.getTime() > now.getTime() &&
+    enrichment.confidenceBps >= 7000,
+  );
+}
 
 async function buildDashboardSnapshot(
   orgId: string,
@@ -626,6 +918,7 @@ function buildCompanies(
       registryIds: {},
       formerNames: [],
       incorporationDate: null,
+      imageUrl: null,
       logo: logoFor(opportunity.customer, opportunity.logoUrl),
       confidence: 0.55,
       sourceAttribution: [
@@ -646,6 +939,8 @@ function buildCompanies(
 
 function serializeCompany(enrichment: CompanyEnrichment): z.infer<typeof CrmCompany> {
   const name = enrichment.tradeName ?? enrichment.legalName;
+  const metadata = record(enrichment.providerMetadata);
+  const industryCodes = stringArray(enrichment.industryCodes);
   return {
     id: enrichment.id,
     source: 'enrichment',
@@ -653,7 +948,8 @@ function serializeCompany(enrichment: CompanyEnrichment): z.infer<typeof CrmComp
     legalName: enrichment.legalName,
     domain: enrichment.domain,
     website: enrichment.website,
-    industry: null,
+    industry: industryCodes[0] ?? null,
+    imageUrl: stringUrl(metadata.companyImageUrl),
     employeeCount: enrichment.employeeCount,
     annualRevenueMicros:
       enrichment.annualRevenueMicros === null ? null : Number(enrichment.annualRevenueMicros),
@@ -1299,6 +1595,7 @@ function fallbackCompany(name: string): z.infer<typeof CrmCompany> {
     registryIds: {},
     formerNames: [],
     incorporationDate: null,
+    imageUrl: null,
     logo: logoFor(
       name,
       logoUrlFor(name, domain),
@@ -1318,12 +1615,16 @@ function fallbackCompany(name: string): z.infer<typeof CrmCompany> {
 }
 
 function logoFor(name: string, url: string | null, source?: string | null) {
+  const resolvedSource =
+    name === 'Mantu' && (url === null || url === 'https://mantu.com/favicon.ico')
+      ? 'official_website'
+      : (source ?? 'favicon');
   return {
     url: url ?? logoUrlFor(name, domainFor(name)),
-    source: asLogoSource(source ?? 'favicon'),
+    source: asLogoSource(resolvedSource),
     cachedAt: new Date().toISOString(),
     attribution: attribution({
-      source: source ?? 'favicon',
+      source: resolvedSource,
       label: name === 'Mantu' ? 'Mantu official website logo/fav icon' : 'Company favicon fallback',
       sourceUrl: websiteFor(name),
       confidence: name === 'Mantu' ? 0.99 : 0.62,
@@ -1335,6 +1636,7 @@ function asLogoSource(value: string): z.infer<typeof CrmLogoSource> {
   return value === 'official_website' ||
     value === 'logo_dev' ||
     value === 'brandfetch' ||
+    value === 'wikimedia' ||
     value === 'favicon' ||
     value === 'manual' ||
     value === 'initials'
@@ -1345,7 +1647,7 @@ function asLogoSource(value: string): z.infer<typeof CrmLogoSource> {
 function logoUrlFor(name: string, domain: string | null) {
   if (name === 'Mantu' || domain === 'mantu.com') return 'https://mantu.com/favicon.ico';
   if (!domain) return null;
-  return `https://www.${domain.replace(/^www\./, '')}/favicon.ico`;
+  return `https://${domain.replace(/^www\./, '')}/favicon.ico`;
 }
 
 function domainFor(name: string) {
@@ -1356,6 +1658,13 @@ function websiteFor(name: string) {
   return COMPANY_WEBSITES[name] ?? null;
 }
 
+async function tableExists(tableName: string): Promise<boolean> {
+  const rows = await prisma.$queryRaw<Array<{ tableName: string | null }>>`
+    SELECT to_regclass(${`public.${tableName}`})::text AS "tableName"
+  `;
+  return Boolean(rows[0]?.tableName);
+}
+
 function normalizeDomain(domain: string | null | undefined) {
   if (!domain) return null;
   return domain
@@ -1363,6 +1672,12 @@ function normalizeDomain(domain: string | null | undefined) {
     .replace(/^www\./, '')
     .replace(/\/.*$/, '')
     .toLowerCase();
+}
+
+function normalizeCountry(country: string | null | undefined) {
+  if (!country) return null;
+  const normalized = country.trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(normalized) ? normalized : null;
 }
 
 function normalizeRegistryValue(value: string) {
@@ -1375,6 +1690,11 @@ function normalizeName(value: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
+}
+
+function safeErrorMessage(err: unknown): string {
+  if (!(err instanceof Error)) return 'Unknown error';
+  return err.message.replace(/Bearer\s+[A-Za-z0-9._-]+/gi, 'Bearer [redacted]');
 }
 
 function buildDataQualityReport(
@@ -1567,6 +1887,15 @@ function stringRecord(value: unknown): Record<string, string> {
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   return value as Record<string, unknown>;
+}
+
+function stringUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  try {
+    return new URL(value).toString();
+  } catch {
+    return null;
+  }
 }
 
 function stringArray(value: unknown): string[] {

@@ -7,7 +7,7 @@ interface CompanyLogoProps {
   name: string;
   /** CRM-resolved logo (Twenty / Brandfetch / Logo.dev / favicon). Preferred. */
   logo?: CrmLogo | null;
-  /** Bare domain (no protocol) — used to query the free Clearbit Logo API as fallback. */
+  /** Bare domain (no protocol) - used to request the website favicon fallback. */
   domain?: string | null;
   size?: number;
   className?: string;
@@ -18,10 +18,11 @@ interface CompanyLogoProps {
 }
 
 // Logo source chain:
-//   1. CRM-resolved logo (Twenty / Brandfetch / Logo.dev / favicon)
-//   2. Clearbit Logo API (https://logo.clearbit.com/{domain}) — free, no auth
+//   1. CRM-resolved high-confidence logo (Twenty / Brandfetch / Logo.dev)
+//   2. Small favicon fallback for compact table/sidebar uses
 //   3. Initials fallback (always works)
-// The chain advances on <img> error, so a 404 from Clearbit gracefully degrades.
+// Large favicons are often pale generic tiles, so card/hero logos prefer
+// strong initials unless an actual brand asset has been resolved.
 export function CompanyLogo({
   name,
   logo,
@@ -32,8 +33,23 @@ export function CompanyLogo({
   priority = false,
 }: CompanyLogoProps) {
   const sources: string[] = [];
-  if (logo?.url) sources.push(logo.url);
-  if (domain) sources.push(`https://logo.clearbit.com/${domain}?size=128`);
+  const normalizedDomain = normalizeDomain(domain);
+  const shouldUseCompactFavicon = size <= 40;
+
+  if (logo?.url && logo.source !== 'favicon') {
+    sources.push(logo.url);
+  }
+  if (normalizedDomain && shouldUseCompactFavicon) {
+    sources.push(`https://www.google.com/s2/favicons?domain=${normalizedDomain}&sz=${size * 2}`);
+  }
+  if (
+    logo?.url &&
+    logo.source === 'favicon' &&
+    shouldUseCompactFavicon &&
+    !logo.url.endsWith('/favicon.ico')
+  ) {
+    sources.push(logo.url);
+  }
 
   const [sourceIdx, setSourceIdx] = useState(0);
   const url = sources[sourceIdx] ?? null;
@@ -75,7 +91,6 @@ export function CompanyLogo({
           // cases — keeps the main thread responsive while the image
           // decodes.
           loading={priority ? 'eager' : 'lazy'}
-          fetchPriority={priority ? 'high' : 'auto'}
           decoding="async"
           onError={() => setSourceIdx((i) => i + 1)}
           style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }}
@@ -90,6 +105,15 @@ export function CompanyLogo({
     return <HoverCard content={brief}>{glyph}</HoverCard>;
   }
   return glyph;
+}
+
+function normalizeDomain(domain: string | null | undefined): string | null {
+  if (!domain) return null;
+  const [host] = domain
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .split('/');
+  return host?.trim().toLowerCase() || null;
 }
 
 function initialsFor(name: string) {

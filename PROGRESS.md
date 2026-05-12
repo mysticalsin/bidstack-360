@@ -4,6 +4,62 @@ Append-only sprint log. Every sprint ends with a commit + a checkpoint here.
 
 ---
 
+## 2026-05-11 — Sprint AUDIT-A: Deep audit + ship-blocker remediation
+
+**Branch:** `feat/sprint-0-foundation`
+
+**Done — deep audit (5 parallel specialists):**
+
+- Security, accessibility, performance, architecture, code-quality lenses.
+- Findings consolidated to `AUDIT-2026-05-11.md` — 80/100 score, 3 BLOCKER security + 1 production-breaking CSP issue + invisible focus ring on 12+ components + dead frontend hook code + missing DELETE route + duplicated money formatter (currency hazard).
+- Top 5 risks ranked by exploitability × likelihood; 5 architectural lifts identified; cross-cutting themes called out.
+
+**Done — Sprint A ship-blocker remediation:**
+
+- **S-B1** `apps/api/src/routes/tasks.ts:60-68` — POST /tasks now verifies the supplied oppId belongs to the caller's org. Cross-tenant task-graft closed.
+- **S-B2** `apps/api/src/routes/webhooks.ts:104-109` — webhook seed-org fallback now gated on `NODE_ENV in {development, test}`. Production rejects with 404 when no subscription matches.
+- **S-B3** `apps/worker/src/queues/company-enrich-apollo.ts:128-145, 233` — Apollo enrichment jobs now HMAC-signed via `BIDSTACK_JOB_SIGNING_SECRET`; consumer rejects unsigned jobs with timing-safe verify in production.
+- **S-M1** `apps/api/src/server.ts:29-39, 86-89` — CSP `connectSrc` extended with `api.clerk.com`, `*.clerk.accounts.dev`, `dust.tt`, `*.sentry.io`, `api.apollo.io`; `frameSrc` opens for Clerk + Cloudflare Turnstile. Production no longer breaks on first load.
+- **S-M3** `apps/api/src/routes/webhooks.ts:80-117` — webhook now requires `x-dust-event-id` (400 if absent), requires `x-dust-timestamp` (epoch ms), rejects with 401 if outside ±5min skew. HMAC stays body-only per Dust's documented contract (re-audit caught a near-miss where I'd bound the HMAC to the timestamp prefix — would have rejected every legitimate webhook). `WebhookSubscription` lookup now `orderBy: { createdAt: 'desc' }` for deterministic resolution during secret rotation.
+- **P-H5** `apps/api/src/routes/opportunities.ts:191-234` — added missing `DELETE /api/opportunities/:id` route (the bulk-delete in OpportunitiesPage was 404'ing every row silently). Audit-log tombstone written **inside** the same `$transaction` as the delete so we never delete-without-record.
+- **P-H6** `apps/web/src/hooks/useSalesDashboard.ts` deleted — dead frontend hooks file. SalesDashboardPage uses `useSalesIntelligence` (single endpoint) which is the correct architecture for this workload (per react-best-practices re-audit: server-side fan-out cheaper, all widgets share `currencyCode`, topCustomers derives from topQuotations+topOrders). The `/api/sales-dashboard/*` routes stay (covered by 8 integration tests + future MCP consumers).
+- **Arch-4** `apps/api/src/routes/opportunities.ts` — POST/PATCH/stage-change/DELETE all now atomic in `$transaction([...])`. POST has bounded retry loop on `P2002` unique-collision (mirrors sales-orders pattern). `mintNextCode` takes a `Prisma.TransactionClient` so the read sees prior winners inside the active tx. Post-tx re-fetch is org-scoped for defence-in-depth (re-audit catch).
+- **CQ-M1** `apps/web/src/pages/AccountsPage.tsx:14, 99, 148, 305` — local `formatMoneyMicros` (which shadowed the lib export with `'EUR'` hard-coded) removed; canonical `formatMoneyMicros` from `@/lib/format` imported and `'EUR'` passed explicitly at all 3 call sites. Currency-correctness hazard closed.
+- **A-B1** focus-ring token — already fixed in flight (linter/user pass): every `ring-[var(--focus-ring)]` swapped to `ring-[var(--border-focus)]` (a real color token). Visible focus restored across filter chips, KPI tiles, treemap toggle, country links, search box, CSV export button.
+
+**Done — re-audit + iterate:**
+
+- Spawned code-reviewer + react-best-practices verifier on the Sprint A changes.
+- Caught a BLOCKER: my webhook HMAC change bound the signature to `${ts}.${rawBody}` while `verifyDustSignature` hashes `rawBody` only — would have 401'd every legitimate Dust webhook in prod. Reverted the HMAC binding while keeping the timestamp-window + event-id requirement (still meaningfully better than before).
+- Caught a MAJOR: post-transaction `findFirstOrThrow` in opportunities.ts was missing `orgId` scope — added for defence-in-depth.
+- Caught a MINOR: `WebhookSubscription` lookup was non-deterministic during secret rotation — added `orderBy: { createdAt: 'desc' }`.
+
+**Verified:**
+
+- 8/8 packages typecheck clean.
+- 8/8 packages lint clean.
+- API: 69/69 tests pass · web: 17/17 · odoo-mcp-client: 8/8 · dust-client: 7/7 (101 total).
+- Web prod build: 769 modules, 4.94s. SalesDashboardPage 8.3kB gzip (modest growth from autopopulate + motion stagger).
+
+**Score delta:** 80 → 88/100 (Functional 23, Code 22, Design 22, Infra 21). To reach 95: tests for opportunity DELETE + webhook timestamp-window + unique-retry path; refactor Framer per-child `delay: i * 0.03` to `staggerParent`/`staggerChild` variants in TopCountriesCard, TopCategoriesTreemap, SalesDashboardPage products table; memoize totals in AccountsPage:78-85; service-layer extract from `crm.ts` (1590 lines); audit-log composite index on `(orgId, targetType, targetId, at desc)`; Idempotency-Key middleware.
+
+**Deferred (need design / schema migrations / DLL unlock):**
+
+- Sprint 23b Invoicing API+UI (waits for `pnpm db:generate`)
+- Composite FKs `(org_id, X_id) → X(org_id, id)` for DB-level multi-tenancy
+- Per-org Odoo credentials (currently global Odoo backend)
+- `audit_log.diff` typed split (untyped JSON shared by 5+ writers)
+- `Opportunity.valueEur Decimal(14,2)` → `valueMicros BigInt` (money-doctrine consistency)
+- `Company` first-class entity + FK (currently `Note.accountId`/`FileAttachment.accountId` are free-text VarChar)
+- `packages/twenty-bidstack` decision — extract real modules or delete the 5-file stub
+- Service-layer extract from `crm.ts` (1590 lines, 4× the 400-line cap)
+- Idempotency-Key middleware + `idempotency_keys` table
+- Zod-validated config replacing 29 scattered `process.env.X` reads
+
+**Next session:** Sprint B (audit-log index, SELECT \* fix across CRM, Idempotency middleware, Framer stagger refactor) or Sprint 23b (Invoicing API+UI once DLL releases).
+
+---
+
 ## 2026-05-11 — Sprint 22a: QA hardening + Sprint 23a Invoicing groundwork
 
 **Branch:** `feat/sprint-0-foundation`
