@@ -16,6 +16,8 @@ export function CompanyDetailPage() {
   const company = useCompany(id);
   const update = useUpdateCompany();
   const [tab, setTab] = useState<TabKey>('contacts');
+  const tabId = (key: TabKey) => `company-tab-${key}`;
+  const panelId = (key: TabKey) => `company-panel-${key}`;
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [editIndustry, setEditIndustry] = useState('');
@@ -131,7 +133,11 @@ export function CompanyDetailPage() {
         </div>
       </header>
 
-      <div className="flex gap-2 border-b border-[var(--border-subtle)]">
+      <div
+        className="flex gap-2 border-b border-[var(--border-subtle)]"
+        role="tablist"
+        aria-label="Company sections"
+      >
         {(
           [
             { key: 'contacts', label: `Contacts (${c.contacts.length})` },
@@ -142,8 +148,28 @@ export function CompanyDetailPage() {
         ).map((t) => (
           <button
             key={t.key}
+            role="tab"
+            aria-selected={tab === t.key}
+            aria-controls={panelId(t.key)}
+            id={tabId(t.key)}
+            tabIndex={tab === t.key ? 0 : -1}
             onClick={() => setTab(t.key)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            onKeyDown={(e) => {
+              const keys = ['contacts', 'opportunities', 'cases', 'notes'] as const;
+              const idx = keys.indexOf(t.key);
+              if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                const next = keys[(idx + 1) % keys.length] as TabKey;
+                setTab(next);
+                document.getElementById(tabId(next))?.focus();
+              } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                const prev = keys[(idx - 1 + keys.length) % keys.length] as TabKey;
+                setTab(prev);
+                document.getElementById(tabId(prev))?.focus();
+              }
+            }}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] rounded-t-md ${
               tab === t.key
                 ? 'border-[var(--brand-primary)] text-[var(--brand-primary)]'
                 : 'border-transparent text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]'
@@ -154,10 +180,26 @@ export function CompanyDetailPage() {
         ))}
       </div>
 
-      {tab === 'contacts' && <ContactTab contacts={c.contacts} />}
-      {tab === 'opportunities' && <OpportunityTab opportunities={c.opportunities} />}
-      {tab === 'cases' && <CasesTab cases={c.openCases} />}
-      {tab === 'notes' && <NotesTab notes={c.notes} />}
+      {tab === 'contacts' && (
+        <div role="tabpanel" id={panelId('contacts')} aria-labelledby={tabId('contacts')}>
+          <ContactTab contacts={c.contacts} />
+        </div>
+      )}
+      {tab === 'opportunities' && (
+        <div role="tabpanel" id={panelId('opportunities')} aria-labelledby={tabId('opportunities')}>
+          <OpportunityTab opportunities={c.opportunities} />
+        </div>
+      )}
+      {tab === 'cases' && (
+        <div role="tabpanel" id={panelId('cases')} aria-labelledby={tabId('cases')}>
+          <CasesTab cases={c.openCases} />
+        </div>
+      )}
+      {tab === 'notes' && (
+        <div role="tabpanel" id={panelId('notes')} aria-labelledby={tabId('notes')}>
+          <NotesTab notes={c.notes} />
+        </div>
+      )}
     </div>
   );
 }

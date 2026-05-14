@@ -309,6 +309,7 @@ export const odooRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/odoo/search',
     {
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
       schema: {
         body: SearchBody,
         response: { 200: z.object({ rows: z.unknown() }) },

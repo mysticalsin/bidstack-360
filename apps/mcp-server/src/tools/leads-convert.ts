@@ -7,7 +7,7 @@ import type { Tool } from './index.js';
 const Input = z.object({
   id: z.string().uuid(),
   opportunityName: z.string().min(1).max(255).optional(),
-  opportunityValueEur: z.number().min(0).optional(),
+  opportunityValueMicros: z.number().min(0).optional(),
   stage: z
     .enum(['discovery', 'qualified', 'proposal', 'negotiation', 'closed_won', 'closed_lost'])
     .optional(),
@@ -22,7 +22,7 @@ export const leadsConvert: Tool<typeof Input> = {
     properties: {
       id: { type: 'string', format: 'uuid' },
       opportunityName: { type: 'string', minLength: 1, maxLength: 255 },
-      opportunityValueEur: { type: 'number', minimum: 0 },
+      opportunityValueMicros: { type: 'number', minimum: 0 },
       stage: {
         type: 'string',
         enum: ['discovery', 'qualified', 'proposal', 'negotiation', 'closed_won', 'closed_lost'],
@@ -54,7 +54,7 @@ export const leadsConvert: Tool<typeof Input> = {
           customer: lead.companyName,
           name: args.opportunityName ?? `${lead.companyName} — ${lead.firstName} ${lead.lastName}`,
           stage: (args.stage ?? 'discovery') as PrismaStage,
-          valueMicros: BigInt(Math.round((args.opportunityValueEur ?? 0) * 1_000_000)),
+          valueMicros: BigInt(Math.round(args.opportunityValueMicros ?? 0)),
           probability: 25,
           industry: null,
           intel: {},

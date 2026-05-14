@@ -9,7 +9,7 @@ import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simp
 import { scaleSequential } from 'd3-scale';
 
 import { cn } from '@/lib/cn';
-import { formatMoney } from '@/lib/format';
+import { formatMoneyMicros } from '@/lib/format';
 
 import type { TerritoryAnalyticsItem } from '@/hooks/useTerritories';
 
@@ -216,7 +216,7 @@ export const WorldMap = memo(function WorldMap({ data, className, onCountryClick
   }, [data]);
 
   const maxValue = useMemo(
-    () => (data.length > 0 ? Math.max(...data.map((d) => d.totalValueEur)) : 1),
+    () => (data.length > 0 ? Math.max(...data.map((d) => d.totalValueMicros)) : 1),
     [data],
   );
 
@@ -248,7 +248,7 @@ export const WorldMap = memo(function WorldMap({ data, className, onCountryClick
                 const item = byNumeric.get(numeric);
                 const hasData = !!item && item.opportunityCount > 0;
                 const fill = (
-                  hasData ? colorScale(item.totalValueEur) : 'var(--surface-sunken)'
+                  hasData ? colorScale(item.totalValueMicros) : 'var(--surface-sunken)'
                 ) as string;
                 return (
                   <Geography
@@ -262,7 +262,7 @@ export const WorldMap = memo(function WorldMap({ data, className, onCountryClick
                       hover: {
                         outline: 'none',
                         fill: hasData
-                          ? (colorScale(Math.min(item.totalValueEur * 1.2, maxValue)) as string)
+                          ? (colorScale(Math.min(item.totalValueMicros * 1.2, maxValue)) as string)
                           : 'var(--surface-hover)',
                         cursor: hasData ? 'pointer' : 'default',
                       },
@@ -310,7 +310,7 @@ export const WorldMap = memo(function WorldMap({ data, className, onCountryClick
           <div className="mt-0.5 tabular-nums text-[var(--fg-secondary)]">
             {hovered.item.opportunityCount} opp
             {hovered.item.opportunityCount === 1 ? '' : 's'} ·{' '}
-            {formatMoney(hovered.item.totalValueEur, 'EUR')}
+            {formatMoneyMicros(hovered.item.totalValueMicros, 'EUR')}
           </div>
           <div className="tabular-nums text-[var(--fg-tertiary)]">
             Avg prob: {hovered.item.avgProbability}%

@@ -196,7 +196,7 @@ export function TasksPage() {
               type="button"
               onClick={() => setView('list')}
               className={cn(
-                'px-2 py-1 text-xs transition-colors',
+                'px-2 py-1 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]',
                 view === 'list'
                   ? 'bg-[var(--surface-hover)] text-[var(--fg-primary)] font-medium'
                   : 'text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)]',
@@ -210,7 +210,7 @@ export function TasksPage() {
               type="button"
               onClick={() => setView('calendar')}
               className={cn(
-                'px-2 py-1 text-xs transition-colors',
+                'px-2 py-1 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]',
                 view === 'calendar'
                   ? 'bg-[var(--surface-hover)] text-[var(--fg-primary)] font-medium'
                   : 'text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)]',
@@ -383,7 +383,7 @@ function InlineTaskAdd() {
           <button
             type="submit"
             disabled={create.isPending}
-            className="rounded-md px-2 py-0.5 text-xs font-medium text-[var(--brand-primary)] hover:bg-[var(--brand-primary-tint)]"
+            className="rounded-md px-2 py-0.5 text-xs font-medium text-[var(--brand-primary)] hover:bg-[var(--brand-primary-tint)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
           >
             Add
           </button>
@@ -583,7 +583,7 @@ function Chip({
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`rounded-full border px-3 py-1 transition-colors ${
+      className={`rounded-full border px-3 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] ${
         active
           ? tone === 'danger'
             ? 'border-[var(--danger)] bg-[var(--danger-tint)] text-[var(--danger)]'
@@ -640,7 +640,7 @@ function SavedViewsBar() {
       <button
         type="button"
         onClick={onSave}
-        className="rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-1 text-xs text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]"
+        className="rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-1 text-xs text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
       >
         Save view
       </button>
@@ -653,8 +653,9 @@ function SavedViewsBar() {
               remove('tasks', v.id);
             }
           }}
-          className="text-[10px] text-[var(--fg-tertiary)] hover:text-[var(--danger)]"
+          className="text-[10px] text-[var(--fg-tertiary)] hover:text-[var(--danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
           title="Remove most-recent saved view"
+          aria-label="Remove most-recent saved view"
         >
           ✕
         </button>

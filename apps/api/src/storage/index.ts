@@ -12,6 +12,17 @@ import { mkdir, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
 
+/**
+ * RFC 5987 safe Content-Disposition filename encoding. Rejects control chars
+ * outright and percent-encodes everything else that isn't a safe token char.
+ * Prevents CRLF injection (S-M5).
+ */
+function safeContentDisposition(filename: string): string {
+  // eslint-disable-next-line no-control-regex
+  const sanitized = filename.replace(/[\x00-\x1f\x7f]/g, '');
+  return `attachment; filename*=UTF-8''${encodeURIComponent(sanitized)}`;
+}
+
 export interface UploadUrlOptions {
   key: string;
   contentType: string;
@@ -234,7 +245,7 @@ class S3Storage implements StorageAdapter {
     const cmd = new (asSdk(this.mod).GetObjectCommand)({
       Bucket: this.bucket,
       Key: key,
-      ResponseContentDisposition: `attachment; filename="${opts.filename.replace(/"/g, '')}"`,
+      ResponseContentDisposition: safeContentDisposition(opts.filename),
       ResponseContentType: opts.contentType,
     });
     const url: string = await asSdk(this.signer).getSignedUrl(this.client, cmd, {

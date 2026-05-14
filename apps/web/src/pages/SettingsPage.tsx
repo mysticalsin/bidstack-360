@@ -175,7 +175,7 @@ function RadioOption({
         value={value}
         checked={checked}
         onChange={onChange}
-        className="mt-1 accent-[var(--brand-primary)]"
+        className="mt-1 accent-[var(--brand-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
       />
       <div>
         <div className="text-sm font-medium text-[var(--fg-primary)]">{label}</div>
@@ -212,7 +212,7 @@ function ThemeOption({
         value={value}
         checked={checked}
         onChange={onChange}
-        className="mt-1 accent-[var(--brand-primary)]"
+        className="mt-1 accent-[var(--brand-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
       />
       <div>
         <div className="text-sm font-medium text-[var(--fg-primary)]">{label}</div>

@@ -12,7 +12,7 @@ import { Card, SectionHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
-import { formatMoney } from '@/lib/format';
+import { formatMoneyMicros } from '@/lib/format';
 import { staggerChild, staggerParent } from '@/lib/motion';
 
 import {
@@ -80,7 +80,7 @@ export function TerritoriesPage() {
         >
           <KpiTile
             label="Total Pipeline"
-            value={formatMoney(totals.totalValueEur, 'EUR')}
+            value={formatMoneyMicros(totals.totalValueMicros, 'EUR')}
             tone="blue"
           />
           <KpiTile label="Countries Active" value={String(totals.totalCountries)} tone="jade" />
@@ -157,7 +157,7 @@ export function TerritoriesPage() {
                     Pipeline
                   </div>
                   <div className="mt-1 text-lg font-bold text-[var(--fg-primary)] tabular-nums">
-                    {formatMoney(selected.totalValueEur, 'EUR')}
+                    {formatMoneyMicros(selected.totalValueMicros, 'EUR')}
                   </div>
                 </div>
               </div>

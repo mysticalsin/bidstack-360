@@ -32,11 +32,11 @@ export function LeadDetailPage() {
   const [isConverting, setIsConverting] = useState(false);
   const [convertForm, setConvertForm] = useState<{
     opportunityName: string;
-    opportunityValueEur: number;
+    opportunityValueMicros: number;
     stage: OpportunityStage;
   }>({
     opportunityName: '',
-    opportunityValueEur: 0,
+    opportunityValueMicros: 0,
     stage: 'discovery',
   });
 
@@ -177,9 +177,12 @@ export function LeadDetailPage() {
                 </label>
                 <input
                   type="number"
-                  value={convertForm.opportunityValueEur}
+                  value={convertForm.opportunityValueMicros / 1_000_000}
                   onChange={(e) =>
-                    setConvertForm((s) => ({ ...s, opportunityValueEur: Number(e.target.value) }))
+                    setConvertForm((s) => ({
+                      ...s,
+                      opportunityValueMicros: Math.round(Number(e.target.value) * 1_000_000),
+                    }))
                   }
                   className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
                 />

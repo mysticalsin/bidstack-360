@@ -7,7 +7,7 @@ export interface TerritoryAnalyticsItem {
   countryCode: string;
   countryCodeA3: string;
   opportunityCount: number;
-  totalValueEur: number;
+  totalValueMicros: number;
   avgProbability: number;
   territories: string[];
   ownerNames: string[];
@@ -17,7 +17,7 @@ export interface TerritoryAnalytics {
   items: TerritoryAnalyticsItem[];
   totals: {
     totalCountries: number;
-    totalValueEur: number;
+    totalValueMicros: number;
     totalOpportunities: number;
     avgProbability: number;
   };

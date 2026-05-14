@@ -457,6 +457,18 @@ function buildCockpit({
   };
 }
 
+export function buildCockpitFromCompany(
+  snapshot: z.infer<typeof CrmDashboardSnapshot>,
+  company: z.infer<typeof CrmCompany>,
+) {
+  if (company.id === snapshot.cockpit.company.id) return snapshot.cockpit;
+  return {
+    ...snapshot.cockpit,
+    company,
+    keyContacts: snapshot.cockpit.keyContacts.filter((contact) => contact.companyId === company.id),
+  };
+}
+
 function serializeDeal(opportunity: {
   id: string;
   customer: string;

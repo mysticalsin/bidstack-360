@@ -293,11 +293,13 @@ export function SmartCompanyDialog({ trigger }: Props) {
                     <button
                       key={item.id}
                       type="button"
+                      aria-label={`Select ${item.name}`}
                       onClick={() => {
                         setQuery(item.name);
                         setDomain(item.domain ?? '');
                         setWebsite(item.website ?? '');
                       }}
+                      className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
                     >
                       {item.name}
                     </button>

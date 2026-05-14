@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { prisma, type Prisma } from '@bidstack/db';
 import { Plugin, PluginInstall } from '@bidstack/shared';
 
+import { isPublicHostname } from '../lib/ssrf-guard.js';
+
 export const pluginRoutes: FastifyPluginAsyncZod = async (server) => {
   // GET /api/plugins
   server.get(
@@ -56,32 +58,7 @@ export const pluginRoutes: FastifyPluginAsyncZod = async (server) => {
         throw server.httpErrors.badRequest('manifestUrl must use HTTPS');
       }
       // Reject private/internal addresses (basic SSRF defense).
-      const hostname = url.hostname.toLowerCase();
-      if (
-        hostname === 'localhost' ||
-        hostname.endsWith('.local') ||
-        hostname === '127.0.0.1' ||
-        hostname === '0.0.0.0' ||
-        hostname.startsWith('10.') ||
-        hostname.startsWith('172.16.') ||
-        hostname.startsWith('172.17.') ||
-        hostname.startsWith('172.18.') ||
-        hostname.startsWith('172.19.') ||
-        hostname.startsWith('172.20.') ||
-        hostname.startsWith('172.21.') ||
-        hostname.startsWith('172.22.') ||
-        hostname.startsWith('172.23.') ||
-        hostname.startsWith('172.24.') ||
-        hostname.startsWith('172.25.') ||
-        hostname.startsWith('172.26.') ||
-        hostname.startsWith('172.27.') ||
-        hostname.startsWith('172.28.') ||
-        hostname.startsWith('172.29.') ||
-        hostname.startsWith('172.30.') ||
-        hostname.startsWith('172.31.') ||
-        hostname.startsWith('192.168.') ||
-        hostname.startsWith('169.254.')
-      ) {
+      if (!isPublicHostname(url.hostname)) {
         throw server.httpErrors.badRequest(
           'manifestUrl must not point to a private or internal address',
         );

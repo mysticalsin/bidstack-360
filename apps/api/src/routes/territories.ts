@@ -396,7 +396,7 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
                 countryCode: z.string(),
                 countryCodeA3: z.string(),
                 opportunityCount: z.number().int(),
-                totalValueEur: z.number(),
+                totalValueMicros: z.number(),
                 avgProbability: z.number(),
                 territories: z.array(z.string()),
                 ownerNames: z.array(z.string()),
@@ -404,7 +404,7 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
             ),
             totals: z.object({
               totalCountries: z.number().int(),
-              totalValueEur: z.number(),
+              totalValueMicros: z.number(),
               totalOpportunities: z.number().int(),
               avgProbability: z.number(),
             }),
@@ -433,7 +433,7 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
           countryCode: string;
           countryCodeA3: string;
           opportunityCount: number;
-          totalValueEur: number;
+          totalValueMicros: bigint;
           avgProbability: number;
           probabilities: number[];
           territories: Set<string>;
@@ -442,7 +442,7 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
       >();
 
       // Prisma Decimal → number helper
-      const toNum = (v: unknown): number => {
+      const _toNum = (v: unknown): number => {
         if (v === null || v === undefined) return 0;
         if (typeof v === 'number') return v;
         if (typeof v === 'string') return Number(v);
@@ -461,11 +461,11 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
         // Derive country: opportunity.country → territory.countryCodes[0] → 'Unknown'
         const a2 = row.country ?? row.territory?.countryCodes[0] ?? 'Unknown';
         const a3 = A2_TO_A3[a2] ?? a2;
-        const val = toNum(row.valueMicros) / 1_000_000;
+        const val = row.valueMicros ?? BigInt(0);
         const existing = byCountry.get(a2);
         if (existing) {
           existing.opportunityCount += 1;
-          existing.totalValueEur += val;
+          existing.totalValueMicros += val;
           existing.probabilities.push(row.probability ?? 0);
           if (row.territory?.name) existing.territories.add(row.territory.name);
           if (row.owner?.name) existing.ownerNames.add(row.owner.name);
@@ -474,7 +474,7 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
             countryCode: a2,
             countryCodeA3: a3,
             opportunityCount: 1,
-            totalValueEur: val,
+            totalValueMicros: val,
             avgProbability: row.probability ?? 0,
             probabilities: [row.probability ?? 0],
             territories: new Set(row.territory?.name ? [row.territory.name] : []),
@@ -487,7 +487,7 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
         countryCode: c.countryCode,
         countryCodeA3: c.countryCodeA3,
         opportunityCount: c.opportunityCount,
-        totalValueEur: c.totalValueEur,
+        totalValueMicros: Number(c.totalValueMicros),
         avgProbability:
           c.probabilities.length > 0
             ? Math.round(
@@ -498,10 +498,10 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
         ownerNames: [...c.ownerNames],
       }));
 
-      items.sort((a, b) => b.totalValueEur - a.totalValueEur);
+      items.sort((a, b) => b.totalValueMicros - a.totalValueMicros);
 
       const totalOpportunities = items.reduce((s, i) => s + i.opportunityCount, 0);
-      const totalValueEur = items.reduce((s, i) => s + i.totalValueEur, 0);
+      const totalValueMicros = items.reduce((s, i) => s + i.totalValueMicros, 0);
       const avgProbability =
         totalOpportunities > 0
           ? Math.round((rows.reduce((s, r) => s + (r.probability ?? 0), 0) / rows.length) * 10) / 10
@@ -511,7 +511,7 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
         items,
         totals: {
           totalCountries: items.length,
-          totalValueEur,
+          totalValueMicros,
           totalOpportunities,
           avgProbability,
         },

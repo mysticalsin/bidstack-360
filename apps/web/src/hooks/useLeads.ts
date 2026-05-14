@@ -67,7 +67,7 @@ export function useConvertLead(id: string) {
   return useMutation({
     mutationFn: (body: {
       opportunityName?: string;
-      opportunityValueEur?: number;
+      opportunityValueMicros?: number;
       stage?: OpportunityStage;
     }) =>
       api<{ leadId: string; opportunityId: string; contactId: string }>(

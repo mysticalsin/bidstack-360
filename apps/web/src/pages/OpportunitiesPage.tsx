@@ -251,7 +251,7 @@ export function OpportunitiesPage() {
                 <button
                   type="button"
                   onClick={clearSearch}
-                  className="ml-2 text-xs text-[var(--fg-tertiary)] underline hover:text-[var(--brand-primary)]"
+                  className="ml-2 text-xs text-[var(--fg-tertiary)] underline hover:text-[var(--brand-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] rounded"
                 >
                   clear
                 </button>
@@ -265,7 +265,7 @@ export function OpportunitiesPage() {
                 <button
                   type="button"
                   onClick={() => setStageFilter(null)}
-                  className="ml-2 text-xs text-[var(--fg-tertiary)] underline hover:text-[var(--brand-primary)]"
+                  className="ml-2 text-xs text-[var(--fg-tertiary)] underline hover:text-[var(--brand-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] rounded"
                 >
                   clear filter
                 </button>
@@ -295,7 +295,7 @@ export function OpportunitiesPage() {
           <button
             type="button"
             onClick={() => setStageFilter(null)}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] ${
               !stageFilter
                 ? 'bg-[var(--fg-primary)] text-[var(--surface-page)]'
                 : 'bg-[var(--surface-sunken)] text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)]'
@@ -308,7 +308,7 @@ export function OpportunitiesPage() {
               key={s}
               type="button"
               onClick={() => setStageFilter(stageFilter === s ? null : s)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] ${
                 stageFilter === s
                   ? 'bg-[var(--fg-primary)] text-[var(--surface-page)]'
                   : 'bg-[var(--surface-sunken)] text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)]'

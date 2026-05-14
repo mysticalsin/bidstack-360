@@ -253,7 +253,7 @@ const MicrosoftSignInButton = lazy(() =>
               redirectUrlComplete: '/dashboard',
             });
           }}
-          className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-4 py-2.5 text-sm font-medium text-[var(--fg-primary)] transition-colors hover:bg-[var(--surface-hover)]"
+          className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-4 py-2.5 text-sm font-medium text-[var(--fg-primary)] transition-colors hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
         >
           <MicrosoftLogo />
           {label}

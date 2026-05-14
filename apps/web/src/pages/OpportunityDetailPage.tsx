@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useReducedMotion } from 'framer-motion';
 import { useParams, Link } from 'react-router-dom';
 
 import { Badge, stageTone } from '@/components/ui/Badge';
@@ -216,10 +217,11 @@ export function OpportunityDetailPage() {
 }
 
 function DataFreshnessRibbon({ refreshedAt }: { refreshedAt?: string }) {
+  const reduced = useReducedMotion();
   return (
     <div className="flex items-center gap-2 text-xs text-[var(--fg-tertiary)]">
       <span
-        className="inline-block h-2 w-2 rounded-full bg-[var(--success)] animate-pulse"
+        className={`inline-block h-2 w-2 rounded-full bg-[var(--success)] ${reduced ? '' : 'animate-pulse'}`}
         aria-hidden
       />
       <span>

@@ -98,6 +98,7 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/dust/push-deal/:id',
     {
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 200: z.object({ dustDocId: z.string() }) },

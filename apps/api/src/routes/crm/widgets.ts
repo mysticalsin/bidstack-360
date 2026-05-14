@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { DashboardWidget } from '@bidstack/shared';
 
-import { persistWidgets } from '../services/crm/widget.service.js';
+import { persistWidgets } from '../../services/crm/widget.service.js';
 
 const WidgetsPatchBody = z.object({
   widgets: z.array(DashboardWidget),

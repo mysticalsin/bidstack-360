@@ -10,6 +10,8 @@ import { confirm } from '@/components/ui/ConfirmDialog';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useDeleteLead, useLeads } from '@/hooks/useLeads';
+import { useBulkSelection } from '@/hooks/useBulkSelection';
+import { BulkActionBar } from '@/components/ui/BulkActionBar';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { LeadStatus, LeadPriority } from '@bidstack/shared';
 import type { LeadSummary } from '@bidstack/shared';
@@ -47,6 +49,67 @@ export function LeadsPage() {
   const del = useDeleteLead();
 
   const items = data?.items ?? [];
+  const bulk = useBulkSelection(items);
+
+  const exportSelected = () => {
+    if (bulk.selectedItems.length === 0) {
+      toast.info('Nothing to export');
+      return;
+    }
+    const csv = rowsToCsv(
+      bulk.selectedItems.map((l) => ({
+        name: `${l.firstName} ${l.lastName}`,
+        company: l.companyName ?? '',
+        email: l.email ?? '',
+        status: l.status,
+        priority: l.priority,
+        score: l.score.toString(),
+        source: l.source ?? '',
+        createdAt: l.createdAt.slice(0, 10),
+      })),
+      [
+        { key: 'name', label: 'Name' },
+        { key: 'company', label: 'Company' },
+        { key: 'email', label: 'Email' },
+        { key: 'status', label: 'Status' },
+        { key: 'priority', label: 'Priority' },
+        { key: 'score', label: 'Score' },
+        { key: 'source', label: 'Source' },
+        { key: 'createdAt', label: 'Created' },
+      ],
+    );
+    downloadCsv(`bidstack-leads-${new Date().toISOString().slice(0, 10)}`, csv);
+    toast.success(
+      `Exported ${bulk.selectedItems.length} lead${bulk.selectedItems.length === 1 ? '' : 's'}`,
+    );
+  };
+
+  const bulkDelete = async () => {
+    if (bulk.selectedItems.length === 0) return;
+    const ok = await confirm({
+      title: `Delete ${bulk.selectedItems.length} lead${bulk.selectedItems.length === 1 ? '' : 's'}?`,
+      description: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+    let failed = 0;
+    await Promise.all(
+      bulk.selectedItems.map((l) =>
+        del.mutateAsync(l.id).catch(() => {
+          failed += 1;
+        }),
+      ),
+    );
+    bulk.clear();
+    if (failed === 0) {
+      toast.success(
+        `Deleted ${bulk.selectedItems.length} lead${bulk.selectedItems.length === 1 ? '' : 's'}`,
+      );
+    } else {
+      toast.error(`${failed} deletion${failed === 1 ? '' : 's'} failed`);
+    }
+  };
 
   return (
     <div className="page">
@@ -130,6 +193,14 @@ export function LeadsPage() {
         </div>
       </Card>
 
+      <BulkActionBar
+        count={bulk.count}
+        onExport={exportSelected}
+        onDelete={bulkDelete}
+        onClear={bulk.clear}
+        isDeleting={del.isPending}
+      />
+
       {isError ? (
         <ErrorState
           title="Failed to load leads"
@@ -146,9 +217,21 @@ export function LeadsPage() {
         />
       ) : (
         <Card>
-          <table className="w-full text-left text-sm">
+          <table className="w-full text-left text-sm [&_tr[data-selected=true]]:bg-[var(--brand-primary-tint)]/60">
             <thead>
               <tr className="border-b border-[var(--border-subtle)] text-xs text-[var(--fg-tertiary)]">
+                <th className="w-10 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    aria-label={bulk.allSelected ? 'Deselect all' : 'Select all'}
+                    checked={bulk.allSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = bulk.someSelected;
+                    }}
+                    onChange={() => bulk.toggleAll(items)}
+                    className="h-4 w-4 cursor-pointer accent-[var(--brand-primary)]"
+                  />
+                </th>
                 <th className="px-4 py-3 font-medium">Name</th>
                 <th className="px-4 py-3 font-medium">Company</th>
                 <th className="px-4 py-3 font-medium">Status</th>
@@ -164,6 +247,8 @@ export function LeadsPage() {
                 <LeadRow
                   key={lead.id}
                   lead={lead}
+                  selected={bulk.isSelected(lead.id)}
+                  onToggle={() => bulk.toggleOne(lead.id)}
                   onDelete={async () => {
                     const ok = await confirm({
                       title: 'Delete lead?',
@@ -187,14 +272,34 @@ export function LeadsPage() {
   );
 }
 
-function LeadRow({ lead, onDelete }: { lead: LeadSummary; onDelete: () => void }) {
+function LeadRow({
+  lead,
+  selected,
+  onToggle,
+  onDelete,
+}: {
+  lead: LeadSummary;
+  selected: boolean;
+  onToggle: () => void;
+  onDelete: () => void;
+}) {
   return (
     <motion.tr
       layout
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
+      data-selected={selected}
       className="group border-b border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-hover)]"
     >
+      <td className="px-4 py-3">
+        <input
+          type="checkbox"
+          aria-label={`Select ${lead.firstName} ${lead.lastName}`}
+          checked={selected}
+          onChange={onToggle}
+          className="h-4 w-4 cursor-pointer accent-[var(--brand-primary)]"
+        />
+      </td>
       <td className="px-4 py-3">
         <Link
           to={`/leads/${lead.id}`}

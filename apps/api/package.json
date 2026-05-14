@@ -37,10 +37,11 @@
     "pdf-parse": "^2.4.5",
     "word-extractor": "^1.0.4",
     "@e965/xlsx": "^0.20.3",
-    "@opentelemetry/auto-instrumentations-node": "^0.56.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.57.0",
-    "@opentelemetry/resources": "^1.30.0",
-    "@opentelemetry/sdk-node": "^0.57.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.76.0",
+    "@opentelemetry/core": "^2.7.1",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.218.0",
+    "@opentelemetry/resources": "^2.7.1",
+    "@opentelemetry/sdk-node": "^0.218.0",
     "@opentelemetry/semantic-conventions": "^1.30.0",
     "zod": "^3.24.1"
   },
@@ -50,6 +51,6 @@
     "pino-pretty": "^13.0.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^3.2.4"
   }
 }

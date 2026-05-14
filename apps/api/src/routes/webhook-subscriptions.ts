@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 
+import { isPublicHostname } from '../lib/ssrf-guard.js';
+
 const WebhookSub = z.object({
   id: z.string().uuid(),
   url: z.string(),
@@ -49,12 +51,26 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
   server.post(
     '/webhook-subscriptions',
     {
+      config: { rateLimit: { max: 15, timeWindow: '1 minute' } },
       schema: {
         body: WebhookSubCreate,
         response: { 201: WebhookSub },
       },
     },
     async (req, reply) => {
+      // SSRF defense: reject private/internal URLs.
+      let url: URL;
+      try {
+        url = new URL(req.body.url);
+      } catch {
+        throw server.httpErrors.badRequest('url must be a valid URL');
+      }
+      if (url.protocol !== 'https:') {
+        throw server.httpErrors.badRequest('url must use HTTPS');
+      }
+      if (!isPublicHostname(url.hostname)) {
+        throw server.httpErrors.badRequest('url must not point to a private or internal address');
+      }
       const secret = `whsec_${Buffer.from(crypto.randomUUID()).toString('base64url')}`;
       const created = await prisma.webhookSubscription.create({
         data: {

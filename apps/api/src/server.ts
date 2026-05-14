@@ -15,7 +15,11 @@ import { rbacPlugin } from './plugins/rbac.js';
 import { auditLogsRoutes } from './routes/audit-logs.js';
 import { collaborationRoutes } from './routes/collaboration.js';
 import { contactsRoutes } from './routes/contacts.js';
-import { crmRoutes } from './routes/crm.js';
+import { crmDashboardRoutes } from './routes/crm/dashboard.js';
+import { crmCompanyRoutes } from './routes/crm/companies.js';
+import { crmHealthRoutes } from './routes/crm/health.js';
+import { crmConnectorRoutes } from './routes/crm/connectors.js';
+import { crmWidgetRoutes } from './routes/crm/widgets.js';
 import { dustRoutes } from './routes/dust-integration.js';
 import { filesRoutes } from './routes/files.js';
 import { healthRoute } from './routes/health.js';
@@ -107,6 +111,8 @@ export async function buildServer(): Promise<FastifyInstance> {
         objectSrc: ["'none'"],
         frameSrc: FRAME_SRC,
         frameAncestors: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
       },
     },
     strictTransportSecurity: {
@@ -124,6 +130,7 @@ export async function buildServer(): Promise<FastifyInstance> {
     originAgentCluster: true,
     permittedCrossDomainPolicies: { permittedPolicies: 'none' },
     xssFilter: true,
+    // permissionsPolicy removed in @fastify/helmet v12 — set via custom header if needed
   });
   await server.register(cors, {
     origin: (origin, cb) => {
@@ -153,6 +160,15 @@ export async function buildServer(): Promise<FastifyInstance> {
     },
   });
 
+  // Permissions-Policy is not exposed by @fastify/helmet@12 (helmet@7), so we
+  // set it manually on every outbound response.
+  server.addHook('onSend', async (_req, reply) => {
+    reply.header(
+      'Permissions-Policy',
+      'camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()',
+    );
+  });
+
   await server.register(errorHandlerPlugin);
   await server.register(authPlugin);
   await server.register(rbacPlugin);
@@ -168,7 +184,11 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(invoicesRoutes, { prefix: '/api' });
   await server.register(productsRoutes, { prefix: '/api' });
   await server.register(auditLogsRoutes, { prefix: '/api' });
-  await server.register(crmRoutes, { prefix: '/api' });
+  await server.register(crmDashboardRoutes, { prefix: '/api' });
+  await server.register(crmCompanyRoutes, { prefix: '/api' });
+  await server.register(crmHealthRoutes, { prefix: '/api' });
+  await server.register(crmConnectorRoutes, { prefix: '/api' });
+  await server.register(crmWidgetRoutes, { prefix: '/api' });
   await server.register(notesRoutes, { prefix: '/api' });
   await server.register(opportunityContactsRoutes, { prefix: '/api' });
   await server.register(filesRoutes, { prefix: '/api' });

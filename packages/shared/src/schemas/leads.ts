@@ -118,7 +118,7 @@ export type LeadPatch = z.infer<typeof LeadPatch>;
 
 export const LeadConvertBody = z.object({
   opportunityName: z.string().min(1).max(255).optional(),
-  opportunityValueEur: z.number().min(0).optional(),
+  opportunityValueMicros: z.number().min(0).optional(),
   stage: z.string().optional(),
 });
 export type LeadConvertBody = z.infer<typeof LeadConvertBody>;

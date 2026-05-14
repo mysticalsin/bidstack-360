@@ -272,7 +272,7 @@ function ReadMode({
       }}
       title={label}
       aria-label={label}
-      className={`inline-edit-trigger ${className ?? ''}`}
+      className={`inline-edit-trigger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] rounded ${className ?? ''}`}
     >
       {children}
     </button>

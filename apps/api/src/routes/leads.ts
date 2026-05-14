@@ -329,7 +329,7 @@ export const leadRoutes: FastifyPluginAsyncZod = async (server) => {
             customer: lead.companyName,
             name: body.opportunityName ?? `${lead.companyName} — ${lead.title ?? 'Opportunity'}`,
             stage: (body.stage ?? 'discovery') as PrismaStage,
-            valueMicros: BigInt(Math.round((body.opportunityValueEur ?? 0) * 1_000_000)),
+            valueMicros: BigInt(Math.round(body.opportunityValueMicros ?? 0)),
             probability: 20,
             ownerId: lead.ownerId,
           },

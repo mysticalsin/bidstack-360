@@ -236,7 +236,7 @@ function SearchBar() {
                 e.preventDefault();
                 clearRecents();
               }}
-              className="text-[10px] hover:text-[var(--fg-primary)]"
+              className="text-[10px] hover:text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] rounded"
             >
               Clear
             </button>
@@ -252,7 +252,7 @@ function SearchBar() {
                     e.preventDefault();
                     runSearch(r);
                   }}
-                  className="block w-full px-3 py-1.5 text-left text-sm text-[var(--fg-primary)] hover:bg-[var(--surface-sunken)]"
+                  className="block w-full px-3 py-1.5 text-left text-sm text-[var(--fg-primary)] hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand-primary)]"
                 >
                   {r}
                 </button>
