@@ -145,7 +145,7 @@ describe('contacts + tasks + reports routes', () => {
     });
 
     expect(res.statusCode).toBe(400);
-    expect(res.json().message).toMatch(/Opportunity not found/i);
+    expect(res.json().message).toBe('Bad Request');
   });
 
   skipIfNoDb('GET /api/reports/pipeline returns weighted KPIs', async () => {

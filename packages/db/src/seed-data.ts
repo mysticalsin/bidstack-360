@@ -1,7 +1,13 @@
 // Fixtures distilled from the prototype's `src/data.js`.
 // Stage names are normalized to the canonical enum.
 
-import { OpportunityStage, Sentiment, TaskStatus } from '../generated/client/index.js';
+import {
+  LeadPriority,
+  LeadStatus,
+  OpportunityStage,
+  Sentiment,
+  TaskStatus,
+} from '../generated/client/index.js';
 
 export interface FixtureUser {
   initials: string;
@@ -46,6 +52,7 @@ export interface FixtureOpp {
   ownerInitials: string;
   industry: string;
   logoUrl: string | null;
+  country: string;
 }
 
 export const fixtureOpps: FixtureOpp[] = [
@@ -60,6 +67,7 @@ export const fixtureOpps: FixtureOpp[] = [
     ownerInitials: 'JS',
     industry: 'financial_services',
     logoUrl: null,
+    country: 'CA',
   },
   {
     code: 'OP-2042',
@@ -72,6 +80,7 @@ export const fixtureOpps: FixtureOpp[] = [
     ownerInitials: 'MT',
     industry: 'transportation',
     logoUrl: null,
+    country: 'CA',
   },
   {
     code: 'OP-2043',
@@ -84,6 +93,7 @@ export const fixtureOpps: FixtureOpp[] = [
     ownerInitials: 'JS',
     industry: 'healthcare',
     logoUrl: null,
+    country: 'US',
   },
   {
     code: 'OP-2044',
@@ -96,6 +106,7 @@ export const fixtureOpps: FixtureOpp[] = [
     ownerInitials: 'SB',
     industry: 'insurance',
     logoUrl: null,
+    country: 'ES',
   },
   {
     code: 'OP-2045',
@@ -108,6 +119,7 @@ export const fixtureOpps: FixtureOpp[] = [
     ownerInitials: 'DL',
     industry: 'manufacturing',
     logoUrl: null,
+    country: 'DE',
   },
   {
     code: 'OP-2046',
@@ -120,6 +132,7 @@ export const fixtureOpps: FixtureOpp[] = [
     ownerInitials: 'MT',
     industry: 'retail',
     logoUrl: null,
+    country: 'CA',
   },
   {
     code: 'OP-2047',
@@ -132,6 +145,7 @@ export const fixtureOpps: FixtureOpp[] = [
     ownerInitials: 'SB',
     industry: 'telecom',
     logoUrl: null,
+    country: 'PT',
   },
   {
     code: 'OP-2048',
@@ -144,6 +158,7 @@ export const fixtureOpps: FixtureOpp[] = [
     ownerInitials: 'JS',
     industry: 'financial_services',
     logoUrl: null,
+    country: 'NO',
   },
 ];
 
@@ -493,3 +508,75 @@ export function intelFor(code: string): Record<string, unknown> {
     },
   };
 }
+
+export interface FixtureLead {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  companyName: string;
+  title?: string;
+  source: string;
+  status: LeadStatus;
+  score: number;
+  priority: LeadPriority;
+  ownerInitials: string;
+}
+
+export const fixtureLeads: FixtureLead[] = [
+  {
+    id: '00000000-0000-4000-8000-000000000101',
+    firstName: 'Alex',
+    lastName: 'Chen',
+    email: 'alex.chen@techflow.io',
+    phone: '+1 415 555 0198',
+    companyName: 'TechFlow Inc',
+    title: 'CTO',
+    source: 'website',
+    status: LeadStatus.new,
+    score: 72,
+    priority: LeadPriority.high,
+    ownerInitials: 'JS',
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000102',
+    firstName: 'Maria',
+    lastName: 'Gonzalez',
+    email: 'maria.gonzalez@globalhealth.org',
+    companyName: 'Global Health Partners',
+    title: 'Procurement Director',
+    source: 'referral',
+    status: LeadStatus.qualified,
+    score: 85,
+    priority: LeadPriority.critical,
+    ownerInitials: 'MT',
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000103',
+    firstName: 'James',
+    lastName: 'Wilson',
+    email: 'j.wilson@finsec.com',
+    phone: '+44 20 7946 0958',
+    companyName: 'FinSec Solutions',
+    title: 'Head of IT',
+    source: 'event',
+    status: LeadStatus.nurture,
+    score: 45,
+    priority: LeadPriority.medium,
+    ownerInitials: 'SB',
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000104',
+    firstName: 'Priya',
+    lastName: 'Patel',
+    email: 'priya.patel@logistec.ca',
+    companyName: 'Logistec Corporation',
+    title: 'VP Operations',
+    source: 'partner',
+    status: LeadStatus.new,
+    score: 60,
+    priority: LeadPriority.high,
+    ownerInitials: 'JS',
+  },
+];

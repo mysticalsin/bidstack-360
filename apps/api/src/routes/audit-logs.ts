@@ -15,6 +15,7 @@ export const auditLogsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/audit-logs',
     {
+      preHandler: server.requireRole('admin'),
       schema: {
         querystring: AuditLogFilter,
         response: { 200: AuditLogPage },

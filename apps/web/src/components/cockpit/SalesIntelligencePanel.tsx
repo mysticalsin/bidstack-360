@@ -1,3 +1,4 @@
+import { motion, useReducedMotion } from 'framer-motion';
 import { memo, type CSSProperties } from 'react';
 
 import type {
@@ -15,12 +16,15 @@ import { Card, SectionHeader } from '@/components/ui/Card';
 import { EmptyState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import type { useSalesIntelligence } from '@/hooks/useSalesIntelligence';
 import { formatMoney, formatStage } from '@/lib/format';
+import { springSnap, springSoft } from '@/lib/motion';
 
 interface Props {
   report: ReturnType<typeof useSalesIntelligence>;
 }
 
 export const SalesIntelligencePanel = memo(function SalesIntelligencePanel({ report }: Props) {
+  const reducedMotion = useReducedMotion();
+
   if (report.isLoading) {
     return (
       <Card>
@@ -44,8 +48,14 @@ export const SalesIntelligencePanel = memo(function SalesIntelligencePanel({ rep
   return (
     <section className="sales-intel" aria-label="Sales intelligence">
       <div className="sales-kpis">
-        {data.kpis.map((kpi) => (
-          <MetricTile key={kpi.id} kpi={kpi} reportCurrency={data.currencyCode} />
+        {data.kpis.map((kpi, index) => (
+          <MetricTile
+            key={kpi.id}
+            kpi={kpi}
+            reportCurrency={data.currencyCode}
+            index={index}
+            reducedMotion={Boolean(reducedMotion)}
+          />
         ))}
       </div>
 
@@ -58,7 +68,11 @@ export const SalesIntelligencePanel = memo(function SalesIntelligencePanel({ rep
               <Badge tone={data.source === 'sales_orders' ? 'jade' : 'blue'}>{data.source}</Badge>
             }
           />
-          <MonthlySalesChart points={data.monthlySales} currencyCode={data.currencyCode} />
+          <MonthlySalesChart
+            points={data.monthlySales}
+            currencyCode={data.currencyCode}
+            reducedMotion={Boolean(reducedMotion)}
+          />
         </Card>
 
         <Card>
@@ -66,7 +80,11 @@ export const SalesIntelligencePanel = memo(function SalesIntelligencePanel({ rep
             title="Top countries"
             action={<span className="sales-tabs">Map&nbsp;&nbsp;Top 10</span>}
           />
-          <CountryPanel countries={data.topCountries} currencyCode={data.currencyCode} />
+          <CountryPanel
+            countries={data.topCountries}
+            currencyCode={data.currencyCode}
+            reducedMotion={Boolean(reducedMotion)}
+          />
         </Card>
       </div>
 
@@ -91,7 +109,17 @@ export const SalesIntelligencePanel = memo(function SalesIntelligencePanel({ rep
   );
 });
 
-function MetricTile({ kpi, reportCurrency }: { kpi: SalesMetricKpi; reportCurrency: string }) {
+function MetricTile({
+  kpi,
+  reportCurrency,
+  index,
+  reducedMotion,
+}: {
+  kpi: SalesMetricKpi;
+  reportCurrency: string;
+  index: number;
+  reducedMotion: boolean;
+}) {
   const value =
     kpi.kind === 'money'
       ? formatCompactMicros(kpi.value, kpi.currencyCode ?? reportCurrency)
@@ -100,22 +128,31 @@ function MetricTile({ kpi, reportCurrency }: { kpi: SalesMetricKpi; reportCurren
     kpi.trend === 'up' ? 'sales-trend-up' : kpi.trend === 'down' ? 'sales-trend-down' : '';
 
   return (
-    <Card className={`sales-kpi sales-kpi-${kpi.tone}`}>
-      <div className="sales-kpi-label">{kpi.label}</div>
-      <div className="sales-kpi-value">{value}</div>
-      <div className={`sales-kpi-trend ${trendClass}`}>
-        {formatTrend(kpi.percentChange)} since prior quarter
-      </div>
-    </Card>
+    <motion.div
+      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={reducedMotion ? undefined : { y: -2 }}
+      transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.04 }}
+    >
+      <Card className={`sales-kpi sales-kpi-${kpi.tone}`}>
+        <div className="sales-kpi-label">{kpi.label}</div>
+        <div className="sales-kpi-value">{value}</div>
+        <div className={`sales-kpi-trend ${trendClass}`}>
+          {formatTrend(kpi.percentChange)} since prior quarter
+        </div>
+      </Card>
+    </motion.div>
   );
 }
 
 function MonthlySalesChart({
   points,
   currencyCode,
+  reducedMotion,
 }: {
   points: MonthlySalesPoint[];
   currencyCode: string;
+  reducedMotion: boolean;
 }) {
   const chart = chartGeometry(points);
   if (!chart) {
@@ -139,10 +176,30 @@ function MonthlySalesChart({
         {chart.grid.map((y) => (
           <line key={y} x1={chart.pad} x2={chart.width - chart.pad} y1={y} y2={y} />
         ))}
-        <path d={chart.areaPath} className="sales-area-fill" />
-        <polyline points={chart.linePoints} className="sales-area-line" />
+        <motion.path
+          d={chart.areaPath}
+          className="sales-area-fill"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ ...springSoft, delay: reducedMotion ? 0 : 0.08 }}
+        />
+        <motion.polyline
+          points={chart.linePoints}
+          className="sales-area-line"
+          initial={reducedMotion ? { opacity: 0 } : { opacity: 0, pathLength: 0 }}
+          animate={reducedMotion ? { opacity: 1 } : { opacity: 1, pathLength: 1 }}
+          transition={{ ...springSoft, delay: reducedMotion ? 0 : 0.14 }}
+        />
         {chart.points.map((point) => (
-          <circle key={point.label} cx={point.x} cy={point.y} r="3.5" />
+          <motion.circle
+            key={point.label}
+            cx={point.x}
+            cy={point.y}
+            r="3.5"
+            initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.7 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={springSnap}
+          />
         ))}
       </svg>
       <div className="sales-chart-axis">
@@ -160,9 +217,11 @@ function MonthlySalesChart({
 function CountryPanel({
   countries,
   currencyCode,
+  reducedMotion,
 }: {
   countries: CountrySalesRow[];
   currencyCode: string;
+  reducedMotion: boolean;
 }) {
   if (countries.length === 0) return <EmptyState title="No country data yet" />;
   const top = countries[0];
@@ -172,9 +231,13 @@ function CountryPanel({
     <div className="sales-country-shell">
       <div className="sales-country-map" aria-label="Country revenue heat map">
         {countries.slice(0, 6).map((country, index) => (
-          <div
+          <motion.div
             key={country.countryCode}
             className="sales-country-bubble"
+            initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            whileHover={reducedMotion ? undefined : { y: -2, scale: 1.02 }}
+            transition={{ ...springSnap, delay: reducedMotion ? 0 : index * 0.035 }}
             style={
               {
                 '--bubble-size': `${48 + Math.round((country.revenueMicros / maxRevenue) * 72)}px`,
@@ -184,7 +247,7 @@ function CountryPanel({
           >
             <span>{country.countryCode}</span>
             <strong>{index + 1}</strong>
-          </div>
+          </motion.div>
         ))}
       </div>
 
@@ -202,7 +265,11 @@ function CountryPanel({
               <b>{formatCompactMicros(country.revenueMicros, currencyCode)}</b>
             </div>
             <div className="sales-country-bar">
-              <span style={{ width: `${Math.max(6, country.sharePct)}%` }} />
+              <motion.span
+                initial={{ width: reducedMotion ? `${Math.max(6, country.sharePct)}%` : '0%' }}
+                animate={{ width: `${Math.max(6, country.sharePct)}%` }}
+                transition={springSoft}
+              />
             </div>
             <div className="sales-country-people">
               {(country.people.length > 0
@@ -369,7 +436,11 @@ function BarRow({
         <b>{value}</b>
       </div>
       <div className="sales-product-bar">
-        <span style={{ width: `${Math.max(5, Math.min(100, share))}%` }} />
+        <motion.span
+          initial={{ width: '0%' }}
+          animate={{ width: `${Math.max(5, Math.min(100, share))}%` }}
+          transition={springSoft}
+        />
       </div>
     </div>
   );

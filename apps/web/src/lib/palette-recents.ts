@@ -8,7 +8,16 @@ const MAX_RECENTS = 6;
 
 export interface RecentEntry {
   id: string;
-  group: 'navigate' | 'opportunity' | 'account' | 'contact' | 'task';
+  group:
+    | 'navigate'
+    | 'opportunity'
+    | 'account'
+    | 'contact'
+    | 'task'
+    | 'company'
+    | 'note'
+    | 'sales_order'
+    | 'invoice';
   label: string;
   hint?: string;
   route: string;

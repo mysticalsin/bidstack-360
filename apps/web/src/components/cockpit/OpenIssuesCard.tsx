@@ -1,8 +1,11 @@
+import { motion, useReducedMotion } from 'framer-motion';
 import { memo } from 'react';
 
+import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/StateMessages';
+import { springSoft } from '@/lib/motion';
 
 import type { ComplianceCheck, RiskItem } from '@bidstack/shared';
 
@@ -16,6 +19,7 @@ interface Props {
 // Memoized — render is pure on risks+compliance arrays, both stable per
 // snapshot fetch. Avoids re-render when sibling cards refetch.
 export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }: Props) {
+  const reducedMotion = useReducedMotion();
   const openRisks = risks.filter((r) => r.status === 'open' || r.status === 'in_progress');
   const openCompliance = compliance.filter(
     (c) => c.status === 'blocked' || c.status === 'in_progress' || c.status === 'not_started',
@@ -50,19 +54,32 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
       />
       <div style={{ padding: '8px 18px 14px' }}>
         <div className="issue-buckets" aria-label="Severity buckets">
-          {buckets.map((bucket) => (
-            <div key={bucket.label} className="issue-bucket">
+          {buckets.map((bucket, index) => (
+            <motion.div
+              key={bucket.label}
+              className="issue-bucket"
+              initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.035 }}
+            >
               <Badge tone={bucket.tone}>{bucket.label}</Badge>
-              <strong>{bucket.count}</strong>
-            </div>
+              <strong>
+                <AnimatedMetric value={bucket.count.toLocaleString()} />
+              </strong>
+            </motion.div>
           ))}
         </div>
         {total === 0 ? (
           <EmptyState title="No open issues" message="Everything is green here." />
         ) : (
           <ul className="open-issues">
-            {openRisks.slice(0, 4).map((r) => (
-              <li key={r.id}>
+            {openRisks.slice(0, 4).map((r, index) => (
+              <motion.li
+                key={r.id}
+                initial={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.04 }}
+              >
                 <span className="oi-count" style={{ background: severityBg(r.severity) }}>
                   {severityShort(r.severity)}
                 </span>
@@ -76,10 +93,18 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
                   </div>
                 </div>
                 <Badge tone={severityTone(r.severity)}>{r.severity}</Badge>
-              </li>
+              </motion.li>
             ))}
-            {openCompliance.slice(0, 2).map((c) => (
-              <li key={c.id}>
+            {openCompliance.slice(0, 2).map((c, index) => (
+              <motion.li
+                key={c.id}
+                initial={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{
+                  ...springSoft,
+                  delay: reducedMotion ? 0 : (openRisks.length + index) * 0.04,
+                }}
+              >
                 <span className="oi-count" style={{ background: 'var(--tag-amber-bg)' }}>
                   C
                 </span>
@@ -92,7 +117,7 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
                   </div>
                 </div>
                 <Badge tone="amber">{c.status.replace('_', ' ')}</Badge>
-              </li>
+              </motion.li>
             ))}
           </ul>
         )}

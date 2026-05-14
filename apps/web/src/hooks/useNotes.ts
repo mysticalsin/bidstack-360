@@ -7,7 +7,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
-import type { Note, NoteCreate, NotePatch } from '@bidstack/shared';
+import type {
+  MeetingNotesImportRequest,
+  MeetingNotesImportResponse,
+  Note,
+  NoteCreate,
+  NotePatch,
+} from '@bidstack/shared';
 
 const notesKey = (accountId: string) => ['notes', accountId] as const;
 
@@ -89,6 +95,26 @@ export function useDeleteNote(accountId: string | undefined) {
     },
     onSettled: () => {
       if (accountId) void qc.invalidateQueries({ queryKey: notesKey(accountId) });
+    },
+  });
+}
+
+export function useImportMeetingNotes(accountId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Omit<MeetingNotesImportRequest, 'accountId'>) => {
+      if (!accountId) throw new Error('Select an account before importing meeting notes.');
+      return api<MeetingNotesImportResponse>('/api/notes/import-meeting', {
+        method: 'POST',
+        body: { ...input, accountId },
+      });
+    },
+    onSuccess: () => {
+      if (accountId) void qc.invalidateQueries({ queryKey: notesKey(accountId) });
+      void qc.invalidateQueries({ queryKey: ['crm-dashboard'] });
+      void qc.invalidateQueries({ queryKey: ['crm-company-lookup'] });
+      void qc.invalidateQueries({ queryKey: ['tasks'] });
+      void qc.invalidateQueries({ queryKey: ['contacts'] });
     },
   });
 }

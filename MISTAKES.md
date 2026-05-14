@@ -27,6 +27,97 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 <!-- New entries appended at the top of this section. -->
 
+### 2026-05-12 TESTING: Ambiguous close button in meeting-import E2E
+
+- **What went wrong:** The new account E2E clicked `getByRole('button', { name: 'Close' })` inside the meeting import dialog, but Radix also renders an icon-only close button with the same accessible name.
+- **Root cause:** I added a dialog assertion without checking for duplicate accessible names in the modal header and footer.
+- **Prevention rule:** In dialog E2E tests, close via exact visible text (`getByText('Close', { exact: true })`) or a more specific footer container when the header has an aria-label close control.
+- **Files affected:** `apps/web/e2e/accounts.spec.ts`.
+
+### 2026-05-12 TOOLING: External smoke script imported wrong Playwright package
+
+- **What went wrong:** I wrote an inline smoke script with `require('playwright')`, but this workspace exposes Playwright through `@playwright/test`.
+- **Root cause:** I used the generic Playwright package name instead of checking the package already used by the repo's E2E tests.
+- **Prevention rule:** For ad-hoc browser smoke in this repo, import `chromium` from `@playwright/test` or run the existing `pnpm --filter @bidstack/web e2e` command.
+- **Files affected:** none; validation script only.
+
+### 2026-05-12 TOOLING: In-app browser selector timed out after screenshot failures
+
+- **What went wrong:** After repeated screenshot capture timeouts, a normal in-app browser locator for the `New account` button also timed out during selector evaluation.
+- **Root cause:** The browser automation bridge was degraded after the CDP screenshot timeouts, even though prior DOM checks had already validated the rendered cockpit.
+- **Prevention rule:** If screenshot capture timeouts are followed by selector-evaluation timeouts, stop using the in-app bridge for that pass and switch to the repo Playwright runtime for browser smoke.
+- **Files affected:** none; validation tooling only.
+
+### 2026-05-12 TOOLING: Browser visible-screen capture also used timed-out screenshot path
+
+- **What went wrong:** I switched from Playwright screenshot to the browser visible-screen capture path, but it still timed out through the same underlying screenshot command.
+- **Root cause:** The available screenshot methods share a CDP capture dependency in this environment.
+- **Prevention rule:** When both Playwright and visible-screen capture time out, stop retrying in-app screenshots and use external Playwright CLI or DOM/console validation instead.
+- **Files affected:** none; validation artifact capture only.
+
+### 2026-05-12 TOOLING: Viewport screenshot used same timed-out CDP capture path
+
+- **What went wrong:** After the full-page screenshot timeout, I retried with `fullPage: false`, but it still used the same CDP screenshot path and timed out again.
+- **Root cause:** I assumed viewport capture would use a lighter transport; in this browser bridge it still depends on `Page.captureScreenshot`.
+- **Prevention rule:** If `Page.captureScreenshot` times out once on the dense cockpit, do not retry the Playwright screenshot API in the same smoke pass; use DOM/console checks or the browser visible-screen capture path.
+- **Files affected:** none; validation artifact capture only.
+
+### 2026-05-12 TOOLING: Full-page browser screenshot timed out on dense cockpit
+
+- **What went wrong:** I attempted a full-page in-app browser screenshot of the motion-heavy cockpit and the browser bridge timed out on `Page.captureScreenshot`.
+- **Root cause:** The page is tall and animation-rich; full-page capture is heavier than needed for a visual smoke artifact.
+- **Prevention rule:** For dense animated cockpit QA, capture the visible viewport first; only use full-page screenshots when the viewport artifact is insufficient.
+- **Files affected:** none; validation artifact capture only.
+
+### 2026-05-12 TESTING: E2E run skipped after API was stopped for typecheck
+
+- **What went wrong:** I ran `pnpm e2e` immediately after stopping the API for the root Prisma/typecheck gate, so Playwright's API health preflight failed and all tests were skipped.
+- **Root cause:** I treated the typecheck stop/restart protocol as complete before actually restarting the API.
+- **Prevention rule:** After any validation step that stops the API, restart the API and verify `/health` before running E2E; skipped Playwright tests are never a green gate.
+- **Files affected:** none; validation sequencing only.
+
+### 2026-05-12 INFRA: Profile-gated Odoo required env blocked Redis-only compose start
+
+- **What went wrong:** After adding a transient Postgres password, `docker compose up -d redis` still failed because the profile-gated Odoo MCP service has required env placeholders that Compose interpolates before selecting services.
+- **Root cause:** The compose file uses required variable expressions inside an optional profile; Compose still validates those expressions during config loading.
+- **Prevention rule:** For local Redis-only recovery, either provide all compose-required transient env placeholders or start the Redis image directly with the same port/container name; do not edit `.env*` to bypass it.
+- **Files affected:** none; local service startup only.
+
+### 2026-05-12 INFRA: Compose Redis startup missed required env interpolation
+
+- **What went wrong:** I ran `docker compose up -d redis` without a transient `POSTGRES_PASSWORD`, and Compose failed while interpolating the Postgres service environment even though only Redis was targeted.
+- **Root cause:** Docker Compose validates required variables for the whole compose file before service selection.
+- **Prevention rule:** For targeted Compose service starts in this repo, provide non-secret transient defaults for required variables in the shell invocation when no local `.env` is loaded; never edit or print `.env*`.
+- **Files affected:** none; local service startup only.
+
+### 2026-05-12 TOOLING: PowerShell wildcard paths passed directly to rg
+
+- **What went wrong:** I passed `docker-compose*` and `compose*` as positional paths to `rg` in PowerShell, which treated them as invalid literal path patterns and exited nonzero even though it still found Redis references.
+- **Root cause:** I mixed shell-style glob habits with ripgrep path arguments on Windows.
+- **Prevention rule:** In PowerShell, use `rg` from the repository root with `-g` include globs only, or resolve paths with `Get-ChildItem` before passing them as explicit files.
+- **Files affected:** none; inspection command only.
+
+### 2026-05-12 TOOLING: Reused browser script binding while saving QA screenshot
+
+- **What went wrong:** I declared `const fs` in the persistent browser automation runtime even though that binding already existed from earlier QA work, so the screenshot-save script failed before writing the file.
+- **Root cause:** I forgot that browser automation variables persist across cells and reused a common binding name.
+- **Prevention rule:** In persistent browser scripts, use unique binding names or `globalThis` properties for one-off helpers; never redeclare common names like `fs`, `path`, or `screenshot`.
+- **Files affected:** none; validation scripting only.
+
+### 2026-05-12 BUG: Smart intake derived fields with setState effects
+
+- **What went wrong:** I derived the company domain and website by calling `setState` synchronously inside effects, and the React hooks lint gate rejected it.
+- **Root cause:** I treated derived form defaults as synchronization work instead of handling them directly in the user input handlers.
+- **Prevention rule:** For form autofill/defaulting, derive values in the event handler or render path; reserve effects for external synchronization and async subscriptions.
+- **Files affected:** `apps/web/src/components/company/SmartCompanyDialog.tsx`.
+
+### 2026-05-12 TOOLING: Skill archive read as text
+
+- **What went wrong:** I read downloaded `.skill` package files directly as text, which produced ZIP binary output instead of the skill instructions.
+- **Root cause:** I assumed the `.skill` extension was a plain markdown skill file rather than a packaged archive.
+- **Prevention rule:** Inspect package entries first and extract the embedded `SKILL.md` before reading or applying a downloaded skill.
+- **Files affected:** none.
+
 ### 2026-05-11 UX: Broad stat span selector broke animated metrics
 
 - **What went wrong:** `.account-source-stat span` applied `display: block` to nested spans inside `AnimatedMetric`, causing currency values to stack vertically.

@@ -10,6 +10,7 @@
 //   g s                Go to /settings
 //   g r                Go to /reports
 //   g a                Go to /accounts
+//   g f                Go to search
 //
 // Vim-style two-key chords work by remembering that `g` was pressed within
 // the last ~900ms (the time a user typically pauses before the next key).
@@ -30,6 +31,7 @@ const CHORD_TARGETS: Record<string, string> = {
   s: '/settings',
   r: '/reports',
   a: '/accounts',
+  f: '/search',
 };
 
 function isTypingTarget(target: EventTarget | null): boolean {

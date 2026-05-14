@@ -89,13 +89,13 @@ export const WinPrediction = z.object({
 export type WinPrediction = z.infer<typeof WinPrediction>;
 
 export const IntelPayload = z.object({
-  financial: Financial.nullable(),
-  triggers: z.array(Trigger),
-  decisionUnit: z.array(DecisionMember),
-  competitors: z.array(Competitor),
-  news: z.array(NewsItem),
-  hiring: HiringSignal.nullable(),
-  winPrediction: WinPrediction.nullable(),
-  refreshedAt: z.string().datetime(),
+  financial: Financial.nullable().optional(),
+  triggers: z.array(Trigger).optional(),
+  decisionUnit: z.array(DecisionMember).optional(),
+  competitors: z.array(Competitor).optional(),
+  news: z.array(NewsItem).optional(),
+  hiring: HiringSignal.nullable().optional(),
+  winPrediction: WinPrediction.nullable().optional(),
+  refreshedAt: z.string().datetime().optional(),
 });
 export type IntelPayload = z.infer<typeof IntelPayload>;

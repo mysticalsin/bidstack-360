@@ -1,43 +1,19 @@
-import { test, expect, type Page, request as pwRequest } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 
-const API_URL = process.env.E2E_API_URL ?? 'http://localhost:4000';
-
-let apiHealthy = false;
-
-test.beforeAll(async () => {
-  try {
-    const ctx = await pwRequest.newContext();
-    const res = await ctx.get(`${API_URL}/health`, { timeout: 2_000 });
-    apiHealthy = res.ok();
-    await ctx.dispose();
-  } catch {
-    apiHealthy = false;
-  }
-});
-
-test.beforeEach(async () => {
-  test.skip(!apiHealthy, `API at ${API_URL} not reachable — skipping smoke suite`);
-});
-
-async function gotoAndWait(page: Page, path: string) {
-  await page.goto(path, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('main')).toBeVisible({ timeout: 10_000 });
-}
-
-test('dashboard loads with KPI cards', async ({ page }) => {
-  await gotoAndWait(page, '/dashboard');
+test('dashboard loads with KPI cards', async ({ page, gotoAndWait }) => {
+  await gotoAndWait('/dashboard');
   await expect(page.getByRole('heading', { level: 1, name: /dashboard/i })).toBeVisible({
     timeout: 10_000,
   });
 });
 
-test('opportunities list renders seeded MAHLE row', async ({ page }) => {
-  await gotoAndWait(page, '/opportunities');
+test('opportunities list renders seeded MAHLE row', async ({ page, gotoAndWait }) => {
+  await gotoAndWait('/opportunities');
   await expect(page.getByText(/MAHLE/i).first()).toBeVisible({ timeout: 10_000 });
 });
 
-test('opportunity detail shows Intel ribbon panels', async ({ page }) => {
-  await gotoAndWait(page, '/opportunities');
+test('opportunity detail shows Intel ribbon panels', async ({ page, gotoAndWait }) => {
+  await gotoAndWait('/opportunities');
   const firstLink = page.locator('a[href^="/opportunities/"]').first();
   await firstLink.click();
   await expect(page.getByRole('main')).toBeVisible();
@@ -46,8 +22,8 @@ test('opportunity detail shows Intel ribbon panels', async ({ page }) => {
   });
 });
 
-test('command palette opens via Ctrl+K and navigates', async ({ page }) => {
-  await gotoAndWait(page, '/dashboard');
+test('command palette opens via Ctrl+K and navigates', async ({ page, gotoAndWait }) => {
+  await gotoAndWait('/dashboard');
   await page.keyboard.press('Control+K');
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.keyboard.type('pipeline');
@@ -55,8 +31,8 @@ test('command palette opens via Ctrl+K and navigates', async ({ page }) => {
   await expect(page).toHaveURL(/\/pipeline/);
 });
 
-test('dark mode toggle persists across reload', async ({ page }) => {
-  await gotoAndWait(page, '/settings');
+test('dark mode toggle persists across reload', async ({ page, gotoAndWait }) => {
+  await gotoAndWait('/settings');
   const toggle = page.getByRole('button', { name: /theme|dark|light/i }).first();
   if (!(await toggle.isVisible().catch(() => false))) {
     test.skip(true, 'theme toggle not present in current settings page');

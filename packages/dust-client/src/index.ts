@@ -2,7 +2,7 @@
 // Reference: handoff/dust.integration.md
 //
 // Exposes:
-//   - DustClient.listDocuments / upsertDocument
+//   - DustClient.listDocuments / getDocument / upsertDocument
 //   - DustClient.runAgent
 //   - DustClient.streamConversation
 //
@@ -31,6 +31,12 @@ export const DustDocument = z.object({
   updated: z.number().optional(),
 });
 export type DustDocument = z.infer<typeof DustDocument>;
+
+export const DustDocumentDetail = DustDocument.extend({
+  text: z.string().optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+export type DustDocumentDetail = z.infer<typeof DustDocumentDetail>;
 
 export const DustAgentRun = z.object({
   run_id: z.string(),
@@ -90,6 +96,14 @@ export class DustClient {
       `/v1/w/${this.workspaceId}/data_sources/${dataSourceId}/documents`,
     );
     return z.array(DustDocument).parse(data.documents);
+  }
+
+  async getDocument(dataSourceId: string, documentId: string): Promise<DustDocumentDetail> {
+    const data = await this.request<{ document: unknown }>(
+      'GET',
+      `/v1/w/${this.workspaceId}/data_sources/${dataSourceId}/documents/${encodeURIComponent(documentId)}`,
+    );
+    return DustDocumentDetail.parse(data.document);
   }
 
   async listAgents(

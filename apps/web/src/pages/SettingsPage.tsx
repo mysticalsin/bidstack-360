@@ -1,10 +1,18 @@
 import { ApiKeysSection } from '@/components/settings/ApiKeysSection';
+import { CustomFieldsSection } from '@/components/settings/CustomFieldsSection';
 import { WorkspaceSection } from '@/components/settings/WorkspaceSection';
+import { TeamSection } from '@/components/settings/TeamSection';
+import { NotificationPrefsSection } from '@/components/settings/NotificationPrefsSection';
+import { PipelineStagesSection } from '@/components/settings/PipelineStagesSection';
+import { CurrencyLocaleSection } from '@/components/settings/CurrencyLocaleSection';
+import { WebhooksSection } from '@/components/settings/WebhooksSection';
 import { Card, SectionHeader } from '@/components/ui/Card';
+import { useIsAdmin } from '@/lib/auth';
 import { usePreferences, type Density, type MotionPref } from '@/stores/preferences';
 import { useThemeStore } from '@/stores/theme';
 
 export function SettingsPage() {
+  const isAdmin = useIsAdmin();
   const { theme, setTheme } = useThemeStore();
   const density = usePreferences((s) => s.density);
   const setDensity = usePreferences((s) => s.setDensity);
@@ -16,11 +24,15 @@ export function SettingsPage() {
       <header>
         <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">Settings</h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          Personalize BidStack, manage API access, and review your workspace.
+          Personalize BidStack, manage your team, and configure workspace defaults.
         </p>
       </header>
 
       <WorkspaceSection />
+      <TeamSection />
+      <NotificationPrefsSection />
+      <CurrencyLocaleSection />
+      <PipelineStagesSection />
 
       <Card>
         <SectionHeader title="Appearance" caption="Theme follows your OS by default." />
@@ -123,7 +135,13 @@ export function SettingsPage() {
         </div>
       </Card>
 
-      <ApiKeysSection />
+      {isAdmin ? (
+        <>
+          <CustomFieldsSection />
+          <WebhooksSection />
+          <ApiKeysSection />
+        </>
+      ) : null}
     </div>
   );
 }

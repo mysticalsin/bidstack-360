@@ -1,8 +1,10 @@
+import { motion, useReducedMotion } from 'framer-motion';
 import { memo } from 'react';
 
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
+import { springSoft } from '@/lib/motion';
 
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
 
@@ -11,14 +13,19 @@ interface Props {
 }
 
 export const KeyContactsCard = memo(function KeyContactsCard({ cockpit }: Props) {
+  const reducedMotion = useReducedMotion();
   if (cockpit.keyContacts.length === 0) return null;
   return (
     <Card>
       <SectionHeader title="Key contacts" />
       <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-        {cockpit.keyContacts.slice(0, 5).map((person) => (
-          <li
+        {cockpit.keyContacts.slice(0, 5).map((person, index) => (
+          <motion.li
             key={person.id}
+            className="key-contact-row"
+            initial={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.04 }}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -53,7 +60,7 @@ export const KeyContactsCard = memo(function KeyContactsCard({ cockpit }: Props)
                 {person.roleInDecision}
               </Badge>
             ) : null}
-          </li>
+          </motion.li>
         ))}
       </ul>
     </Card>

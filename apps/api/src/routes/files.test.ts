@@ -145,6 +145,7 @@ describe('files route contract', () => {
       getUploadUrl: async () => ({ url: 'http://x', headers: {} }),
       getDownload: async () => ({ kind: 'redirect', url: 'http://x' }),
       delete: async () => undefined,
+      readBuffer: async () => Buffer.from('fake'),
     };
     __setStorageForTest(fake);
     // No assertion needed — this just locks the type signature so future

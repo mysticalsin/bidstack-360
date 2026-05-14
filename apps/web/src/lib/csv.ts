@@ -25,8 +25,12 @@ function toString(value: unknown): string {
 }
 
 function quote(value: string): string {
-  if (!/[,"\r\n]/.test(value)) return value;
-  return `"${value.replace(/"/g, '""')}"`;
+  // S-M12: Sanitize formula trigger characters to prevent CSV injection
+  // when exported files are opened in Excel. Prefix with a single quote
+  // so the cell is treated as plain text rather than a formula.
+  const sanitized = value.replace(/^(=|\+|-|@|\t|\r)/, "'$1");
+  if (!/[,"\r\n]/.test(sanitized)) return sanitized;
+  return `"${sanitized.replace(/"/g, '""')}"`;
 }
 
 /** Trigger a CSV download in the browser. */

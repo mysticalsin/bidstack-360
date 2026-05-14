@@ -1,6 +1,7 @@
 import { motion, useReducedMotion } from 'framer-motion';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
+import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { springSoft } from '@/lib/motion';
 
@@ -15,64 +16,93 @@ interface Props {
 export function HealthScoreCard({ cockpit }: Props) {
   const reducedMotion = useReducedMotion();
   const total = ORDER.reduce((acc, key) => acc + (cockpit.health.counts[key] ?? 0), 0) || 1;
+  const scorePct = Math.max(0, Math.min(100, cockpit.health.score)) / 100;
   const segments = ORDER.map((key) => ({
     key,
     count: cockpit.health.counts[key] ?? 0,
     pct: ((cockpit.health.counts[key] ?? 0) / total) * 100,
   }));
-  const stops = segments
-    .reduce(
-      (acc, segment) => {
-        const start = acc.cursor;
-        const end = start + segment.pct;
-        return {
-          cursor: end,
-          values: [
-            ...acc.values,
-            `${colorForHealth(segment.key)} ${start.toFixed(2)}% ${end.toFixed(2)}%`,
-          ],
-        };
-      },
-      { cursor: 0, values: [] as string[] },
-    )
-    .values.join(', ');
+  const strongest = [...segments].sort((a, b) => b.count - a.count)[0] ?? segments[0];
 
   return (
-    <Card role="region" aria-label="Health score">
-      <SectionHeader title="Health Score" caption={`${total} scored signals`} />
+    <Card role="region" aria-label="Health score" className="health-score-card">
+      <SectionHeader
+        title="Health Score"
+        caption={`${total} scored signals`}
+        action={
+          <Badge tone={badgeTone(cockpit.health.band)}>{labelForHealth(cockpit.health.band)}</Badge>
+        }
+      />
       <div className="health-card-body">
         <motion.div
-          className="health-ring"
-          initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.92, rotate: -8 }}
-          animate={{ opacity: 1, scale: 1, rotate: 0 }}
+          className="health-stage"
+          initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={springSoft}
-          style={{ background: `conic-gradient(${stops})` }}
           aria-label={`Health score ${cockpit.health.score} out of 100`}
           role="img"
         >
-          <div>
+          <svg className="health-gauge" viewBox="0 0 180 180" aria-hidden>
+            <defs>
+              <linearGradient id="health-gauge-gradient" x1="20" x2="160" y1="160" y2="20">
+                <stop offset="0%" stopColor="var(--danger)" />
+                <stop offset="42%" stopColor="var(--warning)" />
+                <stop offset="100%" stopColor="var(--success)" />
+              </linearGradient>
+            </defs>
+            <circle className="health-gauge-track" cx="90" cy="90" r="72" pathLength="1" />
+            <motion.circle
+              className="health-gauge-progress"
+              cx="90"
+              cy="90"
+              r="72"
+              pathLength="1"
+              initial={{ strokeDashoffset: 1 }}
+              animate={{ strokeDashoffset: 1 - scorePct }}
+              transition={
+                reducedMotion ? { duration: 0 } : { duration: 1.05, ease: [0.2, 0.8, 0.2, 1] }
+              }
+            />
+          </svg>
+          <div className="health-core">
+            <span>BidStack IQ</span>
             <strong>
               <AnimatedMetric value={cockpit.health.score.toLocaleString()} />
             </strong>
-            <span>/100</span>
+            <small>/100</small>
           </div>
+          <div className="health-pulse" aria-hidden />
         </motion.div>
-        <ul className="health-legend" aria-label="Health bands">
-          {segments.map((segment, index) => (
-            <motion.li
-              key={segment.key}
-              initial={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 8 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.04 }}
-            >
-              <span className={`legend-dot ${segment.key}`} aria-hidden />
-              <span>{labelForHealth(segment.key)}</span>
-              <strong>
-                <AnimatedMetric value={segment.count.toLocaleString()} />
-              </strong>
-            </motion.li>
-          ))}
-        </ul>
+        <div className="health-summary">
+          <div className="health-summary-head">
+            <span>Dominant signal</span>
+            <strong>{strongest ? labelForHealth(strongest.key) : 'No signal'}</strong>
+          </div>
+          <ul className="health-legend" aria-label="Health bands">
+            {segments.map((segment, index) => (
+              <motion.li
+                key={segment.key}
+                initial={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.04 }}
+              >
+                <span className={`legend-dot ${segment.key}`} aria-hidden />
+                <span>{labelForHealth(segment.key)}</span>
+                <span className="health-band-track" aria-hidden>
+                  <motion.span
+                    className={`health-band-fill ${segment.key}`}
+                    initial={{ width: reducedMotion ? `${segment.pct}%` : '0%' }}
+                    animate={{ width: `${segment.pct}%` }}
+                    transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.05 }}
+                  />
+                </span>
+                <strong>
+                  <AnimatedMetric value={segment.count.toLocaleString()} />
+                </strong>
+              </motion.li>
+            ))}
+          </ul>
+        </div>
       </div>
     </Card>
   );
@@ -85,9 +115,9 @@ function labelForHealth(key: (typeof ORDER)[number]): string {
   return 'Critical';
 }
 
-function colorForHealth(key: (typeof ORDER)[number]): string {
-  if (key === 'strong') return 'var(--success)';
-  if (key === 'good') return 'var(--tag-jade-fg)';
-  if (key === 'needs_attention') return 'var(--warning)';
-  return 'var(--danger)';
+function badgeTone(key: (typeof ORDER)[number]) {
+  if (key === 'strong') return 'jade';
+  if (key === 'good') return 'blue';
+  if (key === 'needs_attention') return 'amber';
+  return 'tomato';
 }

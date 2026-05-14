@@ -1,18 +1,22 @@
+import { motion, useReducedMotion } from 'framer-motion';
 import { memo } from 'react';
 import { Link } from 'react-router-dom';
 
+import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import type { useOpportunities } from '@/hooks/useOpportunities';
 import { formatMoney, formatStage } from '@/lib/format';
+import { springSoft } from '@/lib/motion';
 
 interface Props {
   opps: ReturnType<typeof useOpportunities>;
 }
 
 export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({ opps }: Props) {
+  const reducedMotion = useReducedMotion();
   return (
     <Card>
       <SectionHeader
@@ -30,8 +34,14 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({ o
         <EmptyState title="No opportunities yet" />
       ) : (
         <ul className="proto-list-flat">
-          {opps.data?.items.slice(0, 5).map((o) => (
-            <li key={o.id} className="proto-row">
+          {opps.data?.items.slice(0, 5).map((o, index) => (
+            <motion.li
+              key={o.id}
+              className="proto-row"
+              initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.035 }}
+            >
               <Link to={`/opportunities/${o.id}`} className="proto-row-link">
                 <div className="proto-row-main">
                   <span className="proto-row-code">{o.code}</span>
@@ -39,11 +49,13 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({ o
                   <span className="proto-row-meta">{o.customer}</span>
                 </div>
                 <div className="proto-row-right">
-                  <span className="proto-row-money">{formatMoney(o.value, 'EUR')}</span>
+                  <span className="proto-row-money">
+                    <AnimatedMetric value={formatMoney(o.value, 'EUR')} />
+                  </span>
                   <Badge tone="purple">{formatStage(o.stage)}</Badge>
                 </div>
               </Link>
-            </li>
+            </motion.li>
           ))}
         </ul>
       )}

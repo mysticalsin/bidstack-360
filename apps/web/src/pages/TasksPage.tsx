@@ -8,12 +8,13 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { CreateTaskDialog } from '@/components/task/CreateTaskDialog';
+import { TaskCalendar } from '@/components/task/TaskCalendar';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { EmptyState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useCreateTask, useTasks, useUpdateTask } from '@/hooks/useTasks';
 import { cn } from '@/lib/cn';
@@ -23,9 +24,9 @@ import { useTaskOrder } from '@/stores/taskOrder';
 
 import type { Task, TaskStatus } from '@bidstack/shared';
 
-type StatusFilter = 'all' | TaskStatus | 'overdue';
+type StatusFilter = 'all' | TaskStatus | 'overdue' | 'today';
 
-const STATUS_LABELS: Record<Exclude<StatusFilter, 'all' | 'overdue'>, string> = {
+const STATUS_LABELS: Record<Exclude<StatusFilter, 'all' | 'overdue' | 'today'>, string> = {
   open: 'Open',
   in_progress: 'In progress',
   blocked: 'Blocked',
@@ -41,7 +42,15 @@ const STATUS_CYCLE: Record<TaskStatus, TaskStatus> = {
   blocked: 'open',
 };
 
-const VALID_FILTERS: StatusFilter[] = ['all', 'overdue', 'open', 'in_progress', 'blocked', 'done'];
+const VALID_FILTERS: StatusFilter[] = [
+  'all',
+  'today',
+  'overdue',
+  'open',
+  'in_progress',
+  'blocked',
+  'done',
+];
 
 function parseFilter(raw: string | null): StatusFilter {
   // Anything we don't recognize collapses back to 'all' so a stale or
@@ -50,7 +59,7 @@ function parseFilter(raw: string | null): StatusFilter {
 }
 
 export function TasksPage() {
-  const { data, isLoading } = useTasks();
+  const { data, isLoading, isError, error } = useTasks();
   // Filter rides on the query string so the view is shareable + back/forward
   // navigable. Linking to "/tasks?filter=overdue" lands a coworker on the
   // exact same slice we were looking at.
@@ -65,6 +74,10 @@ export function TasksPage() {
     const all = data?.items ?? [];
     return all.filter((t) => {
       if (filter === 'all') return true;
+      if (filter === 'today') {
+        const d = daysUntil(t.dueDate);
+        return d !== null && d === 0 && t.status !== 'done';
+      }
       if (filter === 'overdue') {
         const d = daysUntil(t.dueDate);
         return d !== null && d < 0 && t.status !== 'done';
@@ -118,6 +131,14 @@ export function TasksPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredItems, sort, ordinalOf]);
 
+  const view = (searchParams.get('view') as 'list' | 'calendar') ?? 'list';
+  const setView = (next: 'list' | 'calendar') => {
+    const params = new URLSearchParams(searchParams);
+    if (next === 'list') params.delete('view');
+    else params.set('view', next);
+    setSearchParams(params, { replace: true });
+  };
+
   const setSort = (next: Sort) => {
     const params = new URLSearchParams(searchParams);
     if (next === 'natural') params.delete('sort');
@@ -157,6 +178,9 @@ export function TasksPage() {
           <Chip active={filter === 'all'} onClick={() => switchFilter('all')}>
             All
           </Chip>
+          <Chip active={filter === 'today'} onClick={() => switchFilter('today')}>
+            Today
+          </Chip>
           <Chip active={filter === 'overdue'} onClick={() => switchFilter('overdue')} tone="danger">
             Overdue
           </Chip>
@@ -166,73 +190,116 @@ export function TasksPage() {
             </Chip>
           ))}
         </div>
-        <label className="flex items-center gap-1.5 text-[var(--fg-tertiary)]">
-          <span>Sort by</span>
-          <select
-            aria-label="Sort tasks"
-            value={sort}
-            onChange={(e) => setSort(e.target.value as Sort)}
-            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-1 text-xs text-[var(--fg-primary)]"
-          >
-            <option value="natural">Recent</option>
-            <option value="due">Due date</option>
-            <option value="status">Status</option>
-          </select>
-        </label>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setView('list')}
+              className={cn(
+                'px-2 py-1 text-xs transition-colors',
+                view === 'list'
+                  ? 'bg-[var(--surface-hover)] text-[var(--fg-primary)] font-medium'
+                  : 'text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)]',
+              )}
+              aria-pressed={view === 'list'}
+              aria-label="List view"
+            >
+              List
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('calendar')}
+              className={cn(
+                'px-2 py-1 text-xs transition-colors',
+                view === 'calendar'
+                  ? 'bg-[var(--surface-hover)] text-[var(--fg-primary)] font-medium'
+                  : 'text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)]',
+              )}
+              aria-pressed={view === 'calendar'}
+              aria-label="Calendar view"
+            >
+              Calendar
+            </button>
+          </div>
+          {view === 'list' && (
+            <label className="flex items-center gap-1.5 text-[var(--fg-tertiary)]">
+              <span>Sort by</span>
+              <select
+                aria-label="Sort tasks"
+                value={sort}
+                onChange={(e) => setSort(e.target.value as Sort)}
+                className="rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-1 text-xs text-[var(--fg-primary)]"
+              >
+                <option value="natural">Recent</option>
+                <option value="due">Due date</option>
+                <option value="status">Status</option>
+              </select>
+            </label>
+          )}
+        </div>
       </div>
 
-      <Card
-        className={cn(
-          'overflow-hidden transition-opacity',
-          // Subtle dimming while the deferred re-filter runs. Gives users a
-          // hint that the filter is in flight without blocking input.
-          isFilterPending && 'opacity-70',
-        )}
-      >
-        {isLoading ? (
-          <LoadingSkeleton />
-        ) : items.length === 0 ? (
-          <EmptyState
-            title={filter === 'all' ? 'No tasks yet' : 'No tasks match this filter'}
-            message={filter === 'all' ? 'Create a follow-up to get started.' : undefined}
-            action={filter === 'all' ? <CreateTaskDialog /> : null}
-          />
-        ) : sort === 'natural' ? (
-          // Manual ordering — use framer-motion's Reorder primitive so
-          // each row has built-in drag handling. We use div containers
-          // (with role="list") so the inner TaskRow's motion.div doesn't
-          // produce nested li elements. Drag only enabled when sort is
-          // 'natural'; explicit sort modes would conflict with manual
-          // position.
-          <Reorder.Group
-            axis="y"
-            values={items}
-            onReorder={(next) => setOrder(next.map((t) => t.id))}
-            as="div"
-            role="list"
-            className="divide-y divide-[var(--border-subtle)]"
-          >
-            {items.map((t, i) => (
-              <Reorder.Item key={t.id} value={t} as="div">
-                <TaskRow task={t} index={i} draggable />
-              </Reorder.Item>
-            ))}
-          </Reorder.Group>
-        ) : (
-          <div role="list" className="divide-y divide-[var(--border-subtle)]">
-            <AnimatePresence initial={false}>
+      {view === 'calendar' ? (
+        <TaskCalendar tasks={data?.items ?? []} />
+      ) : (
+        <Card
+          className={cn(
+            'overflow-hidden transition-opacity',
+            // Subtle dimming while the deferred re-filter runs. Gives users a
+            // hint that the filter is in flight without blocking input.
+            isFilterPending && 'opacity-70',
+          )}
+        >
+          {isError ? (
+            <ErrorState
+              title="Could not load tasks"
+              message={error instanceof Error ? error.message : 'Something went wrong'}
+            />
+          ) : isLoading ? (
+            <LoadingSkeleton />
+          ) : items.length === 0 ? (
+            <EmptyState
+              title={filter === 'all' ? 'No tasks yet' : 'No tasks match this filter'}
+              message={filter === 'all' ? 'Create a follow-up to get started.' : undefined}
+              action={filter === 'all' ? <CreateTaskDialog /> : null}
+            />
+          ) : sort === 'natural' ? (
+            // Manual ordering — use framer-motion's Reorder primitive so
+            // each row has built-in drag handling. We use div containers
+            // (with role="list") so the inner TaskRow's motion.div doesn't
+            // produce nested li elements. Drag only enabled when sort is
+            // 'natural'; explicit sort modes would conflict with manual
+            // position.
+            <Reorder.Group
+              axis="y"
+              values={items}
+              onReorder={(next) => setOrder(next.map((t) => t.id))}
+              as="div"
+              role="list"
+              className="divide-y divide-[var(--border-subtle)]"
+            >
               {items.map((t, i) => (
-                <TaskRow key={t.id} task={t} index={i} />
+                <Reorder.Item key={t.id} value={t} as="div">
+                  <TaskRow task={t} index={i} draggable />
+                </Reorder.Item>
               ))}
-            </AnimatePresence>
-          </div>
-        )}
-        {/* Inline quick-add — sits at the bottom of the list so power users
-            don't need to open the dialog for a one-shot follow-up. Press
-            Enter to submit, Esc to clear. Errors fall through to a toast
-            without disturbing the field. */}
-        <InlineTaskAdd />
-      </Card>
+            </Reorder.Group>
+          ) : (
+            <div role="list" className="divide-y divide-[var(--border-subtle)]">
+              <AnimatePresence initial={false}>
+                {items.map((t, i) => (
+                  <TaskRow key={t.id} task={t} index={i} />
+                ))}
+              </AnimatePresence>
+            </div>
+          )}
+          {/* Inline quick-add — sits at the bottom of the list so power users
+              don't need to open the dialog for a one-shot follow-up. Press
+              Enter to submit, Esc to clear. Errors fall through to a toast
+              without disturbing the field. */}
+          <InlineTaskAdd />
+        </Card>
+      )}
     </div>
   );
 }
@@ -434,7 +501,9 @@ const TaskRow = memo(function TaskRow({
             task.status === 'done' && 'line-through text-[var(--fg-tertiary)]',
           )}
         >
-          {task.title}
+          <Link to={`/tasks/${task.id}`} className="hover:text-[var(--brand-primary)]">
+            {task.title}
+          </Link>
         </div>
         <div className="text-xs text-[var(--fg-tertiary)]">
           Due {formatDate(task.dueDate)}

@@ -24,6 +24,19 @@ export function useOpportunities(filter: Partial<OpportunityFilter> = {}) {
   });
 }
 
+/** Lightweight count for badges / KPIs — avoids fetching 200 rows just for a number. */
+export function useOpportunityCount(opts: { excludeClosed?: boolean } = {}) {
+  return useQuery({
+    queryKey: ['opportunities', 'count', opts],
+    queryFn: ({ signal }) => {
+      const params = new URLSearchParams();
+      if (opts.excludeClosed) params.set('excludeClosed', 'true');
+      return api<{ count: number }>(`/api/opportunities/count?${params.toString()}`, { signal });
+    },
+    staleTime: 30_000,
+  });
+}
+
 // Full 360° payload — see apps/api/src/serializers/opportunity.ts
 export interface OpportunityFull extends Opportunity {
   intel: Record<string, unknown>;

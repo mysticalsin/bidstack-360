@@ -211,7 +211,7 @@ export function BidNoBidPage() {
 
       {/* Score Summary Strip */}
       <Reveal>
-        <GlassCard spotlight className="mt-4 mb-6">
+        <GlassCard className="mt-4 mb-6">
           <div className="flex flex-wrap items-center gap-8 p-5">
             {/* Overall Score Ring */}
             <div className="flex items-center gap-4">

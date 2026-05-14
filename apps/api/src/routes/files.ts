@@ -91,6 +91,7 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/files/upload-url',
     {
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
       schema: {
         body: FileUploadUrlRequest,
         response: { 200: FileUploadUrlResponse },

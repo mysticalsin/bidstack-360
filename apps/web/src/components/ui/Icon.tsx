@@ -38,6 +38,21 @@ const PATHS: Record<string, JSX.Element> = {
       <path d="M8 12l3 3 5-6" />
     </>
   ),
+  note: (
+    <>
+      <path d="M5 3h11l3 3v15H5z" />
+      <path d="M16 3v4h4M8 11h8M8 15h8M8 19h5" />
+    </>
+  ),
+  phone: (
+    <path d="M22 16.92v3a2 2 0 01-2.18 2 19.8 19.8 0 01-8.63-3.07A19.5 19.5 0 013.16 12 19.8 19.8 0 01.09 3.37 2 2 0 012.06 1.2h3a2 2 0 012 1.72c.12.9.33 1.77.63 2.61a2 2 0 01-.45 2.11L6 8.9a16 16 0 007.1 7.1l1.26-1.24a2 2 0 012.11-.45c.84.3 1.71.51 2.61.63A2 2 0 0122 16.92z" />
+  ),
+  mail: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3 7l9 6 9-6" />
+    </>
+  ),
   reports: (
     <>
       <path d="M3 17l6-6 4 4 8-8M21 7v6h-6" />
@@ -106,6 +121,7 @@ const PATHS: Record<string, JSX.Element> = {
     </>
   ),
   plus: <path d="M12 5v14M5 12h14" />,
+  close: <path d="M18 6L6 18M6 6l12 12" />,
   moon: <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />,
   sun: (
     <>
@@ -128,6 +144,18 @@ const PATHS: Record<string, JSX.Element> = {
     <>
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v5l3 2" />
+    </>
+  ),
+  receipt: (
+    <>
+      <path d="M4 2v20l4-2 4 2 4-2 4 2V2" />
+      <path d="M8 7h8M8 11h8M8 15h5" />
+    </>
+  ),
+  package: (
+    <>
+      <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" />
+      <path d="M12 12l8-4.5M12 12v9M12 12L4 7.5" />
     </>
   ),
 };

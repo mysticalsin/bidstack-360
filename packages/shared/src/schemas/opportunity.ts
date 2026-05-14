@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { IntelPayload } from './intel.js';
 
 export const OpportunityStage = z.enum([
   'discovery',
@@ -74,7 +75,7 @@ export const OpportunityFilter = z.object({
   stage: OpportunityStage.optional(),
   owner: z.string().optional(),
   industry: Industry.optional(),
-  search: z.string().optional(),
+  search: z.string().max(100).optional(),
   cursor: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
@@ -88,7 +89,7 @@ export type OpportunityPage = z.infer<typeof OpportunityPage>;
 
 // Full 360° payload with nested intel, tasks, documents, and timeline.
 export const OpportunityFull = Opportunity.extend({
-  intel: z.record(z.unknown()),
+  intel: IntelPayload.nullable().optional(),
   tasks: z.array(
     z.object({
       id: z.string().uuid(),

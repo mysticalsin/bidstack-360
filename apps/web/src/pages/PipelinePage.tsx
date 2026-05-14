@@ -16,7 +16,9 @@ import { Link, useSearchParams } from 'react-router-dom';
 
 import { AnimatedNumber } from '@/components/motion/AnimatedNumber';
 import { KanbanSkeleton } from '@/components/skeletons/PageSkeletons';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { Badge, stageTone } from '@/components/ui/Badge';
+import { GlassCard } from '@/components/ui/GlassCard';
 import { toast } from '@/components/ui/Toast';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { useStageMutation } from '@/hooks/useStageMutation';
@@ -36,7 +38,7 @@ const STAGES: OpportunityStage[] = [
 ];
 
 export function PipelinePage() {
-  const { data, isLoading } = useOpportunities({ limit: 200 });
+  const { data, isLoading, isError, error } = useOpportunities({ limit: 50 });
   const move = useStageMutation();
   // Stage filter via the URL. `?stage=qualified` collapses the board to a
   // single column so the user can focus that slice and share the link.
@@ -147,7 +149,61 @@ export function PipelinePage() {
         ) : null}
       </header>
 
-      {isLoading ? (
+      {!isLoading && data && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {(() => {
+            const opps = data.items;
+            const totalValue = opps.reduce((acc, o) => acc + o.value, 0);
+            const openValue = opps
+              .filter((o) => o.stage !== 'closed_won' && o.stage !== 'closed_lost')
+              .reduce((acc, o) => acc + o.value, 0);
+            const won = opps.filter((o) => o.stage === 'closed_won').length;
+            const lost = opps.filter((o) => o.stage === 'closed_lost').length;
+            const totalClosed = won + lost;
+            const winRate = totalClosed > 0 ? Math.round((won / totalClosed) * 100) : 0;
+            return [
+              { label: 'Total pipeline', value: formatMoney(totalValue), tone: 'blue' as const },
+              { label: 'Open value', value: formatMoney(openValue), tone: 'jade' as const },
+              { label: 'Win rate', value: `${winRate}%`, tone: 'amber' as const },
+              {
+                label: 'Active deals',
+                value: String(
+                  opps.filter((o) => o.stage !== 'closed_won' && o.stage !== 'closed_lost').length,
+                ),
+                tone: 'purple' as const,
+              },
+            ];
+          })().map((kpi) => (
+            <div
+              key={kpi.label}
+              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
+            >
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+                {kpi.label}
+              </div>
+              <div className="mt-1 text-lg font-bold text-[var(--fg-primary)] tabular-nums">
+                {kpi.value}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {isError ? (
+        <ErrorState
+          title="Could not load pipeline"
+          message={error instanceof Error ? error.message : 'Please try again.'}
+          action={
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-medium text-fg-on-brand hover:bg-brand-hover"
+            >
+              Reload
+            </button>
+          }
+        />
+      ) : isLoading ? (
         <KanbanSkeleton />
       ) : (
         <div
@@ -284,25 +340,23 @@ const StageColumn = memo(function StageColumn({
           />
         </span>
       </div>
-      <motion.div
+      <GlassCard
+        padding="none"
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
-        // Spring the column background tint on hover so dropping feels
-        // "anchored" rather than abrupt.
         animate={{
           backgroundColor: isHoverTarget ? 'var(--brand-primary-tint)' : 'transparent',
-          outlineWidth: isHoverTarget ? 2 : 0,
-          outlineColor: 'var(--brand-primary)',
+          borderColor: isHoverTarget ? 'var(--brand-primary)' : 'var(--border-subtle)',
         }}
         transition={springSnap}
-        // outlineWidth is driven by the motion animate prop above; the
-        // class only sets a transparent default so the spring has something
-        // to interpolate from.
-        style={{ outline: 'solid transparent', outlineOffset: '2px' }}
-        className="min-h-[120px] rounded-lg p-1"
+        className={cn(
+          'min-h-[200px] border border-[var(--border-subtle)] bg-[var(--surface-sunken-alpha)]',
+          isHoverTarget &&
+            'ring-2 ring-[var(--brand-primary)] ring-offset-2 ring-offset-[var(--surface-page)]',
+        )}
       >
-        <ul className="space-y-2">
+        <ul className="space-y-2 p-1.5">
           <AnimatePresence initial={false}>
             {items.map((o) => (
               <PipelineCard
@@ -319,12 +373,12 @@ const StageColumn = memo(function StageColumn({
             ))}
           </AnimatePresence>
           {items.length === 0 ? (
-            <li className="rounded-md border border-dashed border-[var(--border-subtle)] p-4 text-[10px] text-[var(--fg-tertiary)] text-center">
+            <li className="flex h-32 items-center justify-center rounded-xl border border-dashed border-[var(--border-subtle)] p-4 text-[10px] font-medium text-[var(--fg-tertiary)] uppercase tracking-widest">
               Drop here
             </li>
           ) : null}
         </ul>
-      </motion.div>
+      </GlassCard>
     </section>
   );
 });

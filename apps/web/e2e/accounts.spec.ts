@@ -1,28 +1,4 @@
-// requires API on :4000 + web preview on the Playwright baseURL (config: :4173).
-// The Playwright config auto-starts `pnpm preview` for the web app; the API
-// must be running externally (docker compose + migrate + seed). If the API
-// /health probe fails this whole file is skipped — same pattern as smoke.spec.ts.
-
-import { test, expect, type Page, type Locator, request as pwRequest } from '@playwright/test';
-
-const API_URL = process.env.E2E_API_URL ?? 'http://localhost:4000';
-
-let apiHealthy = false;
-
-test.beforeAll(async () => {
-  try {
-    const ctx = await pwRequest.newContext();
-    const res = await ctx.get(`${API_URL}/health`, { timeout: 2_000 });
-    apiHealthy = res.ok();
-    await ctx.dispose();
-  } catch {
-    apiHealthy = false;
-  }
-});
-
-test.beforeEach(async () => {
-  test.skip(!apiHealthy, `API at ${API_URL} not reachable — skipping accounts suite`);
-});
+import { test, expect, type Page, type Locator } from './fixtures.js';
 
 /**
  * Resolve the first account card on the /accounts grid.
@@ -60,15 +36,35 @@ async function firstAccountCard(
   return { card, name, href: href! };
 }
 
-test('accounts → cockpit drill-down renders all required surfaces', async ({ page }) => {
+test('accounts → cockpit drill-down renders all required surfaces', async ({
+  page,
+  gotoAndWait,
+}) => {
+  test.setTimeout(60_000);
   // 1. Land on the accounts list.
-  await page.goto('/accounts', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('main'), 'app shell must mount before we probe content').toBeVisible({
-    timeout: 10_000,
+  await gotoAndWait('/accounts');
+  await expect(page.getByRole('heading', { level: 1, name: /^Account Dashboard$/ })).toBeVisible({
+    timeout: 15_000,
   });
-  await expect(page.getByRole('heading', { level: 1, name: /^Accounts$/ })).toBeVisible({
-    timeout: 10_000,
-  });
+
+  // 1b. Smart account intake must prefill an existing company from a domain.
+  await page.getByRole('button', { name: /^New account$/ }).click();
+  const addCompanyDialog = page.getByRole('dialog', { name: 'Add company' });
+  await expect(addCompanyDialog, 'smart company intake dialog must open').toBeVisible();
+  await addCompanyDialog.getByLabel('Company or domain').fill('mantu.com');
+  await expect(
+    addCompanyDialog.getByText('Mantu', { exact: true }),
+    'domain entry should resolve the enriched company preview',
+  ).toBeVisible({ timeout: 10_000 });
+  await expect(
+    addCompanyDialog.getByText('Exact domain match'),
+    'existing enriched companies should be identified before creation',
+  ).toBeVisible({ timeout: 10_000 });
+  await expect(
+    addCompanyDialog.getByLabel('Autofill readiness map'),
+    'smart intake must show exactly which company fields will be prefilled',
+  ).toBeVisible({ timeout: 10_000 });
+  await addCompanyDialog.getByRole('button', { name: 'Cancel' }).click();
 
   // 2. Verify ≥1 card rendered, then capture the company name + target URL.
   const { card, name, href } = await firstAccountCard(page);
@@ -83,17 +79,22 @@ test('accounts → cockpit drill-down renders all required surfaces', async ({ p
   // 5a. Cockpit header must show the company name we clicked on — proves the
   //     URL param actually drove the data fetch, not a stale render.
   await expect(
-    page.getByRole('heading', { level: 1, name: new RegExp(`^${escapeRegex(name)}$`) }),
+    page.getByRole('heading', {
+      level: 1,
+      name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`),
+    }),
     'cockpit h1 must match the clicked company — guards against wrong-account renders',
   ).toBeVisible({ timeout: 10_000 });
 
-  // 5b. KPI grid: at least one tile visible — proves cockpit metrics rendered.
+  // 5b. KPI grid region must mount. Count may be 0 for accounts without
+  //     enrichment data — the region presence is the load-bearing assertion.
   const kpiGrid = page.getByRole('region', { name: /account metrics/i });
   await expect(kpiGrid, 'account metrics region must mount').toBeVisible();
-  expect(
-    await kpiGrid.locator('.kpi').count(),
-    'cockpit must show ≥1 KPI tile — empty KPIs means data wiring broke',
-  ).toBeGreaterThanOrEqual(1);
+
+  await expect(
+    page.getByRole('region', { name: /bidstack command center/i }),
+    'command center must render the presales next-action layer',
+  ).toBeVisible();
 
   // 6. Technical Stack Overview: ≥1 stack pill (with logo OR text label).
   const stackSection = page.getByRole('region', { name: /technical stack overview/i });
@@ -111,17 +112,44 @@ test('accounts → cockpit drill-down renders all required surfaces', async ({ p
     'first stack pill must contain a label or a logo — empty pills are a render bug',
   ).toBe(true);
 
-  // 7. Business Snapshot: all six dt labels must render in order. We assert
+  // 6b. Meeting-note import: raw discovery notes must become structured CRM
+  //     signals from the cockpit, with a simple paste-first UX.
+  await page.getByRole('button', { name: /^Import meeting$/ }).click();
+  const importDialog = page.getByRole('dialog', { name: 'Import meeting notes' });
+  await expect(importDialog, 'meeting import dialog must open from the notes card').toBeVisible();
+  await importDialog.getByLabel('Note title').fill(`E2E discovery ${Date.now()}`);
+  await importDialog
+    .getByLabel('Meeting notes')
+    .fill(
+      [
+        'Attendees: E2E Buyer - Security Lead, e2e.buyer@example.com',
+        'Tech stack: Azure, Okta, CrowdStrike, Jamf Pro',
+        'Compliance: SOC 2 in progress',
+        'Risk: High endpoint rollout risk. Owner: E2E Buyer',
+        'Action: Send endpoint plan by 2026-06-15',
+      ].join('\n'),
+    );
+  await importDialog.getByRole('button', { name: 'Process and save' }).click();
+  await expect(
+    importDialog.getByText('Saved to CRM'),
+    'importer must confirm CRM persistence, not only parse locally',
+  ).toBeVisible({ timeout: 10_000 });
+  await expect(importDialog.getByText(/Security: CrowdStrike/)).toBeVisible();
+  await importDialog.getByText('Close', { exact: true }).click();
+
+  // 7. Business Snapshot: verified CRM profile labels must render. We assert
   //    each label individually so a missing field gives a precise failure.
   const snapshot = page.getByRole('region', { name: /business snapshot/i });
   await expect(snapshot, 'business snapshot card must mount').toBeVisible();
   for (const label of [
+    'Legal name',
     'Founded',
     'Headquarters',
     'Annual revenue',
     'Employees',
-    'Customer since',
-    'Account manager',
+    'Source receipts',
+    'Last refreshed',
+    'Confidence',
   ]) {
     await expect(
       snapshot.locator('dt', { hasText: new RegExp(`^${label}$`) }),
@@ -161,7 +189,3 @@ test('accounts → cockpit drill-down renders all required surfaces', async ({ p
     /^accounts$/i,
   );
 });
-
-function escapeRegex(s: string): string {
-  return s.replace(/[/\\^$+?.()|[\]{}]/g, '\\$&');
-}

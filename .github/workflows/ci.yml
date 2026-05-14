@@ -39,7 +39,7 @@ jobs:
 
       - name: Audit dependencies (high+)
         run: pnpm audit --audit-level high
-        continue-on-error: true # advisories shouldn't block until triaged
+        continue-on-error: false
 
       - name: Generate Prisma client
         # Required before typecheck — apps import from the generated client.
@@ -128,7 +128,7 @@ jobs:
       - name: Migrate + seed
         run: |
           pnpm db:generate
-          pnpm db:migrate
+          pnpm db:migrate:deploy
           pnpm db:seed
 
       - name: API integration tests
@@ -200,7 +200,7 @@ jobs:
       - name: Migrate + seed
         run: |
           pnpm db:generate
-          pnpm db:migrate
+          pnpm db:migrate:deploy
           pnpm db:seed
 
       - name: Build web

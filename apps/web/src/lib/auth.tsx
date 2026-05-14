@@ -3,6 +3,10 @@
 // pretend the user is authenticated. This keeps E2E and local dev working
 // without external auth dependencies.
 //
+// Role source of truth:
+//   Production (Clerk): orgRole from Clerk's useAuth() hook / JWT payload.
+//   Dev (stub): hardcoded 'admin' (first seed user is admin).
+//
 // Hook safety: which provider is active is fixed at AuthProvider mount
 // time. We expose ONE shared context (AuthCtx) and split the implementation
 // into two non-overlapping subtrees. Consumers always call the same hooks
@@ -36,6 +40,7 @@ interface AuthCtx {
   isLoaded: boolean;
   isSignedIn: boolean;
   user: AuthUser | null;
+  role: string | null;
   signOut: (cb?: () => void) => void;
 }
 
@@ -63,6 +68,7 @@ function StubAuthProvider({ children }: { children: ReactNode }) {
         isLoaded: true,
         isSignedIn: signedIn,
         user: signedIn ? STUB_USER : null,
+        role: 'admin',
         signOut,
       }}
     >
@@ -82,6 +88,12 @@ function StubAuthProvider({ children }: { children: ReactNode }) {
 const LazyClerkBranch = lazy(async () => {
   const mod = await import('@clerk/clerk-react');
   const { ClerkProvider, useAuth: useClerkAuth, useUser: useClerkUser, useClerk } = mod;
+
+  function mapClerkRole(orgRole: string | null | undefined): string {
+    if (orgRole === 'org:admin') return 'admin';
+    // Future: map custom Clerk roles like 'org:bid_manager' → 'bid_manager'
+    return orgRole ? orgRole.replace('org:', '') : 'member';
+  }
 
   function ClerkAuthBridge({ children }: { children: ReactNode }) {
     const auth = useClerkAuth();
@@ -104,6 +116,7 @@ const LazyClerkBranch = lazy(async () => {
                   : null,
               }
             : null,
+          role: mapClerkRole(auth.orgRole),
           signOut: (cb) => {
             void clerk.signOut().then(() => cb?.());
           },
@@ -136,6 +149,7 @@ function ClerkLoadingFallback({ children }: { children: ReactNode }) {
         isLoaded: false,
         isSignedIn: false,
         user: null,
+        role: null,
         signOut: () => undefined,
       }}
     >
@@ -179,6 +193,18 @@ export function useAuth(): { isLoaded: boolean; isSignedIn: boolean } {
 export function useUser(): { user: AuthUser | null } {
   const ctx = useAuthCtx();
   return { user: ctx.user };
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useRole(): { role: string | null } {
+  const ctx = useAuthCtx();
+  return { role: ctx.role };
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useIsAdmin(): boolean {
+  const ctx = useAuthCtx();
+  return ctx.role === 'admin';
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

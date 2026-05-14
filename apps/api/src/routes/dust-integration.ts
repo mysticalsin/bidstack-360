@@ -6,7 +6,8 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { createHash, randomBytes } from 'node:crypto';
 import { z } from 'zod';
 
-import { prisma } from '@bidstack/db';
+import { prisma, type Opportunity } from '@bidstack/db';
+import type { Logger as PinoLogger } from 'pino';
 import { DustClient } from '@bidstack/dust-client';
 
 import { enqueueDustResync } from '../queues/dust-poll.js';
@@ -65,7 +66,105 @@ const ApiKeySummary = z.object({
   createdAt: z.string().datetime(),
 });
 
+function serializeOpportunityToMarkdown(opp: Opportunity): string {
+  const value =
+    typeof opp.valueMicros === 'bigint'
+      ? (Number(opp.valueMicros) / 1_000_000).toString()
+      : typeof opp.valueMicros === 'number'
+        ? (opp.valueMicros / 1_000_000).toString()
+        : String(opp.valueMicros);
+
+  return [
+    `# ${opp.name}`,
+    ``,
+    `- **Code:** ${opp.code}`,
+    `- **Customer:** ${opp.customer}`,
+    `- **Stage:** ${opp.stage}`,
+    `- **Value (EUR):** ${value}`,
+    `- **Probability:** ${opp.probability}%`,
+    `- **Due Date:** ${opp.dueDate?.toISOString() ?? 'N/A'}`,
+    `- **Industry:** ${opp.industry ?? 'N/A'}`,
+    ``,
+    `## Intel`,
+    ``,
+    '```json',
+    JSON.stringify(opp.intel, null, 2),
+    '```',
+  ].join('\n');
+}
+
 export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
+  // POST /api/integrations/dust/push-deal/:id
+  server.post(
+    '/dust/push-deal/:id',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: { 200: z.object({ dustDocId: z.string() }) },
+      },
+    },
+    async (req, _reply) => {
+      const opp = await prisma.opportunity.findFirst({
+        where: { id: req.params.id, orgId: req.auth.orgId },
+      });
+      if (!opp) throw server.httpErrors.notFound('Opportunity not found');
+
+      const apiKey = process.env.DUST_API_KEY;
+      const workspaceId = process.env.DUST_WORKSPACE_ID;
+      const dataSourceId = process.env.DUST_DATA_SOURCE_ID;
+      if (!apiKey || !workspaceId || !dataSourceId) {
+        throw server.httpErrors.serviceUnavailable('Dust integration not configured');
+      }
+
+      const text = serializeOpportunityToMarkdown(opp);
+      const documentId = `bidstack-deal-${opp.code}`;
+
+      const dust = new DustClient({
+        apiKey,
+        workspaceId,
+        baseUrl: process.env.DUST_BASE_URL,
+        timeoutMs: 10_000,
+        logger: req.log.child({ kind: 'dust' }) as unknown as PinoLogger,
+      });
+
+      const doc = await dust.upsertDocument(dataSourceId, documentId, text, {
+        opportunity_code: opp.code,
+        org_id: req.auth.orgId,
+        source: 'bidstack',
+        pushed_at: new Date().toISOString(),
+      });
+
+      await prisma.$transaction([
+        prisma.opportunity.update({
+          where: { id: opp.id },
+          data: { dustDocId: doc.document_id },
+        }),
+        prisma.syncEvent.create({
+          data: {
+            orgId: req.auth.orgId,
+            source: 'dust.push',
+            eventType: 'deal.pushed',
+            payload: { opportunityId: opp.id, dustDocId: doc.document_id, code: opp.code },
+            status: 'processed',
+            processedAt: new Date(),
+          },
+        }),
+        prisma.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'dust.push.deal',
+            targetType: 'opportunity',
+            targetId: opp.id,
+            diff: { dustDocId: doc.document_id, code: opp.code },
+          },
+        }),
+      ]);
+
+      return { dustDocId: doc.document_id };
+    },
+  );
+
   // GET /api/integrations/dust/status
   server.get('/dust/status', { schema: { response: { 200: DustStatus } } }, async (req) => {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -120,6 +219,7 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/dust/resync',
     {
+      preHandler: server.requireRole('admin'),
       schema: {
         response: { 202: z.object({ jobId: z.string() }) },
       },
@@ -152,7 +252,10 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
   // API keys
   server.get(
     '/api-keys',
-    { schema: { response: { 200: z.object({ items: z.array(ApiKeySummary) }) } } },
+    {
+      preHandler: server.requireRole('admin'),
+      schema: { response: { 200: z.object({ items: z.array(ApiKeySummary) }) } },
+    },
     async (req) => {
       const keys = await prisma.apiKey.findMany({
         where: { orgId: req.auth.orgId, revokedAt: null },
@@ -174,13 +277,15 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/api-keys',
     {
+      preHandler: server.requireRole('admin'),
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {
         body: z.object({
           name: z.string().min(1).max(80),
           scopes: z.array(z.enum(['read', 'write', 'mcp'])).min(1),
         }),
         response: {
-          201: ApiKeySummary.extend({ secret: z.string() }),
+          201: ApiKeySummary.extend({ secret: z.string(), warning: z.string().optional() }),
         },
       },
     },
@@ -219,14 +324,18 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
         scopes: created.scopes,
         lastUsedAt: null,
         createdAt: created.createdAt.toISOString(),
-        secret: raw, // shown once; caller must store
+        secret: raw,
+        warning: 'This secret will never be shown again. Store it securely.',
       });
     },
   );
 
   server.delete(
     '/api-keys/:id',
-    { schema: { params: z.object({ id: z.string().uuid() }) } },
+    {
+      preHandler: server.requireRole('admin'),
+      schema: { params: z.object({ id: z.string().uuid() }) },
+    },
     async (req, reply) => {
       const key = await prisma.apiKey.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, revokedAt: null },

@@ -25,6 +25,7 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\" --ignore-path .prettierignore",
     "db:generate": "pnpm --filter @bidstack/db generate",
     "db:migrate": "pnpm --filter @bidstack/db migrate",
+    "db:migrate:deploy": "pnpm --filter @bidstack/db migrate:deploy",
     "db:seed": "pnpm --filter @bidstack/db seed",
     "db:reset": "pnpm --filter @bidstack/db reset",
     "db:studio": "pnpm --filter @bidstack/db studio",

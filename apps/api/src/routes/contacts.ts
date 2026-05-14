@@ -73,6 +73,23 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
     },
   );
 
+  server.get(
+    '/contacts/:id',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: { 200: Contact },
+      },
+    },
+    async (req) => {
+      const contact = await prisma.contact.findFirst({
+        where: { id: req.params.id, orgId: req.auth.orgId },
+      });
+      if (!contact) throw req.server.httpErrors.notFound('Contact not found');
+      return serializeContact(contact);
+    },
+  );
+
   server.post(
     '/contacts',
     {
@@ -82,27 +99,30 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req, reply) => {
-      const created = await prisma.contact.create({
-        data: {
-          orgId: req.auth.orgId,
-          customer: req.body.customer,
-          name: req.body.name,
-          role: req.body.role,
-          email: req.body.email,
-          phone: req.body.phone,
-          influence: req.body.influence,
-          sentiment: req.body.sentiment as PrismaSentiment | null,
-        },
-      });
-      await prisma.auditLog.create({
-        data: {
-          orgId: req.auth.orgId,
-          userId: req.auth.userId,
-          action: 'contact.create',
-          targetType: 'contact',
-          targetId: created.id,
-          diff: { customer: created.customer, name: created.name },
-        },
+      const created = await prisma.$transaction(async (tx) => {
+        const contact = await tx.contact.create({
+          data: {
+            orgId: req.auth.orgId,
+            customer: req.body.customer,
+            name: req.body.name,
+            role: req.body.role,
+            email: req.body.email,
+            phone: req.body.phone,
+            influence: req.body.influence,
+            sentiment: req.body.sentiment as PrismaSentiment | null,
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'contact.create',
+            targetType: 'contact',
+            targetId: contact.id,
+            diff: { customer: contact.customer, name: contact.name },
+          },
+        });
+        return contact;
       });
       return reply.code(201).send(serializeContact(created));
     },
@@ -127,29 +147,32 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!existing) throw server.httpErrors.notFound('Contact not found');
 
-      const updated = await prisma.contact.update({
-        where: { id: existing.id },
-        data: {
-          ...(req.body.customer !== undefined ? { customer: req.body.customer } : {}),
-          ...(req.body.name !== undefined ? { name: req.body.name } : {}),
-          ...(req.body.role !== undefined ? { role: req.body.role } : {}),
-          ...(req.body.email !== undefined ? { email: req.body.email } : {}),
-          ...(req.body.phone !== undefined ? { phone: req.body.phone } : {}),
-          ...(req.body.influence !== undefined ? { influence: req.body.influence } : {}),
-          ...(req.body.sentiment !== undefined
-            ? { sentiment: req.body.sentiment as PrismaSentiment | null }
-            : {}),
-        },
-      });
-      await prisma.auditLog.create({
-        data: {
-          orgId: req.auth.orgId,
-          userId: req.auth.userId,
-          action: 'contact.update',
-          targetType: 'contact',
-          targetId: updated.id,
-          diff: req.body as object,
-        },
+      const updated = await prisma.$transaction(async (tx) => {
+        const contact = await tx.contact.update({
+          where: { id: existing.id },
+          data: {
+            ...(req.body.customer !== undefined ? { customer: req.body.customer } : {}),
+            ...(req.body.name !== undefined ? { name: req.body.name } : {}),
+            ...(req.body.role !== undefined ? { role: req.body.role } : {}),
+            ...(req.body.email !== undefined ? { email: req.body.email } : {}),
+            ...(req.body.phone !== undefined ? { phone: req.body.phone } : {}),
+            ...(req.body.influence !== undefined ? { influence: req.body.influence } : {}),
+            ...(req.body.sentiment !== undefined
+              ? { sentiment: req.body.sentiment as PrismaSentiment | null }
+              : {}),
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'contact.update',
+            targetType: 'contact',
+            targetId: contact.id,
+            diff: req.body as object,
+          },
+        });
+        return contact;
       });
       return serializeContact(updated);
     },
@@ -170,17 +193,19 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!existing) throw server.httpErrors.notFound('Contact not found');
 
-      await prisma.contact.delete({ where: { id: existing.id } });
-      await prisma.auditLog.create({
-        data: {
-          orgId: req.auth.orgId,
-          userId: req.auth.userId,
-          action: 'contact.delete',
-          targetType: 'contact',
-          targetId: existing.id,
-          diff: { customer: existing.customer, name: existing.name },
-        },
-      });
+      await prisma.$transaction([
+        prisma.contact.delete({ where: { id: existing.id } }),
+        prisma.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'contact.delete',
+            targetType: 'contact',
+            targetId: existing.id,
+            diff: { customer: existing.customer, name: existing.name },
+          },
+        }),
+      ]);
       return reply.code(204).send(null);
     },
   );

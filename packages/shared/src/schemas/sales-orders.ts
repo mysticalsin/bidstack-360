@@ -81,6 +81,8 @@ export const SalesOrderDetail = SalesOrderSummary.extend({
   nextStates: z.array(OrderState),
   lines: z.array(SalesOrderLineDetail),
   audit: z.array(SalesOrderAuditEntry),
+  /** Linked invoice id, if one has been generated from this order. */
+  invoiceId: z.string().uuid().nullable(),
 });
 export type SalesOrderDetail = z.infer<typeof SalesOrderDetail>;
 

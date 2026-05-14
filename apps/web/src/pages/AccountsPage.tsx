@@ -3,9 +3,9 @@ import { useMemo, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 
 import { CompanyLogo } from '@/components/company/CompanyLogo';
+import { SmartCompanyDialog } from '@/components/company/SmartCompanyDialog';
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
-import { SpotlightSurface } from '@/components/motion/SpotlightSurface';
-import { CreateOpportunityDialog } from '@/components/opportunity/CreateOpportunityDialog';
+
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
@@ -122,10 +122,7 @@ export function AccountsPage() {
             )}
             {autopopulate.isPending ? 'Syncing...' : 'Sync Odoo accounts'}
           </button>
-          {/* Accounts are derived from opportunity.customer + companyEnrichment
-              rows. Creating an opportunity for a new customer is the canonical
-              way to add a new account to the grid. */}
-          <CreateOpportunityDialog
+          <SmartCompanyDialog
             trigger={
               <button type="button" className="btn btn-primary">
                 <Icon name="plus" size={14} />
@@ -244,10 +241,9 @@ function AccountCard({ row, index }: { row: AccountRow; index: number }) {
         transition: { ...springLayout, delay: Math.min(index, 16) * 0.028 },
       }}
       exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.16 } }}
-      whileHover={{ y: -3, transition: springSnap }}
-      whileTap={{ scale: 0.99, transition: springSnap }}
+      /* hover/tap animations removed per UX request */
     >
-      <SpotlightSurface className="account-card-shell" tone={spotlightTone(health)}>
+      <div className="account-card-shell">
         <Link
           to={`/accounts/${encodeURIComponent(company.id)}`}
           className="account-card"
@@ -328,20 +324,20 @@ function AccountCard({ row, index }: { row: AccountRow; index: number }) {
             View Stack360 cockpit <Icon name="arrow" size={11} />
           </div>
         </Link>
-      </SpotlightSurface>
+      </div>
     </motion.div>
   );
 }
 
 function SourceStat({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
-    <SpotlightSurface className="account-source-stat" tone="blue">
+    <div className="account-source-stat">
       <span>{label}</span>
       <strong>
         <AnimatedMetric value={value} />
       </strong>
       <small>{detail}</small>
-    </SpotlightSurface>
+    </div>
   );
 }
 
@@ -438,13 +434,6 @@ function healthLabel(h: AccountRow['health']) {
       : h === 'needs_attention'
         ? 'Watch'
         : 'At risk';
-}
-
-function spotlightTone(h: AccountRow['health']): 'blue' | 'jade' | 'amber' | 'purple' {
-  if (h === 'strong') return 'jade';
-  if (h === 'good') return 'blue';
-  if (h === 'needs_attention') return 'amber';
-  return 'purple';
 }
 
 function titleCase(s: string): string {

@@ -1,11 +1,11 @@
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge, stageTone } from '@/components/ui/Badge';
-import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { formatMoney, formatStage } from '@/lib/format';
 
 export function ReportsPage() {
-  const { data, isLoading } = usePipelineReport();
+  const { data, isLoading, isError, error } = usePipelineReport();
 
   return (
     <div className="space-y-6">
@@ -13,6 +13,13 @@ export function ReportsPage() {
         <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">Reports</h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">Pipeline KPIs and velocity.</p>
       </header>
+
+      {isError ? (
+        <ErrorState
+          title="Could not load report"
+          message={error instanceof Error ? error.message : 'Please try again.'}
+        />
+      ) : null}
 
       <Card>
         <SectionHeader title="Pipeline by stage" />

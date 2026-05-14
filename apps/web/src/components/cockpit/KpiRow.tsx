@@ -5,6 +5,7 @@ import { Icon } from '@/components/ui/Icon';
 import { springSnap, staggerChild, staggerParent } from '@/lib/motion';
 import { Sparkline } from './Sparkline';
 import { seedSeries } from './sparkSeed';
+import { GlassCard } from '@/components/ui/GlassCard';
 
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
 
@@ -30,11 +31,11 @@ export function KpiRow({ cockpit }: Props) {
       animate="animate"
     >
       {cockpit.kpis.map((kpi) => (
-        <motion.div
+        <GlassCard
           key={kpi.label}
-          className="kpi"
+          /* spotlight removed — no cursor-tracking glow */
+          className="flex gap-3"
           variants={reduced ? undefined : staggerChild}
-          whileHover={reduced ? undefined : { y: -2 }}
           transition={springSnap}
         >
           <div
@@ -51,9 +52,6 @@ export function KpiRow({ cockpit }: Props) {
             </div>
             {kpi.detail ? <div className="kpi-sub">{kpi.detail}</div> : null}
           </div>
-          {/* Sparkline lives on the right of the tile. Series is a stable
-              hash of the label until the backend exposes real trends —
-              the visual present-ness matters more than the data shape. */}
           <div
             aria-hidden
             style={{
@@ -64,7 +62,7 @@ export function KpiRow({ cockpit }: Props) {
           >
             <Sparkline values={seedSeries(kpi.label)} />
           </div>
-        </motion.div>
+        </GlassCard>
       ))}
     </motion.section>
   );

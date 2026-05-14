@@ -14,7 +14,7 @@ export function serializeOpportunity(o: WithOwner): ApiOpportunity {
     customer: o.customer,
     name: o.name,
     stage: o.stage,
-    value: Number(o.valueEur),
+    value: Number(o.valueMicros) / 1_000_000,
     probability: o.probability,
     dueDate: o.dueDate ? o.dueDate.toISOString().slice(0, 10) : null,
     owner: o.owner?.email ?? null,

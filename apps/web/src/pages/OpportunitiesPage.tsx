@@ -51,9 +51,23 @@ export function OpportunitiesPage() {
   // via URL state) is urgent, but the table re-render is non-urgent.
   const [, startTransition] = useTransition();
 
+  // Stage filter chips (Twenty-style quick filters)
+  const stageFilterRaw = searchParams.get('stage');
+  const stageFilter = STAGES.includes(stageFilterRaw as OpportunityStage)
+    ? (stageFilterRaw as OpportunityStage)
+    : null;
+  const setStageFilter = (next: OpportunityStage | null) => {
+    const params = new URLSearchParams(searchParams);
+    if (next) params.set('stage', next);
+    else params.delete('stage');
+    params.delete('search'); // clear search when switching stage filter
+    setSearchParams(params, { replace: true });
+  };
+
   const { data, isLoading, isError, error } = useOpportunities({
     limit: 100,
     ...(search ? { search } : {}),
+    ...(stageFilter ? { stage: stageFilter } : {}),
   });
 
   // Sortable. Default sort = none (server returns by recent activity); the
@@ -242,6 +256,20 @@ export function OpportunitiesPage() {
                   clear
                 </button>
               </>
+            ) : stageFilter ? (
+              <>
+                <span className="font-medium text-[var(--fg-primary)]">
+                  {data?.items.length ?? 0}
+                </span>{' '}
+                {formatStage(stageFilter).toLowerCase()} opportunities
+                <button
+                  type="button"
+                  onClick={() => setStageFilter(null)}
+                  className="ml-2 text-xs text-[var(--fg-tertiary)] underline hover:text-[var(--brand-primary)]"
+                >
+                  clear filter
+                </button>
+              </>
             ) : (
               <>{data?.items.length ?? 0} bids in flight · click any cell to edit inline.</>
             )}
@@ -260,6 +288,37 @@ export function OpportunitiesPage() {
           <CreateOpportunityDialog />
         </div>
       </header>
+
+      {/* Stage filter chips — Twenty-style quick filters */}
+      {!search && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setStageFilter(null)}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              !stageFilter
+                ? 'bg-[var(--fg-primary)] text-[var(--surface-page)]'
+                : 'bg-[var(--surface-sunken)] text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)]'
+            }`}
+          >
+            All
+          </button>
+          {STAGES.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setStageFilter(stageFilter === s ? null : s)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                stageFilter === s
+                  ? 'bg-[var(--fg-primary)] text-[var(--surface-page)]'
+                  : 'bg-[var(--surface-sunken)] text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)]'
+              }`}
+            >
+              {formatStage(s)}
+            </button>
+          ))}
+        </div>
+      )}
 
       {selectedOpps.length > 0 ? (
         <div
@@ -442,9 +501,6 @@ const Row = memo(function Row({
 
   return (
     <motion.tr
-      // `layout` springs each row to its new position when the sort
-      // comparator flips — same trick as the Contacts table.
-      layout
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{

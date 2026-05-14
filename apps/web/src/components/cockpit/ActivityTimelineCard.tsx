@@ -10,6 +10,7 @@ import { memo, useMemo } from 'react';
 
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { EmptyState } from '@/components/ui/StateMessages';
 import { springSoft } from '@/lib/motion';
 import { relativeTime } from '@/lib/format';
@@ -22,15 +23,15 @@ interface Props {
   limit?: number;
 }
 
-const KIND_GLYPH: Record<CrmActivity['kind'], string> = {
-  note: '🗒',
-  task: '✓',
-  call: '📞',
-  email: '✉',
-  meeting: '👥',
-  timeline_event: '◆',
-  job: '⚙',
-  dust: '✦',
+const KIND_ICON: Record<CrmActivity['kind'], IconName> = {
+  note: 'note',
+  task: 'tasks',
+  call: 'phone',
+  email: 'mail',
+  meeting: 'contacts',
+  timeline_event: 'target',
+  job: 'settings',
+  dust: 'sparkle',
 };
 
 const KIND_TONE: Record<CrmActivity['kind'], 'gray' | 'blue' | 'jade' | 'purple' | 'amber'> = {
@@ -92,9 +93,9 @@ export const ActivityTimelineCard = memo(function ActivityTimelineCard({
           >
             <span
               aria-hidden
-              className="z-10 mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--border-default)] bg-[var(--surface-card)] text-[10px]"
+              className="activity-kind-icon z-10 mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--border-default)] bg-[var(--surface-card)]"
             >
-              {KIND_GLYPH[activity.kind]}
+              <Icon name={KIND_ICON[activity.kind]} size={11} strokeWidth={2} />
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">

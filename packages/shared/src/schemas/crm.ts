@@ -32,6 +32,19 @@ export const CrmLogo = z.object({
 });
 export type CrmLogo = z.infer<typeof CrmLogo>;
 
+export const TechnicalStackItem = z.object({
+  name: z.string().min(1),
+  source: z.string().min(1),
+  confidence: z.number().min(0).max(1),
+});
+export type TechnicalStackItem = z.infer<typeof TechnicalStackItem>;
+
+export const TechnicalStackCategory = z.object({
+  label: z.string().min(1),
+  items: z.array(TechnicalStackItem),
+});
+export type TechnicalStackCategory = z.infer<typeof TechnicalStackCategory>;
+
 export const CrmCompany = z.object({
   id: z.string(),
   source: CrmObjectSource.default('twenty'),
@@ -48,6 +61,7 @@ export const CrmCompany = z.object({
   formerNames: z.array(z.string()).default([]),
   incorporationDate: z.string().date().nullable(),
   logo: CrmLogo.nullable(),
+  technicalStack: z.array(TechnicalStackCategory).optional(),
   confidence: z.number().min(0).max(1),
   sourceAttribution: z.array(SourceAttribution).default([]),
   updatedAt: z.string().datetime(),
@@ -160,19 +174,6 @@ export const DashboardWidget = z.object({
   config: z.record(z.unknown()).default({}),
 });
 export type DashboardWidget = z.infer<typeof DashboardWidget>;
-
-export const TechnicalStackItem = z.object({
-  name: z.string().min(1),
-  source: z.string().min(1),
-  confidence: z.number().min(0).max(1),
-});
-export type TechnicalStackItem = z.infer<typeof TechnicalStackItem>;
-
-export const TechnicalStackCategory = z.object({
-  label: z.string().min(1),
-  items: z.array(TechnicalStackItem),
-});
-export type TechnicalStackCategory = z.infer<typeof TechnicalStackCategory>;
 
 export const HealthBand = z.enum(['strong', 'good', 'needs_attention', 'critical']);
 export type HealthBand = z.infer<typeof HealthBand>;

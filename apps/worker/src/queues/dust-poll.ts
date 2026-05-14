@@ -1,6 +1,7 @@
 // Repeating BullMQ job that pulls deltas from Dust every 5 minutes.
-// In v0.1 this just records a sync_event so the integration timeline UI
-// has data; the real upsert lands when DUST_API_KEY is wired.
+// When DUST_API_KEY is configured, documents are mapped to CRM entities
+// based on metadata/tags. Otherwise stub sync_events are written for UI
+// feedback.
 
 import { Queue, Worker } from 'bullmq';
 import type IORedis from 'ioredis';
@@ -10,11 +11,20 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { DustClient } from '@bidstack/dust-client';
 import { DUST_POLL } from '@bidstack/shared';
+import {
+  upsertOpportunityFromDust,
+  upsertCompanyFromDust,
+  upsertNoteFromDust,
+  upsertLeadFromDust,
+} from './dust-sync-helpers.js';
 
 const QUEUE_NAME = DUST_POLL.name;
 const REPEAT_EVERY_MS = 5 * 60 * 1000;
 
-const JobData = z.object({ source: z.string() });
+const JobData = z.object({
+  source: z.string(),
+  orgId: z.string().uuid().optional(),
+});
 
 // Circuit breaker state
 let consecutiveFailures = 0;
@@ -69,8 +79,8 @@ export async function startDustPoller(
             orgId: o.id,
             source: 'dust.poll',
             eventType: 'tick.stub',
-            payload: { reason: 'DUST_API_KEY/DUST_WORKSPACE_ID not set' },
-            status: 'processed',
+            payload: { reason: 'DUST_API_KEY/DUST_WORKSPACE_ID/DUST_DATA_SOURCE_ID not set' },
+            status: 'processed' as const,
             processedAt: new Date(),
           })),
         });
@@ -81,9 +91,62 @@ export async function startDustPoller(
         const dust = new DustClient({ apiKey, workspaceId, logger: log.child({ kind: 'dust' }) });
         const docs = await dust.listDocuments(dataSourceId);
         log.info({ count: docs.length }, 'pulled from dust');
+
+        // Target orgs: explicit orgId from manual resync, or all orgs for scheduled poll.
+        const targetOrgIds = data.orgId
+          ? [data.orgId]
+          : (await prisma.org.findMany({ select: { id: true } })).map((o) => o.id);
+
+        const results = { opportunity: 0, company: 0, note: 0, lead: 0, skipped: 0, errors: 0 };
+
+        for (const doc of docs) {
+          try {
+            const detail = await dust.getDocument(dataSourceId, doc.document_id);
+            const meta = (detail.metadata ?? {}) as Record<string, unknown>;
+            const metaOrgId = meta.org_id && typeof meta.org_id === 'string' ? meta.org_id : null;
+            const orgsToProcess = metaOrgId ? [metaOrgId] : targetOrgIds;
+
+            for (const orgId of orgsToProcess) {
+              if (meta.opportunity_code && typeof meta.opportunity_code === 'string') {
+                const res = await upsertOpportunityFromDust(orgId, detail);
+                if (res.skipped) results.skipped++;
+                else results.opportunity++;
+              } else if (meta.lead_email && typeof meta.lead_email === 'string') {
+                const res = await upsertLeadFromDust(orgId, detail);
+                if (res.skipped) results.skipped++;
+                else results.lead++;
+              } else if (meta.company_name && typeof meta.company_name === 'string') {
+                await upsertCompanyFromDust(orgId, detail);
+                results.company++;
+              } else {
+                const note = await upsertNoteFromDust(orgId, detail);
+                if (note) results.note++;
+              }
+            }
+          } catch (docErr) {
+            results.errors++;
+            log.warn({ docId: doc.document_id, err: docErr }, 'failed to process dust document');
+          }
+        }
+
+        for (const orgId of targetOrgIds) {
+          await prisma.syncEvent.create({
+            data: {
+              orgId,
+              source: 'dust.poll',
+              eventType: 'poll.completed',
+              payload: {
+                documentCount: docs.length,
+                ...results,
+                orgCount: targetOrgIds.length,
+              },
+              status: 'processed',
+              processedAt: new Date(),
+            },
+          });
+        }
+
         consecutiveFailures = 0;
-        // Real upsert into opportunities/contacts/documents lives in a future
-        // sprint when we agree on the document schema with Dust.
       } catch (err) {
         consecutiveFailures++;
         if (consecutiveFailures >= CIRCUIT_THRESHOLD) {

@@ -5,8 +5,19 @@ import { opportunitiesList } from './opportunities-list.js';
 import { opportunitiesGet } from './opportunities-get.js';
 import { opportunityUpdate } from './opportunity-update.js';
 import { contactsList } from './contacts-list.js';
+import { contactsGet } from './contacts-get.js';
+import { contactsCreate } from './contacts-create.js';
 import { tasksCreate } from './tasks-create.js';
+import { tasksList } from './tasks-list.js';
+import { tasksUpdate } from './tasks-update.js';
 import { proposalDraft } from './proposal-draft.js';
+import { leadsList } from './leads-list.js';
+import { leadsGet } from './leads-get.js';
+import { leadsCreate } from './leads-create.js';
+import { leadsUpdate } from './leads-update.js';
+import { leadsConvert } from './leads-convert.js';
+import { notesList } from './notes-list.js';
+import { notesCreate } from './notes-create.js';
 import {
   crmSearchCompanies,
   crmCreateDeal,
@@ -37,8 +48,19 @@ export const tools = {
   'opportunities.get': opportunitiesGet,
   'opportunity.update': opportunityUpdate,
   'contacts.list': contactsList,
+  'contacts.get': contactsGet,
+  'contacts.create': contactsCreate,
   'tasks.create': tasksCreate,
+  'tasks.list': tasksList,
+  'tasks.update': tasksUpdate,
   'proposal.draft': proposalDraft,
+  'leads.list': leadsList,
+  'leads.get': leadsGet,
+  'leads.create': leadsCreate,
+  'leads.update': leadsUpdate,
+  'leads.convert': leadsConvert,
+  'notes.list': notesList,
+  'notes.create': notesCreate,
   // Canonical CRM surface consumed by Dust (DustCrmToolName enum)
   crm_search_companies: crmSearchCompanies,
   crm_create_deal: crmCreateDeal,

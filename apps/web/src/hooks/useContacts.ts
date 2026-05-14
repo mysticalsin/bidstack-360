@@ -12,6 +12,15 @@ interface ContactsParams {
 // later (counts, next-cursor) without a breaking type change.
 type ContactsPayload = { items: Contact[] };
 
+export function useContact(id: string | undefined) {
+  return useQuery({
+    queryKey: ['contact', id],
+    queryFn: ({ signal }) => api<Contact>(`/api/contacts/${id}`, { signal }),
+    enabled: Boolean(id),
+    staleTime: 30_000,
+  });
+}
+
 export function useContacts(params: ContactsParams = {}) {
   return useQuery({
     queryKey: ['contacts', params],

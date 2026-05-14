@@ -5,6 +5,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma, Prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
+import { pushOpportunityToDust } from '../lib/dust-push.js';
 import {
   Opportunity,
   OpportunityCreate,
@@ -58,10 +59,38 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     },
   );
 
+  // GET /api/opportunities/count — lightweight count for badges / KPIs
+  server.get(
+    '/opportunities/count',
+    {
+      schema: {
+        querystring: z.object({
+          stage: z.string().optional(),
+          excludeClosed: z.coerce.boolean().optional(),
+        }),
+        response: { 200: z.object({ count: z.number().int() }) },
+      },
+    },
+    async (req) => {
+      const { stage, excludeClosed } = req.query;
+      const count = await prisma.opportunity.count({
+        where: {
+          orgId: req.auth.orgId,
+          ...(stage ? { stage: stage as PrismaStage } : {}),
+          ...(excludeClosed
+            ? { stage: { notIn: ['closed_won', 'closed_lost'] as PrismaStage[] } }
+            : {}),
+        },
+      });
+      return { count };
+    },
+  );
+
   // POST /api/opportunities
   server.post(
     '/opportunities',
     {
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
       schema: {
         body: OpportunityCreate,
         response: { 201: Opportunity },
@@ -83,7 +112,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
                 customer: body.customer,
                 name: body.name,
                 stage: body.stage as PrismaStage,
-                valueEur: body.value,
+                valueMicros: BigInt(Math.round(body.value * 1_000_000)),
                 probability: body.probability,
                 dueDate: body.dueDate ? new Date(body.dueDate) : null,
                 industry: body.industry,
@@ -169,7 +198,9 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
             ...(req.body.customer ? { customer: req.body.customer } : {}),
             ...(req.body.name ? { name: req.body.name } : {}),
             ...(req.body.stage ? { stage: req.body.stage as PrismaStage } : {}),
-            ...(req.body.value !== undefined ? { valueEur: req.body.value } : {}),
+            ...(req.body.value !== undefined
+              ? { valueMicros: BigInt(Math.round(req.body.value * 1_000_000)) }
+              : {}),
             ...(req.body.probability !== undefined ? { probability: req.body.probability } : {}),
             ...(req.body.dueDate !== undefined
               ? { dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null }
@@ -190,6 +221,9 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
           },
         }),
       ]);
+
+      // Fire-and-forget push to Dust on any field update.
+      void pushOpportunityToDust(updated.id);
 
       return serializeOpportunity(updated);
     },
@@ -272,6 +306,8 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
           },
         }),
       ]);
+      // Fire-and-forget push to Dust on stage change.
+      void pushOpportunityToDust(updated.id);
       return { id: updated.id, stage: updated.stage as z.infer<typeof OpportunityStage> };
     },
   );
@@ -302,7 +338,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       const brief = `# Exec brief — ${opp.customer}
 
 **Opportunity:** ${opp.name} (${opp.code})
-**Stage:** ${opp.stage}  ·  **Value:** €${opp.valueEur.toString()}  ·  **Probability:** ${opp.probability}%
+**Stage:** ${opp.stage}  ·  **Value:** €${(Number(opp.valueMicros) / 1_000_000).toString()}  ·  **Probability:** ${opp.probability}%
 
 > Stub brief generated locally. Set \`DUST_API_KEY\` and \`DUST_AGENT_EXEC_BRIEF\` to enable the live agent path.
 `;

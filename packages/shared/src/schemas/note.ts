@@ -5,6 +5,8 @@
 
 import { z } from 'zod';
 
+import { ComplianceCheck, RiskItem, SourceAttribution, TechnicalStackCategory } from './crm.js';
+
 // Why 200 chars: short enough to stay readable in a list-row, long enough to
 // hold a full sentence. Matches DB VARCHAR(200) — keep in sync with schema.
 const TITLE_MAX = 200;
@@ -55,3 +57,50 @@ export type NotePatch = z.infer<typeof NotePatch>;
 
 export const NoteList = z.object({ items: z.array(Note) });
 export type NoteList = z.infer<typeof NoteList>;
+
+export const MeetingNotesImportRequest = z.object({
+  accountId: z.string().min(1).max(255),
+  companyName: z.string().min(1).max(255),
+  domain: z.string().trim().min(3).max(255).optional(),
+  title: z.string().min(1).max(TITLE_MAX).optional(),
+  bodyMd: z.string().min(10).max(BODY_MAX),
+});
+export type MeetingNotesImportRequest = z.infer<typeof MeetingNotesImportRequest>;
+
+export const MeetingImportedContact = z.object({
+  name: z.string().min(1),
+  title: z.string().nullable(),
+  email: z.string().email().nullable(),
+  phone: z.string().nullable(),
+  roleInDecision: z.enum(['buyer', 'blocker', 'champion', 'influencer', 'user']).nullable(),
+  confidence: z.number().min(0).max(1),
+});
+export type MeetingImportedContact = z.infer<typeof MeetingImportedContact>;
+
+export const MeetingImportedTask = z.object({
+  title: z.string().min(1).max(255),
+  dueDate: z.string().date().nullable(),
+  status: z.enum(['open', 'in_progress', 'done', 'blocked']),
+  confidence: z.number().min(0).max(1),
+});
+export type MeetingImportedTask = z.infer<typeof MeetingImportedTask>;
+
+export const MeetingNotesImportResponse = z.object({
+  note: Note,
+  extracted: z.object({
+    techStack: z.array(TechnicalStackCategory),
+    contacts: z.array(MeetingImportedContact),
+    risks: z.array(RiskItem),
+    compliance: z.array(ComplianceCheck),
+    tasks: z.array(MeetingImportedTask),
+    sourceAttribution: z.array(SourceAttribution),
+  }),
+  created: z.object({
+    contacts: z.number().int().nonnegative(),
+    risks: z.number().int().nonnegative(),
+    compliance: z.number().int().nonnegative(),
+    tasks: z.number().int().nonnegative(),
+    techStackItems: z.number().int().nonnegative(),
+  }),
+});
+export type MeetingNotesImportResponse = z.infer<typeof MeetingNotesImportResponse>;

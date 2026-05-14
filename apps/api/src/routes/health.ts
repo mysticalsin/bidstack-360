@@ -16,8 +16,6 @@ export const healthRoute: FastifyPluginAsyncZod = async (server) => {
             ok: z.boolean(),
             db: z.boolean(),
             redis: z.boolean(),
-            uptimeSec: z.number(),
-            version: z.string(),
           }),
         },
       },
@@ -41,8 +39,6 @@ export const healthRoute: FastifyPluginAsyncZod = async (server) => {
         ok: db && redisOk,
         db,
         redis: redisOk,
-        uptimeSec: Math.round(process.uptime()),
-        version: process.env.npm_package_version ?? '0.1.0',
       };
     },
   );

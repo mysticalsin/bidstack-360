@@ -36,7 +36,6 @@ const PipelineKpis = z.object({
   }),
 });
 
-const MICROS = 1_000_000;
 const SALES_CURRENCY = 'CAD';
 const QUOTATION_STATES = new Set(['draft', 'sent']);
 const ORDER_STATES = new Set(['confirmed', 'done', 'closed_won']);
@@ -90,13 +89,13 @@ export const reportsRoutes: FastifyPluginAsyncZod = async (server) => {
       by: ['stage'],
       where: { orgId: req.auth.orgId },
       _count: { _all: true },
-      _sum: { valueEur: true },
+      _sum: { valueMicros: true },
     });
 
     const byStage = grouped.map((g) => ({
       stage: g.stage,
       count: g._count._all,
-      valueSum: Number(g._sum.valueEur ?? 0),
+      valueSum: Number(g._sum.valueMicros ?? 0) / 1_000_000,
     }));
 
     const open = byStage.filter((s) => s.stage !== 'closed_won' && s.stage !== 'closed_lost');
@@ -107,9 +106,12 @@ export const reportsRoutes: FastifyPluginAsyncZod = async (server) => {
         orgId: req.auth.orgId,
         stage: { notIn: ['closed_won', 'closed_lost'] },
       },
-      select: { valueEur: true, probability: true },
+      select: { valueMicros: true, probability: true },
     });
-    const weighted = opens.reduce((acc, o) => acc + Number(o.valueEur) * (o.probability / 100), 0);
+    const weighted = opens.reduce(
+      (acc, o) => acc + (Number(o.valueMicros) / 1_000_000) * (o.probability / 100),
+      0,
+    );
 
     const closedThisQuarter = await prisma.opportunity.count({
       where: {
@@ -382,7 +384,7 @@ function buildOpportunitySalesReport(args: {
     customer: string;
     name: string;
     stage: string;
-    valueEur: unknown;
+    valueMicros: bigint | number | unknown;
     dueDate: Date | null;
     updatedAt: Date;
     industry: string | null;
@@ -402,7 +404,7 @@ function buildOpportunitySalesReport(args: {
     number: opp.code,
     customer: opp.customer,
     salesperson: opp.owner?.name ?? null,
-    revenueMicros: Math.max(0, Math.round(Number(opp.valueEur ?? 0) * MICROS)),
+    revenueMicros: Math.max(0, Math.round(Number(opp.valueMicros ?? 0))),
     currencyCode: SALES_CURRENCY,
     countryCode:
       countryByCustomer.get(normalizeName(opp.customer)) ?? customerCountry(opp.customer),
@@ -641,7 +643,12 @@ function mergePeople(
 }
 
 function buildOpportunityProductRows(
-  opportunities: Array<{ name: string; industry: string | null; stage: string; valueEur: unknown }>,
+  opportunities: Array<{
+    name: string;
+    industry: string | null;
+    stage: string;
+    valueMicros: bigint | number | unknown;
+  }>,
   currencyCode: string,
 ): ProductSalesRow[] {
   const buckets = new Map<string, ProductSalesRow>();
@@ -658,7 +665,7 @@ function buildOpportunityProductRows(
         currencyCode,
       } satisfies ProductSalesRow);
     existing.orderCount += 1;
-    existing.revenueMicros += Math.max(0, Math.round(Number(opp.valueEur ?? 0) * MICROS));
+    existing.revenueMicros += Math.max(0, Math.round(Number(opp.valueMicros ?? 0)));
     buckets.set(product.product, existing);
   }
   return [...buckets.values()].sort((a, b) => b.revenueMicros - a.revenueMicros).slice(0, 10);

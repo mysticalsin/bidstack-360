@@ -4,6 +4,8 @@ import { useParams } from 'react-router-dom';
 import {
   ActivityTimelineCard,
   BusinessSnapshotCard,
+  CommandCenter,
+  DataTrustCard,
   HealthScoreCard,
   KeyContactsCard,
   KpiRow,
@@ -18,6 +20,7 @@ import {
   UpsellFilesCard,
 } from '@/components/cockpit';
 import { FilesPanel } from '@/components/files/FilesPanel';
+import { AccountIntelPanel } from '@/components/account-intel/AccountIntelPanel';
 import { Reveal } from '@/components/motion/Reveal';
 import { NotesPanel } from '@/components/notes/NotesPanel';
 import { DashboardSkeleton } from '@/components/skeletons/PageSkeletons';
@@ -87,6 +90,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
     <>
       <PageHead cockpit={cockpit} accountView={isAccountView} />
       <KpiRow cockpit={cockpit} />
+      <CommandCenter cockpit={cockpit} />
 
       <section className="cockpit-grid" aria-label="Account cockpit">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
@@ -127,16 +131,26 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
             />
           </Reveal>
           <Reveal delay={0.08}>
-            <LiveDataMeshCard cockpit={cockpit} />
+            <DataTrustCard cockpit={cockpit} />
           </Reveal>
           <Reveal delay={0.12}>
-            <KeyContactsCard cockpit={cockpit} />
+            <LiveDataMeshCard cockpit={cockpit} />
           </Reveal>
           <Reveal delay={0.16}>
-            <NotesPanel accountId={accountId} />
+            <KeyContactsCard cockpit={cockpit} />
           </Reveal>
           <Reveal delay={0.2}>
+            <NotesPanel
+              accountId={accountId}
+              companyName={cockpit.company.name}
+              domain={cockpit.company.domain}
+            />
+          </Reveal>
+          <Reveal delay={0.24}>
             {accountId ? <FilesPanel accountId={accountId} /> : <UpsellFilesCard />}
+          </Reveal>
+          <Reveal delay={0.28}>
+            {accountId ? <AccountIntelPanel accountId={accountId} /> : null}
           </Reveal>
         </aside>
       </section>

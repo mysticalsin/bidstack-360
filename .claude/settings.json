@@ -44,6 +44,15 @@
       "Read(**/*.key)"
     ]
   },
+  "mcpServers": {
+    "magic": {
+      "command": "npx",
+      "args": ["-y", "@21st-dev/magic@latest"],
+      "env": {
+        "API_KEY": "420f55095bec1db3947a0692aeafef5caad1541edc7f30c39d230241fc6ac3ac"
+      }
+    }
+  },
   "env": {
     "BIDCRM_TOKEN_BUDGET_PER_TASK": "15000",
     "BIDCRM_TOKEN_BUDGET_PER_SESSION": "100000"

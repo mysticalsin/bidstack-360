@@ -124,70 +124,7 @@ export const salesOrdersRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const order = await prisma.salesOrder.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
-        include: {
-          salesperson: { select: { name: true } },
-          lines: {
-            include: {
-              product: { include: { category: { select: { name: true } } } },
-            },
-            orderBy: { createdAt: 'asc' },
-          },
-        },
-      });
-      if (!order) throw server.httpErrors.notFound('Sales order not found');
-
-      // Audit trail for this order — every `sales_order.*` action with this id.
-      const audit = await prisma.auditLog.findMany({
-        where: {
-          orgId: req.auth.orgId,
-          targetType: 'sales_order',
-          targetId: order.id,
-        },
-        include: { user: { select: { name: true } } },
-        orderBy: { at: 'desc' },
-        take: 50,
-      });
-
-      const state = order.state as z.infer<typeof OrderState>;
-      return {
-        id: order.id,
-        number: order.number,
-        state,
-        customerName: order.customerName,
-        salespersonId: order.salespersonId,
-        salespersonName: order.salesperson?.name ?? null,
-        countryCode: order.countryCode,
-        currency: order.currency,
-        totalMicros: order.totalMicros.toString(),
-        orderDate: order.orderDate.toISOString(),
-        confirmedAt: order.confirmedAt?.toISOString() ?? null,
-        lineCount: order.lines.length,
-        nextStates: ORDER_STATE_TRANSITIONS[state],
-        lines: order.lines.map((l) => ({
-          id: l.id,
-          productId: l.productId,
-          productSku: l.product.sku,
-          productName: l.product.name,
-          categoryName: l.product.category?.name ?? null,
-          description: l.description,
-          quantity: l.quantity.toString(),
-          unitPriceMicros: l.unitPriceMicros.toString(),
-          subtotalMicros: l.subtotalMicros.toString(),
-        })),
-        audit: audit.map((row) => {
-          const diff = (row.diff ?? {}) as { from?: string; to?: string };
-          return {
-            id: Number(row.id),
-            action: row.action,
-            fromState: (diff.from as z.infer<typeof OrderState> | undefined) ?? null,
-            toState: (diff.to as z.infer<typeof OrderState> | undefined) ?? null,
-            actorName: row.user?.name ?? null,
-            createdAt: row.at.toISOString(),
-          };
-        }),
-      };
+      return loadDetail(req.auth.orgId, req.params.id);
     },
   );
 
@@ -365,6 +302,10 @@ async function loadDetail(orgId: string, id: string): Promise<z.infer<typeof Sal
     orderBy: { at: 'desc' },
     take: 50,
   });
+  const invoice = await prisma.invoice.findFirst({
+    where: { salesOrderId: id, orgId },
+    select: { id: true },
+  });
   const state = order.state as z.infer<typeof OrderState>;
   return {
     id: order.id,
@@ -379,6 +320,7 @@ async function loadDetail(orgId: string, id: string): Promise<z.infer<typeof Sal
     orderDate: order.orderDate.toISOString(),
     confirmedAt: order.confirmedAt?.toISOString() ?? null,
     lineCount: order.lines.length,
+    invoiceId: invoice?.id ?? null,
     nextStates: ORDER_STATE_TRANSITIONS[state],
     lines: order.lines.map((l) => ({
       id: l.id,

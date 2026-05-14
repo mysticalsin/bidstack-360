@@ -34,6 +34,10 @@ const GROUPS: Array<{ title: string; items: Shortcut[] }> = [
       { keys: ['G', 'P'], label: 'Go to Pipeline' },
       { keys: ['G', 'C'], label: 'Go to Contacts' },
       { keys: ['G', 'T'], label: 'Go to Tasks' },
+      { keys: ['G', 'R'], label: 'Go to Reports' },
+      { keys: ['G', 'A'], label: 'Go to Accounts' },
+      { keys: ['G', 'S'], label: 'Go to Settings' },
+      { keys: ['G', 'F'], label: 'Go to Search' },
     ],
   },
   {

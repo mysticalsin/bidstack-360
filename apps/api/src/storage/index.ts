@@ -49,6 +49,8 @@ export interface StorageAdapter {
   ): Promise<DownloadResult>;
   // Hard-delete the underlying object. Idempotent: missing keys do not throw.
   delete(key: string): Promise<void>;
+  // Read the full object into memory as a Buffer.
+  readBuffer(key: string): Promise<Buffer>;
   // Local-only: persist a PUT body to disk. Absent on s3 driver.
   writeLocal?(key: string, body: Readable | Buffer): Promise<{ bytes: number }>;
 }
@@ -131,6 +133,26 @@ class LocalStorage implements StorageAdapter {
   async delete(key: string): Promise<void> {
     const target = safeJoin(LOCAL_ROOT, key);
     await rm(target, { force: true });
+  }
+
+  async readBuffer(key: string): Promise<Buffer> {
+    const target = safeJoin(LOCAL_ROOT, key);
+    const s = await stat(target);
+    // Safety: reject files > 50 MB to avoid OOM during text extraction.
+    const MAX_BYTES = 50 * 1024 * 1024;
+    if (s.size > MAX_BYTES) {
+      throw new Error(`File too large for text extraction: ${s.size} bytes (max ${MAX_BYTES})`);
+    }
+    const chunks: Buffer[] = [];
+    const stream = createReadStream(target);
+    return new Promise((resolve, reject) => {
+      stream.on('data', (chunk) => {
+        if (Buffer.isBuffer(chunk)) chunks.push(chunk);
+        else chunks.push(Buffer.from(chunk, 'utf-8'));
+      });
+      stream.on('error', reject);
+      stream.on('end', () => resolve(Buffer.concat(chunks)));
+    });
   }
 }
 
@@ -227,6 +249,24 @@ class S3Storage implements StorageAdapter {
       Key: key,
     });
     await asSdk(this.client).send(cmd);
+  }
+
+  async readBuffer(key: string): Promise<Buffer> {
+    const cmd = new (asSdk(this.mod).GetObjectCommand)({
+      Bucket: this.bucket,
+      Key: key,
+    });
+    const response = await asSdk(this.client).send(cmd);
+    const stream = response.Body as Readable;
+    const chunks: Buffer[] = [];
+    return new Promise((resolve, reject) => {
+      stream.on('data', (chunk) => {
+        if (Buffer.isBuffer(chunk)) chunks.push(chunk);
+        else chunks.push(Buffer.from(chunk, 'utf-8'));
+      });
+      stream.on('error', reject);
+      stream.on('end', () => resolve(Buffer.concat(chunks)));
+    });
   }
 }
 

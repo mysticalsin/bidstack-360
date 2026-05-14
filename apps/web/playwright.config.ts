@@ -2,6 +2,41 @@ import { defineConfig, devices } from '@playwright/test';
 
 const PORT = Number(process.env.PORT ?? 4173);
 const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
+const API_URL = process.env.E2E_API_URL ?? 'http://localhost:4000';
+
+/**
+ * Fully automatic E2E orchestration.
+ *
+ * When E2E_BASE_URL is not set, Playwright starts both the API dev server
+ * and the Vite production preview in sequence, waiting for each to be
+ * healthy before proceeding. This makes `pnpm e2e` a single-command
+ * operation with no manual server management.
+ *
+ * Prerequisites (run once per DB reset):
+ *   pnpm db:migrate && pnpm db:seed
+ */
+const servers = process.env.E2E_BASE_URL
+  ? undefined
+  : [
+      // 1. Boot the API first so the web preview can hit endpoints immediately.
+      {
+        command: 'pnpm --filter @bidstack/api dev',
+        url: `${API_URL}/health`,
+        reuseExistingServer: !process.env.CI,
+        timeout: 60_000,
+        stdout: 'pipe',
+        stderr: 'pipe',
+      },
+      // 2. Boot the web production preview.
+      {
+        command: `pnpm preview --host 127.0.0.1 --port ${PORT}`,
+        url: baseURL,
+        reuseExistingServer: !process.env.CI,
+        timeout: 60_000,
+        stdout: 'pipe',
+        stderr: 'pipe',
+      },
+    ];
 
 export default defineConfig({
   testDir: './e2e',
@@ -24,17 +59,5 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  // Boot the production preview against the already-running API+DB.
-  // The API at http://localhost:4000 is *not* started here — that requires
-  // docker compose + migrate + seed and stays a manual local prereq.
-  webServer: process.env.E2E_BASE_URL
-    ? undefined
-    : {
-        command: 'pnpm preview --host 127.0.0.1 --port 4173',
-        url: baseURL,
-        reuseExistingServer: !process.env.CI,
-        timeout: 60_000,
-        stdout: 'pipe',
-        stderr: 'pipe',
-      },
+  webServer: servers,
 });

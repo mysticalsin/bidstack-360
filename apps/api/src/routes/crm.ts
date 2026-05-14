@@ -15,7 +15,6 @@ import {
 import {
   AccountCockpitSnapshot,
   CompanyAutopopulateResponse,
-  CompanyLookupResponse,
   CrmCompany,
   CrmDashboardSnapshot,
   DashboardWidget,
@@ -44,6 +43,10 @@ const CompanySearchQuery = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(10),
 });
 
+const CompanySearchResponse = z.object({
+  items: z.array(CrmCompany),
+});
+
 const CompanyLookupQuery = z.object({
   name: z.string().trim().optional(),
   domain: z.string().trim().optional(),
@@ -54,14 +57,25 @@ const CompanyLookupQuery = z.object({
   registryId: z.string().trim().optional(),
 });
 
-const CompanySearchResponse = z.object({
-  items: z.array(CrmCompany),
+const CompanyLookupResponse = z.object({
+  match: z.enum(['exact_domain', 'registry_id', 'exact_name', 'fuzzy_name', 'none']),
+  company: CrmCompany.nullable(),
+  alternatives: z.array(CrmCompany),
 });
 
 const EnrichCompanyBody = z.object({
   name: z.string().min(1),
   domain: z.string().trim().optional(),
   website: z.string().url().optional(),
+});
+
+const ConnectorsResponse = z.object({
+  items: z.array(CrmConnector),
+});
+
+const OpenDataSignalsQuery = z.object({
+  query: z.string().trim().optional(),
+  ticker: z.string().trim().optional(),
 });
 
 const AutopopulateSalesCompaniesBody = z
@@ -77,15 +91,6 @@ const WidgetsPatchBody = z.object({
 
 const DashboardWidgetsResponse = z.object({
   widgets: z.array(DashboardWidget),
-});
-
-const ConnectorsResponse = z.object({
-  items: z.array(CrmConnector),
-});
-
-const OpenDataSignalsQuery = z.object({
-  query: z.string().trim().optional(),
-  ticker: z.string().trim().optional(),
 });
 
 const COMPANY_DOMAINS: Record<string, string> = {
@@ -506,7 +511,11 @@ export const crmRoutes: FastifyPluginAsyncZod = async (server) => {
         ),
       );
       return {
-        widgets: widgets.map(serializeWidget).sort((a, b) => (a.y === b.y ? a.x - b.x : a.y - b.y)),
+        widgets: widgets
+          .map(serializeWidget)
+          .sort((a: { y: number; x: number }, b: { y: number; x: number }) =>
+            a.y === b.y ? a.x - b.x : a.y - b.y,
+          ),
       };
     },
   );
@@ -718,8 +727,8 @@ async function buildSalesCompanyCandidates({
   if (source !== 'sales_orders') {
     const opportunities = await prisma.opportunity.findMany({
       where: { orgId },
-      select: { customer: true, valueEur: true },
-      orderBy: [{ valueEur: 'desc' }, { updatedAt: 'desc' }],
+      select: { customer: true, valueMicros: true },
+      orderBy: [{ valueMicros: 'desc' }, { updatedAt: 'desc' }],
       take: limit * 3,
     });
     for (const opportunity of opportunities) {
@@ -729,7 +738,7 @@ async function buildSalesCompanyCandidates({
         website: websiteFor(opportunity.customer),
         countryCode: null,
         reason: 'Twenty-compatible opportunity',
-        score: Math.round(Number(opportunity.valueEur ?? 0) * 1_000_000),
+        score: Math.round(Number(opportunity.valueMicros ?? 0)),
       });
     }
   }
@@ -981,7 +990,7 @@ function buildCockpit({
     customer: string;
     name: string;
     stage: PrismaStage;
-    valueEur: unknown;
+    valueMicros: bigint | number | unknown;
     probability: number;
     dueDate: Date | null;
     owner: { name: string | null; email: string } | null;
@@ -1103,7 +1112,7 @@ function serializeDeal(opportunity: {
   customer: string;
   name: string;
   stage: PrismaStage;
-  valueEur: unknown;
+  valueMicros: bigint | number | unknown;
   probability: number;
   dueDate: Date | null;
   ownerId: string | null;
@@ -1117,7 +1126,7 @@ function serializeDeal(opportunity: {
     companyName: opportunity.customer,
     name: opportunity.name,
     stage: mapDealStage(opportunity.stage),
-    amountMicros: Math.round(Number(opportunity.valueEur) * 1_000_000),
+    amountMicros: Math.round(Number(opportunity.valueMicros ?? 0)),
     currencyCode: 'EUR',
     probability: opportunity.probability,
     closeDate: opportunity.dueDate ? opportunity.dueDate.toISOString().slice(0, 10) : null,

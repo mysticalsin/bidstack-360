@@ -2,12 +2,13 @@ import { NavLink } from 'react-router-dom';
 
 import { Tooltip, TooltipProvider } from '@/components/ui/Tooltip';
 import { Icon, type IconName } from '@/components/ui/Icon';
-import { useOpportunities } from '@/hooks/useOpportunities';
+import { useOpportunityCount } from '@/hooks/useOpportunities';
 import { useTasks } from '@/hooks/useTasks';
 import { daysUntil } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { prefetchRoute } from '@/lib/prefetch';
 import { useAccountHistory, type AccountEntry } from '@/stores/accountHistory';
+import { useIsAdmin } from '@/lib/auth';
 import { useUiStore } from '@/stores/ui';
 
 interface NavItem {
@@ -21,35 +22,47 @@ const WORKSPACE: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
   { to: '/sales', label: 'Sales', icon: 'reports' },
   { to: '/sales/orders', label: 'Quotations & Orders', icon: 'briefcase' },
+  { to: '/sales/products', label: 'Products', icon: 'package' },
+  { to: '/sales/invoices', label: 'Invoices', icon: 'receipt' },
   { to: '/accounts', label: 'Accounts', icon: 'building' },
+  { to: '/companies', label: 'Companies', icon: 'building' },
   { to: '/opportunities', label: 'Opportunities', icon: 'briefcase', badgeKey: 'openBids' },
   { to: '/pipeline', label: 'Pipeline', icon: 'pipeline' },
   { to: '/bid-matrix', label: 'Bid/No-Bid Matrix', icon: 'target' },
+  { to: '/leads', label: 'Leads', icon: 'target' },
   { to: '/contacts', label: 'Contacts', icon: 'contacts' },
   { to: '/tasks', label: 'Tasks', icon: 'tasks', badgeKey: 'overdueTasks' },
+  { to: '/territories', label: 'Territories', icon: 'building' },
+  { to: '/service-desk', label: 'Service Desk', icon: 'briefcase' },
+  { to: '/workflows', label: 'Workflows', icon: 'pipeline' },
+  { to: '/intake', label: 'Intake', icon: 'building' },
   { to: '/reports', label: 'Reports', icon: 'reports' },
 ];
 
-const SETTINGS: NavItem[] = [
+const ADMIN_SETTINGS: NavItem[] = [
   { to: '/integrations', label: 'Integrations', icon: 'link' },
   { to: '/audit-log', label: 'Audit log', icon: 'reports' },
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ];
 
+const MEMBER_SETTINGS: NavItem[] = [
+  { to: '/integrations', label: 'Integrations', icon: 'link' },
+  { to: '/settings', label: 'Settings', icon: 'settings' },
+];
+
 export function Sidebar() {
-  const opps = useOpportunities({ limit: 200 });
+  const oppsCount = useOpportunityCount({ excludeClosed: true });
   const tasks = useTasks();
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
   const toggle = useUiStore((s) => s.toggleSidebar);
+  const isAdmin = useIsAdmin();
   // Account history — show top 5 recents + all favorites. Favorites can
   // grow unbounded by design (users curate them), but recents are bounded
   // by the store's LRU eviction cap.
   const recents = useAccountHistory((s) => s.recents);
   const favorites = useAccountHistory((s) => s.favorites);
 
-  const openBids =
-    opps.data?.items.filter((o) => o.stage !== 'closed_won' && o.stage !== 'closed_lost').length ??
-    0;
+  const openBids = oppsCount.data?.count ?? 0;
   // Badge counts only truly overdue tasks (negative daysUntil) so its meaning
   // matches the Dashboard KPI. A "due within 7 days" filter belongs to a
   // separate upcoming surface; mixing the two confused what the count meant.
@@ -117,7 +130,7 @@ export function Sidebar() {
         ) : null}
 
         <SidebarGroup title="Settings">
-          {SETTINGS.map((item) => (
+          {(isAdmin ? ADMIN_SETTINGS : MEMBER_SETTINGS).map((item) => (
             <SidebarItem key={item.to} item={item} badges={badges} collapsed={collapsed} />
           ))}
         </SidebarGroup>

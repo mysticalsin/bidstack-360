@@ -46,6 +46,7 @@ export type {
   Invoice,
   InvoiceLine,
   Payment,
+  Lead,
 } from '../generated/client/index.js';
 
 // `Prisma` is exported as a value because we need its runtime classes
@@ -61,4 +62,10 @@ export {
   OrderState,
   InvoiceState,
   PaymentMethod,
+  CasePriority,
+  CaseStatus,
+  WorkflowTriggerKind,
+  WorkflowActionKind,
+  LeadStatus,
+  LeadPriority,
 } from '../generated/client/index.js';

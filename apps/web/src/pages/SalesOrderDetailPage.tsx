@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { formatDate, formatMoneyMicros, relativeTime } from '@/lib/format';
+import { useCreateInvoiceFromOrder } from '@/hooks/useInvoices';
 import {
   useSalesOrder,
   useTransitionSalesOrder,
@@ -45,6 +46,7 @@ export function SalesOrderDetailPage() {
   const done = useTransitionSalesOrder('done');
   const cancel = useTransitionSalesOrder('cancel');
   const reopen = useTransitionSalesOrder('reopen');
+  const createInvoice = useCreateInvoiceFromOrder();
   const mutations: Record<TransitionAction, ReturnType<typeof useTransitionSalesOrder>> = {
     send,
     confirm,
@@ -159,6 +161,28 @@ export function SalesOrderDetailPage() {
                   </Button>
                 );
               })}
+              {(order.state === 'confirmed' || order.state === 'done') && !order.invoiceId && (
+                <Button
+                  size="sm"
+                  variant="primary"
+                  disabled={pending !== null || createInvoice.isPending}
+                  aria-busy={createInvoice.isPending}
+                  onClick={() => {
+                    if (!id) return;
+                    createInvoice.mutate({ orderId: id });
+                  }}
+                >
+                  {createInvoice.isPending ? 'Creating…' : 'Create Invoice'}
+                </Button>
+              )}
+              {order.invoiceId && (
+                <Link
+                  to={`/sales/invoices/${order.invoiceId}`}
+                  className="inline-flex items-center rounded-md bg-[var(--surface-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--brand-primary)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
+                >
+                  View Invoice
+                </Link>
+              )}
             </div>
           </div>
         ) : (

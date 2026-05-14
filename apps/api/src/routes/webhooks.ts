@@ -62,7 +62,7 @@ export const webhooksRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/webhooks/dust',
     {
-      config: { public: true },
+      config: { public: true, rateLimit: { max: 100, timeWindow: '1 minute' } },
       schema: {
         body: z.record(z.unknown()),
         response: { 200: z.object({ ok: z.literal(true) }) },

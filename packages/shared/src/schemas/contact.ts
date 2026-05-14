@@ -22,6 +22,38 @@ export type ContactCreate = z.infer<typeof ContactCreate>;
 // PATCH body — every field optional but at least one must be present.
 // `customer` is editable (a contact can be re-assigned to another account)
 // — server enforces multi-tenancy by re-checking orgId at the route layer.
+export const ContactDetail = Contact.extend({
+  relatedOpportunities: z.array(
+    z.object({
+      id: z.string().uuid(),
+      code: z.string(),
+      name: z.string(),
+      stage: z.string(),
+      valueMicros: z.string(),
+      probability: z.number(),
+      dueDate: z.string().datetime().nullable(),
+    }),
+  ),
+  relatedTasks: z.array(
+    z.object({
+      id: z.string().uuid(),
+      title: z.string(),
+      status: z.string(),
+      dueDate: z.string().datetime().nullable(),
+      assignee: z.string().nullable(),
+    }),
+  ),
+  relatedNotes: z.array(
+    z.object({
+      id: z.string().uuid(),
+      title: z.string(),
+      authorName: z.string().nullable(),
+      createdAt: z.string().datetime(),
+    }),
+  ),
+});
+export type ContactDetail = z.infer<typeof ContactDetail>;
+
 export const ContactPatch = z
   .object({
     customer: z.string().min(1).optional(),

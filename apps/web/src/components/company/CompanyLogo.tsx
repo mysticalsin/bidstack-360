@@ -34,7 +34,7 @@ export function CompanyLogo({
 }: CompanyLogoProps) {
   const sources: string[] = [];
   const normalizedDomain = normalizeDomain(domain);
-  const shouldUseCompactFavicon = size <= 40;
+  const shouldUseCompactFavicon = size <= 64;
 
   if (logo?.url && logo.source !== 'favicon') {
     sources.push(logo.url);

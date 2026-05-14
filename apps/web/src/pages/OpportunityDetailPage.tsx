@@ -13,11 +13,16 @@ import {
   InlineEditText,
 } from '@/components/opportunity/InlineEdit';
 import { OpportunityTabs } from '@/components/opportunity/OpportunityTabs';
+import { OpportunityAccountIntel } from '@/components/opportunity/OpportunityAccountIntel';
 import { CreateTaskDialog } from '@/components/task/CreateTaskDialog';
+import { GlassCard } from '@/components/ui/GlassCard';
+import { Icon } from '@/components/ui/Icon';
+import { MagneticButton } from '@/components/ui/MagneticButton';
 import { usePatchOpportunity, useOpportunity } from '@/hooks/useOpportunities';
+import { useOpportunityTimeline } from '@/hooks/useOpportunityTimeline';
 import { formatDate, formatMoney, formatStage } from '@/lib/format';
 
-import type { OpportunityStage } from '@bidstack/shared';
+import type { OpportunityStage, IntelPayload } from '@bidstack/shared';
 
 const STAGE_OPTIONS: ReadonlyArray<{ value: OpportunityStage; label: string }> = [
   { value: 'discovery', label: 'Discovery' },
@@ -28,155 +33,154 @@ const STAGE_OPTIONS: ReadonlyArray<{ value: OpportunityStage; label: string }> =
   { value: 'closed_lost', label: 'Closed lost' },
 ];
 
-interface IntelPayload {
-  refreshedAt?: string;
-  financial?: {
-    ticker: string | null;
-    marketCap: number | null;
-    revenueAnnual: number | null;
-    revenueGrowth: number | null;
-    ebitdaMargin: number | null;
-    creditRating: string | null;
-    headcount: number | null;
-    pricePoints?: number[];
-  } | null;
-  triggers?: Array<{
-    id: string;
-    label: string;
-    weight: number;
-    observedAt: string;
-    source: string | null;
-    kind: string;
-  }>;
-  competitors?: Array<{ vendor: string; score: number; strengths: string[]; weaknesses: string[] }>;
-  news?: Array<{
-    id: string;
-    headline: string;
-    source: string;
-    publishedAt: string;
-    sentiment: string;
-  }>;
-  hiring?: { openings: Array<{ title: string; urgency: string }>; trendDirection: string };
-  winPrediction?: {
-    probability: number;
-    modelVersion: string;
-    drivers: Array<{ label: string; contribution: number }>;
-  };
-  decisionUnit?: Array<{
-    contactId: string;
-    name: string;
-    role: string;
-    influence: number;
-    sentiment: 'hot' | 'warm' | 'neutral' | 'cold';
-    power: 'decision' | 'champion' | 'influencer' | 'gatekeeper' | 'approver';
-  }>;
-}
-
 export function OpportunityDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading, isError, error } = useOpportunity(id);
   const patch = usePatchOpportunity(id);
+  const timeline = useOpportunityTimeline(id);
   const [briefOpen, setBriefOpen] = useState(false);
-  const intel = (data?.intel ?? {}) as IntelPayload;
+  const intel: IntelPayload = data?.intel ?? {};
 
   if (isLoading) return <LoadingSkeleton rows={8} />;
   if (isError)
     return <ErrorState title="Couldn't load this opportunity" message={error?.message ?? '—'} />;
   if (!data) return null;
 
+  const timelineItems =
+    timeline.data?.items.map((t: { createdAt: string; kind: string; text: string }) => ({
+      at: t.createdAt,
+      kind: t.kind,
+      text: t.text,
+    })) ?? [];
+
   return (
     <div className="space-y-6">
-      <header>
-        <nav aria-label="Breadcrumb" className="text-xs text-[var(--fg-tertiary)] mb-2">
-          <ol className="flex items-center gap-2">
-            <li>
-              <Link to="/opportunities" className="hover:text-[var(--brand-primary)]">
-                Opportunities
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li aria-current="page">{data.code}</li>
-          </ol>
-        </nav>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-bold tracking-tight text-[var(--fg-primary)]">
-              <InlineEditText
-                value={data.name}
-                onSave={(v) => patch.mutateAsync({ name: v })}
-                label="Edit opportunity name"
-                validate={(v) => (v.length < 1 ? 'Name is required' : null)}
-              />
-            </h1>
-            <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-              <InlineEditText
-                value={data.customer}
-                onSave={(v) => patch.mutateAsync({ customer: v })}
-                label="Edit customer name"
-                validate={(v) => (v.length < 1 ? 'Customer is required' : null)}
-              />
-              {' · '}
-              <InlineEditText
-                value={data.industry ?? ''}
-                onSave={(v) => patch.mutateAsync({ industry: v || null })}
-                label="Edit industry"
-                display={(v) => v || '—'}
-                placeholder="Industry"
-              />
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <CreateTaskDialog
-              oppId={data.id}
-              trigger={
-                <Button variant="secondary" size="sm">
-                  + Task
-                </Button>
-              }
-            />
-            <Button size="sm" onClick={() => setBriefOpen(true)}>
-              Ask Dust
-            </Button>
-            <InlineEditSelect<OpportunityStage>
-              value={data.stage as OpportunityStage}
-              onSave={(v) => patch.mutateAsync({ stage: v })}
-              options={STAGE_OPTIONS}
-              label="Change stage"
-              display={(v) => <Badge tone={stageTone(v)}>{formatStage(v)}</Badge>}
-            />
-            <div className="text-right">
-              <div className="text-2xl font-bold tabular-nums text-[var(--fg-primary)]">
-                <InlineEditNumber
-                  value={data.value}
-                  onSave={(v) => patch.mutateAsync({ value: v })}
-                  label="Edit deal value (EUR)"
-                  min={0}
-                  step={1000}
-                  display={(v) => formatMoney(v, 'EUR')}
+      <GlassCard
+        padding="lg"
+        className="border-none bg-gradient-to-br from-[var(--surface-card)] to-[var(--surface-sunken-alpha)] shadow-2xl"
+      >
+        <header>
+          <nav aria-label="Breadcrumb" className="text-xs text-[var(--fg-tertiary)] mb-4">
+            <ol className="flex items-center gap-2">
+              <li>
+                <Link
+                  to="/opportunities"
+                  className="hover:text-[var(--brand-primary)] transition-colors"
+                >
+                  Opportunities
+                </Link>
+              </li>
+              <li aria-hidden="true" className="opacity-30">
+                /
+              </li>
+              <li aria-current="page" className="font-mono">
+                {data.code}
+              </li>
+            </ol>
+          </nav>
+          <div className="flex flex-wrap items-start justify-between gap-6">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-3xl font-bold tracking-tight text-[var(--fg-primary)] sm:text-4xl">
+                <InlineEditText
+                  value={data.name}
+                  onSave={(v) => patch.mutateAsync({ name: v })}
+                  label="Edit opportunity name"
+                  validate={(v) => (v.length < 1 ? 'Name is required' : null)}
                 />
+              </h1>
+              <div className="mt-2 flex items-center gap-2 text-sm text-[var(--fg-secondary)]">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <Icon name="building" size={14} className="text-[var(--brand-primary)]" />
+                  <InlineEditText
+                    value={data.customer}
+                    onSave={(v) => patch.mutateAsync({ customer: v })}
+                    label="Edit customer name"
+                    validate={(v) => (v.length < 1 ? 'Customer is required' : null)}
+                  />
+                </span>
+                <span className="opacity-30">|</span>
+                <span className="flex items-center gap-1.5">
+                  <Icon name="reports" size={14} className="text-[var(--info)]" />
+                  <InlineEditText
+                    value={data.industry ?? ''}
+                    onSave={(v) => patch.mutateAsync({ industry: v || null })}
+                    label="Edit industry"
+                    display={(v) => v || '—'}
+                    placeholder="Industry"
+                  />
+                </span>
               </div>
-              <div className="text-xs text-[var(--fg-tertiary)]">
-                <InlineEditNumber
-                  value={data.probability}
-                  onSave={(v) => patch.mutateAsync({ probability: v })}
-                  label="Edit probability"
-                  min={0}
-                  max={100}
-                  step={5}
-                  suffix="%"
+            </div>
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2 bg-[var(--surface-sunken-alpha)] p-1 rounded-full border border-[var(--border-subtle)]">
+                <CreateTaskDialog
+                  oppId={data.id}
+                  trigger={
+                    <Button variant="ghost" size="sm" className="rounded-full">
+                      + Task
+                    </Button>
+                  }
                 />
-                {' likely · due '}
-                <InlineEditDate
-                  value={data.dueDate}
-                  onSave={(v) => patch.mutateAsync({ dueDate: v })}
-                  label="Edit due date"
-                  display={(v) => formatDate(v)}
-                />
+                <MagneticButton
+                  onClick={() => setBriefOpen(true)}
+                  className="h-8 px-4 text-xs shadow-none"
+                >
+                  Ask Dust
+                </MagneticButton>
+              </div>
+              <InlineEditSelect<OpportunityStage>
+                value={data.stage as OpportunityStage}
+                onSave={(v) => patch.mutateAsync({ stage: v })}
+                options={STAGE_OPTIONS}
+                label="Change stage"
+                display={(v) => (
+                  <Badge tone={stageTone(v)} className="px-4 py-1 text-xs uppercase tracking-wider">
+                    {formatStage(v)}
+                  </Badge>
+                )}
+              />
+              <div className="text-right border-l border-[var(--border-subtle)] pl-4">
+                <div className="text-3xl font-bold tabular-nums text-[var(--fg-primary)] tracking-tight">
+                  <InlineEditNumber
+                    value={data.value}
+                    onSave={(v) => patch.mutateAsync({ value: v })}
+                    label="Edit deal value (EUR)"
+                    min={0}
+                    step={1000}
+                    display={(v) => formatMoney(v, 'EUR')}
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-2 text-xs text-[var(--fg-tertiary)] mt-1">
+                  <span className="flex items-center gap-1">
+                    <span className="font-semibold text-[var(--success)]">
+                      <InlineEditNumber
+                        value={data.probability}
+                        onSave={(v) => patch.mutateAsync({ probability: v })}
+                        label="Edit probability"
+                        min={0}
+                        max={100}
+                        step={5}
+                        suffix="%"
+                      />
+                    </span>
+                    <span>likely</span>
+                  </span>
+                  <span className="opacity-30">·</span>
+                  <span className="flex items-center gap-1">
+                    <Icon name="clock" size={12} />
+                    <InlineEditDate
+                      value={data.dueDate}
+                      onSave={(v) => patch.mutateAsync({ dueDate: v })}
+                      label="Edit due date"
+                      display={(v) => formatDate(v)}
+                    />
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
+      </GlassCard>
 
       <BriefingDialog
         opportunityId={data.id}
@@ -190,7 +194,7 @@ export function OpportunityDetailPage() {
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
         <FinancialHealthCard intel={intel} />
         <WinPredictionCard intel={intel} />
-        <HiringCard intel={intel} />
+        <OpportunityAccountIntel accountId={data.customer} />
       </div>
 
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
@@ -205,6 +209,7 @@ export function OpportunityDetailPage() {
         customer={data.customer}
         intelDecisionUnit={intel.decisionUnit ?? []}
         documents={data.documents}
+        timeline={timelineItems}
       />
     </div>
   );
@@ -283,31 +288,6 @@ function WinPredictionCard({ intel }: { intel: IntelPayload }) {
             </li>
           ))}
         </ul>
-      </div>
-    </Card>
-  );
-}
-
-function HiringCard({ intel }: { intel: IntelPayload }) {
-  const h = intel.hiring;
-  return (
-    <Card>
-      <SectionHeader title="Hiring signals" caption={h ? `Trend ${h.trendDirection}` : ''} />
-      <div className="p-5 space-y-2">
-        {h?.openings?.length ? (
-          h.openings.map((o, i) => (
-            <div key={i} className="flex items-center justify-between text-xs">
-              <span className="text-[var(--fg-primary)]">{o.title}</span>
-              <Badge
-                tone={o.urgency === 'high' ? 'tomato' : o.urgency === 'medium' ? 'amber' : 'gray'}
-              >
-                {o.urgency}
-              </Badge>
-            </div>
-          ))
-        ) : (
-          <p className="text-xs text-[var(--fg-tertiary)]">No active job postings tracked.</p>
-        )}
       </div>
     </Card>
   );

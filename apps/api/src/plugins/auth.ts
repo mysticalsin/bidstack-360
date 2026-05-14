@@ -9,6 +9,7 @@
 import { verifyToken } from '@clerk/backend';
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
+import * as Sentry from '@sentry/node';
 
 import { prisma } from '@bidstack/db';
 
@@ -27,6 +28,8 @@ export interface AuthContext {
   orgId: string;
   userId: string;
   scopes: string[];
+  role: string;
+  email?: string;
 }
 
 const STUB_CLERK_ORG = 'org_seed_mantu';
@@ -39,15 +42,25 @@ async function resolveStubAuth(req: FastifyRequest): Promise<AuthContext> {
     );
   }
   const user = await prisma.user.findFirst({
-    where: { orgId: org.id, role: 'admin' },
+    where: { orgId: org.id },
     orderBy: { createdAt: 'asc' },
   });
   if (!user) {
-    throw req.server.httpErrors.serviceUnavailable(
-      'Stub auth: no admin seed user — run `pnpm db:seed`',
-    );
+    throw req.server.httpErrors.serviceUnavailable('Stub auth: no seed user — run `pnpm db:seed`');
   }
-  return { orgId: org.id, userId: user.id, scopes: ['read', 'write'] };
+  return {
+    orgId: org.id,
+    userId: user.id,
+    scopes: ['read', 'write'],
+    role: user.role,
+    email: user.email ?? undefined,
+  };
+}
+
+function mapClerkRole(orgRole: string | undefined): string {
+  if (orgRole === 'org:admin') return 'admin';
+  // Future: map custom Clerk roles like 'org:bid_manager' → 'bid_manager'
+  return 'member';
 }
 
 async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
@@ -70,9 +83,26 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
 
     const clerkOrgId = payload.org_id as string | undefined;
     const clerkUserId = payload.sub as string;
+    const email = (payload.email as string | undefined) ?? '';
 
     if (!clerkOrgId) {
       throw req.server.httpErrors.forbidden('No organization context in token');
+    }
+
+    // SSO domain restriction: if SSO_ALLOWED_EMAIL_DOMAINS is set, reject
+    // sign-ins from unlisted domains. This enforces corporate Microsoft Entra
+    // ID boundaries even when Clerk's dashboard allows broader providers.
+    const allowedDomains = process.env.SSO_ALLOWED_EMAIL_DOMAINS?.split(',')
+      .map((d) => d.trim().toLowerCase())
+      .filter(Boolean);
+    if (allowedDomains && allowedDomains.length > 0) {
+      const userDomain = email.split('@')[1]?.toLowerCase() ?? '';
+      if (!userDomain || !allowedDomains.includes(userDomain)) {
+        req.log.warn({ email, userDomain, allowedDomains }, 'SSO domain rejected');
+        throw req.server.httpErrors.forbidden(
+          `Sign-in from @${userDomain} is not permitted. Allowed domains: ${allowedDomains.join(', ')}`,
+        );
+      }
     }
 
     const org = await prisma.org.findUnique({
@@ -82,14 +112,32 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
       throw req.server.httpErrors.notFound('Organization not registered');
     }
 
-    const user = await prisma.user.findFirst({
-      where: { orgId: org.id, clerkUser: clerkUserId },
-    });
-    if (!user) {
-      throw req.server.httpErrors.notFound('User not registered in this organization');
-    }
+    // JIT provisioning: auto-create the user on first sign-in and sync the
+    // Clerk org role on every login so Dashboard changes are immediate.
+    const clerkRole = mapClerkRole(payload.org_role as string | undefined);
+    const firstName = (payload.first_name as string | undefined) ?? '';
+    const lastName = (payload.last_name as string | undefined) ?? '';
+    const name = `${firstName} ${lastName}`.trim() || null;
 
-    return { orgId: org.id, userId: user.id, scopes: ['read', 'write'] };
+    const user = await prisma.user.upsert({
+      where: { clerkUser: clerkUserId },
+      create: {
+        orgId: org.id,
+        clerkUser: clerkUserId,
+        email: email || `${clerkUserId}@placeholder.com`,
+        name,
+        role: clerkRole,
+      },
+      update: { name, role: clerkRole },
+    });
+
+    return {
+      orgId: org.id,
+      userId: user.id,
+      scopes: ['read', 'write'],
+      role: user.role,
+      email: email || undefined,
+    };
   } catch (err) {
     req.log.warn({ err }, 'clerk verification failed');
     throw req.server.httpErrors.unauthorized('Invalid or expired token');
@@ -98,9 +146,9 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
 
 const plugin: FastifyPluginAsync = fp(async (server) => {
   const hasClerkKey = !!process.env.CLERK_SECRET_KEY;
-  const env = process.env.NODE_ENV ?? 'development';
   // Stub auth is allowed in dev and test only — production must provide a key.
-  const allowStub = env === 'development' || env === 'test';
+  // Do NOT default to 'development' — if NODE_ENV is unset, allowStub is false.
+  const allowStub = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
 
   if (!hasClerkKey && !allowStub) {
     server.log.error(
@@ -123,10 +171,13 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
 
     if (!hasClerkKey) {
       req.auth = await resolveStubAuth(req);
-      return;
+    } else {
+      req.auth = await verifyClerkAuth(req);
     }
 
-    req.auth = await verifyClerkAuth(req);
+    Sentry.setTag('orgId', req.auth.orgId);
+    Sentry.setTag('userId', req.auth.userId);
+    Sentry.setUser({ id: req.auth.userId, email: req.auth.email });
   });
 });
 

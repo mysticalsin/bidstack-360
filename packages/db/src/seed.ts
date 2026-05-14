@@ -10,6 +10,7 @@ import { type Prisma, PrismaClient } from '../generated/client/index.js';
 import {
   fixtureCompanyEnrichments,
   fixtureContacts,
+  fixtureLeads,
   fixtureOpps,
   fixtureTasks,
   fixtureUsers,
@@ -66,20 +67,22 @@ async function main() {
         customer: o.customer,
         name: o.name,
         stage: o.stage,
-        valueEur: o.value,
+        valueMicros: Math.round(o.value * 1_000_000),
         probability: o.probability,
         dueDate: o.dueDate ? new Date(o.dueDate) : null,
         ownerId,
         industry: o.industry,
         logoUrl: o.logoUrl,
+        country: o.country,
         intel: intelFor(o.code) as Prisma.InputJsonValue,
       },
       update: {
         stage: o.stage,
-        valueEur: o.value,
+        valueMicros: Math.round(o.value * 1_000_000),
         probability: o.probability,
         dueDate: o.dueDate ? new Date(o.dueDate) : null,
         ownerId,
+        country: o.country,
         intel: intelFor(o.code) as Prisma.InputJsonValue,
       },
     });
@@ -158,6 +161,43 @@ async function main() {
     });
   }
   console.log(`  ✓ contacts: ${fixtureContacts.length}`);
+
+  // Leads
+  for (const l of fixtureLeads) {
+    const ownerId = usersByInitials.get(l.ownerInitials) ?? null;
+    await prisma.lead.upsert({
+      where: { id: l.id },
+      create: {
+        id: l.id,
+        orgId: org.id,
+        firstName: l.firstName,
+        lastName: l.lastName,
+        email: l.email,
+        phone: l.phone,
+        companyName: l.companyName,
+        title: l.title,
+        source: l.source,
+        status: l.status,
+        score: l.score,
+        priority: l.priority,
+        ownerId,
+      },
+      update: {
+        firstName: l.firstName,
+        lastName: l.lastName,
+        email: l.email,
+        phone: l.phone,
+        companyName: l.companyName,
+        title: l.title,
+        source: l.source,
+        status: l.status,
+        score: l.score,
+        priority: l.priority,
+        ownerId,
+      },
+    });
+  }
+  console.log(`  ✓ leads: ${fixtureLeads.length}`);
 
   // Tasks (linked to opportunities by code)
   const oppByCode = new Map(

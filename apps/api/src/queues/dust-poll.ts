@@ -22,7 +22,7 @@ let connectionSingleton: IORedis | null = null;
 function getQueue(): Queue {
   if (queueSingleton) return queueSingleton;
 
-  const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6379';
+  const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6380';
   // BullMQ requires `maxRetriesPerRequest: null` for blocking commands; this
   // dedicated connection is separate from the API's health-probe Redis client
   // which has aggressive retry-disabling settings unfit for enqueueing.

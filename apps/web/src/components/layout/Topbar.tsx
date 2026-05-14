@@ -1,15 +1,16 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { useState, type FormEvent } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useState, useRef, useEffect, type FormEvent } from 'react';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 
 import { Avatar } from '@/components/ui/Avatar';
 import { useHelpDrawer } from '@/components/help/useHelpDrawer';
 import { Icon } from '@/components/ui/Icon';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { useSignOut, useUser } from '@/lib/auth';
+import { useSignOut, useUser, useRole } from '@/lib/auth';
 import { useThemeStore } from '@/stores/theme';
 import { useRecentSearches } from '@/stores/recentSearches';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { useMentions, useMarkMentionRead } from '@/hooks/useMentions';
 
 // Breadcrumb labels by first-path segment. Nested routes inherit their parent.
 const CRUMB_LABELS: Record<string, string> = {
@@ -23,6 +24,7 @@ const CRUMB_LABELS: Record<string, string> = {
   integrations: 'Integrations',
   'audit-log': 'Audit log',
   settings: 'Settings',
+  search: 'Search',
 };
 
 function useCrumbs(): { label: string; here: boolean }[] {
@@ -60,6 +62,7 @@ export function Topbar() {
   const { user } = useUser();
   const { signOut } = useSignOut();
   const navigate = useNavigate();
+  const { role } = useRole();
   const openHelp = useHelpDrawer((s) => s.setOpen);
 
   const seed = user?.fullName || user?.primaryEmailAddress?.emailAddress || 'Guest';
@@ -104,11 +107,7 @@ export function Topbar() {
         </button>
       </Tooltip>
 
-      <Tooltip content="Notifications coming soon">
-        <button type="button" className="iconbtn" aria-label="Notifications (coming soon)" disabled>
-          <Icon name="bell" size={16} ariaHidden />
-        </button>
-      </Tooltip>
+      <NotificationsBell />
 
       <Tooltip content="Help & shortcuts (?)">
         <button
@@ -125,7 +124,14 @@ export function Topbar() {
         <Avatar seed={seed} size={32} decorative className="av" />
         <div className="who">
           <div className="name">{user?.fullName ?? 'Guest'}</div>
-          <div className="role">{user?.primaryEmailAddress?.emailAddress ?? 'Not signed in'}</div>
+          <div className="role">
+            {role ? (
+              <span className="mr-1.5 inline-flex items-center rounded border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-1 py-0 text-[9px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+                {role}
+              </span>
+            ) : null}
+            {user?.primaryEmailAddress?.emailAddress ?? 'Not signed in'}
+          </div>
         </div>
         <button
           type="button"
@@ -169,9 +175,16 @@ function SearchBar() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
+  const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recents = useRecentSearches((s) => s.items);
   const pushRecent = useRecentSearches((s) => s.push);
   const clearRecents = useRecentSearches((s) => s.clear);
+
+  useEffect(() => {
+    return () => {
+      if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
+    };
+  }, []);
 
   const runSearch = (q: string) => {
     const trimmed = q.trim();
@@ -179,7 +192,7 @@ function SearchBar() {
     pushRecent(trimmed);
     setQuery(trimmed);
     setOpen(false);
-    navigate(`/opportunities?search=${encodeURIComponent(trimmed)}`);
+    navigate(`/search?q=${encodeURIComponent(trimmed)}`);
   };
 
   const onSubmit = (e: FormEvent) => {
@@ -202,7 +215,9 @@ function SearchBar() {
         onFocus={() => setOpen(true)}
         // Delay the close so a click on a dropdown item lands before the
         // dropdown unmounts. 150ms is the standard browser delay.
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onBlur={() => {
+          blurTimeoutRef.current = setTimeout(() => setOpen(false), 150);
+        }}
       />
       <kbd aria-hidden>⌘K</kbd>
       {open && !query && recents.length > 0 ? (
@@ -247,5 +262,114 @@ function SearchBar() {
         </div>
       ) : null}
     </form>
+  );
+}
+
+function NotificationsBell() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const mentions = useMentions(true);
+  const markRead = useMarkMentionRead();
+  const unreadCount = mentions.data?.items.length ?? 0;
+
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <Tooltip
+        content={
+          unreadCount > 0
+            ? `${unreadCount} unread mention${unreadCount !== 1 ? 's' : ''}`
+            : 'Notifications'
+        }
+      >
+        <button
+          type="button"
+          className="iconbtn relative"
+          aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <Icon name="bell" size={16} ariaHidden />
+          {unreadCount > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--danger)] px-1 text-[10px] font-bold text-white">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </button>
+      </Tooltip>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-[calc(100%+8px)] z-30 w-80 overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] shadow-[var(--shadow-lg)]"
+        >
+          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2.5">
+            <span className="text-sm font-semibold text-[var(--fg-primary)]">Mentions</span>
+            {unreadCount > 0 && (
+              <span className="text-xs text-[var(--fg-tertiary)]">{unreadCount} unread</span>
+            )}
+          </div>
+          <div className="max-h-72 overflow-y-auto">
+            {mentions.isError ? (
+              <div className="px-4 py-6 text-center text-sm text-[var(--danger)]">
+                Could not load mentions
+              </div>
+            ) : mentions.isLoading ? (
+              <div className="px-4 py-6 text-center text-sm text-[var(--fg-secondary)]">
+                Loading…
+              </div>
+            ) : unreadCount === 0 ? (
+              <div className="px-4 py-6 text-center text-sm text-[var(--fg-secondary)]">
+                No unread mentions
+              </div>
+            ) : (
+              mentions.data?.items.map((m) => (
+                <div
+                  key={m.id}
+                  role="menuitem"
+                  className="flex items-start gap-3 border-b border-[var(--border-subtle)] px-4 py-3 last:border-0 hover:bg-[var(--surface-hover)]"
+                >
+                  <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-[var(--brand-primary)]" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-[var(--fg-primary)]">
+                      Someone mentioned you in a comment
+                    </p>
+                    <p className="text-xs text-[var(--fg-tertiary)]">
+                      {new Date(m.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="shrink-0 text-xs text-[var(--brand-primary)] hover:underline"
+                    onClick={() => markRead.mutate(m.id)}
+                  >
+                    Mark read
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="border-t border-[var(--border-subtle)] px-4 py-2">
+            <Link
+              to="/tasks"
+              className="text-xs text-[var(--brand-primary)] hover:underline"
+              onClick={() => setOpen(false)}
+            >
+              View all mentions
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

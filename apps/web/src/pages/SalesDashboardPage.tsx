@@ -6,7 +6,9 @@
 
 import { useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
+import { useMemo } from 'react';
 
+import { ArAgingCard } from '@/components/sales/ArAgingCard';
 import { KpiTile } from '@/components/sales/KpiTile';
 import { MonthlySalesChart } from '@/components/sales/MonthlySalesChart';
 import { TopCategoriesTreemap } from '@/components/sales/TopCategoriesTreemap';
@@ -14,7 +16,8 @@ import { TopCountriesCard } from '@/components/sales/TopCountriesCard';
 import { TopList } from '@/components/sales/TopList';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
-import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { useArAging } from '@/hooks/useArAging';
 import { useAutopopulateSalesCompanies } from '@/hooks/useAutopopulateSalesCompanies';
 import { useSalesIntelligence } from '@/hooks/useSalesIntelligence';
 import { formatMoneyMicros } from '@/lib/format';
@@ -33,24 +36,60 @@ import type {
 export function SalesDashboardPage() {
   const report = useSalesIntelligence();
   const autopopulate = useAutopopulateSalesCompanies();
+  const isError = report.isError;
   const reducedMotion = useReducedMotion();
   const data = report.data;
+  const arAging = useArAging(data?.currencyCode);
   const currency = data?.currencyCode ?? 'CAD';
-  const topProducts = data?.topProducts ?? [];
-  const topProductMax = topProducts.reduce(
-    (max, product) => Math.max(max, product.revenueMicros),
-    1,
+  const topProducts = useMemo(() => data?.topProducts ?? [], [data?.topProducts]);
+  const monthly = useMemo(() => monthlyPoints(data), [data]);
+  const countries = useMemo(() => toCountries(data), [data]);
+  const categories = useMemo(() => toCategories(data), [data]);
+  const customers = useMemo(() => topCustomers(data), [data]);
+  const quotations = useMemo(() => toTopRows(data?.topQuotations ?? []), [data?.topQuotations]);
+  const orders = useMemo(() => toTopRows(data?.topOrders ?? []), [data?.topOrders]);
+  const topProductMax = useMemo(
+    () => topProducts.reduce((max, product) => Math.max(max, product.revenueMicros), 1),
+    [topProducts],
   );
   const navigate = useNavigate();
   // Each KPI tile drills into a pre-filtered orders list. "Quotations" =
   // draft+sent (no single ?state can encode both, so we land on the union),
   // "Orders" = confirmed, "Revenue"/"Average Order" = confirmed (the same
   // set the metric was computed from).
-  const drill =
-    (state: 'draft' | 'sent' | 'confirmed' | 'all'): (() => void) =>
-    () => {
-      navigate(state === 'all' ? '/sales/orders' : `/sales/orders?state=${state}`);
-    };
+  const drill = useMemo(
+    () =>
+      (state: 'draft' | 'sent' | 'confirmed' | 'all'): (() => void) =>
+      () => {
+        navigate(state === 'all' ? '/sales/orders' : `/sales/orders?state=${state}`);
+      },
+    [navigate],
+  );
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <header>
+          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
+            Sales Dashboard
+          </h1>
+        </header>
+        <ErrorState
+          title="Could not load sales data"
+          message={report.error instanceof Error ? report.error.message : 'Please try again.'}
+          action={
+            <button
+              type="button"
+              onClick={() => report.refetch()}
+              className="inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-medium text-fg-on-brand hover:bg-brand-hover"
+            >
+              Retry
+            </button>
+          }
+        />
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -150,7 +189,7 @@ export function SalesDashboardPage() {
             {report.isLoading ? (
               <LoadingSkeleton rows={3} />
             ) : (
-              <MonthlySalesChart points={monthlyPoints(data)} currency={currency} />
+              <MonthlySalesChart points={monthly} currency={currency} />
             )}
           </div>
         </Card>
@@ -167,7 +206,7 @@ export function SalesDashboardPage() {
               <LoadingSkeleton rows={4} />
             </div>
           ) : (
-            <TopList items={toTopRows(data?.topQuotations ?? [])} variant="quotation" />
+            <TopList items={quotations} variant="quotation" />
           )}
         </Card>
         <Card>
@@ -177,16 +216,17 @@ export function SalesDashboardPage() {
               <LoadingSkeleton rows={4} />
             </div>
           ) : (
-            <TopList items={toTopRows(data?.topOrders ?? [])} variant="order" />
+            <TopList items={orders} variant="order" />
           )}
         </Card>
       </motion.div>
 
       <motion.div
         variants={reducedMotion ? undefined : staggerChild}
-        className="grid grid-cols-1 gap-6 lg:grid-cols-2"
+        className="grid grid-cols-1 gap-6 lg:grid-cols-3"
       >
-        <TopCountriesCard data={toCountries(data)} isLoading={report.isLoading} />
+        <TopCountriesCard data={countries} isLoading={report.isLoading} />
+        <ArAgingCard data={arAging.data} isLoading={arAging.isLoading} />
         <Card>
           <SectionHeader title="Top Products" />
           {report.isLoading ? (
@@ -262,10 +302,10 @@ export function SalesDashboardPage() {
               <LoadingSkeleton rows={5} />
             </div>
           ) : (
-            <TopList items={topCustomers(data)} showSalesperson={false} variant="customer" />
+            <TopList items={customers} showSalesperson={false} variant="customer" />
           )}
         </Card>
-        <TopCategoriesTreemap data={toCategories(data)} isLoading={report.isLoading} />
+        <TopCategoriesTreemap data={categories} isLoading={report.isLoading} />
       </motion.div>
     </motion.div>
   );

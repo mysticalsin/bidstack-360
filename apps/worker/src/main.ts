@@ -11,6 +11,7 @@ import pino from 'pino';
 import { startCompanyEnrichApollo } from './queues/company-enrich-apollo.js';
 import { startDustPoller } from './queues/dust-poll.js';
 import { startWebhookProcessor } from './queues/webhook-processor.js';
+import { startDocumentExtract } from './queues/document-extract.js';
 
 const log = pino({
   level: process.env.LOG_LEVEL ?? 'info',
@@ -21,7 +22,7 @@ const log = pino({
   name: 'worker',
 });
 
-const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6379';
+const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6380';
 
 const connection = new IORedis(redisUrl, {
   maxRetriesPerRequest: null,
@@ -37,9 +38,12 @@ await Promise.all([
   startDustPoller(connection, log, workers, queues),
   startWebhookProcessor(connection, log, workers, queues),
   startCompanyEnrichApollo(connection, log, workers, queues),
+  startDocumentExtract(connection, log, workers, queues),
 ]);
 
-log.info('BidStack worker ready (dust-poll + webhook-processor + company-enrich-apollo)');
+log.info(
+  'BidStack worker ready (dust-poll + webhook-processor + company-enrich-apollo + document-extract)',
+);
 
 const shutdown = async (signal: string) => {
   log.info({ signal }, 'shutting down worker');

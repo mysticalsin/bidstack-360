@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
 import { useContacts } from '@/hooks/useContacts';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
+import { useGlobalSearch } from '@/hooks/useGlobalSearch';
 import { useTasks } from '@/hooks/useTasks';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -29,7 +30,17 @@ interface CommandPaletteProps {
 
 interface Item {
   id: string;
-  group: 'navigate' | 'opportunity' | 'account' | 'contact' | 'task' | 'action';
+  group:
+    | 'navigate'
+    | 'opportunity'
+    | 'account'
+    | 'contact'
+    | 'task'
+    | 'action'
+    | 'company'
+    | 'note'
+    | 'sales_order'
+    | 'invoice';
   label: string;
   hint?: string;
   // Optional leading visual (e.g. CompanyLogo for account rows). Group label
@@ -49,6 +60,7 @@ const NAV_TARGETS: Array<{ to: string; label: string; hint: string }> = [
   { to: '/integrations', label: 'Go to Integrations', hint: '⌘7' },
   { to: '/audit-log', label: 'Go to Audit log', hint: '⌘L' },
   { to: '/settings', label: 'Go to Settings', hint: '⌘8' },
+  { to: '/search', label: 'Search across workspace', hint: '⌘9' },
 ];
 
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
@@ -113,6 +125,8 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
         signal,
       }),
   });
+
+  const globalSearch = useGlobalSearch(query);
 
   // Dashboard snapshot is already in the React Query cache once the user has
   // visited the dashboard, so this hook is effectively free here.
@@ -258,6 +272,25 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
         },
       });
     }
+    for (const g of globalSearch.data?.items ?? []) {
+      out.push({
+        id: `search:${g.type}:${g.id}`,
+        group: g.type === 'sales_order' ? 'opportunity' : g.type,
+        label: g.title,
+        hint: g.subtitle,
+        onSelect: () => {
+          pushRecent({
+            id: `search:${g.type}:${g.id}`,
+            group: g.type === 'sales_order' ? 'opportunity' : g.type,
+            label: g.title,
+            hint: g.subtitle,
+            route: g.url,
+          });
+          navigate(g.url);
+          onClose();
+        },
+      });
+    }
     for (const o of oppSearch.data?.items ?? []) {
       const route = `/opportunities/${o.id}`;
       out.push({
@@ -283,6 +316,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
     query,
     companies,
     oppSearch.data,
+    globalSearch.data,
     contacts.data?.items,
     tasks.data?.items,
     navigate,

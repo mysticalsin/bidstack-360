@@ -11,20 +11,38 @@ import {
 
 import { authPlugin } from './plugins/auth.js';
 import { errorHandlerPlugin } from './plugins/error-handler.js';
+import { rbacPlugin } from './plugins/rbac.js';
 import { auditLogsRoutes } from './routes/audit-logs.js';
+import { collaborationRoutes } from './routes/collaboration.js';
 import { contactsRoutes } from './routes/contacts.js';
 import { crmRoutes } from './routes/crm.js';
 import { dustRoutes } from './routes/dust-integration.js';
 import { filesRoutes } from './routes/files.js';
 import { healthRoute } from './routes/health.js';
+import { invoicesRoutes } from './routes/invoices.js';
+import { leadRoutes } from './routes/leads.js';
 import { notesRoutes } from './routes/notes.js';
+import { opportunityContactsRoutes } from './routes/opportunity-contacts.js';
 import { odooRoutes } from './routes/odoo-integration.js';
 import { opportunityRoutes } from './routes/opportunities.js';
+import { opportunityTimelineRoutes } from './routes/opportunity-timeline.js';
+import { predictiveRoutes } from './routes/predictive.js';
+import { searchRoutes } from './routes/search.js';
+import { serviceDeskRoutes } from './routes/service-desk.js';
 import { reportsRoutes } from './routes/reports.js';
 import { salesDashboardRoutes } from './routes/sales-dashboard.js';
 import { salesOrdersRoutes } from './routes/sales-orders.js';
 import { tasksRoutes } from './routes/tasks.js';
+import { territoryRoutes } from './routes/territories.js';
+import { accountIntelRoutes } from './routes/account-intel.js';
 import { webhooksRoutes } from './routes/webhooks.js';
+import { workflowRoutes } from './routes/workflows.js';
+import { pluginRoutes } from './routes/plugins.js';
+import { productsRoutes } from './routes/products.js';
+import { usersRoutes } from './routes/users.js';
+import { webhookSubscriptionsRoutes } from './routes/webhook-subscriptions.js';
+import { companiesRoutes } from './routes/companies.js';
+import { customFieldsRoutes } from './routes/custom-fields.js';
 
 const CONNECT_SRC = [
   "'self'",
@@ -81,7 +99,8 @@ export async function buildServer(): Promise<FastifyInstance> {
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc:
+          process.env.NODE_ENV === 'development' ? ["'self'", "'unsafe-inline'"] : ["'self'"],
         imgSrc: ["'self'", 'data:', 'https:'],
         connectSrc: CONNECT_SRC,
         fontSrc: ["'self'"],
@@ -90,14 +109,32 @@ export async function buildServer(): Promise<FastifyInstance> {
         frameAncestors: ["'none'"],
       },
     },
+    strictTransportSecurity: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    crossOriginEmbedderPolicy: true,
+    crossOriginOpenerPolicy: true,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    dnsPrefetchControl: { allow: false },
+    ieNoOpen: true,
+    noSniff: true,
+    originAgentCluster: true,
+    permittedCrossDomainPolicies: { permittedPolicies: 'none' },
+    xssFilter: true,
   });
   await server.register(cors, {
     origin: (origin, cb) => {
-      // Dev: allow any localhost / vite dev server.
       if (!origin) return cb(null, true);
       const allowed = [process.env.PUBLIC_BASE_URL].filter(Boolean);
       if (process.env.NODE_ENV === 'development') {
         allowed.push('http://localhost:5173', 'http://localhost:4173');
+      }
+      // Production safety: never allow localhost origins.
+      if (process.env.NODE_ENV === 'production' && origin.includes('localhost')) {
+        return cb(new Error('localhost origin rejected in production'), false);
       }
       cb(null, allowed.includes(origin));
     },
@@ -108,25 +145,49 @@ export async function buildServer(): Promise<FastifyInstance> {
     max: 600,
     timeWindow: '1 minute',
     allowList: ['127.0.0.1', '::1'],
+    keyGenerator: (req) => {
+      // Per-user rate limiting: authenticated users get their own bucket.
+      // Fall back to IP for public routes (health, webhooks).
+      const auth = (req as unknown as { auth?: { userId?: string } }).auth;
+      return auth?.userId ?? req.ip;
+    },
   });
 
   await server.register(errorHandlerPlugin);
   await server.register(authPlugin);
+  await server.register(rbacPlugin);
 
   await server.register(healthRoute);
   await server.register(opportunityRoutes, { prefix: '/api' });
   await server.register(contactsRoutes, { prefix: '/api' });
   await server.register(tasksRoutes, { prefix: '/api' });
   await server.register(reportsRoutes, { prefix: '/api' });
+  await server.register(searchRoutes, { prefix: '/api' });
   await server.register(salesDashboardRoutes, { prefix: '/api' });
   await server.register(salesOrdersRoutes, { prefix: '/api' });
+  await server.register(invoicesRoutes, { prefix: '/api' });
+  await server.register(productsRoutes, { prefix: '/api' });
   await server.register(auditLogsRoutes, { prefix: '/api' });
   await server.register(crmRoutes, { prefix: '/api' });
   await server.register(notesRoutes, { prefix: '/api' });
+  await server.register(opportunityContactsRoutes, { prefix: '/api' });
   await server.register(filesRoutes, { prefix: '/api' });
   await server.register(dustRoutes, { prefix: '/api/integrations' });
   await server.register(odooRoutes, { prefix: '/api/integrations' });
   await server.register(webhooksRoutes); // mounted at /webhooks/*
+  await server.register(territoryRoutes, { prefix: '/api' });
+  await server.register(accountIntelRoutes, { prefix: '/api' });
+  await server.register(opportunityTimelineRoutes, { prefix: '/api' });
+  await server.register(collaborationRoutes, { prefix: '/api' });
+  await server.register(predictiveRoutes, { prefix: '/api' });
+  await server.register(serviceDeskRoutes, { prefix: '/api' });
+  await server.register(workflowRoutes, { prefix: '/api' });
+  await server.register(leadRoutes, { prefix: '/api' });
+  await server.register(pluginRoutes, { prefix: '/api' });
+  await server.register(usersRoutes, { prefix: '/api' });
+  await server.register(webhookSubscriptionsRoutes, { prefix: '/api' });
+  await server.register(companiesRoutes, { prefix: '/api' });
+  await server.register(customFieldsRoutes, { prefix: '/api' });
 
   return server;
 }

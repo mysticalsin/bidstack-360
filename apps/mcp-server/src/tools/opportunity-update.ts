@@ -74,7 +74,9 @@ export const opportunityUpdate: Tool<typeof Input> = {
       data: {
         ...(patch.stage ? { stage: patch.stage as PrismaStage } : {}),
         ...(patch.probability !== undefined ? { probability: patch.probability } : {}),
-        ...(patch.value !== undefined ? { valueEur: patch.value } : {}),
+        ...(patch.value !== undefined
+          ? { valueMicros: BigInt(Math.round(patch.value * 1_000_000)) }
+          : {}),
         ...(patch.dueDate !== undefined
           ? { dueDate: patch.dueDate ? new Date(patch.dueDate) : null }
           : {}),
@@ -101,7 +103,7 @@ export const opportunityUpdate: Tool<typeof Input> = {
       customer: updated.customer,
       name: updated.name,
       stage: updated.stage,
-      value: Number(updated.valueEur),
+      value: Number(updated.valueMicros) / 1_000_000,
       probability: updated.probability,
       dueDate: updated.dueDate?.toISOString().slice(0, 10) ?? null,
       owner: updated.owner?.email ?? null,

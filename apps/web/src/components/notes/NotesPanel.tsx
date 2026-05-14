@@ -18,12 +18,15 @@ import { toast } from '@/components/ui/Toast';
 import { useCreateNote, useDeleteNote, useNotes, useUpdateNote } from '@/hooks/useNotes';
 import { relativeTime } from '@/lib/format';
 import type { Note } from '@bidstack/shared';
+import { MeetingNotesImportDialog } from './MeetingNotesImportDialog';
 
 interface Props {
   accountId: string | undefined;
+  companyName?: string;
+  domain?: string | null;
 }
 
-export function NotesPanel({ accountId }: Props) {
+export function NotesPanel({ accountId, companyName, domain }: Props) {
   const list = useNotes(accountId);
   const [composing, setComposing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -34,16 +37,23 @@ export function NotesPanel({ accountId }: Props) {
         title="Notes"
         action={
           accountId && !composing ? (
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                setComposing(true);
-                setEditingId(null);
-              }}
-            >
-              + Add
-            </Button>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <MeetingNotesImportDialog
+                accountId={accountId}
+                companyName={companyName}
+                domain={domain}
+              />
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setComposing(true);
+                  setEditingId(null);
+                }}
+              >
+                + Add
+              </Button>
+            </div>
           ) : null
         }
       />
@@ -140,10 +150,9 @@ function NoteRow({ note, accountId, onEdit }: RowProps) {
             </h4>
             {note.pinned ? <Badge tone="amber">Pinned</Badge> : null}
           </div>
-          <div
-            className="mt-1 text-xs text-[var(--fg-secondary)] line-clamp-3"
-            dangerouslySetInnerHTML={{ __html: renderInlineMarkdown(note.bodyMd) }}
-          />
+          <div className="mt-1 text-xs text-[var(--fg-secondary)] line-clamp-3">
+            <SafeMarkdownPreview text={note.bodyMd} />
+          </div>
           <div className="mt-1.5 text-[11px] text-[var(--fg-tertiary)]">
             {note.authorEmail ?? 'Unknown'} · {relativeTime(note.createdAt)}
           </div>
@@ -253,18 +262,49 @@ function NoteEditor({ accountId, initial, onDone, onCancel }: EditorProps) {
   );
 }
 
-// Trivial markdown preview. Escapes HTML first so untrusted content can't
-// inject tags, then applies **bold** and *italic*. Anything more elaborate
-// (lists, links) belongs behind a real parser when we add a markdown lib.
-function renderInlineMarkdown(input: string): string {
-  const escaped = input
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-  return escaped
-    .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
-    .replace(/\n/g, '<br />');
+// Safe markdown preview — renders as React nodes without any HTML parsing.
+// No dangerouslySetInnerHTML. XSS-safe by construction.
+function SafeMarkdownPreview({ text }: { text: string }) {
+  const lines = text.split('\n');
+  return (
+    <>
+      {lines.map((line, i) => (
+        <span key={i}>
+          <InlineMarkdownLine line={line} />
+          {i < lines.length - 1 ? <br /> : null}
+        </span>
+      ))}
+    </>
+  );
+}
+
+function InlineMarkdownLine({ line }: { line: string }) {
+  const parts: React.ReactNode[] = [];
+  let remaining = line;
+  let key = 0;
+
+  while (remaining.length > 0) {
+    const boldMatch = remaining.match(/^(.*?)\*\*([^*]+)\*\*(.*)$/);
+    const emMatch = remaining.match(/^(.*?)\*([^*]+)\*(.*)$/);
+
+    if (boldMatch && (!emMatch || boldMatch[1]!.length <= emMatch[1]!.length)) {
+      if (boldMatch[1]) {
+        parts.push(<span key={key++}>{boldMatch[1]}</span>);
+      }
+      parts.push(<strong key={key++}>{boldMatch[2]}</strong>);
+      remaining = boldMatch[3]!;
+    } else if (emMatch) {
+      if (emMatch[1]) {
+        parts.push(<span key={key++}>{emMatch[1]}</span>);
+      }
+      parts.push(<em key={key++}>{emMatch[2]}</em>);
+      remaining = emMatch[3]!;
+    } else {
+      // eslint-disable-next-line no-useless-assignment
+      parts.push(<span key={key++}>{remaining}</span>);
+      break;
+    }
+  }
+
+  return <>{parts}</>;
 }

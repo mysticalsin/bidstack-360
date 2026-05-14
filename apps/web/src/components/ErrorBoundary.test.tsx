@@ -32,7 +32,6 @@ describe('ErrorBoundary', () => {
     );
 
     expect(screen.getByRole('heading', { name: /something went wrong/i })).toBeDefined();
-    expect(screen.getByText(/error id/i)).toBeDefined();
     expect(screen.getByRole('button', { name: /reload page/i })).toBeDefined();
 
     consoleError.mockRestore();

@@ -45,7 +45,7 @@ export const opportunitiesGet: Tool<typeof Input> = {
       customer: opp.customer,
       name: opp.name,
       stage: opp.stage,
-      value: Number(opp.valueEur),
+      value: Number(opp.valueMicros) / 1_000_000,
       probability: opp.probability,
       dueDate: opp.dueDate?.toISOString().slice(0, 10) ?? null,
       owner: opp.owner?.email ?? null,

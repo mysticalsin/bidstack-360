@@ -25,7 +25,7 @@ let connectionSingleton: IORedis | null = null;
 function getQueue(): Queue {
   if (queueSingleton) return queueSingleton;
 
-  const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6379';
+  const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6380';
   // The producer connection is dedicated and uses BullMQ-required settings
   // (maxRetriesPerRequest must be null for blocking commands). It's separate
   // from the API's existing health-probe Redis client which has aggressive

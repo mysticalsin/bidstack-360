@@ -7,7 +7,8 @@ import { ProviderHealthSection } from '@/components/integrations/ProviderHealthS
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { useIsAdmin } from '@/lib/auth';
+import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { api } from '@/lib/api';
 import { formatDate, relativeTime } from '@/lib/format';
 
@@ -78,6 +79,7 @@ const MCP_TOOLS: ReadonlyArray<McpToolEntry> = [
 ];
 
 export function IntegrationsPage() {
+  const isAdmin = useIsAdmin();
   const status = useQuery({
     queryKey: ['dust:status'],
     queryFn: ({ signal }) => api<DustStatus>('/api/integrations/dust/status', { signal }),
@@ -87,6 +89,7 @@ export function IntegrationsPage() {
     queryFn: ({ signal }) =>
       api<{ items: WebhookEvent[] }>('/api/integrations/webhooks', { signal }),
   });
+  const isError = status.isError || events.isError;
 
   return (
     <div className="space-y-6">
@@ -96,6 +99,25 @@ export function IntegrationsPage() {
           Dust workspace sync, MCP server, webhook activity, and verified source posture.
         </p>
       </header>
+
+      {isError ? (
+        <ErrorState
+          title="Could not load integrations"
+          message="Some integration data failed to load. Please try again."
+          action={
+            <button
+              type="button"
+              onClick={() => {
+                if (status.isError) void status.refetch();
+                if (events.isError) void events.refetch();
+              }}
+              className="inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-medium text-fg-on-brand hover:bg-brand-hover"
+            >
+              Retry
+            </button>
+          }
+        />
+      ) : null}
 
       <Card>
         <SectionHeader
@@ -108,17 +130,19 @@ export function IntegrationsPage() {
                   {status.data.configured ? 'configured' : 'local stub'}
                 </Badge>
               ) : null}
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  void api('/api/integrations/dust/resync', { method: 'POST' }).then(() =>
-                    status.refetch(),
-                  );
-                }}
-              >
-                Force resync
-              </Button>
+              {isAdmin ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    void api('/api/integrations/dust/resync', { method: 'POST' }).then(() =>
+                      status.refetch(),
+                    );
+                  }}
+                >
+                  Force resync
+                </Button>
+              ) : null}
             </div>
           }
         />

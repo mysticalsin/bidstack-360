@@ -53,3 +53,14 @@ export const DUST_WEBHOOK_PROCESSOR: QueueConfig = {
     removeOnFail: { age: 604_800, count: 50 },
   },
 };
+
+/** Document intelligence extraction — reads file, calls LLM, writes solutions/products. */
+export const DOCUMENT_EXTRACT: QueueConfig = {
+  name: 'document-extract',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 5_000 },
+    removeOnComplete: { age: 86_400, count: 200 },
+    removeOnFail: { age: 604_800, count: 100 },
+  },
+};

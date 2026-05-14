@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { ContactCsvImportDialog } from '@/components/contact/ContactCsvImportDialog';
 import { ContactDialog } from '@/components/contact/ContactDialog';
@@ -558,7 +558,14 @@ export function ContactsPage() {
                       className="h-4 w-4 cursor-pointer accent-[var(--brand-primary)]"
                     />
                   </td>
-                  <td className="px-5 py-3 font-medium text-[var(--fg-primary)]">{c.name}</td>
+                  <td className="px-5 py-3">
+                    <Link
+                      to={`/contacts/${c.id}`}
+                      className="font-medium text-[var(--brand-primary)] hover:underline"
+                    >
+                      {c.name}
+                    </Link>
+                  </td>
                   <td className="px-5 py-3 text-[var(--fg-secondary)]">{c.role ?? '—'}</td>
                   <td className="px-5 py-3 text-[var(--fg-secondary)]">{c.customer}</td>
                   <td className="px-5 py-3 text-[var(--fg-secondary)]">

@@ -1,0 +1,46 @@
+# Git
+.git
+.gitignore
+
+# Node
+node_modules
+.pnpm-store
+
+# Build outputs
+dist
+build
+.turbo
+.vite
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+.tmp
+.tmp-screens
+.audit-screens
+.playwright-mcp
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tests
+coverage
+playwright-report
+
+# Docs (not needed in containers)
+docs
+*.md
+!AGENTS.md
+!README.md
+
+# Misc
+CRM*.zip

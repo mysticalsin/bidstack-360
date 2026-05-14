@@ -14,7 +14,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { prisma } from '@bidstack/db';
-import { Note, NoteCreate, NotePatch } from '@bidstack/shared';
+import { MeetingNotesImportRequest, Note, NoteCreate, NotePatch } from '@bidstack/shared';
 
 import { buildServer } from '../server.js';
 
@@ -54,6 +54,25 @@ describe('Note schemas', () => {
     // bumps updated_at and creates audit noise. Better to surface it as 400.
     expect(() => NotePatch.parse({})).toThrow();
     expect(() => NotePatch.parse({ pinned: true })).not.toThrow();
+  });
+
+  it('MeetingNotesImportRequest requires real note content before extraction', () => {
+    // Why: this endpoint creates contacts, risks, tasks, and company stack
+    // facts. Accidental tiny pastes should fail before they mutate CRM state.
+    expect(() =>
+      MeetingNotesImportRequest.parse({
+        accountId: 'mantu',
+        companyName: 'Mantu',
+        bodyMd: 'short',
+      }),
+    ).toThrow();
+    expect(() =>
+      MeetingNotesImportRequest.parse({
+        accountId: 'mantu',
+        companyName: 'Mantu',
+        bodyMd: 'Tech stack: Azure and Okta. Action: follow up.',
+      }),
+    ).not.toThrow();
   });
 });
 
@@ -130,5 +149,56 @@ describe('notes routes (integration)', () => {
     // view should add an explicit endpoint with its own auth gate.
     const res = await server.inject({ method: 'GET', url: '/api/notes' });
     expect(res.statusCode).toBe(400);
+  });
+
+  skipIfNoDb('POST import-meeting turns raw notes into CRM records and company stack', async () => {
+    const companyName = `Meeting Import ${Date.now()}`;
+    const normalizedName = companyName.toLowerCase().replaceAll(' ', '-');
+    const bodyMd = [
+      'Attendees: Jane Doe - IT Security Manager, jane.import@example.com',
+      'Tech stack: Azure, Okta, CrowdStrike, Jamf Pro, Salesforce',
+      'Compliance: ISO 27001 complete, SOC 2 in progress',
+      'Risk: High concern around endpoint migration timing. Owner: Jane',
+      'Action: Send Jamf deployment plan by 2026-06-15',
+    ].join('\n');
+
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/notes/import-meeting',
+      payload: {
+        accountId: companyName,
+        companyName,
+        domain: 'meeting-import.example',
+        bodyMd,
+      },
+    });
+    expect(res.statusCode).toBe(201);
+    const json = res.json() as {
+      extracted: {
+        techStack: Array<{ label: string; items: Array<{ name: string }> }>;
+        contacts: unknown[];
+        risks: unknown[];
+        compliance: unknown[];
+        tasks: unknown[];
+      };
+      created: { techStackItems: number };
+    };
+    const vendors = json.extracted.techStack.flatMap((category) =>
+      category.items.map((item) => item.name),
+    );
+    expect(vendors).toEqual(expect.arrayContaining(['Azure', 'Okta', 'CrowdStrike', 'Jamf Pro']));
+    expect(json.extracted.contacts.length).toBeGreaterThanOrEqual(1);
+    expect(json.extracted.risks.length).toBeGreaterThanOrEqual(1);
+    expect(json.extracted.compliance.length).toBeGreaterThanOrEqual(2);
+    expect(json.extracted.tasks.length).toBeGreaterThanOrEqual(1);
+    expect(json.created.techStackItems).toBeGreaterThanOrEqual(4);
+
+    const enrichment = await prisma.companyEnrichment.findFirst({
+      where: { normalizedName },
+      select: { providerMetadata: true },
+    });
+    expect(enrichment).not.toBeNull();
+    expect(JSON.stringify(enrichment?.providerMetadata)).toContain('meetingTechStack');
+    expect(JSON.stringify(enrichment?.providerMetadata)).toContain('CrowdStrike');
   });
 });

@@ -142,7 +142,7 @@ export const crmCreateDeal: Tool<typeof DealCreateInput> = {
         customer: args.customer,
         name: args.name,
         stage: args.stage as PrismaStage,
-        valueEur: args.value,
+        valueMicros: BigInt(Math.round(args.value * 1_000_000)),
         probability: args.probability,
         dueDate: args.dueDate ? new Date(args.dueDate) : null,
         industry: args.industry ?? null,
@@ -185,7 +185,9 @@ export const crmUpdateDeal: Tool<typeof DealUpdateInput> = {
       data: {
         ...(args.patch.stage !== undefined ? { stage: args.patch.stage as PrismaStage } : {}),
         ...(args.patch.probability !== undefined ? { probability: args.patch.probability } : {}),
-        ...(args.patch.value !== undefined ? { valueEur: args.patch.value } : {}),
+        ...(args.patch.value !== undefined
+          ? { valueMicros: BigInt(Math.round(args.patch.value * 1_000_000)) }
+          : {}),
         ...(args.patch.dueDate !== undefined
           ? { dueDate: args.patch.dueDate ? new Date(args.patch.dueDate) : null }
           : {}),
@@ -366,7 +368,7 @@ function serializeDeal(deal: {
   customer: string;
   name: string;
   stage: string;
-  valueEur: unknown;
+  valueMicros: bigint | number | unknown;
   probability: number;
   dueDate: Date | null;
   industry: string | null;
@@ -378,7 +380,7 @@ function serializeDeal(deal: {
     customer: deal.customer,
     name: deal.name,
     stage: deal.stage,
-    value: Number(deal.valueEur),
+    value: Number(deal.valueMicros) / 1_000_000,
     probability: deal.probability,
     dueDate: deal.dueDate?.toISOString().slice(0, 10) ?? null,
     industry: deal.industry,
