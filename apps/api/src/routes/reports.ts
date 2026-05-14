@@ -198,6 +198,158 @@ export const reportsRoutes: FastifyPluginAsyncZod = async (server) => {
       });
     },
   );
+
+  // ── Lead funnel report ──
+  server.get(
+    '/reports/leads',
+    {
+      schema: {
+        response: {
+          200: z.object({
+            byStatus: z.array(z.object({ status: z.string(), count: z.number().int() })),
+            bySource: z.array(z.object({ source: z.string(), count: z.number().int() })),
+            total: z.number().int(),
+            converted: z.number().int(),
+            conversionRate: z.number(),
+            avgScore: z.number(),
+          }),
+        },
+      },
+    },
+    async (req) => {
+      const [byStatus, bySource, total, converted, scoreAgg] = await Promise.all([
+        prisma.lead.groupBy({
+          by: ['status'],
+          where: { orgId: req.auth.orgId },
+          _count: { _all: true },
+        }),
+        prisma.lead.groupBy({
+          by: ['source'],
+          where: { orgId: req.auth.orgId },
+          _count: { _all: true },
+        }),
+        prisma.lead.count({ where: { orgId: req.auth.orgId } }),
+        prisma.lead.count({ where: { orgId: req.auth.orgId, status: 'converted' } }),
+        prisma.lead.aggregate({
+          where: { orgId: req.auth.orgId },
+          _avg: { score: true },
+        }),
+      ]);
+
+      return {
+        byStatus: byStatus.map((s) => ({ status: s.status, count: s._count._all })),
+        bySource: bySource.map((s) => ({ source: s.source ?? 'unknown', count: s._count._all })),
+        total,
+        converted,
+        conversionRate: total > 0 ? Math.round((converted / total) * 10_000) / 100 : 0,
+        avgScore: Math.round((scoreAgg._avg.score ?? 0) * 100) / 100,
+      };
+    },
+  );
+
+  // ── Service desk report ──
+  server.get(
+    '/reports/service-desk',
+    {
+      schema: {
+        response: {
+          200: z.object({
+            byStatus: z.array(z.object({ status: z.string(), count: z.number().int() })),
+            byPriority: z.array(z.object({ priority: z.string(), count: z.number().int() })),
+            total: z.number().int(),
+            open: z.number().int(),
+            resolvedThisMonth: z.number().int(),
+            avgSatisfaction: z.number().nullable(),
+          }),
+        },
+      },
+    },
+    async (req) => {
+      const monthStart = new Date();
+      monthStart.setUTCDate(1);
+      monthStart.setUTCHours(0, 0, 0, 0);
+
+      const [byStatus, byPriority, total, open, resolvedThisMonth, satAgg] = await Promise.all([
+        prisma.serviceCase.groupBy({
+          by: ['status'],
+          where: { orgId: req.auth.orgId },
+          _count: { _all: true },
+        }),
+        prisma.serviceCase.groupBy({
+          by: ['priority'],
+          where: { orgId: req.auth.orgId },
+          _count: { _all: true },
+        }),
+        prisma.serviceCase.count({ where: { orgId: req.auth.orgId } }),
+        prisma.serviceCase.count({
+          where: { orgId: req.auth.orgId, status: { not: 'closed' } },
+        }),
+        prisma.serviceCase.count({
+          where: { orgId: req.auth.orgId, status: 'closed', resolvedAt: { gte: monthStart } },
+        }),
+        prisma.serviceCase.aggregate({
+          where: { orgId: req.auth.orgId, satisfaction: { not: null } },
+          _avg: { satisfaction: true },
+        }),
+      ]);
+
+      return {
+        byStatus: byStatus.map((s) => ({ status: s.status, count: s._count._all })),
+        byPriority: byPriority.map((p) => ({ priority: p.priority, count: p._count._all })),
+        total,
+        open,
+        resolvedThisMonth,
+        avgSatisfaction: satAgg._avg.satisfaction
+          ? Math.round(satAgg._avg.satisfaction * 100) / 100
+          : null,
+      };
+    },
+  );
+
+  // ── Tasks report ──
+  server.get(
+    '/reports/tasks',
+    {
+      schema: {
+        response: {
+          200: z.object({
+            byStatus: z.array(z.object({ status: z.string(), count: z.number().int() })),
+            total: z.number().int(),
+            completed: z.number().int(),
+            overdue: z.number().int(),
+            completionRate: z.number(),
+          }),
+        },
+      },
+    },
+    async (req) => {
+      const now = new Date();
+      const [byStatus, total, completed, overdue] = await Promise.all([
+        prisma.task.groupBy({
+          by: ['status'],
+          where: { orgId: req.auth.orgId },
+          _count: { _all: true },
+        }),
+        prisma.task.count({ where: { orgId: req.auth.orgId } }),
+        prisma.task.count({ where: { orgId: req.auth.orgId, status: 'done' } }),
+        prisma.task.count({
+          where: {
+            orgId: req.auth.orgId,
+            status: { not: 'done' },
+            dueDate: { lt: now },
+          },
+        }),
+      ]);
+
+      return {
+        byStatus: byStatus.map((s) => ({ status: s.status, count: s._count._all })),
+        total,
+        completed,
+        overdue,
+        completionRate: total > 0 ? Math.round((completed / total) * 10_000) / 100 : 0,
+      };
+    },
+  );
 };
 
 function quarterStart(): Date {

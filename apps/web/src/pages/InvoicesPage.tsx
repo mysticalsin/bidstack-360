@@ -195,13 +195,27 @@ export function InvoicesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[var(--border-subtle)] text-left text-xs font-medium text-[var(--fg-secondary)]">
-                  <th className="px-4 py-3">Number</th>
-                  <th className="px-4 py-3">State</th>
-                  <th className="px-4 py-3">Customer</th>
-                  <th className="px-4 py-3">Total</th>
-                  <th className="px-4 py-3">Balance</th>
-                  <th className="px-4 py-3">Invoice Date</th>
-                  <th className="px-4 py-3">Due Date</th>
+                  <th scope="col" className="px-4 py-3">
+                    Number
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    State
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Customer
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Total
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Balance
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Invoice Date
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Due Date
+                  </th>
                 </tr>
               </thead>
               <tbody>

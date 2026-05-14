@@ -38,6 +38,7 @@ const STAGES: OpportunityStage[] = [
 ];
 
 export function PipelinePage() {
+  const reduced = useReducedMotion();
   const { data, isLoading, isError, error } = useOpportunities({ limit: 50 });
   const move = useStageMutation();
   // Stage filter via the URL. `?stage=qualified` collapses the board to a

@@ -152,11 +152,21 @@ export function InvoiceDetailPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-[var(--border-subtle)] text-left text-xs font-medium text-[var(--fg-secondary)]">
-                        <th className="px-4 py-3">Product</th>
-                        <th className="px-4 py-3">Description</th>
-                        <th className="px-4 py-3 text-right">Qty</th>
-                        <th className="px-4 py-3 text-right">Unit Price</th>
-                        <th className="px-4 py-3 text-right">Subtotal</th>
+                        <th scope="col" className="px-4 py-3">
+                          Product
+                        </th>
+                        <th scope="col" className="px-4 py-3">
+                          Description
+                        </th>
+                        <th scope="col" className="px-4 py-3 text-right">
+                          Qty
+                        </th>
+                        <th scope="col" className="px-4 py-3 text-right">
+                          Unit Price
+                        </th>
+                        <th scope="col" className="px-4 py-3 text-right">
+                          Subtotal
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -196,10 +206,18 @@ export function InvoiceDetailPage() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-[var(--border-subtle)] text-left text-xs font-medium text-[var(--fg-secondary)]">
-                          <th className="px-4 py-3">Date</th>
-                          <th className="px-4 py-3">Method</th>
-                          <th className="px-4 py-3">Reference</th>
-                          <th className="px-4 py-3 text-right">Amount</th>
+                          <th scope="col" className="px-4 py-3">
+                            Date
+                          </th>
+                          <th scope="col" className="px-4 py-3">
+                            Method
+                          </th>
+                          <th scope="col" className="px-4 py-3">
+                            Reference
+                          </th>
+                          <th scope="col" className="px-4 py-3 text-right">
+                            Amount
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -232,9 +250,15 @@ export function InvoiceDetailPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-[var(--border-subtle)] text-left text-xs font-medium text-[var(--fg-secondary)]">
-                        <th className="px-4 py-3">Date</th>
-                        <th className="px-4 py-3">Action</th>
-                        <th className="px-4 py-3">Actor</th>
+                        <th scope="col" className="px-4 py-3">
+                          Date
+                        </th>
+                        <th scope="col" className="px-4 py-3">
+                          Action
+                        </th>
+                        <th scope="col" className="px-4 py-3">
+                          Actor
+                        </th>
                       </tr>
                     </thead>
                     <tbody>

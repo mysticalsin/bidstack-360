@@ -116,12 +116,24 @@ export function ProductsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[var(--border-subtle)] text-left text-[var(--fg-tertiary)]">
-                  <th className="px-4 py-3 font-medium">SKU</th>
-                  <th className="px-4 py-3 font-medium">Name</th>
-                  <th className="px-4 py-3 font-medium">Category</th>
-                  <th className="px-4 py-3 font-medium">List price</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium text-right">Actions</th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    SKU
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Name
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Category
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    List price
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Status
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium text-right">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>

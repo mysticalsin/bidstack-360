@@ -232,14 +232,30 @@ export function LeadsPage() {
                     className="h-4 w-4 cursor-pointer accent-[var(--brand-primary)]"
                   />
                 </th>
-                <th className="px-4 py-3 font-medium">Name</th>
-                <th className="px-4 py-3 font-medium">Company</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Priority</th>
-                <th className="px-4 py-3 font-medium">Score</th>
-                <th className="px-4 py-3 font-medium">Source</th>
-                <th className="px-4 py-3 font-medium">Owner</th>
-                <th className="px-4 py-3 font-medium text-right">Actions</th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Name
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Company
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Status
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Priority
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Score
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Source
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Owner
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium text-right">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>

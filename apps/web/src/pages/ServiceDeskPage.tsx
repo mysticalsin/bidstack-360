@@ -96,12 +96,24 @@ export function ServiceDeskPage() {
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-[var(--border-subtle)] text-xs text-[var(--fg-tertiary)]">
-                <th className="px-4 py-3 font-medium">#</th>
-                <th className="px-4 py-3 font-medium">Subject</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Priority</th>
-                <th className="px-4 py-3 font-medium">Owner</th>
-                <th className="px-4 py-3 font-medium">Source</th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  #
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Subject
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Status
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Priority
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Owner
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Source
+                </th>
               </tr>
             </thead>
             <tbody>
