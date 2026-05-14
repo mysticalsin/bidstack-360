@@ -47,6 +47,7 @@ import { usersRoutes } from './routes/users.js';
 import { webhookSubscriptionsRoutes } from './routes/webhook-subscriptions.js';
 import { companiesRoutes } from './routes/companies.js';
 import { customFieldsRoutes } from './routes/custom-fields.js';
+import { roleRoutes } from './routes/roles.js';
 
 const CONNECT_SRC = [
   "'self'",
@@ -208,6 +209,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(webhookSubscriptionsRoutes, { prefix: '/api' });
   await server.register(companiesRoutes, { prefix: '/api' });
   await server.register(customFieldsRoutes, { prefix: '/api' });
+  await server.register(roleRoutes, { prefix: '/api' });
 
   return server;
 }

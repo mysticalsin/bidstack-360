@@ -23,6 +23,12 @@ export default defineConfig(({ mode }) => {
           open: true,
         }) as PluginOption),
     ].filter(Boolean) as PluginOption[],
+    define: {
+      // Force production builds for dependencies that gate their entry files on
+      // process.env.NODE_ENV (React, react-dom, etc.). Without this, Vite's CJS
+      // interop can resolve the development branch and bloat the bundle 2×.
+      'process.env.NODE_ENV': JSON.stringify('production'),
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
@@ -63,7 +69,8 @@ export default defineConfig(({ mode }) => {
             // break every `/foo/` substring check below. Normalize once.
             const normalized = id.replaceAll('\\', '/');
             if (!normalized.includes('node_modules')) return undefined;
-            if (normalized.includes('/react-router')) return 'router';
+            if (normalized.includes('/react-router') || normalized.includes('/@remix-run/'))
+              return 'router';
             if (normalized.includes('/@tanstack/')) return 'tanstack';
             if (normalized.includes('/@radix-ui/')) return 'radix';
             if (normalized.includes('/zustand/')) return 'state';
@@ -74,6 +81,17 @@ export default defineConfig(({ mode }) => {
             // is present, and contributes ZERO bytes to the eager bundle in
             // stub mode. Audit B2 (2026-05-10) regression guard.
             if (normalized.includes('/@clerk/')) return 'clerk';
+            if (normalized.includes('/@sentry/')) return 'sentry';
+            // Heavy geo/map deps only used by TerritoriesPage — keep them in the
+            // route chunk so the rest of the app never pays the download cost.
+            if (
+              normalized.includes('/react-simple-maps/') ||
+              normalized.includes('/d3-geo/') ||
+              normalized.includes('/d3-scale/') ||
+              normalized.includes('/topojson-client/')
+            ) {
+              return undefined;
+            }
             // framer-motion ships ~50KB gzipped — isolate so the rest of
             // vendor stays lean and motion can be cached separately across
             // deploys where only app code changes.

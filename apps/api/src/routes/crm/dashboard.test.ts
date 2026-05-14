@@ -1,0 +1,100 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+import { prisma } from '@bidstack/db';
+
+import { buildServer } from '../../server.js';
+
+let server: Awaited<ReturnType<typeof buildServer>>;
+let dbReachable = false;
+
+beforeAll(async () => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    dbReachable = true;
+  } catch {
+    dbReachable = false;
+    return;
+  }
+  server = await buildServer();
+  await server.ready();
+});
+
+afterAll(async () => {
+  if (server) await server.close();
+  if (dbReachable) await prisma.$disconnect();
+});
+
+const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
+  it(name, async () => {
+    if (!dbReachable) {
+      console.warn(`[skip] ${name} — DATABASE_URL not reachable`);
+      return;
+    }
+    await fn();
+  });
+
+describe('crm dashboard routes', () => {
+  skipIfNoDb('GET /api/crm/dashboard returns a snapshot with companies', async () => {
+    const res = await server.inject({ method: 'GET', url: '/api/crm/dashboard' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.companies).toEqual(expect.any(Array));
+    expect(body.releaseScore).toEqual(expect.any(Object));
+    expect(body.generatedAt).toEqual(expect.any(String));
+  });
+
+  skipIfNoDb(
+    'GET /api/crm/dashboard?account= returns snapshot with cockpit when account matches',
+    async () => {
+      // First fetch the dashboard to get a valid company id
+      const dash = await server.inject({ method: 'GET', url: '/api/crm/dashboard' });
+      const companies = dash.json().companies as Array<{ id: string; name: string }>;
+      if (companies.length === 0) {
+        console.warn('[skip] no companies seeded');
+        return;
+      }
+      const target = companies[0]!;
+
+      const res = await server.inject({
+        method: 'GET',
+        url: `/api/crm/dashboard?account=${target.id}`,
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.cockpit).toBeDefined();
+      expect(body.cockpit.company.id).toBe(target.id);
+    },
+  );
+
+  skipIfNoDb('GET /api/crm/dashboard?account= falls back to normalized name match', async () => {
+    const dash = await server.inject({ method: 'GET', url: '/api/crm/dashboard' });
+    const companies = dash.json().companies as Array<{ id: string; name: string }>;
+    if (companies.length === 0) {
+      console.warn('[skip] no companies seeded');
+      return;
+    }
+    const target = companies[0]!;
+    const normalized = target.name.toLowerCase().replace(/\s+/g, '-');
+
+    const res = await server.inject({
+      method: 'GET',
+      url: `/api/crm/dashboard?account=${normalized}`,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.cockpit).toBeDefined();
+    expect(body.cockpit.company.name).toBe(target.name);
+  });
+
+  skipIfNoDb('GET /api/crm/release-score returns the score object', async () => {
+    const res = await server.inject({ method: 'GET', url: '/api/crm/release-score' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.functional).toEqual(expect.any(Number));
+    expect(body.code).toEqual(expect.any(Number));
+    expect(body.design).toEqual(expect.any(Number));
+    expect(body.infra).toEqual(expect.any(Number));
+    expect(body.total).toEqual(expect.any(Number));
+    expect(body.passed).toEqual(expect.any(Boolean));
+  });
+});

@@ -176,8 +176,20 @@ export const reportsRoutes: FastifyPluginAsyncZod = async (server) => {
       const [opportunities, enrichments] = await Promise.all([
         prisma.opportunity.findMany({
           where: { orgId: req.auth.orgId },
-          include: { owner: { select: { name: true } } },
+          select: {
+            id: true,
+            code: true,
+            customer: true,
+            name: true,
+            stage: true,
+            valueMicros: true,
+            dueDate: true,
+            updatedAt: true,
+            industry: true,
+            owner: { select: { name: true } },
+          },
           orderBy: [{ updatedAt: 'desc' }],
+          take: 500,
         }),
         prisma.companyEnrichment.findMany({
           where: { orgId: req.auth.orgId },

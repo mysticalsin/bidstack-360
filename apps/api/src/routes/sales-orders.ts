@@ -13,6 +13,7 @@
 // an audit_log row with `from`/`to` state so the detail timeline can render.
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
+import type { FastifyError } from 'fastify';
 import { z } from 'zod';
 
 import { prisma, Prisma } from '@bidstack/db';
@@ -284,7 +285,7 @@ export const salesOrdersRoutes: FastifyPluginAsyncZod = async (server) => {
 
 /** Detail shape used by both GET /:id and every mutation response. */
 async function loadDetail(orgId: string, id: string): Promise<z.infer<typeof SalesOrderDetail>> {
-  const order = await prisma.salesOrder.findFirstOrThrow({
+  const order = await prisma.salesOrder.findFirst({
     where: { id, orgId },
     include: {
       salesperson: { select: { name: true } },
@@ -296,6 +297,11 @@ async function loadDetail(orgId: string, id: string): Promise<z.infer<typeof Sal
       },
     },
   });
+  if (!order) {
+    const error = new Error('Sales order not found') as FastifyError;
+    error.statusCode = 404;
+    throw error;
+  }
   const audit = await prisma.auditLog.findMany({
     where: { orgId, targetType: 'sales_order', targetId: id },
     include: { user: { select: { name: true } } },

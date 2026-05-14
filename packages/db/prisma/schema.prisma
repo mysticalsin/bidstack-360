@@ -222,6 +222,7 @@ model Opportunity {
   @@index([orgId, country], map: "opps_org_country_idx")
   @@index([orgId, stage], map: "opps_org_stage_idx")
   @@index([orgId, ownerId], map: "opps_org_owner_idx")
+  @@index([orgId, customer], map: "opps_org_customer_idx")
   @@index([deletedAt])
   // opps_search_idx is a GIN trigram index on (customer || ' ' || name || ' ' || code)
   // defined in a raw migration (Prisma can't express functional GIN indexes).
@@ -259,6 +260,7 @@ model Contact {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
   @@index([orgId])
   @@index([orgId, companyId])
+  @@index([orgId, customer], map: "contacts_org_customer_idx")
   @@map("contacts")
   @@index([deletedAt])
 }
@@ -290,6 +292,7 @@ model Task {
   @@index([orgId])
   @@index([orgId, status, dueDate], map: "tasks_org_status_due_idx")
   @@index([orgId, oppId], map: "tasks_org_opp_idx")
+  @@index([orgId, assigneeId], map: "tasks_org_assignee_idx")
   @@index([deletedAt])
   @@map("tasks")
 }

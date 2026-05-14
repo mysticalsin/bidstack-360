@@ -6,6 +6,7 @@ import { NotificationPrefsSection } from '@/components/settings/NotificationPref
 import { PipelineStagesSection } from '@/components/settings/PipelineStagesSection';
 import { CurrencyLocaleSection } from '@/components/settings/CurrencyLocaleSection';
 import { WebhooksSection } from '@/components/settings/WebhooksSection';
+import { RolesSection } from '@/components/settings/RolesSection';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { useIsAdmin } from '@/lib/auth';
 import { usePreferences, type Density, type MotionPref } from '@/stores/preferences';
@@ -30,6 +31,7 @@ export function SettingsPage() {
 
       <WorkspaceSection />
       <TeamSection />
+      <RolesSection />
       <NotificationPrefsSection />
       <CurrencyLocaleSection />
       <PipelineStagesSection />

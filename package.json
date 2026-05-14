@@ -58,7 +58,7 @@
     ],
     "overrides": {
       "happy-dom": ">=20.8.9",
-      "esbuild": ">=0.25.0"
+      "esbuild": "~0.25.12"
     }
   }
 }

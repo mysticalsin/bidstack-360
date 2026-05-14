@@ -5,7 +5,14 @@
 // click-to-edit text/number/date.
 
 import { motion } from 'framer-motion';
-import { memo, useTransition, type ChangeEvent, type FocusEvent, type KeyboardEvent } from 'react';
+import {
+  memo,
+  useCallback,
+  useTransition,
+  type ChangeEvent,
+  type FocusEvent,
+  type KeyboardEvent,
+} from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -116,24 +123,31 @@ export function OpportunitiesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const allSelected = items.length > 0 && items.every((o) => selectedIds.has(o.id));
   const someSelected = !allSelected && items.some((o) => selectedIds.has(o.id));
-  const toggleOne = (id: string) =>
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  const toggleAll = () =>
-    setSelectedIds((prev) => {
-      if (items.every((o) => prev.has(o.id))) return new Set();
-      return new Set(items.map((o) => o.id));
-    });
-  const clearSelection = () => setSelectedIds(new Set());
+  const toggleOne = useCallback(
+    (id: string) =>
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      }),
+    [],
+  );
+  const toggleAll = useCallback(
+    () =>
+      setSelectedIds((prev) => {
+        if (items.every((o) => prev.has(o.id))) return new Set();
+        return new Set(items.map((o) => o.id));
+      }),
+    [items],
+  );
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
   const selectedOpps = useMemo(
     () => items.filter((o) => selectedIds.has(o.id)),
     [items, selectedIds],
   );
 
+  const patch = usePatchOpportunity();
   const stageMove = useStageMutation();
   const bulkStageChange = async (stage: OpportunityStage) => {
     if (selectedOpps.length === 0) return;
@@ -449,6 +463,7 @@ export function OpportunitiesPage() {
                   index={i}
                   isSelected={selectedIds.has(opp.id)}
                   onToggleSelect={toggleOne}
+                  patch={patch}
                 />
               ))}
             </tbody>
@@ -459,20 +474,21 @@ export function OpportunitiesPage() {
   );
 }
 
-// One row. Owns its own usePatchOpportunity hook so a mutation on this row
-// doesn't cascade through every other row in the table.
+// One row. Receives a shared patch mutation so we avoid creating 100
+// useMutation hooks (one per row) which is expensive for React Query.
 const Row = memo(function Row({
   opp,
   index,
   isSelected,
   onToggleSelect,
+  patch,
 }: {
   opp: Opportunity;
   index: number;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
+  patch: ReturnType<typeof usePatchOpportunity>;
 }) {
-  const patch = usePatchOpportunity(opp.id);
   const fireConfetti = useConfetti((s) => s.fire);
   // Per-field flash timestamp. Bumping a field's value re-triggers the
   // SavedFlash chip next to that cell, independent of the others.
@@ -545,7 +561,7 @@ const Row = memo(function Row({
           value={opp.stage}
           onSave={(next) => {
             patch.mutate(
-              { stage: next },
+              { id: opp.id, patch: { stage: next } },
               {
                 onSuccess: () => {
                   savedToast('Stage');
@@ -578,7 +594,7 @@ const Row = memo(function Row({
           format={(v) => formatMoney(v, 'EUR')}
           onSave={(next) => {
             patch.mutate(
-              { value: next },
+              { id: opp.id, patch: { value: next } },
               {
                 onSuccess: () => {
                   savedToast('Value');
@@ -601,7 +617,7 @@ const Row = memo(function Row({
           format={(v) => `${v}%`}
           onSave={(next) => {
             patch.mutate(
-              { probability: next },
+              { id: opp.id, patch: { probability: next } },
               {
                 onSuccess: () => {
                   savedToast('Probability');
@@ -620,7 +636,7 @@ const Row = memo(function Row({
           format={(v) => formatDate(v)}
           onSave={(next) => {
             patch.mutate(
-              { dueDate: next },
+              { id: opp.id, patch: { dueDate: next } },
               {
                 onSuccess: () => {
                   savedToast('Due date');

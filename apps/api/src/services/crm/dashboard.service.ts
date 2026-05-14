@@ -1,15 +1,6 @@
 import { z } from 'zod';
 
-import {
-  type PrismaClient,
-  type OpportunityStage as PrismaStage,
-  type CompanyEnrichment,
-  type RiskRegisterItem as PrismaRiskRegisterItem,
-  type ComplianceCheck as PrismaComplianceCheck,
-  type ProviderHealth as PrismaProviderHealth,
-  type QueueHealth as PrismaQueueHealth,
-  type ReleaseScore as PrismaReleaseScore,
-} from '@bidstack/db';
+import { type PrismaClient, type OpportunityStage as PrismaStage } from '@bidstack/db';
 import {
   type AccountCockpitSnapshot,
   type CrmDashboardSnapshot,
@@ -133,50 +124,192 @@ export async function buildDashboardSnapshot(
   ] = await Promise.all([
     prisma.opportunity.findMany({
       where: { orgId },
-      include: { owner: true },
+      select: {
+        id: true,
+        code: true,
+        customer: true,
+        name: true,
+        stage: true,
+        valueMicros: true,
+        probability: true,
+        dueDate: true,
+        ownerId: true,
+        updatedAt: true,
+        industry: true,
+        logoUrl: true,
+        owner: { select: { name: true, email: true } },
+      },
       orderBy: { updatedAt: 'desc' },
       take: 100,
     }),
-    prisma.contact.findMany({ where: { orgId }, orderBy: { name: 'asc' }, take: 200 }),
+    prisma.contact.findMany({
+      where: { orgId },
+      select: {
+        id: true,
+        customer: true,
+        name: true,
+        role: true,
+        email: true,
+        phone: true,
+        influence: true,
+        createdAt: true,
+      },
+      orderBy: { name: 'asc' },
+      take: 200,
+    }),
     prisma.task.findMany({
       where: { orgId },
-      include: { opportunity: true, assignee: true },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        createdAt: true,
+        opportunity: { select: { id: true, customer: true, name: true } },
+        assignee: { select: { name: true, email: true } },
+        dueDate: true,
+      },
       orderBy: { createdAt: 'desc' },
       take: 100,
     }),
     prisma.companyEnrichment.findMany({
       where: { orgId },
+      select: {
+        id: true,
+        tradeName: true,
+        legalName: true,
+        domain: true,
+        website: true,
+        industryCodes: true,
+        providerMetadata: true,
+        employeeCount: true,
+        annualRevenueMicros: true,
+        status: true,
+        registryIds: true,
+        formerNames: true,
+        incorporationDate: true,
+        logoUrl: true,
+        logoSource: true,
+        confidenceBps: true,
+        sourceAttribution: true,
+        updatedAt: true,
+      },
       orderBy: { updatedAt: 'desc' },
       take: 200,
     }),
     prisma.aiInsight.findMany({
       where: { orgId, status: 'active' },
+      select: {
+        id: true,
+        kind: true,
+        title: true,
+        summary: true,
+        confidenceBps: true,
+        companyName: true,
+        opportunityId: true,
+        sourceAttribution: true,
+        createdAt: true,
+      },
       orderBy: { createdAt: 'desc' },
       take: 25,
     }),
     prisma.dashboardWidget.findMany({
       where: { orgId },
+      select: {
+        id: true,
+        kind: true,
+        title: true,
+        x: true,
+        y: true,
+        w: true,
+        h: true,
+        config: true,
+      },
       orderBy: [{ y: 'asc' }, { x: 'asc' }],
       take: 20,
     }),
     prisma.bidOpportunity.findMany({
       where: { orgId },
+      select: {
+        id: true,
+        source: true,
+        externalId: true,
+        title: true,
+        buyer: true,
+        country: true,
+        region: true,
+        status: true,
+        dueDate: true,
+        estimatedValueMicros: true,
+        currencyCode: true,
+        url: true,
+        recommendation: true,
+        readinessScore: true,
+        sourceAttribution: true,
+      },
       orderBy: [{ dueDate: 'asc' }, { updatedAt: 'desc' }],
       take: 50,
     }),
     prisma.riskRegisterItem.findMany({
       where: { orgId },
+      select: {
+        id: true,
+        title: true,
+        severity: true,
+        owner: true,
+        mitigation: true,
+        dueDate: true,
+        status: true,
+        companyName: true,
+      },
       orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
       take: 50,
     }),
     prisma.complianceCheck.findMany({
       where: { orgId },
+      select: {
+        id: true,
+        label: true,
+        status: true,
+        owner: true,
+        sourceAttribution: true,
+      },
       orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
       take: 50,
     }),
-    prisma.providerHealth.findMany({ where: { orgId }, orderBy: { provider: 'asc' } }),
-    prisma.queueHealth.findMany({ where: { orgId }, orderBy: { queueName: 'asc' } }),
-    prisma.releaseScore.findFirst({ where: { orgId }, orderBy: { scoredAt: 'desc' } }),
+    prisma.providerHealth.findMany({
+      where: { orgId },
+      select: {
+        provider: true,
+        status: true,
+        latencyMs: true,
+        lastCheckedAt: true,
+        message: true,
+      },
+      orderBy: { provider: 'asc' },
+    }),
+    prisma.queueHealth.findMany({
+      where: { orgId },
+      select: {
+        queueName: true,
+        waiting: true,
+        active: true,
+        failed: true,
+        completed: true,
+        lastCheckedAt: true,
+      },
+      orderBy: { queueName: 'asc' },
+    }),
+    prisma.releaseScore.findFirst({
+      where: { orgId },
+      select: {
+        functional: true,
+        code: true,
+        design: true,
+        infra: true,
+        scoredAt: true,
+      },
+      orderBy: { scoredAt: 'desc' },
+    }),
   ]);
 
   const companies = buildCompanies(opportunities, enrichments);
@@ -238,7 +371,26 @@ function buildCompanies(
     logoUrl: string | null;
     updatedAt: Date;
   }>,
-  enrichments: CompanyEnrichment[],
+  enrichments: Array<{
+    id: string;
+    tradeName: string | null;
+    legalName: string;
+    domain: string | null;
+    website: string | null;
+    industryCodes: unknown;
+    providerMetadata: unknown;
+    employeeCount: number | null;
+    annualRevenueMicros: bigint | null;
+    status: string | null;
+    registryIds: unknown;
+    formerNames: unknown;
+    incorporationDate: Date | null;
+    logoUrl: string | null;
+    logoSource: string | null;
+    confidenceBps: number;
+    sourceAttribution: unknown;
+    updatedAt: Date;
+  }>,
 ) {
   const byName = new Map<string, z.infer<typeof CrmCompany>>();
   for (const enrichment of enrichments) {
@@ -295,7 +447,26 @@ function findSelectedCompany(
   );
 }
 
-export function serializeCompany(enrichment: CompanyEnrichment): z.infer<typeof CrmCompany> {
+export function serializeCompany(enrichment: {
+  id: string;
+  tradeName: string | null;
+  legalName: string;
+  domain: string | null;
+  website: string | null;
+  industryCodes: unknown;
+  providerMetadata: unknown;
+  employeeCount: number | null;
+  annualRevenueMicros: bigint | null;
+  status: string | null;
+  registryIds: unknown;
+  formerNames: unknown;
+  incorporationDate: Date | null;
+  logoUrl: string | null;
+  logoSource: string | null;
+  confidenceBps: number;
+  sourceAttribution: unknown;
+  updatedAt: Date;
+}): z.infer<typeof CrmCompany> {
   const name = enrichment.tradeName ?? enrichment.legalName;
   const metadata = record(enrichment.providerMetadata);
   const industryCodes = stringArray(enrichment.industryCodes);
@@ -364,8 +535,23 @@ function buildCockpit({
     assignee: { name: string | null; email: string } | null;
     createdAt: Date;
   }>;
-  risks: PrismaRiskRegisterItem[];
-  compliance: PrismaComplianceCheck[];
+  risks: Array<{
+    id: string;
+    title: string;
+    severity: string;
+    owner: string | null;
+    mitigation: string | null;
+    dueDate: Date | null;
+    status: string;
+    companyName: string | null;
+  }>;
+  compliance: Array<{
+    id: string;
+    label: string;
+    status: string;
+    owner: string | null;
+    sourceAttribution: unknown;
+  }>;
 }): z.infer<typeof AccountCockpitSnapshot> {
   const companyOpps = opportunities.filter((opp) => opp.customer === company.name);
   const openDeals = companyOpps.filter(
@@ -638,9 +824,15 @@ function serializeBidOpportunity(row: {
   };
 }
 
-function serializeRisk(
-  row: PrismaRiskRegisterItem,
-): z.infer<typeof AccountCockpitSnapshot>['risks'][number] {
+function serializeRisk(row: {
+  id: string;
+  title: string;
+  severity: string;
+  owner: string | null;
+  mitigation: string | null;
+  dueDate: Date | null;
+  status: string;
+}): z.infer<typeof AccountCockpitSnapshot>['risks'][number] {
   return {
     id: row.id,
     title: row.title,
@@ -652,9 +844,13 @@ function serializeRisk(
   };
 }
 
-function serializeCompliance(
-  row: PrismaComplianceCheck,
-): z.infer<typeof AccountCockpitSnapshot>['compliance'][number] {
+function serializeCompliance(row: {
+  id: string;
+  label: string;
+  status: string;
+  owner: string | null;
+  sourceAttribution: unknown;
+}): z.infer<typeof AccountCockpitSnapshot>['compliance'][number] {
   return {
     id: row.id,
     label: row.label,
@@ -664,7 +860,13 @@ function serializeCompliance(
   };
 }
 
-function serializeProviderHealth(row: PrismaProviderHealth): z.infer<typeof ProviderHealth> {
+function serializeProviderHealth(row: {
+  provider: string;
+  status: string;
+  latencyMs: number | null;
+  lastCheckedAt: Date;
+  message: string | null;
+}): z.infer<typeof ProviderHealth> {
   return {
     provider: row.provider,
     status: asProviderStatus(row.status),
@@ -674,7 +876,14 @@ function serializeProviderHealth(row: PrismaProviderHealth): z.infer<typeof Prov
   };
 }
 
-function serializeQueueHealth(row: PrismaQueueHealth): QueueHealth {
+function serializeQueueHealth(row: {
+  queueName: string;
+  waiting: number;
+  active: number;
+  failed: number;
+  completed: number;
+  lastCheckedAt: Date;
+}): QueueHealth {
   return {
     queueName: row.queueName,
     waiting: row.waiting,
@@ -685,7 +894,13 @@ function serializeQueueHealth(row: PrismaQueueHealth): QueueHealth {
   };
 }
 
-function serializeReleaseScore(row: PrismaReleaseScore): z.infer<typeof ReleaseScore> {
+function serializeReleaseScore(row: {
+  functional: number;
+  code: number;
+  design: number;
+  infra: number;
+  scoredAt: Date;
+}): z.infer<typeof ReleaseScore> {
   const total = row.functional + row.code + row.design + row.infra;
   return {
     functional: row.functional,

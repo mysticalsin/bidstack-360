@@ -40,6 +40,17 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
           message: 'Foreign key constraint failed.',
         });
       }
+      // Log unmapped Prisma errors with their code for observability.
+      req.log.error({ err, prismaCode: err.code }, 'unhandled Prisma error');
+    }
+
+    if (err instanceof Prisma.PrismaClientValidationError) {
+      req.log.warn({ err }, 'Prisma validation error');
+      return reply.status(400).send({
+        statusCode: 400,
+        error: 'Bad Request',
+        message: 'Database query validation failed.',
+      });
     }
 
     if (err.statusCode && err.statusCode < 500) {

@@ -72,3 +72,4 @@ apps/api/.uploads/**
 
 # Large source bundles (kept out of repo; the unpacked tree under handoff/ is canonical)
 *.zip
+.tmp/

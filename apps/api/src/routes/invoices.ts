@@ -10,6 +10,7 @@
 //   POST   /api/invoices/:id/payments     record a payment
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
+import type { FastifyError } from 'fastify';
 import { z } from 'zod';
 
 import { prisma, Prisma } from '@bidstack/db';
@@ -61,7 +62,7 @@ async function loadInvoiceDetail(
   orgId: string,
   id: string,
 ): Promise<z.infer<typeof InvoiceDetail>> {
-  const invoice = await prisma.invoice.findFirstOrThrow({
+  const invoice = await prisma.invoice.findFirst({
     where: { id, orgId },
     include: {
       salesperson: { select: { name: true } },
@@ -73,6 +74,11 @@ async function loadInvoiceDetail(
       payments: { orderBy: { receivedAt: 'desc' } },
     },
   });
+  if (!invoice) {
+    const error = new Error('Invoice not found') as FastifyError;
+    error.statusCode = 404;
+    throw error;
+  }
 
   const audit = await prisma.auditLog.findMany({
     where: { orgId, targetType: 'invoice', targetId: id },

@@ -165,19 +165,30 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
     {
       schema: {
         params: z.object({ id: z.string().uuid(), contactId: z.string().uuid() }),
+        response: { 204: z.null() },
       },
     },
     async (req, reply) => {
-      await prisma.opportunityContact.updateMany({
+      const existing = await prisma.opportunityContact.findFirst({
         where: {
           opportunityId: req.params.id,
           contactId: req.params.contactId,
           orgId: req.auth.orgId,
           deletedAt: null,
         },
+        select: { id: true },
+      });
+      if (!existing) throw server.httpErrors.notFound('Link not found');
+
+      await prisma.opportunityContact.updateMany({
+        where: {
+          opportunityId: req.params.id,
+          contactId: req.params.contactId,
+          orgId: req.auth.orgId,
+        },
         data: { deletedAt: new Date() },
       });
-      reply.status(204).send();
+      return reply.code(204).send(null);
     },
   );
 };

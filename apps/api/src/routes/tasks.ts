@@ -155,4 +155,36 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
       };
     },
   );
+
+  server.delete(
+    '/tasks/:id',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: { 204: z.null() },
+      },
+    },
+    async (req, reply) => {
+      const existing = await prisma.task.findFirst({
+        where: { id: req.params.id, orgId: req.auth.orgId },
+        select: { id: true, title: true },
+      });
+      if (!existing) throw server.httpErrors.notFound('Task not found');
+
+      await prisma.$transaction([
+        prisma.task.delete({ where: { id: existing.id } }),
+        prisma.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'task.delete',
+            targetType: 'task',
+            targetId: existing.id,
+            diff: { title: existing.title },
+          },
+        }),
+      ]);
+      return reply.code(204).send(null);
+    },
+  );
 };

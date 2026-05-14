@@ -37,7 +37,7 @@ const STAGE_OPTIONS: ReadonlyArray<{ value: OpportunityStage; label: string }> =
 export function OpportunityDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading, isError, error } = useOpportunity(id);
-  const patch = usePatchOpportunity(id);
+  const patch = usePatchOpportunity();
   const timeline = useOpportunityTimeline(id);
   const [briefOpen, setBriefOpen] = useState(false);
   const intel: IntelPayload = data?.intel ?? {};
@@ -84,7 +84,7 @@ export function OpportunityDetailPage() {
               <h1 className="text-3xl font-bold tracking-tight text-[var(--fg-primary)] sm:text-4xl">
                 <InlineEditText
                   value={data.name}
-                  onSave={(v) => patch.mutateAsync({ name: v })}
+                  onSave={(v) => patch.mutateAsync({ id, patch: { name: v } })}
                   label="Edit opportunity name"
                   validate={(v) => (v.length < 1 ? 'Name is required' : null)}
                 />
@@ -94,7 +94,7 @@ export function OpportunityDetailPage() {
                   <Icon name="building" size={14} className="text-[var(--brand-primary)]" />
                   <InlineEditText
                     value={data.customer}
-                    onSave={(v) => patch.mutateAsync({ customer: v })}
+                    onSave={(v) => patch.mutateAsync({ id, patch: { customer: v } })}
                     label="Edit customer name"
                     validate={(v) => (v.length < 1 ? 'Customer is required' : null)}
                   />
@@ -104,7 +104,7 @@ export function OpportunityDetailPage() {
                   <Icon name="reports" size={14} className="text-[var(--info)]" />
                   <InlineEditText
                     value={data.industry ?? ''}
-                    onSave={(v) => patch.mutateAsync({ industry: v || null })}
+                    onSave={(v) => patch.mutateAsync({ id, patch: { industry: v || null } })}
                     label="Edit industry"
                     display={(v) => v || '—'}
                     placeholder="Industry"
@@ -131,7 +131,7 @@ export function OpportunityDetailPage() {
               </div>
               <InlineEditSelect<OpportunityStage>
                 value={data.stage as OpportunityStage}
-                onSave={(v) => patch.mutateAsync({ stage: v })}
+                onSave={(v) => patch.mutateAsync({ id, patch: { stage: v } })}
                 options={STAGE_OPTIONS}
                 label="Change stage"
                 display={(v) => (
@@ -144,7 +144,7 @@ export function OpportunityDetailPage() {
                 <div className="text-3xl font-bold tabular-nums text-[var(--fg-primary)] tracking-tight">
                   <InlineEditNumber
                     value={data.value}
-                    onSave={(v) => patch.mutateAsync({ value: v })}
+                    onSave={(v) => patch.mutateAsync({ id, patch: { value: v } })}
                     label="Edit deal value (EUR)"
                     min={0}
                     step={1000}
@@ -156,7 +156,7 @@ export function OpportunityDetailPage() {
                     <span className="font-semibold text-[var(--success)]">
                       <InlineEditNumber
                         value={data.probability}
-                        onSave={(v) => patch.mutateAsync({ probability: v })}
+                        onSave={(v) => patch.mutateAsync({ id, patch: { probability: v } })}
                         label="Edit probability"
                         min={0}
                         max={100}
@@ -171,7 +171,7 @@ export function OpportunityDetailPage() {
                     <Icon name="clock" size={12} />
                     <InlineEditDate
                       value={data.dueDate}
-                      onSave={(v) => patch.mutateAsync({ dueDate: v })}
+                      onSave={(v) => patch.mutateAsync({ id, patch: { dueDate: v } })}
                       label="Edit due date"
                       display={(v) => formatDate(v)}
                     />

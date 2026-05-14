@@ -166,14 +166,20 @@ export const serviceDeskRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/service-cases/:id',
     {
-      schema: { params: z.object({ id: z.string().uuid() }) },
+      schema: { params: z.object({ id: z.string().uuid() }), response: { 204: z.null() } },
     },
     async (req, reply) => {
-      await prisma.serviceCase.updateMany({
+      const existing = await prisma.serviceCase.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        select: { id: true, number: true },
+      });
+      if (!existing) throw server.httpErrors.notFound('Case not found');
+
+      await prisma.serviceCase.updateMany({
+        where: { id: existing.id, orgId: req.auth.orgId },
         data: { deletedAt: new Date() },
       });
-      reply.status(204).send();
+      return reply.code(204).send(null);
     },
   );
 };

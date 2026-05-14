@@ -230,14 +230,21 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       schema: {
         params: z.object({ id: z.string().uuid() }),
+        response: { 204: z.null() },
       },
     },
     async (req, reply) => {
-      await prisma.company.updateMany({
+      const existing = await prisma.company.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        select: { id: true, name: true },
+      });
+      if (!existing) throw server.httpErrors.notFound('Company not found');
+
+      await prisma.company.updateMany({
+        where: { id: existing.id, orgId: req.auth.orgId },
         data: { deletedAt: new Date() },
       });
-      reply.status(204).send();
+      return reply.code(204).send(null);
     },
   );
 };

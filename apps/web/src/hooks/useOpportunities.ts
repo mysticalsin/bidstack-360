@@ -66,15 +66,13 @@ export function useOpportunity(id: string | undefined) {
 // contains this id, plus the single ['opportunity', id] entry. Rollback on
 // error restores the snapshot. This makes inline edits feel instant — the
 // network round-trip happens after the UI has already updated.
-export function usePatchOpportunity(id: string | undefined) {
+export function usePatchOpportunity() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (patch: OpportunityPatch) => {
-      if (!id) throw new Error('Opportunity id required');
+    mutationFn: ({ id, patch }: { id: string; patch: OpportunityPatch }) => {
       return api<Opportunity>(`/api/opportunities/${id}`, { method: 'PATCH', body: patch });
     },
-    onMutate: async (patch) => {
-      if (!id) return undefined;
+    onMutate: async ({ id, patch }) => {
       await qc.cancelQueries({ queryKey: ['opportunities'] });
       await qc.cancelQueries({ queryKey: ['opportunity', id] });
 
@@ -96,14 +94,14 @@ export function usePatchOpportunity(id: string | undefined) {
       if (detailSnap) {
         qc.setQueryData<OpportunityFull>(detailKey, { ...detailSnap, ...patch });
       }
-      return { listSnapshots, detailSnap };
+      return { listSnapshots, detailSnap, id };
     },
     onError: (_err, _vars, ctx) => {
       ctx?.listSnapshots.forEach(([key, value]) => qc.setQueryData(key, value));
-      if (ctx?.detailSnap && id) qc.setQueryData(['opportunity', id], ctx.detailSnap);
+      if (ctx?.detailSnap && ctx.id) qc.setQueryData(['opportunity', ctx.id], ctx.detailSnap);
     },
-    onSettled: () => {
-      void qc.invalidateQueries({ queryKey: ['opportunity', id] });
+    onSettled: (_data, _err, vars) => {
+      void qc.invalidateQueries({ queryKey: ['opportunity', vars.id] });
       void qc.invalidateQueries({ queryKey: ['opportunities'] });
       // Pipeline reports aggregate over opportunities; refresh.
       void qc.invalidateQueries({ queryKey: ['pipeline-report'] });

@@ -369,19 +369,21 @@ export const salesDashboardRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const orgId = req.auth.orgId;
-      const rows = await prisma.salesOrder.groupBy({
-        by: ['countryCode'],
-        where: {
-          orgId,
-          state: { in: [...CONFIRMED_STATES] },
-          countryCode: { not: null },
-        },
-        _sum: { totalMicros: true },
-        _count: { _all: true },
-        orderBy: { _sum: { totalMicros: 'desc' } },
-        take: req.query.limit,
-      });
-      const currency = await dominantCurrency(orgId);
+      const [rows, currency] = await Promise.all([
+        prisma.salesOrder.groupBy({
+          by: ['countryCode'],
+          where: {
+            orgId,
+            state: { in: [...CONFIRMED_STATES] },
+            countryCode: { not: null },
+          },
+          _sum: { totalMicros: true },
+          _count: { _all: true },
+          orderBy: { _sum: { totalMicros: 'desc' } },
+          take: req.query.limit,
+        }),
+        dominantCurrency(orgId),
+      ]);
       return {
         currency,
         items: rows
@@ -514,11 +516,13 @@ export const salesDashboardRoutes: FastifyPluginAsyncZod = async (server) => {
       `;
 
       const ids = grouped.map((g) => g.category_id).filter((id): id is string => id !== null);
-      const categories = ids.length
-        ? await prisma.productCategory.findMany({ where: { orgId, id: { in: ids } } })
-        : [];
+      const [categories, currency] = await Promise.all([
+        ids.length
+          ? prisma.productCategory.findMany({ where: { orgId, id: { in: ids } } })
+          : Promise.resolve([] as Awaited<ReturnType<typeof prisma.productCategory.findMany>>),
+        dominantCurrency(orgId),
+      ]);
       const byId = new Map(categories.map((c) => [c.id, c]));
-      const currency = await dominantCurrency(orgId);
 
       return {
         currency,
