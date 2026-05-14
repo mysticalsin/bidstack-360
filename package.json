@@ -57,7 +57,9 @@
       "prisma"
     ],
     "overrides": {
-      "happy-dom": ">=20.8.9"
+      "happy-dom": ">=20.8.9",
+      "@opentelemetry/exporter-prometheus": ">=0.217.0",
+      "@opentelemetry/sdk-node": ">=0.218.0"
     }
   }
 }
