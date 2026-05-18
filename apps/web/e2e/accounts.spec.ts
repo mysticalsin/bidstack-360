@@ -1,4 +1,5 @@
-import { test, expect, type Page, type Locator } from './fixtures.js';
+import { test, expect } from './fixtures.js';
+import type { Page, Locator } from '@playwright/test';
 
 /**
  * Resolve the first account card on the /accounts grid.
