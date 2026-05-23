@@ -25,6 +25,50 @@ const FALLBACK_TTL_MS = DEDUP_TTL_SECONDS * 1000;
 // 5 minutes matches Stripe / GitHub webhook conventions.
 const MAX_TIMESTAMP_SKEW_MS = 5 * 60 * 1000;
 
+function getRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function firstString(...values: unknown[]): string | null {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function extractPayloadOrgMetadata(payload: Record<string, unknown>): string | null {
+  const metadata = getRecord(payload.metadata);
+  const data = getRecord(payload.data);
+  const dataMetadata = getRecord(data?.metadata);
+  const document = getRecord(payload.document) ?? getRecord(data?.document);
+  const documentMetadata = getRecord(document?.metadata);
+
+  return firstString(
+    payload.orgId,
+    payload.org_id,
+    payload.clerkOrg,
+    payload.clerk_org,
+    metadata?.orgId,
+    metadata?.org_id,
+    metadata?.clerkOrg,
+    metadata?.clerk_org,
+    data?.orgId,
+    data?.org_id,
+    data?.clerkOrg,
+    data?.clerk_org,
+    dataMetadata?.orgId,
+    dataMetadata?.org_id,
+    dataMetadata?.clerkOrg,
+    dataMetadata?.clerk_org,
+    documentMetadata?.orgId,
+    documentMetadata?.org_id,
+    documentMetadata?.clerkOrg,
+    documentMetadata?.clerk_org,
+  );
+}
+
 async function rememberOrReject(
   eventId: string,
   log: { warn: (a: object, msg?: string) => void },
@@ -42,6 +86,13 @@ async function rememberOrReject(
       if (expiry < now) fallbackSeen.delete(k);
     }
     if (fallbackSeen.has(eventId)) return false;
+    // Prevent unbounded memory growth if fallback runs for an extended period under high load
+    if (fallbackSeen.size > 10_000) {
+      const oldestKey = fallbackSeen.keys().next().value;
+      if (oldestKey !== undefined) {
+        fallbackSeen.delete(oldestKey);
+      }
+    }
     fallbackSeen.set(eventId, now + FALLBACK_TTL_MS);
     return true;
   }
@@ -60,7 +111,7 @@ export const webhooksRoutes: FastifyPluginAsyncZod = async (server) => {
   });
 
   server.post(
-    '/webhooks/dust',
+    '/dust',
     {
       config: { public: true, rateLimit: { max: 100, timeWindow: '1 minute' } },
       schema: {
@@ -134,7 +185,7 @@ export const webhooksRoutes: FastifyPluginAsyncZod = async (server) => {
       // (audit P1.3: x-bidstack-org spoofing). In dev with no subscription
       // row, fall back to the seed org so local development stays smooth.
       const subscription = await prisma.webhookSubscription.findFirst({
-        where: { secret, active: true },
+        where: { secret, active: true, deletedAt: null },
         // Deterministic resolution if both old + new active rows ever coexist
         // during a secret rotation. Pick the most recently created one.
         orderBy: { createdAt: 'desc' },
@@ -146,6 +197,21 @@ export const webhooksRoutes: FastifyPluginAsyncZod = async (server) => {
           ? await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } })
           : null;
       if (!org) throw server.httpErrors.notFound('Org not found for webhook subscription');
+
+      const payloadOrg = extractPayloadOrgMetadata(req.body);
+      if (!payloadOrg) {
+        req.log.warn({ eventType, eid, orgId: org.id }, 'webhook rejected - missing org metadata');
+        throw server.httpErrors.badRequest('Webhook payload org metadata required');
+      }
+      if (payloadOrg !== org.id && payloadOrg !== org.clerkOrg) {
+        req.log.warn(
+          { eventType, eid, resolvedOrgId: org.id },
+          'webhook rejected - payload org mismatch',
+        );
+        throw server.httpErrors.forbidden(
+          'Webhook payload org metadata does not match subscription',
+        );
+      }
 
       await prisma.syncEvent.create({
         data: {

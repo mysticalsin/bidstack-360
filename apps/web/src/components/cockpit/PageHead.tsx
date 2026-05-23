@@ -1,25 +1,28 @@
 import { motion, useReducedMotion } from 'framer-motion';
-import { Fragment, useState } from 'react';
+import { Fragment, memo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
 import { CompanyLogo } from '@/components/company/CompanyLogo';
+import { CreateOpportunityDialog } from '@/components/opportunity/CreateOpportunityDialog';
 import { BriefingDialog } from '@/components/opportunity/BriefingDialog';
 import { Icon } from '@/components/ui/Icon';
 import { SavedFlash } from '@/components/ui/SavedFlash';
 import { useEnrichCompany } from '@/hooks/useEnrichCompany';
 import { useOpportunities } from '@/hooks/useOpportunities';
-import { formatDate } from '@/lib/format';
+import { formatDate, relativeTime } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
 import { useAccountHistory } from '@/stores/accountHistory';
 
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
+
+import { labelForBand } from './_tokens';
 
 interface Props {
   cockpit: AccountCockpitSnapshot;
   accountView: boolean;
 }
 
-export function PageHead({ cockpit, accountView }: Props) {
+export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) {
   const [briefOpen, setBriefOpen] = useState(false);
   const enrich = useEnrichCompany();
   const reducedMotion = useReducedMotion();
@@ -31,7 +34,7 @@ export function PageHead({ cockpit, accountView }: Props) {
     (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
   );
 
-  // Pulse a "Saved" chip whenever enrichment finishes. Tracking a counter
+  // Pulse a "Saved" chip whenever data verification finishes. Tracking a counter
   // lets the SavedFlash component re-trigger on each completion, even when
   // the user enriches the same company multiple times in a session.
   const [enrichSavedAt, setEnrichSavedAt] = useState(0);
@@ -57,6 +60,13 @@ export function PageHead({ cockpit, accountView }: Props) {
   const favorites = useAccountHistory((s) => s.favorites);
   const toggleFavorite = useAccountHistory((s) => s.toggleFavorite);
   const isStarred = accountId ? favorites.some((f) => f.slug === accountId) : false;
+  const subtitleParts = [cockpit.company.industry, cockpit.company.domain].filter(Boolean);
+  const subtitle = accountView
+    ? subtitleParts.length > 0
+      ? subtitleParts.join(' - ')
+      : 'Company profile incomplete'
+    : `Today: ${formatDate(new Date().toISOString())} - ${cockpit.company.name} cockpit`;
+  const confidence = Math.round(cockpit.company.confidence * 100);
 
   return (
     <motion.div
@@ -79,11 +89,19 @@ export function PageHead({ cockpit, accountView }: Props) {
         />
         <div style={{ minWidth: 0 }}>
           <h1 className="page-title">{accountView ? cockpit.company.name : 'Dashboard'}</h1>
-          <div className="page-sub">
-            {accountView
-              ? `${cockpit.company.industry ?? 'Industry n/a'} - ${cockpit.company.domain ?? 'no domain'}`
-              : `Today: ${formatDate(new Date().toISOString())} - ${cockpit.company.name} cockpit`}
-          </div>
+          <div className="page-sub">{subtitle}</div>
+          {accountView ? (
+            <div className="account-meta-chips" aria-label="Account status summary">
+              <span data-tone="health">{labelForBand(cockpit.health.band)}</span>
+              <span data-tone="confidence">{confidence}% attribution confidence</span>
+              <span data-tone="muted">Refreshed {relativeTime(cockpit.company.updatedAt)}</span>
+              {linkedOpp ? (
+                <span data-tone="linked">Opportunity linked</span>
+              ) : (
+                <span data-tone="warning">No opportunity linked</span>
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
       <div className="page-actions">
@@ -105,7 +123,7 @@ export function PageHead({ cockpit, accountView }: Props) {
           className="btn btn-secondary"
           onClick={handleEnrich}
           disabled={enrich.isPending}
-          title="Refresh enrichment via open sources + Apollo"
+          title="Refresh available data sources"
         >
           {enrich.isPending ? (
             <span
@@ -125,24 +143,35 @@ export function PageHead({ cockpit, accountView }: Props) {
             onClick={() => window.print()}
             title="Print the cockpit as a one-page brief"
           >
-            <Icon name="download" size={14} />
+            <Icon name="print" size={14} />
             Print
           </button>
         ) : null}
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => setBriefOpen(true)}
-          disabled={!linkedOpp}
-          title={
-            linkedOpp
-              ? `Generate brief for ${linkedOpp.name}`
-              : 'No opportunity for this customer yet'
-          }
-        >
-          <Icon name="sparkle" size={14} />
-          Ask Dust
-        </button>
+        {linkedOpp ? (
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setBriefOpen(true)}
+            title={`Generate brief for ${linkedOpp.name}`}
+          >
+            <Icon name="sparkle" size={14} />
+            Generate brief
+          </button>
+        ) : accountView ? (
+          <CreateOpportunityDialog
+            defaultCustomer={cockpit.company.name}
+            trigger={
+              <button
+                type="button"
+                className="btn btn-primary"
+                title={`Create an opportunity for ${cockpit.company.name}`}
+              >
+                <Icon name="plus" size={14} />
+                Create opportunity
+              </button>
+            }
+          />
+        ) : null}
       </div>
 
       {linkedOpp ? (
@@ -155,10 +184,10 @@ export function PageHead({ cockpit, accountView }: Props) {
       ) : null}
     </motion.div>
   );
-}
+});
 
-// Compact enrichment brief shown when hovering the company logo. Picks
-// from whichever fields the CRM enrichment surfaced; nullable fields are
+// Compact data brief shown when hovering the company logo. Picks
+// from whichever fields the CRM data verification surfaced; nullable fields are
 // quietly skipped rather than rendered as "Unknown" placeholders.
 function CompanyBrief({ cockpit }: { cockpit: AccountCockpitSnapshot }) {
   const c = cockpit.company;

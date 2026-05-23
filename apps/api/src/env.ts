@@ -30,15 +30,34 @@ export const envSchema = z.object({
   DUST_BASE_URL: z.string().url().optional().or(z.literal('')),
   DUST_MCP_PUBLIC_URL: z.string().url().optional().or(z.literal('')),
 
+  ERP_URL: z.string().url().optional().or(z.literal('')),
+  ERP_DB: z.string().min(1).optional().or(z.literal('')),
+  ERP_API_KEY: z.string().min(1).optional().or(z.literal('')),
+  ERP_USER: z.string().min(1).optional().or(z.literal('')),
+  ERP_PASSWORD: z.string().min(1).optional().or(z.literal('')),
+  ERP_MCP_URL: z.string().url().optional().or(z.literal('')),
+  ERP_MCP_BEARER_TOKEN: z.string().min(1).optional().or(z.literal('')),
+  ERP_MCP_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
   ODOO_URL: z.string().url().optional().or(z.literal('')),
   ODOO_DB: z.string().min(1).optional().or(z.literal('')),
   ODOO_API_KEY: z.string().min(1).optional().or(z.literal('')),
   ODOO_USER: z.string().min(1).optional().or(z.literal('')),
   ODOO_PASSWORD: z.string().min(1).optional().or(z.literal('')),
+  ODOO_MCP_URL: z.string().url().optional().or(z.literal('')),
+  ODOO_MCP_BEARER_TOKEN: z.string().min(1).optional().or(z.literal('')),
+  ODOO_MCP_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
 
   STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
   S3_BUCKET: z.string().min(1).optional().or(z.literal('')),
   S3_REGION: z.string().min(1).optional().or(z.literal('')),
+  S3_ENDPOINT: z.string().url().optional().or(z.literal('')),
+  S3_FORCE_PATH_STYLE: z.enum(['true', 'false']).default('false'),
+  STORAGE_UPLOAD_MAX_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(50 * 1024 * 1024),
+  STORAGE_SCAN_REQUIRED: z.enum(['true', 'false']).default('false'),
 
   TRUSTED_PROXIES: z.string().optional().or(z.literal('')),
   BIDSTACK_JOB_SIGNING_SECRET: z.string().min(1).optional().or(z.literal('')),
@@ -64,6 +83,17 @@ export function getEnv(): Env {
     if (invalid.length) lines.push(`  Invalid: ${invalid.join(', ')}`);
     throw new Error(lines.join('\n'));
   }
-  _env = parsed.data;
+  const env = parsed.data;
+  const semanticErrors: string[] = [];
+  if (env.NODE_ENV === 'production' && env.STORAGE_DRIVER !== 's3') {
+    semanticErrors.push('STORAGE_DRIVER=s3 is required in production');
+  }
+  if (env.STORAGE_DRIVER === 's3' && !env.S3_BUCKET) {
+    semanticErrors.push('S3_BUCKET is required when STORAGE_DRIVER=s3');
+  }
+  if (semanticErrors.length > 0) {
+    throw new Error(`Environment validation failed:\n  Invalid: ${semanticErrors.join(', ')}`);
+  }
+  _env = env;
   return _env;
 }

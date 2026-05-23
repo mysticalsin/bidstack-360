@@ -1,4 +1,4 @@
-// Twenty-style record dialog for creating or editing a Contact. Shows all
+// CRM-style record dialog for creating or editing a Contact. Shows all
 // fields in one form; PATCH endpoint accepts partials, so only changed
 // fields hit the wire (the diff is what audit log captures).
 //

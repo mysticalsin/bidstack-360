@@ -29,8 +29,8 @@ function cleanup() {
 
 const plugin: FastifyPluginAsync = fp(async (server) => {
   server.addHook('onRequest', async (req: FastifyRequest, reply: FastifyReply) => {
-    // Only rate-limit the /mcp endpoint
-    if (req.url !== '/mcp') return;
+    const path = req.url.split('?')[0];
+    if (path !== '/mcp' && path !== '/mcp/sse' && path !== '/mcp/messages') return;
 
     cleanup();
 

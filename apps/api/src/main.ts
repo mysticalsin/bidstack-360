@@ -7,14 +7,14 @@ import dotenvFlow from 'dotenv-flow';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenvFlow.config({ path: path.resolve(__dirname, '../../..'), silent: true });
 
-import { initSentry, shutdownSentry } from './instrument.js';
+const { initSentry, shutdownSentry } = await import('./instrument.js');
 initSentry();
 
-import { prisma } from '@bidstack/db';
-import { buildServer } from './server.js';
-import { getEnv } from './env.js';
-import { redis } from './redis.js';
-import { initTelemetry, shutdownTelemetry } from './otel.js';
+const { prisma } = await import('@bidstack/db');
+const { buildServer } = await import('./server.js');
+const { getEnv } = await import('./env.js');
+const { redis } = await import('./redis.js');
+const { initTelemetry, shutdownTelemetry } = await import('./otel.js');
 
 // Fail fast on missing/invalid environment variables.
 const env = getEnv();

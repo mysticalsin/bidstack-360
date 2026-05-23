@@ -57,6 +57,7 @@ export function CreateOpportunityDialog({ trigger, defaultCustomer }: Props = {}
       owner: null,
       industry: (fd.get('industry') as string) || null,
       logo: null,
+      country: (fd.get('country') as string)?.toUpperCase() || null,
     };
 
     // Client-side validation against the canonical Zod schema. The server
@@ -76,7 +77,7 @@ export function CreateOpportunityDialog({ trigger, defaultCustomer }: Props = {}
       </DialogTrigger>
       <DialogContent
         title="New opportunity"
-        description="Add a bid to your pipeline. You can refine intel after Dust enrichment runs."
+        description="Add a bid to your pipeline. You can refine intel after Dust data verification runs."
       >
         <form onSubmit={submit} className="space-y-4">
           <Field label="Customer" htmlFor="customer" error={fieldErrors.customer?.[0]}>
@@ -94,7 +95,7 @@ export function CreateOpportunityDialog({ trigger, defaultCustomer }: Props = {}
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Stage" htmlFor="stage" error={fieldErrors.stage?.[0]}>
-              <Select id="stage" name="stage" defaultValue="discovery">
+              <Select id="stage" name="stage" defaultValue="s1_ongoing">
                 {STAGES.map((s) => (
                   <option key={s} value={s}>
                     {s}
@@ -113,7 +114,7 @@ export function CreateOpportunityDialog({ trigger, defaultCustomer }: Props = {}
               </Select>
             </Field>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             <Field label="Value (EUR)" htmlFor="value" error={fieldErrors.value?.[0]}>
               <Input id="value" name="value" type="number" min={0} step="100" defaultValue="0" />
             </Field>
@@ -130,6 +131,9 @@ export function CreateOpportunityDialog({ trigger, defaultCustomer }: Props = {}
             </Field>
             <Field label="Due date" htmlFor="dueDate" error={fieldErrors.dueDate?.[0]}>
               <Input id="dueDate" name="dueDate" type="date" />
+            </Field>
+            <Field label="Country" htmlFor="country" error={fieldErrors.country?.[0]}>
+              <Input id="country" name="country" maxLength={2} placeholder="DE" />
             </Field>
           </div>
 

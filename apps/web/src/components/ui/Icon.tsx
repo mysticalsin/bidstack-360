@@ -32,6 +32,46 @@ const PATHS: Record<string, JSX.Element> = {
       <path d="M3 21a6 6 0 0112 0M16 4a4 4 0 010 8M19 21v-1a4 4 0 00-3-3.87" />
     </>
   ),
+  user: (
+    <>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21a8 8 0 0116 0" />
+    </>
+  ),
+  menu: (
+    <>
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </>
+  ),
+  palette: (
+    <>
+      <path d="M12 3a9 9 0 00-9 9 8 8 0 008 8h1.5a1.5 1.5 0 001.2-2.4 1.5 1.5 0 011.2-2.4H17a4 4 0 004-4 8 8 0 00-9-8.2z" />
+      <circle cx="7.5" cy="10.5" r=".5" />
+      <circle cx="10" cy="7.5" r=".5" />
+      <circle cx="14" cy="7.5" r=".5" />
+      <circle cx="16.5" cy="10.5" r=".5" />
+    </>
+  ),
+  shield: (
+    <>
+      <path d="M12 3l7 3v5c0 5-3 8.5-7 10-4-1.5-7-5-7-10V6l7-3z" />
+      <path d="M9 12l2 2 4-5" />
+    </>
+  ),
+  sliders: (
+    <>
+      <path d="M4 6h5M15 6h5M4 12h9M17 12h3M4 18h3M11 18h9" />
+      <circle cx="12" cy="6" r="3" />
+      <circle cx="16" cy="12" r="3" />
+      <circle cx="8" cy="18" r="3" />
+    </>
+  ),
+  book: (
+    <>
+      <path d="M4 5.5A2.5 2.5 0 016.5 3H20v17H6.5A2.5 2.5 0 014 17.5v-12z" />
+      <path d="M4 17.5A2.5 2.5 0 016.5 15H20M8 7h8" />
+    </>
+  ),
   tasks: (
     <>
       <rect x="4" y="4" width="16" height="16" rx="2" />
@@ -89,6 +129,7 @@ const PATHS: Record<string, JSX.Element> = {
   caret: <path d="M6 9l6 6 6-6" />,
   caretup: <path d="M6 15l6-6 6 6" />,
   arrow: <path d="M5 12h14M13 6l6 6-6 6" />,
+  'chevron-right': <path d="M9 6l6 6-6 6" />,
   sparkle: (
     <>
       <path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3zM18 15l1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2z" />
@@ -107,11 +148,24 @@ const PATHS: Record<string, JSX.Element> = {
       <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4zM7 6H4v2a3 3 0 003 3M17 6h3v2a3 3 0 01-3 3" />
     </>
   ),
+  crown: (
+    <>
+      <path d="M3 8l4 4 5-7 5 7 4-4-2 11H5L3 8z" />
+      <path d="M5 19h14" />
+    </>
+  ),
   growth: <path d="M3 17l6-6 4 4 8-8M21 7v6h-6" />,
   warning: (
     <>
       <path d="M12 3l10 18H2L12 3z" />
       <path d="M12 10v5M12 18h.01" />
+    </>
+  ),
+  print: (
+    <>
+      <path d="M6 9V3h12v6" />
+      <path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2" />
+      <path d="M6 14h12v7H6zM18 12h.01" />
     </>
   ),
   download: <path d="M12 3v13M6 11l6 6 6-6M5 21h14" />,
@@ -156,6 +210,42 @@ const PATHS: Record<string, JSX.Element> = {
     <>
       <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" />
       <path d="M12 12l8-4.5M12 12v9M12 12L4 7.5" />
+    </>
+  ),
+  eye: (
+    <>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  messageCircle: (
+    <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" />
+  ),
+  checkCircle: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8 12l3 3 5-6" />
+    </>
+  ),
+  globe: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
+    </>
+  ),
+  pencil: (
+    <>
+      <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
+    </>
+  ),
+  trash: (
+    <>
+      <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" />
+    </>
+  ),
+  'git-branch': (
+    <>
+      <path d="M6 3v12M18 9a3 3 0 100-6 3 3 0 000 6zM6 21a3 3 0 100-6 3 3 0 000 6zM18 9a3 3 0 01-3 3H9a3 3 0 00-3 3" />
     </>
   ),
 };

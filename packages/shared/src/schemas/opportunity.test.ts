@@ -10,10 +10,11 @@ import {
 describe('OpportunityStage', () => {
   it('accepts every canonical stage', () => {
     for (const s of [
-      'discovery',
-      'qualified',
-      'proposal',
-      'negotiation',
+      's1_lead',
+      's1_ongoing',
+      's2_sent',
+      's3_technical_iteration',
+      's4_negotiation',
       'closed_won',
       'closed_lost',
     ]) {
@@ -36,13 +37,16 @@ describe('Opportunity', () => {
     code: 'OP-2041',
     customer: 'CI Financial',
     name: 'CI Financial — IT Modernization',
-    stage: 'proposal',
+    stage: 's3_technical_iteration',
     value: 1_240_000,
     probability: 65,
     dueDate: '2026-07-22',
     owner: 'jane.smith@mantu.com',
     industry: 'financial_services',
     logo: null,
+    country: 'CA',
+    territoryId: null,
+    territoryName: null,
     updatedAt: '2026-05-10T08:00:00.000Z',
   };
 
@@ -65,13 +69,16 @@ describe('OpportunityCreate', () => {
       OpportunityCreate.parse({
         customer: 'X',
         name: 'X bid',
-        stage: 'discovery',
+        stage: 's1_ongoing',
         value: 100,
         probability: 30,
         dueDate: null,
         owner: null,
         industry: null,
         logo: null,
+        country: null,
+        territoryId: null,
+        territoryName: null,
       }),
     ).not.toThrow();
   });

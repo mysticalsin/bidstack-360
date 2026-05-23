@@ -4,12 +4,12 @@ test('opportunities list filters by stage', async ({ page, gotoAndWait }) => {
   await gotoAndWait('/opportunities');
   await expect(page.locator('h1')).toContainText('Opportunities', { timeout: 10_000 });
 
-  // Try clicking a stage filter tab/pill if one exists.
-  const stageFilter = page.getByRole('tab', { name: /discovery|qualified|proposal/i }).first();
-  if (await stageFilter.isVisible().catch(() => false)) {
-    await stageFilter.click();
-    await expect(page.locator('#main')).toBeVisible();
-  }
+  // Try clicking a canonical stage filter chip. It should exist and update
+  // the current list without leaving the page.
+  const stageFilter = page.getByRole('button', { name: /s1 lead|s1 ongoing|s2 sent/i }).first();
+  await expect(stageFilter).toBeVisible({ timeout: 5_000 });
+  await stageFilter.click();
+  await expect(page.locator('#main')).toBeVisible();
 });
 
 test('opportunity detail shows activity tab', async ({ page, gotoAndWait }) => {

@@ -21,12 +21,12 @@ export const ALLOWED_FILE_CONTENT_TYPES = [
   'image/jpeg',
   'image/gif',
   'image/webp',
-  'image/svg+xml',
 ] as const;
 
 export const FileAttachment = z.object({
   id: z.string().uuid(),
   accountId: z.string().min(1).max(255),
+  companyId: z.string().uuid().optional(),
   name: z.string().min(1).max(255),
   contentType: z.string().min(1).max(100),
   bytes: z.number().int().nonnegative(),
@@ -34,11 +34,16 @@ export const FileAttachment = z.object({
   uploadedByUserId: z.string().uuid().nullable(),
   uploadedByEmail: z.string().email().nullable(),
   createdAt: z.string().datetime(),
+  verifiedBytes: z.number().int().nonnegative().optional(),
+  verifiedContentType: z.string().min(1).max(100).optional(),
+  checksum: z.string().nullable().optional(),
+  scanStatus: z.enum(['not_required', 'pending', 'passed', 'failed']).optional(),
 });
 export type FileAttachment = z.infer<typeof FileAttachment>;
 
 export const FileUploadUrlRequest = z.object({
   accountId: z.string().min(1).max(255),
+  companyId: z.string().uuid().optional(),
   name: z.string().min(1).max(255),
   contentType: z.enum(ALLOWED_FILE_CONTENT_TYPES),
   bytes: z.number().int().positive().max(FILE_MAX_BYTES),
@@ -57,6 +62,7 @@ export type FileUploadUrlResponse = z.infer<typeof FileUploadUrlResponse>;
 
 export const FileFinalizeRequest = z.object({
   accountId: z.string().min(1).max(255),
+  companyId: z.string().uuid().optional(),
   storageKey: z.string().min(1).max(500),
   name: z.string().min(1).max(255),
   contentType: z.enum(ALLOWED_FILE_CONTENT_TYPES),

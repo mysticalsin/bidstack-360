@@ -7,8 +7,11 @@ import { createHmac } from 'node:crypto';
 
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
+import pino from 'pino';
 
 import { COMPANY_ENRICH_APOLLO } from '@bidstack/shared';
+
+const log = pino({ name: 'queue:apollo-enrich', level: process.env.LOG_LEVEL ?? 'info' });
 
 export const COMPANY_ENRICH_APOLLO_QUEUE = COMPANY_ENRICH_APOLLO.name;
 
@@ -35,8 +38,10 @@ function getQueue(): Queue {
     enableOfflineQueue: true,
     lazyConnect: false,
   });
-  // Swallow listener-less errors so an unreachable Redis doesn't crash the API.
-  connectionSingleton.on('error', () => undefined);
+  // Log Redis errors so queue failures are visible in logs/metrics.
+  connectionSingleton.on('error', (err) => {
+    log.error({ err }, 'Redis connection error in apollo-enrich queue');
+  });
 
   queueSingleton = new Queue(COMPANY_ENRICH_APOLLO_QUEUE, {
     connection: connectionSingleton,
@@ -65,22 +70,30 @@ export function createApolloEnrichJobSignature(
 }
 
 /**
- * Enqueue an Apollo enrichment job. Returns the BullMQ job id, or null if
+ * Enqueue an Apollo data verification job. Returns the BullMQ job id, or null if
  * Redis is unreachable (we swallow the failure so the calling route can still
- * complete the synchronous enrichment write).
+ * complete the synchronous data verification write).
  */
 export async function enqueueApolloEnrich(job: ApolloEnrichJob): Promise<string | null> {
   try {
     const secret = getJobSigningSecret();
-    if (!secret && process.env.NODE_ENV === 'production') return null;
+    if (!secret && process.env.NODE_ENV === 'production') {
+      log.warn('Skipping Apollo enrich enqueue: no JOB_SIGNING_SECRET in production');
+      return null;
+    }
     const payload = secret
       ? { ...job, signature: createApolloEnrichJobSignature(job, secret) }
       : job;
     const queued = await getQueue().add('apollo.enrich', payload, {
       jobId: `${job.orgId}:${job.companyName}`,
     });
+    log.info({ jobId: queued.id, orgId: job.orgId }, 'Apollo enrich job enqueued');
     return queued.id ?? null;
-  } catch {
+  } catch (err) {
+    log.error(
+      { err, orgId: job.orgId, companyName: job.companyName },
+      'Failed to enqueue Apollo enrich job',
+    );
     return null;
   }
 }

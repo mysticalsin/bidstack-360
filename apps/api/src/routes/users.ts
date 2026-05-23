@@ -15,6 +15,7 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/users',
     {
+      config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
       schema: {
         response: { 200: z.array(OrgUser) },
       },
@@ -38,6 +39,7 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
     '/users/:id/role',
     {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      preHandler: server.requirePermission('users:write'),
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: z.object({ role: z.enum(['member', 'admin']) }),
@@ -45,16 +47,19 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      if (req.auth.role !== 'admin') {
-        throw server.httpErrors.forbidden('Admin required');
-      }
       const user = await prisma.user.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId },
       });
       if (!user) throw server.httpErrors.notFound('User not found');
-      const updated = await prisma.user.update({
-        where: { id: user.id },
+      const updateResult = await prisma.user.updateMany({
+        where: { id: user.id, orgId: req.auth.orgId },
         data: { role: req.body.role },
+      });
+      if (updateResult.count === 0) {
+        throw server.httpErrors.notFound('User not found');
+      }
+      const updated = await prisma.user.findFirstOrThrow({
+        where: { id: user.id, orgId: req.auth.orgId },
       });
       return {
         id: updated.id,

@@ -57,6 +57,13 @@ jobs:
       - name: Build
         run: pnpm -r build
 
+      - name: Verify PWA manifest exists
+        run: |
+          test -f apps/web/dist/manifest.json || (echo "::error::manifest.json missing from dist" && exit 1)
+          test -f apps/web/dist/sw.js || (echo "::error::sw.js missing from dist" && exit 1)
+          test -f apps/web/dist/icon-192.png || (echo "::error::icon-192.png missing from dist" && exit 1)
+          test -f apps/web/dist/icon-512.png || (echo "::error::icon-512.png missing from dist" && exit 1)
+
       - name: Bundle size guard (web)
         # Hard-fail if any non-react chunk exceeds 200 KB minified — catches
         # accidental bundling of heavy deps in app code. React itself

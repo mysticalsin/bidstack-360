@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from 'framer-motion';
+import { memo } from 'react';
 import type { CSSProperties } from 'react';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
@@ -15,7 +16,11 @@ interface Props {
   tasksLoading: boolean;
 }
 
-export function KpiSidebar({ snapshot, overdueCount, tasksLoading }: Props) {
+export const KpiSidebar = memo(function KpiSidebar({
+  snapshot,
+  overdueCount,
+  tasksLoading,
+}: Props) {
   const reducedMotion = useReducedMotion();
   const queueWaiting = snapshot.queueHealth.reduce((acc, q) => acc + q.waiting + q.active, 0);
   const providers = snapshot.providerHealth.length;
@@ -23,7 +28,7 @@ export function KpiSidebar({ snapshot, overdueCount, tasksLoading }: Props) {
 
   return (
     <Card>
-      <SectionHeader title="Platform pulse" caption="Live from BidStack APIs" />
+      <SectionHeader title="Platform status" caption="Latest available BidStack metrics" />
       <div className="pulse-stack">
         <PulseRow
           label="Release score"
@@ -60,7 +65,7 @@ export function KpiSidebar({ snapshot, overdueCount, tasksLoading }: Props) {
       </div>
     </Card>
   );
-}
+});
 
 function PulseRow({
   label,

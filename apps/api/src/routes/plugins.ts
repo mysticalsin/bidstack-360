@@ -14,7 +14,7 @@ export const pluginRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const rows = await prisma.plugin.findMany({
-        where: { orgId: req.auth.orgId },
+        where: { orgId: req.auth.orgId, deletedAt: null },
         orderBy: { installedAt: 'desc' },
       });
       return {
@@ -39,6 +39,7 @@ export const pluginRoutes: FastifyPluginAsyncZod = async (server) => {
     '/plugins',
     {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      preHandler: server.requirePermission('integrations:write'),
       schema: {
         body: PluginInstall,
         response: { 201: Plugin },
@@ -99,14 +100,18 @@ export const pluginRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/plugins/:id',
     {
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      preHandler: server.requirePermission('integrations:write'),
       schema: { params: z.object({ id: z.string().uuid() }), response: { 204: z.null() } },
     },
     async (req, reply) => {
-      const existing = await prisma.plugin.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+      const updateResult = await prisma.plugin.updateMany({
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        data: { deletedAt: new Date() },
       });
-      if (!existing) throw server.httpErrors.notFound('Plugin not found');
-      await prisma.plugin.delete({ where: { id: existing.id } });
+      if (updateResult.count === 0) {
+        throw server.httpErrors.notFound('Plugin not found');
+      }
       return reply.code(204).send(null);
     },
   );

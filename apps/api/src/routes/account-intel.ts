@@ -2,9 +2,6 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { DocumentExtraction, ExtractDocumentRequest, AccountIntelSnapshot } from '@bidstack/shared';
-import path from 'node:path';
-import { getStorage } from '../storage/index.js';
-import { extractTextFromBuffer } from '../lib/extract-text.js';
 import { enqueueDocumentExtract } from '../queues/document-extract.js';
 
 export const accountIntelRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -13,22 +10,22 @@ export const accountIntelRoutes: FastifyPluginAsyncZod = async (server) => {
     '/accounts/:accountId/intel',
     {
       schema: {
-        params: z.object({ accountId: z.string().min(1) }),
+        params: z.object({ accountId: z.string().min(1).max(255) }),
         response: { 200: AccountIntelSnapshot },
       },
     },
     async (req) => {
       const [solutions, products, extractions] = await Promise.all([
         prisma.accountSolution.findMany({
-          where: { orgId: req.auth.orgId, accountId: req.params.accountId },
+          where: { orgId: req.auth.orgId, accountId: req.params.accountId, deletedAt: null },
           orderBy: { updatedAt: 'desc' },
         }),
         prisma.accountProduct.findMany({
-          where: { orgId: req.auth.orgId, accountId: req.params.accountId },
+          where: { orgId: req.auth.orgId, accountId: req.params.accountId, deletedAt: null },
           orderBy: { updatedAt: 'desc' },
         }),
         prisma.documentExtraction.findMany({
-          where: { orgId: req.auth.orgId, accountId: req.params.accountId },
+          where: { orgId: req.auth.orgId, accountId: req.params.accountId, deletedAt: null },
           orderBy: { createdAt: 'desc' },
           take: 50,
         }),
@@ -79,12 +76,14 @@ export const accountIntelRoutes: FastifyPluginAsyncZod = async (server) => {
   );
 
   // POST /api/accounts/:accountId/documents/:documentId/extract
-  // Reads file, extracts text, enqueues a worker job, returns pending record.
+  // Creates a pending extraction row and enqueues a worker job. Parser/OCR work
+  // stays out of the API request path.
   server.post(
     '/accounts/:accountId/documents/:documentId/extract',
     {
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {
-        params: z.object({ accountId: z.string().min(1), documentId: z.string().uuid() }),
+        params: z.object({ accountId: z.string().min(1).max(255), documentId: z.string().uuid() }),
         body: ExtractDocumentRequest,
         response: { 200: DocumentExtraction },
       },
@@ -94,26 +93,9 @@ export const accountIntelRoutes: FastifyPluginAsyncZod = async (server) => {
 
       // Verify the document exists and belongs to this org/account
       const file = await prisma.fileAttachment.findFirst({
-        where: { id: documentId, orgId: req.auth.orgId, accountId },
+        where: { id: documentId, orgId: req.auth.orgId, accountId, deletedAt: null },
       });
       if (!file) throw server.httpErrors.notFound('Document not found');
-
-      // Read file from storage and extract text
-      const storage = await getStorage();
-      const buffer = await storage.readBuffer(file.storageKey);
-      const text = await extractTextFromBuffer({
-        buffer,
-        contentType: file.contentType,
-        name: file.name,
-        sourcePath:
-          storage.driver === 'local'
-            ? path.resolve(process.cwd(), '.uploads', file.storageKey)
-            : undefined,
-      });
-
-      // Cap text length to stay within Redis job payload limits
-      const MAX_TEXT_LEN = 100_000;
-      const cappedText = text.length > MAX_TEXT_LEN ? text.slice(0, MAX_TEXT_LEN) : text;
 
       // Create extraction job record
       const extraction = await prisma.documentExtraction.create({
@@ -132,7 +114,9 @@ export const accountIntelRoutes: FastifyPluginAsyncZod = async (server) => {
         accountId,
         documentId,
         extractionId: extraction.id,
-        text: cappedText,
+        storageKey: file.storageKey,
+        contentType: file.contentType,
+        name: file.name,
         prompt: req.body.prompt,
       });
 
@@ -155,16 +139,17 @@ export const accountIntelRoutes: FastifyPluginAsyncZod = async (server) => {
     '/accounts/:accountId/solutions/:solutionId',
     {
       schema: {
-        params: z.object({ accountId: z.string().min(1), solutionId: z.string().uuid() }),
+        params: z.object({ accountId: z.string().min(1).max(255), solutionId: z.string().uuid() }),
       },
     },
     async (req) => {
-      await prisma.accountSolution.deleteMany({
+      await prisma.accountSolution.updateMany({
         where: {
           id: req.params.solutionId,
           orgId: req.auth.orgId,
           accountId: req.params.accountId,
         },
+        data: { deletedAt: new Date() },
       });
       return { success: true };
     },
@@ -175,12 +160,13 @@ export const accountIntelRoutes: FastifyPluginAsyncZod = async (server) => {
     '/accounts/:accountId/products/:productId',
     {
       schema: {
-        params: z.object({ accountId: z.string().min(1), productId: z.string().uuid() }),
+        params: z.object({ accountId: z.string().min(1).max(255), productId: z.string().uuid() }),
       },
     },
     async (req) => {
-      await prisma.accountProduct.deleteMany({
+      await prisma.accountProduct.updateMany({
         where: { id: req.params.productId, orgId: req.auth.orgId, accountId: req.params.accountId },
+        data: { deletedAt: new Date() },
       });
       return { success: true };
     },

@@ -10,13 +10,7 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
-    "noEmit": true,
-    "baseUrl": "..",
-    "paths": {
-      "@playwright/test": [
-        "../../node_modules/.pnpm/@playwright+test@1.59.1/node_modules/@playwright/test"
-      ]
-    }
+    "noEmit": true
   },
   "include": ["./**/*.ts"]
 }

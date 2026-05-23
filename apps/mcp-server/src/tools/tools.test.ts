@@ -2,12 +2,28 @@ import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { PrismaClient } from '@bidstack/db';
 import { createHash, randomBytes } from 'node:crypto';
 
-import { tools } from './index.js';
+import { requiredScopeForTool, toolScopes, tools, type ToolName } from './index.js';
 
 const hasDb = !!process.env.DATABASE_URL;
 const describeDb = hasDb ? describe : describe.skip;
 
 const prisma = new PrismaClient();
+
+describe('MCP tool scopes', () => {
+  it('declares a read/write scope for every registered tool', () => {
+    for (const name of Object.keys(tools) as ToolName[]) {
+      expect(toolScopes[name]).toMatch(/^(read|write)$/);
+    }
+  });
+
+  it('keeps mutation tools write-scoped and query tools read-scoped', () => {
+    expect(requiredScopeForTool('opportunity.update')).toBe('write');
+    expect(requiredScopeForTool('contacts.create')).toBe('write');
+    expect(requiredScopeForTool('crm_enrich_company')).toBe('write');
+    expect(requiredScopeForTool('opportunities.list')).toBe('read');
+    expect(requiredScopeForTool('proposal.draft')).toBe('read');
+  });
+});
 
 describeDb('MCP tools', () => {
   let orgId: string;
@@ -22,13 +38,15 @@ describeDb('MCP tools', () => {
     });
     orgId = org.id;
 
+    await prisma.opportunity.deleteMany({ where: { orgId, code: 'OP-9999' } });
+
     const opp = await prisma.opportunity.create({
       data: {
         orgId,
         code: 'OP-9999',
         customer: 'TestCorp',
         name: 'Test Opportunity',
-        stage: 'discovery',
+        stage: 's1_ongoing',
         valueMicros: 100_000_000_000,
         probability: 50,
         intel: {},

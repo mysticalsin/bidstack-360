@@ -48,12 +48,14 @@ describe('crm dashboard routes', () => {
     async () => {
       // First fetch the dashboard to get a valid company id
       const dash = await server.inject({ method: 'GET', url: '/api/crm/dashboard' });
-      const companies = dash.json().companies as Array<{ id: string; name: string }>;
+      const baseline = dash.json();
+      const companies = baseline.companies as Array<{ id: string; name: string }>;
       if (companies.length === 0) {
         console.warn('[skip] no companies seeded');
         return;
       }
-      const target = companies[0]!;
+      const target =
+        companies.find((company) => company.id !== baseline.cockpit.company.id) ?? companies[0]!;
 
       const res = await server.inject({
         method: 'GET',
@@ -63,6 +65,17 @@ describe('crm dashboard routes', () => {
       const body = res.json();
       expect(body.cockpit).toBeDefined();
       expect(body.cockpit.company.id).toBe(target.id);
+      const expectedOpenDeals = body.deals.filter(
+        (deal: { companyId: string | null; companyName: string | null; stage: string }) =>
+          (deal.companyId === target.id || deal.companyName === target.name) &&
+          deal.stage !== 'customer' &&
+          deal.stage !== 'closed_won' &&
+          deal.stage !== 'closed_lost',
+      ).length;
+      const openDealsKpi = body.cockpit.kpis.find(
+        (kpi: { label: string; value: string }) => kpi.label === 'Open deals',
+      );
+      expect(openDealsKpi?.value).toBe(String(expectedOpenDeals));
     },
   );
 
@@ -84,6 +97,14 @@ describe('crm dashboard routes', () => {
     const body = res.json();
     expect(body.cockpit).toBeDefined();
     expect(body.cockpit.company.name).toBe(target.name);
+  });
+
+  skipIfNoDb('GET /api/crm/dashboard?account= returns 404 for unknown account', async () => {
+    const res = await server.inject({
+      method: 'GET',
+      url: '/api/crm/dashboard?account=unknown-account-should-not-fallback',
+    });
+    expect(res.statusCode).toBe(404);
   });
 
   skipIfNoDb('GET /api/crm/release-score returns the score object', async () => {

@@ -23,7 +23,11 @@ export const roleRoutes: FastifyPluginAsyncZod = async (server) => {
   // GET /api/roles
   server.get(
     '/roles',
-    { schema: { response: { 200: z.object({ items: z.array(RoleSchema) }) } } },
+    {
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      preHandler: [server.requirePermission('settings:read'), server.requireRole('admin')],
+      schema: { response: { 200: z.object({ items: z.array(RoleSchema) }) } },
+    },
     async (req) => {
       const roles = await prisma.role.findMany({
         where: { orgId: req.auth.orgId, deletedAt: null },
@@ -50,7 +54,11 @@ export const roleRoutes: FastifyPluginAsyncZod = async (server) => {
   // GET /api/permissions
   server.get(
     '/permissions',
-    { schema: { response: { 200: z.object({ items: z.array(PermissionSchema) }) } } },
+    {
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      preHandler: [server.requirePermission('settings:read'), server.requireRole('admin')],
+      schema: { response: { 200: z.object({ items: z.array(PermissionSchema) }) } },
+    },
     async () => {
       const permissions = await prisma.permission.findMany({
         orderBy: { name: 'asc' },
@@ -70,6 +78,8 @@ export const roleRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/roles',
     {
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      preHandler: [server.requirePermission('settings:write'), server.requireRole('admin')],
       schema: {
         body: z.object({
           name: z.string().min(1).max(100),
@@ -113,6 +123,8 @@ export const roleRoutes: FastifyPluginAsyncZod = async (server) => {
   server.patch(
     '/roles/:id',
     {
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      preHandler: [server.requirePermission('settings:write'), server.requireRole('admin')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: z.object({
@@ -133,28 +145,42 @@ export const roleRoutes: FastifyPluginAsyncZod = async (server) => {
       const data: {
         name?: string;
         description?: string | null;
-        permissions?: { deleteMany: object; create: { permission: { connect: { id: string } } }[] };
       } = {};
       if (req.body.name !== undefined) data.name = req.body.name;
       if (req.body.description !== undefined) data.description = req.body.description ?? null;
-      if (req.body.permissionIds !== undefined) {
-        data.permissions = {
-          deleteMany: {},
-          create: req.body.permissionIds.map((pid) => ({
-            permission: { connect: { id: pid } },
-          })),
-        };
+
+      const updateResult = await prisma.role.updateMany({
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        data,
+      });
+
+      if (updateResult.count === 0) {
+        throw server.httpErrors.notFound('Role not found');
       }
 
-      const role = await prisma.role.update({
-        where: { id: req.params.id },
-        data,
+      if (req.body.permissionIds !== undefined) {
+        await prisma.rolePermission.deleteMany({
+          where: { roleId: req.params.id },
+        });
+        if (req.body.permissionIds.length > 0) {
+          await prisma.rolePermission.createMany({
+            data: req.body.permissionIds.map((pid) => ({
+              roleId: req.params.id,
+              permissionId: pid,
+            })),
+          });
+        }
+      }
+
+      const role = await prisma.role.findFirstOrThrow({
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
         include: {
           permissions: {
             include: { permission: { select: { id: true, key: true, name: true } } },
           },
         },
       });
+
       return {
         id: role.id,
         name: role.name,
@@ -170,6 +196,8 @@ export const roleRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/roles/:id',
     {
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      preHandler: [server.requirePermission('settings:write'), server.requireRole('admin')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 204: z.void() },
@@ -182,11 +210,16 @@ export const roleRoutes: FastifyPluginAsyncZod = async (server) => {
       if (!existing) throw server.httpErrors.notFound('Role not found');
       if (existing.isSystem) throw server.httpErrors.forbidden('Cannot delete system roles');
 
-      await prisma.role.update({
-        where: { id: req.params.id },
+      const updateResult = await prisma.role.updateMany({
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
         data: { deletedAt: new Date() },
       });
-      reply.status(204).send();
+
+      if (updateResult.count === 0) {
+        throw server.httpErrors.notFound('Role not found');
+      }
+
+      return reply.status(204).send();
     },
   );
 };

@@ -163,7 +163,7 @@ export async function fetchOpenCompanyProfile({
       logoFile,
       imageFile,
       companyImageUrl: imageUrl,
-      openEnrichmentProvider: 'wikidata_wikimedia',
+      openDataProvider: 'wikidata_wikimedia',
     },
   };
 }

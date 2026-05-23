@@ -121,196 +121,203 @@ export async function buildDashboardSnapshot(
     providerRows,
     queueRows,
     releaseScoreRow,
-  ] = await Promise.all([
-    prisma.opportunity.findMany({
-      where: { orgId },
-      select: {
-        id: true,
-        code: true,
-        customer: true,
-        name: true,
-        stage: true,
-        valueMicros: true,
-        probability: true,
-        dueDate: true,
-        ownerId: true,
-        updatedAt: true,
-        industry: true,
-        logoUrl: true,
-        owner: { select: { name: true, email: true } },
-      },
-      orderBy: { updatedAt: 'desc' },
-      take: 100,
-    }),
-    prisma.contact.findMany({
-      where: { orgId },
-      select: {
-        id: true,
-        customer: true,
-        name: true,
-        role: true,
-        email: true,
-        phone: true,
-        influence: true,
-        createdAt: true,
-      },
-      orderBy: { name: 'asc' },
-      take: 200,
-    }),
-    prisma.task.findMany({
-      where: { orgId },
-      select: {
-        id: true,
-        title: true,
-        status: true,
-        createdAt: true,
-        opportunity: { select: { id: true, customer: true, name: true } },
-        assignee: { select: { name: true, email: true } },
-        dueDate: true,
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    }),
-    prisma.companyEnrichment.findMany({
-      where: { orgId },
-      select: {
-        id: true,
-        tradeName: true,
-        legalName: true,
-        domain: true,
-        website: true,
-        industryCodes: true,
-        providerMetadata: true,
-        employeeCount: true,
-        annualRevenueMicros: true,
-        status: true,
-        registryIds: true,
-        formerNames: true,
-        incorporationDate: true,
-        logoUrl: true,
-        logoSource: true,
-        confidenceBps: true,
-        sourceAttribution: true,
-        updatedAt: true,
-      },
-      orderBy: { updatedAt: 'desc' },
-      take: 200,
-    }),
-    prisma.aiInsight.findMany({
-      where: { orgId, status: 'active' },
-      select: {
-        id: true,
-        kind: true,
-        title: true,
-        summary: true,
-        confidenceBps: true,
-        companyName: true,
-        opportunityId: true,
-        sourceAttribution: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 25,
-    }),
-    prisma.dashboardWidget.findMany({
-      where: { orgId },
-      select: {
-        id: true,
-        kind: true,
-        title: true,
-        x: true,
-        y: true,
-        w: true,
-        h: true,
-        config: true,
-      },
-      orderBy: [{ y: 'asc' }, { x: 'asc' }],
-      take: 20,
-    }),
-    prisma.bidOpportunity.findMany({
-      where: { orgId },
-      select: {
-        id: true,
-        source: true,
-        externalId: true,
-        title: true,
-        buyer: true,
-        country: true,
-        region: true,
-        status: true,
-        dueDate: true,
-        estimatedValueMicros: true,
-        currencyCode: true,
-        url: true,
-        recommendation: true,
-        readinessScore: true,
-        sourceAttribution: true,
-      },
-      orderBy: [{ dueDate: 'asc' }, { updatedAt: 'desc' }],
-      take: 50,
-    }),
-    prisma.riskRegisterItem.findMany({
-      where: { orgId },
-      select: {
-        id: true,
-        title: true,
-        severity: true,
-        owner: true,
-        mitigation: true,
-        dueDate: true,
-        status: true,
-        companyName: true,
-      },
-      orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
-      take: 50,
-    }),
-    prisma.complianceCheck.findMany({
-      where: { orgId },
-      select: {
-        id: true,
-        label: true,
-        status: true,
-        owner: true,
-        sourceAttribution: true,
-      },
-      orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
-      take: 50,
-    }),
-    prisma.providerHealth.findMany({
-      where: { orgId },
-      select: {
-        provider: true,
-        status: true,
-        latencyMs: true,
-        lastCheckedAt: true,
-        message: true,
-      },
-      orderBy: { provider: 'asc' },
-    }),
-    prisma.queueHealth.findMany({
-      where: { orgId },
-      select: {
-        queueName: true,
-        waiting: true,
-        active: true,
-        failed: true,
-        completed: true,
-        lastCheckedAt: true,
-      },
-      orderBy: { queueName: 'asc' },
-    }),
-    prisma.releaseScore.findFirst({
-      where: { orgId },
-      select: {
-        functional: true,
-        code: true,
-        design: true,
-        infra: true,
-        scoredAt: true,
-      },
-      orderBy: { scoredAt: 'desc' },
-    }),
-  ]);
+  ] = await prisma.$transaction(
+    [
+      prisma.opportunity.findMany({
+        where: { orgId },
+        select: {
+          id: true,
+          code: true,
+          customer: true,
+          name: true,
+          stage: true,
+          valueMicros: true,
+          probability: true,
+          dueDate: true,
+          ownerId: true,
+          updatedAt: true,
+          industry: true,
+          logoUrl: true,
+          owner: { select: { name: true, email: true } },
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 100,
+      }),
+      prisma.contact.findMany({
+        where: { orgId },
+        select: {
+          id: true,
+          customer: true,
+          name: true,
+          role: true,
+          email: true,
+          phone: true,
+          influence: true,
+          createdAt: true,
+        },
+        orderBy: { name: 'asc' },
+        take: 200,
+      }),
+      prisma.task.findMany({
+        where: { orgId },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          createdAt: true,
+          opportunity: { select: { id: true, customer: true, name: true } },
+          assignee: { select: { name: true, email: true } },
+          dueDate: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }),
+      prisma.companyEnrichment.findMany({
+        where: { orgId },
+        select: {
+          id: true,
+          tradeName: true,
+          legalName: true,
+          domain: true,
+          website: true,
+          industryCodes: true,
+          providerMetadata: true,
+          employeeCount: true,
+          annualRevenueMicros: true,
+          status: true,
+          registryIds: true,
+          formerNames: true,
+          incorporationDate: true,
+          logoUrl: true,
+          logoSource: true,
+          confidenceBps: true,
+          sourceAttribution: true,
+          updatedAt: true,
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 200,
+      }),
+      prisma.aiInsight.findMany({
+        where: { orgId, status: 'active' },
+        select: {
+          id: true,
+          kind: true,
+          title: true,
+          summary: true,
+          confidenceBps: true,
+          companyName: true,
+          opportunityId: true,
+          sourceAttribution: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 25,
+      }),
+      prisma.dashboardWidget.findMany({
+        where: { orgId },
+        select: {
+          id: true,
+          kind: true,
+          title: true,
+          x: true,
+          y: true,
+          w: true,
+          h: true,
+          config: true,
+        },
+        orderBy: [{ y: 'asc' }, { x: 'asc' }],
+        take: 20,
+      }),
+      prisma.bidOpportunity.findMany({
+        where: { orgId },
+        select: {
+          id: true,
+          source: true,
+          externalId: true,
+          title: true,
+          buyer: true,
+          country: true,
+          region: true,
+          status: true,
+          dueDate: true,
+          estimatedValueMicros: true,
+          currencyCode: true,
+          url: true,
+          recommendation: true,
+          readinessScore: true,
+          sourceAttribution: true,
+        },
+        orderBy: [{ dueDate: 'asc' }, { updatedAt: 'desc' }],
+        take: 50,
+      }),
+      prisma.riskRegisterItem.findMany({
+        where: { orgId },
+        select: {
+          id: true,
+          title: true,
+          severity: true,
+          owner: true,
+          mitigation: true,
+          dueDate: true,
+          status: true,
+          companyName: true,
+        },
+        orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+        take: 50,
+      }),
+      prisma.complianceCheck.findMany({
+        where: { orgId },
+        select: {
+          id: true,
+          label: true,
+          status: true,
+          owner: true,
+          sourceAttribution: true,
+        },
+        orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+        take: 50,
+      }),
+      prisma.providerHealth.findMany({
+        where: { orgId },
+        select: {
+          provider: true,
+          status: true,
+          latencyMs: true,
+          lastCheckedAt: true,
+          message: true,
+        },
+        orderBy: { provider: 'asc' },
+        take: 50,
+      }),
+      prisma.queueHealth.findMany({
+        where: { orgId },
+        select: {
+          queueName: true,
+          waiting: true,
+          active: true,
+          failed: true,
+          completed: true,
+          lastCheckedAt: true,
+        },
+        orderBy: { queueName: 'asc' },
+        take: 50,
+      }),
+      prisma.releaseScore.findFirst({
+        where: { orgId },
+        select: {
+          functional: true,
+          code: true,
+          design: true,
+          infra: true,
+          scoredAt: true,
+        },
+        orderBy: { scoredAt: 'desc' },
+      }),
+    ],
+    {
+      isolationLevel: 'ReadCommitted',
+    },
+  );
 
   const companies = buildCompanies(opportunities, enrichments);
   const deals = opportunities.map((opportunity) => serializeDeal(opportunity));
@@ -403,7 +410,7 @@ function buildCompanies(
     if (byName.has(normalized)) continue;
     byName.set(normalized, {
       id: normalized,
-      source: 'twenty',
+      source: 'external_crm',
       name: opportunity.customer,
       legalName: opportunity.customer,
       domain: domainFor(opportunity.customer),
@@ -420,8 +427,8 @@ function buildCompanies(
       confidence: 0.55,
       sourceAttribution: [
         attribution({
-          source: 'twenty',
-          label: 'Twenty opportunity/customer record',
+          source: 'external_crm',
+          label: 'External CRM opportunity/customer record',
           sourceUrl: null,
           confidence: 0.55,
         }),
@@ -472,7 +479,7 @@ export function serializeCompany(enrichment: {
   const industryCodes = stringArray(enrichment.industryCodes);
   return {
     id: enrichment.id,
-    source: 'enrichment',
+    source: 'verified_data',
     name,
     legalName: enrichment.legalName,
     domain: enrichment.domain,
@@ -601,10 +608,10 @@ function buildCockpit({
       {
         label: 'Open deals',
         value: openDeals.length.toString(),
-        detail: 'Twenty pipeline',
+        detail: 'External CRM pipeline',
         tone: 'amber',
       },
-      { label: 'Total devices', value: '1,842', detail: 'enrichment estimate', tone: 'purple' },
+      { label: 'Total devices', value: '1,842', detail: 'verified data estimate', tone: 'purple' },
     ],
     technicalStack: mergeTechnicalStack(company.technicalStack ?? [], defaultTechnicalStack()),
     health: {
@@ -617,7 +624,7 @@ function buildCockpit({
       .slice(0, 5)
       .map((contact) => ({
         id: contact.id,
-        source: 'twenty',
+        source: 'external_crm',
         companyId: company.id,
         name: contact.name,
         title: contact.role,
@@ -669,7 +676,7 @@ function serializeDeal(opportunity: {
 }): z.infer<typeof CrmDeal> {
   return {
     id: opportunity.id,
-    source: 'twenty',
+    source: 'external_crm',
     companyId: normalizeName(opportunity.customer),
     companyName: opportunity.customer,
     name: opportunity.name,
@@ -696,7 +703,7 @@ function buildActivities(
 ): Array<z.infer<typeof CrmActivity>> {
   return tasks.map((task) => ({
     id: task.id,
-    source: 'twenty',
+    source: 'external_crm',
     subject: task.title,
     body: `Task is ${task.status.replace('_', ' ')}.`,
     kind: 'task',
@@ -1041,7 +1048,7 @@ function defaultProviderHealth(): Array<z.infer<typeof ProviderHealth>> {
   const checked = checkedAt.toISOString();
   const coreProviders: Array<z.infer<typeof ProviderHealth>> = [
     {
-      provider: 'Twenty GraphQL',
+      provider: 'External CRM GraphQL',
       status: 'healthy',
       latencyMs: 42,
       lastCheckedAt: checked,
@@ -1087,7 +1094,7 @@ function defaultQueueHealth(): Array<z.infer<typeof QueueHealth>> {
   const checked = new Date().toISOString();
   return [
     {
-      queueName: 'enrichment',
+      queueName: 'data_verification',
       waiting: 0,
       active: 0,
       failed: 0,
@@ -1295,10 +1302,10 @@ export function buildDataQualityReport(
     const latestFetch = latestAttributionDate(company.sourceAttribution);
     if (latestFetch && now - latestFetch.getTime() > 90 * 24 * 60 * 60 * 1000) {
       issues.push({
-        id: `stale-enrichment:${company.id}`,
-        kind: 'stale_enrichment',
+        id: `stale-data:${company.id}`,
+        kind: 'stale_data',
         severity: 'low',
-        title: `${company.name} enrichment is older than 90 days`,
+        title: `${company.name} data is older than 90 days`,
         detail: `Last verified ${latestFetch.toISOString().slice(0, 10)}`,
         companyId: company.id,
         companyName: company.name,
@@ -1372,14 +1379,22 @@ function isValidDomain(domain: string) {
 
 function mapDealStage(stage: PrismaStage): z.infer<typeof CrmDeal>['stage'] {
   switch (stage) {
-    case 'discovery':
+    case 's1_lead':
       return 'new';
-    case 'qualified':
+    case 's1_ongoing':
       return 'screening';
-    case 'negotiation':
+    case 's2_sent':
       return 'meeting';
+    case 's3_technical_iteration':
+      return 'proposal';
+    case 's4_negotiation':
+      return 'proposal';
+    case 'closed_won':
+      return 'closed_won';
+    case 'closed_lost':
+      return 'closed_lost';
     default:
-      return stage;
+      return 'new';
   }
 }
 
@@ -1538,4 +1553,47 @@ export function normalizeCountry(country: string | null | undefined) {
 export function safeErrorMessage(err: unknown): string {
   if (!(err instanceof Error)) return 'Unknown error';
   return err.message.replace(/Bearer\s+[A-Za-z0-9._-]+/gi, 'Bearer [redacted]');
+}
+
+export async function getCompaniesOnly(
+  orgId: string,
+  prisma: PrismaClient,
+): Promise<Array<z.infer<typeof CrmCompany>>> {
+  const [opportunities, enrichments] = await Promise.all([
+    prisma.opportunity.findMany({
+      where: { orgId },
+      select: {
+        customer: true,
+        industry: true,
+        logoUrl: true,
+        updatedAt: true,
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 200,
+    }),
+    prisma.companyEnrichment.findMany({
+      where: { orgId },
+      select: {
+        id: true,
+        tradeName: true,
+        legalName: true,
+        domain: true,
+        website: true,
+        industryCodes: true,
+        providerMetadata: true,
+        employeeCount: true,
+        annualRevenueMicros: true,
+        status: true,
+        registryIds: true,
+        formerNames: true,
+        incorporationDate: true,
+        logoUrl: true,
+        logoSource: true,
+        confidenceBps: true,
+        sourceAttribution: true,
+        updatedAt: true,
+      },
+    }),
+  ]);
+  return buildCompanies(opportunities, enrichments);
 }

@@ -69,14 +69,9 @@ export function AuditLogPage() {
             title="Couldn't load audit log"
             message={error instanceof Error ? error.message : 'Try again in a moment.'}
           />
-        ) : !data || data.items.length === 0 ? (
-          <EmptyState
-            title="No audit events match your filters"
-            message="Backend writers stamp entries on opportunity edits, MCP tool calls, and CRM enrichment."
-          />
         ) : (
           <AuditTable
-            rows={data.items}
+            rows={data?.items ?? []}
             expanded={expanded}
             onToggle={(id) => setExpanded((cur) => (cur === id ? null : id))}
           />
@@ -194,14 +189,25 @@ function AuditTable({ rows, expanded, onToggle }: TableProps) {
         </tr>
       </thead>
       <tbody className="divide-y divide-[var(--border-subtle)]">
-        {rows.map((row) => (
-          <RowPair
-            key={row.id}
-            row={row}
-            isOpen={expanded === row.id}
-            onToggle={() => onToggle(row.id)}
-          />
-        ))}
+        {rows.length === 0 ? (
+          <tr>
+            <td colSpan={6} className="px-5 py-8">
+              <EmptyState
+                title="No audit events match your filters"
+                message="Backend writers stamp entries on opportunity edits, MCP tool calls, and CRM enrichment."
+              />
+            </td>
+          </tr>
+        ) : (
+          rows.map((row) => (
+            <RowPair
+              key={row.id}
+              row={row}
+              isOpen={expanded === row.id}
+              onToggle={() => onToggle(row.id)}
+            />
+          ))
+        )}
       </tbody>
     </table>
   );

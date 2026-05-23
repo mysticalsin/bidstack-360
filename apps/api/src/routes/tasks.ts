@@ -2,34 +2,36 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
-import { Task, TaskCreate, TaskPatch, TaskStatus } from '@bidstack/shared';
+import { Task, TaskCreate, TaskFilter, TaskPage, TaskPatch } from '@bidstack/shared';
 
 export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/tasks',
     {
       schema: {
-        querystring: z.object({
-          oppId: z.string().uuid().optional(),
-          status: TaskStatus.optional(),
-          limit: z.coerce.number().int().min(1).max(200).default(50),
-        }),
-        response: { 200: z.object({ items: z.array(Task) }) },
+        querystring: TaskFilter,
+        response: { 200: TaskPage },
       },
     },
     async (req) => {
+      const { oppId, status, cursor, limit } = req.query;
       const items = await prisma.task.findMany({
         where: {
           orgId: req.auth.orgId,
-          ...(req.query.oppId ? { oppId: req.query.oppId } : {}),
-          ...(req.query.status ? { status: req.query.status } : {}),
+          deletedAt: null,
+          ...(oppId ? { oppId } : {}),
+          ...(status ? { status } : {}),
         },
         include: { assignee: true },
-        orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
-        take: req.query.limit,
+        orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }, { id: 'asc' }],
+        take: limit + 1,
+        ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
       });
+      const hasMore = items.length > limit;
+      const sliced = hasMore ? items.slice(0, -1) : items;
+      const nextCursor = hasMore ? (sliced[sliced.length - 1]?.id ?? null) : null;
       return {
-        items: items.map((t) => ({
+        items: sliced.map((t) => ({
           id: t.id,
           oppId: t.oppId,
           title: t.title,
@@ -38,6 +40,33 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
           assignee: t.assignee?.email ?? null,
           createdAt: t.createdAt.toISOString(),
         })),
+        nextCursor,
+      };
+    },
+  );
+
+  server.get(
+    '/tasks/:id',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: { 200: Task },
+      },
+    },
+    async (req) => {
+      const task = await prisma.task.findFirst({
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        include: { assignee: true },
+      });
+      if (!task) throw server.httpErrors.notFound('Task not found');
+      return {
+        id: task.id,
+        oppId: task.oppId,
+        title: task.title,
+        dueDate: task.dueDate ? task.dueDate.toISOString().slice(0, 10) : null,
+        status: task.status,
+        assignee: task.assignee?.email ?? null,
+        createdAt: task.createdAt.toISOString(),
       };
     },
   );
@@ -102,10 +131,17 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
       // Two-step find-then-update enforces multi-tenancy (Prisma's `update`
       // only matches a unique key; we need orgId in the filter too).
       const existing = await prisma.task.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
-        select: { id: true },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        select: { id: true, assigneeId: true },
       });
       if (!existing) throw server.httpErrors.notFound('Task not found');
+
+      const isAdmin = req.auth.role === 'admin';
+      const isAssignee = existing.assigneeId === req.auth.userId;
+      const isUnassigned = existing.assigneeId === null;
+      if (!isAdmin && !isAssignee && !isUnassigned) {
+        throw server.httpErrors.forbidden('You are not authorized to modify this task');
+      }
 
       // Resolve assignee email -> userId in the same org (or unset if null).
       let assigneeId: string | null | undefined;
@@ -166,13 +202,23 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const existing = await prisma.task.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
-        select: { id: true, title: true },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        select: { id: true, title: true, assigneeId: true },
       });
       if (!existing) throw server.httpErrors.notFound('Task not found');
 
+      const isAdmin = req.auth.role === 'admin';
+      const isAssignee = existing.assigneeId === req.auth.userId;
+      const isUnassigned = existing.assigneeId === null;
+      if (!isAdmin && !isAssignee && !isUnassigned) {
+        throw server.httpErrors.forbidden('You are not authorized to delete this task');
+      }
+
       await prisma.$transaction([
-        prisma.task.delete({ where: { id: existing.id } }),
+        prisma.task.update({
+          where: { id: existing.id },
+          data: { deletedAt: new Date() },
+        }),
         prisma.auditLog.create({
           data: {
             orgId: req.auth.orgId,

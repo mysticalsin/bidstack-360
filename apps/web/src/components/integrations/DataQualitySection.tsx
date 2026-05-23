@@ -1,6 +1,6 @@
 // Integrations → Data quality report. The /crm/data-quality endpoint
 // inspects every company + deal in the snapshot and flags issues:
-// duplicate domains, stale enrichments (>90 days), missing logos,
+// duplicate domains, stale data (>90 days), missing logos,
 // missing deal owners, invalid domain syntax. We render a counts strip
 // + a sortable issue list so an admin can triage during weekly cleanup.
 
@@ -13,7 +13,7 @@ import type { DataQualityIssue } from '@bidstack/shared';
 
 const KIND_LABEL: Record<DataQualityIssue['kind'], string> = {
   duplicate_company: 'Duplicate company',
-  stale_enrichment: 'Stale enrichment',
+  stale_data: 'Stale data',
   missing_owner: 'Missing owner',
   invalid_domain: 'Invalid domain',
   missing_logo: 'Missing logo',
@@ -45,7 +45,7 @@ export function DataQualitySection() {
             ? `Report generated ${relativeTime(data.generatedAt)} · ${issues.length} issue${
                 issues.length === 1 ? '' : 's'
               }`
-            : 'Detects duplicate companies, stale enrichments, missing owners, and bad domains.'
+            : 'Detects duplicate companies, stale data, missing owners, and bad domains.'
         }
       />
       {isLoading ? (
@@ -67,7 +67,7 @@ export function DataQualitySection() {
       ) : !data || issues.length === 0 ? (
         <EmptyState
           title="No data quality issues"
-          message="Your CRM data is clean — duplicates, stale enrichments, and missing owners are all clear."
+          message="No duplicate domains, stale data, missing owners, invalid domains, or missing logos were detected in this scan."
         />
       ) : (
         <>

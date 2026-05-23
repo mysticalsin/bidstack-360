@@ -88,7 +88,7 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
           dragActive
             ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)]'
             : 'border-[var(--border-default)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-sunken)]'
-        } focus:outline-none focus:ring-2 focus:ring-[var(--border-focus)]`}
+        } focus:outline-none focus:ring-2 focus:ring-border-focus`}
         onClick={() => inputRef.current?.click()}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
@@ -190,7 +190,7 @@ function FileRow({ file, onDelete }: { file: FileAttachment; onDelete: () => voi
         type="button"
         aria-label={`Delete ${file.name}`}
         onClick={onDelete}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--danger-tint)] hover:text-[var(--danger)] focus:outline-none focus:ring-2 focus:ring-[var(--border-focus)] pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--danger-tint)] hover:text-[var(--danger)] focus:outline-none focus:ring-2 focus:ring-border-focus pointer-coarse:min-h-11 pointer-coarse:min-w-11"
       >
         <TrashGlyph />
       </button>

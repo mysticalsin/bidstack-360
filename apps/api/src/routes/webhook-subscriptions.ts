@@ -14,16 +14,31 @@ const WebhookSub = z.object({
 });
 
 const WebhookSubCreate = z.object({
-  url: z.string().url(),
-  events: z.array(z.string().min(1)).min(1),
+  url: z.string().url().max(500),
+  events: z.array(z.string().min(1).max(100)).max(50).min(1),
   active: z.boolean().default(true),
 });
 
 const WebhookSubUpdate = z.object({
-  url: z.string().url().optional(),
-  events: z.array(z.string().min(1)).optional(),
+  url: z.string().url().max(500).optional(),
+  events: z.array(z.string().min(1).max(100)).max(50).optional(),
   active: z.boolean().optional(),
 });
+
+function assertSafeWebhookUrl(rawUrl: string): void {
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    throw new Error('url must be a valid URL');
+  }
+  if (url.protocol !== 'https:') {
+    throw new Error('url must use HTTPS');
+  }
+  if (!isPublicHostname(url.hostname)) {
+    throw new Error('url must not point to a private or internal address');
+  }
+}
 
 export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
@@ -35,7 +50,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
     },
     async (req) => {
       const rows = await prisma.webhookSubscription.findMany({
-        where: { orgId: req.auth.orgId },
+        where: { orgId: req.auth.orgId, deletedAt: null },
         orderBy: { createdAt: 'desc' },
       });
       return rows.map((s) => ({
@@ -52,6 +67,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
     '/webhook-subscriptions',
     {
       config: { rateLimit: { max: 15, timeWindow: '1 minute' } },
+      preHandler: server.requirePermission('webhooks:write'),
       schema: {
         body: WebhookSubCreate,
         response: { 201: WebhookSub },
@@ -59,17 +75,10 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
     },
     async (req, reply) => {
       // SSRF defense: reject private/internal URLs.
-      let url: URL;
       try {
-        url = new URL(req.body.url);
-      } catch {
-        throw server.httpErrors.badRequest('url must be a valid URL');
-      }
-      if (url.protocol !== 'https:') {
-        throw server.httpErrors.badRequest('url must use HTTPS');
-      }
-      if (!isPublicHostname(url.hostname)) {
-        throw server.httpErrors.badRequest('url must not point to a private or internal address');
+        assertSafeWebhookUrl(req.body.url);
+      } catch (err) {
+        throw server.httpErrors.badRequest(err instanceof Error ? err.message : 'Invalid URL');
       }
       const secret = `whsec_${Buffer.from(crypto.randomUUID()).toString('base64url')}`;
       const created = await prisma.webhookSubscription.create({
@@ -94,6 +103,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
   server.patch(
     '/webhook-subscriptions/:id',
     {
+      preHandler: server.requirePermission('webhooks:write'),
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: WebhookSubUpdate,
@@ -102,9 +112,18 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
     },
     async (req) => {
       const existing = await prisma.webhookSubscription.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!existing) throw server.httpErrors.notFound('Subscription not found');
+
+      if (req.body.url !== undefined) {
+        try {
+          assertSafeWebhookUrl(req.body.url);
+        } catch (err) {
+          throw server.httpErrors.badRequest(err instanceof Error ? err.message : 'Invalid URL');
+        }
+      }
+
       const updated = await prisma.webhookSubscription.update({
         where: { id: existing.id },
         data: {
@@ -126,6 +145,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
   server.delete(
     '/webhook-subscriptions/:id',
     {
+      preHandler: server.requirePermission('webhooks:write'),
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 204: z.void() },
@@ -133,10 +153,13 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
     },
     async (req, reply) => {
       const existing = await prisma.webhookSubscription.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!existing) throw server.httpErrors.notFound('Subscription not found');
-      await prisma.webhookSubscription.delete({ where: { id: existing.id } });
+      await prisma.webhookSubscription.update({
+        where: { id: existing.id },
+        data: { deletedAt: new Date() },
+      });
       return reply.code(204).send();
     },
   );

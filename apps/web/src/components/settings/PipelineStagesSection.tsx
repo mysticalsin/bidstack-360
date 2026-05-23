@@ -3,10 +3,16 @@ import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 
 const DEFAULT_STAGES = [
-  { id: 'discovery', name: 'Discovery', probability: 10, color: '#3b82f6' },
-  { id: 'qualified', name: 'Qualified', probability: 25, color: '#6366f1' },
-  { id: 'proposal', name: 'Proposal', probability: 50, color: '#8b5cf6' },
-  { id: 'negotiation', name: 'Negotiation', probability: 75, color: '#ec4899' },
+  { id: 's1_lead', name: 'S1 Lead', probability: 10, color: '#3b82f6' },
+  { id: 's1_ongoing', name: 'S1 Ongoing', probability: 25, color: '#6366f1' },
+  { id: 's2_sent', name: 'S2 Sent', probability: 50, color: '#8b5cf6' },
+  {
+    id: 's3_technical_iteration',
+    name: 'S3 Technical Iteration',
+    probability: 75,
+    color: '#ec4899',
+  },
+  { id: 's4_negotiation', name: 'S4 Negotiation', probability: 90, color: '#f59e0b' },
   { id: 'closed_won', name: 'Closed Won', probability: 100, color: '#10b981' },
   { id: 'closed_lost', name: 'Closed Lost', probability: 0, color: '#ef4444' },
 ];
@@ -29,7 +35,11 @@ export function PipelineStagesSection() {
   const [draftName, setDraftName] = useState('');
 
   const save = (next: typeof stages) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      /* quota / private mode — silent */
+    }
     setStages(next);
   };
 

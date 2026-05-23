@@ -7,8 +7,8 @@
 // the animation frame, not via setState — won't trigger a React re-render
 // per tick.
 
-import { animate, useMotionValue } from 'framer-motion';
-import { useEffect, useRef } from 'react';
+import { animate, useMotionValue, useReducedMotion } from 'framer-motion';
+import { useEffect, useMemo, useRef } from 'react';
 
 interface Props {
   value: number;
@@ -28,6 +28,7 @@ export function AnimatedNumber({
   startWhen = true,
   className,
 }: Props) {
+  const reduced = useReducedMotion();
   // The motion value tracks the displayed number. We start at 0 on first
   // mount so the user sees the count-up effect; subsequent value changes
   // animate from the current motion value to the new target (framer-motion's
@@ -35,8 +36,15 @@ export function AnimatedNumber({
   const motion = useMotionValue(0);
   const ref = useRef<HTMLSpanElement | null>(null);
 
+  const formattedValue = useMemo(() => format(value), [value, format]);
+
   useEffect(() => {
     if (!startWhen) return;
+    if (reduced) {
+      // Respect prefers-reduced-motion: render final value immediately.
+      if (ref.current) ref.current.textContent = formattedValue;
+      return;
+    }
     const controls = animate(motion, value, {
       duration,
       ease: [0, 0.72, 0.32, 1],
@@ -49,13 +57,14 @@ export function AnimatedNumber({
     // for our call sites and including them would restart the tween on
     // parent re-renders.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, startWhen, duration]);
+  }, [value, startWhen, duration, reduced, formattedValue]);
 
-  // First paint shows the formatted starting value (0). The effect then
-  // drives ref.current.textContent directly without React re-renders.
+  // First paint shows the formatted starting value (0), or the final value
+  // when reduced motion is preferred. The effect drives ref.current.textContent
+  // directly without React re-renders.
   return (
-    <span ref={ref} className={className}>
-      {format(0)}
+    <span ref={ref} className={className} aria-label={formattedValue}>
+      {reduced ? formattedValue : format(0)}
     </span>
   );
 }

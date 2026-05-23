@@ -17,7 +17,8 @@ export interface RecentEntry {
     | 'company'
     | 'note'
     | 'sales_order'
-    | 'invoice';
+    | 'invoice'
+    | 'agent';
   label: string;
   hint?: string;
   route: string;

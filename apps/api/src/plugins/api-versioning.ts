@@ -38,7 +38,7 @@ export const apiVersioningPlugin: FastifyPluginAsync = fp(async (server) => {
     req.apiVersion = resolved;
 
     if (!ALLOWED_VERSIONS.has(resolved)) {
-      throw req.server.httpErrors.notFound(`API version ${resolved} is not supported`);
+      throw req.server.httpErrors.badRequest(`API version ${resolved} is not supported`);
     }
   });
 

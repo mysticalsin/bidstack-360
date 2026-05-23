@@ -22,7 +22,7 @@ export function useUpdateUserRole() {
     mutationFn: ({ id, role }: { id: string; role: 'member' | 'admin' }) =>
       api<OrgUser>(`/api/users/${id}/role`, {
         method: 'PATCH',
-        body: JSON.stringify({ role }),
+        body: { role },
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
   });

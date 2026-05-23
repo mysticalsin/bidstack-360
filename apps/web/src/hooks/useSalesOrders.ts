@@ -62,6 +62,7 @@ export function useCreateSalesOrder() {
       void qc.invalidateQueries({ queryKey: ['sales:orders'] });
       void qc.invalidateQueries({ queryKey: ['sales:kpis'] });
       void qc.invalidateQueries({ queryKey: ['sales:monthly'] });
+      void qc.invalidateQueries({ queryKey: ['report:sales-intelligence'] });
     },
   });
 }
@@ -83,6 +84,7 @@ export function useTransitionSalesOrder(action: TransitionAction) {
       void qc.invalidateQueries({ queryKey: ['sales:monthly'] });
       void qc.invalidateQueries({ queryKey: ['sales:top-quotations'] });
       void qc.invalidateQueries({ queryKey: ['sales:top-orders'] });
+      void qc.invalidateQueries({ queryKey: ['report:sales-intelligence'] });
     },
   });
 }

@@ -135,7 +135,7 @@ export function IntakePage() {
                   ? 'bg-[var(--fg-primary)] text-[var(--surface-page)]'
                   : i < STEPS.findIndex((x) => x.id === step)
                     ? 'bg-[#ecfdf5] text-[#059669]'
-                    : 'bg-[var(--surface-sunken)] text-[var(--fg-tertiary)]'
+                    : 'bg-[var(--surface-sunken)] text-[var(--fg-secondary)]'
               }`}
             >
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-current/15 text-[10px] font-bold">
@@ -261,8 +261,11 @@ function ReceiveStep({
             <input type="file" multiple className="sr-only" onChange={handleFileInput} />
           </label>
         </p>
-        <p className="text-[10px] text-[var(--fg-tertiary)]">
-          PDF, DOCX, PPTX, XLSX, TXT — up to 50 MB
+        <p className="text-[10px] text-[var(--fg-secondary)]">
+          PDF, DOCX, PPTX, XLSX, TXT, images and scans — up to 50 MB
+        </p>
+        <p className="text-[10px] text-[var(--fg-secondary)]">
+          Scanned PDFs and images are OCR-ready when the server OCR runtime is enabled.
         </p>
         {upload.isPending && (
           <div className="mt-2 flex items-center justify-center gap-2 text-xs text-[var(--fg-secondary)]">
@@ -317,7 +320,11 @@ function ReceiveStep({
       )}
 
       <div className="flex justify-end">
-        <Button onClick={onNext} disabled={selectedDocs.size === 0}>
+        <Button
+          onClick={onNext}
+          disabled={selectedDocs.size === 0}
+          aria-label="Continue to next intake step"
+        >
           Next: Extract →
         </Button>
       </div>
@@ -432,7 +439,7 @@ function StatusBadge({ status }: { status: string }) {
       className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold ${styles[status] ?? 'bg-gray-100 text-gray-700'}`}
     >
       {status === 'pending' || status === 'running' ? (
-        <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-current" />
+        <span className="inline-block h-2 w-2 motion-safe:animate-pulse rounded-full bg-current" />
       ) : status === 'done' || status === 'completed' ? (
         <Icon name="check" size={10} />
       ) : (
@@ -518,10 +525,10 @@ function ReviewStep({
                       </div>
                       <button
                         type="button"
+                        aria-label={`Remove ${s.name}`}
                         onClick={() => handleDeleteSolution(s.id, s.name)}
                         disabled={deleteSolution.isPending}
-                        className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0 rounded-md p-1 text-[var(--fg-tertiary)] hover:bg-red-50 hover:text-red-600"
-                        title="Remove"
+                        className="opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100 focus:opacity-100 shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-red-50 hover:text-red-600 focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
                       >
                         <Icon name="trash" size={14} />
                       </button>
@@ -561,10 +568,10 @@ function ReviewStep({
                       </div>
                       <button
                         type="button"
+                        aria-label={`Remove ${p.name}`}
                         onClick={() => handleDeleteProduct(p.id, p.name)}
                         disabled={deleteProduct.isPending}
-                        className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0 rounded-md p-1 text-[var(--fg-tertiary)] hover:bg-red-50 hover:text-red-600"
-                        title="Remove"
+                        className="opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100 focus:opacity-100 shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-red-50 hover:text-red-600 focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
                       >
                         <Icon name="trash" size={14} />
                       </button>

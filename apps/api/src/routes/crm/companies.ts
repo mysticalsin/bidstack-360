@@ -11,6 +11,7 @@ import {
   normalizeDomain,
   normalizeRegistryValue,
   domainFor,
+  getCompaniesOnly,
 } from '../../services/crm/dashboard.service.js';
 import { upsertVerifiedCompanyEnrichment } from '../../services/crm/enrichment.service.js';
 import { enqueueApolloEnrich } from '../../queues/company-enrich-apollo.js';
@@ -43,9 +44,9 @@ const CompanyLookupResponse = z.object({
 });
 
 const EnrichCompanyBody = z.object({
-  name: z.string().min(1),
-  domain: z.string().trim().optional(),
-  website: z.string().url().optional(),
+  name: z.string().min(1).max(255),
+  domain: z.string().trim().max(255).optional(),
+  website: z.string().url().max(500).optional(),
 });
 
 const AutopopulateSalesCompaniesBody = z
@@ -65,9 +66,9 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const snapshot = await buildDashboardSnapshot(req.auth.orgId, undefined, prisma, req.log);
+      const companies = await getCompaniesOnly(req.auth.orgId, prisma);
       const q = req.query.q?.toLowerCase();
-      const items = snapshot.companies
+      const items = companies
         .filter((company) => {
           if (!q) return true;
           return [
@@ -95,7 +96,7 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const snapshot = await buildDashboardSnapshot(req.auth.orgId, undefined, prisma, req.log);
+      const companies = await getCompaniesOnly(req.auth.orgId, prisma);
       const domain = normalizeDomain(req.query.domain);
       const registryNeedles = [
         req.query.vat,
@@ -109,12 +110,12 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
       const name = req.query.name?.trim().toLowerCase();
 
       if (domain) {
-        const company = snapshot.companies.find((item) => normalizeDomain(item.domain) === domain);
+        const company = companies.find((item) => normalizeDomain(item.domain) === domain);
         if (company) return { match: 'exact_domain' as const, company, alternatives: [] };
       }
 
       if (registryNeedles.length) {
-        const company = snapshot.companies.find((item) =>
+        const company = companies.find((item) =>
           Object.values(item.registryIds).some((value) =>
             registryNeedles.includes(normalizeRegistryValue(value)),
           ),
@@ -123,14 +124,14 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
       }
 
       if (name) {
-        const exact = snapshot.companies.find(
+        const exact = companies.find(
           (item) =>
             item.name.toLowerCase() === name ||
             (item.legalName !== null && item.legalName.toLowerCase() === name),
         );
         if (exact) return { match: 'exact_name' as const, company: exact, alternatives: [] };
 
-        const alternatives = snapshot.companies
+        const alternatives = companies
           .filter((item) =>
             [item.name, item.legalName ?? '', item.domain ?? '']
               .join(' ')
@@ -153,7 +154,7 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
     '/crm/companies/:id',
     {
       schema: {
-        params: z.object({ id: z.string().min(1) }),
+        params: z.object({ id: z.string().min(1).max(255) }),
         response: { 200: AccountCockpitSnapshot },
       },
     },
@@ -170,8 +171,10 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/crm/companies/:id/enrich',
     {
+      config: { rateLimit: { max: 10, timeWindow: '1 hour' } },
+      preHandler: [server.requirePermission('companies:write'), server.requireRole('admin')],
       schema: {
-        params: z.object({ id: z.string().min(1) }),
+        params: z.object({ id: z.string().min(1).max(255) }),
         body: EnrichCompanyBody,
         response: { 200: CrmCompany },
       },
@@ -195,9 +198,9 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
         ...(result.domain ? { domain: result.domain } : {}),
       });
       if (apolloJobId) {
-        req.log.info({ apolloJobId, company: req.body.name }, 'queued apollo enrichment');
+        req.log.info({ apolloJobId, company: req.body.name }, 'queued apollo data verification');
       } else {
-        req.log.warn('apollo enrichment enqueue skipped (redis unreachable)');
+        req.log.warn('apollo data verification enqueue skipped (redis unreachable)');
       }
 
       return result.company;
@@ -207,6 +210,8 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/crm/companies/autopopulate-from-sales',
     {
+      config: { rateLimit: { max: 10, timeWindow: '1 hour' } },
+      preHandler: [server.requirePermission('companies:write'), server.requireRole('admin')],
       schema: {
         body: AutopopulateSalesCompaniesBody,
         response: { 200: CompanyAutopopulateResponse },

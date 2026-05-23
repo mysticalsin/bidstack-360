@@ -62,7 +62,7 @@ export function SmartCompanyDialog({ trigger }: Props) {
   const logoUrl = company?.logo?.url ?? (previewDomain ? faviconUrl(previewDomain, 128) : null);
   const sourceItems =
     company?.sourceAttribution.slice(0, 3).map((source) => source.label) ??
-    (previewDomain ? ['Domain signal', 'Logo preview', 'Open enrichment ready'] : ['Name signal']);
+    (previewDomain ? ['Domain signal', 'Logo preview', 'Open data ready'] : ['Name signal']);
   const autofillItems = [
     {
       label: 'Legal profile',
@@ -160,7 +160,7 @@ export function SmartCompanyDialog({ trigger }: Props) {
       </DialogTrigger>
       <DialogContent
         title="Add company"
-        description="Prefill the account from verified sources, logo providers, and the enrichment cache."
+        description="Prefill the account from verified sources, logo providers, and the verified data cache."
         className="smart-company-dialog"
       >
         <div className="smart-company-shell">
@@ -238,7 +238,7 @@ export function SmartCompanyDialog({ trigger }: Props) {
             <div className="smart-intel-card">
               <div className="smart-intel-head">
                 <div>
-                  <span>{existing ? 'Existing account' : 'New enrichment'}</span>
+                  <span>{existing ? 'Existing account' : 'New data'}</span>
                   <strong>
                     {lookup.isFetching ? 'Resolving profile...' : statusLabel(lookup.data?.match)}
                   </strong>

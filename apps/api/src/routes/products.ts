@@ -1,7 +1,8 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
+import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
-import { prisma, type Prisma } from '@bidstack/db';
+import { prisma, Prisma } from '@bidstack/db';
 import {
   ProductCategoryCreate,
   ProductCategory,
@@ -23,7 +24,7 @@ export const productsRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const rows = await prisma.productCategory.findMany({
-        where: { orgId: req.auth.orgId },
+        where: { orgId: req.auth.orgId, deletedAt: null },
         orderBy: { name: 'asc' },
       });
       return rows.map((r) => ({
@@ -38,19 +39,45 @@ export const productsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/products/categories',
     {
+      preHandler: server.requirePermission('products:write'),
       schema: {
         body: ProductCategoryCreate,
         response: { 201: ProductCategory },
       },
     },
     async (req, reply) => {
-      const created = await prisma.productCategory.create({
-        data: {
-          orgId: req.auth.orgId,
-          name: req.body.name,
-          parentId: req.body.parentId ?? null,
-        },
-      });
+      if (req.body.parentId) {
+        await assertCategoryInOrg(req.body.parentId, req.auth.orgId, server);
+      }
+      const name = req.body.name.trim();
+      let created;
+      try {
+        created = await prisma.$transaction(async (tx) => {
+          const row = await tx.productCategory.create({
+            data: {
+              orgId: req.auth.orgId,
+              name,
+              parentId: req.body.parentId ?? null,
+            },
+          });
+          await tx.auditLog.create({
+            data: {
+              orgId: req.auth.orgId,
+              userId: req.auth.userId,
+              action: 'product_category.create',
+              targetType: 'product_category',
+              targetId: row.id,
+              diff: { name, parentId: row.parentId },
+            },
+          });
+          return row;
+        });
+      } catch (err) {
+        if (isUniqueViolation(err)) {
+          throw server.httpErrors.conflict('Product category name already exists');
+        }
+        throw err;
+      }
       return reply.code(201).send({
         id: created.id,
         name: created.name,
@@ -73,6 +100,7 @@ export const productsRoutes: FastifyPluginAsyncZod = async (server) => {
       const { search, categoryId, activeOnly, cursor, limit } = req.query;
       const where: Prisma.ProductWhereInput = {
         orgId: req.auth.orgId,
+        deletedAt: null,
         ...(categoryId ? { categoryId } : {}),
         ...(activeOnly === 'true'
           ? { active: true }
@@ -129,7 +157,7 @@ export const productsRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const p = await prisma.product.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
         include: { category: { select: { name: true } } },
       });
       if (!p) throw server.httpErrors.notFound('Product not found');
@@ -152,6 +180,7 @@ export const productsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/products',
     {
+      preHandler: server.requirePermission('products:write'),
       schema: {
         body: ProductCreate,
         response: { 201: Product },
@@ -159,18 +188,49 @@ export const productsRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const body = req.body;
-      const created = await prisma.product.create({
-        data: {
-          orgId: req.auth.orgId,
-          sku: body.sku,
-          name: body.name,
-          categoryId: body.categoryId ?? null,
-          listPriceMicros: BigInt(body.listPriceMicros),
-          currency: body.currency,
-          active: body.active,
-        },
-        include: { category: { select: { name: true } } },
-      });
+      if (body.categoryId) {
+        await assertCategoryInOrg(body.categoryId, req.auth.orgId, server);
+      }
+      let created;
+      try {
+        created = await prisma.$transaction(async (tx) => {
+          const row = await tx.product.create({
+            data: {
+              orgId: req.auth.orgId,
+              sku: normalizeSku(body.sku),
+              name: body.name.trim(),
+              categoryId: body.categoryId ?? null,
+              listPriceMicros: BigInt(body.listPriceMicros),
+              currency: normalizeCurrency(body.currency),
+              active: body.active,
+            },
+            include: { category: { select: { name: true } } },
+          });
+          await tx.auditLog.create({
+            data: {
+              orgId: req.auth.orgId,
+              userId: req.auth.userId,
+              action: 'product.create',
+              targetType: 'product',
+              targetId: row.id,
+              diff: {
+                sku: row.sku,
+                name: row.name,
+                categoryId: row.categoryId,
+                listPriceMicros: row.listPriceMicros.toString(),
+                currency: row.currency,
+                active: row.active,
+              },
+            },
+          });
+          return row;
+        });
+      } catch (err) {
+        if (isUniqueViolation(err)) {
+          throw server.httpErrors.conflict('Product SKU already exists');
+        }
+        throw err;
+      }
       return reply.code(201).send({
         id: created.id,
         sku: created.sku,
@@ -190,6 +250,7 @@ export const productsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.patch(
     '/products/:id',
     {
+      preHandler: server.requirePermission('products:write'),
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: ProductUpdate,
@@ -198,25 +259,65 @@ export const productsRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const existing = await prisma.product.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!existing) throw server.httpErrors.notFound('Product not found');
 
       const b = req.body;
-      const updated = await prisma.product.update({
-        where: { id: existing.id },
-        data: {
-          ...(b.sku !== undefined ? { sku: b.sku } : {}),
-          ...(b.name !== undefined ? { name: b.name } : {}),
-          ...(b.categoryId !== undefined ? { categoryId: b.categoryId } : {}),
-          ...(b.listPriceMicros !== undefined
-            ? { listPriceMicros: BigInt(b.listPriceMicros) }
-            : {}),
-          ...(b.currency !== undefined ? { currency: b.currency } : {}),
-          ...(b.active !== undefined ? { active: b.active } : {}),
-        },
-        include: { category: { select: { name: true } } },
-      });
+      if (b.categoryId) {
+        await assertCategoryInOrg(b.categoryId, req.auth.orgId, server);
+      }
+      const data = {
+        ...(b.sku !== undefined ? { sku: normalizeSku(b.sku) } : {}),
+        ...(b.name !== undefined ? { name: b.name.trim() } : {}),
+        ...(b.categoryId !== undefined ? { categoryId: b.categoryId } : {}),
+        ...(b.listPriceMicros !== undefined ? { listPriceMicros: BigInt(b.listPriceMicros) } : {}),
+        ...(b.currency !== undefined ? { currency: normalizeCurrency(b.currency) } : {}),
+        ...(b.active !== undefined ? { active: b.active } : {}),
+      };
+      let updated;
+      try {
+        updated = await prisma.$transaction(async (tx) => {
+          const row = await tx.product.update({
+            where: { id: existing.id },
+            data,
+            include: { category: { select: { name: true } } },
+          });
+          await tx.auditLog.create({
+            data: {
+              orgId: req.auth.orgId,
+              userId: req.auth.userId,
+              action: 'product.update',
+              targetType: 'product',
+              targetId: existing.id,
+              diff: {
+                before: {
+                  sku: existing.sku,
+                  name: existing.name,
+                  categoryId: existing.categoryId,
+                  listPriceMicros: existing.listPriceMicros.toString(),
+                  currency: existing.currency,
+                  active: existing.active,
+                },
+                after: {
+                  sku: row.sku,
+                  name: row.name,
+                  categoryId: row.categoryId,
+                  listPriceMicros: row.listPriceMicros.toString(),
+                  currency: row.currency,
+                  active: row.active,
+                },
+              },
+            },
+          });
+          return row;
+        });
+      } catch (err) {
+        if (isUniqueViolation(err)) {
+          throw server.httpErrors.conflict('Product SKU already exists');
+        }
+        throw err;
+      }
       return {
         id: updated.id,
         sku: updated.sku,
@@ -236,6 +337,7 @@ export const productsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/products/:id',
     {
+      preHandler: server.requirePermission('products:write'),
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 204: z.void() },
@@ -243,11 +345,49 @@ export const productsRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const existing = await prisma.product.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!existing) throw server.httpErrors.notFound('Product not found');
-      await prisma.product.delete({ where: { id: existing.id } });
+      await prisma.$transaction([
+        prisma.product.update({ where: { id: existing.id }, data: { deletedAt: new Date() } }),
+        prisma.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'product.delete',
+            targetType: 'product',
+            targetId: existing.id,
+            diff: { sku: existing.sku, name: existing.name },
+          },
+        }),
+      ]);
       return reply.code(204).send();
     },
   );
 };
+
+async function assertCategoryInOrg(
+  categoryId: string,
+  orgId: string,
+  server: FastifyInstance,
+): Promise<void> {
+  const category = await prisma.productCategory.findFirst({
+    where: { id: categoryId, orgId, deletedAt: null },
+    select: { id: true },
+  });
+  if (!category) {
+    throw server.httpErrors.badRequest('Product category does not belong to this org');
+  }
+}
+
+function normalizeSku(sku: string): string {
+  return sku.trim().toUpperCase();
+}
+
+function normalizeCurrency(currency: string): string {
+  return currency.trim().toUpperCase();
+}
+
+function isUniqueViolation(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+}

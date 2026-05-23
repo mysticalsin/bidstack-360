@@ -5,7 +5,8 @@ import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { EmptyState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
+import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { useCompany, useUpdateCompany } from '@/hooks/useCompanies';
 import { formatMoneyMicros } from '@/lib/format';
 
@@ -23,8 +24,33 @@ export function CompanyDetailPage() {
   const [editIndustry, setEditIndustry] = useState('');
   const [editDomain, setEditDomain] = useState('');
 
-  if (company.isLoading || !company.data) {
-    return <LoadingSkeleton rows={6} />;
+  if (company.isLoading) {
+    return <DetailPageSkeleton tabs columns={2} cards={2} />;
+  }
+  if (company.isError) {
+    return (
+      <ErrorState
+        title="Couldn't load company"
+        message={
+          company.error instanceof Error
+            ? company.error.message
+            : 'The company may have been deleted.'
+        }
+      />
+    );
+  }
+  if (!company.data) {
+    return (
+      <EmptyState
+        title="Company not found"
+        message="The company may have been deleted or you may not have access to it."
+        action={
+          <Button variant="secondary" onClick={() => window.history.back()}>
+            Go back
+          </Button>
+        }
+      />
+    );
   }
 
   const c = company.data;

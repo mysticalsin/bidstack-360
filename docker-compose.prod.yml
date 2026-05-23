@@ -4,9 +4,9 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -32,6 +32,10 @@ services:
     build:
       context: .
       target: api
+      args:
+        BIDSTACK_BUILD_AUTH_MODE: clerk
+        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:?VITE_CLERK_PUBLISHABLE_KEY is required for production web builds}
+        VITE_API_URL: ${VITE_API_URL:-/api}
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,11 +43,21 @@ services:
         condition: service_started
     environment:
       NODE_ENV: production
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
-      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
-      SENTRY_DSN: ${SENTRY_DSN}
-      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      REDIS_URL: ${REDIS_URL:?REDIS_URL is required}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?PUBLIC_BASE_URL is required}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:?PUBLIC_API_URL is required}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:?CLERK_SECRET_KEY is required}
+      CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY:?CLERK_PUBLISHABLE_KEY is required}
+      STORAGE_DRIVER: ${STORAGE_DRIVER:?STORAGE_DRIVER=s3 is required}
+      S3_BUCKET: ${S3_BUCKET:?S3_BUCKET is required}
+      S3_REGION: ${S3_REGION:?S3_REGION is required}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
+      STORAGE_UPLOAD_MAX_BYTES: ${STORAGE_UPLOAD_MAX_BYTES:-52428800}
+      STORAGE_SCAN_REQUIRED: ${STORAGE_SCAN_REQUIRED:?STORAGE_SCAN_REQUIRED must be explicit}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       LOG_LEVEL: warn
     restart: unless-stopped
     deploy:
@@ -56,6 +70,10 @@ services:
     build:
       context: .
       target: web
+      args:
+        BIDSTACK_BUILD_AUTH_MODE: clerk
+        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:?VITE_CLERK_PUBLISHABLE_KEY is required for production web builds}
+        VITE_API_URL: ${VITE_API_URL:-/api}
     depends_on:
       - api
     restart: unless-stopped
@@ -76,9 +94,22 @@ services:
         condition: service_started
     environment:
       NODE_ENV: production
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
-      SENTRY_DSN: ${SENTRY_DSN}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      REDIS_URL: ${REDIS_URL:?REDIS_URL is required}
+      STORAGE_DRIVER: ${STORAGE_DRIVER:?STORAGE_DRIVER=s3 is required}
+      S3_BUCKET: ${S3_BUCKET:?S3_BUCKET is required}
+      S3_REGION: ${S3_REGION:?S3_REGION is required}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
+      BIDSTACK_OCR_ENABLED: ${BIDSTACK_OCR_ENABLED:-true}
+      BIDSTACK_OCR_LANGUAGES: ${BIDSTACK_OCR_LANGUAGES:-eng}
+      BIDSTACK_OCR_TIMEOUT_MS: ${BIDSTACK_OCR_TIMEOUT_MS:-120000}
+      BIDSTACK_OCRMYPDF_BIN: ${BIDSTACK_OCRMYPDF_BIN:-ocrmypdf}
+      BIDSTACK_TESSERACT_BIN: ${BIDSTACK_TESSERACT_BIN:-tesseract}
+      DUST_API_KEY: ${DUST_API_KEY:-}
+      DUST_WORKSPACE_ID: ${DUST_WORKSPACE_ID:-}
+      DUST_DOCUMENT_EXTRACT_AGENT_ID: ${DUST_DOCUMENT_EXTRACT_AGENT_ID:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
       LOG_LEVEL: warn
     restart: unless-stopped
     deploy:
@@ -98,8 +129,8 @@ services:
         condition: service_started
     environment:
       NODE_ENV: production
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      REDIS_URL: ${REDIS_URL:?REDIS_URL is required}
     restart: unless-stopped
     deploy:
       replicas: 1

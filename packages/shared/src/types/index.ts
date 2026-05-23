@@ -12,6 +12,8 @@ export type {
 
 export type { Contact, ContactCreate, Sentiment } from '../schemas/contact.js';
 export type { Task, TaskCreate, TaskPatch, TaskStatus } from '../schemas/task.js';
+export type { PermissionKey } from './permissions.js';
+export { PERMISSION_KEYS, isPermissionKey } from './permissions.js';
 export type {
   IntelPayload,
   Financial,

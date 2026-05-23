@@ -1,4 +1,4 @@
-// Territories — mission control view.
+// Territories — mission control view with full CRUD.
 //
 // A world map heat-map shows opportunity density by country. Click a country
 // to open its detail panel with top-level stats, territory owners, and a
@@ -8,26 +8,54 @@ import { useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 
 import { WorldMap } from '@/components/territories/WorldMap';
+import { TerritoryDialog } from '@/components/territories/TerritoryDialog';
+import { RoutingRuleDialog } from '@/components/territories/RoutingRuleDialog';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
-import { formatMoneyMicros } from '@/lib/format';
+import { Icon } from '@/components/ui/Icon';
+import { confirm } from '@/components/ui/ConfirmDialog';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { staggerChild, staggerParent } from '@/lib/motion';
 
 import {
   useTerritories,
   useLeadRoutingRules,
   useTerritoryAnalytics,
+  useCreateTerritory,
+  useUpdateTerritory,
+  useDeleteTerritory,
+  useCreateLeadRoutingRule,
+  useUpdateLeadRoutingRule,
+  useDeleteLeadRoutingRule,
   type TerritoryAnalyticsItem,
 } from '@/hooks/useTerritories';
 
+import type { Territory, LeadRoutingRule } from '@bidstack/shared';
+
 export function TerritoriesPage() {
+  const { formatMoneyMicros } = useFormatMoney();
   const territories = useTerritories();
   const rules = useLeadRoutingRules();
   const analytics = useTerritoryAnalytics();
   const reducedMotion = useReducedMotion();
   const [selected, setSelected] = useState<TerritoryAnalyticsItem | null>(null);
+
+  // Dialog state
+  const [territoryDialogOpen, setTerritoryDialogOpen] = useState(false);
+  const [editingTerritory, setEditingTerritory] = useState<Territory | null>(null);
+  const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
+  const [editingRule, setEditingRule] = useState<LeadRoutingRule | null>(null);
+
+  // Mutations
+  const createTerritory = useCreateTerritory();
+  const updateTerritory = useUpdateTerritory();
+  const deleteTerritory = useDeleteTerritory();
+  const createRule = useCreateLeadRoutingRule();
+  const updateRule = useUpdateLeadRoutingRule();
+  const deleteRule = useDeleteLeadRoutingRule();
 
   const tItems = territories.data?.items ?? [];
   const rItems = rules.data?.items ?? [];
@@ -36,6 +64,30 @@ export function TerritoriesPage() {
 
   const isLoading = territories.isLoading || analytics.isLoading;
   const isError = territories.isError || analytics.isError;
+
+  const handleDeleteTerritory = async (t: Territory) => {
+    if (
+      await confirm({
+        title: `Delete "${t.name}"?`,
+        description: 'This territory will be deactivated.',
+        destructive: true,
+      })
+    ) {
+      deleteTerritory.mutate(t.id);
+    }
+  };
+
+  const handleDeleteRule = async (r: LeadRoutingRule) => {
+    if (
+      await confirm({
+        title: `Delete "${r.name}"?`,
+        description: 'This routing rule will be deactivated.',
+        destructive: true,
+      })
+    ) {
+      deleteRule.mutate(r.id);
+    }
+  };
 
   return (
     <motion.div
@@ -69,8 +121,64 @@ export function TerritoriesPage() {
               {totals.totalOpportunities} opps across {totals.totalCountries} countries
             </div>
           ) : null}
+          <Button
+            size="sm"
+            onClick={() => {
+              setEditingRule(null);
+              setRuleDialogOpen(true);
+            }}
+          >
+            <Icon name="git-branch" size={14} /> New rule
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => {
+              setEditingTerritory(null);
+              setTerritoryDialogOpen(true);
+            }}
+          >
+            <Icon name="plus" size={14} /> New territory
+          </Button>
         </div>
       </motion.header>
+
+      {/* Dialogs */}
+      <TerritoryDialog
+        territory={editingTerritory}
+        open={territoryDialogOpen}
+        onClose={() => setTerritoryDialogOpen(false)}
+        onSubmit={(body) => {
+          if (editingTerritory) {
+            updateTerritory.mutate(
+              { id: editingTerritory.id, ...body },
+              { onSuccess: () => setTerritoryDialogOpen(false) },
+            );
+          } else {
+            createTerritory.mutate(body as Territory, {
+              onSuccess: () => setTerritoryDialogOpen(false),
+            });
+          }
+        }}
+        isPending={createTerritory.isPending || updateTerritory.isPending}
+      />
+      <RoutingRuleDialog
+        rule={editingRule}
+        open={ruleDialogOpen}
+        onClose={() => setRuleDialogOpen(false)}
+        onSubmit={(body) => {
+          if (editingRule) {
+            updateRule.mutate(
+              { id: editingRule.id, ...body },
+              { onSuccess: () => setRuleDialogOpen(false) },
+            );
+          } else {
+            createRule.mutate(body as LeadRoutingRule, {
+              onSuccess: () => setRuleDialogOpen(false),
+            });
+          }
+        }}
+        isPending={createRule.isPending || updateRule.isPending}
+      />
 
       {/* KPI tiles */}
       {totals && (
@@ -207,7 +315,10 @@ export function TerritoriesPage() {
 
         {/* Territories list */}
         <div>
-          <h2 className="mb-3 text-sm font-semibold text-[var(--fg-primary)]">Territories</h2>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-[var(--fg-primary)]">Territories</h2>
+            <span className="text-xs text-[var(--fg-tertiary)]">{tItems.length} total</span>
+          </div>
           {territories.isError ? (
             <ErrorState
               title="Failed to load"
@@ -217,19 +328,46 @@ export function TerritoriesPage() {
           ) : territories.isLoading ? (
             <TableSkeleton rows={4} />
           ) : tItems.length === 0 ? (
-            <EmptyState title="No territories" />
+            <EmptyState
+              title="No territories"
+              message="Create your first territory to get started."
+            />
           ) : (
             <div className="space-y-2">
               {tItems.map((t) => (
-                <Card key={t.id} className="p-3">
+                <Card key={t.id} className="p-3 group">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-medium text-[var(--fg-primary)]">{t.name}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className="text-sm font-medium text-[var(--fg-primary)]">{t.name}</div>
+                        {!t.active && <Badge tone="gray">Inactive</Badge>}
+                      </div>
                       <div className="text-xs text-[var(--fg-secondary)]">
                         {t.region ?? 'No region'} · {t.countryCodes.join(', ') || 'Global'}
                       </div>
                     </div>
-                    <div className="text-xs text-[var(--fg-tertiary)]">{t.ownerName ?? '—'}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-xs text-[var(--fg-tertiary)]">{t.ownerName ?? '—'}</div>
+                      <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100 focus-within:opacity-100">
+                        <button
+                          onClick={() => {
+                            setEditingTerritory(t);
+                            setTerritoryDialogOpen(true);
+                          }}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)]"
+                          title="Edit"
+                        >
+                          <Icon name="pencil" size={13} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTerritory(t)}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)]"
+                          title="Delete"
+                        >
+                          <Icon name="trash" size={13} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </Card>
               ))}
@@ -239,9 +377,10 @@ export function TerritoriesPage() {
 
         {/* Lead Routing Rules */}
         <div>
-          <h2 className="mb-3 text-sm font-semibold text-[var(--fg-primary)]">
-            Lead Routing Rules
-          </h2>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-[var(--fg-primary)]">Lead Routing Rules</h2>
+            <span className="text-xs text-[var(--fg-tertiary)]">{rItems.length} total</span>
+          </div>
           {rules.isError ? (
             <ErrorState
               title="Failed to load"
@@ -251,26 +390,61 @@ export function TerritoriesPage() {
           ) : rules.isLoading ? (
             <TableSkeleton rows={4} />
           ) : rItems.length === 0 ? (
-            <EmptyState title="No routing rules" />
+            <EmptyState
+              title="No routing rules"
+              message="Create your first rule to auto-assign leads."
+            />
           ) : (
             <div className="space-y-2">
-              {rItems.map((r) => (
-                <Card key={r.id} className="p-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-medium text-[var(--fg-primary)]">{r.name}</div>
-                      <div className="text-xs text-[var(--fg-secondary)]">
-                        Priority {r.priority} ·{' '}
-                        {r.assignToUserId
-                          ? 'Assign to user'
-                          : r.assignToTerritoryId
-                            ? 'Assign to territory'
-                            : 'Round robin'}
+              {rItems.map((r) => {
+                const criteria = r.criteria as Record<string, unknown>;
+                return (
+                  <Card key={r.id} className="p-3 group">
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <div className="text-sm font-medium text-[var(--fg-primary)]">
+                            {r.name}
+                          </div>
+                          {!r.active && <Badge tone="gray">Inactive</Badge>}
+                          {criteria.countryCode ? (
+                            <Badge tone="blue">{String(criteria.countryCode)}</Badge>
+                          ) : null}
+                        </div>
+                        <div className="text-xs text-[var(--fg-secondary)]">
+                          Priority {r.priority} ·{' '}
+                          {r.assignToUserId
+                            ? 'Assign to user'
+                            : r.assignToTerritoryId
+                              ? 'Assign to territory'
+                              : r.roundRobinTeam.length > 0
+                                ? `Round robin (${r.roundRobinTeam.length})`
+                                : 'No assignment'}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100 focus-within:opacity-100">
+                        <button
+                          onClick={() => {
+                            setEditingRule(r);
+                            setRuleDialogOpen(true);
+                          }}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)]"
+                          title="Edit"
+                        >
+                          <Icon name="pencil" size={13} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteRule(r)}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)]"
+                          title="Delete"
+                        >
+                          <Icon name="trash" size={13} />
+                        </button>
                       </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>

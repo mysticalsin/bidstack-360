@@ -1,19 +1,78 @@
-// MCP server hosted over HTTP/SSE per the JSON-RPC 2.0 transport described in
-// the Model Context Protocol spec. Tools per handoff/mcp.tools.md.
+// MCP server hosted over Streamable HTTP per the JSON-RPC 2.0 transport described in
+// the Model Context Protocol spec. Legacy HTTP+SSE stays available during migration.
 //
-// Auth: Authorization: Bearer <bidstack API key with `mcp` scope>
+// Auth: Authorization: Bearer <bidstack API key with `mcp` + read/write scopes>
 // Rate-limited: 60/min and 600/hour per key.
 
 import rateLimit from '@fastify/rate-limit';
 import sensible from '@fastify/sensible';
-import { createHash } from 'node:crypto';
-import Fastify, { type FastifyInstance } from 'fastify';
+import { createHash, randomUUID } from 'node:crypto';
+import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
+import type { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 
-import { handleRpc } from './rpc.js';
-import { mcpAuth } from './auth.js';
+import { mcpAuth, requireMcpScope, type McpAuthCtx } from './auth.js';
 import { hourlyRateLimitPlugin } from './plugins/hourly-rate-limit.js';
+import { requiredScopeForTool, tools, type ToolName } from './tools/index.js';
+
+type LooseTool = {
+  description: string;
+  input: z.ZodTypeAny;
+  inputJsonSchema: Record<string, unknown>;
+  handler: (args: unknown, ctx: McpAuthCtx) => Promise<unknown>;
+};
+
+type SseSession = {
+  transport: SSEServerTransport;
+  ctx: McpAuthCtx;
+  mcp: McpServer;
+};
+
+type StreamableSession = {
+  transport: StreamableHTTPServerTransport;
+  ctx: McpAuthCtx;
+  mcp: McpServer;
+};
+
+function createAuthenticatedMcp(ctx: McpAuthCtx): McpServer {
+  const mcp = new McpServer({ name: 'BidStack 360', version: '0.1.0' });
+
+  for (const name of Object.keys(tools) as ToolName[]) {
+    const tool = tools[name];
+    const requiredScope = requiredScopeForTool(name);
+
+    mcp.tool(
+      name,
+      tool.description,
+      (tool.input as z.ZodObject<z.ZodRawShape>).shape,
+      async (args: unknown) => {
+        try {
+          requireMcpScope(ctx, requiredScope);
+          const out = await (tool as LooseTool).handler(args, ctx);
+          return { content: [{ type: 'text' as const, text: JSON.stringify(out, null, 2) }] };
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Internal error';
+          return { content: [{ type: 'text' as const, text: message }], isError: true };
+        }
+      },
+    );
+  }
+
+  return mcp;
+}
+
+function sendJsonRpcError(reply: FastifyReply, statusCode: number, message: string): void {
+  reply.status(statusCode).send({
+    jsonrpc: '2.0',
+    error: { code: -32000, message },
+    id: null,
+  });
+}
 
 export async function buildMcpServer(): Promise<FastifyInstance> {
   const server = Fastify({
@@ -41,23 +100,126 @@ export async function buildMcpServer(): Promise<FastifyInstance> {
     },
   });
 
-  // Health endpoint — public, used by Dust to verify the URL.
+  // Public liveness endpoint for MCP client registration checks.
   server.get('/health', async () => ({ ok: true, name: 'bidstack-mcp' }));
 
-  // Lookup the metadata Dust expects when registering an MCP server.
   server.get('/.well-known/mcp', async () => ({
-    name: 'BidStack 360°',
+    name: 'BidStack 360',
     vendor: 'Mantu',
     version: '0.1.0',
-    transport: 'http+sse',
-    endpoints: { rpc: '/mcp', sse: '/mcp/sse' },
+    transport: 'streamable-http',
+    endpoints: {
+      mcp: '/mcp',
+      legacySse: '/mcp/sse',
+      legacyMessages: '/mcp/messages',
+    },
+    legacy: {
+      transport: 'http+sse',
+      deprecated: true,
+    },
   }));
 
-  // POST /mcp — JSON-RPC 2.0 over HTTP. The SSE leg is omitted from v0.1
-  // (servers are allowed to support either; Dust accepts HTTP-only).
-  server.post('/mcp', async (req, _reply) => {
+  const sseTransports = new Map<string, SseSession>();
+  const streamableTransports = new Map<string, StreamableSession>();
+
+  server.route({
+    method: ['GET', 'POST', 'DELETE'],
+    url: '/mcp',
+    handler: async (req, reply) => {
+      const ctx = await mcpAuth(req, prisma);
+      const sessionHeader = req.headers['mcp-session-id'];
+      const sessionId = Array.isArray(sessionHeader) ? sessionHeader[0] : sessionHeader;
+      let transport: StreamableHTTPServerTransport;
+
+      if (sessionId) {
+        const session = streamableTransports.get(sessionId);
+        if (!session) {
+          sendJsonRpcError(reply, 404, 'Session not found');
+          return;
+        }
+        if (session.ctx.keyId !== ctx.keyId) {
+          sendJsonRpcError(reply, 403, 'Session belongs to a different API key');
+          return;
+        }
+        transport = session.transport;
+      } else if (req.method === 'POST' && isInitializeRequest(req.body)) {
+        const mcp = createAuthenticatedMcp(ctx);
+        transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          onsessioninitialized: (initializedSessionId) => {
+            streamableTransports.set(initializedSessionId, { transport, ctx, mcp });
+          },
+        });
+        transport.onclose = () => {
+          const closedSessionId = transport.sessionId;
+          if (!closedSessionId) return;
+          const session = streamableTransports.get(closedSessionId);
+          streamableTransports.delete(closedSessionId);
+          if (session) {
+            void session.mcp.close().catch((err) => req.log.warn({ err }, 'mcp close failed'));
+          }
+        };
+        await mcp.connect(transport);
+      } else {
+        sendJsonRpcError(reply, 400, 'No valid MCP session ID provided');
+        return;
+      }
+
+      try {
+        await transport.handleRequest(req.raw, reply.raw, req.body);
+        reply.hijack();
+      } catch (err) {
+        req.log.error({ err }, 'streamable mcp request failed');
+        if (!reply.raw.headersSent) {
+          sendJsonRpcError(reply, 500, 'Internal server error');
+        }
+      }
+    },
+  });
+
+  // Deprecated HTTP+SSE transport, kept for older clients during migration.
+  server.get('/mcp/sse', async (req, reply) => {
     const ctx = await mcpAuth(req, prisma);
-    return handleRpc(req.body, ctx, server.log);
+    const mcp = createAuthenticatedMcp(ctx);
+
+    const transport = new SSEServerTransport('/mcp/messages', reply.raw);
+    await mcp.connect(transport);
+
+    sseTransports.set(transport.sessionId, { transport, ctx, mcp });
+
+    const originalOnClose = transport.onclose;
+    transport.onclose = () => {
+      const session = sseTransports.get(transport.sessionId);
+      sseTransports.delete(transport.sessionId);
+      if (session) {
+        void session.mcp.close().catch((err) => req.log.warn({ err }, 'legacy mcp close failed'));
+      }
+      originalOnClose?.();
+    };
+
+    reply.hijack();
+  });
+
+  server.post('/mcp/messages', async (req, reply) => {
+    const ctx = await mcpAuth(req, prisma);
+    const sessionId = (req.query as Record<string, unknown>)?.sessionId;
+    if (typeof sessionId !== 'string' || !sessionId) {
+      reply.status(400).send('Missing sessionId');
+      return;
+    }
+
+    const session = sseTransports.get(sessionId);
+    if (!session) {
+      reply.status(404).send('Session not found');
+      return;
+    }
+    if (session.ctx.keyId !== ctx.keyId) {
+      reply.status(403).send('Session belongs to a different API key');
+      return;
+    }
+
+    await session.transport.handlePostMessage(req.raw, reply.raw, req.body);
+    reply.hijack();
   });
 
   return server;

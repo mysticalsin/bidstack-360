@@ -17,7 +17,7 @@ const PARTICLE_COUNT = 60;
 export function ConfettiHost() {
   const bursts = useConfetti((s) => s.bursts);
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 z-[300] overflow-hidden">
+    <div aria-hidden className="pointer-events-none fixed inset-0 z-40 overflow-hidden">
       <AnimatePresence>
         {bursts.map((id) => (
           <Burst key={id} />

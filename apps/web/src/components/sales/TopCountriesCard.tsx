@@ -11,7 +11,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { formatMoneyMicros } from '@/lib/format';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSnap, springSoft } from '@/lib/motion';
 
 import type { TopCountries } from '@bidstack/shared';
@@ -40,7 +40,9 @@ const FLAGS: Record<string, string> = {
 export function TopCountriesCard({ data, isLoading }: Props) {
   const [view, setView] = useState<'list' | 'map'>('list');
   const reducedMotion = useReducedMotion();
+  const { formatMoneyMicros } = useFormatMoney();
   const items = data?.items ?? [];
+  const sourceCurrency = data?.currency ?? 'CAD';
   const max = items.reduce((acc, it) => {
     const v = Number(BigInt(it.revenueMicros) / BigInt(1_000_000));
     return v > acc ? v : acc;
@@ -115,7 +117,7 @@ export function TopCountriesCard({ data, isLoading }: Props) {
                         {c.name}
                       </span>
                       <span className="tabular-nums text-sm text-[var(--fg-primary)] whitespace-nowrap">
-                        {formatMoneyMicros(c.revenueMicros, data?.currency ?? 'CAD')}
+                        {formatMoneyMicros(c.revenueMicros, sourceCurrency)}
                       </span>
                     </div>
                     <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--surface-subtle)]">
@@ -152,6 +154,7 @@ function MiniMap({
   currency: string;
 }) {
   const reducedMotion = useReducedMotion();
+  const { formatMoneyMicros } = useFormatMoney();
   // We don't ship a true choropleth (would need topojson + a maps lib). The
   // grid still gives a "spatial scan" feel: bigger + darker chip = more
   // revenue. Each tile is now a Link so keyboard users get the same drill-

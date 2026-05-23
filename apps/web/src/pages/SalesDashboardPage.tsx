@@ -1,7 +1,7 @@
-// Sales Dashboard — Odoo-style KPIs, monthly chart, top quotations/orders,
+// Sales Dashboard — ERP-style KPIs, monthly chart, top quotations/orders,
 // countries, products, customers, and categories. The page uses the same
 // resilient sales-intelligence endpoint as /dashboard, so it works before
-// optional Odoo sale.order tables are migrated and automatically switches to
+// optional ERP sale.order tables are migrated and automatically switches to
 // those tables when they exist.
 
 import { useNavigate } from 'react-router-dom';
@@ -11,16 +11,20 @@ import { useMemo } from 'react';
 import { ArAgingCard } from '@/components/sales/ArAgingCard';
 import { KpiTile } from '@/components/sales/KpiTile';
 import { MonthlySalesChart } from '@/components/sales/MonthlySalesChart';
+import { PipelineSnapshot } from '@/components/sales/PipelineSnapshot';
+import { TeamLeaderboard } from '@/components/sales/TeamLeaderboard';
+import { TerritoryRevenueCard } from '@/components/sales/TerritoryRevenueCard';
 import { TopCategoriesTreemap } from '@/components/sales/TopCategoriesTreemap';
 import { TopCountriesCard } from '@/components/sales/TopCountriesCard';
 import { TopList } from '@/components/sales/TopList';
+import { WinRateCard } from '@/components/sales/WinRateCard';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useArAging } from '@/hooks/useArAging';
 import { useAutopopulateSalesCompanies } from '@/hooks/useAutopopulateSalesCompanies';
 import { useSalesIntelligence } from '@/hooks/useSalesIntelligence';
-import { formatMoneyMicros } from '@/lib/format';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
 
 import type {
@@ -40,7 +44,8 @@ export function SalesDashboardPage() {
   const reducedMotion = useReducedMotion();
   const data = report.data;
   const arAging = useArAging(data?.currencyCode);
-  const currency = data?.currencyCode ?? 'CAD';
+  const { currency, formatMoneyMicros } = useFormatMoney();
+  const sourceCurrency = data?.currencyCode ?? 'CAD';
   const topProducts = useMemo(() => data?.topProducts ?? [], [data?.topProducts]);
   const monthly = useMemo(() => monthlyPoints(data), [data]);
   const countries = useMemo(() => toCountries(data), [data]);
@@ -53,10 +58,6 @@ export function SalesDashboardPage() {
     [topProducts],
   );
   const navigate = useNavigate();
-  // Each KPI tile drills into a pre-filtered orders list. "Quotations" =
-  // draft+sent (no single ?state can encode both, so we land on the union),
-  // "Orders" = confirmed, "Revenue"/"Average Order" = confirmed (the same
-  // set the metric was computed from).
   const drill = useMemo(
     () =>
       (state: 'draft' | 'sent' | 'confirmed' | 'all'): (() => void) =>
@@ -107,7 +108,7 @@ export function SalesDashboardPage() {
             Sales Dashboard
           </h1>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            Quotations, orders, revenue, geography, products, and customer ownership.
+            Quotations, orders, revenue, pipeline, team, territories, and geography.
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -141,12 +142,13 @@ export function SalesDashboardPage() {
                   reducedMotion ? '' : 'animate-pulse'
                 }`}
               />
-              {data.source === 'sales_orders' ? 'Odoo sale.order mirror' : 'Opportunity pipeline'}
+              {data.source === 'sales_orders' ? 'ERP sale.order mirror' : 'Opportunity pipeline'}
             </div>
           ) : null}
         </div>
       </motion.header>
 
+      {/* KPI Row */}
       <motion.section
         variants={reducedMotion ? undefined : staggerChild}
         aria-label="Key performance indicators"
@@ -154,34 +156,44 @@ export function SalesDashboardPage() {
       >
         <KpiTile
           label="Quotations"
-          value={metricValue(data, 'quotations', currency)}
+          value={metricValue(data, 'quotations', formatMoneyMicros, sourceCurrency)}
           deltaPct={metricDelta(data, 'quotations')}
           tone="blue"
           onClick={drill('sent')}
         />
         <KpiTile
           label="Orders"
-          value={metricValue(data, 'orders', currency)}
+          value={metricValue(data, 'orders', formatMoneyMicros, sourceCurrency)}
           deltaPct={metricDelta(data, 'orders')}
           tone="gray"
           onClick={drill('confirmed')}
         />
         <KpiTile
           label="Revenue"
-          value={metricValue(data, 'revenue', currency)}
+          value={metricValue(data, 'revenue', formatMoneyMicros, sourceCurrency)}
           deltaPct={metricDelta(data, 'revenue')}
           tone="amber"
           onClick={drill('confirmed')}
         />
         <KpiTile
           label="Average Order"
-          value={metricValue(data, 'average_order', currency)}
+          value={metricValue(data, 'average_order', formatMoneyMicros, sourceCurrency)}
           deltaPct={metricDelta(data, 'average_order')}
           tone="amber"
           onClick={drill('confirmed')}
         />
       </motion.section>
 
+      {/* Pipeline + Win/Loss */}
+      <motion.div
+        variants={reducedMotion ? undefined : staggerChild}
+        className="grid grid-cols-1 gap-6 lg:grid-cols-2"
+      >
+        <PipelineSnapshot stages={data?.pipelineByStage ?? []} isLoading={report.isLoading} />
+        <WinRateCard stats={data?.winLoss} isLoading={report.isLoading} />
+      </motion.div>
+
+      {/* Monthly Sales */}
       <motion.div variants={reducedMotion ? undefined : staggerChild}>
         <Card>
           <SectionHeader title="Monthly Sales" caption={`Currency: ${currency}`} />
@@ -189,12 +201,13 @@ export function SalesDashboardPage() {
             {report.isLoading ? (
               <LoadingSkeleton rows={3} />
             ) : (
-              <MonthlySalesChart points={monthly} currency={currency} />
+              <MonthlySalesChart points={monthly} sourceCurrency={sourceCurrency} />
             )}
           </div>
         </Card>
       </motion.div>
 
+      {/* Top Quotations + Orders */}
       <motion.div
         variants={reducedMotion ? undefined : staggerChild}
         className="grid grid-cols-1 gap-6 lg:grid-cols-2"
@@ -221,6 +234,19 @@ export function SalesDashboardPage() {
         </Card>
       </motion.div>
 
+      {/* Team + Territory */}
+      <motion.div
+        variants={reducedMotion ? undefined : staggerChild}
+        className="grid grid-cols-1 gap-6 lg:grid-cols-2"
+      >
+        <TeamLeaderboard members={data?.teamPerformance ?? []} isLoading={report.isLoading} />
+        <TerritoryRevenueCard
+          territories={data?.territoryBreakdown ?? []}
+          isLoading={report.isLoading}
+        />
+      </motion.div>
+
+      {/* Countries + A/R + Products */}
       <motion.div
         variants={reducedMotion ? undefined : staggerChild}
         className="grid grid-cols-1 gap-6 lg:grid-cols-3"
@@ -266,13 +292,13 @@ export function SalesDashboardPage() {
                       <td className="relative px-4 py-2.5 text-[var(--fg-primary)]">
                         <motion.span
                           aria-hidden="true"
-                          className="absolute inset-y-1 left-1 -z-0 rounded bg-[#eef4ff]"
+                          className="absolute inset-y-1 left-1 rounded bg-[#eef4ff]"
                           initial={reducedMotion ? false : { width: 0 }}
                           animate={{ width: `calc(${pct.toFixed(2)}% - 8px)` }}
                           transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.025 }}
                         />
-                        <div className="relative z-10 truncate font-medium">{product.product}</div>
-                        <div className="relative z-10 text-[10px] uppercase tracking-wider text-[var(--fg-tertiary)]">
+                        <div className="relative truncate font-medium">{product.product}</div>
+                        <div className="relative text-[10px] uppercase tracking-wider text-[var(--fg-tertiary)]">
                           {product.category}
                         </div>
                       </td>
@@ -280,7 +306,10 @@ export function SalesDashboardPage() {
                         {product.orderCount}
                       </td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-[var(--fg-primary)] whitespace-nowrap">
-                        {formatMoneyMicros(product.revenueMicros, product.currencyCode)}
+                        {formatMoneyMicros(
+                          product.revenueMicros,
+                          product.currencyCode ?? sourceCurrency,
+                        )}
                       </td>
                     </motion.tr>
                   );
@@ -291,6 +320,7 @@ export function SalesDashboardPage() {
         </Card>
       </motion.div>
 
+      {/* Customers + Categories */}
       <motion.div
         variants={reducedMotion ? undefined : staggerChild}
         className="grid grid-cols-1 gap-6 lg:grid-cols-2"
@@ -318,12 +348,15 @@ function metric(report: SalesIntelligenceReport | undefined, id: SalesMetricKpi[
 function metricValue(
   report: SalesIntelligenceReport | undefined,
   id: SalesMetricKpi['id'],
-  fallbackCurrency: string,
+  formatMoneyMicros: (micros: string | number | bigint, sourceCurrency?: string) => string,
+  sourceCurrency: string,
 ): string {
   const kpi = metric(report, id);
   if (!kpi) return '—';
-  if (kpi.kind === 'money')
-    return formatMoneyMicros(kpi.value, kpi.currencyCode ?? fallbackCurrency);
+  if (kpi.kind === 'money') {
+    const from = kpi.currencyCode ?? sourceCurrency;
+    return formatMoneyMicros(kpi.value, from);
+  }
   return new Intl.NumberFormat('en-US').format(kpi.value);
 }
 

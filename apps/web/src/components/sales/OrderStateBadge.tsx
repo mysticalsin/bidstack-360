@@ -1,5 +1,5 @@
 // Per-state tone badge for Sales Orders. Each state gets a stable color so
-// users learn the mapping at a glance. Mirrors Odoo's color discipline:
+// users learn the mapping at a glance. Mirrors ERP's color discipline:
 //   draft     → gray (no commitment)
 //   sent      → blue (out for review)
 //   confirmed → jade (signed)

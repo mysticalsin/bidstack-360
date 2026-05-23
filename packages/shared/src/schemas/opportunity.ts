@@ -2,17 +2,18 @@ import { z } from 'zod';
 import { IntelPayload } from './intel.js';
 
 export const OpportunityStage = z.enum([
-  'discovery',
-  'qualified',
-  'proposal',
-  'negotiation',
+  's1_lead',
+  's1_ongoing',
+  's2_sent',
+  's3_technical_iteration',
+  's4_negotiation',
   'closed_won',
   'closed_lost',
 ]);
 export type OpportunityStage = z.infer<typeof OpportunityStage>;
 
 // Industry is stored as an unrestricted string in the database so Dust
-// enrichment and manual inserts can add new verticals without a schema
+// data verification and manual inserts can add new verticals without a schema
 // change. We provide a helper array for UI pickers but validate as string.
 export const INDUSTRIES = [
   'financial_services',
@@ -32,28 +33,38 @@ export const INDUSTRIES = [
   'professional_services',
   'other',
 ] as const;
-export const Industry = z.string();
+export const Industry = z.string().max(100);
 export type Industry = string;
 
 export const Opportunity = z.object({
   id: z.string().uuid(),
   code: z.string().regex(/^OP-\d{4}$/),
-  customer: z.string().min(1),
-  name: z.string().min(1),
+  customer: z.string().min(1).max(255),
+  name: z.string().min(1).max(255),
   stage: OpportunityStage,
-  value: z.number().nonnegative(),
+  value: z.number().nonnegative().max(1_000_000_000_000),
   probability: z.number().int().min(0).max(100),
   dueDate: z.string().date().nullable(),
   owner: z.string().email().nullable(),
   industry: Industry.nullable(),
   logo: z.string().url().nullable(),
+  country: z.string().max(2).nullable(),
+  territoryId: z.string().uuid().nullable(),
+  territoryName: z.string().nullable(),
   updatedAt: z.string().datetime(),
+  taskCount: z.number().int().min(0).default(0),
+  commentCount: z.number().int().min(0).default(0),
+  viewCount: z.number().int().min(0).default(0),
 });
 export type Opportunity = z.infer<typeof Opportunity>;
 
 export const OpportunityCreate = Opportunity.omit({
   id: true,
   updatedAt: true,
+  taskCount: true,
+  commentCount: true,
+  viewCount: true,
+  territoryName: true,
 }).extend({
   code: z
     .string()
@@ -66,8 +77,33 @@ export const OpportunityPatch = Opportunity.partial().omit({
   id: true,
   code: true,
   updatedAt: true,
+  taskCount: true,
+  commentCount: true,
+  viewCount: true,
+  territoryName: true,
 });
 export type OpportunityPatch = z.infer<typeof OpportunityPatch>;
+
+export const OpportunityImport = z.object({
+  opportunities: z
+    .array(
+      OpportunityCreate.omit({ code: true }).extend({
+        code: z
+          .string()
+          .regex(/^OP-\d{4}$/)
+          .optional(),
+      }),
+    )
+    .min(1)
+    .max(500),
+});
+export type OpportunityImport = z.infer<typeof OpportunityImport>;
+
+export const OpportunityImportResult = z.object({
+  created: z.number().int(),
+  errors: z.array(z.object({ index: z.number().int(), message: z.string() })),
+});
+export type OpportunityImportResult = z.infer<typeof OpportunityImportResult>;
 
 // Filter is consumed from query strings — coerce numerics so callers can pass
 // `?limit=20` without manual casting.
@@ -76,7 +112,7 @@ export const OpportunityFilter = z.object({
   owner: z.string().optional(),
   industry: Industry.optional(),
   search: z.string().max(100).optional(),
-  cursor: z.string().optional(),
+  cursor: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 export type OpportunityFilter = z.infer<typeof OpportunityFilter>;

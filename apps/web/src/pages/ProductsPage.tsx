@@ -4,7 +4,9 @@ import { useSearchParams } from 'react-router-dom';
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
-import { EmptyState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
+import { SpotlightTable, SpotlightTableRow } from '@/components/ui/SpotlightTable';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { Badge } from '@/components/ui/Badge';
 import { formatMoneyMicros } from '@/lib/format';
 import {
@@ -49,10 +51,10 @@ export function ProductsPage() {
             Manage your catalog, SKUs, categories, and list prices.
           </p>
         </div>
-        <Button onClick={() => setShowNew(true)}>
+        <LiquidGlassButton onClick={() => setShowNew(true)} size="md">
           <Icon name="plus" size={14} />
           New product
-        </Button>
+        </LiquidGlassButton>
       </header>
 
       <Card>
@@ -99,8 +101,12 @@ export function ProductsPage() {
           categories={categories.data ?? []}
           onClose={() => setShowNew(false)}
           onCreate={async (body) => {
-            await createProduct.mutateAsync(body);
-            setShowNew(false);
+            try {
+              await createProduct.mutateAsync(body);
+              setShowNew(false);
+            } catch {
+              /* error is surfaced by the mutation toast in the hook */
+            }
           }}
           isPending={createProduct.isPending}
         />
@@ -108,40 +114,42 @@ export function ProductsPage() {
 
       {products.isLoading ? (
         <LoadingSkeleton rows={8} />
+      ) : products.isError ? (
+        <ErrorState
+          title="Failed to load products"
+          message={
+            products.error instanceof Error ? products.error.message : 'Something went wrong'
+          }
+        />
       ) : !products.data || products.data.items.length === 0 ? (
         <EmptyState title="No products found" />
       ) : (
         <div className="card">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="p-3">
+            <SpotlightTable query={filter.search} minWidth={760}>
               <thead>
-                <tr className="border-b border-[var(--border-subtle)] text-left text-[var(--fg-tertiary)]">
-                  <th scope="col" className="px-4 py-3 font-medium">
-                    SKU
-                  </th>
-                  <th scope="col" className="px-4 py-3 font-medium">
-                    Name
-                  </th>
-                  <th scope="col" className="px-4 py-3 font-medium">
-                    Category
-                  </th>
-                  <th scope="col" className="px-4 py-3 font-medium">
-                    List price
-                  </th>
-                  <th scope="col" className="px-4 py-3 font-medium">
-                    Status
-                  </th>
-                  <th scope="col" className="px-4 py-3 font-medium text-right">
+                <tr>
+                  <th scope="col">SKU</th>
+                  <th scope="col">Name</th>
+                  <th scope="col">Category</th>
+                  <th scope="col">List price</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" className="text-right">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {products.data.items.map((p) => (
-                  <ProductRow key={p.id} product={p} onDelete={(id) => deleteProduct.mutate(id)} />
+                  <ProductRow
+                    key={p.id}
+                    product={p}
+                    query={filter.search}
+                    onDelete={(id) => deleteProduct.mutate(id)}
+                  />
                 ))}
               </tbody>
-            </table>
+            </SpotlightTable>
           </div>
         </div>
       )}
@@ -149,23 +157,34 @@ export function ProductsPage() {
   );
 }
 
-function ProductRow({ product, onDelete }: { product: Product; onDelete: (id: string) => void }) {
+function ProductRow({
+  product,
+  query,
+  onDelete,
+}: {
+  product: Product;
+  query?: string;
+  onDelete: (id: string) => void;
+}) {
   const update = useUpdateProduct(product.id);
 
   return (
-    <tr className="border-b border-[var(--border-subtle)] hover:bg-[var(--surface-sunken)] transition-colors">
-      <td className="px-4 py-3 font-medium text-[var(--fg-primary)]">{product.sku}</td>
-      <td className="px-4 py-3 text-[var(--fg-primary)]">{product.name}</td>
+    <SpotlightTableRow
+      query={query}
+      searchableText={`${product.sku} ${product.name} ${product.categoryName ?? ''} ${product.currency}`}
+    >
+      <td className="font-medium text-[var(--fg-primary)]">{product.sku}</td>
+      <td className="text-[var(--fg-primary)]">{product.name}</td>
       <td className="px-4 py-3 text-[var(--fg-secondary)]">{product.categoryName ?? '—'}</td>
-      <td className="px-4 py-3 font-medium text-[var(--fg-primary)]">
+      <td className="font-medium text-[var(--fg-primary)]">
         {formatMoneyMicros(product.listPriceMicros, product.currency)}
       </td>
-      <td className="px-4 py-3">
+      <td>
         <Badge tone={product.active ? 'jade' : 'gray'}>
           {product.active ? 'Active' : 'Inactive'}
         </Badge>
       </td>
-      <td className="px-4 py-3 text-right">
+      <td className="text-right">
         <div className="inline-flex items-center gap-2">
           <Button
             variant="ghost"
@@ -185,7 +204,7 @@ function ProductRow({ product, onDelete }: { product: Product; onDelete: (id: st
           </Button>
         </div>
       </td>
-    </tr>
+    </SpotlightTableRow>
   );
 }
 
@@ -234,7 +253,8 @@ function NewProductDialog({
           <h2 className="text-lg font-semibold text-[var(--fg-primary)]">New product</h2>
           <button
             type="button"
-            className="text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)]"
+            aria-label="Close"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
             onClick={onClose}
           >
             <Icon name="close" size={18} />

@@ -17,8 +17,8 @@ export const PipelineByStageCard = memo(function PipelineByStageCard({ report }:
   const reducedMotion = useReducedMotion();
   const maxValue = report ? Math.max(1, ...report.byStage.map((stage) => stage.valueSum)) : 1;
   return (
-    <Card>
-      <SectionHeader title="Pipeline by stage" />
+    <Card role="region" aria-label="Portfolio pipeline by stage">
+      <SectionHeader title="Portfolio pipeline" caption="All-account pipeline by stage" />
       <div style={{ padding: '14px 18px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {!report ? (
           <LoadingSkeleton rows={4} />

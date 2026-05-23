@@ -8,7 +8,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { formatMoneyMicros } from '@/lib/format';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSnap, springSoft } from '@/lib/motion';
 
 import type { CategoryRow, TopCategories } from '@bidstack/shared';
@@ -35,7 +35,9 @@ const PALETTE = [
 export function TopCategoriesTreemap({ data, isLoading }: Props) {
   const [view, setView] = useState<'treemap' | 'list'>('treemap');
   const reducedMotion = useReducedMotion();
+  const { formatMoneyMicros } = useFormatMoney();
   const items = data?.items ?? [];
+  const sourceCurrency = data?.currency ?? 'CAD';
 
   return (
     <Card>
@@ -75,7 +77,7 @@ export function TopCategoriesTreemap({ data, isLoading }: Props) {
           No category breakdown yet.
         </motion.div>
       ) : view === 'treemap' ? (
-        <Treemap items={items} currency={data?.currency ?? 'CAD'} />
+        <Treemap items={items} sourceCurrency={sourceCurrency} />
       ) : (
         <motion.ul
           initial={reducedMotion ? false : { opacity: 0, y: 8 }}
@@ -102,7 +104,7 @@ export function TopCategoriesTreemap({ data, isLoading }: Props) {
               />
               <span className="flex-1 truncate text-sm text-[var(--fg-primary)]">{c.name}</span>
               <span className="tabular-nums text-sm text-[var(--fg-primary)] whitespace-nowrap">
-                {formatMoneyMicros(c.revenueMicros, data?.currency ?? 'CAD')}
+                {formatMoneyMicros(c.revenueMicros, sourceCurrency)}
               </span>
               <Badge tone="gray">{c.orders}</Badge>
             </motion.li>
@@ -126,9 +128,10 @@ interface Tile {
 const W = 720;
 const H = 240;
 
-function Treemap({ items, currency }: { items: CategoryRow[]; currency: string }) {
+function Treemap({ items, sourceCurrency }: { items: CategoryRow[]; sourceCurrency: string }) {
   const tiles = useMemo(() => squarify(items), [items]);
   const reducedMotion = useReducedMotion();
+  const { formatMoneyMicros } = useFormatMoney();
 
   return (
     <motion.div
@@ -158,7 +161,7 @@ function Treemap({ items, currency }: { items: CategoryRow[]; currency: string }
               transition={{ ...springSnap, delay: reducedMotion ? 0 : index * 0.03 }}
               style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
             >
-              <title>{`${t.item.name}: ${formatMoneyMicros(t.item.revenueMicros, currency)} (${t.item.orders} orders)`}</title>
+              <title>{`${t.item.name}: ${formatMoneyMicros(t.item.revenueMicros, sourceCurrency)} (${t.item.orders} orders)`}</title>
             </motion.rect>
             {t.w > 80 && t.h > 36 ? (
               <motion.text
@@ -186,7 +189,7 @@ function Treemap({ items, currency }: { items: CategoryRow[]; currency: string }
                 transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.035 + 0.12 }}
                 style={{ pointerEvents: 'none' }}
               >
-                {formatMoneyMicros(t.item.revenueMicros, currency)}
+                {formatMoneyMicros(t.item.revenueMicros, sourceCurrency)}
               </motion.text>
             ) : null}
           </g>

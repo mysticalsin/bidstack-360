@@ -33,10 +33,10 @@ export const CustomFieldDefinition = z.object({
   fieldKey: z.string().min(1).max(64),
   label: z.string().min(1).max(128),
   fieldType: FieldType,
-  options: z.array(z.string()).default([]),
+  options: z.array(z.string().max(255)).max(100).default([]),
   defaultValue: z.unknown().nullable(),
   required: z.boolean().default(false),
-  orderIndex: z.number().int().default(0),
+  orderIndex: z.number().int().min(0).max(999).default(0),
   active: z.boolean().default(true),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -49,7 +49,7 @@ export const CustomFieldDefinitionCreate = CustomFieldDefinition.omit({
   createdAt: true,
   updatedAt: true,
 }).extend({
-  options: z.array(z.string()).optional(),
+  options: z.array(z.string().max(255)).max(100).optional(),
   defaultValue: z.unknown().optional(),
 });
 export type CustomFieldDefinitionCreate = z.infer<typeof CustomFieldDefinitionCreate>;

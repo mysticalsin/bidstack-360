@@ -38,28 +38,28 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
 
   const signals: CommandSignal[] = [
     {
-      label: 'Bid readiness',
+      label: 'Bid readiness estimate',
       value: `${readiness}%`,
       detail: readiness >= 85 ? 'ready for exec review' : 'needs presales focus',
       progress: readiness,
       tone: readiness >= 85 ? 'jade' : readiness >= 68 ? 'blue' : 'amber',
     },
     {
-      label: 'Source proof',
+      label: 'Source coverage',
       value: proofCount.toLocaleString(),
-      detail: `${cockpit.company.sourceAttribution.length} receipts plus logo chain`,
+      detail: `${cockpit.company.sourceAttribution.length} attributed source${cockpit.company.sourceAttribution.length === 1 ? '' : 's'}`,
       progress: Math.min(100, proofCount * 16),
       tone: proofCount >= 5 ? 'jade' : proofCount >= 3 ? 'blue' : 'amber',
     },
     {
-      label: 'Buying unit',
+      label: 'Decision coverage',
       value: `${committee.influence}/5`,
       detail: committee.summary,
       progress: committee.influence * 20,
       tone: committee.influence >= 4 ? 'jade' : committee.influence >= 3 ? 'blue' : 'amber',
     },
     {
-      label: 'Risk pressure',
+      label: 'Open risk load',
       value: criticalRisks ? `${criticalRisks} high` : `${openRisks} open`,
       detail: criticalRisks ? 'escalate before proposal' : 'manageable with owner follow-up',
       progress: Math.max(8, 100 - criticalRisks * 26 - openRisks * 7),
@@ -182,10 +182,10 @@ function deriveNextMove(cockpit: AccountCockpitSnapshot): string {
   if (champion) return `Use ${champion.name} as champion for the next presales milestone.`;
 
   if (cockpit.company.sourceAttribution.length < 3) {
-    return 'Refresh enrichment to strengthen legal, logo, market, and account-source proof.';
+    return 'Refresh data verification to strengthen legal, logo, market, and account-source proof.';
   }
 
-  return 'Advance the next proposal step with verified account context and owner alignment.';
+  return 'Advance the next proposal step with available account context and owner alignment.';
 }
 
 function deriveCommittee(cockpit: AccountCockpitSnapshot): {

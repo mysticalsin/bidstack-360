@@ -7,31 +7,76 @@
 // Without it, SPA navigations are silent for assistive tech users — a
 // regression from the multi-page-app default they expect.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 
 const ROUTE_TITLES: Record<string, string> = {
   '/dashboard': 'Dashboard',
+  '/sales': 'Sales',
+  '/sales/orders': 'Quotes & Orders',
+  '/sales/products': 'Products',
+  '/sales/invoices': 'Invoices',
   '/accounts': 'Accounts',
+  '/accounts/key': 'Key Accounts',
+  '/accounts/top': 'Top Accounts',
+  '/companies': 'Companies',
+  '/references': 'Reference Library',
   '/opportunities': 'Opportunities',
   '/pipeline': 'Pipeline',
+  '/bid-matrix': 'Bid Decision Matrix',
+  '/leads': 'Leads',
   '/contacts': 'Contacts',
   '/tasks': 'Tasks',
+  '/territories': 'Territories',
+  '/service-desk': 'Service Desk',
+  '/workflows': 'Workflows',
+  '/agents': 'Dust Agents',
+  '/intake': 'Document Intake',
   '/reports': 'Reports',
+  '/search': 'Search',
   '/integrations': 'Integrations',
+  '/audit-log': 'Audit Log',
   '/settings': 'Settings',
-  '/audit-log': 'Audit log',
   '/login': 'Sign in',
 };
 
 function titleFor(pathname: string, params: Record<string, string | undefined>): string {
-  // Try most-specific first.
+  // Detail routes — announce record type + identifier.
   if (pathname.startsWith('/accounts/') && params.accountId) {
     return `Account: ${decodeURIComponent(params.accountId)}`;
   }
   if (pathname.startsWith('/opportunities/') && params.id) {
     return 'Opportunity detail';
   }
+  if (pathname.startsWith('/contacts/') && params.id) {
+    return 'Contact detail';
+  }
+  if (pathname.startsWith('/leads/') && params.id) {
+    return 'Lead detail';
+  }
+  if (pathname.startsWith('/companies/') && params.id) {
+    return 'Company detail';
+  }
+  if (pathname.startsWith('/tasks/') && params.id) {
+    return 'Task detail';
+  }
+  if (pathname.startsWith('/sales/invoices/') && params.id) {
+    return 'Invoice detail';
+  }
+  if (pathname.startsWith('/sales/orders/') && params.id) {
+    return 'Quote or order detail';
+  }
+  if (pathname.startsWith('/service-desk/') && params.id) {
+    return 'Service desk case detail';
+  }
+
+  // Sub-routes (e.g., /accounts/key, /sales/orders).
+  const twoSegments = pathname.split('/').slice(0, 3).join('/');
+  if (ROUTE_TITLES[twoSegments]) {
+    return ROUTE_TITLES[twoSegments];
+  }
+
+  // Single-segment routes.
   const segment = '/' + (pathname.split('/')[1] ?? '');
   return ROUTE_TITLES[segment] ?? 'Page';
 }
@@ -40,15 +85,34 @@ export function RouteAnnouncer() {
   const { pathname } = useLocation();
   const params = useParams<Record<string, string>>();
   const [message, setMessage] = useState('');
+  const isFirstMount = useRef(true);
 
   useEffect(() => {
     // Skip the initial mount so we don't announce on first paint — only
     // navigations should speak.
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
+
     const next = `Now on ${titleFor(pathname, params)}`;
     // Set after a beat so the change is detected as a live-region update
     // rather than initial content.
     const handle = window.setTimeout(() => setMessage(next), 50);
-    return () => window.clearTimeout(handle);
+
+    // Move focus to the main content area so keyboard users start at the
+    // top of the new page instead of staying on the sidebar link.
+    const focusHandle = window.setTimeout(() => {
+      const main = document.getElementById('main');
+      if (main) {
+        main.focus({ preventScroll: true });
+      }
+    }, 60);
+
+    return () => {
+      window.clearTimeout(handle);
+      window.clearTimeout(focusHandle);
+    };
   }, [pathname, params]);
 
   return (

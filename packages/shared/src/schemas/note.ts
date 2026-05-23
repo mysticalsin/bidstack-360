@@ -19,6 +19,7 @@ const BODY_MAX = 32_000;
 export const Note = z.object({
   id: z.string().uuid(),
   accountId: z.string().min(1).max(255),
+  companyId: z.string().uuid().optional(),
   title: z.string().min(1).max(TITLE_MAX),
   bodyMd: z.string().max(BODY_MAX),
   pinned: z.boolean(),
@@ -34,6 +35,7 @@ export type Note = z.infer<typeof Note>;
 
 export const NoteCreate = z.object({
   accountId: z.string().min(1).max(255),
+  companyId: z.string().uuid().optional(),
   title: z.string().min(1).max(TITLE_MAX),
   bodyMd: z.string().max(BODY_MAX),
   pinned: z.boolean().optional().default(false),
@@ -60,6 +62,7 @@ export type NoteList = z.infer<typeof NoteList>;
 
 export const MeetingNotesImportRequest = z.object({
   accountId: z.string().min(1).max(255),
+  companyId: z.string().uuid().optional(),
   companyName: z.string().min(1).max(255),
   domain: z.string().trim().min(3).max(255).optional(),
   title: z.string().min(1).max(TITLE_MAX).optional(),

@@ -15,7 +15,7 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: {
         querystring: z.object({
           q: z.string().trim().min(1).max(120),
-          types: z.string().optional(),
+          types: z.string().max(255).optional(),
           limit: z.coerce.number().int().min(1).max(20).default(5),
         }),
         response: { 200: SearchResponse },

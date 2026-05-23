@@ -1,4 +1,4 @@
-// Twenty-style opportunities table with inline-editable stage, value,
+// CRM-style opportunities table with inline-editable stage, value,
 // probability, and due date. Each row owns its own mutation hook so a
 // PATCH on row N doesn't trigger renders on row M. Stage is a select cell
 // (the most common field to edit during pipeline review); the rest are
@@ -13,19 +13,20 @@ import {
   type FocusEvent,
   type KeyboardEvent,
 } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { announceStageChange } from '@/components/a11y/useAnnouncer';
 import { useConfetti } from '@/components/delight/useConfetti';
 import { CreateOpportunityDialog } from '@/components/opportunity/CreateOpportunityDialog';
+import { ImportOpportunitiesDialog } from '@/components/opportunity/ImportOpportunitiesDialog';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge, stageTone } from '@/components/ui/Badge';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { SavedFlash } from '@/components/ui/SavedFlash';
-import { SortableHeader } from '@/components/ui/SortableHeader';
+import { SortableHeader, getSortableHeaderAriaSort } from '@/components/ui/SortableHeader';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useLiveRelativeTime } from '@/hooks/useLiveRelativeTime';
@@ -37,20 +38,24 @@ import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { prefetchRoute } from '@/lib/prefetch';
-import { formatDate, formatMoney, formatStage } from '@/lib/format';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { formatDate, formatStage } from '@/lib/format';
 
 import type { Opportunity, OpportunityStage } from '@bidstack/shared';
 
 const STAGES: OpportunityStage[] = [
-  'discovery',
-  'qualified',
-  'proposal',
-  'negotiation',
+  's1_lead',
+  's1_ongoing',
+  's2_sent',
+  's3_technical_iteration',
+  's4_negotiation',
   'closed_won',
   'closed_lost',
 ];
 
 export function OpportunitiesPage() {
+  const navigate = useNavigate();
+  const { formatMoney } = useFormatMoney();
   const [searchParams, setSearchParams] = useSearchParams();
   const search = searchParams.get('search') ?? undefined;
   const qc = useQueryClient();
@@ -58,7 +63,7 @@ export function OpportunitiesPage() {
   // via URL state) is urgent, but the table re-render is non-urgent.
   const [, startTransition] = useTransition();
 
-  // Stage filter chips (Twenty-style quick filters)
+  // Stage filter chips (CRM-style quick filters)
   const stageFilterRaw = searchParams.get('stage');
   const stageFilter = STAGES.includes(stageFilterRaw as OpportunityStage)
     ? (stageFilterRaw as OpportunityStage)
@@ -247,9 +252,41 @@ export function OpportunitiesPage() {
 
   return (
     <div className="space-y-6">
+      {!isLoading && data && data.items.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {(() => {
+            const opps = data.items;
+            const totalValue = opps.reduce((acc, o) => acc + o.value, 0);
+            const openOpps = opps.filter(
+              (o) => o.stage !== 'closed_won' && o.stage !== 'closed_lost',
+            );
+            const openValue = openOpps.reduce((acc, o) => acc + o.value, 0);
+            const weighted = openOpps.reduce((acc, o) => acc + o.value * (o.probability / 100), 0);
+            return [
+              { label: 'Opportunities', value: String(opps.length) },
+              { label: 'Revenue', value: formatMoney(totalValue, 'EUR') },
+              { label: 'WR', value: formatMoney(weighted, 'EUR') },
+              { label: 'Open', value: formatMoney(openValue, 'EUR') },
+            ];
+          })().map((kpi) => (
+            <div
+              key={kpi.label}
+              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
+            >
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+                {kpi.label}
+              </div>
+              <div className="mt-1 text-lg font-bold text-[var(--fg-primary)] tabular-nums">
+                {kpi.value}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
+          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight gradient-text">
             Opportunities
           </h1>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
@@ -292,6 +329,15 @@ export function OpportunitiesPage() {
         <div className="flex items-center gap-2">
           <Button
             size="sm"
+            variant="ghost"
+            onClick={() => navigate('/pipeline')}
+            aria-label="Switch to kanban view"
+          >
+            Kanban
+          </Button>
+          <ImportOpportunitiesDialog />
+          <Button
+            size="sm"
             variant="secondary"
             onClick={exportCsv}
             disabled={!data || data.items.length === 0}
@@ -303,11 +349,16 @@ export function OpportunitiesPage() {
         </div>
       </header>
 
-      {/* Stage filter chips — Twenty-style quick filters */}
+      {/* Stage filter chips — CRM-style quick filters */}
       {!search && (
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div
+          role="group"
+          aria-label="Filter opportunities by stage"
+          className="flex flex-wrap items-center gap-1.5"
+        >
           <button
             type="button"
+            aria-pressed={!stageFilter}
             onClick={() => setStageFilter(null)}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] ${
               !stageFilter
@@ -321,6 +372,7 @@ export function OpportunitiesPage() {
             <button
               key={s}
               type="button"
+              aria-pressed={stageFilter === s}
               onClick={() => setStageFilter(stageFilter === s ? null : s)}
               className={`rounded-full px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] ${
                 stageFilter === s
@@ -393,81 +445,111 @@ export function OpportunitiesPage() {
             action={<CreateOpportunityDialog />}
           />
         ) : (
-          <table className="w-full text-left text-sm">
-            <caption className="sr-only">
-              {search
-                ? `Opportunities matching "${search}"`
-                : 'All opportunities, sorted by most recent activity. Cells are inline-editable.'}
-            </caption>
-            <thead className="sticky top-0 z-10 bg-[var(--surface-sunken)] text-xs text-[var(--fg-tertiary)] uppercase tracking-wider">
-              <tr>
-                <th scope="col" className="w-10 px-5 py-3">
-                  <input
-                    type="checkbox"
-                    aria-label={allSelected ? 'Deselect all' : 'Select all'}
-                    checked={allSelected}
-                    ref={(el) => {
-                      if (el) el.indeterminate = someSelected;
-                    }}
-                    onChange={toggleAll}
-                    className="h-4 w-4 cursor-pointer accent-[var(--brand-primary)]"
+          <div className="overflow-x-auto">
+            <table className="min-w-[980px] w-full text-left text-sm">
+              <caption className="sr-only">
+                {search
+                  ? `Opportunities matching "${search}"`
+                  : 'All opportunities, sorted by most recent activity. Cells are inline-editable.'}
+              </caption>
+              <thead className="sticky top-0 z-10 bg-[var(--surface-sunken)] text-xs text-[var(--fg-tertiary)] uppercase tracking-wider">
+                <tr>
+                  <th scope="col" className="w-10 px-5 py-3">
+                    <label className="table-checkbox-hit">
+                      <span className="sr-only">{allSelected ? 'Deselect all' : 'Select all'}</span>
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = someSelected;
+                        }}
+                        onChange={toggleAll}
+                        className="cursor-pointer accent-[var(--brand-primary)]"
+                      />
+                    </label>
+                  </th>
+                  <th
+                    scope="col"
+                    aria-sort={getSortableHeaderAriaSort('code', sortState)}
+                    className="px-5 py-3 font-semibold"
+                  >
+                    <SortableHeader columnKey="code" state={sortState} onChange={setSortState}>
+                      Code
+                    </SortableHeader>
+                  </th>
+                  <th
+                    scope="col"
+                    aria-sort={getSortableHeaderAriaSort('name', sortState)}
+                    className="px-5 py-3 font-semibold"
+                  >
+                    <SortableHeader columnKey="name" state={sortState} onChange={setSortState}>
+                      Opportunity
+                    </SortableHeader>
+                  </th>
+                  <th scope="col" className="px-5 py-3 font-semibold">
+                    Territory
+                  </th>
+                  <th
+                    scope="col"
+                    aria-sort={getSortableHeaderAriaSort('stage', sortState)}
+                    className="px-5 py-3 font-semibold"
+                  >
+                    <SortableHeader columnKey="stage" state={sortState} onChange={setSortState}>
+                      Stage
+                    </SortableHeader>
+                  </th>
+                  <th
+                    scope="col"
+                    aria-sort={getSortableHeaderAriaSort('value', sortState)}
+                    className="px-5 py-3 font-semibold"
+                  >
+                    <SortableHeader
+                      columnKey="value"
+                      state={sortState}
+                      onChange={setSortState}
+                      align="right"
+                    >
+                      Value
+                    </SortableHeader>
+                  </th>
+                  <th
+                    scope="col"
+                    aria-sort={getSortableHeaderAriaSort('probability', sortState)}
+                    className="px-5 py-3 font-semibold"
+                  >
+                    <SortableHeader
+                      columnKey="probability"
+                      state={sortState}
+                      onChange={setSortState}
+                      align="right"
+                    >
+                      Probability
+                    </SortableHeader>
+                  </th>
+                  <th
+                    scope="col"
+                    aria-sort={getSortableHeaderAriaSort('dueDate', sortState)}
+                    className="px-5 py-3 font-semibold"
+                  >
+                    <SortableHeader columnKey="dueDate" state={sortState} onChange={setSortState}>
+                      Due
+                    </SortableHeader>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border-subtle)]">
+                {items.map((opp) => (
+                  <Row
+                    key={opp.id}
+                    opp={opp}
+                    isSelected={selectedIds.has(opp.id)}
+                    onToggleSelect={toggleOne}
+                    patch={patch}
                   />
-                </th>
-                <th scope="col" className="px-5 py-3 font-semibold">
-                  <SortableHeader columnKey="code" state={sortState} onChange={setSortState}>
-                    Code
-                  </SortableHeader>
-                </th>
-                <th scope="col" className="px-5 py-3 font-semibold">
-                  <SortableHeader columnKey="name" state={sortState} onChange={setSortState}>
-                    Opportunity
-                  </SortableHeader>
-                </th>
-                <th scope="col" className="px-5 py-3 font-semibold">
-                  <SortableHeader columnKey="stage" state={sortState} onChange={setSortState}>
-                    Stage
-                  </SortableHeader>
-                </th>
-                <th scope="col" className="px-5 py-3 font-semibold">
-                  <SortableHeader
-                    columnKey="value"
-                    state={sortState}
-                    onChange={setSortState}
-                    align="right"
-                  >
-                    Value
-                  </SortableHeader>
-                </th>
-                <th scope="col" className="px-5 py-3 font-semibold">
-                  <SortableHeader
-                    columnKey="probability"
-                    state={sortState}
-                    onChange={setSortState}
-                    align="right"
-                  >
-                    Probability
-                  </SortableHeader>
-                </th>
-                <th scope="col" className="px-5 py-3 font-semibold">
-                  <SortableHeader columnKey="dueDate" state={sortState} onChange={setSortState}>
-                    Due
-                  </SortableHeader>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border-subtle)]">
-              {items.map((opp, i) => (
-                <Row
-                  key={opp.id}
-                  opp={opp}
-                  index={i}
-                  isSelected={selectedIds.has(opp.id)}
-                  onToggleSelect={toggleOne}
-                  patch={patch}
-                />
-              ))}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
     </div>
@@ -478,17 +560,16 @@ export function OpportunitiesPage() {
 // useMutation hooks (one per row) which is expensive for React Query.
 const Row = memo(function Row({
   opp,
-  index,
   isSelected,
   onToggleSelect,
   patch,
 }: {
   opp: Opportunity;
-  index: number;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
   patch: ReturnType<typeof usePatchOpportunity>;
 }) {
+  const { formatMoney } = useFormatMoney();
   const fireConfetti = useConfetti((s) => s.fire);
   // Per-field flash timestamp. Bumping a field's value re-triggers the
   // SavedFlash chip next to that cell, independent of the others.
@@ -516,28 +597,27 @@ const Row = memo(function Row({
   };
 
   return (
-    <motion.tr
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{
-        type: 'spring',
-        stiffness: 200,
-        damping: 26,
-        delay: Math.min(index, 16) * 0.028,
-      }}
-      className="group hover:bg-[var(--surface-sunken)] transition-colors"
+    <tr
+      className={cn(
+        'group transition-colors hover:bg-[var(--surface-sunken)]',
+        isSelected && 'bg-[var(--brand-primary-tint)]/60',
+      )}
       data-selected={isSelected ? 'true' : undefined}
       onMouseEnter={prefetch}
     >
       <td className="w-10 px-5 py-3">
-        <input
-          type="checkbox"
-          aria-label={`Select ${opp.name}`}
-          checked={isSelected}
-          onChange={() => onToggleSelect(opp.id)}
-          onClick={(e) => e.stopPropagation()}
-          className="h-4 w-4 cursor-pointer accent-[var(--brand-primary)]"
-        />
+        <label className="table-checkbox-hit">
+          <span className="sr-only">
+            {isSelected ? `Deselect ${opp.name}` : `Select ${opp.name}`}
+          </span>
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelect(opp.id)}
+            onClick={(e) => e.stopPropagation()}
+            className="cursor-pointer accent-[var(--brand-primary)]"
+          />
+        </label>
       </td>
       <td className="px-5 py-3 font-mono text-xs text-[var(--fg-tertiary)]">
         <Link to={`/opportunities/${opp.id}`} className="hover:text-[var(--brand-primary)]">
@@ -555,6 +635,15 @@ const Row = memo(function Row({
           <span>{opp.customer}</span>
           <UpdatedAgo iso={opp.updatedAt} />
         </div>
+      </td>
+      <td className="px-5 py-3">
+        {opp.territoryName ? (
+          <Badge tone="teal">{opp.territoryName}</Badge>
+        ) : opp.country ? (
+          <span className="text-xs text-[var(--fg-tertiary)]">{opp.country}</span>
+        ) : (
+          <span className="text-xs text-[var(--fg-tertiary)]">—</span>
+        )}
       </td>
       <td className="px-5 py-3">
         <StageCell
@@ -649,7 +738,7 @@ const Row = memo(function Row({
         />
         <SavedFlash trigger={saved.dueDate} />
       </td>
-    </motion.tr>
+    </tr>
   );
 });
 

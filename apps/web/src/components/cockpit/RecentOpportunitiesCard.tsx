@@ -13,28 +13,57 @@ import { springSoft } from '@/lib/motion';
 
 interface Props {
   opps: ReturnType<typeof useOpportunities>;
+  accountName?: string;
+  items?: NonNullable<ReturnType<typeof useOpportunities>['data']>['items'];
 }
 
-export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({ opps }: Props) {
+export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
+  opps,
+  accountName,
+  items,
+}: Props) {
   const reducedMotion = useReducedMotion();
+  const visibleItems = items ?? opps.data?.items ?? [];
+  const accountScoped = Boolean(accountName);
   return (
-    <Card>
+    <Card
+      role="region"
+      aria-label={accountScoped ? 'Account opportunities' : 'Recent opportunities'}
+    >
       <SectionHeader
-        title="Recent opportunities"
-        caption="Latest activity across all customers"
+        title={accountScoped ? 'Account opportunities' : 'Recent opportunities'}
+        caption={
+          accountScoped
+            ? `Open opportunities linked to ${accountName}`
+            : 'Latest portfolio activity across all customers'
+        }
         action={
-          <Link to="/opportunities" className="link-arrow">
-            View all <Icon name="arrow" size={12} />
+          <Link
+            to={
+              accountScoped
+                ? `/opportunities?search=${encodeURIComponent(accountName ?? '')}`
+                : '/opportunities'
+            }
+            className="link-arrow"
+          >
+            {accountScoped ? 'Open pipeline' : 'View all'} <Icon name="arrow" size={12} />
           </Link>
         }
       />
       {opps.isLoading ? (
         <LoadingSkeleton rows={3} />
-      ) : opps.data?.items.length === 0 ? (
-        <EmptyState title="No opportunities yet" />
+      ) : visibleItems.length === 0 ? (
+        <EmptyState
+          title={accountScoped ? 'No opportunities for this account yet' : 'No opportunities yet'}
+          message={
+            accountScoped
+              ? 'Create an opportunity from the account header to start a bid workspace.'
+              : undefined
+          }
+        />
       ) : (
         <ul className="proto-list-flat">
-          {opps.data?.items.slice(0, 5).map((o, index) => (
+          {visibleItems.slice(0, 5).map((o, index) => (
             <motion.li
               key={o.id}
               className="proto-row"
@@ -46,7 +75,7 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({ o
                 <div className="proto-row-main">
                   <span className="proto-row-code">{o.code}</span>
                   <span className="proto-row-name">{o.name}</span>
-                  <span className="proto-row-meta">{o.customer}</span>
+                  {!accountScoped ? <span className="proto-row-meta">{o.customer}</span> : null}
                 </div>
                 <div className="proto-row-right">
                   <span className="proto-row-money">

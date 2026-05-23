@@ -14,7 +14,7 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: {
         querystring: z.object({
           active: z.coerce.boolean().optional(),
-          limit: z.coerce.number().min(1).max(200).default(50),
+          limit: z.coerce.number().int().min(1).max(200).default(50),
         }),
         response: { 200: z.object({ items: z.array(Workflow) }) },
       },
@@ -23,6 +23,7 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
       const rows = await prisma.workflow.findMany({
         where: {
           orgId: req.auth.orgId,
+          deletedAt: null,
           ...(req.query.active !== undefined ? { active: req.query.active } : {}),
         },
         include: { actions: { orderBy: { sortOrder: 'asc' } } },
@@ -43,6 +44,23 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req, reply) => {
+      // Verify assigneeIds belong to the current orgId (BS-15)
+      for (const a of req.body.actions) {
+        if (a.kind === 'create_task') {
+          const config = a.config as Record<string, unknown> | null;
+          if (config && typeof config.assigneeId === 'string') {
+            const assignee = await prisma.user.findFirst({
+              where: { id: config.assigneeId, orgId: req.auth.orgId },
+            });
+            if (!assignee) {
+              throw server.httpErrors.badRequest(
+                `Assignee ${config.assigneeId} does not belong to your organization`,
+              );
+            }
+          }
+        }
+      }
+
       const created = await prisma.workflow.create({
         data: {
           orgId: req.auth.orgId,
@@ -74,7 +92,7 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const row = await prisma.workflow.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
         include: { actions: { orderBy: { sortOrder: 'asc' } } },
       });
       if (!row) throw server.httpErrors.notFound('Workflow not found');
@@ -94,11 +112,30 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const existing = await prisma.workflow.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!existing) throw server.httpErrors.notFound('Workflow not found');
-      const updated = await prisma.workflow.update({
-        where: { id: existing.id },
+
+      if (req.body.actions) {
+        for (const a of req.body.actions) {
+          if (a.kind === 'create_task') {
+            const config = a.config as Record<string, unknown> | null;
+            if (config && typeof config.assigneeId === 'string') {
+              const assignee = await prisma.user.findFirst({
+                where: { id: config.assigneeId, orgId: req.auth.orgId },
+              });
+              if (!assignee) {
+                throw server.httpErrors.badRequest(
+                  `Assignee ${config.assigneeId} does not belong to your organization`,
+                );
+              }
+            }
+          }
+        }
+      }
+
+      const updateResult = await prisma.workflow.updateMany({
+        where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
         data: {
           ...(req.body.name !== undefined ? { name: req.body.name } : {}),
           ...(req.body.description !== undefined ? { description: req.body.description } : {}),
@@ -108,6 +145,14 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
             ? { triggerConfig: req.body.triggerConfig as Prisma.InputJsonValue }
             : {}),
         },
+      });
+
+      if (updateResult.count === 0) {
+        throw server.httpErrors.notFound('Workflow not found');
+      }
+
+      const updated = await prisma.workflow.findFirstOrThrow({
+        where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
         include: { actions: { orderBy: { sortOrder: 'asc' } } },
       });
       return serializeWorkflow(updated);
@@ -122,10 +167,16 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const existing = await prisma.workflow.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!existing) throw server.httpErrors.notFound('Workflow not found');
-      await prisma.workflow.delete({ where: { id: existing.id } });
+      const updateResult = await prisma.workflow.updateMany({
+        where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
+        data: { deletedAt: new Date() },
+      });
+      if (updateResult.count === 0) {
+        throw server.httpErrors.notFound('Workflow not found');
+      }
       return reply.code(204).send(null);
     },
   );
@@ -143,7 +194,7 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const wf = await prisma.workflow.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
         include: { actions: { orderBy: { sortOrder: 'asc' } } },
       });
       if (!wf) throw server.httpErrors.notFound('Workflow not found');
@@ -184,8 +235,8 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
             finishedAt: new Date(),
           },
         });
-        await tx.workflow.update({
-          where: { id: wf.id },
+        await tx.workflow.updateMany({
+          where: { id: wf.id, orgId: req.auth.orgId },
           data: { runCount: { increment: 1 }, lastRunAt: new Date() },
         });
         return updated;
@@ -213,13 +264,13 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       schema: {
         params: z.object({ id: z.string().uuid() }),
-        querystring: z.object({ limit: z.coerce.number().min(1).max(100).default(20) }),
+        querystring: z.object({ limit: z.coerce.number().int().min(1).max(100).default(20) }),
         response: { 200: z.object({ items: z.array(WorkflowRun) }) },
       },
     },
     async (req) => {
       const rows = await prisma.workflowRun.findMany({
-        where: { workflowId: req.params.id, orgId: req.auth.orgId },
+        where: { workflowId: req.params.id, orgId: req.auth.orgId, deletedAt: null },
         orderBy: { startedAt: 'desc' },
         take: req.query.limit,
       });

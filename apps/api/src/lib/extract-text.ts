@@ -13,12 +13,50 @@
 // Why `require()` instead of `import`: several extraction libraries are CommonJS-only
 // and their type declarations are inconsistent. Dynamic require keeps tsc happy.
 
+import { execFile as execFileCallback } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { writeFile, unlink } from 'node:fs/promises';
+import { writeFile, unlink, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { promisify } from 'node:util';
 
 const require = createRequire(import.meta.url);
+const execFile = promisify(execFileCallback);
+
+const OCR_MIN_PDF_TEXT_CHARS = 50;
+const OCR_MAX_BUFFER = 20 * 1024 * 1024;
+
+function ocrEnabled(): boolean {
+  return process.env.BIDSTACK_OCR_ENABLED === 'true';
+}
+
+function ocrTimeoutMs(): number {
+  const parsed = Number(process.env.BIDSTACK_OCR_TIMEOUT_MS ?? 120_000);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 120_000;
+}
+
+function ocrLanguages(): string {
+  return process.env.BIDSTACK_OCR_LANGUAGES ?? 'eng';
+}
+
+async function runOcrCommand(binary: string, args: string[]): Promise<{ stdout: string }> {
+  try {
+    return await execFile(binary, args, {
+      timeout: ocrTimeoutMs(),
+      maxBuffer: OCR_MAX_BUFFER,
+      windowsHide: true,
+    });
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
+      throw new Error(
+        `${binary} is not installed or not on PATH. Install the open-source OCR runtime or disable BIDSTACK_OCR_ENABLED.`,
+        { cause: err },
+      );
+    }
+    throw err;
+  }
+}
 
 interface ExtractOptions {
   buffer: Buffer;
@@ -50,6 +88,66 @@ function inferExtension(name?: string): string {
   if (!name) return '';
   const ext = path.extname(name).toLowerCase();
   return ext;
+}
+
+function isImageContentType(contentType: string, ext: string): boolean {
+  return (
+    contentType.startsWith('image/') ||
+    ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.tif', '.tiff', '.bmp'].includes(ext)
+  );
+}
+
+async function extractPdfText(buffer: Buffer): Promise<string> {
+  const pdfParse = require('pdf-parse');
+  const result = await pdfParse(buffer);
+  return typeof result.text === 'string' ? result.text : '';
+}
+
+async function ocrPdf(buffer: Buffer): Promise<string> {
+  if (!ocrEnabled()) {
+    return '';
+  }
+
+  const input = await withTempFile(buffer, '.pdf');
+  const output = path.join(
+    tmpdir(),
+    `bidstack-ocr-${Date.now()}-${Math.random().toString(36).slice(2)}.pdf`,
+  );
+  try {
+    await runOcrCommand(process.env.BIDSTACK_OCRMYPDF_BIN ?? 'ocrmypdf', [
+      '--skip-text',
+      '--deskew',
+      '--rotate-pages',
+      '-l',
+      ocrLanguages(),
+      input,
+      output,
+    ]);
+    return extractPdfText(await readFile(output));
+  } finally {
+    await safeUnlink(input);
+    await safeUnlink(output);
+  }
+}
+
+async function ocrImage(buffer: Buffer, ext: string): Promise<string> {
+  if (!ocrEnabled()) {
+    return '';
+  }
+
+  const suffix = ext && ext !== '.svg' ? ext : '.png';
+  const input = await withTempFile(buffer, suffix);
+  try {
+    const result = await runOcrCommand(process.env.BIDSTACK_TESSERACT_BIN ?? 'tesseract', [
+      input,
+      'stdout',
+      '-l',
+      ocrLanguages(),
+    ]);
+    return result.stdout.trim();
+  } finally {
+    await safeUnlink(input);
+  }
 }
 
 // ─── XLSX / XLS ────────────────────────────────────────────────────────────
@@ -148,9 +246,22 @@ export async function extractTextFromBuffer(opts: ExtractOptions): Promise<strin
 
   // PDF
   if (ct === 'application/pdf' || ext === '.pdf') {
-    const pdfParse = require('pdf-parse');
-    const result = await pdfParse(buffer);
-    return typeof result.text === 'string' ? result.text : '';
+    const text = await extractPdfText(buffer);
+    if (text.trim().length >= OCR_MIN_PDF_TEXT_CHARS || !ocrEnabled()) {
+      return text;
+    }
+    const ocrText = await ocrPdf(buffer);
+    return ocrText || text;
+  }
+
+  // Images and scans. SVG is accepted for uploads but intentionally not OCRed
+  // because it can contain active content; treat it as unsupported for text extraction.
+  if (isImageContentType(ct, ext) && ext !== '.svg' && ct !== 'image/svg+xml') {
+    const text = await ocrImage(buffer, ext);
+    if (text) return text;
+    throw new Error(
+      'Image OCR requires BIDSTACK_OCR_ENABLED=true plus Tesseract installed on the API runtime',
+    );
   }
 
   // DOCX

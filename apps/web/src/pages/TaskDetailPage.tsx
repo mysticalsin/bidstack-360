@@ -4,7 +4,7 @@ import { useParams, Link } from 'react-router-dom';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { EmptyState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useTasks, useUpdateTask } from '@/hooks/useTasks';
 import { formatDate } from '@/lib/format';
 
@@ -19,6 +19,13 @@ export function TaskDetailPage() {
   const task = tasks.data?.items.find((t) => t.id === id);
 
   if (tasks.isLoading) return <LoadingSkeleton rows={6} />;
+  if (tasks.isError)
+    return (
+      <ErrorState
+        title="Failed to load task"
+        message={tasks.error instanceof Error ? tasks.error.message : 'Something went wrong'}
+      />
+    );
   if (!task)
     return <EmptyState title="Task not found" message="This task may have been deleted." />;
 

@@ -89,7 +89,7 @@ function ConfirmInstance({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-40 bg-[var(--surface-overlay)] backdrop-blur-sm"
+            className="fixed inset-0 z-40 bg-surface-overlay backdrop-blur-sm"
           />
         </RadixDialog.Overlay>
         <RadixDialog.Content

@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from 'framer-motion';
+import { memo } from 'react';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge } from '@/components/ui/Badge';
@@ -13,7 +14,7 @@ interface Props {
   cockpit: AccountCockpitSnapshot;
 }
 
-export function HealthScoreCard({ cockpit }: Props) {
+export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props) {
   const reducedMotion = useReducedMotion();
   const total = ORDER.reduce((acc, key) => acc + (cockpit.health.counts[key] ?? 0), 0) || 1;
   const scorePct = Math.max(0, Math.min(100, cockpit.health.score)) / 100;
@@ -25,10 +26,10 @@ export function HealthScoreCard({ cockpit }: Props) {
   const strongest = [...segments].sort((a, b) => b.count - a.count)[0] ?? segments[0];
 
   return (
-    <Card role="region" aria-label="Health score" className="health-score-card">
+    <Card role="region" aria-label="Account signal coverage" className="health-score-card">
       <SectionHeader
-        title="Health Score"
-        caption={`${total} scored signals`}
+        title="Signal coverage"
+        caption={`${total} account signals scored`}
         action={
           <Badge tone={badgeTone(cockpit.health.band)}>{labelForHealth(cockpit.health.band)}</Badge>
         }
@@ -39,7 +40,7 @@ export function HealthScoreCard({ cockpit }: Props) {
           initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={springSoft}
-          aria-label={`Health score ${cockpit.health.score} out of 100`}
+          aria-label={`Account signal coverage ${cockpit.health.score} out of 100`}
           role="img"
         >
           <svg className="health-gauge" viewBox="0 0 180 180" aria-hidden>
@@ -65,7 +66,7 @@ export function HealthScoreCard({ cockpit }: Props) {
             />
           </svg>
           <div className="health-core">
-            <span>BidStack IQ</span>
+            <span>Coverage</span>
             <strong>
               <AnimatedMetric value={cockpit.health.score.toLocaleString()} />
             </strong>
@@ -75,7 +76,7 @@ export function HealthScoreCard({ cockpit }: Props) {
         </motion.div>
         <div className="health-summary">
           <div className="health-summary-head">
-            <span>Dominant signal</span>
+            <span>Strongest coverage band</span>
             <strong>{strongest ? labelForHealth(strongest.key) : 'No signal'}</strong>
           </div>
           <ul className="health-legend" aria-label="Health bands">
@@ -106,7 +107,7 @@ export function HealthScoreCard({ cockpit }: Props) {
       </div>
     </Card>
   );
-}
+});
 
 function labelForHealth(key: (typeof ORDER)[number]): string {
   if (key === 'strong') return 'Strong';

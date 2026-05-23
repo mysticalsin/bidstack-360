@@ -9,8 +9,12 @@ import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
+import { BulkActionBar } from '@/components/ui/BulkActionBar';
 import { confirm } from '@/components/ui/ConfirmDialog';
-import { SortableHeader } from '@/components/ui/SortableHeader';
+import { Icon } from '@/components/ui/Icon';
+import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
+import { SortableHeader, getSortableHeaderAriaSort } from '@/components/ui/SortableHeader';
+import { SpotlightTable, SpotlightTableRow } from '@/components/ui/SpotlightTable';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useContacts, useCreateContact, useDeleteContact } from '@/hooks/useContacts';
@@ -331,7 +335,9 @@ export function ContactsPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">Contacts</h1>
+          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight gradient-text">
+            Contacts
+          </h1>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
             {items.length} {items.length === 1 ? 'person' : 'people'} in the decision unit.
           </p>
@@ -339,24 +345,26 @@ export function ContactsPage() {
         <div className="flex items-center gap-2">
           <ContactCsvImportDialog
             trigger={
-              <Button size="sm" variant="secondary">
-                Paste CSV
+              <Button size="sm" variant="secondary" aria-label="Import contacts from CSV">
+                Import CSV
               </Button>
             }
           />
-          <Button
+          <LiquidGlassButton
+            tone="secondary"
             size="sm"
-            variant="secondary"
             onClick={() => exportCsv(items)}
             disabled={items.length === 0}
             aria-label="Export all visible contacts as CSV"
           >
+            <Icon name="download" size={14} />
             Export CSV
-          </Button>
+          </LiquidGlassButton>
           <ContactDialog
             trigger={
-              <Button size="md" variant="primary">
-                + New contact
+              <Button size="sm" variant="primary" aria-label="Create a new contact">
+                <Icon name="plus" size={14} />
+                New contact
               </Button>
             }
           />
@@ -365,37 +373,13 @@ export function ContactsPage() {
 
       {/* Bulk-action toolbar — only mounted when the user has a selection.
           Sits above the table so it doesn't displace any row. */}
-      {selectedContacts.length > 0 ? (
-        <div
-          role="region"
-          aria-label="Bulk actions"
-          // Stays pinned just below the topbar while the user scrolls the
-          // table. The shadow appears on stuck state so it visually
-          // separates from the cards below.
-          className="sticky top-2 z-20 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] px-3 py-2 text-xs shadow-[var(--shadow-sm)] backdrop-blur"
-        >
-          <span className="font-medium text-[var(--fg-primary)]">
-            {selectedContacts.length} selected
-          </span>
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="secondary" onClick={() => exportCsv(selectedContacts)}>
-              Export selected
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={bulkDelete}
-              disabled={del.isPending}
-              className="text-[var(--danger)] hover:text-[var(--danger)]"
-            >
-              Delete selected
-            </Button>
-            <Button size="sm" variant="ghost" onClick={clearSelection}>
-              Clear
-            </Button>
-          </div>
-        </div>
-      ) : null}
+      <BulkActionBar
+        count={selectedContacts.length}
+        onExport={() => exportCsv(selectedContacts)}
+        onDelete={bulkDelete}
+        onClear={clearSelection}
+        isDeleting={del.isPending}
+      />
 
       <div className="flex items-center gap-2">
         <div className="relative max-w-md flex-1">
@@ -414,7 +398,7 @@ export function ContactsPage() {
               aria-label="Clear search"
               className="absolute right-2 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
             >
-              ×
+              <Icon name="close" size={14} ariaHidden />
             </button>
           ) : null}
         </div>
@@ -471,35 +455,55 @@ export function ContactsPage() {
             }
           />
         ) : (
-          <table className="w-full text-left text-sm [&_tr[data-selected=true]]:bg-[var(--brand-primary-tint)]/60">
-            <thead className="sticky top-0 z-10 bg-[var(--surface-sunken)] text-xs uppercase tracking-wider text-[var(--fg-tertiary)]">
+          <SpotlightTable
+            query={deferredSearch}
+            minWidth={980}
+            className="[&_tr[data-selected=true]]:bg-[var(--brand-primary-tint)]/60"
+          >
+            <thead>
               <tr>
                 <th scope="col" className="w-10 px-5 py-3">
-                  <input
-                    type="checkbox"
-                    aria-label={allSelected ? 'Deselect all contacts' : 'Select all contacts'}
-                    checked={allSelected}
-                    ref={(el) => {
-                      // `indeterminate` is a DOM property, not an HTML attribute,
-                      // so React can't set it declaratively. Ref callback fires
-                      // on every commit, which is exactly when we want to sync.
-                      if (el) el.indeterminate = someSelected;
-                    }}
-                    onChange={toggleAll}
-                    className="h-4 w-4 cursor-pointer accent-[var(--brand-primary)]"
-                  />
+                  <label className="table-checkbox-hit">
+                    <span className="sr-only">
+                      {allSelected ? 'Deselect all contacts' : 'Select all contacts'}
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      ref={(el) => {
+                        // `indeterminate` is a DOM property, not an HTML attribute,
+                        // so React can't set it declaratively. Ref callback fires
+                        // on every commit, which is exactly when we want to sync.
+                        if (el) el.indeterminate = someSelected;
+                      }}
+                      onChange={toggleAll}
+                      className="cursor-pointer accent-[var(--brand-primary)]"
+                    />
+                  </label>
                 </th>
-                <th scope="col" className="px-5 py-3 font-semibold">
+                <th
+                  scope="col"
+                  aria-sort={getSortableHeaderAriaSort('name', sortState)}
+                  className="px-5 py-3 font-semibold"
+                >
                   <SortableHeader columnKey="name" state={sortState} onChange={setSortState}>
                     Name
                   </SortableHeader>
                 </th>
-                <th scope="col" className="px-5 py-3 font-semibold">
+                <th
+                  scope="col"
+                  aria-sort={getSortableHeaderAriaSort('role', sortState)}
+                  className="px-5 py-3 font-semibold"
+                >
                   <SortableHeader columnKey="role" state={sortState} onChange={setSortState}>
                     Role
                   </SortableHeader>
                 </th>
-                <th scope="col" className="px-5 py-3 font-semibold">
+                <th
+                  scope="col"
+                  aria-sort={getSortableHeaderAriaSort('customer', sortState)}
+                  className="px-5 py-3 font-semibold"
+                >
                   <SortableHeader columnKey="customer" state={sortState} onChange={setSortState}>
                     Customer
                   </SortableHeader>
@@ -507,39 +511,36 @@ export function ContactsPage() {
                 <th scope="col" className="px-5 py-3 font-semibold">
                   Contact
                 </th>
-                <th scope="col" className="px-5 py-3 font-semibold">
+                <th
+                  scope="col"
+                  aria-sort={getSortableHeaderAriaSort('influence', sortState)}
+                  className="px-5 py-3 font-semibold"
+                >
                   <SortableHeader columnKey="influence" state={sortState} onChange={setSortState}>
                     Influence
                   </SortableHeader>
                 </th>
-                <th scope="col" className="px-5 py-3 font-semibold">
+                <th
+                  scope="col"
+                  aria-sort={getSortableHeaderAriaSort('sentiment', sortState)}
+                  className="px-5 py-3 font-semibold"
+                >
                   <SortableHeader columnKey="sentiment" state={sortState} onChange={setSortState}>
                     Sentiment
                   </SortableHeader>
                 </th>
                 <th scope="col" className="px-5 py-3 text-right font-semibold">
-                  <span className="sr-only">Actions</span>
+                  Actions
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border-subtle)]">
               {items.map((c, i) => (
-                <motion.tr
+                <SpotlightTableRow
                   key={c.id}
-                  // `layout` makes rows glide to their new positions when
-                  // the sort comparator flips — without it the table
-                  // would just snap. Cap the entrance stagger at 16 rows
-                  // so a 200-row search result doesn't animate for 6s.
-                  layout
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{
-                    type: 'spring',
-                    stiffness: 180,
-                    damping: 26,
-                    delay: Math.min(i, 16) * 0.032,
-                  }}
-                  className="group relative hover:bg-[var(--surface-sunken)] data-[cursor=true]:bg-[var(--surface-sunken)] data-[cursor=true]:shadow-[inset_3px_0_0_var(--brand-primary)]"
+                  query={deferredSearch}
+                  searchableText={`${c.name} ${c.role ?? ''} ${c.customer} ${c.email ?? ''} ${c.phone ?? ''} ${c.sentiment ?? ''}`}
+                  className="group relative data-[cursor=true]:bg-[var(--surface-sunken)] data-[cursor=true]:shadow-[inset_3px_0_0_var(--brand-primary)]"
                   data-selected={selectedIds.has(c.id) ? 'true' : undefined}
                   data-cursor={i === cursorIdx ? 'true' : undefined}
                   onContextMenu={(e) => {
@@ -548,20 +549,23 @@ export function ContactsPage() {
                   }}
                 >
                   <td className="w-10 px-5 py-3">
-                    <input
-                      type="checkbox"
-                      aria-label={`Select ${c.name}`}
-                      checked={selectedIds.has(c.id)}
-                      onChange={() => toggleOne(c.id)}
-                      // Stop click from bubbling into row hover/edit affordances.
-                      onClick={(e) => e.stopPropagation()}
-                      className="h-4 w-4 cursor-pointer accent-[var(--brand-primary)]"
-                    />
+                    <label className="table-checkbox-hit">
+                      <span className="sr-only">
+                        {selectedIds.has(c.id) ? `Deselect ${c.name}` : `Select ${c.name}`}
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(c.id)}
+                        onChange={() => toggleOne(c.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="cursor-pointer accent-[var(--brand-primary)]"
+                      />
+                    </label>
                   </td>
                   <td className="px-5 py-3">
                     <Link
                       to={`/contacts/${c.id}`}
-                      className="font-medium text-[var(--brand-primary)] hover:underline"
+                      className="rounded font-medium text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
                     >
                       {c.name}
                     </Link>
@@ -573,7 +577,7 @@ export function ContactsPage() {
                       {c.email ? (
                         <a
                           href={`mailto:${c.email}`}
-                          className="text-[var(--brand-primary)] hover:underline"
+                          className="rounded text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
                         >
                           {c.email}
                         </a>
@@ -595,7 +599,7 @@ export function ContactsPage() {
                     )}
                   </td>
                   <td className="px-5 py-3 text-right">
-                    <div className="inline-flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                    <div className="inline-flex items-center gap-1">
                       <Button
                         size="sm"
                         variant="ghost"
@@ -616,10 +620,10 @@ export function ContactsPage() {
                       </Button>
                     </div>
                   </td>
-                </motion.tr>
+                </SpotlightTableRow>
               ))}
             </tbody>
-          </table>
+          </SpotlightTable>
         )}
       </Card>
 
@@ -747,7 +751,7 @@ function ContextItem({
         type="button"
         role="menuitem"
         onClick={onClick}
-        className={`flex w-full items-center px-3 py-1.5 text-left hover:bg-[var(--surface-sunken)] ${
+        className={`flex w-full items-center px-3 py-1.5 text-left hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)] ${
           tone === 'danger' ? 'text-[var(--danger)]' : 'text-[var(--fg-primary)]'
         }`}
       >

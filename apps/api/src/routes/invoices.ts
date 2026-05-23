@@ -1,4 +1,4 @@
-﻿// Invoice CRUD + state-machine routes.
+// Invoice CRUD + state-machine routes.
 //
 //   GET    /api/invoices                  list + filter + cursor pagination
 //   GET    /api/invoices/:id              detail with lines + payments + audit
@@ -29,6 +29,8 @@ import {
 } from '@bidstack/shared';
 import type { InvoiceState, PaymentMethod } from '@bidstack/shared';
 
+import { tenantEntitiesBelongToOrg } from '../lib/tenant-ownership.js';
+
 const ArAgingQuery = z.object({ currency: z.string().length(3).optional() });
 
 const toPrismaState = (s: z.infer<typeof InvoiceState>): PrismaInvoiceState =>
@@ -55,6 +57,10 @@ function resolveLineSubtotal(line: z.infer<typeof InvoiceCreateLine>) {
   const qThousandths = BigInt(Math.round(Number(line.quantity) * 1_000));
   const subtotalMicros = (unitMicros * qThousandths) / BigInt(1_000);
   return { unitMicros, subtotalMicros };
+}
+
+function invoiceLineProductIds(lines: readonly z.infer<typeof InvoiceCreateLine>[]): string[] {
+  return lines.map((line) => line.productId).filter((id): id is string => Boolean(id));
 }
 
 /** Detail shape used by GET /:id and every mutation response. */
@@ -256,6 +262,7 @@ export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/invoices',
     {
+      preHandler: server.requireRole('admin', 'finance'),
       schema: {
         body: InvoiceCreate,
         response: { 201: InvoiceDetail },
@@ -264,6 +271,11 @@ export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req, reply) => {
       const { customerName, countryCode, currency, salespersonId, netDays, notes, lines } =
         req.body;
+
+      const productIds = invoiceLineProductIds(lines);
+      if (!(await tenantEntitiesBelongToOrg('product', productIds, req.auth.orgId))) {
+        throw server.httpErrors.notFound('Product not found');
+      }
 
       const resolvedLines = lines.map((line) => {
         const { unitMicros, subtotalMicros } = resolveLineSubtotal(line);
@@ -337,6 +349,7 @@ export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.patch(
     '/invoices/:id',
     {
+      preHandler: server.requireRole('admin', 'finance'),
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: InvoiceUpdate,
@@ -370,6 +383,11 @@ export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
       let resolvedLines: InvoiceLineInsert[];
 
       if (lines && lines.length > 0) {
+        const productIds = invoiceLineProductIds(lines);
+        if (!(await tenantEntitiesBelongToOrg('product', productIds, req.auth.orgId))) {
+          throw server.httpErrors.notFound('Product not found');
+        }
+
         resolvedLines = lines.map((line) => {
           const { unitMicros, subtotalMicros } = resolveLineSubtotal(line);
           return {
@@ -423,6 +441,7 @@ export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
     server.post(
       `/invoices/:id/${action}`,
       {
+        preHandler: server.requireRole('admin', 'finance'),
         schema: {
           params: z.object({ id: z.string().uuid() }),
           body: OptionalInvoiceTransitionBody,
@@ -465,6 +484,7 @@ export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/invoices/:id/pay',
     {
+      preHandler: server.requireRole('admin', 'finance'),
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: OptionalInvoiceTransitionBody,
@@ -510,6 +530,7 @@ export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/invoices/:id/payments',
     {
+      preHandler: server.requireRole('admin', 'finance'),
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: PaymentCreate,
@@ -574,6 +595,7 @@ export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/invoices/from-order/:orderId',
     {
+      preHandler: server.requireRole('admin', 'finance'),
       schema: {
         params: z.object({ orderId: z.string().uuid() }),
         body: z.object({
@@ -656,6 +678,7 @@ export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/invoices/export',
     {
+      preHandler: server.requireRole('admin', 'finance'),
       schema: {
         querystring: InvoiceFilter,
       },
@@ -738,18 +761,29 @@ export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
       const stamp = new Date().toISOString().slice(0, 10);
       const tag = state ? `-${state}` : '';
       const filename = `invoices${tag}-${stamp}.csv`;
+      const sanitized = Array.from(filename)
+        .filter((char) => {
+          const code = char.charCodeAt(0);
+          return code >= 0x20 && code !== 0x7f && char !== '"';
+        })
+        .join('');
+      const encodedFilename = `attachment; filename*=UTF-8''${encodeURIComponent(sanitized)}`;
 
       return reply
         .header('Content-Type', 'text/csv; charset=utf-8')
-        .header('Content-Disposition', `attachment; filename="${filename}"`)
+        .header('Content-Disposition', encodedFilename)
         .send('\uFEFF' + csv);
     },
   );
 
-  // â”€â”€â”€ GET /api/invoices/ar-aging â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ————————————————————————————————————————————————————————————————————————
   server.get(
     '/invoices/ar-aging',
     {
+      preHandler: [
+        server.requirePermission('invoices:read'),
+        server.requireRole('admin', 'finance'),
+      ],
       schema: {
         querystring: ArAgingQuery,
         response: { 200: ArAgingReport },

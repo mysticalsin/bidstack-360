@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { Card } from '@/components/ui/Card';
+import { toast } from '@/components/ui/Toast';
 import { useCreateInvoice } from '@/hooks/useInvoices';
 
 export function NewInvoicePage() {
@@ -10,17 +11,26 @@ export function NewInvoicePage() {
   const [customerName, setCustomerName] = useState('');
   const [currency, setCurrency] = useState('CAD');
   const [dueDate, setDueDate] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     if (!customerName || !dueDate) return;
-    const invoice = await create.mutateAsync({
-      customerName,
-      currency,
-      netDays: Math.ceil((new Date(dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
-      lines: [],
-    });
-    navigate(`/sales/invoices/${invoice.id}`);
+    try {
+      const invoice = await create.mutateAsync({
+        customerName,
+        currency,
+        netDays: Math.ceil((new Date(dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
+        lines: [],
+      });
+      navigate(`/sales/invoices/${invoice.id}`);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Create failed');
+      toast.error('Could not create invoice', {
+        description: err instanceof Error ? err.message : 'The server rejected the request.',
+      });
+    }
   };
 
   return (
@@ -75,6 +85,11 @@ export function NewInvoicePage() {
               />
             </div>
           </div>
+          {formError ? (
+            <p role="alert" className="text-xs text-[var(--danger)]">
+              {formError}
+            </p>
+          ) : null}
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"

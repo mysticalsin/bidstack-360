@@ -7,6 +7,7 @@
 import * as RadixDialog from '@radix-ui/react-dialog';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 
+import { Icon } from '@/components/ui/Icon';
 import { springModal } from '@/lib/motion';
 
 import { useHelpDrawer } from './useHelpDrawer';
@@ -20,10 +21,10 @@ const GROUPS: Array<{ title: string; items: Shortcut[] }> = [
   {
     title: 'Global',
     items: [
-      { keys: ['⌘', 'K'], label: 'Open command palette' },
+      { keys: ['Ctrl', 'K'], label: 'Open command palette' },
       { keys: ['N'], label: 'Quick-add menu' },
       { keys: ['?'], label: 'Open this drawer' },
-      { keys: ['⌘', '.'], label: 'Close any dialog' },
+      { keys: ['Esc'], label: 'Close current dialog' },
     ],
   },
   {
@@ -43,10 +44,10 @@ const GROUPS: Array<{ title: string; items: Shortcut[] }> = [
   {
     title: 'Records',
     items: [
-      { keys: ['↑', '↓'], label: 'Move selection in lists' },
+      { keys: ['Up', 'Down'], label: 'Move selection in lists' },
       { keys: ['Enter'], label: 'Open record' },
       { keys: ['E'], label: 'Edit selected record' },
-      { keys: ['⌫'], label: 'Delete (with confirmation)' },
+      { keys: ['Del'], label: 'Delete with confirmation' },
     ],
   },
 ];
@@ -67,7 +68,7 @@ export function HelpDrawer() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.12 }}
-                className="fixed inset-0 z-40 bg-[var(--surface-overlay)] backdrop-blur-sm"
+                className="fixed inset-0 z-40 bg-surface-overlay backdrop-blur-sm"
               />
             </RadixDialog.Overlay>
             <RadixDialog.Content asChild forceMount aria-describedby={undefined}>
@@ -86,7 +87,7 @@ export function HelpDrawer() {
                     aria-label="Close shortcuts"
                     className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)]"
                   >
-                    ×
+                    <Icon name="close" size={16} />
                   </RadixDialog.Close>
                 </header>
 
@@ -120,8 +121,8 @@ export function HelpDrawer() {
                   ))}
 
                   <footer className="pt-2 text-[11px] text-[var(--fg-tertiary)]">
-                    Most shortcuts work everywhere except inside text fields. The full list lives in
-                    Settings → Shortcuts (coming soon).
+                    Most shortcuts work everywhere except inside text fields. Press ? any time to
+                    reopen this drawer.
                   </footer>
                 </div>
               </motion.aside>

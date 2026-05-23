@@ -146,7 +146,8 @@ function NewWebhookDialog({
           </h2>
           <button
             type="button"
-            className="text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)]"
+            aria-label="Close"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
             onClick={onClose}
           >
             <Icon name="close" size={18} />

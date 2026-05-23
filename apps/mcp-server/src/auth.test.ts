@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { PrismaClient } from '@bidstack/db';
 import { createHash, randomBytes } from 'node:crypto';
-import { mcpAuth } from './auth.js';
+import { mcpAuth, requireMcpScope } from './auth.js';
 
 // Tests need a live Postgres. CI without docker stays green via skipIfNoDb.
 const hasDb = !!process.env.DATABASE_URL;
@@ -20,6 +20,20 @@ function mockRequest(token?: string) {
     },
   } as unknown as Parameters<typeof mcpAuth>[0];
 }
+
+describe('requireMcpScope', () => {
+  it('allows keys with the requested read/write scope', () => {
+    expect(() =>
+      requireMcpScope({ orgId: 'org', keyId: 'key', scopes: ['mcp', 'read'] }, 'read'),
+    ).not.toThrow();
+  });
+
+  it('rejects read-only keys for write-scoped tools', () => {
+    expect(() =>
+      requireMcpScope({ orgId: 'org', keyId: 'key', scopes: ['mcp', 'read'] }, 'write'),
+    ).toThrow('lacks `write` scope');
+  });
+});
 
 describeDb('mcpAuth', () => {
   let orgId: string;

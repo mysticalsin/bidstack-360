@@ -11,7 +11,7 @@ import type { CrmCompany } from '@bidstack/shared';
 function company(overrides: Partial<CrmCompany>): CrmCompany {
   return {
     id: overrides.id ?? 'co_test',
-    source: 'twenty',
+    source: 'external_crm',
     name: overrides.name ?? 'Test Co',
     legalName: overrides.legalName ?? null,
     domain: overrides.domain ?? null,
@@ -75,7 +75,7 @@ describe('CommandPalette — accounts section', () => {
   it('filters companies by name when the user types a substring', () => {
     renderPalette();
 
-    const input = screen.getByRole('searchbox', { name: /search across the crm/i });
+    const input = screen.getByRole('combobox', { name: /search across the crm/i });
     fireEvent.change(input, { target: { value: 'ari' } });
 
     // The Aritzia row is the only listbox option after filtering by "ari".

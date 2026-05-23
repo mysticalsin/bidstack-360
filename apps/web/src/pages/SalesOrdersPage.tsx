@@ -7,7 +7,9 @@ import { Link, useSearchParams } from 'react-router-dom';
 
 import { OrderStateBadge } from '@/components/sales/OrderStateBadge';
 import { Card, SectionHeader } from '@/components/ui/Card';
+import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { SpotlightTable, SpotlightTableRow } from '@/components/ui/SpotlightTable';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { formatDate, formatMoneyMicros } from '@/lib/format';
 import { useSalesOrders, type SalesOrdersListFilter } from '@/hooks/useSalesOrders';
@@ -99,14 +101,15 @@ export function SalesOrdersPage() {
             Sales pipeline from draft quotation through confirmed order.
           </p>
         </div>
-        <button
+        <LiquidGlassButton
           type="button"
           onClick={onExport}
           disabled={!list.data || list.data.items.length === 0}
-          className="inline-flex min-h-9 items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-1.5 text-xs font-medium text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-11"
+          tone="secondary"
+          size="sm"
         >
           Export CSV
-        </button>
+        </LiquidGlassButton>
       </header>
 
       {/* Filter chips */}
@@ -117,6 +120,7 @@ export function SalesOrdersPage() {
             <button
               key={s.id}
               type="button"
+              aria-pressed={active}
               onClick={() => setQueryParam('state', s.id === 'all' ? null : s.id)}
               className={
                 active
@@ -176,9 +180,9 @@ export function SalesOrdersPage() {
             No matching quotations or orders.
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <SpotlightTable query={filter.search} minWidth={820}>
             <thead>
-              <tr className="text-left text-xs text-[var(--fg-tertiary)]">
+              <tr>
                 <th scope="col" className="px-4 py-2 font-medium">
                   Number
                 </th>
@@ -204,7 +208,11 @@ export function SalesOrdersPage() {
             </thead>
             <tbody>
               {list.data?.items.map((row) => (
-                <tr key={row.id} className="border-t border-[var(--border-subtle)]">
+                <SpotlightTableRow
+                  key={row.id}
+                  query={filter.search}
+                  searchableText={`${row.number} ${row.customerName} ${row.state} ${row.salespersonName ?? ''} ${row.countryCode ?? ''}`}
+                >
                   <td className="px-4 py-2.5">
                     <Link
                       to={`/sales/orders/${row.id}`}
@@ -229,10 +237,10 @@ export function SalesOrdersPage() {
                   <td className="px-4 py-2.5 text-right tabular-nums text-[var(--fg-primary)] whitespace-nowrap">
                     {formatMoneyMicros(row.totalMicros, row.currency)}
                   </td>
-                </tr>
+                </SpotlightTableRow>
               ))}
             </tbody>
-          </table>
+          </SpotlightTable>
         )}
         {list.data?.nextCursor ? (
           <div className="border-t border-[var(--border-subtle)] px-5 py-3 text-right">

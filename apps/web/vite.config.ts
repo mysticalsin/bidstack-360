@@ -4,9 +4,24 @@ import tailwindcss from '@tailwindcss/vite';
 import { defineConfig, loadEnv, type PluginOption } from 'vite';
 import { visualizer } from 'rollup-plugin-visualizer';
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ command, mode }) => {
+  // Belt-and-suspenders: @vitejs/plugin-react gates its dev/prod JSX transform
+  // on process.env.NODE_ENV. Ensure production so jsxDEV() never leaks into the
+  // bundle (Windows shells often don't forward NODE_ENV to Node).
+  if (mode === 'production') {
+    process.env.NODE_ENV = 'production';
+  }
+
   const env = loadEnv(mode, path.resolve(__dirname, '../..'), 'VITE_');
-  const apiUrl = env.VITE_API_URL ?? 'http://localhost:4000';
+  const authMode = env.VITE_AUTH_MODE ?? process.env.VITE_AUTH_MODE;
+  if (command === 'build' && mode === 'production' && !env.VITE_CLERK_PUBLISHABLE_KEY) {
+    if (authMode !== 'stub' || process.env.BIDSTACK_ALLOW_STUB_AUTH !== 'true') {
+      throw new Error(
+        'VITE_CLERK_PUBLISHABLE_KEY is required for production web builds. Set VITE_AUTH_MODE=stub with BIDSTACK_ALLOW_STUB_AUTH=true only for local/test builds.',
+      );
+    }
+  }
+  const apiUrl = env.VITE_API_URL ?? process.env.VITE_API_URL ?? 'http://localhost:4000';
   // Bundle analyzer fires only in `--mode analyze`; keeps prod builds clean.
   const analyze = mode === 'analyze';
 
@@ -37,6 +52,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       strictPort: true,
+      host: true,
       proxy: {
         '/api': { target: apiUrl, changeOrigin: true },
         '/webhooks': { target: apiUrl, changeOrigin: true },
@@ -53,6 +69,8 @@ export default defineConfig(({ mode }) => {
     build: {
       sourcemap: process.env.NODE_ENV === 'development',
       target: 'es2022',
+      cssCodeSplit: true,
+      cssMinify: 'esbuild',
       // React DOM is the largest legitimate vendor chunk in this app. Keep the
       // limit tight enough to catch app-code creep without warning on framework
       // bytes we intentionally isolate below.

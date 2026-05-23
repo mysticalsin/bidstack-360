@@ -243,7 +243,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: {
         querystring: z.object({
           entityType: EntityType,
-          entityIds: z.string(),
+          entityIds: z.string().max(5000),
         }),
         response: { 200: CustomFieldValueBulkList },
       },

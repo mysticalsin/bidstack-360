@@ -5,7 +5,8 @@ import { useParams, Link } from 'react-router-dom';
 import { Badge, stageTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
+import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { BriefingDialog } from '@/components/opportunity/BriefingDialog';
 import {
   InlineEditDate,
@@ -21,15 +22,17 @@ import { Icon } from '@/components/ui/Icon';
 import { MagneticButton } from '@/components/ui/MagneticButton';
 import { usePatchOpportunity, useOpportunity } from '@/hooks/useOpportunities';
 import { useOpportunityTimeline } from '@/hooks/useOpportunityTimeline';
+import { useBidScoreLatest } from '@/hooks/useBidScore';
 import { formatDate, formatMoney, formatStage } from '@/lib/format';
 
 import type { OpportunityStage, IntelPayload } from '@bidstack/shared';
 
 const STAGE_OPTIONS: ReadonlyArray<{ value: OpportunityStage; label: string }> = [
-  { value: 'discovery', label: 'Discovery' },
-  { value: 'qualified', label: 'Qualified' },
-  { value: 'proposal', label: 'Proposal' },
-  { value: 'negotiation', label: 'Negotiation' },
+  { value: 's1_lead', label: 'S1 Lead' },
+  { value: 's1_ongoing', label: 'S1 Ongoing' },
+  { value: 's2_sent', label: 'S2 Sent' },
+  { value: 's3_technical_iteration', label: 'S3 Technical Iteration' },
+  { value: 's4_negotiation', label: 'S4 Negotiation' },
   { value: 'closed_won', label: 'Closed won' },
   { value: 'closed_lost', label: 'Closed lost' },
 ];
@@ -42,10 +45,22 @@ export function OpportunityDetailPage() {
   const [briefOpen, setBriefOpen] = useState(false);
   const intel: IntelPayload = data?.intel ?? {};
 
-  if (isLoading) return <LoadingSkeleton rows={8} />;
+  if (isLoading) return <DetailPageSkeleton tabs columns={2} cards={3} />;
   if (isError)
     return <ErrorState title="Couldn't load this opportunity" message={error?.message ?? '—'} />;
-  if (!data) return null;
+  if (!data) {
+    return (
+      <EmptyState
+        title="Opportunity not found"
+        message="The opportunity may have been deleted or you may not have access to it."
+        action={
+          <Button variant="secondary" onClick={() => window.history.back()}>
+            Go back
+          </Button>
+        }
+      />
+    );
+  }
 
   const timelineItems =
     timeline.data?.items.map((t: { createdAt: string; kind: string; text: string }) => ({
@@ -84,7 +99,7 @@ export function OpportunityDetailPage() {
               <h1 className="text-3xl font-bold tracking-tight text-[var(--fg-primary)] sm:text-4xl">
                 <InlineEditText
                   value={data.name}
-                  onSave={(v) => patch.mutateAsync({ id, patch: { name: v } })}
+                  onSave={(v) => patch.mutateAsync({ id: id!, patch: { name: v } })}
                   label="Edit opportunity name"
                   validate={(v) => (v.length < 1 ? 'Name is required' : null)}
                 />
@@ -94,7 +109,7 @@ export function OpportunityDetailPage() {
                   <Icon name="building" size={14} className="text-[var(--brand-primary)]" />
                   <InlineEditText
                     value={data.customer}
-                    onSave={(v) => patch.mutateAsync({ id, patch: { customer: v } })}
+                    onSave={(v) => patch.mutateAsync({ id: id!, patch: { customer: v } })}
                     label="Edit customer name"
                     validate={(v) => (v.length < 1 ? 'Customer is required' : null)}
                   />
@@ -104,11 +119,22 @@ export function OpportunityDetailPage() {
                   <Icon name="reports" size={14} className="text-[var(--info)]" />
                   <InlineEditText
                     value={data.industry ?? ''}
-                    onSave={(v) => patch.mutateAsync({ id, patch: { industry: v || null } })}
+                    onSave={(v) => patch.mutateAsync({ id: id!, patch: { industry: v || null } })}
                     label="Edit industry"
                     display={(v) => v || '—'}
                     placeholder="Industry"
                   />
+                </span>
+                <span className="opacity-30">|</span>
+                <span className="flex items-center gap-1.5">
+                  <Icon name="globe" size={14} className="text-[var(--success)]" />
+                  {data.territoryName ? (
+                    <Badge tone="teal">{data.territoryName}</Badge>
+                  ) : data.country ? (
+                    <span className="text-sm">{data.country}</span>
+                  ) : (
+                    <span className="text-sm text-[var(--fg-tertiary)]">—</span>
+                  )}
                 </span>
               </div>
             </div>
@@ -131,7 +157,7 @@ export function OpportunityDetailPage() {
               </div>
               <InlineEditSelect<OpportunityStage>
                 value={data.stage as OpportunityStage}
-                onSave={(v) => patch.mutateAsync({ id, patch: { stage: v } })}
+                onSave={(v) => patch.mutateAsync({ id: id!, patch: { stage: v } })}
                 options={STAGE_OPTIONS}
                 label="Change stage"
                 display={(v) => (
@@ -144,7 +170,7 @@ export function OpportunityDetailPage() {
                 <div className="text-3xl font-bold tabular-nums text-[var(--fg-primary)] tracking-tight">
                   <InlineEditNumber
                     value={data.value}
-                    onSave={(v) => patch.mutateAsync({ id, patch: { value: v } })}
+                    onSave={(v) => patch.mutateAsync({ id: id!, patch: { value: v } })}
                     label="Edit deal value (EUR)"
                     min={0}
                     step={1000}
@@ -156,7 +182,7 @@ export function OpportunityDetailPage() {
                     <span className="font-semibold text-[var(--success)]">
                       <InlineEditNumber
                         value={data.probability}
-                        onSave={(v) => patch.mutateAsync({ id, patch: { probability: v } })}
+                        onSave={(v) => patch.mutateAsync({ id: id!, patch: { probability: v } })}
                         label="Edit probability"
                         min={0}
                         max={100}
@@ -171,7 +197,7 @@ export function OpportunityDetailPage() {
                     <Icon name="clock" size={12} />
                     <InlineEditDate
                       value={data.dueDate}
-                      onSave={(v) => patch.mutateAsync({ id, patch: { dueDate: v } })}
+                      onSave={(v) => patch.mutateAsync({ id: id!, patch: { dueDate: v } })}
                       label="Edit due date"
                       display={(v) => formatDate(v)}
                     />
@@ -192,9 +218,10 @@ export function OpportunityDetailPage() {
 
       <DataFreshnessRibbon refreshedAt={intel.refreshedAt} />
 
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
         <FinancialHealthCard intel={intel} />
         <WinPredictionCard intel={intel} />
+        <BidScoreCard opportunityId={data.id} />
         <OpportunityAccountIntel accountId={data.customer} />
       </div>
 
@@ -391,5 +418,72 @@ function Row({ label, value }: { label: string; value: string }) {
       <span className="text-xs text-[var(--fg-tertiary)]">{label}</span>
       <span className="font-medium text-[var(--fg-primary)] tabular-nums">{value}</span>
     </div>
+  );
+}
+
+function BidScoreCard({ opportunityId }: { opportunityId: string }) {
+  const { data, isLoading } = useBidScoreLatest(opportunityId);
+
+  return (
+    <Card>
+      <SectionHeader title="Bid/No-Bid Score" />
+      <div className="p-5 flex flex-col justify-between h-[calc(100%-48px)] min-h-[140px]">
+        {isLoading ? (
+          <div className="space-y-3">
+            <div className="h-8 w-24 bg-[var(--surface-sunken)] animate-pulse rounded" />
+            <div className="h-4 w-32 bg-[var(--surface-sunken)] animate-pulse rounded" />
+          </div>
+        ) : data ? (
+          <div className="space-y-4 flex flex-col justify-between h-full">
+            <div className="space-y-2">
+              <div className="flex items-baseline gap-2">
+                <div className="text-4xl font-bold tabular-nums text-[var(--fg-primary)]">
+                  {data.totalScore.toFixed(0)}%
+                </div>
+                <div className="text-xs text-[var(--fg-tertiary)]">overall score</div>
+              </div>
+              <div>
+                <Badge
+                  tone={
+                    data.recommendation === 'bid'
+                      ? 'jade'
+                      : data.recommendation === 'no_bid'
+                        ? 'tomato'
+                        : 'amber'
+                  }
+                  className="px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider"
+                >
+                  {data.recommendation === 'bid'
+                    ? 'Bid'
+                    : data.recommendation === 'no_bid'
+                      ? 'No-Bid'
+                      : 'Conditional Bid'}
+                </Badge>
+              </div>
+            </div>
+            <div className="pt-2">
+              <Link to={`/bid-matrix?opportunityId=${opportunityId}`} className="block">
+                <Button variant="secondary" size="sm" className="w-full text-xs">
+                  Details
+                </Button>
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4 flex flex-col justify-between h-full">
+            <p className="text-xs text-[var(--fg-tertiary)]">
+              No bid evaluation score has been recorded for this opportunity yet.
+            </p>
+            <div>
+              <Link to={`/bid-matrix?opportunityId=${opportunityId}`} className="block">
+                <Button variant="secondary" size="sm" className="w-full text-xs">
+                  Evaluate Now
+                </Button>
+              </Link>
+            </div>
+          </div>
+        )}
+      </div>
+    </Card>
   );
 }

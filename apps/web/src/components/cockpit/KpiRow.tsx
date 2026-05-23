@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from 'framer-motion';
+import { memo } from 'react';
 
 import { AnimatedNumber } from '@/components/motion/AnimatedNumber';
 import { Icon } from '@/components/ui/Icon';
@@ -15,7 +16,7 @@ interface Props {
   cockpit: AccountCockpitSnapshot;
 }
 
-export function KpiRow({ cockpit }: Props) {
+export const KpiRow = memo(function KpiRow({ cockpit }: Props) {
   const reduced = useReducedMotion();
   // Adapt the column count to the available KPI tiles — 6 is the design
   // ceiling, 3 is the minimum that still reads as a row. The CSS classes
@@ -66,7 +67,7 @@ export function KpiRow({ cockpit }: Props) {
       ))}
     </motion.section>
   );
-}
+});
 
 // Parse a formatted KPI value like "€12,345", "48%", "2.5x", "1,200 days"
 // and animate just the numeric portion. The prefix and suffix render as

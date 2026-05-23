@@ -9,7 +9,7 @@
 //   POST   /api/sales/orders/:id/cancel       any → cancelled
 //   POST   /api/sales/orders/:id/reopen       cancelled → draft, sent → draft
 //
-// State machine mirrors Odoo's sale.order lifecycle. Each transition writes
+// State machine mirrors ERP's sale.order lifecycle. Each transition writes
 // an audit_log row with `from`/`to` state so the detail timeline can render.
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -73,6 +73,7 @@ export const salesOrdersRoutes: FastifyPluginAsyncZod = async (server) => {
       const items = await prisma.salesOrder.findMany({
         where: {
           orgId: req.auth.orgId,
+          deletedAt: null,
           ...(state ? { state: toPrismaState(state) } : {}),
           ...(salespersonId ? { salespersonId } : {}),
           ...(countryCode ? { countryCode } : {}),
@@ -133,22 +134,47 @@ export const salesOrdersRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/sales/orders',
     {
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
       schema: {
         body: SalesOrderCreate,
         response: { 201: SalesOrderDetail },
       },
     },
     async (req, reply) => {
-      const { customerName, countryCode, currency, salespersonId, lines } = req.body;
+      const { customerName, countryCode, salespersonId, lines } = req.body;
+      const currency = req.body.currency.trim().toUpperCase();
+
+      if (salespersonId) {
+        const salesperson = await prisma.user.findFirst({
+          where: { id: salespersonId, orgId: req.auth.orgId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!salesperson) {
+          throw server.httpErrors.badRequest('Salesperson does not belong to this org');
+        }
+      }
 
       // Look up products in one query so a bad productId fails fast.
       const productIds = lines.map((l) => l.productId);
       const products = await prisma.product.findMany({
-        where: { orgId: req.auth.orgId, id: { in: productIds } },
+        where: {
+          orgId: req.auth.orgId,
+          id: { in: productIds },
+          active: true,
+          deletedAt: null,
+        },
         include: { category: { select: { name: true } } },
       });
       if (products.length !== new Set(productIds).size) {
-        throw server.httpErrors.badRequest('One or more productIds are unknown to this org');
+        throw server.httpErrors.badRequest(
+          'One or more products are unknown, inactive, or deleted for this org',
+        );
+      }
+      const currencyMismatch = products.find((p) => p.currency !== currency);
+      if (currencyMismatch) {
+        throw server.httpErrors.badRequest(
+          `Product ${currencyMismatch.sku} is priced in ${currencyMismatch.currency}, not ${currency}`,
+        );
       }
       const productById = new Map(products.map((p) => [p.id, p]));
 
@@ -168,7 +194,7 @@ export const salesOrdersRoutes: FastifyPluginAsyncZod = async (server) => {
           : product.listPriceMicros;
         // Quantity → millis (q × 1000) for integer math, then divide back at
         // subtotal-write time so we don't lose three decimal places.
-        const qThousandths = BigInt(Math.round(Number(line.quantity) * 1_000));
+        const qThousandths = parseQuantityThousandths(line.quantity);
         const subtotal = (unitMicros * qThousandths) / BigInt(1_000);
         return {
           orgId: req.auth.orgId,
@@ -245,6 +271,7 @@ export const salesOrdersRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/sales/orders/:id/reopen',
     {
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: OptionalSalesOrderTransitionBody,
@@ -253,7 +280,7 @@ export const salesOrdersRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const order = await prisma.salesOrder.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!order) throw server.httpErrors.notFound('Sales order not found');
       const from = order.state as z.infer<typeof OrderState>;
@@ -265,7 +292,7 @@ export const salesOrdersRoutes: FastifyPluginAsyncZod = async (server) => {
       await prisma.$transaction([
         prisma.salesOrder.update({
           where: { id: order.id },
-          data: { state: 'draft' },
+          data: { state: 'draft', confirmedAt: null },
         }),
         prisma.auditLog.create({
           data: {
@@ -286,13 +313,14 @@ export const salesOrdersRoutes: FastifyPluginAsyncZod = async (server) => {
 /** Detail shape used by both GET /:id and every mutation response. */
 async function loadDetail(orgId: string, id: string): Promise<z.infer<typeof SalesOrderDetail>> {
   const order = await prisma.salesOrder.findFirst({
-    where: { id, orgId },
+    where: { id, orgId, deletedAt: null },
     include: {
       salesperson: { select: { name: true } },
       lines: {
         include: {
           product: { include: { category: { select: { name: true } } } },
         },
+        where: { deletedAt: null },
         orderBy: { createdAt: 'asc' },
       },
     },
@@ -309,7 +337,7 @@ async function loadDetail(orgId: string, id: string): Promise<z.infer<typeof Sal
     take: 50,
   });
   const invoice = await prisma.invoice.findFirst({
-    where: { salesOrderId: id, orgId },
+    where: { salesOrderId: id, orgId, deletedAt: null },
     select: { id: true },
   });
   const state = order.state as z.infer<typeof OrderState>;
@@ -364,6 +392,7 @@ function registerTransition(
   server.post(
     `/sales/orders/:id/${action}`,
     {
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: OptionalSalesOrderTransitionBody,
@@ -379,7 +408,7 @@ function registerTransition(
       _reply: unknown,
     ) => {
       const order = await prisma.salesOrder.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!order) throw server.httpErrors.notFound('Sales order not found');
       const from = order.state as z.infer<typeof OrderState>;
@@ -410,4 +439,9 @@ function registerTransition(
       return loadDetail(req.auth.orgId, order.id);
     },
   );
+}
+
+function parseQuantityThousandths(quantity: string): bigint {
+  const [whole = '0', fraction = ''] = quantity.split('.');
+  return BigInt(whole) * BigInt(1_000) + BigInt(fraction.padEnd(3, '0'));
 }

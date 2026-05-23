@@ -11,6 +11,8 @@ import { useThemeStore } from '@/stores/theme';
 import { useRecentSearches } from '@/stores/recentSearches';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useMentions, useMarkMentionRead } from '@/hooks/useMentions';
+import { useUiStore } from '@/stores/ui';
+import { CurrencySelector } from './CurrencySelector';
 
 // Breadcrumb labels by first-path segment. Nested routes inherit their parent.
 const CRUMB_LABELS: Record<string, string> = {
@@ -64,6 +66,8 @@ export function Topbar() {
   const navigate = useNavigate();
   const { role } = useRole();
   const openHelp = useHelpDrawer((s) => s.setOpen);
+  const mobileNavOpen = useUiStore((s) => s.mobileNavOpen);
+  const toggleMobileNav = useUiStore((s) => s.toggleMobileNav);
 
   const seed = user?.fullName || user?.primaryEmailAddress?.emailAddress || 'Guest';
 
@@ -72,6 +76,18 @@ export function Topbar() {
       <a href="#main" className="skip-link">
         Skip to content
       </a>
+
+      {/* Hamburger — visible only below md breakpoint where sidebar is hidden */}
+      <button
+        type="button"
+        className="iconbtn md:hidden"
+        aria-label="Open navigation"
+        aria-controls="mobile-nav-drawer"
+        aria-expanded={mobileNavOpen}
+        onClick={toggleMobileNav}
+      >
+        <Icon name="menu" size={18} ariaHidden />
+      </button>
 
       <nav aria-label="Breadcrumb" className="crumbs">
         {crumbs.map((c, i) => (
@@ -109,10 +125,12 @@ export function Topbar() {
 
       <NotificationsBell />
 
+      <CurrencySelector />
+
       <Tooltip content="Help & shortcuts (?)">
         <button
           type="button"
-          className="iconbtn"
+          className="iconbtn tb-help-btn"
           aria-label="Help and keyboard shortcuts"
           onClick={() => openHelp(true)}
         >
@@ -219,7 +237,7 @@ function SearchBar() {
           blurTimeoutRef.current = setTimeout(() => setOpen(false), 150);
         }}
       />
-      <kbd aria-hidden>⌘K</kbd>
+      <kbd aria-hidden>Ctrl+/</kbd>
       {open && !query && recents.length > 0 ? (
         <div
           role="listbox"
@@ -301,7 +319,7 @@ function NotificationsBell() {
         >
           <Icon name="bell" size={16} ariaHidden />
           {unreadCount > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--danger)] px-1 text-[10px] font-bold text-white">
+            <span className="absolute right-0 top-0 flex h-4 min-w-4 -translate-y-1/4 translate-x-1/4 items-center justify-center rounded-full bg-[var(--danger)] px-1 text-[10px] font-bold text-white">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}

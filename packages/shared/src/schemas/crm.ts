@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const CrmObjectSource = z.enum(['twenty', 'bidstack', 'dust', 'enrichment']);
+export const CrmObjectSource = z.enum(['external_crm', 'bidstack', 'dust', 'verified_data']);
 export type CrmObjectSource = z.infer<typeof CrmObjectSource>;
 
 export const SourceAttribution = z.object({
@@ -47,7 +47,7 @@ export type TechnicalStackCategory = z.infer<typeof TechnicalStackCategory>;
 
 export const CrmCompany = z.object({
   id: z.string(),
-  source: CrmObjectSource.default('twenty'),
+  source: CrmObjectSource.default('external_crm'),
   name: z.string().min(1),
   legalName: z.string().nullable(),
   domain: z.string().nullable(),
@@ -70,7 +70,7 @@ export type CrmCompany = z.infer<typeof CrmCompany>;
 
 export const CrmPerson = z.object({
   id: z.string(),
-  source: CrmObjectSource.default('twenty'),
+  source: CrmObjectSource.default('external_crm'),
   companyId: z.string().nullable(),
   name: z.string().min(1),
   title: z.string().nullable(),
@@ -95,7 +95,7 @@ export type CrmDealStage = z.infer<typeof CrmDealStage>;
 
 export const CrmDeal = z.object({
   id: z.string(),
-  source: CrmObjectSource.default('twenty'),
+  source: CrmObjectSource.default('external_crm'),
   companyId: z.string().nullable(),
   companyName: z.string().nullable(),
   name: z.string().min(1),
@@ -112,7 +112,7 @@ export type CrmDeal = z.infer<typeof CrmDeal>;
 
 export const CrmActivity = z.object({
   id: z.string(),
-  source: CrmObjectSource.default('twenty'),
+  source: CrmObjectSource.default('external_crm'),
   subject: z.string().min(1),
   body: z.string().nullable(),
   kind: z.enum(['note', 'task', 'call', 'email', 'meeting', 'timeline_event', 'job', 'dust']),
@@ -361,6 +361,41 @@ export const CategorySalesRow = z.object({
 });
 export type CategorySalesRow = z.infer<typeof CategorySalesRow>;
 
+export const TeamPerformanceRow = z.object({
+  name: z.string().min(1),
+  revenueMicros: z.number().int().nonnegative(),
+  pipelineMicros: z.number().int().nonnegative(),
+  wonCount: z.number().int().nonnegative(),
+  lostCount: z.number().int().nonnegative(),
+  openCount: z.number().int().nonnegative(),
+});
+export type TeamPerformanceRow = z.infer<typeof TeamPerformanceRow>;
+
+export const TerritoryRevenueRow = z.object({
+  territoryId: z.string().nullable(),
+  territoryName: z.string().min(1),
+  revenueMicros: z.number().int().nonnegative(),
+  pipelineMicros: z.number().int().nonnegative(),
+  opportunityCount: z.number().int().nonnegative(),
+});
+export type TerritoryRevenueRow = z.infer<typeof TerritoryRevenueRow>;
+
+export const PipelineStageSnapshot = z.object({
+  stage: z.string().min(1),
+  count: z.number().int().nonnegative(),
+  valueMicros: z.number().int().nonnegative(),
+});
+export type PipelineStageSnapshot = z.infer<typeof PipelineStageSnapshot>;
+
+export const WinLossStats = z.object({
+  wonCount: z.number().int().nonnegative(),
+  lostCount: z.number().int().nonnegative(),
+  wonRevenueMicros: z.number().int().nonnegative(),
+  lostRevenueMicros: z.number().int().nonnegative(),
+  winRate: z.number().min(0).max(100),
+});
+export type WinLossStats = z.infer<typeof WinLossStats>;
+
 export const SalesIntelligenceReport = z.object({
   generatedAt: z.string().datetime(),
   currencyCode: z.string().length(3),
@@ -373,6 +408,10 @@ export const SalesIntelligenceReport = z.object({
   topCountries: z.array(CountrySalesRow),
   topProducts: z.array(ProductSalesRow),
   topCategories: z.array(CategorySalesRow),
+  teamPerformance: z.array(TeamPerformanceRow),
+  territoryBreakdown: z.array(TerritoryRevenueRow),
+  pipelineByStage: z.array(PipelineStageSnapshot),
+  winLoss: WinLossStats,
 });
 export type SalesIntelligenceReport = z.infer<typeof SalesIntelligenceReport>;
 
@@ -471,7 +510,7 @@ export const DataQualityIssue = z.object({
   id: z.string(),
   kind: z.enum([
     'duplicate_company',
-    'stale_enrichment',
+    'stale_data',
     'missing_owner',
     'invalid_domain',
     'missing_logo',

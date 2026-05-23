@@ -1,8 +1,9 @@
 // Apple-style sortable column header. Three states cycle on click:
 // unsorted → asc → desc → unsorted. Active column shows a chevron;
 // inactive columns hint sortability on hover. Renders as a button inside
-// the <th> so it's keyboard-reachable and screen-reader-announced via
-// aria-sort.
+// the <th> so it's keyboard-reachable. Pair it with
+// `getSortableHeaderAriaSort` on the owning <th>; screen readers expect the
+// sort state on the columnheader, not on the nested button.
 //
 // Pair with `useTableSort` for the state + comparator.
 
@@ -13,6 +14,18 @@ export type SortDir = 'asc' | 'desc' | null;
 export interface SortState<K extends string> {
   key: K | null;
   dir: SortDir;
+}
+
+export type SortAria = 'ascending' | 'descending' | 'none';
+
+export function getSortableHeaderAriaSort<K extends string>(
+  columnKey: K,
+  state: SortState<K>,
+): SortAria {
+  if (state.key !== columnKey) return 'none';
+  if (state.dir === 'asc') return 'ascending';
+  if (state.dir === 'desc') return 'descending';
+  return 'none';
 }
 
 interface Props<K extends string> {
@@ -42,19 +55,15 @@ export function SortableHeader<K extends string>({
     else onChange({ key: null, dir: null });
   };
 
-  const ariaSort: 'ascending' | 'descending' | 'none' = !isActive
-    ? 'none'
-    : dir === 'asc'
-      ? 'ascending'
-      : dir === 'desc'
-        ? 'descending'
-        : 'none';
+  const nextLabel = !isActive || dir === null ? 'ascending' : dir === 'asc' ? 'descending' : 'none';
+  const currentLabel = getSortableHeaderAriaSort(columnKey, state);
+  const labelText = typeof children === 'string' ? children : String(columnKey);
 
   return (
     <button
       type="button"
       onClick={cycle}
-      aria-sort={ariaSort}
+      aria-label={`Sort by ${labelText}. Current sort: ${currentLabel}. Activate to sort ${nextLabel}.`}
       // Header buttons inherit the th's padding via the parent; here we just
       // need a flex container that aligns chevron + label tightly together.
       className={`group inline-flex w-full items-center gap-1 text-inherit ${

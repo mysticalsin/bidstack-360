@@ -39,6 +39,7 @@ export function usePipelineReport() {
   return useQuery<PipelineReport>({
     queryKey: ['reports', 'pipeline'],
     queryFn: async () => api<PipelineReport>('/api/reports/pipeline'),
+    staleTime: 60_000,
   });
 }
 
@@ -46,6 +47,7 @@ export function useLeadReport() {
   return useQuery<LeadReport>({
     queryKey: ['reports', 'leads'],
     queryFn: async () => api<LeadReport>('/api/reports/leads'),
+    staleTime: 60_000,
   });
 }
 
@@ -53,6 +55,7 @@ export function useServiceDeskReport() {
   return useQuery<ServiceDeskReport>({
     queryKey: ['reports', 'service-desk'],
     queryFn: async () => api<ServiceDeskReport>('/api/reports/service-desk'),
+    staleTime: 60_000,
   });
 }
 
@@ -60,5 +63,6 @@ export function useTaskReport() {
   return useQuery<TaskReport>({
     queryKey: ['reports', 'tasks'],
     queryFn: async () => api<TaskReport>('/api/reports/tasks'),
+    staleTime: 60_000,
   });
 }

@@ -10,7 +10,7 @@
 
 import * as Dialog from '@radix-ui/react-dialog';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/Button';
 import { toast } from '@/components/ui/Toast';
@@ -72,6 +72,9 @@ interface Props {
 }
 
 export function ContactCsvImportDialog({ trigger }: Props) {
+  const textareaId = useId();
+  const guidanceId = useId();
+  const errorId = useId();
   const [open, setOpen] = useState(false);
   const [pasted, setPasted] = useState('');
   const create = useCreateContact();
@@ -79,6 +82,7 @@ export function ContactCsvImportDialog({ trigger }: Props) {
 
   const { headers, rows } = useMemo(() => parseCsv(pasted), [pasted]);
   const importable = rows.filter((r) => r.errors.length === 0);
+  const invalidRows = rows.length - importable.length;
 
   const reset = () => {
     setPasted('');
@@ -129,7 +133,7 @@ export function ContactCsvImportDialog({ trigger }: Props) {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.12 }}
-                className="fixed inset-0 z-40 bg-[var(--surface-overlay)] backdrop-blur-sm"
+                className="fixed inset-0 z-40 bg-surface-overlay backdrop-blur-sm"
               />
             </Dialog.Overlay>
             <Dialog.Content asChild forceMount>
@@ -148,14 +152,34 @@ export function ContactCsvImportDialog({ trigger }: Props) {
                   columns: <code>name, customer, role, email, phone, influence, sentiment</code>.
                 </Dialog.Description>
                 <div className="space-y-3 p-5 pt-3">
+                  <label
+                    htmlFor={textareaId}
+                    className="block text-xs font-medium text-[var(--fg-primary)]"
+                  >
+                    CSV contact rows
+                  </label>
+                  <p id={guidanceId} className="-mt-2 text-xs text-[var(--fg-secondary)]">
+                    Include headers for at least <code>name</code> and <code>customer</code>.
+                    Optional headers are <code>role</code>, <code>email</code>, <code>phone</code>,{' '}
+                    <code>influence</code>, and <code>sentiment</code>.
+                  </p>
                   <textarea
+                    id={textareaId}
                     value={pasted}
                     onChange={(e) => setPasted(e.target.value)}
                     placeholder={'name,customer,email\nAlice Singh,Mantu,alice@mantu.com'}
                     rows={8}
                     spellCheck={false}
+                    aria-describedby={invalidRows > 0 ? `${guidanceId} ${errorId}` : guidanceId}
+                    aria-invalid={invalidRows > 0}
                     className="dialog-input w-full font-mono text-xs"
                   />
+                  {invalidRows > 0 ? (
+                    <p id={errorId} className="text-xs text-[var(--danger)]">
+                      {invalidRows} row{invalidRows === 1 ? '' : 's'} need fixes before import.
+                      Check missing required fields, email format, and sentiment values.
+                    </p>
+                  ) : null}
                   {rows.length > 0 ? (
                     <div className="max-h-48 overflow-y-auto rounded-md border border-[var(--border-subtle)] text-xs">
                       <table className="w-full">

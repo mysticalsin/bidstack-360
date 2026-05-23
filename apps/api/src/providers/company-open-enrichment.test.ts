@@ -4,8 +4,8 @@ import { faviconProfile, fetchOpenCompanyProfile } from './company-open-enrichme
 
 const now = new Date('2026-05-11T00:00:00.000Z');
 
-describe('company open enrichment', () => {
-  it('maps a verified Wikidata company profile into CRM-ready enrichment', async () => {
+describe('company open data verification', () => {
+  it('maps a verified Wikidata company profile into CRM-ready data', async () => {
     const fetchImpl = vi.fn(async (input: string | URL) => {
       const url = input.toString();
       if (url.includes('wbsearchentities')) {

@@ -24,6 +24,8 @@ interface Props {
   accountId: string;
 }
 
+type IntelTabKey = 'solutions' | 'products' | 'extractions';
+
 export function AccountIntelPanel({ accountId }: Props) {
   const intel = useAccountIntel(accountId);
   const files = useFiles(accountId);
@@ -31,11 +33,23 @@ export function AccountIntelPanel({ accountId }: Props) {
   const deleteSolution = useDeleteSolution(accountId);
   const deleteProduct = useDeleteProduct(accountId);
   const reducedMotion = useReducedMotion();
-  const [activeTab, setActiveTab] = useState<'solutions' | 'products' | 'extractions'>('solutions');
+  const [activeTab, setActiveTab] = useState<IntelTabKey>('solutions');
 
   const solutions = intel.data?.solutions ?? [];
   const products = intel.data?.products ?? [];
   const extractions = intel.data?.extractions ?? [];
+  const tabs: Array<{ key: IntelTabKey; label: string }> = [
+    { key: 'solutions', label: `Solutions (${solutions.length})` },
+    { key: 'products', label: `Products (${products.length})` },
+    { key: 'extractions', label: `Extractions (${extractions.length})` },
+  ];
+
+  const selectTab = (key: IntelTabKey) => {
+    setActiveTab(key);
+    window.requestAnimationFrame(() => {
+      document.getElementById(`account-intel-tab-${key}`)?.focus();
+    });
+  };
 
   const handleExtract = (documentId: string) => {
     extract.mutate(
@@ -62,17 +76,40 @@ export function AccountIntelPanel({ accountId }: Props) {
         caption="Solutions, products & document extractions"
       />
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-[var(--border-subtle)]">
-        {[
-          { key: 'solutions' as const, label: `Solutions (${solutions.length})` },
-          { key: 'products' as const, label: `Products (${products.length})` },
-          { key: 'extractions' as const, label: `Extractions (${extractions.length})` },
-        ].map((tab) => (
+      <div
+        className="flex items-center gap-1 border-b border-[var(--border-subtle)]"
+        role="tablist"
+        aria-label="Account intelligence views"
+      >
+        {tabs.map((tab) => (
           <button
             key={tab.key}
+            id={`account-intel-tab-${tab.key}`}
             type="button"
+            role="tab"
+            aria-selected={activeTab === tab.key}
+            aria-controls={`account-intel-panel-${tab.key}`}
+            tabIndex={activeTab === tab.key ? 0 : -1}
             onClick={() => setActiveTab(tab.key)}
+            onKeyDown={(event) => {
+              const currentIndex = tabs.findIndex((item) => item.key === activeTab);
+              if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+                event.preventDefault();
+                selectTab(tabs[(currentIndex + 1) % tabs.length]!.key);
+              }
+              if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                selectTab(tabs[(currentIndex - 1 + tabs.length) % tabs.length]!.key);
+              }
+              if (event.key === 'Home') {
+                event.preventDefault();
+                selectTab(tabs[0]!.key);
+              }
+              if (event.key === 'End') {
+                event.preventDefault();
+                selectTab(tabs[tabs.length - 1]!.key);
+              }
+            }}
             className={`relative px-3 py-2 text-xs font-medium transition-colors ${
               activeTab === tab.key
                 ? 'text-[var(--brand-primary)]'
@@ -98,28 +135,46 @@ export function AccountIntelPanel({ accountId }: Props) {
       ) : (
         <>
           {activeTab === 'solutions' && (
-            <SolutionsTab
-              solutions={solutions}
-              files={files.data?.items ?? []}
-              onDelete={(id) => deleteSolution.mutate(id)}
-              isDeleting={deleteSolution.isPending}
-            />
+            <div
+              id="account-intel-panel-solutions"
+              role="tabpanel"
+              aria-labelledby="account-intel-tab-solutions"
+            >
+              <SolutionsTab
+                solutions={solutions}
+                files={files.data?.items ?? []}
+                onDelete={(id) => deleteSolution.mutate(id)}
+                isDeleting={deleteSolution.isPending}
+              />
+            </div>
           )}
           {activeTab === 'products' && (
-            <ProductsTab
-              products={products}
-              files={files.data?.items ?? []}
-              onDelete={(id) => deleteProduct.mutate(id)}
-              isDeleting={deleteProduct.isPending}
-            />
+            <div
+              id="account-intel-panel-products"
+              role="tabpanel"
+              aria-labelledby="account-intel-tab-products"
+            >
+              <ProductsTab
+                products={products}
+                files={files.data?.items ?? []}
+                onDelete={(id) => deleteProduct.mutate(id)}
+                isDeleting={deleteProduct.isPending}
+              />
+            </div>
           )}
           {activeTab === 'extractions' && (
-            <ExtractionsTab
-              extractions={extractions}
-              files={files.data?.items ?? []}
-              onExtract={handleExtract}
-              isExtracting={extract.isPending}
-            />
+            <div
+              id="account-intel-panel-extractions"
+              role="tabpanel"
+              aria-labelledby="account-intel-tab-extractions"
+            >
+              <ExtractionsTab
+                extractions={extractions}
+                files={files.data?.items ?? []}
+                onExtract={handleExtract}
+                isExtracting={extract.isPending}
+              />
+            </div>
           )}
         </>
       )}
@@ -159,7 +214,7 @@ function SolutionsTab({
     return (
       <EmptyState
         title="No solutions yet"
-        message="Upload documents and run extraction to auto-discover solutions."
+        message="Upload documents and run extraction to review suggested solutions."
       />
     );
   }
@@ -177,7 +232,7 @@ function SolutionsTab({
                     {s.category}
                   </span>
                   {s.confidenceBps > 7000 && (
-                    <span className="rounded-full bg-[#ecfdf5] px-2 py-0.5 text-[10px] font-medium text-[#059669]">
+                    <span className="rounded-full bg-[var(--success-tint)] px-2 py-0.5 text-[10px] font-medium text-[var(--success)]">
                       High confidence
                     </span>
                   )}
@@ -195,7 +250,7 @@ function SolutionsTab({
                 type="button"
                 onClick={() => onDelete(s.id)}
                 disabled={isDeleting}
-                className="shrink-0 rounded p-1 text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)]"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)] focus:outline-none focus:ring-2 focus:ring-border-focus pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                 aria-label={`Delete ${s.name}`}
               >
                 <Icon name="trash" size={14} />
@@ -233,7 +288,7 @@ function ProductsTab({
     return (
       <EmptyState
         title="No products yet"
-        message="Upload documents and run extraction to auto-discover products."
+        message="Upload documents and run extraction to review suggested products."
       />
     );
   }
@@ -251,7 +306,7 @@ function ProductsTab({
                     {p.category}
                   </span>
                   {p.priceRangeMicros ? (
-                    <span className="rounded-full bg-[#eef4ff] px-2 py-0.5 text-[10px] font-medium text-[#2c4bff]">
+                    <span className="rounded-full bg-tag-blue-bg px-2 py-0.5 text-[10px] font-medium text-tag-blue-fg">
                       {formatMoney(Number(p.priceRangeMicros), p.currency)}
                     </span>
                   ) : null}
@@ -269,7 +324,7 @@ function ProductsTab({
                 type="button"
                 onClick={() => onDelete(p.id)}
                 disabled={isDeleting}
-                className="shrink-0 rounded p-1 text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)]"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)] focus:outline-none focus:ring-2 focus:ring-border-focus pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                 aria-label={`Delete ${p.name}`}
               >
                 <Icon name="trash" size={14} />
@@ -377,9 +432,9 @@ function ExtractionsTab({
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     pending: 'bg-[var(--surface-sunken)] text-[var(--fg-tertiary)]',
-    running: 'bg-[#eef4ff] text-[#2c4bff]',
-    done: 'bg-[#ecfdf5] text-[#059669]',
-    error: 'bg-[#ffeded] text-[var(--danger)]',
+    running: 'bg-tag-blue-bg text-tag-blue-fg',
+    done: 'bg-[var(--success-tint)] text-[var(--success)]',
+    error: 'bg-[var(--danger-tint)] text-[var(--danger)]',
   };
   return (
     <span

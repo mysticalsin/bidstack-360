@@ -1,6 +1,7 @@
 import { AnimatePresence, motion, Reorder } from 'framer-motion';
 import {
   memo,
+  useCallback,
   useMemo,
   useRef,
   useState,
@@ -14,11 +15,14 @@ import { CreateTaskDialog } from '@/components/task/CreateTaskDialog';
 import { TaskCalendar } from '@/components/task/TaskCalendar';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { confirm } from '@/components/ui/ConfirmDialog';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useCreateTask, useTasks, useUpdateTask } from '@/hooks/useTasks';
 import { cn } from '@/lib/cn';
 import { daysUntil, formatDate } from '@/lib/format';
+import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { useSavedViews } from '@/stores/savedViews';
 import { useTaskOrder } from '@/stores/taskOrder';
 
@@ -69,6 +73,7 @@ export function TasksPage() {
   // immediately, the list re-filters as a non-urgent update so a slow
   // render won't block the press feedback.
   const [isFilterPending, startFilterTransition] = useTransition();
+  const [taskOrderMessage, setTaskOrderMessage] = useState('');
 
   const filteredItems = useMemo(() => {
     const all = data?.items ?? [];
@@ -131,6 +136,19 @@ export function TasksPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredItems, sort, ordinalOf]);
 
+  const moveTask = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      if (toIndex < 0 || toIndex >= items.length) return;
+      const next = [...items];
+      const [moved] = next.splice(fromIndex, 1);
+      if (!moved) return;
+      next.splice(toIndex, 0, moved);
+      setOrder(next.map((task) => task.id));
+      setTaskOrderMessage(`Moved ${moved.title} to position ${toIndex + 1} of ${next.length}.`);
+    },
+    [items, setOrder],
+  );
+
   const view = (searchParams.get('view') as 'list' | 'calendar') ?? 'list';
   const setView = (next: 'list' | 'calendar') => {
     const params = new URLSearchParams(searchParams);
@@ -167,14 +185,37 @@ export function TasksPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              const rows = items.map((t) => ({
+                title: t.title,
+                status: t.status,
+                dueDate: t.dueDate ? formatDate(t.dueDate) : '',
+                assignee: t.assignee ?? '',
+                oppId: t.oppId ?? '',
+              }));
+              const csv = rowsToCsv(rows, [
+                { key: 'title', label: 'Title' },
+                { key: 'status', label: 'Status' },
+                { key: 'dueDate', label: 'Due Date' },
+                { key: 'assignee', label: 'Assignee' },
+                { key: 'oppId', label: 'Opportunity ID' },
+              ]);
+              downloadCsv(`tasks-${new Date().toISOString().slice(0, 10)}`, csv);
+            }}
+          >
+            Export CSV
+          </Button>
           <SavedViewsBar />
           <CreateTaskDialog />
         </div>
       </header>
 
-      {/* Filter chips — Twenty-style segmented control above the table */}
+      {/* Filter chips — CRM-style segmented control above the table */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-        <div role="tablist" aria-label="Filter tasks" className="flex flex-wrap gap-2">
+        <div role="group" aria-label="Filter tasks" className="flex flex-wrap gap-2">
           <Chip active={filter === 'all'} onClick={() => switchFilter('all')}>
             All
           </Chip>
@@ -242,63 +283,75 @@ export function TasksPage() {
       {view === 'calendar' ? (
         <TaskCalendar tasks={data?.items ?? []} />
       ) : (
-        <Card
-          className={cn(
-            'overflow-hidden transition-opacity',
-            // Subtle dimming while the deferred re-filter runs. Gives users a
-            // hint that the filter is in flight without blocking input.
-            isFilterPending && 'opacity-70',
-          )}
-        >
-          {isError ? (
-            <ErrorState
-              title="Could not load tasks"
-              message={error instanceof Error ? error.message : 'Something went wrong'}
-            />
-          ) : isLoading ? (
-            <LoadingSkeleton />
-          ) : items.length === 0 ? (
-            <EmptyState
-              title={filter === 'all' ? 'No tasks yet' : 'No tasks match this filter'}
-              message={filter === 'all' ? 'Create a follow-up to get started.' : undefined}
-              action={filter === 'all' ? <CreateTaskDialog /> : null}
-            />
-          ) : sort === 'natural' ? (
-            // Manual ordering — use framer-motion's Reorder primitive so
-            // each row has built-in drag handling. We use div containers
-            // (with role="list") so the inner TaskRow's motion.div doesn't
-            // produce nested li elements. Drag only enabled when sort is
-            // 'natural'; explicit sort modes would conflict with manual
-            // position.
-            <Reorder.Group
-              axis="y"
-              values={items}
-              onReorder={(next) => setOrder(next.map((t) => t.id))}
-              as="div"
-              role="list"
-              className="divide-y divide-[var(--border-subtle)]"
-            >
-              {items.map((t, i) => (
-                <Reorder.Item key={t.id} value={t} as="div">
-                  <TaskRow task={t} index={i} draggable />
-                </Reorder.Item>
-              ))}
-            </Reorder.Group>
-          ) : (
-            <div role="list" className="divide-y divide-[var(--border-subtle)]">
-              <AnimatePresence initial={false}>
+        <>
+          <div className="sr-only" aria-live="polite" aria-atomic="true">
+            {taskOrderMessage}
+          </div>
+          <Card
+            className={cn(
+              'overflow-hidden transition-opacity',
+              // Subtle dimming while the deferred re-filter runs. Gives users a
+              // hint that the filter is in flight without blocking input.
+              isFilterPending && 'opacity-70',
+            )}
+          >
+            {isError ? (
+              <ErrorState
+                title="Could not load tasks"
+                message={error instanceof Error ? error.message : 'Something went wrong'}
+              />
+            ) : isLoading ? (
+              <LoadingSkeleton />
+            ) : items.length === 0 ? (
+              <EmptyState
+                title={filter === 'all' ? 'No tasks yet' : 'No tasks match this filter'}
+                message={filter === 'all' ? 'Create a follow-up to get started.' : undefined}
+                action={filter === 'all' ? <CreateTaskDialog /> : null}
+              />
+            ) : sort === 'natural' ? (
+              // Manual ordering — use framer-motion's Reorder primitive so
+              // each row has built-in drag handling. We use div containers
+              // (with role="list") so the inner TaskRow's motion.div doesn't
+              // produce nested li elements. Drag only enabled when sort is
+              // 'natural'; explicit sort modes would conflict with manual
+              // position.
+              <Reorder.Group
+                axis="y"
+                values={items}
+                onReorder={(next) => setOrder(next.map((t) => t.id))}
+                as="div"
+                role="list"
+                className="divide-y divide-[var(--border-subtle)]"
+              >
                 {items.map((t, i) => (
-                  <TaskRow key={t.id} task={t} index={i} />
+                  <Reorder.Item key={t.id} value={t} as="div">
+                    <TaskRow
+                      task={t}
+                      draggable
+                      canMoveUp={i > 0}
+                      canMoveDown={i < items.length - 1}
+                      onMoveUp={() => moveTask(i, i - 1)}
+                      onMoveDown={() => moveTask(i, i + 1)}
+                    />
+                  </Reorder.Item>
                 ))}
-              </AnimatePresence>
-            </div>
-          )}
-          {/* Inline quick-add — sits at the bottom of the list so power users
+              </Reorder.Group>
+            ) : (
+              <div role="list" className="divide-y divide-[var(--border-subtle)]">
+                <AnimatePresence initial={false}>
+                  {items.map((t) => (
+                    <TaskRow key={t.id} task={t} />
+                  ))}
+                </AnimatePresence>
+              </div>
+            )}
+            {/* Inline quick-add — sits at the bottom of the list so power users
               don't need to open the dialog for a one-shot follow-up. Press
               Enter to submit, Esc to clear. Errors fall through to a toast
               without disturbing the field. */}
-          <InlineTaskAdd />
-        </Card>
+            <InlineTaskAdd />
+          </Card>
+        </>
       )}
     </div>
   );
@@ -394,17 +447,23 @@ function InlineTaskAdd() {
 }
 
 // Each row is memoized so toggling one task's status doesn't re-render the
-// other 49 rows — the only deps are the task object itself and its index
-// (used for the entry-stagger delay).
+// other 49 rows — the only deps are the task object itself and optional
+// reorder callbacks.
 const TaskRow = memo(function TaskRow({
   task,
-  index,
   draggable = false,
+  canMoveUp = false,
+  canMoveDown = false,
+  onMoveUp,
+  onMoveDown,
 }: {
   task: Task;
-  index: number;
   /** When wrapped in Reorder.Item, show a drag handle. */
   draggable?: boolean;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }) {
   const update = useUpdateTask();
   const d = daysUntil(task.dueDate);
@@ -466,31 +525,39 @@ const TaskRow = memo(function TaskRow({
       // a list of items.
       role="listitem"
       layout
-      initial={{ opacity: 0, y: 6 }}
-      animate={{
-        opacity: 1,
-        y: 0,
-        transition: {
-          type: 'spring',
-          stiffness: 200,
-          damping: 28,
-          delay: Math.min(index, 16) * 0.028,
-        },
-      }}
+      initial={false}
+      animate={{ opacity: 1 }}
       exit={{ opacity: 0, x: -8, transition: { duration: 0.16 } }}
       className="group flex items-center justify-between gap-4 px-5 py-3"
     >
       {draggable ? (
-        // Six-dot drag affordance. Reorder.Item handles the drag itself;
-        // this is purely a visual cue + "where to grab" hint. cursor-grab
-        // / cursor-grabbing comes from the active state on the parent.
-        <span
-          aria-hidden
-          className="select-none text-[var(--fg-tertiary)] opacity-0 transition-opacity group-hover:opacity-100"
-          title="Drag to reorder"
-        >
-          ⋮⋮
-        </span>
+        <div className="flex shrink-0 items-center gap-1" aria-label="Reorder task">
+          <span
+            aria-hidden
+            className="select-none text-[var(--fg-tertiary)]"
+            title="Drag to reorder"
+          >
+            ::
+          </span>
+          <button
+            type="button"
+            onClick={onMoveUp}
+            disabled={!canMoveUp}
+            className="rounded-md border border-[var(--border-subtle)] px-1.5 py-1 text-[10px] font-medium text-[var(--fg-secondary)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label={`Move ${task.title} up`}
+          >
+            Up
+          </button>
+          <button
+            type="button"
+            onClick={onMoveDown}
+            disabled={!canMoveDown}
+            className="rounded-md border border-[var(--border-subtle)] px-1.5 py-1 text-[10px] font-medium text-[var(--fg-secondary)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label={`Move ${task.title} down`}
+          >
+            Down
+          </button>
+        </div>
       ) : null}
       <div className="min-w-0 flex-1">
         <div
@@ -508,8 +575,23 @@ const TaskRow = memo(function TaskRow({
         <div className="text-xs text-[var(--fg-tertiary)]">
           Due {formatDate(task.dueDate)}
           {d !== null && task.status !== 'done' ? (
-            <span className={overdue ? 'text-[var(--danger)] ml-2' : 'ml-2'}>
-              {overdue ? `${Math.abs(d)}d late` : `in ${d}d`}
+            <span
+              className={
+                overdue
+                  ? 'text-[var(--danger)] ml-2 inline-flex items-center gap-1 font-semibold'
+                  : 'ml-2'
+              }
+            >
+              {overdue ? (
+                <>
+                  <span role="img" aria-label="warning">
+                    ⚠️
+                  </span>
+                  Overdue: {Math.abs(d)}d late
+                </>
+              ) : (
+                `in ${d}d`
+              )}
             </span>
           ) : null}
         </div>
@@ -529,7 +611,7 @@ const TaskRow = memo(function TaskRow({
               if (opt) snoozeTo(opt.label, opt.value);
               e.target.value = '';
             }}
-            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-1.5 py-0.5 text-[10px] text-[var(--fg-secondary)] opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-1.5 py-0.5 text-[10px] text-[var(--fg-secondary)] opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100 focus:opacity-100"
           >
             <option value="">Snooze…</option>
             {snoozeOptions().map((o) => (
@@ -544,8 +626,11 @@ const TaskRow = memo(function TaskRow({
           onClick={cycle}
           disabled={update.isPending}
           whileTap={{ scale: 0.94 }}
-          aria-label={`Status: ${task.status.replace('_', ' ')}. Click to cycle.`}
-          title="Click to cycle status"
+          className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] disabled:cursor-not-allowed disabled:opacity-60"
+          aria-label={`Status: ${task.status.replace('_', ' ')}. Activate to change to ${STATUS_CYCLE[
+            task.status
+          ].replace('_', ' ')}.`}
+          title={`Activate to change status to ${STATUS_CYCLE[task.status].replace('_', ' ')}`}
         >
           <Badge
             tone={
@@ -580,8 +665,7 @@ function Chip({
   return (
     <button
       type="button"
-      role="tab"
-      aria-selected={active}
+      aria-pressed={active}
       onClick={onClick}
       className={`rounded-full border px-3 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] ${
         active
@@ -647,9 +731,16 @@ function SavedViewsBar() {
       {views.length > 0 ? (
         <button
           type="button"
-          onClick={() => {
+          onClick={async () => {
             const v = views[0];
-            if (v && window.confirm(`Remove most-recent view "${v.name}"?`)) {
+            if (!v) return;
+            const ok = await confirm({
+              title: 'Remove saved view?',
+              description: `This removes "${v.name}" from your task shortcuts.`,
+              confirmLabel: 'Remove',
+              destructive: true,
+            });
+            if (ok) {
               remove('tasks', v.id);
             }
           }}

@@ -52,7 +52,7 @@ describe('opportunities routes', () => {
       id: expect.any(String),
       code: expect.stringMatching(/^OP-\d{4}$/),
       stage: expect.stringMatching(
-        /^(discovery|qualified|proposal|negotiation|closed_won|closed_lost)$/,
+        /^(s1_lead|s1_ongoing|s2_sent|s3_technical_iteration|s4_negotiation|closed_won|closed_lost)$/,
       ),
       probability: expect.any(Number),
     });
@@ -83,11 +83,11 @@ describe('opportunities routes', () => {
     const list = (
       await server.inject({
         method: 'GET',
-        url: '/api/opportunities?stage=discovery&limit=1',
+        url: '/api/opportunities?stage=s1_ongoing&limit=1',
       })
     ).json();
     if (list.items.length === 0) {
-      console.warn('[skip] no discovery opps to move');
+      console.warn('[skip] no s1_ongoing opps to move');
       return;
     }
     const id = list.items[0].id;
@@ -99,10 +99,10 @@ describe('opportunities routes', () => {
     const move = await server.inject({
       method: 'POST',
       url: `/api/opportunities/${id}/stage`,
-      payload: { stage: 'qualified' },
+      payload: { stage: 's2_sent' },
     });
     expect(move.statusCode).toBe(200);
-    expect(move.json()).toMatchObject({ id, stage: 'qualified' });
+    expect(move.json()).toMatchObject({ id, stage: 's2_sent' });
 
     const auditAfter = await prisma.auditLog.count({
       where: { targetType: 'opportunity', targetId: id, action: 'opportunity.stage' },
@@ -113,7 +113,7 @@ describe('opportunities routes', () => {
     await server.inject({
       method: 'POST',
       url: `/api/opportunities/${id}/stage`,
-      payload: { stage: 'discovery' },
+      payload: { stage: 's1_ongoing' },
     });
   });
 });

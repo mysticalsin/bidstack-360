@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const AccountSolution = z.object({
   id: z.string().uuid(),
-  accountId: z.string(),
+  accountId: z.string().min(1).max(255),
   name: z.string(),
   description: z.string().nullable(),
   category: z.string(),
@@ -17,7 +17,7 @@ export type AccountSolution = z.infer<typeof AccountSolution>;
 
 export const AccountProduct = z.object({
   id: z.string().uuid(),
-  accountId: z.string(),
+  accountId: z.string().min(1).max(255),
   name: z.string(),
   description: z.string().nullable(),
   category: z.string(),
@@ -35,7 +35,7 @@ export type AccountProduct = z.infer<typeof AccountProduct>;
 export const DocumentExtraction = z.object({
   id: z.string().uuid(),
   documentId: z.string().uuid(),
-  accountId: z.string(),
+  accountId: z.string().min(1).max(255),
   status: z.enum(['pending', 'running', 'done', 'error']),
   extractedData: z.record(z.unknown()),
   error: z.string().nullable(),

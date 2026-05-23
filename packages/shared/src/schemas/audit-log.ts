@@ -19,7 +19,7 @@ export type AuditLogEntry = z.infer<typeof AuditLogEntry>;
 
 // Filters are coerced because the API consumes them from query strings.
 // `accountId` filters rows where the targetId matches OR the diff JSON has an
-// `accountId` field — that covers both opportunity-shaped and CRM-enrichment
+// `accountId` field — that covers both opportunity-shaped and CRM data verification
 // audit rows that reference an account but target a different entity.
 export const AuditLogFilter = z.object({
   accountId: z.string().optional(),

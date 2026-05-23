@@ -46,7 +46,11 @@ export const SalesIntelligencePanel = memo(function SalesIntelligencePanel({ rep
   const data = report.data;
 
   return (
-    <section className="sales-intel" aria-label="Sales intelligence">
+    <section className="sales-intel" aria-label="Portfolio sales intelligence">
+      <div className="section-kicker">
+        Portfolio sales intelligence
+        <span>All-account sales and quotation signals</span>
+      </div>
       <div className="sales-kpis">
         {data.kpis.map((kpi, index) => (
           <MetricTile

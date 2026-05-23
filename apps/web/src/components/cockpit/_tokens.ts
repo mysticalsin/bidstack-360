@@ -61,7 +61,7 @@ export function labelForBand(b: AccountCockpitSnapshot['health']['band']): strin
 }
 
 // Static fixtures used by the BusinessSnapshotCard when the company row's
-// fields are sparse (older seed data, accounts without verified enrichment).
+// fields are sparse (older seed data, accounts without verified data).
 // These dictionaries belong in the seeder long-term; for now they live with
 // the card that consumes them so the dashboard isn't reaching into an
 // unrelated module for a literal lookup.

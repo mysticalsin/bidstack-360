@@ -2,13 +2,14 @@ import { useQuery } from '@tanstack/react-query';
 
 import { ConnectorsSection } from '@/components/integrations/ConnectorsSection';
 import { DataQualitySection } from '@/components/integrations/DataQualitySection';
-import { OdooCard } from '@/components/integrations/OdooCard';
+import { ErpConnectorCard } from '@/components/integrations/ErpConnectorCard';
 import { ProviderHealthSection } from '@/components/integrations/ProviderHealthSection';
 import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
+import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
 import { useIsAdmin } from '@/lib/auth';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { UpgradeBanner } from '@/components/ui/UpgradeBanner';
 import { api } from '@/lib/api';
 import { formatDate, relativeTime } from '@/lib/format';
 
@@ -47,7 +48,7 @@ const MCP_TOOLS: ReadonlyArray<McpToolEntry> = [
   {
     group: 'crm',
     name: 'crm_enrich_company',
-    desc: 'Trigger verified company enrichment and update the cache.',
+    desc: 'Request company data verification and refresh the cache.',
   },
   { group: 'crm', name: 'crm_create_deal', desc: 'Create an opportunity tied to a customer.' },
   {
@@ -64,17 +65,21 @@ const MCP_TOOLS: ReadonlyArray<McpToolEntry> = [
   {
     group: 'crm',
     name: 'crm_generate_insights',
-    desc: 'Run the AI-insights generator for a deal or account.',
+    desc: 'Generate draft insights from available CRM data for a deal or account.',
   },
   { group: 'legacy', name: 'opportunities.list', desc: 'List opportunities matching filters.' },
-  { group: 'legacy', name: 'opportunities.get', desc: 'Fetch one opportunity with full intel.' },
+  {
+    group: 'legacy',
+    name: 'opportunities.get',
+    desc: 'Fetch one opportunity with related CRM context.',
+  },
   { group: 'legacy', name: 'opportunity.update', desc: 'Patch fields and write audit log.' },
   { group: 'legacy', name: 'contacts.list', desc: 'List decision-unit contacts by customer.' },
   { group: 'legacy', name: 'tasks.create', desc: 'Create a follow-up task on an opportunity.' },
   {
     group: 'legacy',
     name: 'proposal.draft',
-    desc: 'Draft a proposal section grounded in customer intel.',
+    desc: 'Draft a proposal section using available customer context.',
   },
 ];
 
@@ -83,6 +88,8 @@ export function IntegrationsPage() {
   const status = useQuery({
     queryKey: ['dust:status'],
     queryFn: ({ signal }) => api<DustStatus>('/api/integrations/dust/status', { signal }),
+    retry: false,
+    refetchOnWindowFocus: false,
   });
   const events = useQuery({
     queryKey: ['webhooks'],
@@ -96,9 +103,16 @@ export function IntegrationsPage() {
       <header>
         <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">Integrations</h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          Dust workspace sync, MCP server, webhook activity, and verified source posture.
+          Connection status, CRM sync activity, webhook activity, and source attribution.
         </p>
       </header>
+
+      <UpgradeBanner
+        title="Agent and CRM connections"
+        message="Connect Dust agents, webhooks, and CRM sync monitoring from one place."
+        actionLabel="Manage agents"
+        href="/agents"
+      />
 
       {isError ? (
         <ErrorState
@@ -127,12 +141,12 @@ export function IntegrationsPage() {
             <div className="flex items-center gap-2">
               {status.data ? (
                 <Badge tone={status.data.configured ? 'jade' : 'amber'}>
-                  {status.data.configured ? 'configured' : 'local stub'}
+                  {status.data.configured ? 'Configured' : 'Not configured'}
                 </Badge>
               ) : null}
               {isAdmin ? (
-                <Button
-                  variant="secondary"
+                <LiquidGlassButton
+                  tone="secondary"
                   size="sm"
                   onClick={() => {
                     void api('/api/integrations/dust/resync', { method: 'POST' }).then(() =>
@@ -140,8 +154,8 @@ export function IntegrationsPage() {
                     );
                   }}
                 >
-                  Force resync
-                </Button>
+                  Run sync now
+                </LiquidGlassButton>
               ) : null}
             </div>
           }
@@ -167,7 +181,7 @@ export function IntegrationsPage() {
 
       <DustAgentsCard data={status.data} isLoading={status.isLoading} />
 
-      <OdooCard />
+      <ErpConnectorCard />
 
       <ProviderHealthSection />
 
@@ -240,12 +254,12 @@ function DustAgentsCard({ data, isLoading }: { data?: DustStatus; isLoading: boo
     <Card>
       <SectionHeader
         title="Dust agents"
-        caption="Workspace assistants available for CRM enrichment and reasoning"
+        caption="Workspace agents available for CRM data verification workflows"
         action={
           data?.agentsError ? (
             <Badge tone="tomato">degraded</Badge>
           ) : data?.configured ? (
-            <Badge tone="jade">live</Badge>
+            <Badge tone="jade">configured</Badge>
           ) : (
             <Badge tone="amber">disabled</Badge>
           )
@@ -257,8 +271,7 @@ function DustAgentsCard({ data, isLoading }: { data?: DustStatus; isLoading: boo
         </div>
       ) : !data?.configured ? (
         <div className="px-5 py-6 text-sm text-[var(--fg-secondary)]">
-          Set `DUST_API_KEY` and `DUST_WORKSPACE_ID` to list real Dust agents here. No placeholder
-          agents are shown in local stub mode.
+          Add Dust credentials to list available workspace agents.
         </div>
       ) : data.agentsError ? (
         <div className="mx-5 my-5 rounded-md bg-[var(--danger-tint)] px-3 py-2 text-xs text-[var(--danger)]">

@@ -6,7 +6,7 @@ export type TaskStatus = z.infer<typeof TaskStatus>;
 export const Task = z.object({
   id: z.string().uuid(),
   oppId: z.string().uuid().nullable(),
-  title: z.string().min(1),
+  title: z.string().min(1).max(255),
   dueDate: z.string().date().nullable(),
   status: TaskStatus,
   assignee: z.string().email().nullable(),
@@ -32,3 +32,17 @@ export const TaskPatch = z
     message: 'PATCH body must contain at least one field',
   });
 export type TaskPatch = z.infer<typeof TaskPatch>;
+
+export const TaskFilter = z.object({
+  oppId: z.string().uuid().optional(),
+  status: TaskStatus.optional(),
+  cursor: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+export type TaskFilter = z.infer<typeof TaskFilter>;
+
+export const TaskPage = z.object({
+  items: z.array(Task),
+  nextCursor: z.string().nullable(),
+});
+export type TaskPage = z.infer<typeof TaskPage>;

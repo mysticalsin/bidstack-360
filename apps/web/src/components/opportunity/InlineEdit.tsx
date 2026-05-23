@@ -1,4 +1,4 @@
-// Twenty-style inline editor. Click the read-mode label, a form field
+// CRM-style inline editor. Click the read-mode label, a form field
 // replaces it; Enter or blur commits, Escape reverts. Designed to be a
 // drop-in for record-detail headers where saving 1 field at a time is the
 // dominant interaction. Save is parented at the call site (so the mutation

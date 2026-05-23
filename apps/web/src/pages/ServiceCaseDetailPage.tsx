@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useServiceCase, useUpdateServiceCase } from '@/hooks/useServiceCases';
 
 const STATUS_FLOW: Record<string, string[]> = {
@@ -21,7 +21,16 @@ export function ServiceCaseDetailPage() {
   const update = useUpdateServiceCase();
   const [note, setNote] = useState('');
 
-  if (c.isLoading || !c.data) return <LoadingSkeleton rows={6} />;
+  if (c.isLoading) return <LoadingSkeleton rows={6} />;
+  if (c.isError)
+    return (
+      <ErrorState
+        title="Failed to load case"
+        message={c.error instanceof Error ? c.error.message : 'Something went wrong'}
+      />
+    );
+  if (!c.data)
+    return <EmptyState title="Case not found" message="This case may have been deleted." />;
   const cs = c.data;
 
   const transitions = STATUS_FLOW[cs.status] ?? [];

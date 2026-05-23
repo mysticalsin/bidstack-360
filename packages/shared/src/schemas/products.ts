@@ -16,7 +16,7 @@ export const ProductCreate = z.object({
   sku: z.string().min(1).max(120),
   name: z.string().min(1).max(255),
   categoryId: z.string().uuid().optional().nullable(),
-  listPriceMicros: z.number().int().min(0),
+  listPriceMicros: z.number().int().min(0).max(1_000_000_000_000_000),
   currency: z.string().length(3).default('CAD'),
   active: z.boolean().default(true),
 });
@@ -25,7 +25,7 @@ export const ProductUpdate = z.object({
   sku: z.string().min(1).max(120).optional(),
   name: z.string().min(1).max(255).optional(),
   categoryId: z.string().uuid().optional().nullable(),
-  listPriceMicros: z.number().int().min(0).optional(),
+  listPriceMicros: z.number().int().min(0).max(1_000_000_000_000_000).optional(),
   currency: z.string().length(3).optional(),
   active: z.boolean().optional(),
 });
@@ -44,11 +44,11 @@ export const Product = z.object({
 });
 
 export const ProductFilter = z.object({
-  search: z.string().optional(),
+  search: z.string().max(255).optional(),
   categoryId: z.string().uuid().optional(),
   activeOnly: z.enum(['true', 'false']).optional(),
   cursor: z.string().uuid().optional(),
-  limit: z.number().int().min(1).max(200).default(50),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
 export const ProductPage = z.object({

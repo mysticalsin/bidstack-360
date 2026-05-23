@@ -26,7 +26,7 @@ export const DataTrustCard = memo(function DataTrustCard({ cockpit }: Props) {
   const checks: Array<{ label: string; value: string; tone: BadgeTone }> = [
     {
       label: 'Legal identity',
-      value: company.legalName ? 'Verified' : 'Pending',
+      value: company.legalName ? 'Attributed' : 'Pending',
       tone: company.legalName ? 'jade' : 'amber',
     },
     {
@@ -43,10 +43,10 @@ export const DataTrustCard = memo(function DataTrustCard({ cockpit }: Props) {
 
   return (
     <Card role="region" aria-label="Data trust and attribution">
-      <SectionHeader title="Data trust" caption="Every field keeps its source receipt" />
+      <SectionHeader title="Data trust" caption="Key fields include available source attribution" />
       <div className="data-trust">
         <div className="data-trust-score">
-          <span>Verified confidence</span>
+          <span>Attribution confidence</span>
           <strong>
             <AnimatedMetric value={`${Math.round(averageConfidence * 100)}%`} />
           </strong>
@@ -70,7 +70,7 @@ export const DataTrustCard = memo(function DataTrustCard({ cockpit }: Props) {
         <div className="data-trust-sources" aria-label="Source receipts">
           {sources.length === 0 ? (
             <div className="data-trust-empty">
-              Run enrichment to attach official registry, logo, and market-source receipts.
+              Run data verification to attach registry, logo, and market data sources.
             </div>
           ) : (
             sources.map((source, index) => (

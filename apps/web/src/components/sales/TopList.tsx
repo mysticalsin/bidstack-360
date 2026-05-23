@@ -10,7 +10,7 @@
 import { Link } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 
-import { formatMoneyMicros } from '@/lib/format';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSoft } from '@/lib/motion';
 
 import type { TopRow } from '@bidstack/shared';
@@ -26,6 +26,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 export function TopList({ items, showSalesperson = true, variant = 'quotation' }: Props) {
   const reducedMotion = useReducedMotion();
+  const { formatMoneyMicros } = useFormatMoney();
 
   if (items.length === 0) {
     return (
@@ -81,7 +82,7 @@ export function TopList({ items, showSalesperson = true, variant = 'quotation' }
                   {/* Bar background scales with the row's share of the max. */}
                   <motion.span
                     aria-hidden
-                    className={`absolute inset-y-1 left-1 -z-0 rounded ${barClass}`}
+                    className={`absolute inset-y-1 left-1 rounded ${barClass}`}
                     initial={reducedMotion ? false : { width: 0 }}
                     animate={{ width: `calc(${pct.toFixed(2)}% - 8px)` }}
                     transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.025 }}
@@ -89,12 +90,12 @@ export function TopList({ items, showSalesperson = true, variant = 'quotation' }
                   {UUID_RE.test(row.id) ? (
                     <Link
                       to={`/sales/orders/${row.id}`}
-                      className="relative z-10 truncate font-medium text-[var(--brand-primary)] underline-offset-2 hover:underline"
+                      className="relative truncate font-medium text-[var(--brand-primary)] underline-offset-2 hover:underline"
                     >
                       {row.label}
                     </Link>
                   ) : (
-                    <span className="relative z-10 truncate font-medium text-[var(--fg-primary)]">
+                    <span className="relative truncate font-medium text-[var(--fg-primary)]">
                       {row.label}
                     </span>
                   )}
@@ -105,7 +106,7 @@ export function TopList({ items, showSalesperson = true, variant = 'quotation' }
                   </td>
                 ) : null}
                 <td className="px-4 py-2.5 text-right tabular-nums text-[var(--fg-primary)] whitespace-nowrap">
-                  {formatMoneyMicros(row.revenueMicros, row.currency)}
+                  {formatMoneyMicros(row.revenueMicros, row.currency ?? 'EUR')}
                 </td>
               </motion.tr>
             );

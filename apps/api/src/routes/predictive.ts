@@ -49,9 +49,10 @@ export const predictiveRoutes: FastifyPluginAsyncZod = async (server) => {
     '/predictive/scores',
     {
       config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+      preHandler: server.requirePermission('reports:write'),
       schema: {
         body: z.object({
-          targetType: z.string(),
+          targetType: z.string().max(50),
           targetId: z.string().uuid(),
           kind: PredictiveScoreKind,
         }),
@@ -108,10 +109,11 @@ async function computeHeuristicScore(
     const opp = await prisma.opportunity.findFirst({ where: { id: targetId, orgId } });
     if (!opp) return { score: 5000, confidence: 3000, features: {}, recommendedAction: null };
     const stageScores: Record<string, number> = {
-      discovery: 2000,
-      qualified: 4000,
-      proposal: 6500,
-      negotiation: 8500,
+      s1_lead: 2000,
+      s1_ongoing: 4000,
+      s2_sent: 6500,
+      s3_technical_iteration: 7500,
+      s4_negotiation: 8500,
       closed_won: 10000,
       closed_lost: 0,
     };

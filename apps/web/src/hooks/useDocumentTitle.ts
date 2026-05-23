@@ -12,6 +12,7 @@ const ROUTE_TITLES: Record<string, string> = {
   '/settings': 'Settings',
   '/login': 'Sign in',
   '/bid-matrix': 'Bid/No-Bid Matrix',
+  '/proposals': 'Proposals',
   '/sales': 'Sales',
   '/accounts': 'Accounts',
   '/audit-log': 'Audit Log',

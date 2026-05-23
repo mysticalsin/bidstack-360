@@ -1,40 +1,36 @@
-import { useState, type ReactNode } from 'react';
+import { useState, forwardRef, type ReactNode } from 'react';
 
 import { HoverCard } from '@/components/ui/HoverCard';
 import type { CrmLogo } from '@bidstack/shared';
 
 interface CompanyLogoProps {
   name: string;
-  /** CRM-resolved logo (Twenty / Brandfetch / Logo.dev / favicon). Preferred. */
+  /** CRM-resolved logo (External CRM / Brandfetch / Logo.dev / favicon). Preferred. */
   logo?: CrmLogo | null;
   /** Bare domain (no protocol) - used to request the website favicon fallback. */
   domain?: string | null;
   size?: number;
   className?: string;
-  /** When provided, wraps the logo in a HoverCard that reveals an enrichment brief. */
+  /** When provided, wraps the logo in a HoverCard that reveals a data brief. */
   brief?: ReactNode;
   /** Above-the-fold? Triggers fetchpriority="high" + eager loading. */
   priority?: boolean;
 }
 
 // Logo source chain:
-//   1. CRM-resolved high-confidence logo (Twenty / Brandfetch / Logo.dev)
+//   1. CRM-resolved high-confidence logo (External CRM / Brandfetch / Logo.dev)
 //   2. Small favicon fallback for compact table/sidebar uses
 //   3. Initials fallback (always works)
 // Large favicons are often pale generic tiles, so card/hero logos prefer
 // strong initials unless an actual brand asset has been resolved.
-export function CompanyLogo({
-  name,
-  logo,
-  domain,
-  size = 36,
-  className,
-  brief,
-  priority = false,
-}: CompanyLogoProps) {
+export const CompanyLogo = forwardRef<HTMLSpanElement, CompanyLogoProps>(function CompanyLogo(
+  { name, logo, domain, size = 36, className, brief, priority = false },
+  ref,
+) {
   const sources: string[] = [];
   const normalizedDomain = normalizeDomain(domain);
-  const shouldUseCompactFavicon = size <= 64;
+  const shouldUseCompactFavicon =
+    size <= 64 && normalizedDomain !== null && !isReservedDomain(normalizedDomain);
 
   if (logo?.url && logo.source !== 'favicon') {
     sources.push(logo.url);
@@ -56,6 +52,7 @@ export function CompanyLogo({
 
   const glyph = (
     <span
+      ref={ref}
       className={className}
       style={{
         width: size,
@@ -105,7 +102,7 @@ export function CompanyLogo({
     return <HoverCard content={brief}>{glyph}</HoverCard>;
   }
   return glyph;
-}
+});
 
 function normalizeDomain(domain: string | null | undefined): string | null {
   if (!domain) return null;
@@ -114,6 +111,18 @@ function normalizeDomain(domain: string | null | undefined): string | null {
     .replace(/^www\./, '')
     .split('/');
   return host?.trim().toLowerCase() || null;
+}
+
+function isReservedDomain(domain: string): boolean {
+  return (
+    domain.endsWith('.example') ||
+    domain.endsWith('.invalid') ||
+    domain.endsWith('.localhost') ||
+    domain.endsWith('.test') ||
+    domain === 'example.com' ||
+    domain === 'example.org' ||
+    domain === 'example.net'
+  );
 }
 
 function initialsFor(name: string) {

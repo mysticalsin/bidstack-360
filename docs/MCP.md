@@ -1,82 +1,83 @@
-# MCP server — implementation notes
+# MCP server implementation notes
 
-> Companion to `handoff/mcp.tools.md`. This file documents _how_ the server is built and how to test it locally.
+> Companion to `handoff/mcp.tools.md`. This file documents how the server is built and how to test it locally.
 
 ## Transport
 
-JSON-RPC 2.0 over plain HTTP. The MCP spec also allows SSE; we omit the SSE leg from v0.1 because Dust's MCP client supports HTTP-only registration.
+Production MCP traffic uses Streamable HTTP on one stable endpoint:
 
-- **POST /mcp** — JSON-RPC 2.0 envelope (`{ jsonrpc, id, method, params }`)
-- **GET /.well-known/mcp** — server metadata (name, version, transport, endpoints)
-- **GET /health** — liveness probe (public, no auth)
+- `POST /mcp` - MCP Streamable HTTP requests.
+- `GET /mcp` - MCP Streamable HTTP server-to-client stream.
+- `DELETE /mcp` - terminate a Streamable HTTP session.
+- `GET /.well-known/mcp` - server metadata and endpoint discovery.
+- `GET /health` - process liveness.
 
-## Tools
+Legacy SSE endpoints are still present only for compatibility:
 
-| Tool                 | Source file                                                                                             |
-| -------------------- | ------------------------------------------------------------------------------------------------------- |
-| `opportunities.list` | [`apps/mcp-server/src/tools/opportunities-list.ts`](../apps/mcp-server/src/tools/opportunities-list.ts) |
-| `opportunities.get`  | [`apps/mcp-server/src/tools/opportunities-get.ts`](../apps/mcp-server/src/tools/opportunities-get.ts)   |
-| `opportunity.update` | [`apps/mcp-server/src/tools/opportunity-update.ts`](../apps/mcp-server/src/tools/opportunity-update.ts) |
-| `contacts.list`      | [`apps/mcp-server/src/tools/contacts-list.ts`](../apps/mcp-server/src/tools/contacts-list.ts)           |
-| `tasks.create`       | [`apps/mcp-server/src/tools/tasks-create.ts`](../apps/mcp-server/src/tools/tasks-create.ts)             |
-| `proposal.draft`     | [`apps/mcp-server/src/tools/proposal-draft.ts`](../apps/mcp-server/src/tools/proposal-draft.ts)         |
+- `GET /mcp/sse`
+- `POST /mcp/messages`
 
-Each tool exports a `Tool` object with:
-
-- `description` — surfaced in `tools/list`
-- `input` — Zod schema for runtime validation
-- `inputJsonSchema` — JSON Schema mirror for Dust's tool-discovery UI
-- `handler(args, ctx)` — the work; receives the validated args and the per-key auth context
+Do not register new production clients against the SSE endpoints. They are process-local and do not scale cleanly across replicas.
 
 ## Auth
 
+Every MCP request must include:
+
+```http
+Authorization: Bearer <bidstack API key>
 ```
-Authorization: Bearer <bidstack API key with `mcp` scope>
-```
 
-Mint a key via `POST /api/integrations/api-keys` (returns the secret **once** in the response — store it securely). The MCP server hashes the bearer with SHA-256 and looks it up in `api_keys.hashed_key`. Org-scoping flows from the key's `org_id` column into every tool's Prisma queries.
+Mint the key via `POST /api/integrations/api-keys`. The secret is returned once; store it securely. The MCP server hashes the bearer with SHA-256 and resolves the organization from `api_keys.hashed_key`.
 
-Lacking the `mcp` scope returns `403 Forbidden`. A revoked key returns `401 Unauthorized`.
+Required scopes:
 
-## Rate limit
+- `mcp` on every key.
+- `read` for read-only tools.
+- `write` for mutation tools.
 
-`@fastify/rate-limit`: **60 requests / minute per API key** (keyed on a SHA-256 of the bearer to avoid logging tokens). Returns `429 Too Many Requests` with `Retry-After` header. The mcp.tools.md spec also describes a 600/hour secondary window — to be added when production load demands it.
+Missing, revoked, or malformed keys return `401`. Keys without the required tool scope return `403`.
 
-## Local testing
+## Tool Scopes
 
-With Postgres and Redis running (`docker compose up -d`) and the API + MCP servers running (`pnpm dev`):
+Tool scopes are declared in `apps/mcp-server/src/tools/index.ts` via `toolScopes`.
+
+- Read examples: `opportunities.list`, `opportunities.get`, `contacts.list`, `proposal.draft`.
+- Write examples: `opportunity.update`, `tasks.create`, CRM create/update/enrich tools, activity creation.
+
+Every `tools/call` request resolves the required scope before invoking the handler.
+
+## Rate Limits
+
+MCP requests are rate-limited per API key or IP:
+
+- Fast minute window through `@fastify/rate-limit`.
+- Secondary hourly guard for `/mcp`, `/mcp/sse`, and `/mcp/messages`.
+
+Production deployments should back shared rate limits with Redis so multiple API/MCP replicas enforce one quota window per key and org.
+
+## Local Testing
+
+With Postgres and Redis running and the API + MCP servers running:
 
 ```bash
-# 1. Mint an API key (stub auth gives you a dev session against the seed org)
 SECRET=$(curl -s -X POST http://localhost:4000/api/integrations/api-keys \
   -H 'Content-Type: application/json' \
-  -d '{"name":"local-dev","scopes":["mcp"]}' | jq -r .secret)
+  -d '{"name":"local-dev","scopes":["mcp","read","write"]}' | jq -r .secret)
 
-# 2. Call tools/list via JSON-RPC
 curl -s http://localhost:4001/mcp \
   -H "Authorization: Bearer $SECRET" \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | jq
-
-# 3. Call opportunities.list
-curl -s http://localhost:4001/mcp \
-  -H "Authorization: Bearer $SECRET" \
-  -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"opportunities.list","arguments":{"limit":5}}}' | jq
-
-# 4. Call opportunities.get by code
-curl -s http://localhost:4001/mcp \
-  -H "Authorization: Bearer $SECRET" \
-  -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"opportunities.get","arguments":{"code":"OP-2041"}}}' | jq
 ```
+
+Read-only keys should be tested by minting a key with `["mcp","read"]` and confirming write tools return `403`.
 
 ## Registering with Dust
 
-Dust → Workspace → Tools → External MCP:
+Dust -> Workspace -> Tools -> External MCP:
 
-- **URL:** `${DUST_MCP_PUBLIC_URL}/mcp` (must terminate TLS)
-- **Auth:** Bearer token (paste the secret from step 1 above)
-- **Discovery:** Dust will hit `tools/list` automatically and show 6 tools
+- URL: `${DUST_MCP_PUBLIC_URL}/mcp`
+- Auth: bearer token from the API key creation response.
+- Transport: Streamable HTTP.
 
-Then any agent can call our tools via Dust's normal tool-routing.
+Dust discovers tools through `tools/list`. Keep Claude/Dust provider keys server-side; agents should use BidStack MCP/API keys rather than embedding provider secrets in browser-visible configuration.

@@ -37,6 +37,7 @@ export const leadRoutes: FastifyPluginAsyncZod = async (server) => {
       const items = await prisma.lead.findMany({
         where: {
           orgId: req.auth.orgId,
+          deletedAt: null,
           ...(status ? { status: status as LeadStatus } : {}),
           ...(priority ? { priority: priority as LeadPriority } : {}),
           ...(source ? { source } : {}),
@@ -94,7 +95,7 @@ export const leadRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const lead = await prisma.lead.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
         include: { owner: { select: { name: true } } },
       });
       if (!lead) throw server.httpErrors.notFound('Lead not found');
@@ -212,7 +213,7 @@ export const leadRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const existing = await prisma.lead.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!existing) throw server.httpErrors.notFound('Lead not found');
 
@@ -237,22 +238,27 @@ export const leadRoutes: FastifyPluginAsyncZod = async (server) => {
       if (body.timeline !== undefined) data.timeline = body.timeline;
 
       const updated = await prisma.$transaction(async (tx) => {
-        const lead = await tx.lead.update({
-          where: { id: existing.id },
+        const updateResult = await tx.lead.updateMany({
+          where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
           data,
-          include: { owner: { select: { name: true } } },
         });
+        if (updateResult.count === 0) {
+          throw server.httpErrors.notFound('Lead not found');
+        }
         await tx.auditLog.create({
           data: {
             orgId: req.auth.orgId,
             userId: req.auth.userId,
             action: 'lead.update',
             targetType: 'lead',
-            targetId: lead.id,
+            targetId: existing.id,
             diff: { fields: Object.keys(body) } as Prisma.InputJsonValue,
           },
         });
-        return lead;
+        return tx.lead.findFirstOrThrow({
+          where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
+          include: { owner: { select: { name: true } } },
+        });
       });
       // Fire-and-forget push to Dust on update.
       void pushLeadToDust(updated.id);
@@ -288,6 +294,7 @@ export const leadRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/leads/:id/convert',
     {
+      config: { rateLimit: { max: 15, timeWindow: '1 minute' } },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: LeadConvertBody,
@@ -328,7 +335,7 @@ export const leadRoutes: FastifyPluginAsyncZod = async (server) => {
             code,
             customer: lead.companyName,
             name: body.opportunityName ?? `${lead.companyName} — ${lead.title ?? 'Opportunity'}`,
-            stage: (body.stage ?? 'discovery') as PrismaStage,
+            stage: (body.stage ?? 's1_lead') as PrismaStage,
             valueMicros: BigInt(Math.round(body.opportunityValueMicros ?? 0)),
             probability: 20,
             ownerId: lead.ownerId,
@@ -336,14 +343,17 @@ export const leadRoutes: FastifyPluginAsyncZod = async (server) => {
         });
 
         // 3. Mark lead as converted
-        await tx.lead.update({
-          where: { id: lead.id },
+        const updateResult = await tx.lead.updateMany({
+          where: { id: lead.id, orgId: req.auth.orgId },
           data: {
             status: 'converted',
             convertedToOpportunityId: opp.id,
             convertedAt: new Date(),
           },
         });
+        if (updateResult.count === 0) {
+          throw new Error('Lead not found');
+        }
 
         // 4. Audit log
         await tx.auditLog.create({
@@ -375,12 +385,18 @@ export const leadRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const existing = await prisma.lead.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!existing) throw server.httpErrors.notFound('Lead not found');
-      await prisma.$transaction([
-        prisma.lead.delete({ where: { id: existing.id } }),
-        prisma.auditLog.create({
+      await prisma.$transaction(async (tx) => {
+        const updateResult = await tx.lead.updateMany({
+          where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
+          data: { deletedAt: new Date() },
+        });
+        if (updateResult.count === 0) {
+          throw server.httpErrors.notFound('Lead not found');
+        }
+        await tx.auditLog.create({
           data: {
             orgId: req.auth.orgId,
             userId: req.auth.userId,
@@ -389,8 +405,8 @@ export const leadRoutes: FastifyPluginAsyncZod = async (server) => {
             targetId: existing.id,
             diff: { name: `${existing.firstName} ${existing.lastName}` } as Prisma.InputJsonValue,
           },
-        }),
-      ]);
+        });
+      });
       return reply.code(204).send(null);
     },
   );

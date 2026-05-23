@@ -5,7 +5,7 @@ import { formatStage, formatMoney, daysUntil } from './format.js';
 describe('formatStage', () => {
   it('humanizes snake_case enum values for display', () => {
     expect(formatStage('closed_won')).toBe('Closed Won');
-    expect(formatStage('discovery')).toBe('Discovery');
+    expect(formatStage('s1_ongoing')).toBe('S1 Ongoing');
     expect(formatStage('in_progress')).toBe('In Progress');
   });
 });

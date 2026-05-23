@@ -27,6 +27,244 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 <!-- New entries appended at the top of this section. -->
 
+### 2026-05-22 SECURITY: Invoice lines validated product IDs too late
+
+- **What went wrong:** `POST /api/invoices` accepted a line item `productId` from another tenant and only failed when Prisma hit the invoice-line foreign key, returning a generic 400/500-shaped persistence failure instead of a tenant-aware 404.
+- **Root cause:** The invoice route trusted nested relation IDs while building `lines.create` and did not reuse the shared tenant-ownership guard before writing.
+- **Prevention rule:** Every mutation that accepts related IDs must validate those IDs by `{ id, orgId }` before persistence; nested Prisma writes are never the first tenant boundary.
+- **Files affected:** `apps/api/src/routes/invoices.ts`.
+
+### 2026-05-19 TESTING: Ran preview E2E before rebuilding dist
+
+- **What went wrong:** After changing `CommandPalette.tsx`, I reran Playwright preview E2E without rebuilding `apps/web/dist`, so the test executed the stale bundle and repeated the same failure.
+- **Root cause:** I forgot this repo's E2E script uses `vite preview`, not the dev server, when `E2E_BASE_URL` is unset.
+- **Prevention rule:** After frontend code changes, run `pnpm --filter @bidstack/web build` before preview-backed E2E, or point E2E at an active dev server intentionally.
+- **Files affected:** none; verification command only.
+
+### 2026-05-19 TESTING: Passed unsupported Vitest flag
+
+- **What went wrong:** I ran `pnpm --filter @bidstack/web test -- --runInBand`; this Vitest version does not support Jest's `--runInBand` flag, so the test command failed before running tests.
+- **Root cause:** I reused a Jest flag instead of the repo's documented `pnpm test`/Vitest command shape.
+- **Prevention rule:** For this repo, run `pnpm --filter @bidstack/web test` directly unless a Vitest-supported flag has been confirmed locally.
+- **Files affected:** none; verification command only.
+
+### 2026-05-19 TOOLING: MobileNav patch included shell-rendered mojibake
+
+- **What went wrong:** I included the terminal-rendered `BidStackÂ°` line inside a large `apply_patch`, so the patch could not match the actual Unicode source.
+- **Root cause:** I repeated the already logged Unicode-console mistake while changing a surrounding block.
+- **Prevention rule:** When a file has known mojibake in shell output, keep patches away from those lines unless a byte-safe read has confirmed the exact text.
+- **Files affected:** none.
+
+### 2026-05-19 TOOLING: Repeated mojibake patch attempt on DataQualitySection
+
+- **What went wrong:** I tried to patch a terminal-rendered mojibake line in `DataQualitySection.tsx`, repeating the same Unicode-console failure pattern already logged.
+- **Root cause:** I acted on the shell rendering instead of first reading the exact file text or bytes around the target line.
+- **Prevention rule:** For any file that renders non-ASCII incorrectly in PowerShell, inspect the target line through JSON/byte-safe tooling before `apply_patch`; patch against ASCII-only surrounding structure or replace a bounded helper block.
+- **Files affected:** none.
+
+### 2026-05-19 TOOLING: Browser click timed out on New company
+
+- **What went wrong:** The in-app browser timed out while clicking the `New company` button during smoke verification, even though the button was present in the DOM.
+- **Root cause:** The browser automation bridge timed out on a CDP evaluation/click path in a motion-heavy app view.
+- **Prevention rule:** After one in-app click timeout, stop retrying the same click path; use DOM assertions and the repo Playwright E2E runner for interaction coverage.
+- **Files affected:** none; verification tooling only.
+
+### 2026-05-19 TOOLING: Preview server start did not bind on 4184
+
+- **What went wrong:** I launched a hidden Vite preview process on port 4184, but the follow-up probe could not connect.
+- **Root cause:** The background process failed or exited before binding, and I did not capture its stderr/stdout.
+- **Prevention rule:** When starting a new preview server for verification, either probe an already-running known-good preview after rebuilding `dist` or launch with redirected logs so failures are diagnosable.
+- **Files affected:** none; verification tooling only.
+
+### 2026-05-19 TOOLING: Repeated PowerShell chaining after prevention
+
+- **What went wrong:** I used `&&` again immediately after logging that PowerShell command chaining mistake.
+- **Root cause:** I reused a shell command pattern from memory instead of applying the just-written prevention rule.
+- **Prevention rule:** Do not write compound shell commands manually for the rest of this turn. Use `multi_tool_use.parallel` for independent reads and a single command per shell call for everything else.
+- **Files affected:** none; inspection command only.
+
+### 2026-05-19 TOOLING: Repeated Bash-style command chaining in PowerShell
+
+- **What went wrong:** I used `&&` while combining a file read and ripgrep inspection in PowerShell, which this shell context rejects.
+- **Root cause:** I rushed an inspection command and repeated an already-logged shell syntax mistake.
+- **Prevention rule:** Run dependent PowerShell inspections as separate tool calls or use `multi_tool_use.parallel` for independent reads; do not chain commands with `&&` in this workspace.
+- **Files affected:** none; inspection command only.
+
+### 2026-05-19 TOOLING: Mojibake copy patch failed in data quality
+
+- **What went wrong:** A targeted patch for the data-quality empty-state copy failed because the existing message line contains terminal-rendered mojibake punctuation.
+- **Root cause:** I repeated the provider-health patch pattern too soon and included rendered non-ASCII punctuation in the expected context.
+- **Prevention rule:** For the rest of this session, do not patch copy lines containing mojibake directly; replace a wider ASCII-bounded component block or leave the copy for a later verified encoding pass.
+- **Files affected:** none; patch did not apply.
+
+### 2026-05-19 TOOLING: Subagent repeated leading-dash rg search
+
+- **What went wrong:** The Dev Agent reported hitting an already-logged `rg` leading-dash pattern mistake during inspection.
+- **Root cause:** The subagent did not apply the existing prevention rule for CSS custom-property searches.
+- **Prevention rule:** All agents inspecting CSS variables must use `rg -F -- "--token-name" path` and must keep this rule in their task prompt when CSS/token searches are likely.
+- **Files affected:** none; inspection command only.
+
+### 2026-05-19 TOOLING: Mojibake caption patch failed in provider health
+
+- **What went wrong:** A targeted patch for `ProviderHealthSection.tsx` failed because the exact caption lines contain terminal-rendered mojibake characters and did not match the source bytes.
+- **Root cause:** I copied rendered text from PowerShell output instead of anchoring the patch only on stable ASCII structure.
+- **Prevention rule:** In files with mojibake display text, patch around ASCII-only identifiers or use a small helper insertion plus minimal structural replacement; do not include rendered punctuation in patch context.
+- **Files affected:** none; patch did not apply.
+
+### 2026-05-18 TOOLING: Repeated wildcard positional test search
+
+- **What went wrong:** I passed `apps/web/src/**/*.test.ts` and `apps/web/src/**/*.test.tsx` as positional paths to `rg`, which fails on this PowerShell/Windows path shape.
+- **Root cause:** I repeated the already-logged wildcard path mistake while quickly checking whether preferences tests existed.
+- **Prevention rule:** For the remainder of this session, run `rg` from the repo root with `-g` include globs or concrete directories only; never pass wildcard filesystem paths as positional arguments.
+- **Files affected:** none; inspection command only.
+
+### 2026-05-18 TOOLING: CSS variable search parsed as rg flag
+
+- **What went wrong:** I searched for `--border-focus` with `rg -F` but did not pass `--` before the pattern, so ripgrep treated the CSS variable as a command flag.
+- **Root cause:** I forgot that leading-dash literals need an end-of-options marker even with fixed-string search.
+- **Prevention rule:** When searching for CSS custom properties with `rg`, use `rg -F -- "--token-name" path`.
+- **Files affected:** none; inspection command only.
+
+### 2026-05-18 TOOLING: Double-quote literal search failed in PowerShell
+
+- **What went wrong:** I tried a simple literal `rg` search for double-quoted `api(\"/` calls, but the PowerShell command string still parsed with an unterminated quote.
+- **Root cause:** I mixed JSON escaping with PowerShell quoting after already deciding to avoid fragile quoted searches.
+- **Prevention rule:** Do not search for double-quote code literals with shell quoting in this session; rely on single-quote literal searches, file reads, or TypeScript validation instead.
+- **Files affected:** none; inspection command only.
+
+### 2026-05-18 TOOLING: Repeated quoted regex search failed again
+
+- **What went wrong:** I tried to search for non-`/api` API paths with a quoted regex lookahead, and PowerShell parsed the quote incorrectly before `rg` could run.
+- **Root cause:** I ignored the freshly logged prevention rule and used another complex regex in PowerShell.
+- **Prevention rule:** Do not run any more quoted regex lookahead searches in PowerShell this session; use simple `rg -F`, file-specific reads, or a small Node/Python-free shell-safe inspection only when needed.
+- **Files affected:** none; inspection command only.
+
+### 2026-05-18 TOOLING: Repeated complex rg pattern broke in PowerShell
+
+- **What went wrong:** I ran an `rg` alternation containing escaped quotes for motion CSS checks, and the regex parser failed with an unclosed group.
+- **Root cause:** I repeated the already-logged habit of packing too many quoted alternatives into one PowerShell search.
+- **Prevention rule:** For the rest of this session, use simple literal `rg -F` searches or separate commands for CSS selectors and media queries.
+- **Files affected:** none; inspection command only.
+
+### 2026-05-18 TOOLING: Repeated PowerShell wildcard path passed to rg
+
+- **What went wrong:** I ran `rg` with `apps\web\src\*.tsx` as a positional path, which PowerShell/ripgrep treated as an invalid literal path.
+- **Root cause:** I repeated an already-logged Windows glob mistake while trying to broaden an API/auth usage search quickly.
+- **Prevention rule:** For the rest of this session, run `rg` from the repository root with `-g` include globs only; never pass wildcard filesystem paths as positional arguments in PowerShell.
+- **Files affected:** none; inspection command only.
+
+### 2026-05-17 TESTING: Dashboard test treated customer stage as open
+
+- **What went wrong:** The dashboard account-scoping test computed expected open deals from serialized CRM stages and counted `customer` as open, but `customer` is the current serialized label for raw `closed_won`.
+- **Root cause:** I used the UI-facing deal stage labels without checking `mapDealStage` semantics.
+- **Prevention rule:** When deriving assertions from serialized stage labels, confirm the stage mapping and explicitly classify terminal/customer stages.
+- **Files affected:** `apps/api/src/routes/crm/dashboard.test.ts`.
+
+### 2026-05-17 BUG: Cockpit account test exposed exact-name matching drift
+
+- **What went wrong:** The new dashboard account-scoping regression test failed because `buildCockpit` matched opportunities by exact `opp.customer === company.name`, while serialized deals/company ids use normalized names.
+- **Root cause:** The route fix correctly passed account id into the service, but the service still depended on fragile display-name equality inside the cockpit builder.
+- **Prevention rule:** Account-level dashboard joins must use a shared normalized-company matcher, not raw display-name equality.
+- **Files affected:** `apps/api/src/services/crm/dashboard.service.ts`, `apps/api/src/routes/crm/dashboard.test.ts`.
+
+### 2026-05-17 TOOLING: Playwright smoke targeted a stopped dev port
+
+- **What went wrong:** External Playwright tried `http://127.0.0.1:5173/sales/products` and hit `ERR_CONNECTION_REFUSED`.
+- **Root cause:** I assumed the previous web server on 5173 was still alive after longer work and in-app browser failures.
+- **Prevention rule:** Before browser smoke, probe the candidate dev URLs and use the responding port; start/restart the web server only after confirming no current server is available.
+- **Files affected:** none; browser verification only.
+
+### 2026-05-17 TOOLING: In-app browser blocked localhost navigation
+
+- **What went wrong:** Browser QA attempted to open `http://127.0.0.1:5173/sales/products`, but the in-app browser reported `net::ERR_BLOCKED_BY_CLIENT`.
+- **Root cause:** I targeted a local URL/port without first confirming which in-app tab URL was currently allowed by the browser profile.
+- **Prevention rule:** For in-app browser QA, start from the selected tab/current dev URL when available, or retry once with `localhost`/the active port before falling back to repository Playwright.
+- **Files affected:** none; browser verification only.
+
+### 2026-05-17 PROCESS: Repeated broad patching around mojibake table text
+
+- **What went wrong:** After logging that broad patches around mojibake display text are brittle, I repeated the mistake on `SalesOrdersPage.tsx`, and the patch failed.
+- **Root cause:** I tried to convert too much table structure in one pass instead of applying the logged prevention rule immediately.
+- **Prevention rule:** Halt broad UI table rewrites in mojibake-affected files; only patch imports/actions first, then use tiny ASCII-only row/table tag hunks.
+- **Files affected:** none; patch did not apply.
+
+### 2026-05-17 TOOLING: Broad Products page patch matched mojibake text
+
+- **What went wrong:** A multi-hunk patch for `ProductsPage.tsx` failed because one hunk matched table text containing mojibake characters.
+- **Root cause:** I included too much surrounding display text in the patch context instead of anchoring on stable ASCII identifiers.
+- **Prevention rule:** In files with corrupted/non-ASCII display text, patch imports and structural JSX in smaller ASCII-only hunks.
+- **Files affected:** none; patch did not apply.
+
+### 2026-05-17 TOOLING: Assumed a web test setup filename existed
+
+- **What went wrong:** I tried to read `apps/web/src/test/setup.ts`, which does not exist in this workspace.
+- **Root cause:** I inferred a conventional Vitest setup path instead of checking `apps/web/vitest.config.ts` first.
+- **Prevention rule:** Inspect the package test config before opening assumed setup files.
+- **Files affected:** none; inspection command only.
+
+### 2026-05-17 BUG: Quantity parser allowed an undefined whole part
+
+- **What went wrong:** API typecheck failed because `parseQuantityThousandths` destructured `quantity.split('.')` and passed a possibly undefined `whole` value to `BigInt`.
+- **Root cause:** I relied on the shared Zod regex invariant but did not encode the invariant for TypeScript's control-flow analysis.
+- **Prevention rule:** When converting validated strings to numeric primitives, still provide explicit fallback/default branches so TypeScript and runtime behavior agree.
+- **Files affected:** `apps/api/src/routes/sales-orders.ts`.
+
+### 2026-05-17 TOOLING: Guessed a sales page filename during inspection
+
+- **What went wrong:** I tried to read `apps/web/src/pages/SalesPage.tsx`, but the file does not exist in this repo.
+- **Root cause:** I inferred a route component filename from the route label instead of listing page files first.
+- **Prevention rule:** Use `rg --files apps/web/src/pages` before opening a page file when the filename has not already been confirmed.
+- **Files affected:** none; inspection command only.
+
+### 2026-05-17 TOOLING: Bad PowerShell quoting in a broad rg inspection
+
+- **What went wrong:** A broad `rg` command had an unterminated quoted pattern in PowerShell and failed before returning results.
+- **Root cause:** I mixed many quoted alternatives into one command instead of splitting independent inspections.
+- **Prevention rule:** Keep PowerShell `rg` patterns simple; when searching many CSS selectors, run separate `rg` calls or use a single-quoted pattern.
+- **Files affected:** none; inspection command only.
+
+### 2026-05-17 PROCESS: Tried to spawn all enterprise review squads at once
+
+- **What went wrong:** I attempted to launch the orchestrator plus every section squad in one parallel batch, and the collaboration tool rejected most of them because the active agent thread limit was reached.
+- **Root cause:** I optimized for the user's requested breadth before checking the platform's concurrency ceiling.
+- **Prevention rule:** For large multi-section reviews, spawn the first wave only, wait or close completed agents, then continue section squads in controlled batches.
+- **Files affected:** none; orchestration only.
+
+### 2026-05-17 TOOLING: Used Bash-style `&&` in PowerShell
+
+- **What went wrong:** I chained validation commands with `&&`, which PowerShell rejected as an invalid statement separator in this shell context.
+- **Root cause:** I slipped into Bash syntax after several validation commands instead of using separate tool calls.
+- **Prevention rule:** In this repo's PowerShell shell, run dependent commands as separate tool calls, or use native PowerShell syntax only when a single command truly needs sequencing.
+- **Files affected:** none; validation command only.
+
+### 2026-05-17 PROCESS: Used shell write for a one-line JSX replacement
+
+- **What went wrong:** I used PowerShell `Set-Content` for a small Sidebar text replacement instead of `apply_patch`.
+- **Root cause:** The patch matcher struggled with a mojibake degree symbol and I reached for a broad shell rewrite too quickly.
+- **Prevention rule:** If `apply_patch` cannot match a non-ASCII line, patch a smaller ASCII-only surrounding hunk or leave the harmless text for a later formatting pass; do not use shell writes for manual edits.
+- **Files affected:** `apps/web/src/components/layout/Sidebar.tsx`.
+
+### 2026-05-17 TOOLING: Dotenv helper ran from the wrong package context
+
+- **What went wrong:** An inline Prisma inspection script tried to import `dotenv-flow` from the repo root, where that dependency is not resolvable, then Prisma ran without `DATABASE_URL`.
+- **Root cause:** I forgot the API loads dotenv from `apps/api` while the monorepo root does not expose `dotenv-flow` as a root dependency.
+- **Prevention rule:** For ad-hoc Prisma scripts, run through the API package runtime and explicitly call `dotenvFlow.config({ path: 'D:/BIDCRM', silent: true })` before importing `@bidstack/db`.
+- **Files affected:** none; inspection command only.
+
+### 2026-05-17 PROCESS: Forked subagent options conflicted
+
+- **What went wrong:** I tried to spawn a forked subagent while also overriding the agent type, which the tool rejected because full-history forks inherit the parent agent shape.
+- **Root cause:** I mixed two valid subagent modes instead of using a self-contained non-forked worker prompt for the requested three-agent lane.
+- **Prevention rule:** When using `fork_context: true`, omit `agent_type`, `model`, and `reasoning_effort`; when a specific role is needed, spawn without a full-history fork and provide self-contained task context.
+- **Files affected:** none.
+
+### 2026-05-18 SHELL: PowerShell pattern with embedded quotes failed again
+
+- **What went wrong:** I ran `Select-String` with a pattern containing escaped double quotes, and PowerShell parsed it as an unterminated string.
+- **Root cause:** I used shell-style escaping reflexively instead of single-quoting the whole PowerShell pattern.
+- **Prevention rule:** For `Select-String -Pattern` values that include quotes or punctuation, wrap the entire pattern in single quotes or run separate simple searches.
+- **Files affected:** none.
+
 ### 2026-05-12 TESTING: Ambiguous close button in meeting-import E2E
 
 - **What went wrong:** The new account E2E clicked `getByRole('button', { name: 'Close' })` inside the meeting import dialog, but Radix also renders an icon-only close button with the same accessible name.
@@ -390,3 +628,122 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 - **Root cause:** Trusted prose specs without verifying against upstream code.
 - **Prevention rule:** Before committing to a fork/extension architecture, spawn an Explore agent to verify the actual upstream tech stack and extension-point contracts. Treat any prose claim about an upstream's internals as a hypothesis until grepped.
 - **Files affected:** SPEC.md (architecture decision documented as standalone-first, Twenty overlay preserved for future).
+
+### 2026-05-18 TOOLING: Forked agent spawn included explicit roles
+
+- **What went wrong:** I attempted to spawn three forked agents with explicit `agent_type` values. The tool rejected the calls because full-history forked agents inherit the parent agent type, model, and reasoning effort.
+- **Root cause:** I mixed the full-history fork option with role override parameters without checking this session's spawn constraint.
+- **Prevention rule:** When using `fork_context: true`, omit `agent_type`, `model`, and `reasoning_effort`; only set explicit roles when spawning without full-history fork context.
+- **Files affected:** none.
+
+### 2026-05-18 TOOLING: Browser skill was read partially first
+
+- **What went wrong:** I opened the Browser skill with `-TotalCount 160` even though its instructions require reading the full `SKILL.md` in one read before browser work.
+- **Root cause:** I used my normal quick-inspection habit for a skill file that explicitly disallows partial reads before use.
+- **Prevention rule:** For skills, always read the full `SKILL.md` first unless the skill instructions themselves permit partial loading.
+- **Files affected:** none.
+
+### 2026-05-18 TOOLING: Patched shell-rendered mojibake instead of exact file text
+
+- **What went wrong:** I tried to patch sidebar copy using the mojibake shown by one shell read (`Â·`, `â€¦`), but the actual file text was valid Unicode and the patch failed.
+- **Root cause:** I trusted one console rendering of UTF-8 text instead of confirming with a targeted match before editing.
+- **Prevention rule:** When text appears corrupted in terminal output, confirm the exact source line with a targeted read before patching; do not patch rendered mojibake.
+- **Files affected:** none.
+
+### 2026-05-18 SHELL: Repeated quote-heavy Select-String failed
+
+- **What went wrong:** I ran another `Select-String` pattern containing embedded quotes and alternation, and PowerShell split it into a bad positional argument.
+- **Root cause:** I tried to combine several checks into one quoted pattern instead of using simple single-purpose searches.
+- **Prevention rule:** For PowerShell `Select-String`, avoid combined quote-heavy patterns; run separate simple searches or single-quote the full literal pattern.
+- **Files affected:** none.
+
+### 2026-05-18 TOOLING: In-app browser screenshot capture timed out
+
+- **What went wrong:** After successful DOM/console route smoke, `Page.captureScreenshot` timed out for the in-app browser tab.
+- **Root cause:** The screenshot command can be slower or blocked on complex animated pages; I attempted it after validation instead of treating it as optional evidence.
+- **Prevention rule:** For route smoke, collect DOM and console assertions first. Use screenshots as supplementary evidence only, and if capture times out, report that directly instead of retrying in a loop.
+- **Files affected:** none.
+
+### 2026-05-18 SHELL: Combined rg pattern treated Windows path escapes as regex
+
+- **What went wrong:** I combined multiple Lead checks into one `rg` command, and the Windows path/backslashes became part of the regex parse failure.
+- **Root cause:** I packed verification and target path into a quote-sensitive regex instead of using fixed-string checks.
+- **Prevention rule:** Use `rg -F` with one literal pattern per command for Windows path verification, especially when patterns contain quotes or backslashes.
+- **Files affected:** none.
+
+### 2026-05-18 TESTING: Targeted Playwright command used wrong binary path and flag
+
+- **What went wrong:** I ran `pnpm --filter @bidstack/web exec playwright ... --screenshot=off`, which failed before executing tests because the recursive exec path did not expose `playwright` and this Playwright version rejected `--screenshot=off`.
+- **Root cause:** I copied the intended E2E shape without checking the package's script entry point and supported Playwright CLI flags.
+- **Prevention rule:** Prefer the package script (`pnpm --filter @bidstack/web e2e -- ...`) for web E2E, and only pass flags confirmed by the installed Playwright version.
+- **Files affected:** none.
+
+### 2026-05-18 TESTING: Playwright package script failed before collecting tests
+
+- **What went wrong:** The corrected web E2E package script failed with `@playwright/test does not provide an export named 'test'` and then reported no tests found.
+- **Root cause:** The local Playwright runtime/module resolution is not in a working state for the package-script path, independent of the UI changes under test.
+- **Prevention rule:** Treat package-level E2E infrastructure failures separately from browser smoke. Inspect package resolution before claiming E2E coverage, and report route smoke as manual/browser validation when Playwright collection is broken.
+- **Files affected:** none.
+
+### 2026-05-18 SHELL: Repeated combined rg pattern failed while checking dashboard animation
+
+- **What went wrong:** I used one combined `rg` pattern with quotes and alternation while searching for dashboard glow classes, and the regex parser rejected it.
+- **Root cause:** I repeated a known bad pattern instead of using the documented fixed-string approach from the earlier mistake entry.
+- **Prevention rule:** For class/name searches in this repo, default to `rg -F` with one pattern per command. Do not combine alternation and escaped quotes in PowerShell.
+- **Files affected:** none.
+
+### 2026-05-20 SHELL: Used reserved `$PID` as a loop variable
+
+- **What went wrong:** I used `$pid` as a PowerShell loop variable while trying to restart the local preview server. PowerShell treats `$PID` as a read-only automatic variable, so the cleanup command errored before it could stop the process.
+- **Root cause:** I wrote a quick process loop without checking automatic variable names.
+- **Prevention rule:** In PowerShell process loops, use names like `$ownerPid` or `$processIdValue`, never `$pid`/`$PID`.
+- **Files affected:** none.
+
+### 2026-05-20 TESTING: Playwright link selector matched multiple account nav items
+
+- **What went wrong:** The mobile account E2E clicked `getByRole('link', { name: 'Accounts' })`, which also matched `Key Accounts` and `Top Accounts` in strict mode.
+- **Root cause:** I used a substring role-name selector in a navigation menu with related labels.
+- **Prevention rule:** For navigation labels that are substrings of other labels, use exact role matching: `{ name: 'Accounts', exact: true }`.
+- **Files affected:** `apps/web/e2e/account-detail.spec.ts`.
+
+### 2026-05-20 LINT: OCR wrapper dropped caught error context
+
+- **What went wrong:** The first OCR helper lint run failed because a thrown extraction error did not preserve the original caught error as `cause`.
+- **Root cause:** I optimized the user-facing error message before checking the repo's `preserve-caught-error` lint rule.
+- **Prevention rule:** When translating parser/OCR failures into domain errors, always attach the caught error via `{ cause: err }`.
+- **Files affected:** `apps/api/src/lib/extract-text.ts`.
+
+### 2026-05-20 TESTING: Intake E2E matched extraction text too broadly
+
+- **What went wrong:** The first focused intake E2E rerun still matched multiple elements because the next-step control's accessible name included the substring `Extract`, and the preview initially served an old bundle.
+- **Root cause:** I relied on a visible-label substring in a screen with related extraction copy, then reran before rebuilding the preview bundle.
+- **Prevention rule:** Give step-navigation controls precise accessible names and rebuild the Vite preview bundle before rerunning focused Playwright checks.
+- **Files affected:** `apps/web/src/pages/IntakePage.tsx`.
+
+### 2026-05-20 BUILD: Cross-package typecheck ran before rebuilding shared exports
+
+- **What went wrong:** API and web typecheck initially reported missing shared exports for the new RFP agent schemas because the consumers resolve `@bidstack/shared` through built output.
+- **Root cause:** I added shared source exports and immediately typechecked downstream packages before running the shared package build.
+- **Prevention rule:** After adding new exports to `packages/shared`, run `pnpm --filter @bidstack/shared build` before downstream package typechecks.
+- **Files affected:** `packages/shared/src/schemas/rfp-agent.ts`, `packages/shared/src/schemas/index.ts`.
+
+### 2026-05-20 TESTING: Opportunities page test leaked DOM between cases
+
+- **What went wrong:** The focused Opportunities page test found two matching `Opportunities` headings because prior renders were still mounted.
+- **Root cause:** The test file did not call Testing Library `cleanup()` after each case.
+- **Prevention rule:** Component tests without a global cleanup setup must call `cleanup()` in `afterEach`, especially when multiple cases render the same page shell.
+- **Files affected:** `apps/web/src/pages/OpportunitiesPage.test.tsx`.
+
+### 2026-05-20 SECURITY: Inspected Claude settings before secret scanning
+
+- **What went wrong:** I read `.claude/settings.json` directly and surfaced a hardcoded API-key-looking value in tool output before replacing it with an environment-variable placeholder.
+- **Root cause:** I inspected command configuration before running a targeted secret-safe check.
+- **Prevention rule:** Before reading local tool settings, search for key names and redact/patch hardcoded secrets before displaying config contents.
+- **Files affected:** `.claude/settings.json`.
+
+### 2026-05-20 SHELL: Recursive Claude directory listing timed out
+
+- **What went wrong:** I recursively listed `.claude`, which traversed large worktrees and `node_modules` until the command timed out.
+- **Root cause:** I used broad recursion instead of limiting inspection to the top-level command/config folders.
+- **Prevention rule:** For `.claude` and `.codex`, inspect only known shallow paths first: settings, commands, agents, hooks, and rules. Exclude `worktrees`.
+- **Files affected:** none.

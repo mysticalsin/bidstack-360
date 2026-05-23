@@ -1,7 +1,6 @@
-// Integrations → Provider health. Polls /crm/provider-health on a 30s
-// interval so oncall can see which providers (Twenty, Dust, SAM.gov, …)
-// are healthy / degraded / disabled / down without leaving the integrations
-// page.
+// Integrations -> Provider health. Polls /crm/provider-health on a 30s
+// interval so on-call users can see which providers are healthy, degraded,
+// disabled, or down without leaving the integrations page.
 
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
@@ -30,19 +29,17 @@ export function ProviderHealthSection() {
 
   const downCount = items.filter((p) => p.status === 'down').length;
   const degradedCount = items.filter((p) => p.status === 'degraded').length;
+  const caption = getCaption({
+    isLoading,
+    isFetching,
+    providerCount: items.length,
+    downCount,
+    degradedCount,
+  });
 
   return (
     <Card>
-      <SectionHeader
-        title="Provider health"
-        caption={
-          isLoading
-            ? 'Checking provider status…'
-            : downCount + degradedCount === 0
-              ? `All ${items.length} providers reporting healthy${isFetching ? ' · refreshing' : ''}.`
-              : `${downCount} down, ${degradedCount} degraded · auto-polling every 30s`
-        }
-      />
+      <SectionHeader title="Provider health" caption={caption} />
       {isLoading ? (
         <LoadingSkeleton rows={3} />
       ) : isError ? (
@@ -74,7 +71,7 @@ export function ProviderHealthSection() {
                   <span>Checked {relativeTime(p.lastCheckedAt)}</span>
                   {p.latencyMs !== null ? (
                     <>
-                      <span aria-hidden>·</span>
+                      <span aria-hidden>.</span>
                       <span className="tabular-nums">{p.latencyMs}ms</span>
                     </>
                   ) : null}
@@ -90,6 +87,27 @@ export function ProviderHealthSection() {
       )}
     </Card>
   );
+}
+
+function getCaption({
+  isLoading,
+  isFetching,
+  providerCount,
+  downCount,
+  degradedCount,
+}: {
+  isLoading: boolean;
+  isFetching: boolean;
+  providerCount: number;
+  downCount: number;
+  degradedCount: number;
+}) {
+  if (isLoading) return 'Checking provider status...';
+  if (providerCount === 0) return 'No providers configured yet.';
+  if (downCount + degradedCount === 0) {
+    return `All ${providerCount} providers reporting healthy${isFetching ? ' - refreshing' : ''}.`;
+  }
+  return `${downCount} down, ${degradedCount} degraded - auto-polling every 30s`;
 }
 
 function byStatus(a: ProviderHealth, b: ProviderHealth) {

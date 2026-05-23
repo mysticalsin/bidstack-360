@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge, stageTone } from '@/components/ui/Badge';
@@ -9,7 +9,8 @@ import {
   useServiceDeskReport,
   useTaskReport,
 } from '@/hooks/useReports';
-import { formatMoney, formatStage } from '@/lib/format';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { formatStage } from '@/lib/format';
 
 type ReportTab = 'pipeline' | 'leads' | 'service-desk' | 'tasks';
 
@@ -58,6 +59,7 @@ export function ReportsPage() {
 }
 
 function PipelineReport() {
+  const { formatMoney } = useFormatMoney();
   const { data, isLoading, isError, error } = usePipelineReport();
 
   if (isError) return <ErrorState title="Could not load report" message={error?.message} />;
@@ -70,26 +72,28 @@ function PipelineReport() {
           <LoadingSkeleton />
         ) : (
           <div className="p-5 space-y-3">
-            {data?.byStage.map((s) => {
+            {(() => {
               const max = Math.max(...(data?.byStage.map((x) => x.valueSum) ?? [1]));
-              const pct = (s.valueSum / max) * 100;
-              return (
-                <div key={s.stage}>
-                  <div className="mb-1 flex items-center justify-between text-xs">
-                    <Badge tone={stageTone(s.stage)}>{formatStage(s.stage)}</Badge>
-                    <span className="tabular-nums text-[var(--fg-secondary)]">
-                      {s.count} · {formatMoney(s.valueSum, 'EUR')}
-                    </span>
+              return data?.byStage.map((s) => {
+                const pct = (s.valueSum / max) * 100;
+                return (
+                  <div key={s.stage}>
+                    <div className="mb-1 flex items-center justify-between text-xs">
+                      <Badge tone={stageTone(s.stage)}>{formatStage(s.stage)}</Badge>
+                      <span className="tabular-nums text-[var(--fg-secondary)]">
+                        {s.count} · {formatMoney(s.valueSum, 'EUR')}
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
+                      <div
+                        className="h-full bg-[var(--brand-primary)]"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-2 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
-                    <div
-                      className="h-full bg-[var(--brand-primary)]"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
           </div>
         )}
       </Card>
@@ -130,24 +134,26 @@ function LeadReport() {
             <LoadingSkeleton />
           ) : (
             <div className="p-5 space-y-3">
-              {data?.byStatus.map((s) => {
+              {(() => {
                 const max = Math.max(...(data?.byStatus.map((x) => x.count) ?? [1]));
-                const pct = (s.count / max) * 100;
-                return (
-                  <div key={s.status}>
-                    <div className="mb-1 flex items-center justify-between text-xs">
-                      <span className="capitalize">{s.status}</span>
-                      <span className="tabular-nums text-[var(--fg-secondary)]">{s.count}</span>
+                return data?.byStatus.map((s) => {
+                  const pct = (s.count / max) * 100;
+                  return (
+                    <div key={s.status}>
+                      <div className="mb-1 flex items-center justify-between text-xs">
+                        <span className="capitalize">{s.status}</span>
+                        <span className="tabular-nums text-[var(--fg-secondary)]">{s.count}</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
+                        <div
+                          className="h-full bg-[var(--brand-primary)]"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="h-2 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
-                      <div
-                        className="h-full bg-[var(--brand-primary)]"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
           )}
         </Card>
@@ -158,24 +164,26 @@ function LeadReport() {
             <LoadingSkeleton />
           ) : (
             <div className="p-5 space-y-3">
-              {data?.bySource.map((s) => {
+              {(() => {
                 const max = Math.max(...(data?.bySource.map((x) => x.count) ?? [1]));
-                const pct = (s.count / max) * 100;
-                return (
-                  <div key={s.source}>
-                    <div className="mb-1 flex items-center justify-between text-xs">
-                      <span className="capitalize">{s.source}</span>
-                      <span className="tabular-nums text-[var(--fg-secondary)]">{s.count}</span>
+                return data?.bySource.map((s) => {
+                  const pct = (s.count / max) * 100;
+                  return (
+                    <div key={s.source}>
+                      <div className="mb-1 flex items-center justify-between text-xs">
+                        <span className="capitalize">{s.source}</span>
+                        <span className="tabular-nums text-[var(--fg-secondary)]">{s.count}</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
+                        <div
+                          className="h-full bg-[var(--brand-primary)]"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="h-2 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
-                      <div
-                        className="h-full bg-[var(--brand-primary)]"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
           )}
         </Card>
@@ -208,24 +216,26 @@ function ServiceDeskReport() {
             <LoadingSkeleton />
           ) : (
             <div className="p-5 space-y-3">
-              {data?.byStatus.map((s) => {
+              {(() => {
                 const max = Math.max(...(data?.byStatus.map((x) => x.count) ?? [1]));
-                const pct = (s.count / max) * 100;
-                return (
-                  <div key={s.status}>
-                    <div className="mb-1 flex items-center justify-between text-xs">
-                      <span className="capitalize">{s.status}</span>
-                      <span className="tabular-nums text-[var(--fg-secondary)]">{s.count}</span>
+                return data?.byStatus.map((s) => {
+                  const pct = (s.count / max) * 100;
+                  return (
+                    <div key={s.status}>
+                      <div className="mb-1 flex items-center justify-between text-xs">
+                        <span className="capitalize">{s.status}</span>
+                        <span className="tabular-nums text-[var(--fg-secondary)]">{s.count}</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
+                        <div
+                          className="h-full bg-[var(--brand-primary)]"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="h-2 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
-                      <div
-                        className="h-full bg-[var(--brand-primary)]"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
           )}
         </Card>
@@ -236,24 +246,26 @@ function ServiceDeskReport() {
             <LoadingSkeleton />
           ) : (
             <div className="p-5 space-y-3">
-              {data?.byPriority.map((p) => {
+              {(() => {
                 const max = Math.max(...(data?.byPriority.map((x) => x.count) ?? [1]));
-                const pct = (p.count / max) * 100;
-                return (
-                  <div key={p.priority}>
-                    <div className="mb-1 flex items-center justify-between text-xs">
-                      <span className="capitalize">{p.priority}</span>
-                      <span className="tabular-nums text-[var(--fg-secondary)]">{p.count}</span>
+                return data?.byPriority.map((p) => {
+                  const pct = (p.count / max) * 100;
+                  return (
+                    <div key={p.priority}>
+                      <div className="mb-1 flex items-center justify-between text-xs">
+                        <span className="capitalize">{p.priority}</span>
+                        <span className="tabular-nums text-[var(--fg-secondary)]">{p.count}</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
+                        <div
+                          className="h-full bg-[var(--brand-primary)]"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="h-2 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
-                      <div
-                        className="h-full bg-[var(--brand-primary)]"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
           )}
         </Card>
@@ -282,24 +294,26 @@ function TaskReport() {
           <LoadingSkeleton />
         ) : (
           <div className="p-5 space-y-3">
-            {data?.byStatus.map((s) => {
+            {(() => {
               const max = Math.max(...(data?.byStatus.map((x) => x.count) ?? [1]));
-              const pct = (s.count / max) * 100;
-              return (
-                <div key={s.status}>
-                  <div className="mb-1 flex items-center justify-between text-xs">
-                    <span className="capitalize">{s.status}</span>
-                    <span className="tabular-nums text-[var(--fg-secondary)]">{s.count}</span>
+              return data?.byStatus.map((s) => {
+                const pct = (s.count / max) * 100;
+                return (
+                  <div key={s.status}>
+                    <div className="mb-1 flex items-center justify-between text-xs">
+                      <span className="capitalize">{s.status}</span>
+                      <span className="tabular-nums text-[var(--fg-secondary)]">{s.count}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
+                      <div
+                        className="h-full bg-[var(--brand-primary)]"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-2 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
-                    <div
-                      className="h-full bg-[var(--brand-primary)]"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
           </div>
         )}
       </Card>
@@ -307,7 +321,7 @@ function TaskReport() {
   );
 }
 
-function KpiCard({ label, value }: { label: string; value: string }) {
+const KpiCard = memo(function KpiCard({ label, value }: { label: string; value: string }) {
   return (
     <Card className="px-5 py-4">
       <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
@@ -316,4 +330,4 @@ function KpiCard({ label, value }: { label: string; value: string }) {
       <div className="mt-2 text-3xl font-bold tabular-nums text-[var(--fg-primary)]">{value}</div>
     </Card>
   );
-}
+});

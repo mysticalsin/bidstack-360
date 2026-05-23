@@ -1,15 +1,17 @@
+import { useQuery } from '@tanstack/react-query';
 import { NavLink } from 'react-router-dom';
 
 import { Tooltip, TooltipProvider } from '@/components/ui/Tooltip';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useOpportunityCount } from '@/hooks/useOpportunities';
 import { useTasks } from '@/hooks/useTasks';
-import { daysUntil } from '@/lib/format';
+import { daysUntil, relativeTime } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { prefetchRoute } from '@/lib/prefetch';
 import { useAccountHistory, type AccountEntry } from '@/stores/accountHistory';
 import { useIsAdmin } from '@/lib/auth';
 import { useUiStore } from '@/stores/ui';
+import { api } from '@/lib/api';
 
 interface NavItem {
   to: string;
@@ -28,6 +30,7 @@ const WORKSPACE: NavItem[] = [
   { to: '/companies', label: 'Companies', icon: 'building' },
   { to: '/opportunities', label: 'Opportunities', icon: 'briefcase', badgeKey: 'openBids' },
   { to: '/pipeline', label: 'Pipeline', icon: 'pipeline' },
+  { to: '/forecasts', label: 'Forecasts', icon: 'growth' },
   { to: '/bid-matrix', label: 'Bid/No-Bid Matrix', icon: 'target' },
   { to: '/leads', label: 'Leads', icon: 'target' },
   { to: '/contacts', label: 'Contacts', icon: 'contacts' },
@@ -56,6 +59,16 @@ export function Sidebar() {
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
   const toggle = useUiStore((s) => s.toggleSidebar);
   const isAdmin = useIsAdmin();
+
+  const dustQuery = useQuery({
+    queryKey: ['dust:status'],
+    queryFn: ({ signal }) =>
+      api<{ configured: boolean; lastSyncAt: string | null }>('/api/integrations/dust/status', {
+        signal,
+      }),
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
   // Account history — show top 5 recents + all favorites. Favorites can
   // grow unbounded by design (users curate them), but recents are bounded
   // by the store's LRU eviction cap.
@@ -76,9 +89,8 @@ export function Sidebar() {
 
   return (
     <TooltipProvider delayDuration={300} disableHoverableContent>
-      <aside
+      <nav
         className={cn('sidebar', collapsed && 'is-collapsed')}
-        role="navigation"
         aria-label="Primary navigation"
         style={{ position: 'relative' }}
       >
@@ -139,11 +151,30 @@ export function Sidebar() {
 
         <div className="sb-foot">
           <div className="sb-sync">
-            <span className="cs-pulse" aria-hidden />
-            <span>Dust connected · synced 2m ago</span>
+            {dustQuery.data?.configured ? (
+              <>
+                <span className="cs-pulse" aria-hidden />
+                <span>
+                  Dust connected
+                  {dustQuery.data.lastSyncAt
+                    ? ` · synced ${relativeTime(dustQuery.data.lastSyncAt)}`
+                    : ''}
+                </span>
+              </>
+            ) : (
+              <a
+                href="https://www.linkedin.com/in/tonywalteur/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:underline"
+                style={{ color: 'var(--fg-tertiary)', textDecoration: 'underline' }}
+              >
+                Created by Tony Walteur
+              </a>
+            )}
           </div>
         </div>
-      </aside>
+      </nav>
     </TooltipProvider>
   );
 }
@@ -174,6 +205,7 @@ function SidebarItem({
     <NavLink
       to={item.to}
       className={({ isActive }) => cn('sb-item', isActive && 'active')}
+      aria-label={item.label}
       title={collapsed ? undefined : item.label}
       end={item.to === '/'}
       onMouseEnter={prefetch}

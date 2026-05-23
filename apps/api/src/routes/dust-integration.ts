@@ -10,6 +10,7 @@ import { prisma, type Opportunity } from '@bidstack/db';
 import type { Logger as PinoLogger } from 'pino';
 import { DustClient } from '@bidstack/dust-client';
 
+import { config } from '../config.js';
 import { enqueueDustResync } from '../queues/dust-poll.js';
 
 interface DustAgentStatus {
@@ -65,6 +66,8 @@ const ApiKeySummary = z.object({
   lastUsedAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
 });
+
+const DUST_STATUS_RATE_LIMIT_MAX = Math.max(120, Math.min(config.API_RATE_LIMIT_MAX, 1_000));
 
 function serializeOpportunityToMarkdown(opp: Opportunity): string {
   const value =
@@ -135,12 +138,15 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
         pushed_at: new Date().toISOString(),
       });
 
-      await prisma.$transaction([
-        prisma.opportunity.update({
-          where: { id: opp.id },
+      await prisma.$transaction(async (tx) => {
+        const updateResult = await tx.opportunity.updateMany({
+          where: { id: opp.id, orgId: req.auth.orgId },
           data: { dustDocId: doc.document_id },
-        }),
-        prisma.syncEvent.create({
+        });
+        if (updateResult.count === 0) {
+          throw server.httpErrors.notFound('Opportunity not found');
+        }
+        await tx.syncEvent.create({
           data: {
             orgId: req.auth.orgId,
             source: 'dust.push',
@@ -149,8 +155,8 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
             status: 'processed',
             processedAt: new Date(),
           },
-        }),
-        prisma.auditLog.create({
+        });
+        await tx.auditLog.create({
           data: {
             orgId: req.auth.orgId,
             userId: req.auth.userId,
@@ -159,68 +165,76 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
             targetId: opp.id,
             diff: { dustDocId: doc.document_id, code: opp.code },
           },
-        }),
-      ]);
+        });
+      });
 
       return { dustDocId: doc.document_id };
     },
   );
 
   // GET /api/integrations/dust/status
-  server.get('/dust/status', { schema: { response: { 200: DustStatus } } }, async (req) => {
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const [pulled, pushed, lastErr, lastSync, agentStatus] = await Promise.all([
-      prisma.syncEvent.count({
-        where: {
-          orgId: req.auth.orgId,
-          source: 'dust.poll',
-          receivedAt: { gte: since },
-        },
-      }),
-      prisma.syncEvent.count({
-        where: {
-          orgId: req.auth.orgId,
-          source: 'dust.push',
-          receivedAt: { gte: since },
-        },
-      }),
-      prisma.syncEvent.findFirst({
-        where: { orgId: req.auth.orgId, status: 'error' },
-        orderBy: { receivedAt: 'desc' },
-      }),
-      prisma.syncEvent.findFirst({
-        where: { orgId: req.auth.orgId, source: 'dust.poll', status: 'processed' },
-        orderBy: { receivedAt: 'desc' },
-      }),
-      listDustAgents(req.log),
-    ]);
+  server.get(
+    '/dust/status',
+    {
+      config: { rateLimit: { max: DUST_STATUS_RATE_LIMIT_MAX, timeWindow: '1 minute' } },
+      schema: { response: { 200: DustStatus } },
+    },
+    async (req) => {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const [pulled, pushed, lastErr, lastSync, agentStatus] = await Promise.all([
+        prisma.syncEvent.count({
+          where: {
+            orgId: req.auth.orgId,
+            source: 'dust.poll',
+            receivedAt: { gte: since },
+          },
+        }),
+        prisma.syncEvent.count({
+          where: {
+            orgId: req.auth.orgId,
+            source: 'dust.push',
+            receivedAt: { gte: since },
+          },
+        }),
+        prisma.syncEvent.findFirst({
+          where: { orgId: req.auth.orgId, status: 'error' },
+          orderBy: { receivedAt: 'desc' },
+        }),
+        prisma.syncEvent.findFirst({
+          where: { orgId: req.auth.orgId, source: 'dust.poll', status: 'processed' },
+          orderBy: { receivedAt: 'desc' },
+        }),
+        listDustAgents(req.log),
+      ]);
 
-    const configured = Boolean(process.env.DUST_API_KEY && process.env.DUST_WORKSPACE_ID);
+      const configured = Boolean(process.env.DUST_API_KEY && process.env.DUST_WORKSPACE_ID);
 
-    return {
-      workspace: process.env.DUST_WORKSPACE_ID ?? 'mantu-presales',
-      lastSyncAt:
-        lastSync?.processedAt?.toISOString() ?? lastSync?.receivedAt.toISOString() ?? null,
-      // Best-effort next tick: the dust-poll worker's repeat interval is 5m,
-      // so we estimate from lastSync without coupling this route to BullMQ
-      // scheduler internals.
-      nextSyncAt: lastSync
-        ? new Date(lastSync.receivedAt.getTime() + 5 * 60 * 1000).toISOString()
-        : new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-      lastError: lastErr?.error ?? null,
-      pulled24h: pulled,
-      pushed24h: pushed,
-      configured,
-      agentsError: agentStatus.error,
-      agents: agentStatus.agents,
-    };
-  });
+      return {
+        workspace: process.env.DUST_WORKSPACE_ID ?? 'mantu-presales',
+        lastSyncAt:
+          lastSync?.processedAt?.toISOString() ?? lastSync?.receivedAt.toISOString() ?? null,
+        // Best-effort next tick: the dust-poll worker's repeat interval is 5m,
+        // so we estimate from lastSync without coupling this route to BullMQ
+        // scheduler internals.
+        nextSyncAt: lastSync
+          ? new Date(lastSync.receivedAt.getTime() + 5 * 60 * 1000).toISOString()
+          : new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+        lastError: lastErr?.error ?? null,
+        pulled24h: pulled,
+        pushed24h: pushed,
+        configured,
+        agentsError: agentStatus.error,
+        agents: agentStatus.agents,
+      };
+    },
+  );
 
   // POST /api/integrations/dust/resync
   server.post(
     '/dust/resync',
     {
-      preHandler: server.requireRole('admin'),
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      preHandler: server.requirePermission('integrations:write'),
       schema: {
         response: { 202: z.object({ jobId: z.string() }) },
       },
@@ -254,7 +268,8 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/api-keys',
     {
-      preHandler: server.requireRole('admin'),
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      preHandler: server.requirePermission('integrations:read'),
       schema: { response: { 200: z.object({ items: z.array(ApiKeySummary) }) } },
     },
     async (req) => {
@@ -278,7 +293,7 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/api-keys',
     {
-      preHandler: server.requireRole('admin'),
+      preHandler: server.requirePermission('integrations:write'),
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {
         body: z.object({
@@ -334,8 +349,9 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/api-keys/:id',
     {
-      preHandler: server.requireRole('admin'),
-      schema: { params: z.object({ id: z.string().uuid() }) },
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      preHandler: server.requirePermission('integrations:write'),
+      schema: { params: z.object({ id: z.string().uuid() }), response: { 204: z.null() } },
     },
     async (req, reply) => {
       const key = await prisma.apiKey.findFirst({
@@ -358,7 +374,7 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
           },
         }),
       ]);
-      return reply.code(204).send();
+      return reply.code(204).send(null);
     },
   );
 

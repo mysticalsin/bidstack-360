@@ -1,7 +1,16 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { useQuery } from '@tanstack/react-query';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { CompanyLogo } from '@/components/company/CompanyLogo';
@@ -9,6 +18,7 @@ import { useContacts } from '@/hooks/useContacts';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
 import { useGlobalSearch } from '@/hooks/useGlobalSearch';
 import { useTasks } from '@/hooks/useTasks';
+import { useAgents } from '@/hooks/useAgents';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { springModal } from '@/lib/motion';
@@ -40,7 +50,8 @@ interface Item {
     | 'company'
     | 'note'
     | 'sales_order'
-    | 'invoice';
+    | 'invoice'
+    | 'agent';
   label: string;
   hint?: string;
   // Optional leading visual (e.g. CompanyLogo for account rows). Group label
@@ -49,7 +60,9 @@ interface Item {
   onSelect: () => void;
 }
 
-const NAV_TARGETS: Array<{ to: string; label: string; hint: string }> = [
+type NavTarget = { to: string; label: string; hint: string };
+
+const NAV_TARGETS: NavTarget[] = [
   { to: '/dashboard', label: 'Go to Dashboard', hint: '⌘1' },
   { to: '/accounts', label: 'Go to Accounts', hint: '⌘A' },
   { to: '/opportunities', label: 'Go to Opportunities', hint: '⌘2' },
@@ -76,7 +89,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15 }}
-                className="fixed inset-0 z-40 bg-[var(--surface-overlay)] backdrop-blur-sm"
+                className="fixed inset-0 z-40 bg-surface-overlay backdrop-blur-sm"
               />
             </Dialog.Overlay>
             <Dialog.Content asChild forceMount aria-describedby={undefined}>
@@ -102,6 +115,8 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [activeIdx, setActiveIdx] = useState(0);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const queryRef = useRef('');
   // Snapshot recents at mount — we don't want them shifting around while
   // the palette is open (the user might select an item that's now at a
   // different index than when they started typing).
@@ -116,6 +131,16 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   const allRecents = useAccountHistory((s) => s.recents);
   const accountRecents = useMemo(() => allRecents.slice(0, 3), [allRecents]);
   const listRef = useRef<HTMLUListElement | null>(null);
+
+  useLayoutEffect(() => {
+    inputRef.current?.focus();
+    const frame = window.requestAnimationFrame(() => inputRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    queryRef.current = query;
+  }, [query]);
 
   const oppSearch = useQuery({
     enabled: query.trim().length >= 2,
@@ -138,6 +163,22 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   // has already opened those pages.
   const contacts = useContacts();
   const tasks = useTasks();
+  const agents = useAgents();
+
+  const selectNavTarget = useCallback(
+    (target: NavTarget) => {
+      pushRecent({
+        id: `nav:${target.to}`,
+        group: 'navigate',
+        label: target.label,
+        hint: target.hint,
+        route: target.to,
+      });
+      navigate(target.to);
+      onClose();
+    },
+    [navigate, onClose],
+  );
 
   const items: Item[] = useMemo(() => {
     const out: Item[] = [];
@@ -194,17 +235,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
           group: 'navigate',
           label: n.label,
           hint: n.hint,
-          onSelect: () => {
-            pushRecent({
-              id: `nav:${n.to}`,
-              group: 'navigate',
-              label: n.label,
-              hint: n.hint,
-              route: n.to,
-            });
-            navigate(n.to);
-            onClose();
-          },
+          onSelect: () => selectNavTarget(n),
         });
       }
     }
@@ -311,6 +342,32 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
         },
       });
     }
+    for (const a of agents.data?.items ?? []) {
+      if (
+        !q ||
+        a.name.toLowerCase().includes(q) ||
+        (a.description?.toLowerCase().includes(q) ?? false)
+      ) {
+        const route = `/agents`;
+        out.push({
+          id: `agent:${a.id}`,
+          group: 'agent',
+          label: `Run ${a.name}`,
+          hint: a.description ?? 'Agent',
+          onSelect: () => {
+            pushRecent({
+              id: `agent:${a.id}`,
+              group: 'agent',
+              label: `Run ${a.name}`,
+              hint: a.description ?? 'Agent',
+              route,
+            });
+            navigate(route);
+            onClose();
+          },
+        });
+      }
+    }
     return out;
   }, [
     query,
@@ -323,6 +380,8 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
     onClose,
     recents,
     accountRecents,
+    agents.data?.items,
+    selectNavTarget,
   ]);
 
   // Auto-scroll the active row into view when arrowing through long result
@@ -349,18 +408,52 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const appendQueryCharacter = useCallback((key: string) => {
+    inputRef.current?.focus();
+    setQuery((prev) => {
+      const next = `${prev}${key}`;
+      queryRef.current = next;
+      return next;
+    });
+    setActiveIdx(0);
+  }, []);
+
+  useEffect(() => {
+    const handleDocumentKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.defaultPrevented || event.target === inputRef.current) return;
+      if (event.key.length !== 1 || event.metaKey || event.ctrlKey || event.altKey) return;
+      appendQueryCharacter(event.key);
+      event.preventDefault();
+    };
+
+    document.addEventListener('keydown', handleDocumentKeyDown, true);
+    return () => document.removeEventListener('keydown', handleDocumentKeyDown, true);
+  }, [appendQueryCharacter]);
+
+  const handlePaletteKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.defaultPrevented) return;
+    if (e.target === inputRef.current) return;
+    if (e.key.length !== 1 || e.metaKey || e.ctrlKey || e.altKey) return;
+    appendQueryCharacter(e.key);
+    e.preventDefault();
+  };
+
   return (
-    <>
+    <div onKeyDown={handlePaletteKeyDown}>
       <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-4 py-3">
         <span className="text-[var(--fg-tertiary)]" aria-hidden>
           ⌕
         </span>
         <input
+          ref={inputRef}
+          role="combobox"
           autoFocus
           type="search"
           value={query}
           onChange={(e) => {
-            setQuery(e.target.value);
+            const nextQuery = e.currentTarget.value;
+            queryRef.current = nextQuery;
+            setQuery(nextQuery);
             // Re-anchor to the top of the new result set.
             setActiveIdx(0);
           }}
@@ -373,6 +466,11 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
               setActiveIdx((i) => Math.max(0, i - 1));
             } else if (e.key === 'Enter') {
               e.preventDefault();
+              const directRoute = findDirectNavTarget(queryRef.current || e.currentTarget.value);
+              if (directRoute) {
+                selectNavTarget(directRoute);
+                return;
+              }
               items[safeIdx]?.onSelect();
             }
           }}
@@ -380,7 +478,9 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
           className="flex-1 bg-transparent text-sm text-[var(--fg-primary)] placeholder:text-[var(--fg-tertiary)] focus:outline-none"
           aria-label="Search across the CRM"
           aria-autocomplete="list"
+          aria-expanded="true"
           aria-controls="cmdk-list"
+          aria-activedescendant={items.length ? `cmdk-option-${safeIdx}` : undefined}
         />
         <kbd className="rounded border border-[var(--border-default)] bg-[var(--surface-sunken)] px-1.5 py-0.5 text-[10px] font-mono text-[var(--fg-tertiary)]">
           esc
@@ -397,6 +497,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
           const active = i === safeIdx;
           return (
             <li
+              id={`cmdk-option-${i}`}
               key={item.id}
               data-cmdk-idx={i}
               role="option"
@@ -443,7 +544,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
           );
         })}
       </ul>
-    </>
+    </div>
   );
 }
 
@@ -495,10 +596,30 @@ function taskSubtitle(t: Task): string | undefined {
   return t.dueDate ? `Due ${t.dueDate} · ${t.status}` : t.status;
 }
 
+function findDirectNavTarget(query: string): NavTarget | undefined {
+  const normalized = normalizeNavQuery(query);
+  if (!normalized) return undefined;
+  return NAV_TARGETS.find((target) => {
+    const label = normalizeNavQuery(
+      target.label
+        .replace(/^go to\s+/i, '')
+        .replace(/\([^)]*\)/g, '')
+        .trim(),
+    );
+    const route = normalizeNavQuery(target.to.replace(/^\//, ''));
+    return normalized === label || normalized === route;
+  });
+}
+
+function normalizeNavQuery(value: string) {
+  return value.trim().toLowerCase();
+}
+
 function groupTag(group: Item['group']): string {
   if (group === 'opportunity') return 'opp';
   if (group === 'account') return 'acct';
   if (group === 'contact') return 'who';
   if (group === 'task') return 'todo';
+  if (group === 'agent') return 'agent';
   return group;
 }

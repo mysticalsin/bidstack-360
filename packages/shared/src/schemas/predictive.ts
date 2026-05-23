@@ -12,7 +12,7 @@ export type PredictiveScoreKind = z.infer<typeof PredictiveScoreKind>;
 
 export const PredictiveScore = z.object({
   id: z.string().uuid(),
-  targetType: z.string(),
+  targetType: z.string().max(50),
   targetId: z.string().uuid(),
   kind: PredictiveScoreKind,
   score: z.number().int().min(0).max(10000),

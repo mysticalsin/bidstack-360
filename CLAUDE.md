@@ -10,6 +10,13 @@ Conduct rules apply unless explicitly overridden. Explicit override = the user n
 
 Bias: caution over speed on non-trivial work. Use judgment on trivial tasks.
 
+## Tony's /goal execution standard
+
+For non-trivial work, never take the easy or sloppy route. Think, plan, execute,
+and verify. Define assumptions and success criteria before implementation, use
+the right expert lenses for the work, keep changes surgical, and stop only when
+the goal is verified or the next step needs Tony's product/security guidance.
+
 ## Rule 1 — Think Before Coding
 
 State assumptions explicitly. If uncertain, ask rather than guess. Present multiple interpretations when ambiguity exists. Push back when a simpler approach exists. Stop when confused. Name what's unclear.

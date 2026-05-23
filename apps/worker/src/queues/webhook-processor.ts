@@ -116,15 +116,15 @@ export async function startWebhookProcessor(
             log.info({ eventType, eventId: evt.id }, 'unhandled dust webhook event type');
           }
 
-          await prisma.syncEvent.update({
-            where: { id: evt.id },
+          await prisma.syncEvent.updateMany({
+            where: { id: evt.id, orgId: evt.orgId },
             data: { status: 'processed', processedAt: new Date() },
           });
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
           log.warn({ eventId: evt.id, error }, 'webhook event processing failed');
-          await prisma.syncEvent.update({
-            where: { id: evt.id },
+          await prisma.syncEvent.updateMany({
+            where: { id: evt.id, orgId: evt.orgId },
             data: {
               status: 'error',
               error,

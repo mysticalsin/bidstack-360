@@ -1,3 +1,4 @@
+import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenvFlow from 'dotenv-flow';
@@ -45,6 +46,23 @@ log.info(
   'BidStack worker ready (dust-poll + webhook-processor + company-enrich-apollo + document-extract)',
 );
 
+const healthPort = Number(process.env.WORKER_HEALTH_PORT || 4002);
+
+const healthServer = http.createServer((_req, res) => {
+  const redisReady = connection.status === 'ready';
+  res.writeHead(redisReady ? 200 : 503, { 'Content-Type': 'application/json' });
+  res.end(
+    JSON.stringify({
+      status: redisReady ? 'ok' : 'error',
+      queue: redisReady ? 'connected' : 'disconnected',
+    }),
+  );
+});
+
+healthServer.listen(healthPort, () => {
+  log.info({ healthPort }, 'health server listening');
+});
+
 const shutdown = async (signal: string) => {
   log.info({ signal }, 'shutting down worker');
   const timeout = setTimeout(() => {
@@ -55,6 +73,7 @@ const shutdown = async (signal: string) => {
     await Promise.all(workers.map((w) => w.close()));
     await Promise.all(queues.map((q) => q.close()));
     await connection.quit();
+    healthServer.close();
     clearTimeout(timeout);
     process.exit(0);
   } catch (err) {

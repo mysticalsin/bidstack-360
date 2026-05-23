@@ -25,7 +25,7 @@ export function useCreateProductCategory() {
     mutationFn: (body: ProductCategoryCreate) =>
       api<ProductCategory>('/api/products/categories', {
         method: 'POST',
-        body: JSON.stringify(body),
+        body,
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['product-categories'] }),
   });
@@ -58,7 +58,7 @@ export function useCreateProduct() {
     mutationFn: (body: ProductCreate) =>
       api<Product>('/api/products', {
         method: 'POST',
-        body: JSON.stringify(body),
+        body,
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
   });
@@ -70,7 +70,7 @@ export function useUpdateProduct(id: string) {
     mutationFn: (body: ProductUpdate) =>
       api<Product>(`/api/products/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify(body),
+        body,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['products'] });

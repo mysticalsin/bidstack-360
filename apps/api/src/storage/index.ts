@@ -45,6 +45,12 @@ export interface DownloadResult {
   filename?: string;
 }
 
+export interface ObjectMetadata {
+  bytes: number;
+  contentType?: string;
+  checksum?: string | null;
+}
+
 export interface StorageAdapter {
   driver: 'local' | 's3';
   // Returns the URL the client should PUT bytes to and the headers required.
@@ -60,6 +66,9 @@ export interface StorageAdapter {
   ): Promise<DownloadResult>;
   // Hard-delete the underlying object. Idempotent: missing keys do not throw.
   delete(key: string): Promise<void>;
+  // Verify an object exists and return storage-sourced metadata. Finalization
+  // must use this instead of trusting client-provided bytes/content type.
+  head(key: string): Promise<ObjectMetadata>;
   // Read the full object into memory as a Buffer.
   readBuffer(key: string): Promise<Buffer>;
   // Local-only: persist a PUT body to disk. Absent on s3 driver.
@@ -83,6 +92,11 @@ function safeJoin(root: string, key: string): string {
 function sanitizeName(name: string): string {
   // Strip path separators and control chars; keep readable suffix for the key.
   return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
+}
+
+export function keyBelongsToOrg(storageKey: string, orgId: string): boolean {
+  const safeOrg = sanitizeName(orgId) || 'org';
+  return storageKey.startsWith(`${safeOrg}/`) || storageKey.startsWith(`orgs/${safeOrg}/`);
 }
 
 class LocalStorage implements StorageAdapter {
@@ -146,6 +160,12 @@ class LocalStorage implements StorageAdapter {
     await rm(target, { force: true });
   }
 
+  async head(key: string): Promise<ObjectMetadata> {
+    const target = safeJoin(LOCAL_ROOT, key);
+    const s = await stat(target);
+    return { bytes: s.size, checksum: null };
+  }
+
   async readBuffer(key: string): Promise<Buffer> {
     const target = safeJoin(LOCAL_ROOT, key);
     const s = await stat(target);
@@ -196,6 +216,8 @@ class S3Storage implements StorageAdapter {
   static async create(): Promise<S3Storage> {
     const bucket = process.env.S3_BUCKET;
     const region = process.env.S3_REGION ?? 'us-east-1';
+    const endpoint = process.env.S3_ENDPOINT || undefined;
+    const forcePathStyle = process.env.S3_FORCE_PATH_STYLE === 'true';
     if (!bucket) throw new Error('S3_BUCKET env var required when STORAGE_DRIVER=s3');
     let mod: AnyClient;
     let signer: AnyClient;
@@ -213,7 +235,7 @@ class S3Storage implements StorageAdapter {
         'S3 not installed: add @aws-sdk/client-s3 and @aws-sdk/s3-request-presigner to apps/api',
       );
     }
-    const client = new (asSdk(mod).S3Client)({ region });
+    const client = new (asSdk(mod).S3Client)({ region, endpoint, forcePathStyle });
     return new S3Storage({ bucket, client, mod, signer });
   }
 
@@ -260,6 +282,19 @@ class S3Storage implements StorageAdapter {
       Key: key,
     });
     await asSdk(this.client).send(cmd);
+  }
+
+  async head(key: string): Promise<ObjectMetadata> {
+    const cmd = new (asSdk(this.mod).HeadObjectCommand)({
+      Bucket: this.bucket,
+      Key: key,
+    });
+    const response = await asSdk(this.client).send(cmd);
+    return {
+      bytes: Number(response.ContentLength ?? 0),
+      contentType: response.ContentType,
+      checksum: response.ChecksumSHA256 ?? response.ETag ?? null,
+    };
   }
 
   async readBuffer(key: string): Promise<Buffer> {

@@ -7,6 +7,10 @@ interface ApiOptions {
   signal?: AbortSignal;
 }
 
+type ApiTokenProvider = () => string | null | Promise<string | null>;
+
+let apiTokenProvider: ApiTokenProvider | null = null;
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -18,10 +22,35 @@ export class ApiError extends Error {
   }
 }
 
+export function setApiTokenProvider(provider: ApiTokenProvider | null): void {
+  apiTokenProvider = provider;
+}
+
+function normalizeApiPath(path: string): string {
+  // Ensure all API calls use /api/v1/ prefix. The backend rewriteUrl
+  // handles /api/ → /api/v1/, but normalizing here keeps the frontend
+  // consistent and removes the fragile dependency on that rewrite.
+  if (
+    path.startsWith('/api/') &&
+    !path.startsWith('/api/v1/') &&
+    !path.startsWith('/api/webhooks')
+  ) {
+    return path.replace('/api/', '/api/v1/');
+  }
+  return path;
+}
+
 export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
-  const res = await fetch(path, {
+  const resolvedPath = normalizeApiPath(path);
+  const token = apiTokenProvider ? await apiTokenProvider() : null;
+  const headers: Record<string, string> = {
+    ...(opts.body ? { 'Content-Type': 'application/json' } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
+  const res = await fetch(resolvedPath, {
     method: opts.method ?? 'GET',
-    headers: opts.body ? { 'Content-Type': 'application/json' } : undefined,
+    headers: Object.keys(headers).length > 0 ? headers : undefined,
     body: opts.body ? JSON.stringify(opts.body) : undefined,
     signal: opts.signal,
     credentials: 'include',

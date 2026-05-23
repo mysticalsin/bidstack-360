@@ -23,13 +23,31 @@ interface PersistedShape {
   [surface: string]: SavedView[];
 }
 
+function isSavedView(v: unknown): v is SavedView {
+  if (!v || typeof v !== 'object') return false;
+  const o = v as Record<string, unknown>;
+  return (
+    typeof o.id === 'string' &&
+    typeof o.name === 'string' &&
+    typeof o.query === 'string' &&
+    typeof o.createdAt === 'string'
+  );
+}
+
 function read(): PersistedShape {
   if (typeof window === 'undefined') return {};
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? (parsed as PersistedShape) : {};
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const out: PersistedShape = {};
+    for (const [surface, views] of Object.entries(parsed)) {
+      if (Array.isArray(views) && views.every(isSavedView)) {
+        out[surface] = views;
+      }
+    }
+    return out;
   } catch {
     return {};
   }

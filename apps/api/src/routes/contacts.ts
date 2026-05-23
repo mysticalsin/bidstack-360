@@ -7,7 +7,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma, type Sentiment as PrismaSentiment } from '@bidstack/db';
-import { Contact, ContactCreate, ContactPatch } from '@bidstack/shared';
+import { Contact, ContactCreate, ContactFilter, ContactPage, ContactPatch } from '@bidstack/shared';
 
 function serializeContact(c: {
   id: string;
@@ -38,23 +38,17 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
     '/contacts',
     {
       schema: {
-        querystring: z.object({
-          customer: z.string().optional(),
-          search: z.string().optional(),
-          limit: z.coerce.number().int().min(1).max(200).default(50),
-        }),
-        response: { 200: z.object({ items: z.array(Contact) }) },
+        querystring: ContactFilter,
+        response: { 200: ContactPage },
       },
     },
     async (req) => {
-      // `search` is a simple substring across name/email/role/customer.
-      // Postgres `mode: 'insensitive'` is supported by Prisma; trigram
-      // index can be added later if this turns into a hot path.
-      const s = req.query.search;
+      const { customer, search: s, cursor, limit } = req.query;
       const items = await prisma.contact.findMany({
         where: {
           orgId: req.auth.orgId,
-          ...(req.query.customer ? { customer: req.query.customer } : {}),
+          deletedAt: null,
+          ...(customer ? { customer } : {}),
           ...(s
             ? {
                 OR: [
@@ -66,10 +60,14 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
               }
             : {}),
         },
-        orderBy: { createdAt: 'desc' },
-        take: req.query.limit,
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        take: limit + 1,
+        ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
       });
-      return { items: items.map(serializeContact) };
+      const hasMore = items.length > limit;
+      const sliced = hasMore ? items.slice(0, -1) : items;
+      const nextCursor = hasMore ? (sliced[sliced.length - 1]?.id ?? null) : null;
+      return { items: sliced.map(serializeContact), nextCursor };
     },
   );
 
@@ -83,7 +81,7 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const contact = await prisma.contact.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!contact) throw req.server.httpErrors.notFound('Contact not found');
       return serializeContact(contact);
@@ -142,7 +140,7 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
       // `update` can only match a unique key. Without this, an attacker
       // could PATCH any contact by guessing its UUID.
       const existing = await prisma.contact.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
         select: { id: true },
       });
       if (!existing) throw server.httpErrors.notFound('Contact not found');
@@ -188,13 +186,16 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const existing = await prisma.contact.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
         select: { id: true, customer: true, name: true },
       });
       if (!existing) throw server.httpErrors.notFound('Contact not found');
 
       await prisma.$transaction([
-        prisma.contact.delete({ where: { id: existing.id } }),
+        prisma.contact.update({
+          where: { id: existing.id },
+          data: { deletedAt: new Date() },
+        }),
         prisma.auditLog.create({
           data: {
             orgId: req.auth.orgId,

@@ -9,9 +9,15 @@ import {
   type ZodTypeProvider,
 } from 'fastify-type-provider-zod';
 
+import { apiVersioningPlugin } from './plugins/api-versioning.js';
 import { authPlugin } from './plugins/auth.js';
+import { cacheHeadersPlugin } from './plugins/cache-headers.js';
 import { errorHandlerPlugin } from './plugins/error-handler.js';
+import { idempotencyPlugin } from './plugins/idempotency.js';
+import { redisCachePlugin } from './plugins/redis-cache.js';
+import { config } from './config.js';
 import { rbacPlugin } from './plugins/rbac.js';
+import { redis } from './redis.js';
 import { auditLogsRoutes } from './routes/audit-logs.js';
 import { collaborationRoutes } from './routes/collaboration.js';
 import { contactsRoutes } from './routes/contacts.js';
@@ -20,14 +26,16 @@ import { crmCompanyRoutes } from './routes/crm/companies.js';
 import { crmHealthRoutes } from './routes/crm/health.js';
 import { crmConnectorRoutes } from './routes/crm/connectors.js';
 import { crmWidgetRoutes } from './routes/crm/widgets.js';
+import { crmSummaryRoutes } from './routes/crm/summary.js';
 import { dustRoutes } from './routes/dust-integration.js';
+import { exchangeRatesRoutes } from './routes/exchange-rates.js';
 import { filesRoutes } from './routes/files.js';
 import { healthRoute } from './routes/health.js';
 import { invoicesRoutes } from './routes/invoices.js';
 import { leadRoutes } from './routes/leads.js';
 import { notesRoutes } from './routes/notes.js';
 import { opportunityContactsRoutes } from './routes/opportunity-contacts.js';
-import { odooRoutes } from './routes/odoo-integration.js';
+import { erpRoutes } from './routes/erp-integration.js';
 import { opportunityRoutes } from './routes/opportunities.js';
 import { opportunityTimelineRoutes } from './routes/opportunity-timeline.js';
 import { predictiveRoutes } from './routes/predictive.js';
@@ -48,6 +56,14 @@ import { webhookSubscriptionsRoutes } from './routes/webhook-subscriptions.js';
 import { companiesRoutes } from './routes/companies.js';
 import { customFieldsRoutes } from './routes/custom-fields.js';
 import { roleRoutes } from './routes/roles.js';
+import { microsoftRoutes } from './routes/microsoft.js';
+import { accountsRoutes } from './routes/accounts.js';
+import { referencesRoutes } from './routes/references.js';
+import { agentsRoutes } from './routes/agents.js';
+import { bidScoreRoutes } from './routes/bid-scores.js';
+import { proposalRoutes } from './routes/proposals.js';
+import { activityRoutes } from './routes/activities.js';
+import { bidWorkspaceRoutes } from './routes/bid-workspace.js';
 
 const CONNECT_SRC = [
   "'self'",
@@ -63,10 +79,25 @@ const FRAME_SRC = ["'self'", 'https://*.clerk.accounts.dev', 'https://challenges
 
 export async function buildServer(): Promise<FastifyInstance> {
   const server = Fastify({
+    bodyLimit: 10485760, // 10 MiB to allow large Dust AI webhooks
+    rewriteUrl: (req) => {
+      const url = req.url ?? '';
+      if (url.startsWith('/api/') && !url.startsWith('/api/v')) {
+        return url.replace(/^\/api\//, '/api/v1/');
+      }
+      return url;
+    },
+    genReqId: (req) => {
+      const incoming = req.headers['x-request-id'];
+      if (typeof incoming === 'string' && incoming.length >= 8 && incoming.length <= 255) {
+        return incoming;
+      }
+      return crypto.randomUUID();
+    },
     logger: {
-      level: process.env.LOG_LEVEL ?? 'info',
+      level: config.LOG_LEVEL,
       // Strip bearer tokens, cookies, and any obvious credential fields before they
-      // ever hit stdout / log aggregation. The Odoo MCP client also has its own
+      // ever hit stdout / log aggregation. The ERP MCP client also has its own
       // URL-scrubbing layer (see packages/odoo-mcp-client/src/index.ts).
       redact: {
         paths: [
@@ -87,26 +118,29 @@ export async function buildServer(): Promise<FastifyInstance> {
         remove: true,
       },
       transport:
-        process.env.NODE_ENV === 'development'
+        config.NODE_ENV === 'development'
           ? { target: 'pino-pretty', options: { colorize: true, singleLine: true } }
           : undefined,
     },
-    trustProxy: process.env.TRUSTED_PROXIES
-      ? process.env.TRUSTED_PROXIES.split(',').map((s) => s.trim())
+    trustProxy: config.TRUSTED_PROXIES
+      ? config.TRUSTED_PROXIES.split(',').map((s) => s.trim())
       : false,
   }).withTypeProvider<ZodTypeProvider>();
 
   server.setValidatorCompiler(validatorCompiler);
   server.setSerializerCompiler(serializerCompiler);
 
+  server.addHook('onSend', async (_req, reply) => {
+    reply.header('X-Request-Id', _req.id);
+  });
+
   await server.register(helmet, {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'"],
-        styleSrc:
-          process.env.NODE_ENV === 'development' ? ["'self'", "'unsafe-inline'"] : ["'self'"],
-        imgSrc: ["'self'", 'data:', 'https:'],
+        styleSrc: config.NODE_ENV === 'development' ? ["'self'", "'unsafe-inline'"] : ["'self'"],
+        imgSrc: ["'self'", 'data:'],
         connectSrc: CONNECT_SRC,
         fontSrc: ["'self'"],
         objectSrc: ["'none'"],
@@ -114,6 +148,9 @@ export async function buildServer(): Promise<FastifyInstance> {
         frameAncestors: ["'none'"],
         baseUri: ["'self'"],
         formAction: ["'self'"],
+        workerSrc: ["'none'"],
+        mediaSrc: ["'none'"],
+        ...(config.NODE_ENV === 'production' ? { upgradeInsecureRequests: [] } : {}),
       },
     },
     strictTransportSecurity: {
@@ -131,17 +168,18 @@ export async function buildServer(): Promise<FastifyInstance> {
     originAgentCluster: true,
     permittedCrossDomainPolicies: { permittedPolicies: 'none' },
     xssFilter: true,
+    xFrameOptions: { action: 'deny' },
     // permissionsPolicy removed in @fastify/helmet v12 — set via custom header if needed
   });
   await server.register(cors, {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
       const allowed = [process.env.PUBLIC_BASE_URL].filter(Boolean);
-      if (process.env.NODE_ENV === 'development') {
+      if (config.NODE_ENV === 'development') {
         allowed.push('http://localhost:5173', 'http://localhost:4173');
       }
       // Production safety: never allow localhost origins.
-      if (process.env.NODE_ENV === 'production' && origin.includes('localhost')) {
+      if (config.NODE_ENV === 'production' && origin.includes('localhost')) {
         return cb(new Error('localhost origin rejected in production'), false);
       }
       cb(null, allowed.includes(origin));
@@ -149,17 +187,6 @@ export async function buildServer(): Promise<FastifyInstance> {
     credentials: true,
   });
   await server.register(sensible);
-  await server.register(rateLimit, {
-    max: 600,
-    timeWindow: '1 minute',
-    allowList: ['127.0.0.1', '::1'],
-    keyGenerator: (req) => {
-      // Per-user rate limiting: authenticated users get their own bucket.
-      // Fall back to IP for public routes (health, webhooks).
-      const auth = (req as unknown as { auth?: { userId?: string } }).auth;
-      return auth?.userId ?? req.ip;
-    },
-  });
 
   // Permissions-Policy is not exposed by @fastify/helmet@12 (helmet@7), so we
   // set it manually on every outbound response.
@@ -170,46 +197,83 @@ export async function buildServer(): Promise<FastifyInstance> {
     );
   });
 
+  await server.register(apiVersioningPlugin);
   await server.register(errorHandlerPlugin);
   await server.register(authPlugin);
   await server.register(rbacPlugin);
-
+  await server.register(idempotencyPlugin);
+  await server.register(cacheHeadersPlugin);
+  await server.register(redisCachePlugin);
   await server.register(healthRoute);
-  await server.register(opportunityRoutes, { prefix: '/api' });
-  await server.register(contactsRoutes, { prefix: '/api' });
-  await server.register(tasksRoutes, { prefix: '/api' });
-  await server.register(reportsRoutes, { prefix: '/api' });
-  await server.register(searchRoutes, { prefix: '/api' });
-  await server.register(salesDashboardRoutes, { prefix: '/api' });
-  await server.register(salesOrdersRoutes, { prefix: '/api' });
-  await server.register(invoicesRoutes, { prefix: '/api' });
-  await server.register(productsRoutes, { prefix: '/api' });
-  await server.register(auditLogsRoutes, { prefix: '/api' });
-  await server.register(crmDashboardRoutes, { prefix: '/api' });
-  await server.register(crmCompanyRoutes, { prefix: '/api' });
-  await server.register(crmHealthRoutes, { prefix: '/api' });
-  await server.register(crmConnectorRoutes, { prefix: '/api' });
-  await server.register(crmWidgetRoutes, { prefix: '/api' });
-  await server.register(notesRoutes, { prefix: '/api' });
-  await server.register(opportunityContactsRoutes, { prefix: '/api' });
-  await server.register(filesRoutes, { prefix: '/api' });
-  await server.register(dustRoutes, { prefix: '/api/integrations' });
-  await server.register(odooRoutes, { prefix: '/api/integrations' });
-  await server.register(webhooksRoutes); // mounted at /webhooks/*
-  await server.register(territoryRoutes, { prefix: '/api' });
-  await server.register(accountIntelRoutes, { prefix: '/api' });
-  await server.register(opportunityTimelineRoutes, { prefix: '/api' });
-  await server.register(collaborationRoutes, { prefix: '/api' });
-  await server.register(predictiveRoutes, { prefix: '/api' });
-  await server.register(serviceDeskRoutes, { prefix: '/api' });
-  await server.register(workflowRoutes, { prefix: '/api' });
-  await server.register(leadRoutes, { prefix: '/api' });
-  await server.register(pluginRoutes, { prefix: '/api' });
-  await server.register(usersRoutes, { prefix: '/api' });
-  await server.register(webhookSubscriptionsRoutes, { prefix: '/api' });
-  await server.register(companiesRoutes, { prefix: '/api' });
-  await server.register(customFieldsRoutes, { prefix: '/api' });
-  await server.register(roleRoutes, { prefix: '/api' });
+  if (config.NODE_ENV !== 'test') {
+    await server.register(rateLimit, {
+      max: config.NODE_ENV === 'development' ? 10_000 : config.API_RATE_LIMIT_MAX,
+      timeWindow: '1 minute',
+      redis: redis.status === 'ready' || redis.status === 'connect' ? redis : undefined,
+      keyGenerator: (req) => {
+        // Registered after auth so authenticated routes get per-user buckets.
+        // Public routes (health, webhooks) intentionally fall back to IP.
+        const auth = (req as unknown as { auth?: { userId?: string } }).auth;
+        return auth?.userId ?? req.ip;
+      },
+    });
+  }
+
+  await server.register(opportunityRoutes, { prefix: '/api/v1' });
+  await server.register(contactsRoutes, { prefix: '/api/v1' });
+  await server.register(tasksRoutes, { prefix: '/api/v1' });
+  await server.register(reportsRoutes, { prefix: '/api/v1' });
+  await server.register(searchRoutes, { prefix: '/api/v1' });
+  await server.register(salesDashboardRoutes, { prefix: '/api/v1' });
+  await server.register(salesOrdersRoutes, { prefix: '/api/v1' });
+  await server.register(invoicesRoutes, { prefix: '/api/v1' });
+  await server.register(productsRoutes, { prefix: '/api/v1' });
+  await server.register(auditLogsRoutes, { prefix: '/api/v1' });
+  await server.register(crmDashboardRoutes, { prefix: '/api/v1' });
+  await server.register(crmCompanyRoutes, { prefix: '/api/v1' });
+  await server.register(crmHealthRoutes, { prefix: '/api/v1' });
+  await server.register(crmConnectorRoutes, { prefix: '/api/v1' });
+  await server.register(crmWidgetRoutes, { prefix: '/api/v1' });
+  await server.register(crmSummaryRoutes, { prefix: '/api/v1' });
+  await server.register(notesRoutes, { prefix: '/api/v1' });
+  await server.register(opportunityContactsRoutes, { prefix: '/api/v1' });
+  await server.register(filesRoutes, { prefix: '/api/v1' });
+  await server.register(dustRoutes, { prefix: '/api/v1/integrations' });
+  await server.register(erpRoutes, { prefix: '/api/v1/integrations' });
+
+  // Backward-compatible redirects: /api/v1/integrations/odoo/* → /api/v1/integrations/erp/*
+  server.get('/api/v1/integrations/odoo/*', async (req, reply) => {
+    const target = req.url.replace('/odoo/', '/erp/');
+    return reply.redirect(target, 307);
+  });
+  server.post('/api/v1/integrations/odoo/*', async (req, reply) => {
+    const target = req.url.replace('/odoo/', '/erp/');
+    return reply.redirect(target, 307);
+  });
+  await server.register(webhooksRoutes, { prefix: '/webhooks' });
+  await server.register(territoryRoutes, { prefix: '/api/v1' });
+  await server.register(accountIntelRoutes, { prefix: '/api/v1' });
+  await server.register(opportunityTimelineRoutes, { prefix: '/api/v1' });
+  await server.register(collaborationRoutes, { prefix: '/api/v1' });
+  await server.register(predictiveRoutes, { prefix: '/api/v1' });
+  await server.register(serviceDeskRoutes, { prefix: '/api/v1' });
+  await server.register(workflowRoutes, { prefix: '/api/v1' });
+  await server.register(leadRoutes, { prefix: '/api/v1' });
+  await server.register(pluginRoutes, { prefix: '/api/v1' });
+  await server.register(usersRoutes, { prefix: '/api/v1' });
+  await server.register(webhookSubscriptionsRoutes, { prefix: '/api/v1' });
+  await server.register(companiesRoutes, { prefix: '/api/v1' });
+  await server.register(customFieldsRoutes, { prefix: '/api/v1' });
+  await server.register(roleRoutes, { prefix: '/api/v1' });
+  await server.register(microsoftRoutes, { prefix: '/api/v1' });
+  await server.register(accountsRoutes, { prefix: '/api/v1' });
+  await server.register(referencesRoutes, { prefix: '/api/v1' });
+  await server.register(agentsRoutes, { prefix: '/api/v1' });
+  await server.register(bidScoreRoutes, { prefix: '/api/v1' });
+  await server.register(proposalRoutes, { prefix: '/api/v1' });
+  await server.register(activityRoutes, { prefix: '/api/v1' });
+  await server.register(bidWorkspaceRoutes, { prefix: '/api/v1' });
+  await server.register(exchangeRatesRoutes, { prefix: '/api/v1' });
 
   return server;
 }

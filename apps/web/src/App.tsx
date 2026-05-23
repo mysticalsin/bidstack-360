@@ -117,6 +117,11 @@ const WorkflowsPage = lazy(() =>
 const TerritoriesPage = lazy(() =>
   import('@/pages/TerritoriesPage').then((m) => ({ default: m.TerritoriesPage })),
 );
+const ForecastsPage = lazy(() =>
+  import('@/pages/ForecastsPage').then((m) => ({ default: m.ForecastsPage })),
+);
+
+const LoginPage = lazy(() => import('@/pages/LoginPage').then((m) => ({ default: m.LoginPage })));
 
 const SsoCallbackPage = lazy(() =>
   import('@clerk/clerk-react').then((m) => ({
@@ -161,117 +166,6 @@ function RequireAdmin({ children }: { children: React.ReactNode }) {
     return <Navigate to="/dashboard" replace />;
   }
   return <>{children}</>;
-}
-
-function LoginPage() {
-  const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-  const microsoftEnabled = import.meta.env.VITE_SSO_MICROSOFT_ENABLED === 'true';
-  const microsoftLabel = import.meta.env.VITE_SSO_MICROSOFT_LABEL ?? 'Sign in with Microsoft';
-
-  // Stub mode: auto-redirect to dashboard (no login UI needed)
-  if (!clerkKey) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  // Real Clerk mode: render branded login with Microsoft SSO
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--surface-bg)]">
-      <div className="w-full max-w-sm space-y-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-8 shadow-[var(--shadow-md)]">
-        <div className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--brand-primary)] text-lg font-bold text-white">
-            B
-          </div>
-          <h1 className="text-xl font-semibold text-[var(--fg-primary)]">BidStack 360°</h1>
-          <p className="mt-1 text-sm text-[var(--fg-secondary)]">Mantu · Bid &amp; presales CRM</p>
-        </div>
-
-        {microsoftEnabled ? <MicrosoftSignInButton label={microsoftLabel} /> : null}
-
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-[var(--border-subtle)]" />
-          </div>
-          <div className="relative flex justify-center text-xs">
-            <span className="bg-[var(--surface-card)] px-2 text-[var(--fg-tertiary)]">
-              {microsoftEnabled ? 'or continue with email' : 'Sign in to continue'}
-            </span>
-          </div>
-        </div>
-
-        <ClerkSignIn />
-      </div>
-    </div>
-  );
-}
-
-// Lazy-load Clerk's SignIn so stub builds put it in its own chunk that's
-// only fetched when a real publishable key is present.
-const ClerkSignIn = lazy(() =>
-  import('@clerk/clerk-react').then((m) => ({
-    default: () => (
-      <m.SignIn
-        routing="path"
-        path="/login"
-        signUpUrl="/login"
-        afterSignInUrl="/dashboard"
-        appearance={{
-          elements: {
-            rootBox: 'w-full',
-            card: 'shadow-none bg-transparent p-0',
-            headerTitle: 'hidden',
-            headerSubtitle: 'hidden',
-            socialButtonsBlockButton: 'hidden',
-            dividerRow: 'hidden',
-            formButtonPrimary:
-              'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white rounded-lg h-10 text-sm font-medium',
-            formFieldInput:
-              'bg-[var(--surface-sunken)] border-[var(--border-subtle)] rounded-lg h-10 text-sm text-[var(--fg-primary)]',
-            formFieldLabel: 'text-xs text-[var(--fg-secondary)]',
-            footerActionLink: 'text-[var(--brand-primary)] text-sm',
-            identityPreviewText: 'text-sm text-[var(--fg-primary)]',
-            identityPreviewEditButton: 'text-[var(--brand-primary)]',
-          },
-        }}
-      />
-    ),
-  })),
-);
-
-// Microsoft SSO button — uses Clerk's OAuth flow for Microsoft.
-const MicrosoftSignInButton = lazy(() =>
-  import('@clerk/clerk-react').then((m) => ({
-    default: ({ label }: { label: string }) => {
-      const { signIn, isLoaded } = m.useSignIn();
-      if (!isLoaded) return null;
-      return (
-        <button
-          type="button"
-          onClick={() => {
-            void signIn?.authenticateWithRedirect({
-              strategy: 'oauth_microsoft',
-              redirectUrl: '/sso-callback',
-              redirectUrlComplete: '/dashboard',
-            });
-          }}
-          className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-4 py-2.5 text-sm font-medium text-[var(--fg-primary)] transition-colors hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
-        >
-          <MicrosoftLogo />
-          {label}
-        </button>
-      );
-    },
-  })),
-);
-
-function MicrosoftLogo() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden>
-      <rect x="1" y="1" width="9" height="9" fill="#f25022" />
-      <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
-      <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
-      <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
-    </svg>
-  );
 }
 
 function AnimatedRoutes() {
@@ -543,6 +437,14 @@ function AnimatedRoutes() {
             }
           />
           <Route
+            path="/forecasts"
+            element={
+              <RequireAuth>
+                <ForecastsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
             path="/intake"
             element={
               <RequireAuth>
@@ -583,6 +485,8 @@ export function App() {
   useCmdDotClose();
   useGlobalShortcuts();
   useGlobalUndoHotkey();
+  const location = useLocation();
+  const isLogin = location.pathname === '/login';
   // Map our 3-way motion pref onto framer-motion's MotionConfig contract.
   // `system` is framer's `user` (read prefers-reduced-motion). `reduced`
   // forces `always`, overriding the OS. `full` forces `never`. This makes
@@ -592,29 +496,35 @@ export function App() {
   return (
     <MotionConfig reducedMotion={reducedMotion}>
       <RouteProgress />
-      <AppShell>
-        {/* ErrorBoundary scoped inside AppShell so a render error in any page
-            falls back to the boundary card while the sidebar/topbar survive.
-            Mounting at the route level (vs. global at main.tsx) preserves the
-            shell so users can still navigate away from the broken page. */}
-        <ErrorBoundary>
-          <Suspense fallback={<LoadingSkeleton rows={6} />}>
-            <AnimatedRoutes />
-          </Suspense>
-        </ErrorBoundary>
-        <CommandPalette open={palette.open} onOpenChange={palette.setOpen} />
-        {/* Press N (outside an input) → quick-add menu → choose entity. */}
-        <QuickAddMenu />
-        {/* `?` (outside an input) → keyboard shortcut drawer. */}
-        <HelpDrawer />
-        {/* Global hosts — mount once at the root so any component can dispatch
-            toasts / open a confirm without prop-drilling. */}
-        <Toaster />
-        <ConfirmHost />
-        <ConfettiHost />
-        <LiveAnnouncer />
-        <WebVitalsHud />
-      </AppShell>
+      {isLogin ? (
+        <Suspense fallback={<LoadingSkeleton rows={6} />}>
+          <LoginPage />
+        </Suspense>
+      ) : (
+        <AppShell>
+          {/* ErrorBoundary scoped inside AppShell so a render error in any page
+              falls back to the boundary card while the sidebar/topbar survive.
+              Mounting at the route level (vs. global at main.tsx) preserves the
+              shell so users can still navigate away from the broken page. */}
+          <ErrorBoundary>
+            <Suspense fallback={<LoadingSkeleton rows={6} />}>
+              <AnimatedRoutes />
+            </Suspense>
+          </ErrorBoundary>
+          <CommandPalette open={palette.open} onOpenChange={palette.setOpen} />
+          {/* Press N (outside an input) → quick-add menu → choose entity. */}
+          <QuickAddMenu />
+          {/* `?` (outside an input) → keyboard shortcut drawer. */}
+          <HelpDrawer />
+          {/* Global hosts — mount once at the root so any component can dispatch
+              toasts / open a confirm without prop-drilling. */}
+          <Toaster />
+          <ConfirmHost />
+          <ConfettiHost />
+          <LiveAnnouncer />
+          <WebVitalsHud />
+        </AppShell>
+      )}
     </MotionConfig>
   );
 }

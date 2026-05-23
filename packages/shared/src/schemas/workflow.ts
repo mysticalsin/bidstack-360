@@ -35,8 +35,8 @@ export type WorkflowAction = z.infer<typeof WorkflowAction>;
 export const Workflow = z.object({
   id: z.string().uuid(),
   orgId: z.string().uuid(),
-  name: z.string().min(1),
-  description: z.string().nullable(),
+  name: z.string().min(1).max(255),
+  description: z.string().max(2000).nullable(),
   active: z.boolean().default(true),
   triggerKind: WorkflowTriggerKind,
   triggerConfig: z.record(z.unknown()).default({}),
@@ -83,6 +83,7 @@ export const WorkflowCreate = Workflow.omit({
         sortOrder: z.number().int().default(0),
       }),
     )
+    .max(50)
     .default([]),
 });
 export type WorkflowCreate = z.infer<typeof WorkflowCreate>;

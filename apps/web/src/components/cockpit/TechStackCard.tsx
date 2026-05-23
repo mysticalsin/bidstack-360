@@ -32,7 +32,7 @@ export const TechStackCard = memo(function TechStackCard({ cockpit }: Props) {
   }
   return (
     <Card role="region" aria-label="Technical Stack Overview">
-      <SectionHeader title="Technical Stack Overview" caption="From discovery & enrichment" />
+      <SectionHeader title="Technical Stack Overview" caption="From discovery & verification" />
       <div style={{ padding: '14px 18px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         {cockpit.technicalStack.slice(0, 3).map((cat) => (
           <div key={cat.label}>

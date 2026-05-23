@@ -22,7 +22,7 @@ export function useCreateWebhookSubscription() {
     mutationFn: (body: { url: string; events: string[]; active?: boolean }) =>
       api<WebhookSub>('/api/webhook-subscriptions', {
         method: 'POST',
-        body: JSON.stringify(body),
+        body,
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['webhook-subscriptions'] }),
   });
@@ -34,7 +34,7 @@ export function useUpdateWebhookSubscription(id: string) {
     mutationFn: (body: Partial<Pick<WebhookSub, 'url' | 'events' | 'active'>>) =>
       api<WebhookSub>(`/api/webhook-subscriptions/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify(body),
+        body,
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['webhook-subscriptions'] }),
   });

@@ -4,8 +4,9 @@ import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { InvoiceStateBadge } from '@/components/sales/InvoiceStateBadge';
+import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { formatDate, formatMoneyMicros } from '@/lib/format';
 import { useInvoices, type InvoicesListFilter } from '@/hooks/useInvoices';
@@ -37,6 +38,7 @@ export function InvoicesPage() {
   }, [params]);
 
   const list = useInvoices(filter);
+  const { refetch } = list;
   const [cursorStack, setCursorStack] = useState<string[]>([]);
 
   const setQueryParam = (key: string, value: string | null): void => {
@@ -187,9 +189,20 @@ export function InvoicesPage() {
         {list.isLoading ? (
           <LoadingSkeleton rows={6} />
         ) : list.isError ? (
-          <p className="p-4 text-sm text-[var(--fg-error)]">Failed to load invoices.</p>
+          <ErrorState
+            title="Failed to load invoices"
+            message={list.error instanceof Error ? list.error.message : 'Something went wrong'}
+            action={
+              <Button size="sm" variant="secondary" onClick={() => refetch()}>
+                Try again
+              </Button>
+            }
+          />
         ) : items.length === 0 ? (
-          <p className="p-4 text-sm text-[var(--fg-secondary)]">No invoices match the filters.</p>
+          <EmptyState
+            title="No invoices match the filters"
+            message="Adjust your search or filters, or create a new invoice."
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

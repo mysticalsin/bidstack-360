@@ -21,6 +21,7 @@ function serializeCompany(c: {
   source: string;
   confidence: number;
   enrichedAt: Date | null;
+  tier: string;
   createdAt: Date;
   updatedAt: Date;
 }): z.infer<typeof Company> {
@@ -41,6 +42,7 @@ function serializeCompany(c: {
     source: c.source,
     confidence: c.confidence,
     enrichedAt: c.enrichedAt?.toISOString() ?? null,
+    tier: c.tier as 'key' | 'top' | 'standard',
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
   };
@@ -52,8 +54,8 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       schema: {
         querystring: z.object({
-          search: z.string().optional(),
-          industry: z.string().optional(),
+          search: z.string().max(255).optional(),
+          industry: z.string().max(100).optional(),
           limit: z.coerce.number().int().min(1).max(200).default(50),
           cursor: z.string().uuid().optional(),
         }),
@@ -79,7 +81,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
               }
             : {}),
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         take: req.query.limit + 1,
         ...(req.query.cursor ? { skip: 1, cursor: { id: req.query.cursor } } : {}),
       });
@@ -158,6 +160,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/companies',
     {
+      preHandler: [server.requirePermission('companies:write'), server.requireRole('admin')],
       schema: {
         body: CompanyCreate,
         response: { 201: Company },
@@ -178,6 +181,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           taxId: body.taxId,
           logoUrl: body.logoUrl,
           website: body.website,
+          tier: body.tier,
           orgId: req.auth.orgId,
           source: 'manual',
           confidence: 1,
@@ -191,6 +195,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.patch(
     '/companies/:id',
     {
+      preHandler: [server.requirePermission('companies:write'), server.requireRole('admin')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: CompanyPatch,
@@ -215,6 +220,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           ...(patch.taxId !== undefined && { taxId: patch.taxId }),
           ...(patch.logoUrl !== undefined && { logoUrl: patch.logoUrl }),
           ...(patch.website !== undefined && { website: patch.website }),
+          ...(patch.tier !== undefined && patch.tier !== null && { tier: patch.tier }),
         },
       });
       if (updateResult.count === 0) throw server.httpErrors.notFound('Company not found');
@@ -228,6 +234,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/companies/:id',
     {
+      preHandler: [server.requirePermission('companies:write'), server.requireRole('admin')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 204: z.null() },

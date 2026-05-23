@@ -1,8 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = Number(process.env.PORT ?? 4173);
+const PORT = Number(process.env.E2E_WEB_PORT ?? process.env.PORT ?? 4174);
+const API_PORT = Number(process.env.E2E_API_PORT ?? 4010);
 const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
-const API_URL = process.env.E2E_API_URL ?? 'http://localhost:4000';
+const API_URL = process.env.E2E_API_URL ?? `http://localhost:${API_PORT}`;
+process.env.E2E_API_URL = API_URL;
+const reuseExistingServer = process.env.E2E_REUSE_SERVER === '1' && !process.env.CI;
+const webEnv = `BIDSTACK_ALLOW_STUB_AUTH=true VITE_AUTH_MODE=stub VITE_API_URL=${API_URL}`;
 
 /**
  * Fully automatic E2E orchestration.
@@ -20,19 +24,19 @@ const servers = process.env.E2E_BASE_URL
   : [
       // 1. Boot the API first so the web preview can hit endpoints immediately.
       {
-        command: 'pnpm --filter @bidstack/api dev',
+        command: `pnpm exec cross-env PORT_API=${API_PORT} PUBLIC_BASE_URL=${baseURL} PUBLIC_API_URL=${API_URL} API_RATE_LIMIT_MAX=5000 pnpm --filter @bidstack/api exec tsx src/main.ts`,
         url: `${API_URL}/health`,
-        reuseExistingServer: !process.env.CI,
-        timeout: 60_000,
+        reuseExistingServer,
+        timeout: 120_000,
         stdout: 'pipe',
         stderr: 'pipe',
       },
       // 2. Boot the web production preview.
       {
-        command: `pnpm preview --host 127.0.0.1 --port ${PORT}`,
+        command: `pnpm exec cross-env ${webEnv} pnpm --filter @bidstack/web build && pnpm exec cross-env ${webEnv} pnpm --filter @bidstack/web exec vite preview --host 127.0.0.1 --port ${PORT}`,
         url: baseURL,
-        reuseExistingServer: !process.env.CI,
-        timeout: 60_000,
+        reuseExistingServer,
+        timeout: 120_000,
         stdout: 'pipe',
         stderr: 'pipe',
       },
@@ -40,7 +44,7 @@ const servers = process.env.E2E_BASE_URL
 
 export default defineConfig({
   testDir: './e2e',
-  timeout: 30_000,
+  timeout: 60_000,
   expect: { timeout: 5_000 },
   fullyParallel: true,
   forbidOnly: !!process.env.CI,

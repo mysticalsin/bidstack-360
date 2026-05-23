@@ -22,11 +22,14 @@ import {
   useContext,
   useState,
   useCallback,
+  useEffect,
   Suspense,
   lazy,
   type ReactNode,
   type ComponentType,
 } from 'react';
+
+import { setApiTokenProvider } from '@/lib/api';
 
 interface AuthUser {
   id: string;
@@ -56,6 +59,11 @@ const STUB_USER: AuthUser = {
 
 function StubAuthProvider({ children }: { children: ReactNode }) {
   const [signedIn, setSignedIn] = useState(true);
+
+  useEffect(() => {
+    setApiTokenProvider(null);
+    return () => setApiTokenProvider(null);
+  }, []);
 
   const signOut = useCallback((cb?: () => void) => {
     setSignedIn(false);
@@ -99,6 +107,11 @@ const LazyClerkBranch = lazy(async () => {
     const auth = useClerkAuth();
     const { user } = useClerkUser();
     const clerk = useClerk();
+
+    useEffect(() => {
+      setApiTokenProvider(() => auth.getToken());
+      return () => setApiTokenProvider(null);
+    }, [auth]);
 
     return (
       <AuthContext.Provider
@@ -165,7 +178,11 @@ export function AuthProvider({
   publishableKey: string | undefined;
   children: ReactNode;
 }) {
-  if (!publishableKey) {
+  const hasKey = publishableKey !== undefined && publishableKey !== null && publishableKey !== '';
+  if (!hasKey) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('VITE_CLERK_PUBLISHABLE_KEY is required in production');
+    }
     return <StubAuthProvider>{children}</StubAuthProvider>;
   }
   return (

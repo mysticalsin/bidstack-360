@@ -5,8 +5,10 @@ import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 
 import { InvoiceStateBadge } from '@/components/sales/InvoiceStateBadge';
+import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { toast } from '@/components/ui/Toast';
 import { formatDate, formatMoneyMicros } from '@/lib/format';
 import { useInvoice, useRecordPayment, useTransitionInvoice } from '@/hooks/useInvoices';
 
@@ -37,20 +39,27 @@ export function InvoiceDetailPage() {
   const onRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || !payAmount) return;
-    const micros = BigInt(Math.round(parseFloat(payAmount) * 1_000_000));
-    await recordPayment.mutateAsync({
-      id,
-      payment: {
-        amountMicros: String(micros),
-        currency: d?.currency ?? 'CAD',
-        method: payMethod,
-        reference: payRef || undefined,
-        receivedAt: new Date().toISOString(),
-      },
-    });
-    setPayOpen(false);
-    setPayAmount('');
-    setPayRef('');
+    try {
+      const micros = BigInt(Math.round(parseFloat(payAmount) * 1_000_000));
+      await recordPayment.mutateAsync({
+        id,
+        payment: {
+          amountMicros: String(micros),
+          currency: d?.currency ?? 'CAD',
+          method: payMethod,
+          reference: payRef || undefined,
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      setPayOpen(false);
+      setPayAmount('');
+      setPayRef('');
+      toast.success('Payment recorded');
+    } catch (err) {
+      toast.error('Could not record payment', {
+        description: err instanceof Error ? err.message : 'The server rejected the request.',
+      });
+    }
   };
 
   const actionLoading = sendInvoice.isPending || cancelInvoice.isPending || recordPayment.isPending;
@@ -81,7 +90,19 @@ export function InvoiceDetailPage() {
           {d?.state === 'draft' && (
             <button
               type="button"
-              onClick={() => sendInvoice.mutate({ id: d.id })}
+              onClick={() =>
+                sendInvoice.mutate(
+                  { id: d.id },
+                  {
+                    onSuccess: () => toast.success('Invoice sent'),
+                    onError: (err) =>
+                      toast.error('Could not send invoice', {
+                        description:
+                          err instanceof Error ? err.message : 'The server rejected the request.',
+                      }),
+                  },
+                )
+              }
               disabled={actionLoading}
               className="btn-primary inline-flex min-h-9 items-center rounded-md px-4 py-2 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-11"
             >
@@ -93,7 +114,17 @@ export function InvoiceDetailPage() {
               type="button"
               onClick={() => {
                 if (window.confirm('Cancel this invoice?')) {
-                  cancelInvoice.mutate({ id: d.id });
+                  cancelInvoice.mutate(
+                    { id: d.id },
+                    {
+                      onSuccess: () => toast.success('Invoice cancelled'),
+                      onError: (err) =>
+                        toast.error('Could not cancel invoice', {
+                          description:
+                            err instanceof Error ? err.message : 'The server rejected the request.',
+                        }),
+                    },
+                  );
                 }
               }}
               disabled={actionLoading}
@@ -106,7 +137,20 @@ export function InvoiceDetailPage() {
       </header>
 
       {invoice.isLoading && <LoadingSkeleton rows={8} />}
-      {invoice.isError && <p className="text-sm text-[var(--fg-error)]">Failed to load invoice.</p>}
+      {invoice.isError && (
+        <ErrorState
+          title="Failed to load invoice"
+          message={invoice.error instanceof Error ? invoice.error.message : 'Something went wrong'}
+          action={
+            <Button size="sm" variant="secondary" onClick={() => invoice.refetch()}>
+              Try again
+            </Button>
+          }
+        />
+      )}
+      {!invoice.isLoading && !invoice.isError && !d && (
+        <EmptyState title="Invoice not found" message="This invoice may have been deleted." />
+      )}
 
       {d && (
         <>

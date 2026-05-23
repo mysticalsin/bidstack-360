@@ -42,7 +42,8 @@ export function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') ?? '';
   const activeTab = (searchParams.get('type') as TabKey) ?? 'all';
-  const [inputValue, setInputValue] = useState(query);
+  const [draft, setDraft] = useState({ query, value: query });
+  const inputValue = draft.query === query ? draft.value : query;
 
   const { data, isLoading, isError, error } = useGlobalSearch(query);
 
@@ -74,7 +75,13 @@ export function SearchPage() {
   return (
     <div className="page">
       <div className="max-w-3xl mx-auto w-full">
-        <form onSubmit={onSubmit} className="relative mb-6" role="search">
+        <h1 className="sr-only">Search</h1>
+        <form
+          onSubmit={onSubmit}
+          className="relative mb-6"
+          role="search"
+          aria-label="Workspace search"
+        >
           <div className="flex items-center gap-3 rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] px-4 py-3 shadow-[var(--shadow-sm)] focus-within:ring-2 focus-within:ring-[var(--brand-primary)] focus-within:border-[var(--brand-primary)] transition-all">
             <Icon name="search" size={18} ariaHidden />
             <input
@@ -82,8 +89,8 @@ export function SearchPage() {
               className="flex-1 bg-transparent text-lg text-[var(--fg-primary)] placeholder:text-[var(--fg-tertiary)] outline-none"
               placeholder="Search across opportunities, contacts, companies, tasks, notes, and orders…"
               value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              aria-label="Search"
+              onChange={(e) => setDraft({ query, value: e.target.value })}
+              aria-label="Search workspace"
               autoFocus
             />
             {isLoading && (
@@ -123,64 +130,70 @@ export function SearchPage() {
               ))}
             </div>
 
-            {isError ? (
-              <ErrorState
-                title="Search failed"
-                message={error?.message ?? 'Something went wrong'}
-              />
-            ) : isLoading ? (
-              <SearchSkeleton />
-            ) : filtered.length === 0 ? (
-              <EmptyState
-                title="No results found"
-                message={`We couldn't find anything matching "${query}". Try different keywords or check your spelling.`}
-              />
-            ) : (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-1"
-              >
-                <p className="mb-2 text-xs text-[var(--fg-tertiary)]">
-                  {filtered.length} result{filtered.length !== 1 ? 's' : ''}
-                </p>
-                {filtered.map((item) => (
-                  <Link
-                    key={`${item.type}-${item.id}`}
-                    to={item.url}
-                    className="group flex items-center gap-4 rounded-lg border border-transparent px-4 py-3 transition-colors hover:border-[var(--border-default)] hover:bg-[var(--surface-hover)]"
-                  >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-sunken)] text-[var(--fg-secondary)] group-hover:text-[var(--brand-primary)] transition-colors">
-                      <Icon name={TYPE_ICONS[item.type] ?? 'search'} size={18} ariaHidden />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate text-sm font-medium text-[var(--fg-primary)]">
-                          {item.title}
-                        </span>
-                        <Badge tone="gray">{TYPE_LABELS[item.type] ?? item.type}</Badge>
+            <section role="region" aria-label="Search results" aria-live="polite">
+              {isError ? (
+                <ErrorState
+                  title="Search failed"
+                  message={error?.message ?? 'Something went wrong'}
+                />
+              ) : isLoading ? (
+                <SearchSkeleton />
+              ) : filtered.length === 0 ? (
+                <EmptyState
+                  title="No results found"
+                  message={`We couldn't find anything matching "${query}". Try different keywords or check your spelling.`}
+                />
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-1"
+                >
+                  <p className="mb-2 text-xs text-[var(--fg-tertiary)]">
+                    {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+                  </p>
+                  {filtered.map((item) => (
+                    <Link
+                      key={`${item.type}-${item.id}`}
+                      to={item.url}
+                      className="group flex items-center gap-4 rounded-lg border border-transparent px-4 py-3 transition-colors hover:border-[var(--border-default)] hover:bg-[var(--surface-hover)]"
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-sunken)] text-[var(--fg-secondary)] group-hover:text-[var(--brand-primary)] transition-colors">
+                        <Icon name={TYPE_ICONS[item.type] ?? 'search'} size={18} ariaHidden />
                       </div>
-                      <p className="truncate text-xs text-[var(--fg-secondary)]">{item.subtitle}</p>
-                    </div>
-                    <Icon
-                      name="arrow"
-                      size={14}
-                      className="shrink-0 -rotate-90 text-[var(--fg-tertiary)] group-hover:text-[var(--fg-primary)] transition-colors"
-                      ariaHidden
-                    />
-                  </Link>
-                ))}
-              </motion.div>
-            )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate text-sm font-medium text-[var(--fg-primary)]">
+                            {item.title}
+                          </span>
+                          <Badge tone="gray">{TYPE_LABELS[item.type] ?? item.type}</Badge>
+                        </div>
+                        <p className="truncate text-xs text-[var(--fg-secondary)]">
+                          {item.subtitle}
+                        </p>
+                      </div>
+                      <Icon
+                        name="arrow"
+                        size={14}
+                        className="shrink-0 -rotate-90 text-[var(--fg-tertiary)] group-hover:text-[var(--fg-primary)] transition-colors"
+                        ariaHidden
+                      />
+                    </Link>
+                  ))}
+                </motion.div>
+              )}
+            </section>
           </>
         )}
 
         {!query && !isLoading && (
-          <EmptyState
-            title="Search across your workspace"
-            message="Type a keyword above to find opportunities, contacts, companies, tasks, notes, and sales orders."
-          />
+          <section role="region" aria-label="Search guidance">
+            <EmptyState
+              title="Search across your workspace"
+              message="Type a keyword above to find opportunities, contacts, companies, tasks, notes, and sales orders."
+            />
+          </section>
         )}
       </div>
     </div>

@@ -79,7 +79,7 @@ export function ConnectorsSection() {
       ) : (
         <>
           <div
-            role="tablist"
+            role="group"
             aria-label="Filter connectors by category"
             className="flex flex-wrap gap-2 px-5 pt-4 text-xs"
           >
@@ -184,8 +184,7 @@ function FilterChip({
   return (
     <button
       type="button"
-      role="tab"
-      aria-selected={active}
+      aria-pressed={active}
       onClick={onClick}
       className={`rounded-full border px-3 py-1 transition-colors ${
         active

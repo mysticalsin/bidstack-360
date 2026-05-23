@@ -1,7 +1,16 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { prisma } from '@bidstack/db';
-import { Territory, LeadRoutingRule, Forecast } from '@bidstack/shared';
+import { prisma, type Prisma } from '@bidstack/db';
+import {
+  Territory,
+  TerritoryCreate,
+  TerritoryPatch,
+  LeadRoutingRule,
+  LeadRoutingRuleCreate,
+  LeadRoutingRulePatch,
+  Forecast,
+} from '@bidstack/shared';
+import { tenantEntitiesBelongToOrg, tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 
 // ISO-3166 alpha-3 to alpha-2 mapping for common countries used in sales data.
 // react-simple-maps uses alpha-3 (numeric ISO codes in the topojson), but our
@@ -184,6 +193,42 @@ const A2_TO_A3: Record<string, string> = {
 };
 
 export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
+  const validateTerritoryOwner = async (orgId: string, ownerId: string) => {
+    if (!(await tenantEntityBelongsToOrg('user', ownerId, orgId))) {
+      throw server.httpErrors.badRequest('Owner does not belong to this organization');
+    }
+  };
+
+  const validateRoutingLinks = async (
+    orgId: string,
+    links: {
+      assignToUserId?: string | null;
+      assignToTerritoryId?: string | null;
+      roundRobinTeam?: readonly string[] | null;
+    },
+  ) => {
+    if (
+      links.assignToUserId &&
+      !(await tenantEntityBelongsToOrg('user', links.assignToUserId, orgId))
+    ) {
+      throw server.httpErrors.badRequest('Assigned user does not belong to this organization');
+    }
+    if (
+      links.assignToTerritoryId &&
+      !(await tenantEntityBelongsToOrg('territory', links.assignToTerritoryId, orgId))
+    ) {
+      throw server.httpErrors.badRequest('Assigned territory does not belong to this organization');
+    }
+    if (
+      links.roundRobinTeam &&
+      !(await tenantEntitiesBelongToOrg('user', links.roundRobinTeam, orgId))
+    ) {
+      throw server.httpErrors.badRequest(
+        'Round-robin team contains users outside this organization',
+      );
+    }
+  };
+
   // GET /api/territories
   server.get(
     '/territories',
@@ -211,6 +256,108 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
           updatedAt: r.updatedAt.toISOString(),
         })),
       };
+    },
+  );
+
+  // POST /api/territories
+  server.post(
+    '/territories',
+    {
+      preHandler: server.requirePermission('territories:write'),
+      schema: {
+        body: TerritoryCreate,
+        response: { 201: Territory },
+      },
+    },
+    async (req, reply) => {
+      await validateTerritoryOwner(req.auth.orgId, req.body.ownerId);
+      const created = await prisma.territory.create({
+        data: {
+          orgId: req.auth.orgId,
+          name: req.body.name,
+          countryCodes: req.body.countryCodes,
+          region: req.body.region,
+          postalCodes: req.body.postalCodes,
+          ownerId: req.body.ownerId,
+          active: req.body.active,
+        },
+        include: { owner: { select: { name: true } } },
+      });
+      return reply.code(201).send({
+        id: created.id,
+        orgId: created.orgId,
+        name: created.name,
+        countryCodes: created.countryCodes,
+        region: created.region,
+        postalCodes: created.postalCodes,
+        ownerId: created.ownerId,
+        ownerName: created.owner.name,
+        active: created.active,
+        createdAt: created.createdAt.toISOString(),
+        updatedAt: created.updatedAt.toISOString(),
+      });
+    },
+  );
+
+  // PATCH /api/territories/:id
+  server.patch(
+    '/territories/:id',
+    {
+      preHandler: server.requirePermission('territories:write'),
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        body: TerritoryPatch,
+        response: { 200: Territory },
+      },
+    },
+    async (req) => {
+      const data: Prisma.TerritoryUpdateInput = {};
+      if (req.body.name !== undefined) data.name = req.body.name;
+      if (req.body.countryCodes !== undefined) data.countryCodes = req.body.countryCodes;
+      if (req.body.region !== undefined) data.region = req.body.region;
+      if (req.body.postalCodes !== undefined) data.postalCodes = req.body.postalCodes;
+      if (req.body.ownerId !== undefined) {
+        await validateTerritoryOwner(req.auth.orgId, req.body.ownerId);
+        data.owner = { connect: { id: req.body.ownerId } };
+      }
+      if (req.body.active !== undefined) data.active = req.body.active;
+
+      const updated = await prisma.territory.update({
+        where: { id: req.params.id, orgId: req.auth.orgId },
+        data,
+        include: { owner: { select: { name: true } } },
+      });
+      return {
+        id: updated.id,
+        orgId: updated.orgId,
+        name: updated.name,
+        countryCodes: updated.countryCodes,
+        region: updated.region,
+        postalCodes: updated.postalCodes,
+        ownerId: updated.ownerId,
+        ownerName: updated.owner.name,
+        active: updated.active,
+        createdAt: updated.createdAt.toISOString(),
+        updatedAt: updated.updatedAt.toISOString(),
+      };
+    },
+  );
+
+  // DELETE /api/territories/:id (soft delete)
+  server.delete(
+    '/territories/:id',
+    {
+      preHandler: server.requirePermission('territories:write'),
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+      },
+    },
+    async (req) => {
+      await prisma.territory.update({
+        where: { id: req.params.id, orgId: req.auth.orgId },
+        data: { deletedAt: new Date(), active: false },
+      });
+      return { ok: true };
     },
   );
 
@@ -244,15 +391,135 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
     },
   );
 
+  // POST /api/lead-routing-rules
+  server.post(
+    '/lead-routing-rules',
+    {
+      preHandler: server.requirePermission('territories:write'),
+      schema: {
+        body: LeadRoutingRuleCreate,
+        response: { 201: LeadRoutingRule },
+      },
+    },
+    async (req, reply) => {
+      await validateRoutingLinks(req.auth.orgId, {
+        assignToUserId: req.body.assignToUserId,
+        assignToTerritoryId: req.body.assignToTerritoryId,
+        roundRobinTeam: req.body.roundRobinTeam,
+      });
+      const created = await prisma.leadRoutingRule.create({
+        data: {
+          orgId: req.auth.orgId,
+          name: req.body.name,
+          active: req.body.active ?? true,
+          priority: req.body.priority ?? 0,
+          criteria: req.body.criteria as Prisma.InputJsonValue,
+          assignToUserId: req.body.assignToUserId ?? null,
+          assignToTerritoryId: req.body.assignToTerritoryId ?? null,
+          roundRobinTeam: req.body.roundRobinTeam ?? [],
+          roundRobinIndex: req.body.roundRobinIndex ?? 0,
+        },
+      });
+      return reply.code(201).send({
+        id: created.id,
+        orgId: created.orgId,
+        name: created.name,
+        active: created.active,
+        priority: created.priority,
+        criteria: created.criteria as Record<string, unknown>,
+        assignToUserId: created.assignToUserId,
+        assignToTerritoryId: created.assignToTerritoryId,
+        roundRobinTeam: created.roundRobinTeam,
+        roundRobinIndex: created.roundRobinIndex,
+        createdAt: created.createdAt.toISOString(),
+        updatedAt: created.updatedAt.toISOString(),
+      });
+    },
+  );
+
+  // PATCH /api/lead-routing-rules/:id
+  server.patch(
+    '/lead-routing-rules/:id',
+    {
+      preHandler: server.requirePermission('territories:write'),
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        body: LeadRoutingRulePatch,
+        response: { 200: LeadRoutingRule },
+      },
+    },
+    async (req) => {
+      const data: Prisma.LeadRoutingRuleUpdateInput = {};
+      if (req.body.name !== undefined) data.name = req.body.name;
+      if (req.body.active !== undefined) data.active = req.body.active;
+      if (req.body.priority !== undefined) data.priority = req.body.priority;
+      if (req.body.criteria !== undefined)
+        data.criteria = req.body.criteria as Prisma.InputJsonValue;
+      if (req.body.assignToUserId !== undefined) {
+        await validateRoutingLinks(req.auth.orgId, { assignToUserId: req.body.assignToUserId });
+        data.assignToUserId = req.body.assignToUserId;
+      }
+      if (req.body.assignToTerritoryId !== undefined) {
+        await validateRoutingLinks(req.auth.orgId, {
+          assignToTerritoryId: req.body.assignToTerritoryId,
+        });
+        data.assignToTerritoryId = req.body.assignToTerritoryId;
+      }
+      if (req.body.roundRobinTeam !== undefined) {
+        await validateRoutingLinks(req.auth.orgId, { roundRobinTeam: req.body.roundRobinTeam });
+        data.roundRobinTeam = req.body.roundRobinTeam;
+      }
+      if (req.body.roundRobinIndex !== undefined) data.roundRobinIndex = req.body.roundRobinIndex;
+
+      const updated = await prisma.leadRoutingRule.update({
+        where: { id: req.params.id, orgId: req.auth.orgId },
+        data,
+      });
+      return {
+        id: updated.id,
+        orgId: updated.orgId,
+        name: updated.name,
+        active: updated.active,
+        priority: updated.priority,
+        criteria: updated.criteria as Record<string, unknown>,
+        assignToUserId: updated.assignToUserId,
+        assignToTerritoryId: updated.assignToTerritoryId,
+        roundRobinTeam: updated.roundRobinTeam,
+        roundRobinIndex: updated.roundRobinIndex,
+        createdAt: updated.createdAt.toISOString(),
+        updatedAt: updated.updatedAt.toISOString(),
+      };
+    },
+  );
+
+  // DELETE /api/lead-routing-rules/:id (soft delete)
+  server.delete(
+    '/lead-routing-rules/:id',
+    {
+      preHandler: server.requirePermission('territories:write'),
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+      },
+    },
+    async (req) => {
+      await prisma.leadRoutingRule.update({
+        where: { id: req.params.id, orgId: req.auth.orgId },
+        data: { deletedAt: new Date(), active: false },
+      });
+      return { ok: true };
+    },
+  );
+
   // POST /api/lead-routing-rules/evaluate
   server.post(
     '/lead-routing-rules/evaluate',
     {
+      preHandler: server.requirePermission('territories:write'),
       schema: {
         body: z.object({
-          industry: z.string().optional(),
-          countryCode: z.string().optional(),
-          valueMicros: z.number().optional(),
+          industry: z.string().max(100).optional(),
+          countryCode: z.string().length(2).optional(),
+          valueMicros: z.number().int().min(0).max(1_000_000_000_000_000).optional(),
         }),
         response: {
           200: z.object({
@@ -276,9 +543,21 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
         if (criteria.minValue && (req.body.valueMicros ?? 0) < Number(criteria.minValue))
           match = false;
         if (match) {
+          // Round-robin: if team is defined, pick next user and advance index
+          let assignToUserId = rule.assignToUserId;
+          if (rule.roundRobinTeam && rule.roundRobinTeam.length > 0) {
+            const team = rule.roundRobinTeam;
+            const idx = rule.roundRobinIndex % team.length;
+            assignToUserId = team[idx] ?? null;
+            // Advance index atomically for next evaluation
+            await prisma.leadRoutingRule.updateMany({
+              where: { id: rule.id, orgId: req.auth.orgId },
+              data: { roundRobinIndex: { increment: 1 } },
+            });
+          }
           return {
             matchedRuleId: rule.id,
-            assignToUserId: rule.assignToUserId,
+            assignToUserId,
             assignToTerritoryId: rule.assignToTerritoryId,
           };
         }
@@ -331,13 +610,14 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/forecasts',
     {
+      preHandler: server.requirePermission('territories:write'),
       schema: {
         body: z.object({
-          period: z.string().min(1),
+          period: z.string().min(1).max(50),
           category: z.enum(['pipeline', 'best_case', 'commit', 'closed']),
-          amountMicros: z.number().int().nonnegative(),
+          amountMicros: z.number().int().nonnegative().max(1_000_000_000_000_000),
           currency: z.string().length(3).default('EUR'),
-          note: z.string().optional(),
+          note: z.string().max(2000).optional(),
         }),
         response: { 201: Forecast },
       },

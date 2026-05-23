@@ -1,5 +1,5 @@
 // Audit log read-only routes. Backend writers live across opportunities,
-// CRM enrichment, and the MCP server; this is the only consumer for the UI.
+// Data verification, and the MCP server; this is the only consumer for the UI.
 //
 // Cursor pagination uses the auto-incrementing BigInt id, exposed as a string
 // on the wire so JS Number precision can't mangle it.
@@ -15,7 +15,8 @@ export const auditLogsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/audit-logs',
     {
-      preHandler: server.requireRole('admin'),
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      preHandler: server.requirePermission('audit-log:read'),
       schema: {
         querystring: AuditLogFilter,
         response: { 200: AuditLogPage },
@@ -68,7 +69,7 @@ export const auditLogsRoutes: FastifyPluginAsyncZod = async (server) => {
 
 // Build the OR clauses for accountId matching. We test:
 //   - targetId equals accountId (opportunity.update / stage rows)
-//   - diff -> 'accountId' equals accountId (CRM enrichment / MCP rows)
+//   - diff -> 'accountId' equals accountId (data verification / MCP rows)
 //   - diff -> 'opportunityId' equals accountId (defensive — some writers stamp
 //     the linked opportunity instead of an explicit accountId)
 function accountIdClauses(accountId: string): Prisma.AuditLogWhereInput[] {

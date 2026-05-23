@@ -8,8 +8,24 @@ import {
   type CasePriority,
   type CaseStatus,
 } from '@bidstack/shared';
+import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 
 export const serviceDeskRoutes: FastifyPluginAsyncZod = async (server) => {
+  const validateServiceCaseLinks = async (
+    orgId: string,
+    links: { accountId?: string | null; contactId?: string | null; ownerId?: string | null },
+  ) => {
+    if (links.accountId && !(await tenantEntityBelongsToOrg('account', links.accountId, orgId))) {
+      throw server.httpErrors.badRequest('Account does not belong to this organization');
+    }
+    if (links.contactId && !(await tenantEntityBelongsToOrg('contact', links.contactId, orgId))) {
+      throw server.httpErrors.badRequest('Contact does not belong to this organization');
+    }
+    if (links.ownerId && !(await tenantEntityBelongsToOrg('user', links.ownerId, orgId))) {
+      throw server.httpErrors.badRequest('Owner does not belong to this organization');
+    }
+  };
+
   // GET /api/service-cases
   server.get(
     '/service-cases',
@@ -26,6 +42,7 @@ export const serviceDeskRoutes: FastifyPluginAsyncZod = async (server) => {
       const items = await prisma.serviceCase.findMany({
         where: {
           orgId: req.auth.orgId,
+          deletedAt: null,
           ...(status ? { status } : {}),
           ...(priority ? { priority } : {}),
           ...(ownerId ? { ownerId } : {}),
@@ -58,6 +75,7 @@ export const serviceDeskRoutes: FastifyPluginAsyncZod = async (server) => {
     '/service-cases',
     {
       config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+      preHandler: server.requirePermission('service-desk:write'),
       schema: {
         body: ServiceCaseCreate,
         response: { 201: ServiceCase },
@@ -65,6 +83,7 @@ export const serviceDeskRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const body = req.body;
+      await validateServiceCaseLinks(req.auth.orgId, body);
       let createdId: string | null = null;
       for (let attempt = 0; attempt < 5 && !createdId; attempt += 1) {
         try {
@@ -108,7 +127,7 @@ export const serviceDeskRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const row = await prisma.serviceCase.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
         include: { owner: { select: { name: true } } },
       });
       if (!row) throw server.httpErrors.notFound('Case not found');
@@ -120,6 +139,7 @@ export const serviceDeskRoutes: FastifyPluginAsyncZod = async (server) => {
   server.patch(
     '/service-cases/:id',
     {
+      preHandler: server.requirePermission('service-desk:write'),
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: ServiceCaseCreate.partial(),
@@ -128,7 +148,7 @@ export const serviceDeskRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const existing = await prisma.serviceCase.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!existing) throw server.httpErrors.notFound('Case not found');
 
@@ -148,14 +168,21 @@ export const serviceDeskRoutes: FastifyPluginAsyncZod = async (server) => {
         if (req.body.ownerId === null) {
           data.owner = { disconnect: true };
         } else {
+          await validateServiceCaseLinks(req.auth.orgId, { ownerId: req.body.ownerId });
           data.owner = { connect: { id: req.body.ownerId } };
         }
       }
       if (req.body.satisfaction !== undefined) data.satisfaction = req.body.satisfaction;
 
-      const updated = await prisma.serviceCase.update({
-        where: { id: existing.id },
+      const updateResult = await prisma.serviceCase.updateMany({
+        where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
         data,
+      });
+      if (updateResult.count === 0) {
+        throw server.httpErrors.notFound('Case not found');
+      }
+      const updated = await prisma.serviceCase.findFirstOrThrow({
+        where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
         include: { owner: { select: { name: true } } },
       });
       return serializeCase(updated);
@@ -166,6 +193,7 @@ export const serviceDeskRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/service-cases/:id',
     {
+      preHandler: server.requirePermission('service-desk:write'),
       schema: { params: z.object({ id: z.string().uuid() }), response: { 204: z.null() } },
     },
     async (req, reply) => {
@@ -228,7 +256,7 @@ function serializeCase(row: {
 
 async function mintCaseNumber(tx: Prisma.TransactionClient, orgId: string): Promise<string> {
   const last = await tx.serviceCase.findFirst({
-    where: { orgId, number: { startsWith: 'CS-' } },
+    where: { orgId, number: { startsWith: 'CS-' }, deletedAt: null },
     orderBy: { number: 'desc' },
     select: { number: true },
   });

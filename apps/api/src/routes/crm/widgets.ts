@@ -7,7 +7,7 @@ import { DashboardWidget } from '@bidstack/shared';
 import { persistWidgets } from '../../services/crm/widget.service.js';
 
 const WidgetsPatchBody = z.object({
-  widgets: z.array(DashboardWidget),
+  widgets: z.array(DashboardWidget).max(50),
 });
 
 const DashboardWidgetsResponse = z.object({

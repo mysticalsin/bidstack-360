@@ -1,3 +1,5 @@
+import '../styles/cockpit.css';
+
 import { useEffect, useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 

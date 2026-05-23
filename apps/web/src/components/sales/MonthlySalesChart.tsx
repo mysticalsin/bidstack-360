@@ -1,43 +1,42 @@
-// Hand-rolled SVG area chart for Monthly Sales. Matches the Sparkline pattern
-// already in the codebase (no chart-library dep). Renders:
-//   - Y-axis with 5 evenly-spaced ticks
-//   - X-axis labels at each data point
-//   - Smooth Catmull-Rom→Bezier path with translucent area fill
-//   - Hover-state circles + month-revenue tooltip
-//
-// Money on the wire is integer micros (string-encoded), formatted at the edge.
+// Premium Monthly Sales Area Chart
+// Smooth Catmull-Rom splines, gradient fill, glow stroke, animated dots,
+// and a rich glass tooltip. Responsive via viewBox.
 
 import { useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 
-import { formatMoneyMicros } from '@/lib/format';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { easeStandard, springSoft } from '@/lib/motion';
 
 import type { SalesDashMonthlyPoint } from '@bidstack/shared';
 
 interface Props {
   points: SalesDashMonthlyPoint[];
-  currency: string;
   height?: number;
+  sourceCurrency?: string;
 }
 
-const MARGIN = { top: 16, right: 16, bottom: 32, left: 56 } as const;
-const CHART_HEIGHT_DEFAULT = 280;
+const MARGIN = { top: 20, right: 16, bottom: 36, left: 56 } as const;
+const CHART_HEIGHT_DEFAULT = 300;
 
-export function MonthlySalesChart({ points, currency, height = CHART_HEIGHT_DEFAULT }: Props) {
+export function MonthlySalesChart({
+  points,
+  height = CHART_HEIGHT_DEFAULT,
+  sourceCurrency = 'CAD',
+}: Props) {
   const [hover, setHover] = useState<number | null>(null);
   const reducedMotion = useReducedMotion();
+  const { convert, formatMoneyMicros: fmtMicros } = useFormatMoney();
 
   const geometry = useMemo(() => {
-    // Each point's micros come as a string-encoded bigint to survive JSON.
-    // We project to Number for the chart: divide by 1e6 then by 1000 for
-    // axis labels (which display as "120k"). Loss-of-precision is fine for
-    // pixel positioning; absolute values stay accurate in the tooltip.
-    const values = points.map((p) => Number(BigInt(p.revenueMicros) / BigInt(1_000)) / 1000);
+    const values = points.map((p) => {
+      const converted = convertedMicros(p.revenueMicros, convert, sourceCurrency);
+      return Number(BigInt(converted) / BigInt(1_000)) / 1000;
+    });
     const max = Math.max(...values, 1);
     const niceMax = niceCeil(max);
     return { values, max: niceMax, niceMax };
-  }, [points]);
+  }, [points, convert, sourceCurrency]);
 
   if (points.length === 0) {
     return (
@@ -45,33 +44,32 @@ export function MonthlySalesChart({ points, currency, height = CHART_HEIGHT_DEFA
         initial={reducedMotion ? false : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={springSoft}
-        className="grid place-items-center rounded-md bg-[var(--surface-subtle)] text-sm text-[var(--fg-tertiary)]"
+        className="grid place-items-center rounded-xl bg-[var(--surface-subtle)] text-sm text-[var(--fg-tertiary)]"
         style={{ height }}
       >
         No confirmed orders in this window yet.
       </motion.div>
     );
   }
+
   if (points.length === 1) {
-    // A single bar visualises a one-month window — area chart needs ≥2 anchors.
     return (
       <motion.div
         initial={reducedMotion ? false : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={springSoft}
-        className="flex flex-col items-center justify-center gap-2 rounded-md bg-[var(--surface-subtle)] text-sm text-[var(--fg-secondary)]"
+        className="flex flex-col items-center justify-center gap-2 rounded-xl bg-[var(--surface-subtle)] text-sm text-[var(--fg-secondary)]"
         style={{ height }}
       >
         <div className="text-[var(--fg-tertiary)]">{points[0]!.label}</div>
-        <div className="text-2xl font-semibold tabular-nums text-[var(--fg-primary)]">
-          {formatMoneyMicros(points[0]!.revenueMicros, currency)}
+        <div className="text-3xl font-bold tabular-nums text-[var(--fg-primary)]">
+          {fmtMicros(points[0]!.revenueMicros, sourceCurrency)}
         </div>
       </motion.div>
     );
   }
 
-  // Compute SVG geometry with viewBox so the chart is responsive without ResizeObservers.
-  const width = 720; // viewBox; scales to container via preserveAspectRatio
+  const width = 720;
   const innerW = width - MARGIN.left - MARGIN.right;
   const innerH = height - MARGIN.top - MARGIN.bottom;
   const stepX = innerW / (points.length - 1);
@@ -82,16 +80,16 @@ export function MonthlySalesChart({ points, currency, height = CHART_HEIGHT_DEFA
     return { x, y };
   });
 
-  const linePath = smoothPath(coords);
+  const linePath = splinePath(coords);
   const areaPath = `${linePath} L ${coords[coords.length - 1]!.x.toFixed(2)} ${
     MARGIN.top + innerH
   } L ${coords[0]!.x.toFixed(2)} ${MARGIN.top + innerH} Z`;
 
-  // 5 Y-axis ticks at 0, 25%, 50%, 75%, 100% of niceMax.
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => ({
     value: geometry.niceMax * f,
     y: MARGIN.top + innerH - f * innerH,
   }));
+
   const tooltip =
     hover === null
       ? null
@@ -116,6 +114,23 @@ export function MonthlySalesChart({ points, currency, height = CHART_HEIGHT_DEFA
         role="img"
         aria-label="Monthly sales area chart"
       >
+        <defs>
+          <linearGradient id="sales-area-gradient" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="var(--brand-primary)" stopOpacity="0.28" />
+            <stop offset="60%" stopColor="var(--brand-primary)" stopOpacity="0.08" />
+            <stop offset="100%" stopColor="var(--brand-primary)" stopOpacity="0" />
+          </linearGradient>
+          <filter id="sales-shadow" x="-10%" y="-10%" width="120%" height="120%">
+            <feDropShadow
+              dx="0"
+              dy="2"
+              stdDeviation="3"
+              floodColor="var(--brand-primary)"
+              floodOpacity="0.12"
+            />
+          </filter>
+        </defs>
+
         {/* Y gridlines + labels */}
         {yTicks.map((tick) => (
           <g key={tick.value}>
@@ -127,11 +142,13 @@ export function MonthlySalesChart({ points, currency, height = CHART_HEIGHT_DEFA
               stroke="var(--border-subtle)"
               strokeWidth={1}
               strokeDasharray={tick.value === 0 ? '' : '2 4'}
+              opacity={tick.value === 0 ? 0.3 : 0.2}
             />
             <text
-              x={MARGIN.left - 8}
+              x={MARGIN.left - 10}
               y={tick.y + 4}
-              fontSize={11}
+              fontSize={10}
+              fontWeight={400}
               textAnchor="end"
               fill="var(--fg-tertiary)"
             >
@@ -140,27 +157,44 @@ export function MonthlySalesChart({ points, currency, height = CHART_HEIGHT_DEFA
           </g>
         ))}
 
-        {/* Area + line */}
+        {/* Area fill */}
         <motion.path
           d={areaPath}
-          fill="var(--brand-primary)"
-          fillOpacity={0.16}
+          fill="url(#sales-area-gradient)"
           initial={reducedMotion ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={easeStandard}
+          transition={{ ...easeStandard, duration: 0.8 }}
         />
+
+        {/* Shadow line */}
         <motion.path
           d={linePath}
           fill="none"
           stroke="var(--brand-primary)"
-          strokeWidth={2}
+          strokeWidth={3}
           strokeLinejoin="round"
           strokeLinecap="round"
-          initial={reducedMotion ? false : { pathLength: 0, opacity: 0.45 }}
-          animate={{ pathLength: 1, opacity: 1 }}
-          transition={springSoft}
+          opacity={0.15}
+          filter="url(#sales-shadow)"
+          initial={reducedMotion ? false : { pathLength: 0, opacity: 0 }}
+          animate={{ pathLength: 1, opacity: 0.15 }}
+          transition={{ ...springSoft, duration: 1.2 }}
         />
 
+        {/* Main line */}
+        <motion.path
+          d={linePath}
+          fill="none"
+          stroke="var(--brand-primary)"
+          strokeWidth={2.5}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          initial={reducedMotion ? false : { pathLength: 0, opacity: 0.5 }}
+          animate={{ pathLength: 1, opacity: 1 }}
+          transition={{ ...springSoft, duration: 1.2 }}
+        />
+
+        {/* Hover guide line */}
         {hover !== null ? (
           <motion.line
             key={`hover-line-${hover}`}
@@ -169,54 +203,55 @@ export function MonthlySalesChart({ points, currency, height = CHART_HEIGHT_DEFA
             y1={MARGIN.top}
             y2={MARGIN.top + innerH}
             stroke="var(--brand-primary)"
-            strokeOpacity={0.2}
+            strokeOpacity={0.15}
             strokeWidth={1}
+            strokeDasharray="4 4"
             initial={reducedMotion ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={easeStandard}
           />
         ) : null}
 
+        {/* Static dots */}
         {coords.map((c, i) => (
           <motion.circle
-            key={`point-${points[i]!.month}`}
+            key={`dot-${points[i]!.month}`}
             cx={c.x}
             cy={c.y}
-            r={2.5}
+            r={3}
             fill="var(--brand-primary)"
-            fillOpacity={0.65}
-            initial={reducedMotion ? false : { opacity: 0, scale: 0.5 }}
+            fillOpacity={0.5}
+            initial={reducedMotion ? false : { opacity: 0, scale: 0 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ ...springSoft, delay: reducedMotion ? 0 : i * 0.035 }}
+            transition={{ ...springSoft, delay: reducedMotion ? 0 : i * 0.04 + 0.3 }}
             style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
           />
         ))}
 
-        {/* Dots + hit areas. Each rect is focusable so a keyboard user can
-            tab through the months; the focus state mirrors the hover state
-            so the dot + outline appear and the <title> + aria-label
-            announce the data point. */}
+        {/* Focused dot */}
+        {hover !== null ? (
+          <motion.circle
+            key={`focus-${hover}`}
+            cx={coords[hover]!.x}
+            cy={coords[hover]!.y}
+            r={6}
+            fill="var(--surface-card)"
+            stroke="var(--brand-primary)"
+            strokeWidth={2.5}
+            initial={reducedMotion ? false : { scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={springSoft}
+            style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
+          />
+        ) : null}
+
+        {/* Hit areas */}
         {coords.map((c, i) => {
           const p = points[i]!;
-          const label = `${p.label}: ${formatMoneyMicros(p.revenueMicros, currency)}, ${p.orders} orders`;
+          const label = `${p.label}: ${fmtMicros(p.revenueMicros, sourceCurrency)}, ${p.orders} orders`;
           const focused = hover === i;
           return (
             <g key={`${p.month}-${i}`}>
-              {focused ? (
-                <motion.circle
-                  key={`focus-${i}`}
-                  cx={c.x}
-                  cy={c.y}
-                  r={4}
-                  fill="var(--brand-primary)"
-                  stroke="white"
-                  strokeWidth={2}
-                  initial={reducedMotion ? false : { scale: 0.65, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={springSoft}
-                  style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
-                />
-              ) : null}
               <rect
                 x={c.x - stepX / 2}
                 y={MARGIN.top}
@@ -232,7 +267,7 @@ export function MonthlySalesChart({ points, currency, height = CHART_HEIGHT_DEFA
                 aria-label={label}
                 style={
                   focused
-                    ? { outline: '2px solid var(--focus-ring)', outlineOffset: '2px' }
+                    ? { outline: '2px solid var(--focus-ring-color)', outlineOffset: '2px' }
                     : undefined
                 }
               >
@@ -242,29 +277,16 @@ export function MonthlySalesChart({ points, currency, height = CHART_HEIGHT_DEFA
           );
         })}
 
+        {/* Tooltip */}
         {tooltip ? (
           <motion.g
             key={`tooltip-${tooltip.point.month}`}
             pointerEvents="none"
-            initial={reducedMotion ? false : { opacity: 0, y: tooltip.above ? 4 : -4, scale: 0.98 }}
+            initial={reducedMotion ? false : { opacity: 0, y: tooltip.above ? 6 : -6, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={springSoft}
             style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
           >
-            <path
-              d={
-                tooltip.above
-                  ? `M ${tooltip.anchorX - 6} ${tooltip.y + tooltip.h - 1} L ${tooltip.anchorX} ${
-                      tooltip.y + tooltip.h + 7
-                    } L ${tooltip.anchorX + 6} ${tooltip.y + tooltip.h - 1} Z`
-                  : `M ${tooltip.anchorX - 6} ${tooltip.y + 1} L ${tooltip.anchorX} ${
-                      tooltip.y - 7
-                    } L ${tooltip.anchorX + 6} ${tooltip.y + 1} Z`
-              }
-              fill="var(--surface-card)"
-              stroke="var(--border-subtle)"
-              strokeWidth={1}
-            />
             <rect
               x={tooltip.x}
               y={tooltip.y}
@@ -274,11 +296,11 @@ export function MonthlySalesChart({ points, currency, height = CHART_HEIGHT_DEFA
               fill="var(--surface-card)"
               stroke="var(--border-subtle)"
               strokeWidth={1}
-              style={{ filter: 'drop-shadow(0 12px 24px rgba(16, 24, 40, 0.14))' }}
+              style={{ filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.08))' }}
             />
             <text
-              x={tooltip.x + 12}
-              y={tooltip.y + 18}
+              x={tooltip.x + 14}
+              y={tooltip.y + 20}
               fontSize={11}
               fontWeight={600}
               fill="var(--fg-secondary)"
@@ -286,18 +308,19 @@ export function MonthlySalesChart({ points, currency, height = CHART_HEIGHT_DEFA
               {tooltip.point.label}
             </text>
             <text
-              x={tooltip.x + 12}
-              y={tooltip.y + 38}
-              fontSize={15}
+              x={tooltip.x + 14}
+              y={tooltip.y + 42}
+              fontSize={16}
               fontWeight={700}
               fill="var(--fg-primary)"
             >
-              {formatMoneyMicros(tooltip.point.revenueMicros, currency)}
+              {fmtMicros(tooltip.point.revenueMicros, sourceCurrency)}
             </text>
             <text
-              x={tooltip.x + tooltip.w - 12}
-              y={tooltip.y + 38}
+              x={tooltip.x + tooltip.w - 14}
+              y={tooltip.y + 42}
               fontSize={11}
+              fontWeight={500}
               textAnchor="end"
               fill="var(--fg-tertiary)"
             >
@@ -306,13 +329,14 @@ export function MonthlySalesChart({ points, currency, height = CHART_HEIGHT_DEFA
           </motion.g>
         ) : null}
 
-        {/* X labels at each point */}
+        {/* X labels */}
         {coords.map((c, i) => (
           <text
             key={`xlbl-${points[i]!.month}`}
             x={c.x}
-            y={height - 8}
-            fontSize={11}
+            y={height - 10}
+            fontSize={10}
+            fontWeight={400}
             textAnchor={i === 0 ? 'start' : i === coords.length - 1 ? 'end' : 'middle'}
             fill="var(--fg-tertiary)"
           >
@@ -340,10 +364,12 @@ function niceCeil(value: number): number {
 }
 
 function formatYTick(value: number): string {
-  // Y is already in $k (we divided by 1000 above). Render as "120k".
-  if (value >= 1000) return `${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)}M`;
+  if (value >= 1_000_000_000)
+    return `${(value / 1_000_000_000).toFixed(value % 1_000_000_000 === 0 ? 0 : 1)}B`;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(value % 1_000_000 === 0 ? 0 : 1)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(value % 1_000 === 0 ? 0 : 1)}k`;
   if (value === 0) return '0';
-  return `${value.toLocaleString('en-US')}k`;
+  return value.toLocaleString('en-US');
 }
 
 function getTooltipFrame(
@@ -351,9 +377,9 @@ function getTooltipFrame(
   chartWidth: number,
   chartHeight: number,
 ): { x: number; y: number; w: number; h: number; above: boolean } {
-  const w = 168;
-  const h = 54;
-  const above = point.y > MARGIN.top + h + 18;
+  const w = 176;
+  const h = 58;
+  const above = point.y > MARGIN.top + h + 20;
   const x = clamp(point.x - w / 2, MARGIN.left + 4, chartWidth - MARGIN.right - w - 4);
   const y = above ? point.y - h - 14 : Math.min(point.y + 14, chartHeight - MARGIN.bottom - h - 2);
   return { x, y, w, h, above };
@@ -363,14 +389,46 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-/** Catmull-Rom-to-Bezier smoothing for the area chart. */
-function smoothPath(points: Array<{ x: number; y: number }>): string {
+function convertedMicros(
+  micros: string,
+  convert: ((amount: number, from: string) => number) | undefined,
+  sourceCurrency: string,
+): string {
+  if (!convert) return micros;
+  const asBigInt = BigInt(micros);
+  const million = BigInt(1_000_000);
+  const whole = asBigInt / million;
+  const remainder = asBigInt % million;
+  const value = Number(whole) + Number(remainder) / 1_000_000;
+  const converted = convert(value, sourceCurrency);
+  return String(BigInt(Math.round(converted * 1_000_000)));
+}
+
+/** Catmull-Rom spline → cubic Bezier. Smooth curve through all points. */
+function splinePath(points: Array<{ x: number; y: number }>): string {
   if (points.length === 0) return '';
   if (points.length === 1) return `M ${points[0]!.x} ${points[0]!.y}`;
-  const segs = points.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`);
-  // Simple version: straight lines (matches the screenshot's clean look).
-  return `M ${segs[0]!} ${segs
-    .slice(1)
-    .map((s) => `L ${s}`)
-    .join(' ')}`;
+  if (points.length === 2) {
+    return `M ${points[0]!.x} ${points[0]!.y} L ${points[1]!.x} ${points[1]!.y}`;
+  }
+
+  const segs: string[] = [`M ${points[0]!.x.toFixed(2)} ${points[0]!.y.toFixed(2)}`];
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(0, i - 1)]!;
+    const p1 = points[i]!;
+    const p2 = points[i + 1]!;
+    const p3 = points[Math.min(points.length - 1, i + 2)]!;
+
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    segs.push(
+      `C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)}, ${cp2x.toFixed(2)} ${cp2y.toFixed(2)}, ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`,
+    );
+  }
+
+  return segs.join(' ');
 }

@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
 import { useServiceCases } from '@/hooks/useServiceCases';
+import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import type { CasePriority, CaseStatus } from '@bidstack/shared';
 
 const STATUS_OPTIONS: { value: CaseStatus | ''; label: string }[] = [
@@ -56,7 +57,28 @@ export function ServiceDeskPage() {
             onChange={(e) => setSearch(e.target.value)}
             className="min-w-[200px] flex-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
           />
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              const csv = rowsToCsv(items, [
+                { key: 'number', label: 'Case #' },
+                { key: 'subject', label: 'Subject' },
+                { key: 'status', label: 'Status' },
+                { key: 'priority', label: 'Priority' },
+                { key: 'ownerName', label: 'Owner' },
+                { key: 'source', label: 'Source' },
+                { key: 'satisfaction', label: 'Satisfaction' },
+                { key: 'createdAt', label: 'Created' },
+                { key: 'resolvedAt', label: 'Resolved' },
+              ]);
+              downloadCsv(`service-desk-${new Date().toISOString().slice(0, 10)}`, csv);
+            }}
+          >
+            Export CSV
+          </Button>
           <select
+            aria-label="Filter by status"
             value={status}
             onChange={(e) => setStatus(e.target.value as CaseStatus | '')}
             className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none"
@@ -68,6 +90,7 @@ export function ServiceDeskPage() {
             ))}
           </select>
           <select
+            aria-label="Filter by priority"
             value={priority}
             onChange={(e) => setPriority(e.target.value as CasePriority | '')}
             className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none"

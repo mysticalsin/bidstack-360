@@ -73,7 +73,7 @@ export async function upsertOpportunityFromDust(
       code,
       customer,
       name,
-      stage: 'discovery',
+      stage: 's1_ongoing',
       intel: intel as Prisma.InputJsonValue,
       dustDocId: doc.document_id,
     },

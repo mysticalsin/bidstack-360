@@ -135,7 +135,7 @@ describe('crm companies routes', () => {
     expect(res.statusCode).toBe(404);
   });
 
-  skipIfNoDb('POST /api/crm/companies/:id/enrich persists an enrichment cache row', async () => {
+  skipIfNoDb('POST /api/crm/companies/:id/enrich persists a verified data cache row', async () => {
     const res = await server.inject({
       method: 'POST',
       url: `/api/crm/companies/${TEST_NORMALIZED}/enrich`,
@@ -150,7 +150,7 @@ describe('crm companies routes', () => {
     expect(res.json()).toMatchObject({
       name: TEST_COMPANY,
       domain: TEST_DOMAIN,
-      source: 'enrichment',
+      source: 'verified_data',
     });
 
     const row = await prisma.companyEnrichment.findUnique({
@@ -173,7 +173,7 @@ describe('crm companies routes', () => {
   });
 
   skipIfNoDb(
-    'POST /api/crm/companies/autopopulate-from-sales enriches Twenty-compatible customers',
+    'POST /api/crm/companies/autopopulate-from-sales enriches external CRM-compatible customers',
     async () => {
       const res = await server.inject({
         method: 'POST',
@@ -188,14 +188,14 @@ describe('crm companies routes', () => {
       expect(body.enriched + body.cached + body.skipped).toBe(body.requested);
       expect(body.sourceAttribution).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ source: 'odoo_twenty_sales_autopopulate' }),
-          expect.objectContaining({ source: 'twenty_core_objects' }),
+          expect.objectContaining({ source: 'external_erp_crm_sales_autopopulate' }),
+          expect.objectContaining({ source: 'external_crm_core_objects' }),
         ]),
       );
       expect(body.items[0].company).toEqual(
         expect.objectContaining({
           name: expect.any(String),
-          source: 'enrichment',
+          source: 'verified_data',
           sourceAttribution: expect.any(Array),
         }),
       );

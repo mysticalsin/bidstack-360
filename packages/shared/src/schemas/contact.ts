@@ -5,11 +5,11 @@ export type Sentiment = z.infer<typeof Sentiment>;
 
 export const Contact = z.object({
   id: z.string().uuid(),
-  customer: z.string().min(1),
-  name: z.string().min(1),
-  role: z.string().nullable(),
+  customer: z.string().min(1).max(255),
+  name: z.string().min(1).max(255),
+  role: z.string().max(255).nullable(),
   email: z.string().email().nullable(),
-  phone: z.string().nullable(),
+  phone: z.string().max(50).nullable(),
   influence: z.number().int().min(1).max(5).nullable(),
   sentiment: Sentiment.nullable(),
   createdAt: z.string().datetime(),
@@ -54,6 +54,8 @@ export const ContactDetail = Contact.extend({
 });
 export type ContactDetail = z.infer<typeof ContactDetail>;
 
+export type ContactPatch = z.infer<typeof ContactPatch>;
+
 export const ContactPatch = z
   .object({
     customer: z.string().min(1).optional(),
@@ -67,4 +69,17 @@ export const ContactPatch = z
   .refine((v) => Object.keys(v).length > 0, {
     message: 'PATCH body must contain at least one field',
   });
-export type ContactPatch = z.infer<typeof ContactPatch>;
+
+export const ContactFilter = z.object({
+  customer: z.string().max(255).optional(),
+  search: z.string().max(255).optional(),
+  cursor: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+export type ContactFilter = z.infer<typeof ContactFilter>;
+
+export const ContactPage = z.object({
+  items: z.array(Contact),
+  nextCursor: z.string().nullable(),
+});
+export type ContactPage = z.infer<typeof ContactPage>;

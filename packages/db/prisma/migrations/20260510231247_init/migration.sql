@@ -8,7 +8,7 @@ CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- CreateEnum
-CREATE TYPE "opportunity_stage" AS ENUM ('discovery', 'qualified', 'proposal', 'negotiation', 'closed_won', 'closed_lost');
+CREATE TYPE "opportunity_stage" AS ENUM ('s1_lead', 's1_ongoing', 's2_sent', 's3_technical_iteration', 's4_negotiation', 'closed_won', 'closed_lost');
 
 -- CreateEnum
 CREATE TYPE "sentiment" AS ENUM ('hot', 'warm', 'neutral', 'cold');
@@ -53,7 +53,7 @@ CREATE TABLE "opportunities" (
     "customer" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "stage" "opportunity_stage" NOT NULL,
-    "value_eur" DECIMAL(14,2) NOT NULL DEFAULT 0,
+    "value_micros" BIGINT NOT NULL DEFAULT 0,
     "probability" INTEGER NOT NULL DEFAULT 0,
     "due_date" DATE,
     "owner_id" UUID,

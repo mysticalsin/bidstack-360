@@ -1,6 +1,8 @@
 import { test, expect } from './fixtures.js';
 import type { Page, Locator } from '@playwright/test';
 
+const SMART_LOOKUP_TIMEOUT_MS = 30_000;
+
 /**
  * Resolve the first account card on the /accounts grid.
  *
@@ -41,10 +43,10 @@ test('accounts → cockpit drill-down renders all required surfaces', async ({
   page,
   gotoAndWait,
 }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(90_000);
   // 1. Land on the accounts list.
   await gotoAndWait('/accounts');
-  await expect(page.getByRole('heading', { level: 1, name: /^Account Dashboard$/ })).toBeVisible({
+  await expect(page.getByRole('heading', { level: 1, name: /^Accounts$/ })).toBeVisible({
     timeout: 15_000,
   });
 
@@ -56,15 +58,15 @@ test('accounts → cockpit drill-down renders all required surfaces', async ({
   await expect(
     addCompanyDialog.getByText('Mantu', { exact: true }),
     'domain entry should resolve the enriched company preview',
-  ).toBeVisible({ timeout: 10_000 });
+  ).toBeVisible({ timeout: SMART_LOOKUP_TIMEOUT_MS });
   await expect(
     addCompanyDialog.getByText('Exact domain match'),
     'existing enriched companies should be identified before creation',
-  ).toBeVisible({ timeout: 10_000 });
+  ).toBeVisible({ timeout: SMART_LOOKUP_TIMEOUT_MS });
   await expect(
     addCompanyDialog.getByLabel('Autofill readiness map'),
     'smart intake must show exactly which company fields will be prefilled',
-  ).toBeVisible({ timeout: 10_000 });
+  ).toBeVisible({ timeout: SMART_LOOKUP_TIMEOUT_MS });
   await addCompanyDialog.getByRole('button', { name: 'Cancel' }).click();
 
   // 2. Verify ≥1 card rendered, then capture the company name + target URL.

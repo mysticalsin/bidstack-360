@@ -10,12 +10,32 @@ import {
   Opportunity,
   OpportunityCreate,
   OpportunityFilter,
+  OpportunityFull,
+  OpportunityImport,
+  OpportunityImportResult,
   OpportunityPage,
   OpportunityPatch,
   OpportunityStage,
 } from '@bidstack/shared';
 
 import { serializeOpportunity, serializeOpportunityFull } from '../serializers/opportunity.js';
+
+/** Allowed stage transitions. Any stage not listed as a key is unrestricted. */
+const STAGE_TRANSITIONS: Record<string, string[]> = {
+  s1_lead: ['s1_ongoing', 's2_sent', 's3_technical_iteration', 's4_negotiation', 'closed_lost'],
+  s1_ongoing: ['s2_sent', 's3_technical_iteration', 's4_negotiation', 'closed_lost'],
+  s2_sent: ['s3_technical_iteration', 's4_negotiation', 'closed_lost'],
+  s3_technical_iteration: ['s4_negotiation', 'closed_lost'],
+  s4_negotiation: ['closed_won', 'closed_lost'],
+  closed_won: ['s1_ongoing'], // reopen
+  closed_lost: ['s1_ongoing'], // reopen
+};
+
+function isValidStageTransition(from: string, to: string): boolean {
+  const allowed = STAGE_TRANSITIONS[from];
+  if (!allowed) return true; // unrestricted
+  return allowed.includes(to);
+}
 
 export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
   // GET /api/opportunities
@@ -32,6 +52,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       const items = await prisma.opportunity.findMany({
         where: {
           orgId: req.auth.orgId,
+          deletedAt: null,
           ...(stage ? { stage: stage as PrismaStage } : {}),
           ...(industry ? { industry } : {}),
           ...(owner ? { owner: { email: owner } } : {}),
@@ -45,15 +66,38 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
               }
             : {}),
         },
-        include: { owner: true },
+        include: {
+          owner: { select: { id: true, name: true, email: true } },
+          territory: { select: { name: true } },
+          _count: { select: { tasks: true } },
+        },
         orderBy: { updatedAt: 'desc' },
         take: limit + 1,
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       });
       const hasMore = items.length > limit;
       const page = hasMore ? items.slice(0, limit) : items;
+      // Batch-fetch comment counts for the page
+      const commentCounts =
+        page.length > 0
+          ? await prisma.comment.groupBy({
+              by: ['targetId'],
+              where: {
+                orgId: req.auth.orgId,
+                targetType: 'opportunity',
+                targetId: { in: page.map((o) => o.id) },
+              },
+              _count: { targetId: true },
+            })
+          : [];
+      const commentCountById = new Map(commentCounts.map((c) => [c.targetId, c._count.targetId]));
       return {
-        items: page.map(serializeOpportunity),
+        items: page.map((o) =>
+          serializeOpportunity(o, {
+            taskCount: o._count.tasks,
+            commentCount: commentCountById.get(o.id) ?? 0,
+          }),
+        ),
         nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
       };
     },
@@ -65,7 +109,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       schema: {
         querystring: z.object({
-          stage: z.string().optional(),
+          stage: OpportunityStage.optional(),
           excludeClosed: z.coerce.boolean().optional(),
         }),
         response: { 200: z.object({ count: z.number().int() }) },
@@ -98,6 +142,33 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const body = req.body;
+      // Resolve owner email to ownerId if provided
+      let ownerId: string | null | undefined = undefined;
+      if (body.owner !== undefined && body.owner !== null) {
+        const ownerUser = await prisma.user.findFirst({
+          where: { email: body.owner, orgId: req.auth.orgId },
+          select: { id: true },
+        });
+        if (!ownerUser) throw server.httpErrors.badRequest('Owner user not found');
+        ownerId = ownerUser.id;
+      } else if (body.owner === null) {
+        ownerId = null;
+      }
+
+      // Auto-assign territory from country if not explicitly provided
+      let territoryId: string | null | undefined = body.territoryId;
+      if (territoryId === undefined && body.country) {
+        const territory = await prisma.territory.findFirst({
+          where: {
+            orgId: req.auth.orgId,
+            active: true,
+            countryCodes: { has: body.country },
+          },
+          select: { id: true },
+        });
+        if (territory) territoryId = territory.id;
+      }
+
       // Mint code + create + audit atomically; retry on Q-NNNN unique
       // collision with bounded attempts (mirrors sales-orders pattern).
       let createdId: string | null = null;
@@ -117,7 +188,10 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
                 dueDate: body.dueDate ? new Date(body.dueDate) : null,
                 industry: body.industry,
                 logoUrl: body.logo,
+                country: body.country ?? null,
+                ...(territoryId !== undefined ? { territoryId } : {}),
                 intel: {},
+                ...(ownerId !== undefined ? { ownerId } : {}),
               },
             });
             await tx.auditLog.create({
@@ -127,7 +201,14 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
                 action: 'opportunity.create',
                 targetType: 'opportunity',
                 targetId: created.id,
-                diff: { code, customer: body.customer, name: body.name, stage: body.stage },
+                diff: {
+                  code,
+                  customer: body.customer,
+                  name: body.name,
+                  stage: body.stage,
+                  country: body.country,
+                  territoryId,
+                },
               },
             });
             return created.id;
@@ -145,7 +226,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       // is org-scoped and we don't want to break that invariant.
       const created = await prisma.opportunity.findFirstOrThrow({
         where: { id: createdId, orgId: req.auth.orgId },
-        include: { owner: true },
+        include: { owner: true, territory: { select: { name: true } } },
       });
       return reply.code(201).send(serializeOpportunity(created));
     },
@@ -157,18 +238,26 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       schema: {
         params: z.object({ id: z.string().uuid() }),
+        response: { 200: OpportunityFull },
       },
     },
     async (req) => {
       const opp = await prisma.opportunity.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
         include: {
           owner: true,
+          territory: { select: { name: true } },
           tasks: { orderBy: { createdAt: 'desc' }, take: 50 },
           documents: { orderBy: { createdAt: 'desc' }, take: 50 },
         },
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
+      // Increment view count — awaited so it actually lands (Fastify
+      // cancels dangling promises when the reply is sent).
+      await prisma.opportunity.update({
+        where: { id: opp.id },
+        data: { viewCount: { increment: 1 } },
+      });
       return serializeOpportunityFull(opp);
     },
   );
@@ -185,12 +274,30 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const before = await prisma.opportunity.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!before) throw server.httpErrors.notFound('Opportunity not found');
 
       // Update + audit atomic so a crash mid-mutation can't leave an opp
       // changed without a paper trail (Arch-4).
+      // Auto-assign territory if country changed and territoryId not explicitly set
+      let territoryId: string | null | undefined = req.body.territoryId;
+      if (
+        territoryId === undefined &&
+        req.body.country !== undefined &&
+        req.body.country !== before.country
+      ) {
+        const territory = await prisma.territory.findFirst({
+          where: {
+            orgId: req.auth.orgId,
+            active: true,
+            countryCodes: { has: req.body.country },
+          },
+          select: { id: true },
+        });
+        territoryId = territory?.id ?? null;
+      }
+
       const [updated] = await prisma.$transaction([
         prisma.opportunity.update({
           where: { id: before.id },
@@ -207,8 +314,22 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
               : {}),
             ...(req.body.industry !== undefined ? { industry: req.body.industry } : {}),
             ...(req.body.logo !== undefined ? { logoUrl: req.body.logo } : {}),
+            ...(req.body.country !== undefined ? { country: req.body.country } : {}),
+            ...(territoryId !== undefined ? { territoryId } : {}),
+            ...(req.body.owner !== undefined && req.body.owner !== null
+              ? {
+                  ownerId: (
+                    await prisma.user.findFirst({
+                      where: { email: req.body.owner, orgId: req.auth.orgId },
+                      select: { id: true },
+                    })
+                  )?.id,
+                }
+              : req.body.owner === null
+                ? { ownerId: null }
+                : {}),
           },
-          include: { owner: true },
+          include: { owner: true, territory: { select: { name: true } } },
         }),
         prisma.auditLog.create({
           data: {
@@ -241,7 +362,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const opp = await prisma.opportunity.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
         select: { id: true, code: true, customer: true, name: true, stage: true },
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
@@ -265,7 +386,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
             },
           },
         }),
-        prisma.opportunity.delete({ where: { id: opp.id } }),
+        prisma.opportunity.update({ where: { id: opp.id }, data: { deletedAt: new Date() } }),
       ]);
 
       return reply.code(204).send(null);
@@ -286,14 +407,22 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const opp = await prisma.opportunity.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
+
+      const fromStage = opp.stage;
+      const toStage = req.body.stage;
+      if (!isValidStageTransition(fromStage, toStage)) {
+        throw server.httpErrors.badRequest(
+          `Invalid stage transition: ${fromStage} → ${toStage}. Allowed: ${STAGE_TRANSITIONS[fromStage]?.join(', ') ?? 'any'}`,
+        );
+      }
 
       const [updated] = await prisma.$transaction([
         prisma.opportunity.update({
           where: { id: opp.id },
-          data: { stage: req.body.stage as PrismaStage },
+          data: { stage: toStage as PrismaStage },
         }),
         prisma.auditLog.create({
           data: {
@@ -302,13 +431,118 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
             action: 'opportunity.stage',
             targetType: 'opportunity',
             targetId: opp.id,
-            diff: { from: opp.stage, to: req.body.stage },
+            diff: { from: fromStage, to: toStage },
           },
         }),
       ]);
       // Fire-and-forget push to Dust on stage change.
       void pushOpportunityToDust(updated.id);
       return { id: updated.id, stage: updated.stage as z.infer<typeof OpportunityStage> };
+    },
+  );
+
+  // POST /api/opportunities/import
+  server.post(
+    '/opportunities/import',
+    {
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      schema: {
+        body: OpportunityImport,
+        response: { 200: OpportunityImportResult },
+      },
+    },
+    async (req) => {
+      const { opportunities } = req.body;
+      const errors: Array<{ index: number; message: string }> = [];
+      let created = 0;
+
+      for (let i = 0; i < opportunities.length; i += 1) {
+        const row = opportunities[i];
+        if (!row) continue;
+        try {
+          let ownerId: string | null | undefined = undefined;
+          if (row.owner !== undefined && row.owner !== null) {
+            const ownerUser = await prisma.user.findFirst({
+              where: { email: row.owner, orgId: req.auth.orgId },
+              select: { id: true },
+            });
+            if (!ownerUser) {
+              errors.push({ index: i, message: `Owner user not found: ${row.owner}` });
+              continue;
+            }
+            ownerId = ownerUser.id;
+          } else if (row.owner === null) {
+            ownerId = null;
+          }
+
+          // Auto-assign territory from country
+          let territoryId: string | null = null;
+          if (row.country) {
+            const territory = await prisma.territory.findFirst({
+              where: {
+                orgId: req.auth.orgId,
+                active: true,
+                countryCodes: { has: row.country },
+              },
+              select: { id: true },
+            });
+            if (territory) territoryId = territory.id;
+          }
+
+          let createdId: string | null = null;
+          for (let attempt = 0; attempt < 5 && !createdId; attempt += 1) {
+            try {
+              createdId = await prisma.$transaction(async (tx) => {
+                const code = row.code ?? (await mintNextCode(tx, req.auth.orgId));
+                const o = await tx.opportunity.create({
+                  data: {
+                    orgId: req.auth.orgId,
+                    code,
+                    customer: row.customer,
+                    name: row.name,
+                    stage: row.stage as PrismaStage,
+                    valueMicros: BigInt(Math.round(row.value * 1_000_000)),
+                    probability: row.probability,
+                    dueDate: row.dueDate ? new Date(row.dueDate) : null,
+                    industry: row.industry,
+                    logoUrl: row.logo,
+                    country: row.country ?? null,
+                    ...(territoryId !== null ? { territoryId } : {}),
+                    intel: {},
+                    ...(ownerId !== undefined ? { ownerId } : {}),
+                  },
+                });
+                await tx.auditLog.create({
+                  data: {
+                    orgId: req.auth.orgId,
+                    userId: req.auth.userId,
+                    action: 'opportunity.create',
+                    targetType: 'opportunity',
+                    targetId: o.id,
+                    diff: {
+                      code,
+                      customer: row.customer,
+                      name: row.name,
+                      stage: row.stage,
+                      source: 'import',
+                    },
+                  },
+                });
+                return o.id;
+              });
+            } catch (err) {
+              if (isUniqueViolation(err) && attempt < 4) continue;
+              throw err;
+            }
+          }
+          if (createdId) created += 1;
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          errors.push({ index: i, message });
+        }
+      }
+
+      return { created, errors };
     },
   );
 
@@ -331,7 +565,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const opp = await prisma.opportunity.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
 
@@ -352,7 +586,7 @@ async function mintNextCode(tx: Prisma.TransactionClient, orgId: string): Promis
   // visible to whichever attempt wins. Unique violation on collision is
   // caught by the caller's bounded retry loop.
   const last = await tx.opportunity.findFirst({
-    where: { orgId, code: { startsWith: 'OP-' } },
+    where: { orgId, code: { startsWith: 'OP-' }, deletedAt: null },
     orderBy: { code: 'desc' },
     select: { code: true },
   });

@@ -8,14 +8,17 @@ test.describe('Tasks page', () => {
 
   test('filter chips are rendered', async ({ page, gotoAndWait }) => {
     await gotoAndWait('/tasks');
-    const tablist = page.getByRole('tablist', { name: 'Filter tasks' });
-    await expect(tablist).toBeVisible();
-    await expect(tablist.getByText('All')).toBeVisible();
-    await expect(tablist.getByText('Today')).toBeVisible();
-    await expect(tablist.getByText('Overdue')).toBeVisible();
-    await expect(tablist.getByText('Open')).toBeVisible();
-    await expect(tablist.getByText('In progress')).toBeVisible();
-    await expect(tablist.getByText('Done')).toBeVisible();
+    const filterGroup = page.getByRole('group', { name: 'Filter tasks' });
+    await expect(filterGroup).toBeVisible();
+    await expect(filterGroup.getByRole('button', { name: 'All' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(filterGroup.getByRole('button', { name: 'Today' })).toBeVisible();
+    await expect(filterGroup.getByRole('button', { name: 'Overdue' })).toBeVisible();
+    await expect(filterGroup.getByRole('button', { name: 'Open' })).toBeVisible();
+    await expect(filterGroup.getByRole('button', { name: 'In progress' })).toBeVisible();
+    await expect(filterGroup.getByRole('button', { name: 'Done' })).toBeVisible();
   });
 
   test('"+ New task" button is present', async ({ page, gotoAndWait }) => {
@@ -33,8 +36,24 @@ test.describe('Tasks page', () => {
 
   test('clicking "Overdue" filter chip updates URL', async ({ page, gotoAndWait }) => {
     await gotoAndWait('/tasks');
-    const tablist = page.getByRole('tablist', { name: 'Filter tasks' });
-    await tablist.getByText('Overdue').click();
+    const filterGroup = page.getByRole('group', { name: 'Filter tasks' });
+    await filterGroup.getByRole('button', { name: 'Overdue' }).click();
     await expect(page).toHaveURL(/filter=overdue/);
+  });
+
+  test('natural ordering exposes keyboard reorder and status actions', async ({
+    page,
+    gotoAndWait,
+  }) => {
+    await gotoAndWait('/tasks');
+    const taskItems = page.locator('[role="listitem"]');
+    const emptyState = page.getByText(/no tasks|nothing here/i);
+    await expect(taskItems.or(emptyState).first()).toBeVisible();
+    test.skip((await taskItems.count()) === 0, 'no task rows visible');
+
+    await expect(page.getByRole('button', { name: /^Move .+ down$/ }).first()).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /^Status: .+ Activate to change to .+$/ }).first(),
+    ).toBeVisible();
   });
 });

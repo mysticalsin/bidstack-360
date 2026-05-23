@@ -1,8 +1,8 @@
 // Document intelligence extraction worker.
 //
-// Reads pre-extracted text from the job payload, calls a Dust agent (if
-// configured) or falls back to deterministic keyword extraction, then writes
-// structured solutions/products back to the CRM database.
+// Reads the source object from storage, performs parser/OCR work off the API
+// request path, calls a Dust agent if configured, and writes structured
+// solutions/products back to the CRM database.
 
 import type { Queue, Worker, Job } from 'bullmq';
 import type IORedis from 'ioredis';
@@ -14,6 +14,8 @@ import { prisma, type Prisma } from '@bidstack/db';
 
 import { DOCUMENT_EXTRACT } from '@bidstack/shared';
 import { DustClient } from '@bidstack/dust-client';
+import { extractTextFromBuffer } from '../lib/extract-text.js';
+import { readStoredDocument } from '../lib/storage-read.js';
 
 const QUEUE_NAME = DOCUMENT_EXTRACT.name;
 
@@ -235,19 +237,34 @@ const JobData = z.object({
   accountId: z.string().min(1),
   documentId: z.string().uuid(),
   extractionId: z.string().uuid(),
-  text: z.string(),
+  storageKey: z.string().min(1),
+  contentType: z.string().min(1),
+  name: z.string().min(1),
   prompt: z.string().optional(),
 });
 type JobData = z.infer<typeof JobData>;
 
 async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
-  const { orgId, accountId, documentId, extractionId, text, prompt } = JobData.parse(job.data);
+  const { orgId, accountId, documentId, extractionId, storageKey, contentType, name, prompt } =
+    JobData.parse(job.data);
 
   // Mark as running
-  await prisma.documentExtraction.update({
-    where: { id: extractionId },
+  const runningUpdate = await prisma.documentExtraction.updateMany({
+    where: { id: extractionId, orgId, documentId, deletedAt: null },
     data: { status: 'running' },
   });
+  if (runningUpdate.count !== 1) {
+    throw new Error('Document extraction job does not match an active tenant-scoped extraction');
+  }
+
+  const stored = await readStoredDocument({ orgId, storageKey });
+  const extractedText = await extractTextFromBuffer({
+    buffer: stored.buffer,
+    contentType,
+    name,
+    sourcePath: stored.sourcePath,
+  });
+  const text = extractedText.length > 100_000 ? extractedText.slice(0, 100_000) : extractedText;
 
   let result: ExtractionResult;
   let dustRunId: string | null = null;
@@ -368,14 +385,19 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
     solutions: result.solutions,
     products: result.products,
   };
-  await prisma.documentExtraction.update({
-    where: { id: extractionId },
+  const doneUpdate = await prisma.documentExtraction.updateMany({
+    where: { id: extractionId, orgId, documentId, deletedAt: null },
     data: {
       status: 'done',
       extractedData: extractedData as unknown as Prisma.InputJsonValue,
       dustRunId,
     },
   });
+  if (doneUpdate.count !== 1) {
+    throw new Error(
+      'Document extraction completion did not match an active tenant-scoped extraction',
+    );
+  }
 }
 
 // ─── BullMQ bootstrap ──────────────────────────────────────────────────────
@@ -386,11 +408,15 @@ export async function startDocumentExtract(
   workers: Worker[],
   _queues: Queue[],
 ): Promise<void> {
-  const queue = new BullWorker<JobData>(QUEUE_NAME, async (job) => processJob(job, log), {
-    connection,
-    concurrency: 2,
-    limiter: { max: 10, duration: 60_000 },
-  });
+  const queue = new BullWorker<JobData>(
+    QUEUE_NAME,
+    async (job) => processJob(job, log.child({ jobId: job.id })),
+    {
+      connection,
+      concurrency: 2,
+      limiter: { max: 10, duration: 60_000 },
+    },
+  );
 
   queue.on('completed', (job) => {
     log.info({ jobId: job.id, documentId: job.data.documentId }, 'document extraction completed');
@@ -399,10 +425,18 @@ export async function startDocumentExtract(
   queue.on('failed', (job, err) => {
     log.error({ jobId: job?.id, err }, 'document extraction failed');
     if (job) {
-      const { extractionId } = JobData.parse(job.data);
+      const parsed = JobData.safeParse(job.data);
+      if (!parsed.success) {
+        log.error(
+          { jobId: job.id, err: parsed.error },
+          'failed to parse job data in failure handler',
+        );
+        return;
+      }
+      const { orgId, documentId, extractionId } = parsed.data;
       prisma.documentExtraction
-        .update({
-          where: { id: extractionId },
+        .updateMany({
+          where: { id: extractionId, orgId, documentId, deletedAt: null },
           data: { status: 'error', error: err.message.slice(0, 2000) },
         })
         .catch(() => undefined);

@@ -96,7 +96,7 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
       docsUrl: 'https://www.mediawiki.org/wiki/API:Main_page',
       lastCheckedAt,
       message: 'Open company profiles, official websites, logos, and images without credentials.',
-      capabilities: ['company profile lookup', 'official website', 'logo enrichment', 'images'],
+      capabilities: ['company profile lookup', 'official website', 'logo lookup', 'images'],
     },
     {
       id: 'usaspending',
@@ -121,7 +121,7 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
       sourceUrl: 'https://www.tradingview.com/widget-docs/',
       docsUrl: 'https://www.tradingview.com/widget-docs/faq/data/',
       lastCheckedAt,
-      message: 'Official embeddable widgets; market data is not exposed as a raw open API.',
+      message: 'Official embeddable widgets; market data is not exposed as a raw public API.',
       capabilities: ['symbol overview widget', 'financial widget', 'technical-analysis widget'],
     },
     {
@@ -132,14 +132,14 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
       status: credentialStatus('APOLLO_API_KEY'),
       requiresCredential: true,
       sourceUrl: 'https://api.apollo.io/',
-      docsUrl: 'https://docs.apollo.io/reference/organization-enrichment',
+      docsUrl: 'https://docs.apollo.io/reference/organization-verification',
       lastCheckedAt,
       message: credentialMessage(
         'APOLLO_API_KEY',
-        'Organization enrichment and contact discovery enabled.',
-        'Ready for credentialed enrichment',
+        'Organization verification and contact discovery enabled.',
+        'Ready for credentialed verification',
       ),
-      capabilities: ['organization enrichment', 'people discovery', 'firmographics'],
+      capabilities: ['organization verification', 'people discovery', 'firmographics'],
     },
     {
       id: 'sam-gov',
@@ -170,7 +170,7 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
       lastCheckedAt,
       message: credentialMessage(
         'COMPANIES_HOUSE_API_KEY',
-        'UK company registry enrichment enabled.',
+        'UK company registry verification enabled.',
         'UK registry lookup requires an API key',
       ),
       capabilities: ['legal name lookup', 'officer data', 'filing status'],
@@ -187,10 +187,10 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
       lastCheckedAt,
       message: credentialMessage(
         'BRANDFETCH_API_KEY',
-        'Logo and brand asset enrichment enabled.',
+        'Logo and brand asset lookup enabled.',
         'Favicon and initials fallback active',
       ),
-      capabilities: ['logo enrichment', 'brand colors', 'domain matching'],
+      capabilities: ['logo lookup', 'brand colors', 'domain matching'],
     },
     {
       id: 'logo-dev',
@@ -204,10 +204,10 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
       lastCheckedAt,
       message: credentialMessage(
         'LOGO_DEV_TOKEN',
-        'Primary logo enrichment enabled.',
+        'Primary logo lookup enabled.',
         'Favicon and initials fallback active',
       ),
-      capabilities: ['logo enrichment', 'domain matching', 'fallback images'],
+      capabilities: ['logo lookup', 'domain matching', 'fallback images'],
     },
   ];
 }
@@ -230,7 +230,7 @@ export async function fetchSecTickerSignal(
     id: `sec-edgar:${ticker}`,
     provider: 'SEC EDGAR',
     title: `${match.title} is mapped to ${ticker}`,
-    summary: `SEC EDGAR resolves ${ticker} to CIK ${cik}; this can feed legal entity and public-company enrichment.`,
+    summary: `SEC EDGAR resolves ${ticker} to CIK ${cik}; this can feed legal entity and public-company verification.`,
     url: `https://data.sec.gov/submissions/CIK${cik}.json`,
     observedAt: now.toISOString(),
     confidence: 0.93,

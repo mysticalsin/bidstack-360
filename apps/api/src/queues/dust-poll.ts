@@ -11,8 +11,11 @@
 
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
+import pino from 'pino';
 
 import { DUST_POLL } from '@bidstack/shared';
+
+const log = pino({ name: 'queue:dust-poll', level: process.env.LOG_LEVEL ?? 'info' });
 
 export const DUST_POLL_QUEUE = DUST_POLL.name;
 
@@ -31,8 +34,10 @@ function getQueue(): Queue {
     enableOfflineQueue: true,
     lazyConnect: false,
   });
-  // Swallow listener-less errors so an unreachable Redis doesn't crash the API.
-  connectionSingleton.on('error', () => undefined);
+  // Log Redis errors so queue failures are visible in logs/metrics.
+  connectionSingleton.on('error', (err) => {
+    log.error({ err }, 'Redis connection error in dust-poll queue');
+  });
 
   queueSingleton = new Queue(DUST_POLL_QUEUE, {
     connection: connectionSingleton,
@@ -59,8 +64,10 @@ export async function enqueueDustResync(job: DustPollJob): Promise<string | null
       // Per-org dedup window: at most one manual resync queued at a time.
       jobId: `${job.orgId}:manual:${Math.floor(Date.now() / 30_000)}`,
     });
+    log.info({ jobId: queued.id, orgId: job.orgId, source: job.source }, 'Dust poll job enqueued');
     return queued.id ?? null;
-  } catch {
+  } catch (err) {
+    log.error({ err, orgId: job.orgId, source: job.source }, 'Failed to enqueue dust poll job');
     return null;
   }
 }

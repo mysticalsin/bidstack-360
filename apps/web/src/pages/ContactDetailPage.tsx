@@ -4,7 +4,8 @@ import { Link, useParams } from 'react-router-dom';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
-import { LoadingSkeleton, ErrorState } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
+import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { useContact } from '@/hooks/useContacts';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { useTasks } from '@/hooks/useTasks';
@@ -18,11 +19,31 @@ export function ContactDetailPage() {
   const allTasks = useTasks();
   const allNotes = useNotes(contact.data?.customer);
 
-  if (contact.isLoading) return <LoadingSkeleton rows={8} />;
-  if (contact.isError || !contact.data)
+  if (contact.isLoading) return <DetailPageSkeleton columns={3} cards={3} />;
+  if (contact.isError)
     return (
-      <ErrorState title="Couldn't load contact" message="The contact may have been deleted." />
+      <ErrorState
+        title="Couldn't load contact"
+        message={
+          contact.error instanceof Error
+            ? contact.error.message
+            : 'The contact may have been deleted.'
+        }
+      />
     );
+  if (!contact.data) {
+    return (
+      <EmptyState
+        title="Contact not found"
+        message="The contact may have been deleted or you may not have access to it."
+        action={
+          <Link to="/contacts" className="btn btn-secondary">
+            Back to contacts
+          </Link>
+        }
+      />
+    );
+  }
 
   const c = contact.data;
   const relatedOpps = allOpps.data?.items.filter((o) => o.customer === c.customer) ?? [];

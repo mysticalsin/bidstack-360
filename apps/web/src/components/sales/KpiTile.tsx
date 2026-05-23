@@ -1,4 +1,4 @@
-// One KPI tile for the Sales Dashboard. Mirrors the Odoo tile shape:
+// One KPI tile for the Sales Dashboard. Mirrors the ERP tile shape:
 //   label    →   big number   →   ↑/↓ delta vs previous period
 // When `onClick` is passed the tile renders as a `<button>` and drills into
 // a pre-filtered list. With no handler it stays a plain `<div>` (no

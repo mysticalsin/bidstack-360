@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from 'framer-motion';
+import { memo } from 'react';
 
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
@@ -13,7 +14,7 @@ interface Props {
   cockpit: AccountCockpitSnapshot;
 }
 
-export function LiveDataMeshCard({ cockpit }: Props) {
+export const LiveDataMeshCard = memo(function LiveDataMeshCard({ cockpit }: Props) {
   const reducedMotion = useReducedMotion();
   const ticker = tickerForCompany(cockpit.company.name);
   const liveData = useOpenDataSignals({
@@ -21,28 +22,36 @@ export function LiveDataMeshCard({ cockpit }: Props) {
     ticker,
   });
   const connectors = liveData.data?.connectors ?? [];
-  const visibleConnectors = connectors.length ? connectors : fallbackConnectors();
+  const usingFallbackConnectors = connectors.length === 0;
+  const visibleConnectors = usingFallbackConnectors ? fallbackConnectors() : connectors;
   const signals = liveData.data?.signals ?? [];
   const openConnectors = visibleConnectors.filter((c) => c.kind === 'open_api').length;
-  const enabledConnectors = visibleConnectors.filter((c) => c.status === 'healthy').length;
+  const enabledConnectors = usingFallbackConnectors
+    ? 0
+    : visibleConnectors.filter((c) => c.status === 'healthy').length;
+  const availabilityLabel = usingFallbackConnectors
+    ? `${visibleConnectors.length} available`
+    : `${enabledConnectors}/${visibleConnectors.length} connected`;
 
   return (
-    <Card role="region" aria-label="Live data mesh">
+    <Card role="region" aria-label="Connected data sources">
       <SectionHeader
-        title="Live Data Mesh"
-        caption="Verified APIs, widgets, and credentialed feeds"
+        title={usingFallbackConnectors ? 'Available data sources' : 'Connected data sources'}
+        caption={
+          usingFallbackConnectors
+            ? 'Sources available after credentials or connector setup'
+            : 'Configured APIs, widgets, and verified data feeds'
+        }
       />
       <div className="data-mesh">
         <div className="mesh-hero">
           <div>
-            <div className="mesh-kicker">Real-time source posture</div>
-            <strong>
-              {enabledConnectors}/{visibleConnectors.length} online
-            </strong>
+            <div className="mesh-kicker">Source availability</div>
+            <strong>{availabilityLabel}</strong>
           </div>
           <div className="mesh-stat">
             <span>{openConnectors}</span>
-            <small>open APIs</small>
+            <small>public sources</small>
           </div>
         </div>
 
@@ -57,15 +66,15 @@ export function LiveDataMeshCard({ cockpit }: Props) {
           ))}
         </div>
 
-        <div className="mesh-signals" aria-label="Live verified signals">
+        <div className="mesh-signals" aria-label="Available source signals">
           {liveData.isLoading ? (
-            <div className="mesh-empty">Checking live sources...</div>
+            <div className="mesh-empty">Checking configured sources...</div>
           ) : liveData.isError ? (
             <div className="mesh-empty">
-              Connector registry loaded; live source check returned an error.
+              Connector registry loaded; source check returned an error.
             </div>
           ) : signals.length === 0 ? (
-            <div className="mesh-empty">No public live signal returned for this account yet.</div>
+            <div className="mesh-empty">No public signal returned for this account yet.</div>
           ) : (
             signals
               .slice(0, 3)
@@ -82,7 +91,7 @@ export function LiveDataMeshCard({ cockpit }: Props) {
       </div>
     </Card>
   );
-}
+});
 
 function ConnectorPill({
   connector,
@@ -151,8 +160,14 @@ function SignalRow({
 function fallbackConnectors(): CrmConnector[] {
   const lastCheckedAt = new Date().toISOString();
   return [
-    fallbackConnector('odoo-sales', 'Odoo', 'official_widget', 'company', lastCheckedAt),
-    fallbackConnector('twenty-core', 'Twenty', 'official_widget', 'company', lastCheckedAt),
+    fallbackConnector('erp-sales', 'ERP', 'official_widget', 'company', lastCheckedAt),
+    fallbackConnector(
+      'external-crm-core',
+      'External CRM',
+      'official_widget',
+      'company',
+      lastCheckedAt,
+    ),
     fallbackConnector('sec-edgar', 'SEC EDGAR', 'open_api', 'company', lastCheckedAt),
     fallbackConnector('usaspending', 'USAspending', 'open_api', 'procurement', lastCheckedAt),
     fallbackConnector(
@@ -187,7 +202,7 @@ function fallbackConnector(
     name,
     category,
     kind,
-    status: kind === 'credentialed_api' ? 'disabled' : 'healthy',
+    status: 'disabled',
     requiresCredential: kind === 'credentialed_api',
     sourceUrl: docsUrl,
     docsUrl,
@@ -198,14 +213,14 @@ function fallbackConnector(
 }
 
 function fallbackConnectorDocs(id: string): string {
-  if (id === 'odoo-sales') return 'https://github.com/mysticalsin/odoo';
-  if (id === 'twenty-core') return 'https://github.com/mysticalsin/twenty';
+  if (id === 'erp-sales') return 'https://github.com/mysticalsin/bidstack';
+  if (id === 'external-crm-core') return 'https://github.com/mysticalsin/bidstack';
   if (id === 'sec-edgar')
     return 'https://www.sec.gov/search-filings/edgar-application-programming-interfaces';
   if (id === 'usaspending') return 'https://api.usaspending.gov/docs/';
   if (id === 'tradingview-widgets') return 'https://www.tradingview.com/widget-docs/';
   if (id === 'apollo-organizations')
-    return 'https://docs.apollo.io/reference/organization-enrichment';
+    return 'https://docs.apollo.io/reference/organization-verification';
   if (id === 'sam-gov') return 'https://open.gsa.gov/api/get-opportunities-public-api/';
   return 'https://docs.brandfetch.com/docs/logo-link';
 }

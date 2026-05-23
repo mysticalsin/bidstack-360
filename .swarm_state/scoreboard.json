@@ -1,9 +1,9 @@
 {
   "version": "1.0.3",
-  "last_updated": "2026-05-23T17:15:00-04:00",
-  "cycle": 8,
+  "last_updated": "2026-05-23T17:50:00-04:00",
+  "cycle": 9,
   "status": "scored",
-  "composite_score": 69,
+  "composite_score": 70,
   "target_score": 98,
   "dimensions": {
     "functionality": {
@@ -147,10 +147,44 @@
       "composite_score": 69,
       "delta": 1,
       "note": "EXP-8-1: Defer Sentry initialization using requestIdleCallback and add preconnect links for Clerk and Sentry to optimize DNS and boot performance."
+    },
+    {
+      "cycle": 9,
+      "timestamp": "2026-05-23T17:50:00-04:00",
+      "composite_score": 70,
+      "delta": 1,
+      "note": "EXP-9-1: Ghost utility audit. Bridged --color-border-focus, --color-surface-overlay, and all tag colors to @theme in index.css. Cleaned up arbitrary class expressions in components, ensuring clean utility styling and 100% test pass rate."
     }
   ],
   "active_experiments": [],
   "completed_experiments": [
+    {
+      "experiment_id": "EXP-9-1",
+      "status": "committed",
+      "dimension_target": "design_ux",
+      "agents_assigned": ["#8"],
+      "proposal": {
+        "hypothesis": "Bridging all missing color and focus tokens into Tailwind v4 @theme and removing component arbitrary values avoids compiler warning/arbitrary class hazards and improves styling consistency.",
+        "expected_delta": 1,
+        "files_to_touch": [
+          "apps/web/src/index.css",
+          "apps/web/src/components/command/CommandPalette.tsx",
+          "apps/web/src/components/contact/ContactCsvImportDialog.tsx",
+          "apps/web/src/components/contact/ContactQuickLook.tsx",
+          "apps/web/src/components/help/HelpDrawer.tsx",
+          "apps/web/src/components/ui/ConfirmDialog.tsx",
+          "apps/web/src/components/ui/Dialog.tsx",
+          "apps/web/src/App.tsx",
+          "apps/web/src/components/ErrorBoundary.tsx",
+          "apps/web/src/components/account-intel/AccountIntelPanel.tsx",
+          "apps/web/src/components/files/FilesPanel.tsx",
+          "apps/web/src/components/notes/NotesPanel.tsx"
+        ]
+      },
+      "score_delta": 1,
+      "learning_id": "L-10-1",
+      "committed_ref": "aee66408"
+    },
     {
       "experiment_id": "EXP-8-1",
       "status": "committed",

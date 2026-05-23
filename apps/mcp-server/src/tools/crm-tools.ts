@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
+import { prisma, type OpportunityStage as PrismaStage, type Prisma } from '@bidstack/db';
 
 import type { Tool } from './index.js';
 
@@ -225,22 +225,48 @@ export const crmEnrichCompany: Tool<typeof EnrichCompanyInput> = {
     additionalProperties: false,
   },
   handler: async (args, ctx) => {
-    void ctx.orgId;
     const domain = normalizeDomain(args.domain);
     const website = args.website ?? (domain ? `https://${domain}/` : null);
-    // CompanyEnrichment Prisma model is pending — synthesize an enrichment
-    // response from the inputs so the tool stays callable. When the model
-    // lands, swap to the upsert. The Apollo worker also writes back here.
+    const normalizedName = normalizeName(args.name);
     const confidenceBps = domain === 'mantu.com' ? 9900 : 7200;
+    const attribution = [source(args.name, website, domain === 'mantu.com' ? 0.99 : 0.72)];
+
+    const upserted = await prisma.companyEnrichment.upsert({
+      where: {
+        orgId_normalizedName: {
+          orgId: ctx.orgId,
+          normalizedName,
+        },
+      },
+      create: {
+        orgId: ctx.orgId,
+        normalizedName,
+        legalName: args.name,
+        domain,
+        website,
+        logoUrl: logoUrl(args.name, domain),
+        confidenceBps,
+        sourceAttribution: attribution as Prisma.InputJsonValue,
+      },
+      update: {
+        legalName: args.name,
+        domain,
+        website,
+        logoUrl: logoUrl(args.name, domain),
+        confidenceBps,
+        sourceAttribution: attribution as Prisma.InputJsonValue,
+      },
+    });
+
     return {
-      id: normalizeName(args.name),
+      id: upserted.id,
       name: args.name,
-      legalName: args.name,
-      domain,
-      website,
-      logoUrl: logoUrl(args.name, domain),
-      confidence: confidenceBps / 10000,
-      sourceAttribution: [source(args.name, website, domain === 'mantu.com' ? 0.99 : 0.72)],
+      legalName: upserted.legalName,
+      domain: upserted.domain,
+      website: upserted.website,
+      logoUrl: upserted.logoUrl,
+      confidence: upserted.confidenceBps / 10000,
+      sourceAttribution: upserted.sourceAttribution,
     };
   },
 };

@@ -17,7 +17,7 @@ export function useDataQuality() {
     queryKey: ['crm-data-quality'],
     queryFn: ({ signal }) => api<DataQualityReport>('/api/crm/data-quality', { signal }),
     staleTime: 30 * 1000,
-    // Data quality changes as enrichment jobs land — refresh on tab focus
+    // Data quality changes as data verification jobs land — refresh on tab focus
     // so an admin who comes back to the tab sees fresh issues.
     refetchOnWindowFocus: true,
   });

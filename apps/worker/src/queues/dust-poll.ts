@@ -104,7 +104,15 @@ export async function startDustPoller(
             const detail = await dust.getDocument(dataSourceId, doc.document_id);
             const meta = (detail.metadata ?? {}) as Record<string, unknown>;
             const metaOrgId = meta.org_id && typeof meta.org_id === 'string' ? meta.org_id : null;
-            const orgsToProcess = metaOrgId ? [metaOrgId] : targetOrgIds;
+            if (!metaOrgId || !targetOrgIds.includes(metaOrgId)) {
+              results.skipped++;
+              log.warn(
+                { docId: doc.document_id, metaOrgId, targetOrgIds },
+                'skipping dust document with missing or mismatched org metadata',
+              );
+              continue;
+            }
+            const orgsToProcess = [metaOrgId];
 
             for (const orgId of orgsToProcess) {
               if (meta.opportunity_code && typeof meta.opportunity_code === 'string') {

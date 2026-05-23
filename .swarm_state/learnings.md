@@ -184,9 +184,20 @@
 
 ---
 
-## Cycle #9 — Queued
+## Cycle #9 — Ghost Utility Audit & Token Alignment (2026-05-23)
+
+### Learning L-10-1
+
+**Bridging design tokens to Tailwind v4 `@theme` eliminates compiler warning/arbitrary class hazards.** Replaced arbitrary declarations like `bg-[var(--surface-overlay)]` and `focus:ring-[var(--border-focus)]` with standard class names (`bg-surface-overlay` and `focus:ring-border-focus`), ensuring clean design system compliance and visual fidelity.
+
+### Learning L-10-2
+
+**E2E tests can fail on cold Vite startup due to Playwright's default timeouts.** Running tests incrementally or warming up the dev/preview server avoids flaky test failures.
+
+---
+
+## Cycle #10 — Queued
 
 ### Proposed Experiments
 
-1. **EXP-9-1 (Design/UX / Code Quality):** Ghost utility audit — scan all `text-*` and `bg-*` classes against `@theme` declarations to find other missing tokens.
-2. **EXP-9-2 (Functionality / Design):** Enhance the Opportunity 360° view by refining the visual styling of dynamic timeline updates and adding transition micro-animations.
+1. **EXP-10-1 (Functionality / Design):** Enhance the Opportunity 360° view by refining the visual styling of dynamic timeline updates and adding transition micro-animations.

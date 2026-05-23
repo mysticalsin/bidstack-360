@@ -9,6 +9,7 @@ interface GlassCardProps extends Omit<HTMLMotionProps<'div'>, 'children'> {
   className?: string;
   padding?: 'none' | 'sm' | 'md' | 'lg';
   hoverable?: boolean;
+  glow?: 'none' | 'blue' | 'jade' | 'purple' | 'amber' | 'teal' | 'rose';
 }
 
 const paddingMap = {
@@ -18,25 +19,36 @@ const paddingMap = {
   lg: 'p-6',
 } as const;
 
+const glowMap = {
+  none: '',
+  blue: 'glass-glow-blue',
+  jade: 'glass-glow-jade',
+  purple: 'glass-glow-purple',
+  amber: 'glass-glow-amber',
+  teal: 'glass-glow-teal',
+  rose: 'glass-glow-rose',
+} as const;
+
 /**
- * GlassCard — Frosted glass card. Built on backdrop-filter for the frosted look.
- * Uses `will-change: transform` only during hover to avoid permanent compositor layer cost.
+ * GlassCard — Frosted glass card with optional colored glow.
+ * Built on backdrop-filter for the frosted look.
  */
 export function GlassCard({
   children,
   className,
   padding = 'md',
   hoverable = true,
+  glow = 'none',
   ...motionProps
 }: GlassCardProps) {
   const reduced = useReducedMotion();
 
   return (
     <motion.div
-      className={cn('glass-card', paddingMap[padding], className)}
+      className={cn('glass-card dark:card-shimmer', paddingMap[padding], glowMap[glow], className)}
       whileHover={
         hoverable && !reduced
-          ? { y: -2, transition: { type: 'spring', stiffness: 400, damping: 25 } }
+          ? { y: -3, transition: { type: 'spring', stiffness: 400, damping: 25 } }
           : undefined
       }
       {...motionProps}

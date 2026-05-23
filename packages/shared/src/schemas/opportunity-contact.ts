@@ -24,7 +24,7 @@ export type OpportunityContact = z.infer<typeof OpportunityContact>;
 
 export const OpportunityContactCreate = z.object({
   contactId: z.string().uuid(),
-  role: z.string().optional(),
+  role: z.string().max(255).optional(),
   isPrimary: z.boolean().optional(),
 });
 export type OpportunityContactCreate = z.infer<typeof OpportunityContactCreate>;
@@ -34,6 +34,6 @@ export const OpportunityContactPatch = z.object({
   isPrimary: z.boolean().optional(),
   influence: z.number().int().min(1).max(5).nullable().optional(),
   sentiment: z.enum(['hot', 'warm', 'neutral', 'cold']).nullable().optional(),
-  notes: z.string().nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
 });
 export type OpportunityContactPatch = z.infer<typeof OpportunityContactPatch>;

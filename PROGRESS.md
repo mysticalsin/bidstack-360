@@ -1017,3 +1017,65 @@ Sprint 21 shipped the read-only Sales Dashboard. Sprint 22 makes it _act_: every
 ---
 
 <!-- New entries appended above this marker. -->
+
+---
+
+## 2026-05-21 — Day 1: Unblock & Foundation ( autonomous sprint )
+
+**Done:**
+
+- **B-1** Fixed `dashboard.service.ts` OpportunityStage mismatch — `mapDealStage` now correctly maps `s1_lead` → `new`, `s1_ongoing` → `screening`, `s2_sent` → `meeting`, `s3_technical_iteration` → `proposal`, `s4_negotiation` → `proposal`, `closed_won`/`closed_lost` pass through.
+- **B-2** Verified service layer already extracted into `apps/api/src/services/crm/*.service.ts` — no action needed.
+- **B-4** Idempotency-Key middleware verified fully operational with Redis + memory fallback, tests pass (5/5).
+- **B-5** Created `apps/api/src/config.ts` with Zod-validated schema for 20+ env vars; wired into `server.ts` for `LOG_LEVEL`, `NODE_ENV`, `TRUSTED_PROXIES`.
+- **B-6** Fixed worker test env: added `vitest.config.ts` with repo-root `.env` loading + `unhandledRejection` filter for BullMQ/ioredis teardown noise. Worker tests now green (15/15).
+- **MemOS** Schema created (`memos_traces`, `memos_policies`, `memos_world_models`, `bid_scores`), tables applied via SQL, unique constraints added, Prisma generate unblocked.
+- **MemOS package** `packages/memos` ships with `MemOSService` (L1/L2/L3 + hybrid retrieval).
+- **Bid/No-Bid backend** API routes: `POST /api/v1/bid-scores`, `GET /api/v1/bid-scores`, `GET /api/v1/bid-scores/:opportunityId/latest`, `POST /api/v1/bid-scores/:opportunityId/ai-calibrate`.
+- **Bid/No-Bid frontend** Opportunity selector, Save Score, AI Calibrate buttons with `useBidScore` hook.
+- **Tests** Bid-score integration tests added (2/2 pass).
+
+**Verified:**
+
+- `pnpm -r typecheck` — 10/10 packages clean
+- `pnpm -r test` — 189 passed, 1 skipped, 0 regressions
+- `pnpm -r build` — 10/10 packages build successfully
+
+**Deferred:**
+
+- B-3 Composite FKs for DB-level multi-tenancy (requires migration + careful rollout)
+- B-5 full process.env replacement (config file created, incremental wiring ongoing)
+
+**Score delta:** 88 → 89/100 (Code +1 from clean build, Infra +1 from worker test fix)
+
+**Next:** Day 2 — Invoicing Module (Sprint 23b)
+
+---
+
+## 2026-05-21 — Session 2: MemOS + Bid/No-Bid + RFP Proposal Factory
+
+**Done:**
+
+- **MemOS Cognitive Layer** — Full `packages/memos` with L1 traces, L2 policies (upsert), L3 world model, hybrid retrieval across tiers.
+- **Bid/No-Bid (Module 8)** — Backend: 4 API routes with weighted scoring, MemOS policy calibration, AI calibration heuristic. Frontend: opportunity selector, Save Score, AI Calibrate, auto-load existing scores.
+- **RFP/Proposal Factory (Module 9)** — Schema: `Proposal` + `ProposalSection` + `ProposalStatus` enum. API: CRUD, section editing, AI draft endpoint with template fallback. Frontend: `ProposalsPage` with status filters, create dialog, list view.
+- **Prisma fixes** — Unblocked generator (DLL rename workaround), replaced `ProposalDocument` with full `Proposal`/`ProposalSection`, updated `packages/db` exports.
+- **Config** — `apps/api/src/config.ts` with Zod validation for 20+ env vars.
+- **Worker tests** — Added `vitest.config.ts` with `.env` loading, unhandled rejection filter for ioredis teardown.
+- **App.tsx** — Added `/proposals` route with lazy loading.
+
+**Verified:**
+
+- `pnpm -r typecheck` — 10/10 packages clean
+- `pnpm -r test` — 189 passed, 1 skipped, 0 regressions
+- `pnpm -r build` — 10/10 packages build successfully
+
+**Deferred:**
+
+- Composite FKs for DB-level multi-tenancy
+- Full process.env replacement (config file created, incremental wiring)
+- Real Dust AI integration for proposal drafting (stub with template fallback)
+- Proposal detail/workspace page with TipTap editor
+- Proposal export to PDF
+
+**Next:** Day 3 — Dust agent integration for score defense + proposal AI drafting. Day 4 — Proposal workspace UI with TipTap. Day 5 — Test hardening.

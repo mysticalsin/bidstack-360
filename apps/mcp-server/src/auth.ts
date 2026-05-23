@@ -12,6 +12,12 @@ export interface McpAuthCtx {
   scopes: string[];
 }
 
+export function requireMcpScope(ctx: McpAuthCtx, scope: 'read' | 'write'): void {
+  if (!ctx.scopes.includes(scope)) {
+    throw new Error(`API key lacks \`${scope}\` scope`);
+  }
+}
+
 export async function mcpAuth(req: FastifyRequest, prisma: PrismaClient): Promise<McpAuthCtx> {
   const auth = req.headers.authorization ?? '';
   if (!auth.startsWith('Bearer ')) {

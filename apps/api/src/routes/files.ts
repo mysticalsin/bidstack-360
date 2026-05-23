@@ -27,7 +27,8 @@ import {
   FileUploadUrlResponse,
 } from '@bidstack/shared';
 
-import { getStorage } from '../storage/index.js';
+import { getStorage, keyBelongsToOrg } from '../storage/index.js';
+import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 
 // accountId is a free-text string (not a UUID FK) — different cases of the
 // same brand should resolve to one account. Lowercase + trim at every write
@@ -35,15 +36,6 @@ import { getStorage } from '../storage/index.js';
 // is already lowercase via normalizeName(); this is the symmetric write-side.
 function normalizeAccountId(raw: string): string {
   return raw.trim().toLowerCase();
-}
-
-/**
- * Sanitize orgId for storage-key prefixing. Must match the sanitizer used
- * by storage.newKey() so the assertion in finalize / local-upload is reliable.
- */
-function sanitizeOrgPrefix(orgId: string): string {
-  // UUID characters only — no slashes, dots, or path traversal.
-  return orgId.replace(/[^a-f0-9-]/gi, '');
 }
 
 /**
@@ -121,6 +113,7 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.put<{ Querystring: { key: string } }>(
     '/files/local-upload',
     {
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
       schema: { querystring: z.object({ key: z.string().min(1).max(500) }) },
       // Why: Fastify's default 1 MB cap blocks larger files. We lift the cap
       // to FILE_MAX_BYTES at the route boundary so the global cap stays small.
@@ -134,9 +127,7 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
       // S-M6: Verify the key belongs to the caller's org. The first path
       // segment must match the sanitized orgId so a malicious client can't
       // target another tenant's storage namespace.
-      const expectedPrefix = sanitizeOrgPrefix(req.auth.orgId);
-      const keyFirstSegment = req.query.key.split('/')[0];
-      if (keyFirstSegment !== expectedPrefix) {
+      if (!keyBelongsToOrg(req.query.key, req.auth.orgId)) {
         throw server.httpErrors.forbidden('Storage key does not belong to your organization');
       }
       const result = await storage.writeLocal(req.query.key, req.raw);
@@ -148,46 +139,86 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/files/finalize',
     {
+      config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
       schema: { body: FileFinalizeRequest, response: { 201: FileAttachment } },
     },
     async (req, reply) => {
+      const storage = await getStorage();
       // S-M4: Verify storageKey starts with the caller's orgId. A malicious
       // client that obtained a valid pre-signed URL for another org could
       // otherwise register the foreign object under their own account.
-      const expectedPrefix = sanitizeOrgPrefix(req.auth.orgId);
-      const keyFirstSegment = req.body.storageKey.split('/')[0];
-      if (keyFirstSegment !== expectedPrefix) {
+      if (!keyBelongsToOrg(req.body.storageKey, req.auth.orgId)) {
         throw server.httpErrors.forbidden('Storage key does not belong to your organization');
+      }
+      if (
+        req.body.companyId &&
+        !(await tenantEntityBelongsToOrg('company', req.body.companyId, req.auth.orgId))
+      ) {
+        throw server.httpErrors.notFound('Company not found');
+      }
+
+      let metadata;
+      try {
+        metadata = await storage.head(req.body.storageKey);
+      } catch (err) {
+        req.log.warn({ err, key: req.body.storageKey }, 'storage object missing during finalize');
+        throw server.httpErrors.notFound('Uploaded object not found');
+      }
+      if (metadata.bytes !== req.body.bytes) {
+        throw server.httpErrors.badRequest('Uploaded object size does not match finalize payload');
+      }
+      if (metadata.contentType && metadata.contentType !== req.body.contentType) {
+        throw server.httpErrors.badRequest(
+          'Uploaded object content type does not match finalize payload',
+        );
+      }
+      const scanStatus = process.env.STORAGE_SCAN_REQUIRED === 'true' ? 'pending' : 'not_required';
+      if (scanStatus === 'pending') {
+        throw server.httpErrors.conflict('Uploaded object has not passed malware scan');
       }
 
       const accountId = normalizeAccountId(req.body.accountId);
       // Atomic create + audit so a crash can't leave a file row without a
       // paper trail.
-      const [created] = await prisma.$transaction([
-        prisma.fileAttachment.create({
+      const created = await prisma.$transaction(async (tx) => {
+        const row = await tx.fileAttachment.create({
           data: {
             orgId: req.auth.orgId,
             accountId,
+            companyId: req.body.companyId ?? null,
             name: req.body.name,
             contentType: req.body.contentType,
-            bytes: req.body.bytes,
+            bytes: metadata.bytes,
             storageKey: req.body.storageKey,
             uploadedByUserId: req.auth.userId,
           },
           include: { uploader: { select: { email: true } } },
-        }),
-        prisma.auditLog.create({
+        });
+        await tx.auditLog.create({
           data: {
             orgId: req.auth.orgId,
             userId: req.auth.userId,
             action: 'file.upload',
             targetType: 'file_attachment',
-            targetId: 'pending', // overwritten below
-            diff: { name: req.body.name, bytes: req.body.bytes, accountId },
+            targetId: row.id,
+            diff: {
+              name: req.body.name,
+              bytes: metadata.bytes,
+              accountId,
+              checksum: metadata.checksum ?? null,
+              scanStatus,
+            },
           },
-        }),
-      ]);
-      return reply.code(201).send(serialize(created));
+        });
+        return row;
+      });
+      return reply.code(201).send({
+        ...serialize(created),
+        verifiedBytes: metadata.bytes,
+        verifiedContentType: metadata.contentType ?? req.body.contentType,
+        checksum: metadata.checksum ?? null,
+        scanStatus,
+      });
     },
   );
 
@@ -205,7 +236,11 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const items = await prisma.fileAttachment.findMany({
-        where: { orgId: req.auth.orgId, accountId: normalizeAccountId(req.query.accountId) },
+        where: {
+          orgId: req.auth.orgId,
+          accountId: normalizeAccountId(req.query.accountId),
+          deletedAt: null,
+        },
         include: { uploader: { select: { email: true } } },
         orderBy: { createdAt: 'desc' },
         take: req.query.limit,
@@ -220,7 +255,7 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
     { schema: { params: z.object({ id: z.string().uuid() }) } },
     async (req, reply) => {
       const row = await prisma.fileAttachment.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!row) throw server.httpErrors.notFound('File not found');
 
@@ -249,10 +284,10 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
   // 6. Delete.
   server.delete<{ Params: { id: string } }>(
     '/files/:id',
-    { schema: { params: z.object({ id: z.string().uuid() }) } },
+    { schema: { params: z.object({ id: z.string().uuid() }), response: { 204: z.null() } } },
     async (req, reply) => {
       const row = await prisma.fileAttachment.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!row) throw server.httpErrors.notFound('File not found');
 
@@ -267,7 +302,10 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
           'storage delete failed; proceeding with DB row removal',
         );
       }
-      await prisma.fileAttachment.delete({ where: { id: row.id } });
+      await prisma.fileAttachment.update({
+        where: { id: row.id },
+        data: { deletedAt: new Date() },
+      });
       await prisma.auditLog.create({
         data: {
           orgId: req.auth.orgId,

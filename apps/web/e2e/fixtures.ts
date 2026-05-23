@@ -1,6 +1,6 @@
 import { test as base, expect, request as pwRequest } from '@playwright/test';
 
-const API_URL = process.env.E2E_API_URL ?? 'http://localhost:4000';
+const API_URL = process.env.E2E_API_URL ?? 'http://localhost:4010';
 
 /**
  * Wait for the API to become healthy.
@@ -30,18 +30,20 @@ export const test = base.extend<{
     // eslint-disable-next-line react-hooks/rules-of-hooks
     await use(async (path: string) => {
       // 'load' waits for the main JS bundle; lazy chunks are fetched by
-      // React Router afterwards. We then wait for #main to be visible
-      // (AppShell renders it immediately) so downstream assertions can
-      // target page-specific content with their own timeouts.
+      // React Router afterwards. We then wait for the semantic main
+      // landmark so downstream assertions can target page-specific
+      // content with their own timeouts.
       await page.goto(path, { waitUntil: 'load' });
-      await page.locator('#main').waitFor({ state: 'visible', timeout: 10_000 });
+      await page.getByRole('main').waitFor({ state: 'visible' });
     });
   },
 });
 
 test.beforeAll(async () => {
   const healthy = await probeApiHealth();
-  test.skip(!healthy, `API at ${API_URL} not reachable — skipping E2E suite`);
+  if (!healthy) {
+    throw new Error(`API at ${API_URL} not reachable — aborting E2E suite. (Rule 12: Fail loud)`);
+  }
 });
 
 export { expect };

@@ -48,7 +48,7 @@ export function WebVitalsHud() {
     <div
       role="region"
       aria-label="Dev metrics HUD"
-      className="pointer-events-auto fixed bottom-3 left-3 z-[400] w-56 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] p-2 text-[10px] font-mono shadow-[var(--shadow-md)]"
+      className="pointer-events-auto fixed bottom-3 left-3 z-50 w-56 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] p-2 text-[10px] font-mono shadow-[var(--shadow-md)]"
     >
       <div className="mb-1 flex items-center justify-between text-[var(--fg-tertiary)]">
         <span>DEV HUD</span>

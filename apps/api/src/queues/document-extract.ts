@@ -4,8 +4,11 @@
 
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
+import pino from 'pino';
 
 import { DOCUMENT_EXTRACT } from '@bidstack/shared';
+
+const log = pino({ name: 'queue:document-extract', level: process.env.LOG_LEVEL ?? 'info' });
 
 export const DOCUMENT_EXTRACT_QUEUE = DOCUMENT_EXTRACT.name;
 
@@ -14,9 +17,9 @@ export interface DocumentExtractJob {
   accountId: string;
   documentId: string;
   extractionId: string;
-  /** Pre-extracted text sent in the job payload so the worker doesn't need
-   *  direct storage access. Capped at ~100k chars to stay within Redis limits. */
-  text: string;
+  storageKey: string;
+  contentType: string;
+  name: string;
   /** Optional custom prompt override. */
   prompt?: string;
 }
@@ -33,7 +36,10 @@ function getQueue(): Queue {
     enableOfflineQueue: true,
     lazyConnect: false,
   });
-  connectionSingleton.on('error', () => undefined);
+  // Log Redis errors so queue failures are visible in logs/metrics.
+  connectionSingleton.on('error', (err) => {
+    log.error({ err }, 'Redis connection error in document-extract queue');
+  });
 
   queueSingleton = new Queue(DOCUMENT_EXTRACT_QUEUE, {
     connection: connectionSingleton,
@@ -51,8 +57,16 @@ export async function enqueueDocumentExtract(job: DocumentExtractJob): Promise<s
     const queued = await getQueue().add('document.extract', job, {
       jobId: `${job.orgId}--${job.documentId}`,
     });
+    log.info(
+      { jobId: queued.id, orgId: job.orgId, documentId: job.documentId },
+      'Document extract job enqueued',
+    );
     return queued.id ?? null;
-  } catch {
+  } catch (err) {
+    log.error(
+      { err, orgId: job.orgId, documentId: job.documentId },
+      'Failed to enqueue document extract job',
+    );
     return null;
   }
 }

@@ -1,12 +1,39 @@
-import { describe, it, expect } from 'vitest';
+import Fastify from 'fastify';
+import {
+  serializerCompiler,
+  validatorCompiler,
+  type ZodTypeProvider,
+} from 'fastify-type-provider-zod';
+import { describe, expect, it } from 'vitest';
 
-// Why: the health route returns ok=true ONLY when the DB roundtrip works.
-// This contract is what our deploy-status check relies on — if the route
-// drifts to "always 200" we lose the deploy-time canary.
+import { healthRoute, storageConfigReady } from './health.js';
 
 describe('health route contract', () => {
-  it('exports a Fastify plugin (smoke-only — full route test in integration)', async () => {
-    const mod = await import('./health.js');
-    expect(typeof mod.healthRoute).toBe('function');
+  it('keeps liveness separate from dependency readiness', async () => {
+    const app = Fastify({ logger: false }).withTypeProvider<ZodTypeProvider>();
+    app.setValidatorCompiler(validatorCompiler);
+    app.setSerializerCompiler(serializerCompiler);
+    await app.register(healthRoute);
+
+    const res = await app.inject({ method: 'GET', url: '/livez' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true });
+    await app.close();
+  });
+
+  it('treats local storage as not production-ready', () => {
+    expect(storageConfigReady({ NODE_ENV: 'production', STORAGE_DRIVER: 'local' })).toBe(false);
+  });
+
+  it('requires an S3 bucket when S3 storage is selected', () => {
+    expect(storageConfigReady({ NODE_ENV: 'production', STORAGE_DRIVER: 's3' })).toBe(false);
+    expect(
+      storageConfigReady({
+        NODE_ENV: 'production',
+        STORAGE_DRIVER: 's3',
+        S3_BUCKET: 'bidstack-prod-files',
+      }),
+    ).toBe(true);
   });
 });

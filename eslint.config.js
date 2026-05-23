@@ -88,7 +88,7 @@ export default tseslint.config(
 
   // 4. Project-wide TS rules.
   {
-    files: ['**/*.{ts,tsx}'],
+    files: ['**/*.{ts,tsx,mjs,cjs}'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',

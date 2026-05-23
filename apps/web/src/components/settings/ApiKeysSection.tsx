@@ -1,4 +1,4 @@
-// Settings → API keys card. Mirrors Twenty's developer settings — list of
+// Settings → API keys card. Mirrors CRM developer settings — list of
 // active keys (showing only the prefix), one-shot reveal of the secret on
 // creation, and revoke action. Secrets are SHA-256 hashed server-side; the
 // raw value is shown exactly once and never re-derivable.

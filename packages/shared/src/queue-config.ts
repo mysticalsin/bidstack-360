@@ -21,7 +21,7 @@ export interface QueueConfig {
   defaultJobOptions: QueueDefaults;
 }
 
-/** Apollo.io enrichment queue — long backoff, 5 attempts. */
+/** Apollo.io data verification queue — long backoff, 5 attempts. */
 export const COMPANY_ENRICH_APOLLO: QueueConfig = {
   name: 'company-enrich-apollo',
   defaultJobOptions: {

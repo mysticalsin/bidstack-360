@@ -58,9 +58,18 @@ async function resolveStubAuth(req: FastifyRequest): Promise<AuthContext> {
 }
 
 function mapClerkRole(orgRole: string | undefined): string {
-  if (orgRole === 'org:admin') return 'admin';
-  // Future: map custom Clerk roles like 'org:bid_manager' → 'bid_manager'
-  return 'member';
+  if (orgRole === undefined || orgRole === null) return 'member';
+  const roleMap: Record<string, string> = {
+    'org:admin': 'admin',
+    'org:member': 'member',
+    'org:manager': 'manager',
+    'org:finance': 'finance',
+  };
+  const mapped = roleMap[orgRole];
+  if (!mapped) {
+    throw new Error(`UNRECOGNIZED_CLERK_ROLE:${orgRole}`);
+  }
+  return mapped;
 }
 
 async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
@@ -75,10 +84,16 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
     throw req.server.httpErrors.unauthorized('Missing Authorization header');
   }
 
+  const publicBaseUrl = process.env.PUBLIC_BASE_URL;
+  if (process.env.NODE_ENV === 'production' && (!publicBaseUrl || publicBaseUrl.trim() === '')) {
+    throw req.server.httpErrors.serviceUnavailable('PUBLIC_BASE_URL is required in production');
+  }
+  const authorizedParties = publicBaseUrl ? [publicBaseUrl] : [];
+
   try {
     const payload = await verifyToken(token, {
       secretKey,
-      authorizedParties: [process.env.PUBLIC_BASE_URL ?? ''].filter(Boolean),
+      authorizedParties,
     });
 
     const clerkOrgId = payload.org_id as string | undefined;
@@ -114,10 +129,48 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
 
     // JIT provisioning: auto-create the user on first sign-in and sync the
     // Clerk org role on every login so Dashboard changes are immediate.
-    const clerkRole = mapClerkRole(payload.org_role as string | undefined);
+    let clerkRole: string;
+    try {
+      clerkRole = mapClerkRole(payload.org_role as string | undefined);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.startsWith('UNRECOGNIZED_CLERK_ROLE:')) {
+        const roleName = err.message.split(':')[1];
+        req.log.warn({ role: roleName }, 'Unknown Clerk role mapping encountered');
+        throw req.server.httpErrors.forbidden(`Unrecognized organization role: ${roleName}`);
+      }
+      throw err;
+    }
     const firstName = (payload.first_name as string | undefined) ?? '';
     const lastName = (payload.last_name as string | undefined) ?? '';
     const name = `${firstName} ${lastName}`.trim() || null;
+
+    const existingUser = await prisma.user.findUnique({
+      where: { clerkUser: clerkUserId },
+      select: { id: true, orgId: true },
+    });
+    if (existingUser && existingUser.orgId !== org.id) {
+      req.log.warn(
+        { clerkOrgId, clerkUserId, existingOrgId: existingUser.orgId, tokenOrgId: org.id },
+        'clerk user attempted cross-organization auth before org-scoped identity migration',
+      );
+      throw req.server.httpErrors.forbidden('User is already registered in another organization');
+    }
+
+    if (email) {
+      const existingEmail = await prisma.user.findUnique({
+        where: { email },
+        select: { id: true, orgId: true },
+      });
+      if (existingEmail && existingEmail.orgId !== org.id) {
+        req.log.warn(
+          { clerkOrgId, clerkUserId, existingOrgId: existingEmail.orgId, tokenOrgId: org.id },
+          'email attempted cross-organization auth before org-scoped identity migration',
+        );
+        throw req.server.httpErrors.forbidden(
+          'Email is already registered in another organization',
+        );
+      }
+    }
 
     const user = await prisma.user.upsert({
       where: { clerkUser: clerkUserId },

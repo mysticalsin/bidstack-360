@@ -220,18 +220,28 @@ export const WorldMap = memo(function WorldMap({ data, className, onCountryClick
     [data],
   );
 
-  // Simple blue interpolation: white → deep blue
-  const interpolateBlues = (t: number) => {
-    const r = Math.round(239 - t * 207);
-    const g = Math.round(244 - t * 196);
-    const b = Math.round(255 - t * 128);
-    return `rgb(${r}, ${g}, ${b})`;
+  // Brand-aware interpolation: surface-sunken → brand-primary
+  // Uses CSS custom properties for consistency with the design system.
+  const interpolateBrand = (t: number) => {
+    // Surface sunken (light): ~#F8F9FB  →  Brand primary (light): ~#2C4BFF
+    // We interpolate in HSL space for cleaner perceptual gradients.
+    const h = 230 + t * 8; // 230 → 238
+    const s = 20 + t * 60; // 20% → 80%
+    const l = 97 - t * 42; // 97% → 55%
+    return `hsl(${h} ${s}% ${l}%)`;
   };
 
   const colorScale = useMemo(
-    () => scaleSequential(interpolateBlues).domain([0, maxValue]),
+    () => scaleSequential(interpolateBrand).domain([0, maxValue]),
     [maxValue],
   );
+
+  const legendSteps = 5;
+  const legendItems = Array.from({ length: legendSteps }, (_, i) => {
+    const t = i / (legendSteps - 1);
+    const value = Math.round(maxValue * t);
+    return { color: interpolateBrand(t), label: formatMoneyMicros(String(value), 'EUR') };
+  });
 
   return (
     <div className={cn('relative', className)}>
@@ -258,11 +268,11 @@ export const WorldMap = memo(function WorldMap({ data, className, onCountryClick
                     stroke="var(--border-subtle)"
                     strokeWidth={0.5}
                     style={{
-                      default: { outline: 'none', transition: 'fill 200ms' },
+                      default: { outline: 'none', transition: 'fill 150ms ease' },
                       hover: {
                         outline: 'none',
                         fill: hasData
-                          ? (colorScale(Math.min(item.totalValueMicros * 1.2, maxValue)) as string)
+                          ? (colorScale(Math.min(item.totalValueMicros * 1.15, maxValue)) as string)
                           : 'var(--surface-hover)',
                         cursor: hasData ? 'pointer' : 'default',
                       },
@@ -298,22 +308,39 @@ export const WorldMap = memo(function WorldMap({ data, className, onCountryClick
         </ZoomableGroup>
       </ComposableMap>
 
+      {/* Legend */}
+      <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)]/90 px-2.5 py-1.5 text-[10px] shadow-[var(--shadow-xs)] backdrop-blur">
+        <span className="text-[var(--fg-tertiary)]">Pipeline</span>
+        <div className="flex items-center gap-1">
+          {legendItems.map((l, i) => (
+            <div key={i} className="flex flex-col items-center gap-0.5">
+              <div className="h-3 w-5 rounded-sm" style={{ backgroundColor: l.color }} />
+              <span className="tabular-nums text-[var(--fg-tertiary)]">{l.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {hovered ? (
         <div
-          className="pointer-events-none fixed z-50 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-2 text-xs shadow-[var(--shadow-md)]"
+          className="pointer-events-none fixed z-50 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-2 shadow-[var(--shadow-md)]"
           style={{
             left: hovered.x + 12,
             top: hovered.y - 12,
           }}
         >
-          <div className="font-semibold text-[var(--fg-primary)]">{hovered.item.countryCode}</div>
-          <div className="mt-0.5 tabular-nums text-[var(--fg-secondary)]">
-            {hovered.item.opportunityCount} opp
-            {hovered.item.opportunityCount === 1 ? '' : 's'} ·{' '}
-            {formatMoneyMicros(hovered.item.totalValueMicros, 'EUR')}
+          <div className="text-xs font-semibold text-[var(--fg-primary)]">
+            {hovered.item.countryCode}
           </div>
-          <div className="tabular-nums text-[var(--fg-tertiary)]">
-            Avg prob: {hovered.item.avgProbability}%
+          <div className="mt-1 flex items-center gap-2 text-[11px] tabular-nums text-[var(--fg-secondary)]">
+            <span>
+              {hovered.item.opportunityCount} opp{hovered.item.opportunityCount === 1 ? '' : 's'}
+            </span>
+            <span className="text-[var(--border-subtle)]">·</span>
+            <span>{formatMoneyMicros(hovered.item.totalValueMicros, 'EUR')}</span>
+          </div>
+          <div className="text-[11px] tabular-nums text-[var(--fg-tertiary)]">
+            Avg prob {hovered.item.avgProbability}%
           </div>
         </div>
       ) : null}

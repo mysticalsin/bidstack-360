@@ -80,7 +80,7 @@ export async function buildSalesCompanyCandidates({
         domain: domainFor(opportunity.customer),
         website: websiteFor(opportunity.customer),
         countryCode: null,
-        reason: 'Twenty-compatible opportunity',
+        reason: 'External CRM opportunity',
         score: Math.round(Number(opportunity.valueMicros ?? 0)),
       });
     }
@@ -172,7 +172,7 @@ export async function autopopulateCompanies({
       items.push({
         company: serializeCompany(existing),
         action: 'cached',
-        reason: 'fresh enrichment cache',
+        reason: 'fresh verified data cache',
       });
       continue;
     }
@@ -212,15 +212,15 @@ export async function autopopulateCompanies({
     items,
     sourceAttribution: [
       attribution({
-        source: 'odoo_twenty_sales_autopopulate',
-        label: 'Odoo sale.order pattern + Twenty-compatible customer records',
-        sourceUrl: 'https://github.com/mysticalsin/odoo',
+        source: 'external_erp_crm_sales_autopopulate',
+        label: 'External ERP/CRM sales pattern + compatible customer records',
+        sourceUrl: 'https://github.com/mysticalsin/bidstack',
         confidence: 0.84,
       }),
       attribution({
-        source: 'twenty_core_objects',
-        label: 'Twenty Company/Opportunity object model',
-        sourceUrl: 'https://github.com/mysticalsin/twenty',
+        source: 'external_crm_core_objects',
+        label: 'External CRM Company/Opportunity object model',
+        sourceUrl: 'https://github.com/mysticalsin/bidstack',
         confidence: 0.86,
       }),
     ],

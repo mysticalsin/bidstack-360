@@ -31,6 +31,29 @@ export const LeadRoutingRule = z.object({
 });
 export type LeadRoutingRule = z.infer<typeof LeadRoutingRule>;
 
+export const TerritoryCreate = Territory.omit({
+  id: true,
+  orgId: true,
+  ownerName: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type TerritoryCreate = z.infer<typeof TerritoryCreate>;
+
+export const TerritoryPatch = TerritoryCreate.partial();
+export type TerritoryPatch = z.infer<typeof TerritoryPatch>;
+
+export const LeadRoutingRuleCreate = LeadRoutingRule.omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type LeadRoutingRuleCreate = z.infer<typeof LeadRoutingRuleCreate>;
+
+export const LeadRoutingRulePatch = LeadRoutingRuleCreate.partial();
+export type LeadRoutingRulePatch = z.infer<typeof LeadRoutingRulePatch>;
+
 export const Forecast = z.object({
   id: z.string().uuid(),
   orgId: z.string().uuid(),

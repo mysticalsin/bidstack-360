@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Card, SectionHeader } from '@/components/ui/Card';
 
 interface NotificationPrefs {
@@ -28,17 +28,25 @@ function loadPrefs(): NotificationPrefs {
 }
 
 function savePrefs(prefs: NotificationPrefs) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+  } catch {
+    /* quota / private mode — silent */
+  }
 }
 
 export function NotificationPrefsSection() {
-  const prefs = loadPrefs();
+  const [prefs, setPrefs] = useState(loadPrefs);
 
-  const toggle = useCallback((key: keyof NotificationPrefs) => {
-    const next = { ...loadPrefs(), [key]: !loadPrefs()[key] };
-    savePrefs(next);
-    window.dispatchEvent(new Event('storage'));
-  }, []);
+  const toggle = useCallback(
+    (key: keyof NotificationPrefs) => {
+      const next = { ...prefs, [key]: !prefs[key] };
+      savePrefs(next);
+      setPrefs(next);
+      window.dispatchEvent(new Event('storage'));
+    },
+    [prefs],
+  );
 
   const items: { key: keyof NotificationPrefs; label: string; desc: string }[] = [
     {

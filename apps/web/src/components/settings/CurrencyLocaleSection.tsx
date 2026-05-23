@@ -24,7 +24,11 @@ export function CurrencyLocaleSection() {
 
   const update = (patch: Partial<CurrencyLocale>) => {
     const next = { ...values, ...patch };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      /* quota / private mode — silent */
+    }
     setValues(next);
   };
 

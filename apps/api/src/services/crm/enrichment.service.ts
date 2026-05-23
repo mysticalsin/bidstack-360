@@ -58,7 +58,7 @@ export async function upsertVerifiedCompanyEnrichment({
           website: requestedWebsite,
           now,
         }).catch((err) => {
-          log.warn({ err, company: name }, 'open company enrichment failed');
+          log.warn({ err, company: name }, 'open company data verification failed');
           return null;
         });
   const favicon = faviconProfile({
@@ -75,8 +75,8 @@ export async function upsertVerifiedCompanyEnrichment({
     ...(openProfile?.sourceAttribution ?? []),
     ...(openProfile?.logoUrl ? [] : favicon.sourceAttribution),
     attribution({
-      source: isMantu ? 'official_website' : 'verified_company_enrichment',
-      label: isMantu ? 'Mantu official website' : 'BidStack enrichment cache',
+      source: isMantu ? 'official_website' : 'verified_data_source',
+      label: isMantu ? 'Mantu official website' : 'BidStack verified data cache',
       sourceUrl: website,
       confidence: isMantu ? 0.99 : 0.72,
     }),
@@ -184,9 +184,9 @@ export async function queueApolloEnrichment({
     ...(domain ? { domain } : {}),
   });
   if (apolloJobId) {
-    log.info({ apolloJobId, company: companyName }, 'queued apollo enrichment');
+    log.info({ apolloJobId, company: companyName }, 'queued apollo data verification');
   } else {
-    log.warn('apollo enrichment enqueue skipped (redis unreachable)');
+    log.warn('apollo data verification enqueue skipped (redis unreachable)');
   }
   return apolloJobId;
 }

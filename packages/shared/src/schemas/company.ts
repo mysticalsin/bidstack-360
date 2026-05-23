@@ -3,20 +3,21 @@ import { z } from 'zod';
 export const Company = z.object({
   id: z.string().uuid(),
   orgId: z.string().uuid(),
-  name: z.string().min(1),
-  legalName: z.string().nullable(),
-  domain: z.string().nullable(),
-  industry: z.string().nullable(),
-  employeeCount: z.number().int().nullable(),
+  name: z.string().min(1).max(255),
+  legalName: z.string().max(255).nullable(),
+  domain: z.string().max(255).nullable(),
+  industry: z.string().max(100).nullable(),
+  employeeCount: z.number().int().min(0).max(999999).nullable(),
   countryCode: z.string().length(2).nullable(),
   address: z.record(z.unknown()).nullable(),
-  billingEmail: z.string().email().nullable(),
-  taxId: z.string().nullable(),
-  logoUrl: z.string().nullable(),
-  website: z.string().nullable(),
+  billingEmail: z.string().email().max(255).nullable(),
+  taxId: z.string().max(100).nullable(),
+  logoUrl: z.string().url().max(500).nullable(),
+  website: z.string().url().max(500).nullable(),
   source: z.string(),
   confidence: z.number(),
   enrichedAt: z.string().datetime().nullable(),
+  tier: z.enum(['key', 'top', 'standard']).nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -30,6 +31,8 @@ export const CompanyCreate = Company.omit({
   enrichedAt: true,
   confidence: true,
   source: true,
+}).extend({
+  tier: z.enum(['key', 'top', 'standard']).optional(),
 });
 export type CompanyCreate = z.infer<typeof CompanyCreate>;
 
@@ -46,6 +49,7 @@ export const CompanyPatch = z
     taxId: z.string().nullable().optional(),
     logoUrl: z.string().nullable().optional(),
     website: z.string().nullable().optional(),
+    tier: z.enum(['key', 'top', 'standard']).nullable().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, {
     message: 'PATCH body must contain at least one field',

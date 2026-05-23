@@ -17,7 +17,7 @@ describe('CRM schemas', () => {
   it('accepts a Mantu company profile with official logo attribution', () => {
     const company = CrmCompany.parse({
       id: 'mantu',
-      source: 'enrichment',
+      source: 'verified_data',
       name: 'Mantu',
       legalName: 'Mantu',
       domain: 'mantu.com',
@@ -91,13 +91,13 @@ describe('CRM schemas', () => {
 
     const report = DataQualityReport.parse({
       generatedAt: fetchedAt,
-      counts: { stale_enrichment: 1 },
+      counts: { stale_data: 1 },
       issues: [
         {
-          id: 'stale-enrichment:mantu',
-          kind: 'stale_enrichment',
+          id: 'stale-data:mantu',
+          kind: 'stale_data',
           severity: 'low',
-          title: 'Mantu enrichment is older than 90 days',
+          title: 'Mantu data is older than 90 days',
           detail: null,
           companyId: 'mantu',
           companyName: 'Mantu',
@@ -105,7 +105,7 @@ describe('CRM schemas', () => {
         },
       ],
     });
-    expect(report.counts.stale_enrichment).toBe(1);
+    expect(report.counts.stale_data).toBe(1);
   });
 
   it('separates open APIs from credentialed or widget-only connectors', () => {
@@ -141,8 +141,8 @@ describe('CRM schemas', () => {
       source: 'opportunities',
       sourceAttribution: [
         {
-          source: 'twenty_compatible_opportunities',
-          label: 'Twenty-compatible BidStack opportunity pipeline',
+          source: 'external_crm_compatible_opportunities',
+          label: 'External CRM-compatible BidStack opportunity pipeline',
           sourceUrl: null,
           fetchedAt,
           confidence: 0.78,
@@ -195,6 +195,16 @@ describe('CRM schemas', () => {
       ],
       topProducts: [],
       topCategories: [],
+      teamPerformance: [],
+      territoryBreakdown: [],
+      pipelineByStage: [],
+      winLoss: {
+        wonCount: 5,
+        lostCount: 2,
+        wonRevenueMicros: 500_000_000_000,
+        lostRevenueMicros: 100_000_000_000,
+        winRate: 71.4,
+      },
     });
 
     expect(report.topCountries[0]?.people[0]?.customer).toBe('CI Financial');

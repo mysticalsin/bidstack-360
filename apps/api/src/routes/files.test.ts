@@ -12,12 +12,13 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   ALLOWED_FILE_CONTENT_TYPES,
   FILE_MAX_BYTES,
+  FileAttachment,
   FileFinalizeRequest,
   FileUploadUrlRequest,
   FileUploadUrlResponse,
 } from '@bidstack/shared';
 
-import { __setStorageForTest, type StorageAdapter } from '../storage/index.js';
+import { __setStorageForTest, keyBelongsToOrg, type StorageAdapter } from '../storage/index.js';
 import { filesRoutes } from './files.js';
 
 describe('files route contract', () => {
@@ -74,6 +75,25 @@ describe('files route contract', () => {
     expect(ok.success).toBe(true);
   });
 
+  it('allows finalize responses to include storage-verified metadata', () => {
+    const ok = FileAttachment.safeParse({
+      id: '11111111-1111-1111-1111-111111111111',
+      accountId: 'acme',
+      name: 'rfp.pdf',
+      contentType: 'application/pdf',
+      bytes: 4096,
+      storageKey: 'acme/abc123-rfp.pdf',
+      uploadedByUserId: null,
+      uploadedByEmail: null,
+      createdAt: new Date().toISOString(),
+      verifiedBytes: 4096,
+      verifiedContentType: 'application/pdf',
+      checksum: 'etag-123',
+      scanStatus: 'not_required',
+    });
+    expect(ok.success).toBe(true);
+  });
+
   it('locks the upload-url response shape (uploadUrl, storageKey, headers)', () => {
     // Why: the web client builds the PUT request against this exact shape;
     // dropping `headers` or renaming `storageKey` is a silent breaking change.
@@ -116,13 +136,21 @@ describe('files route contract', () => {
     expect(presigned.headers['Content-Type']).toBe('application/pdf');
   });
 
-  it('s3 driver throws a descriptive error if the AWS SDK is not installed', async () => {
+  it('accepts both local and S3 org key layouts for ownership checks', () => {
+    const orgId = '11111111-1111-1111-1111-111111111111';
+    expect(keyBelongsToOrg(`${orgId}/acme/file.pdf`, orgId)).toBe(true);
+    expect(keyBelongsToOrg(`orgs/${orgId}/accounts/acme/file.pdf`, orgId)).toBe(true);
+    expect(
+      keyBelongsToOrg('orgs/22222222-2222-2222-2222-222222222222/accounts/acme/file.pdf', orgId),
+    ).toBe(false);
+  });
+
+  it('s3 driver fails closed when bucket config is missing', async () => {
     process.env.STORAGE_DRIVER = 's3';
-    process.env.S3_BUCKET = 'bidstack-files';
+    delete process.env.S3_BUCKET;
     __setStorageForTest(null);
-    // Why: prod deploy without optional AWS deps must fail loudly at boot,
-    // not silently fall back to local disk where files would vanish on
-    // container restarts.
+    // Why: production must never silently fall back to local disk, where files
+    // would vanish on container restarts.
     const { getStorage } = await import('../storage/index.js');
     let err: unknown;
     try {
@@ -131,7 +159,20 @@ describe('files route contract', () => {
       err = e;
     }
     expect(err).toBeInstanceOf(Error);
-    expect((err as Error).message).toMatch(/S3 not installed|bucket/i);
+    expect((err as Error).message).toMatch(/S3_BUCKET/i);
+    // restore
+    process.env.STORAGE_DRIVER = 'local';
+    __setStorageForTest(null);
+  });
+
+  it('s3 driver loads the installed AWS SDK when bucket config is present', async () => {
+    process.env.STORAGE_DRIVER = 's3';
+    process.env.S3_BUCKET = 'bidstack-files';
+    __setStorageForTest(null);
+    const { getStorage } = await import('../storage/index.js');
+    const storage = await getStorage();
+    expect(storage.driver).toBe('s3');
+    expect(storage.newKey('org_123', 'acme', 'rfp.pdf')).toContain('orgs/org_123/accounts/acme/');
     // restore
     process.env.STORAGE_DRIVER = 'local';
     delete process.env.S3_BUCKET;
@@ -145,6 +186,7 @@ describe('files route contract', () => {
       getUploadUrl: async () => ({ url: 'http://x', headers: {} }),
       getDownload: async () => ({ kind: 'redirect', url: 'http://x' }),
       delete: async () => undefined,
+      head: async () => ({ bytes: 4, checksum: null }),
       readBuffer: async () => Buffer.from('fake'),
     };
     __setStorageForTest(fake);

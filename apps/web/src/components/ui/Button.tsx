@@ -15,16 +15,21 @@ interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> {
 
 const VARIANT: Record<Variant, string> = {
   primary:
-    'bg-[var(--brand-primary)] text-white hover:bg-[var(--brand-primary-hover)] active:bg-[var(--brand-primary-press)] shadow-[var(--shadow-xs)]',
+    'bg-[var(--brand-primary)] text-white hover:bg-[var(--brand-primary-hover)] active:bg-[var(--brand-primary-press)] shadow-[var(--shadow-xs)] ' +
+    'dark:bg-gradient-to-r dark:from-[var(--brand-primary)] dark:to-[#c084fc] dark:shadow-[0_0_16px_rgba(168,85,247,0.25)] dark:hover:shadow-[0_0_24px_rgba(168,85,247,0.35)] dark:pulse-glow',
   secondary:
-    'bg-[var(--surface-card)] text-[var(--fg-primary)] border border-[var(--border-default)] hover:bg-[var(--surface-sunken)] hover:border-[var(--border-strong)]',
+    'bg-[var(--surface-card)] text-[var(--fg-primary)] border border-[var(--border-default)] hover:bg-[var(--surface-sunken)] hover:border-[var(--border-strong)] active:bg-[var(--border-subtle)] active:scale-[0.98] ' +
+    'dark:bg-[var(--surface-glass)] dark:backdrop-blur-md dark:hover:border-[var(--border-glow-strong)] dark:hover:shadow-[0_0_16px_var(--border-glow)]',
   ghost:
-    'bg-transparent text-[var(--fg-secondary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)]',
-  destructive: 'bg-[var(--danger)] text-white hover:opacity-95 shadow-[var(--shadow-xs)]',
+    'bg-transparent text-[var(--fg-secondary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)] active:bg-[var(--border-subtle)] ' +
+    'dark:hover:bg-[rgba(168,85,247,0.08)] dark:hover:text-[var(--brand-primary)] dark:active:bg-[rgba(168,85,247,0.12)]',
+  destructive:
+    'bg-[var(--danger)] text-white hover:opacity-95 active:opacity-90 active:scale-[0.98] shadow-[var(--shadow-xs)] ' +
+    'dark:bg-[rgba(251,113,133,0.18)] dark:text-[#fda4af] dark:border dark:border-[rgba(251,113,133,0.25)] dark:hover:bg-[rgba(251,113,133,0.25)] dark:hover:shadow-[0_0_16px_rgba(251,113,133,0.2)]',
 };
 
 const SIZE: Record<Size, string> = {
-  sm: 'h-8 px-3 text-xs gap-1.5',
+  sm: 'h-8 px-3 text-xs gap-1',
   md: 'h-9 px-4 text-sm gap-2',
   lg: 'h-11 px-5 text-sm gap-2',
 };
@@ -56,7 +61,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           // expands to the 44×44 Apple HIG / WCAG 2.2 AAA target on coarse
           // pointer devices (touch). Keeps desktop density while staying
           // tappable on phones and tablets.
-          'inline-flex items-center justify-center rounded-md font-medium transition-colors',
+          'inline-flex items-center justify-center rounded-md dark:rounded-full font-medium transition-colors',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]',
           'disabled:cursor-not-allowed disabled:opacity-60',
           'pointer-coarse:min-h-11 pointer-coarse:min-w-11',

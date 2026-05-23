@@ -1,4 +1,4 @@
-// Per-state tone badge for Invoices. Mirrors Odoo account.move colours:
+// Per-state tone badge for Invoices. Mirrors ERP account.move colours:
 //   draft     → gray   (not yet sent)
 //   sent      → blue   (awaiting payment)
 //   paid      → jade   (fully paid)

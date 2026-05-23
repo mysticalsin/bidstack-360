@@ -72,3 +72,36 @@ export const tools = {
 } as const;
 
 export type ToolName = keyof typeof tools;
+
+export type ToolScope = 'read' | 'write';
+
+export const toolScopes = {
+  'opportunities.list': 'read',
+  'opportunities.get': 'read',
+  'opportunity.update': 'write',
+  'contacts.list': 'read',
+  'contacts.get': 'read',
+  'contacts.create': 'write',
+  'tasks.create': 'write',
+  'tasks.list': 'read',
+  'tasks.update': 'write',
+  'proposal.draft': 'read',
+  'leads.list': 'read',
+  'leads.get': 'read',
+  'leads.create': 'write',
+  'leads.update': 'write',
+  'leads.convert': 'write',
+  'notes.list': 'read',
+  'notes.create': 'write',
+  crm_search_companies: 'read',
+  crm_create_deal: 'write',
+  crm_update_deal: 'write',
+  crm_enrich_company: 'write',
+  crm_list_activities: 'read',
+  crm_create_activity: 'write',
+  crm_generate_insights: 'read',
+} satisfies Record<ToolName, ToolScope>;
+
+export function requiredScopeForTool(name: ToolName): ToolScope {
+  return toolScopes[name];
+}

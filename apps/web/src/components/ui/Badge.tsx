@@ -37,10 +37,11 @@ export function Badge({ tone = 'gray', className, ...rest }: BadgeProps) {
 }
 
 const STAGE_TONE: Record<string, BadgeTone> = {
-  discovery: 'gray',
-  qualified: 'purple',
-  proposal: 'blue',
-  negotiation: 'amber',
+  s1_lead: 'gray',
+  s1_ongoing: 'purple',
+  s2_sent: 'blue',
+  s3_technical_iteration: 'teal',
+  s4_negotiation: 'amber',
   closed_won: 'jade',
   closed_lost: 'tomato',
 };

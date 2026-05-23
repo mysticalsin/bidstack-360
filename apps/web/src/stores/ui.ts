@@ -34,10 +34,14 @@ function write(state: PersistedState): void {
 interface UiStore extends PersistedState {
   toggleSidebar: () => void;
   setSidebarCollapsed: (v: boolean) => void;
+  mobileNavOpen: boolean;
+  setMobileNavOpen: (v: boolean) => void;
+  toggleMobileNav: () => void;
 }
 
 export const useUiStore = create<UiStore>((set, get) => ({
   ...read(),
+  mobileNavOpen: false,
   toggleSidebar: () => {
     const next = !get().sidebarCollapsed;
     write({ sidebarCollapsed: next });
@@ -47,4 +51,6 @@ export const useUiStore = create<UiStore>((set, get) => ({
     write({ sidebarCollapsed: v });
     set({ sidebarCollapsed: v });
   },
+  setMobileNavOpen: (v) => set({ mobileNavOpen: v }),
+  toggleMobileNav: () => set({ mobileNavOpen: !get().mobileNavOpen }),
 }));

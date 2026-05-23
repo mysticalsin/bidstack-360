@@ -33,7 +33,7 @@ export const opportunityTimelineRoutes: FastifyPluginAsyncZod = async (server) =
 
       // Verify the opportunity exists and belongs to the org
       const opp = await prisma.opportunity.findFirst({
-        where: { id: oppId, orgId },
+        where: { id: oppId, orgId, deletedAt: null },
         select: { id: true, customer: true },
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
@@ -47,13 +47,13 @@ export const opportunityTimelineRoutes: FastifyPluginAsyncZod = async (server) =
           include: { user: { select: { name: true } } },
         }),
         prisma.task.findMany({
-          where: { orgId, oppId },
+          where: { orgId, oppId, deletedAt: null },
           orderBy: { createdAt: 'desc' },
           take: limit,
           include: { assignee: { select: { name: true } } },
         }),
         prisma.comment.findMany({
-          where: { orgId, targetType: 'opportunity', targetId: oppId },
+          where: { orgId, targetType: 'opportunity', targetId: oppId, deletedAt: null },
           orderBy: { createdAt: 'desc' },
           take: limit,
           include: { author: { select: { name: true } } },

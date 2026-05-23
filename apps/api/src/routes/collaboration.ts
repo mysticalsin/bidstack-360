@@ -10,9 +10,9 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       schema: {
         querystring: z.object({
-          targetType: z.string(),
+          targetType: z.string().max(50),
           targetId: z.string().uuid(),
-          limit: z.coerce.number().min(1).max(200).default(50),
+          limit: z.coerce.number().int().min(1).max(200).default(50),
         }),
         response: { 200: z.object({ items: z.array(Comment) }) },
       },
@@ -21,6 +21,7 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
       const rows = await prisma.comment.findMany({
         where: {
           orgId: req.auth.orgId,
+          deletedAt: null,
           targetType: req.query.targetType,
           targetId: req.query.targetId,
         },
@@ -113,10 +114,15 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const existing = await prisma.comment.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId, authorUserId: req.auth.userId },
+        where: {
+          id: req.params.id,
+          orgId: req.auth.orgId,
+          authorUserId: req.auth.userId,
+          deletedAt: null,
+        },
       });
       if (!existing) throw server.httpErrors.notFound('Comment not found');
-      await prisma.comment.delete({ where: { id: existing.id } });
+      await prisma.comment.update({ where: { id: existing.id }, data: { deletedAt: new Date() } });
       return reply.code(204).send(null);
     },
   );
@@ -135,6 +141,7 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
         where: {
           orgId: req.auth.orgId,
           userId: req.auth.userId,
+          deletedAt: null,
           ...(req.query.unreadOnly ? { readAt: null } : {}),
         },
         orderBy: { createdAt: 'desc' },
@@ -196,6 +203,7 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
         where: {
           orgId: req.auth.orgId,
           status: { not: 'offline' },
+          deletedAt: null,
           ...(req.query.recordType && req.query.recordId
             ? { currentRecordType: req.query.recordType, currentRecordId: req.query.recordId }
             : {}),

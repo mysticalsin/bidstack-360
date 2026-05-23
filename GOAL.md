@@ -4,6 +4,15 @@
 
 ---
 
+## 0. Execution Doctrine
+
+BidStack work must not take the easy or sloppy route. Every meaningful change
+starts with assumptions, success criteria, a short plan, surgical execution, and
+honest verification. The bar is production-grade: secure, scalable, auditable,
+accessible, elegant, and useful to bid and presales teams under real pressure.
+
+---
+
 ## 1. The Ultimate Goal
 
 The goal of BidStack 360° is to dominate the **Bid and Pre-Sales lifecycle** by providing a "360° Intelligence" layer that standard CRMs (Odoo, Salesforce, Twenty) lack.

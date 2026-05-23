@@ -31,6 +31,15 @@ export function NotesPanel({ accountId, companyName, domain }: Props) {
   const [composing, setComposing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  // Filter out auto-generated meeting import notes with numeric timestamps
+  // (e.g. "Meeting Import 1778695956797") — these are noise in the UI.
+  const filteredNotes =
+    list.data?.items.filter((note) => {
+      if (!note.title) return true;
+      const isNumericImport = /Meeting\s*Import\s*\d{10,}/i.test(note.title);
+      return !isNumericImport;
+    }) ?? [];
+
   return (
     <Card>
       <SectionHeader
@@ -79,11 +88,11 @@ export function NotesPanel({ accountId, companyName, domain }: Props) {
             title="Couldn't load notes"
             message={list.error instanceof Error ? list.error.message : 'Unknown error'}
           />
-        ) : !list.data || list.data.items.length === 0 ? (
+        ) : filteredNotes.length === 0 ? (
           <EmptyState title="No notes yet" message="Capture a meeting summary or context." />
         ) : (
           <ul className="divide-y divide-[var(--border-subtle)]">
-            {list.data.items.map((note) =>
+            {filteredNotes.map((note) =>
               editingId === note.id ? (
                 <li key={note.id} className="py-3">
                   <NoteEditor
@@ -234,7 +243,7 @@ function NoteEditor({ accountId, initial, onDone, onCancel }: EditorProps) {
         maxLength={200}
         required
         aria-label="Note title"
-        className="w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-3 py-2 text-sm text-[var(--fg-primary)] placeholder:text-[var(--fg-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--border-focus)]"
+        className="w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-3 py-2 text-sm text-[var(--fg-primary)] placeholder:text-[var(--fg-tertiary)] focus:outline-none focus:ring-2 focus:ring-border-focus"
       />
       <textarea
         value={bodyMd}
@@ -243,7 +252,7 @@ function NoteEditor({ accountId, initial, onDone, onCancel }: EditorProps) {
         rows={4}
         maxLength={32_000}
         aria-label="Note body"
-        className="w-full resize-y rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-3 py-2 text-sm text-[var(--fg-primary)] placeholder:text-[var(--fg-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--border-focus)]"
+        className="w-full resize-y rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-3 py-2 text-sm text-[var(--fg-primary)] placeholder:text-[var(--fg-tertiary)] focus:outline-none focus:ring-2 focus:ring-border-focus"
       />
       {error ? (
         <p role="alert" className="text-xs text-[var(--danger)]">

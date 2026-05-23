@@ -12,7 +12,7 @@
     }
   },
   "scripts": {
-    "generate": "prisma generate",
+    "generate": "node scripts/pre-generate.js && prisma generate",
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "seed": "tsx src/seed.ts",
@@ -28,7 +28,8 @@
     "seed": "tsx src/seed.ts"
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0"
+    "@prisma/client": "^5.22.0",
+    "dotenv-flow": "^4.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

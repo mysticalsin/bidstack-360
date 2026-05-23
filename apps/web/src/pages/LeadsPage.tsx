@@ -1,17 +1,19 @@
-import { motion } from 'framer-motion';
-import { useDeferredValue, useState } from 'react';
+import { useDeferredValue, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { LeadPriorityBadge, LeadStatusBadge } from '@/components/lead/LeadStatusBadge';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
 import { Button } from '@/components/ui/Button';
+import { BulkActionBar } from '@/components/ui/BulkActionBar';
 import { Card } from '@/components/ui/Card';
 import { confirm } from '@/components/ui/ConfirmDialog';
+import { Icon } from '@/components/ui/Icon';
+import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
+import { SpotlightTable, SpotlightTableRow } from '@/components/ui/SpotlightTable';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
-import { useDeleteLead, useLeads } from '@/hooks/useLeads';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
-import { BulkActionBar } from '@/components/ui/BulkActionBar';
+import { useDeleteLead, useLeads } from '@/hooks/useLeads';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { LeadStatus, LeadPriority } from '@bidstack/shared';
 import type { LeadSummary } from '@bidstack/shared';
@@ -48,8 +50,36 @@ export function LeadsPage() {
   });
   const del = useDeleteLead();
 
-  const items = data?.items ?? [];
+  const items = useMemo(() => data?.items ?? [], [data?.items]);
   const bulk = useBulkSelection(items);
+  const leadStats = useMemo(() => {
+    const total = items.length;
+    const priorityLeads = items.filter(
+      (lead) => lead.priority === 'high' || lead.priority === 'critical',
+    ).length;
+    const pipelineReady = items.filter(
+      (lead) => lead.status === 'qualified' || lead.status === 'converted',
+    ).length;
+    const averageScore =
+      total === 0
+        ? '0'
+        : Math.round(items.reduce((sum, lead) => sum + lead.score, 0) / total).toLocaleString();
+
+    return [
+      { label: 'Filtered leads', value: total.toLocaleString(), detail: 'current view' },
+      {
+        label: 'High priority',
+        value: `${priorityLeads}/${total || 0}`,
+        detail: 'high or critical',
+      },
+      {
+        label: 'Pipeline-ready',
+        value: pipelineReady.toLocaleString(),
+        detail: 'qualified or converted',
+      },
+      { label: 'Avg score', value: averageScore, detail: 'fit score' },
+    ];
+  }, [items]);
 
   const exportSelected = () => {
     if (bulk.selectedItems.length === 0) {
@@ -116,8 +146,8 @@ export function LeadsPage() {
       <div className="page-header">
         <h1 className="page-title">Leads</h1>
         <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
+          <LiquidGlassButton
+            tone="secondary"
             size="sm"
             onClick={() => {
               if (items.length === 0) {
@@ -149,27 +179,36 @@ export function LeadsPage() {
             }}
             disabled={items.length === 0}
           >
+            <Icon name="download" size={14} />
             Export CSV
-          </Button>
-          <Button onClick={() => nav('/leads/new')}>New lead</Button>
+          </LiquidGlassButton>
+          <LiquidGlassButton onClick={() => nav('/leads/new')} size="sm">
+            <Icon name="plus" size={14} />
+            New lead
+          </LiquidGlassButton>
         </div>
       </div>
 
       <Card className="mb-4">
         <div className="flex flex-wrap items-center gap-3 p-3">
-          <input
-            type="text"
-            placeholder="Search leads…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="min-w-[200px] flex-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
-          />
+          <label className="min-w-[200px] flex-1">
+            <span className="sr-only">Search leads</span>
+            <input
+              type="text"
+              aria-label="Search leads"
+              placeholder="Search leads..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
+            />
+          </label>
           <select
+            aria-label="Filter leads by status"
             value={statusFilter}
             onChange={(e) =>
               setStatusFilter(e.target.value === '' ? '' : LeadStatus.parse(e.target.value))
             }
-            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
+            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
           >
             {STATUS_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -178,11 +217,12 @@ export function LeadsPage() {
             ))}
           </select>
           <select
+            aria-label="Filter leads by priority"
             value={priorityFilter}
             onChange={(e) =>
               setPriorityFilter(e.target.value === '' ? '' : LeadPriority.parse(e.target.value))
             }
-            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
+            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
           >
             {PRIORITY_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -192,6 +232,23 @@ export function LeadsPage() {
           </select>
         </div>
       </Card>
+
+      {!isLoading && !isError ? (
+        <section
+          className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4"
+          aria-label="Lead list summary"
+        >
+          {leadStats.map((stat) => (
+            <Card key={stat.label} className="px-3 py-2">
+              <span className="text-xs font-medium text-[var(--fg-tertiary)]">{stat.label}</span>
+              <strong className="mt-1 block text-lg font-semibold tabular-nums text-[var(--fg-primary)]">
+                {stat.value}
+              </strong>
+              <span className="text-xs text-[var(--fg-tertiary)]">{stat.detail}</span>
+            </Card>
+          ))}
+        </section>
+      ) : null}
 
       <BulkActionBar
         count={bulk.count}
@@ -216,21 +273,29 @@ export function LeadsPage() {
           action={<Button onClick={() => nav('/leads/new')}>New lead</Button>}
         />
       ) : (
-        <Card>
-          <table className="w-full text-left text-sm [&_tr[data-selected=true]]:bg-[var(--brand-primary-tint)]/60">
+        <Card className="p-3">
+          <SpotlightTable
+            query={deferredSearch}
+            minWidth={900}
+            className="[&_tr[data-selected=true]]:bg-[var(--brand-primary-tint)]/60"
+          >
             <thead>
-              <tr className="border-b border-[var(--border-subtle)] text-xs text-[var(--fg-tertiary)]">
-                <th className="w-10 px-4 py-3">
-                  <input
-                    type="checkbox"
-                    aria-label={bulk.allSelected ? 'Deselect all' : 'Select all'}
-                    checked={bulk.allSelected}
-                    ref={(el) => {
-                      if (el) el.indeterminate = bulk.someSelected;
-                    }}
-                    onChange={() => bulk.toggleAll(items)}
-                    className="h-4 w-4 cursor-pointer accent-[var(--brand-primary)]"
-                  />
+              <tr>
+                <th className="w-10">
+                  <label className="table-checkbox-hit">
+                    <span className="sr-only">
+                      {bulk.allSelected ? 'Deselect all' : 'Select all'}
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={bulk.allSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = bulk.someSelected;
+                      }}
+                      onChange={() => bulk.toggleAll(items)}
+                      className="cursor-pointer accent-[var(--brand-primary)]"
+                    />
+                  </label>
                 </th>
                 <th scope="col" className="px-4 py-3 font-medium">
                   Name
@@ -264,6 +329,7 @@ export function LeadsPage() {
                   key={lead.id}
                   lead={lead}
                   selected={bulk.isSelected(lead.id)}
+                  query={deferredSearch}
                   onToggle={() => bulk.toggleOne(lead.id)}
                   onDelete={async () => {
                     const ok = await confirm({
@@ -281,7 +347,7 @@ export function LeadsPage() {
                 />
               ))}
             </tbody>
-          </table>
+          </SpotlightTable>
         </Card>
       )}
     </div>
@@ -291,30 +357,37 @@ export function LeadsPage() {
 function LeadRow({
   lead,
   selected,
+  query,
   onToggle,
   onDelete,
 }: {
   lead: LeadSummary;
   selected: boolean;
+  query: string;
   onToggle: () => void;
   onDelete: () => void;
 }) {
   return (
-    <motion.tr
-      layout
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+    <SpotlightTableRow
+      query={query}
+      searchableText={`${lead.firstName} ${lead.lastName} ${lead.email ?? ''} ${lead.companyName ?? ''} ${lead.status} ${lead.priority} ${lead.source ?? ''} ${lead.ownerName ?? ''}`}
       data-selected={selected}
-      className="group border-b border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-hover)]"
+      className="group"
     >
       <td className="px-4 py-3">
-        <input
-          type="checkbox"
-          aria-label={`Select ${lead.firstName} ${lead.lastName}`}
-          checked={selected}
-          onChange={onToggle}
-          className="h-4 w-4 cursor-pointer accent-[var(--brand-primary)]"
-        />
+        <label className="table-checkbox-hit">
+          <span className="sr-only">
+            {selected
+              ? `Deselect ${lead.firstName} ${lead.lastName}`
+              : `Select ${lead.firstName} ${lead.lastName}`}
+          </span>
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={onToggle}
+            className="cursor-pointer accent-[var(--brand-primary)]"
+          />
+        </label>
       </td>
       <td className="px-4 py-3">
         <Link
@@ -339,12 +412,14 @@ function LeadRow({
       <td className="px-4 py-3 text-[var(--fg-secondary)]">{lead.ownerName ?? '—'}</td>
       <td className="px-4 py-3 text-right">
         <button
+          type="button"
           onClick={onDelete}
-          className="rounded-md px-2 py-1 text-xs text-[var(--fg-tertiary)] opacity-0 transition-opacity hover:bg-[var(--surface-hover)] hover:text-[var(--danger)] group-hover:opacity-100"
+          className="rounded-md px-2 py-1 text-xs font-medium text-[var(--danger)] transition-colors hover:bg-[var(--danger-tint)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
+          aria-label={`Delete ${lead.firstName} ${lead.lastName}`}
         >
           Delete
         </button>
       </td>
-    </motion.tr>
+    </SpotlightTableRow>
   );
 }

@@ -6,9 +6,11 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { Icon } from '@/components/ui/Icon';
-import { LoadingSkeleton, ErrorState } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
+import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { toast } from '@/components/ui/Toast';
 import { useConvertLead, useDeleteLead, useLead, useUpdateLead } from '@/hooks/useLeads';
+import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 import { formatDate } from '@/lib/format';
 import { LeadPriority, LeadStatus, LeadSource, OpportunityStage } from '@bidstack/shared';
 
@@ -29,6 +31,12 @@ export function LeadDetailPage() {
   const update = useUpdateLead(id ?? '');
   const convert = useConvertLead(id ?? '');
   const del = useDeleteLead();
+  const { debounced: debouncedUpdate } = useDebouncedCallback((patch: Record<string, unknown>) => {
+    update.mutate(patch as Parameters<typeof update.mutate>[0], {
+      onSuccess: () => toast.success('Saved'),
+      onError: () => toast.error('Save failed'),
+    });
+  }, 500);
   const [isConverting, setIsConverting] = useState(false);
   const [convertForm, setConvertForm] = useState<{
     opportunityName: string;
@@ -37,12 +45,25 @@ export function LeadDetailPage() {
   }>({
     opportunityName: '',
     opportunityValueMicros: 0,
-    stage: 'discovery',
+    stage: 's1_ongoing',
   });
 
-  if (lead.isLoading) return <LoadingSkeleton rows={8} />;
-  if (lead.isError || !lead.data) {
+  if (lead.isLoading) return <DetailPageSkeleton columns={2} cards={3} />;
+  if (lead.isError) {
     return <ErrorState title="Couldn't load lead" message="The lead may have been deleted." />;
+  }
+  if (!lead.data) {
+    return (
+      <EmptyState
+        title="Lead not found"
+        message="The lead may have been deleted or you may not have access to it."
+        action={
+          <Button variant="secondary" onClick={() => window.history.back()}>
+            Go back
+          </Button>
+        }
+      />
+    );
   }
 
   const l = lead.data;
@@ -198,10 +219,10 @@ export function LeadDetailPage() {
                   }
                   className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
                 >
-                  <option value="discovery">Discovery</option>
-                  <option value="qualified">Qualified</option>
-                  <option value="proposal">Proposal</option>
-                  <option value="negotiation">Negotiation</option>
+                  <option value="s1_ongoing">Discovery</option>
+                  <option value="s2_sent">Qualified</option>
+                  <option value="s3_technical_iteration">Proposal</option>
+                  <option value="s4_negotiation">Negotiation</option>
                   <option value="closed_won">Closed won</option>
                   <option value="closed_lost">Closed lost</option>
                 </select>
@@ -282,7 +303,7 @@ export function LeadDetailPage() {
                     min={0}
                     max={100}
                     value={l.score}
-                    onChange={(e) => update.mutate({ score: Number(e.target.value) })}
+                    onChange={(e) => debouncedUpdate({ score: Number(e.target.value) })}
                     className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
                   />
                 </div>
@@ -315,7 +336,7 @@ export function LeadDetailPage() {
                 <input
                   type="text"
                   value={l.budget ?? ''}
-                  onChange={(e) => update.mutate({ budget: e.target.value || null })}
+                  onChange={(e) => debouncedUpdate({ budget: e.target.value || null })}
                   placeholder="e.g. €500K"
                   className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
                 />
@@ -325,7 +346,7 @@ export function LeadDetailPage() {
                 <input
                   type="text"
                   value={l.authority ?? ''}
-                  onChange={(e) => update.mutate({ authority: e.target.value || null })}
+                  onChange={(e) => debouncedUpdate({ authority: e.target.value || null })}
                   placeholder="Decision maker"
                   className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
                 />
@@ -334,7 +355,7 @@ export function LeadDetailPage() {
                 <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">Need</label>
                 <textarea
                   value={l.need ?? ''}
-                  onChange={(e) => update.mutate({ need: e.target.value || null })}
+                  onChange={(e) => debouncedUpdate({ need: e.target.value || null })}
                   placeholder="What problem are they trying to solve?"
                   rows={2}
                   className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
@@ -345,7 +366,7 @@ export function LeadDetailPage() {
                 <input
                   type="text"
                   value={l.timeline ?? ''}
-                  onChange={(e) => update.mutate({ timeline: e.target.value || null })}
+                  onChange={(e) => debouncedUpdate({ timeline: e.target.value || null })}
                   placeholder="e.g. Q2 2026"
                   className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
                 />
@@ -360,7 +381,7 @@ export function LeadDetailPage() {
             <h3 className="text-sm font-semibold text-[var(--fg-primary)]">Notes</h3>
             <textarea
               value={l.notes ?? ''}
-              onChange={(e) => update.mutate({ notes: e.target.value || null })}
+              onChange={(e) => debouncedUpdate({ notes: e.target.value || null })}
               placeholder="Add notes about this lead…"
               rows={4}
               className="mt-3 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
