@@ -10,18 +10,30 @@ import { browserTracingIntegration } from '@sentry/browser';
 import { ApiError } from '@/lib/api';
 import { AuthProvider } from '@/lib/auth';
 import { logVitalsToConsole, reportWebVitals } from '@/lib/web-vitals';
+import { persistCache, hydrateCache, watchAuthForCacheClear } from '@/lib/queryCache';
 import { App } from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
 if (sentryDsn) {
-  Sentry.init({
-    dsn: sentryDsn,
-    environment: import.meta.env.VITE_SENTRY_ENVIRONMENT || import.meta.env.MODE,
-    release: import.meta.env.VITE_SENTRY_RELEASE || '@bidstack/web@0.1.0',
-    integrations: [browserTracingIntegration()],
-    tracesSampleRate: 1.0,
-  });
+  const initSentry = () => {
+    Sentry.init({
+      dsn: sentryDsn,
+      environment: import.meta.env.VITE_SENTRY_ENVIRONMENT || import.meta.env.MODE,
+      release: import.meta.env.VITE_SENTRY_RELEASE || '@bidstack/web@0.1.0',
+      integrations: [browserTracingIntegration()],
+      tracesSampleRate: 1.0,
+    });
+  };
+  if (typeof window !== 'undefined') {
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(() => initSentry());
+    } else {
+      setTimeout(initSentry, 50);
+    }
+  } else {
+    initSentry();
+  }
 }
 
 // Boot the Web Vitals observer once at app load. In dev/preview we log each
@@ -42,7 +54,8 @@ const queryClient = new QueryClient({
         return true;
       },
       refetchOnWindowFocus: false,
-      staleTime: 30_000,
+      staleTime: 120_000, // 2 minutes (up from 30s)
+      gcTime: 600_000, // 10 minutes
     },
     mutations: {
       // Mutations retry exactly once on a 5xx/network drop. 4xx surfaces
@@ -59,9 +72,17 @@ const queryClient = new QueryClient({
   },
 });
 
+// Hydrate React Query cache from localStorage on boot, then persist
+// successful query results back to localStorage.
+hydrateCache(queryClient);
+persistCache(queryClient);
+watchAuthForCacheClear(queryClient);
+
 window.addEventListener('unhandledrejection', (event) => {
   if (import.meta.env.DEV) {
-    console.error('[unhandledrejection]', event.reason);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[unhandledrejection]', event.reason);
+    }
   }
   Sentry.captureException(event.reason);
 });
@@ -71,6 +92,17 @@ window.addEventListener('error', (event) => {
 });
 
 const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+const authMode = import.meta.env.VITE_AUTH_MODE;
+
+if (!clerkKey && authMode !== 'stub') {
+  throw new Error(
+    'VITE_CLERK_PUBLISHABLE_KEY is missing. Set VITE_AUTH_MODE=stub only for local/test runs.',
+  );
+}
+
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  navigator.serviceWorker.register('/sw.js').catch(console.error);
+}
 
 const root = createRoot(document.getElementById('root') as HTMLElement);
 

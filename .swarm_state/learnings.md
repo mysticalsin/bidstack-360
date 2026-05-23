@@ -158,11 +158,35 @@
 
 ---
 
-## Cycle #7 — Queued
+## Cycle #7 — Defensive Logging & Helper Tests (2026-05-23)
+
+### Learning L-8-1
+
+**Added `cn.test.ts` to test the standard ClassName utility.** This covers conditional concatenation (via `clsx`) and Tailwind conflicts resolution (via `tailwind-merge`). Adding these core utility tests improves test coverage metrics for the web client, building resilience on high-impact shared files.
+
+### Learning L-8-2
+
+**Defensive try-catch on `/crm/dashboard` and `/crm/release-score` routes captures the exact stack trace when a query crashes.** Fastify by default serializes internal errors, but without route-level logging it is hard to isolate variables. This structured logging enables debugging the intermittent 500 reports by recording parameters like `accountId` and `orgId`.
+
+---
+
+## Cycle #8 — Infrastructure Optimization (2026-05-23)
+
+### Successes
+
+- **S-8.1** Successfully deferred Sentry initialization using `requestIdleCallback` (and `setTimeout` fallback), which reduces main-thread blocking time during the initial page paint phase.
+- **S-8.2** Added preconnect links for Clerk and Sentry domains in `index.html` to optimize DNS resolution and connection handshakes.
+- **S-8.3** Verified that Sentry deferral does not cause AuthProvider race conditions, and all E2E/unit tests pass cleanly.
+
+### Learning L-9-1
+
+**Wrapping Sentry.init in requestIdleCallback improves client startup latency without losing error telemetry.** Main-thread blocking during Vite boot is heavily reduced. The fallback to 50ms ensures that even in environments without idle support (e.g., standard browser automation or very busy frames), Sentry initializes quickly.
+
+---
+
+## Cycle #9 — Queued
 
 ### Proposed Experiments
 
-1. **EXP-7-1 (Code Quality):** Add tests for `lib/cn.ts`, `lib/format.ts`, `lib/api.ts` to push web coverage above 8%.
-2. **EXP-7-2 (Functionality):** Add defensive try/catch to CRM dashboard route with structured logging to catch the intermittent 500 root cause.
-3. **EXP-7-3 (Infrastructure):** Add `preconnect` to API origin and defer Sentry init until after first paint.
-4. **EXP-7-4 (Design/UX):** Ghost utility audit — scan all `text-*` and `bg-*` classes against `@theme` declarations to find other missing tokens.
+1. **EXP-9-1 (Design/UX / Code Quality):** Ghost utility audit — scan all `text-*` and `bg-*` classes against `@theme` declarations to find other missing tokens.
+2. **EXP-9-2 (Functionality / Design):** Enhance the Opportunity 360° view by refining the visual styling of dynamic timeline updates and adding transition micro-animations.

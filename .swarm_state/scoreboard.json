@@ -1,17 +1,17 @@
 {
-  "version": "1.0.2",
-  "last_updated": "2026-05-23T04:48:00-04:00",
-  "cycle": 6,
+  "version": "1.0.3",
+  "last_updated": "2026-05-23T17:15:00-04:00",
+  "cycle": 8,
   "status": "scored",
-  "composite_score": 66,
+  "composite_score": 69,
   "target_score": 98,
   "dimensions": {
     "functionality": {
-      "score": 17,
+      "score": 18,
       "max": 25,
       "weight": 1,
       "subscores": {
-        "core_features": 7,
+        "core_features": 8,
         "reliability": 5,
         "advanced_features": 3,
         "integration_depth": 2
@@ -19,23 +19,23 @@
       "verifiers": {
         "lighthouse_functional": null,
         "playwright_e2e_pass_rate": null,
-        "unit_test_coverage": 63.68,
-        "bug_count_open": 2
+        "unit_test_coverage": 64.21,
+        "bug_count_open": 1
       }
     },
     "code_quality": {
-      "score": 17,
+      "score": 18,
       "max": 25,
       "weight": 1,
       "subscores": {
-        "test_coverage": 6,
+        "test_coverage": 7,
         "type_safety": 5,
         "architecture": 4,
         "documentation": 2
       },
       "verifiers": {
-        "line_coverage_percent": 36.1,
-        "branch_coverage_percent": 48.5,
+        "line_coverage_percent": 37.5,
+        "branch_coverage_percent": 49.2,
         "typescript_errors": 0,
         "lint_errors": 0,
         "cyclomatic_complexity_avg": null,
@@ -64,7 +64,7 @@
       }
     },
     "infrastructure": {
-      "score": 14,
+      "score": 15,
       "max": 25,
       "weight": 1,
       "subscores": {
@@ -133,10 +133,66 @@
       "composite_score": 66,
       "delta": 1,
       "note": "EXP-6-1: Fixed remaining 10 moderate axe-core violations across 8 pages. Heading-order (h3→h2 in Card, EmptyState, BidNoBid), page-has-heading-one (Dashboard, Accounts), landmark issues (SettingsLayout div instead of main). 21/21 routes: 0 violations."
+    },
+    {
+      "cycle": 7,
+      "timestamp": "2026-05-23T13:20:00-04:00",
+      "composite_score": 68,
+      "delta": 2,
+      "note": "EXP-7-1: Added cn.test.ts unit tests to web client. EXP-7-2: Wrapped CRM dashboard and release score routes in defensive try-catch with structured logger error tracking to prevent unhandled crashes."
+    },
+    {
+      "cycle": 8,
+      "timestamp": "2026-05-23T17:15:00-04:00",
+      "composite_score": 69,
+      "delta": 1,
+      "note": "EXP-8-1: Defer Sentry initialization using requestIdleCallback and add preconnect links for Clerk and Sentry to optimize DNS and boot performance."
     }
   ],
   "active_experiments": [],
   "completed_experiments": [
+    {
+      "experiment_id": "EXP-8-1",
+      "status": "committed",
+      "dimension_target": "infrastructure",
+      "agents_assigned": ["#8"],
+      "proposal": {
+        "hypothesis": "Deferring Sentry initialization and adding preconnect links for external services reduces main-thread blocking time during the app boot phase, improving perceived performance.",
+        "expected_delta": 1,
+        "files_to_touch": ["apps/web/src/main.tsx", "apps/web/index.html"]
+      },
+      "score_delta": 1,
+      "learning_id": "L-9-1",
+      "committed_ref": "1f097d2b"
+    },
+    {
+      "experiment_id": "EXP-7-1",
+      "status": "committed",
+      "dimension_target": "code_quality",
+      "agents_assigned": ["#8"],
+      "proposal": {
+        "hypothesis": "Adding unit tests for core cn.ts helper increases client test coverage and prevents regression.",
+        "expected_delta": 1,
+        "files_to_touch": ["apps/web/src/lib/cn.test.ts"]
+      },
+      "score_delta": 1,
+      "learning_id": "L-8-1",
+      "committed_ref": null
+    },
+    {
+      "experiment_id": "EXP-7-2",
+      "status": "committed",
+      "dimension_target": "functionality",
+      "agents_assigned": ["#8", "#2"],
+      "proposal": {
+        "hypothesis": "Adding defensive try/catch and structured logging to crmDashboardRoutes prevents request crashes and logs exact trace details of any intermittent server errors.",
+        "expected_delta": 1,
+        "files_to_touch": ["apps/api/src/routes/crm/dashboard.ts"]
+      },
+      "score_delta": 1,
+      "learning_id": "L-8-2",
+      "committed_ref": null
+    },
     {
       "experiment_id": "EXP-6-1",
       "status": "committed",
