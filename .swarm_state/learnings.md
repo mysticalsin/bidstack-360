@@ -108,11 +108,61 @@
 
 ---
 
-## Cycle #5 — Queued
+## Cycle #5 — Accessibility Audit & Fixes (2026-05-23)
+
+### Learning L-6-1
+
+** axe-core via Playwright is the definitive accessibility verifier.** Lighthouse accessibility is noisy (animations cause false-positive contrast failures) and only samples one page state. axe-core with `tags: ['wcag2a', 'wcag2aa', 'wcag21aa', 'best-practice']` catches real barriers that Lighthouse misses.
+
+**Results:** 36 → 10 violations, 5 → 0 critical/serious.
+
+### Learning L-6-2
+
+**The `text-fg-on-brand` Tailwind utility was completely broken.** `--color-fg-on-brand` was missing from `@theme`, so every brand button across the app rendered with inherited dark text instead of white. This was a design-system-level bug affecting ~10 components. Adding one line to `@theme` fixed all of them.
+
+**Implication:** Any custom color token used with Tailwind v4 must be explicitly declared in `@theme`. No implicit fallback exists.
+
+### Learning L-6-3
+
+**Color contrast fixes are surgical and high-impact.** Darkening `--tag-amber-fg` from `#9a6500` to `#8a5a00` and `--tag-tomato-fg` from `#c0381f` to `#b03018` pushed both from ~4.4:1 to ~5.1:1 — safely above WCAG AA. No visual degradation; the tags look identical to the human eye.
+
+### Learning L-6-4
+
+**`<aside role="navigation">` is invalid ARIA.** `aside` is a landmark element; adding `role="navigation"` conflicts with its implicit `role="complementary"`. The correct element is `<nav>`. One change in `Sidebar.tsx` eliminated 21 `aria-allowed-role` violations across every page.
+
+---
+
+## Cycle #6 — Heading-order & Landmark Fixes (2026-05-23)
+
+### Learning L-7-1
+
+**Zero axe-core violations across all 21 routes is achievable in one cycle.** The 10 remaining moderate violations fell into three patterns: (1) `heading-order` — card section headers used `<h3>` without an `<h2>` parent, (2) `page-has-heading-one` — pages with animated headers where the `<h1>` starts at `opacity: 0` and isn't visible when axe runs, (3) `landmark-*` — nested `<main>` elements when `SettingsLayout` rendered `<main>` inside `AppShell`'s `<main>`.
+
+**Fixes applied:**
+
+- `Card.tsx` `SectionHeader`: `<h3>` → `<h2>` (cards are semantic sections)
+- `StateMessages.tsx` `EmptyState`: `<h3>` → `<h2>` (empty states are page-level)
+- `BidNoBidPage.tsx`: criterion label `<h3>` → `<h2>`
+- `SettingsLayout.tsx`: `<main>` → `<div>` (AppShell already provides the outer `<main>`)
+- `DashboardPage.tsx` & `AccountsPage.tsx`: added `sr-only` `<h1>` outside animated containers and in all early-return states (loading, error, empty)
+
+**Result:** 10 moderate violations → 0. Lighthouse accessibility: 100 (dashboard). Score: 65 → 66.
+
+### Learning L-7-2
+
+**Framer Motion `initial={{ opacity: 0 }}` can hide headings from axe-core.** The `page-has-heading-one` rule checks element visibility. An `<h1>` inside a `motion.div` that starts at `opacity: 0` may not be counted as visible during the 500ms wait window. Adding a static `sr-only` `<h1>` before the animated container solves this without affecting visual design.
+
+### Learning L-7-3
+
+**Shared components that render headings must choose levels carefully.** `EmptyState` renders an `<h2>` now because it's used at page level. If it were ever used inside a card, this would be wrong. Consider making heading level configurable via prop in future refactor.
+
+---
+
+## Cycle #7 — Queued
 
 ### Proposed Experiments
 
-1. **EXP-5-1 (Code Quality):** Add tests for `lib/cn.ts`, `lib/format.ts`, `lib/api.ts` to push web coverage above 8%.
-2. **EXP-5-2 (Design/UX):** Run axe-core CLI on all 21 pages, fix any violations to push Accessibility from 96 → 97+.
-3. **EXP-5-3 (Functionality):** Add defensive try/catch to CRM dashboard route with structured logging to catch the intermittent 500 root cause.
-4. **EXP-5-4 (Infrastructure):** Add `preconnect` to API origin (same-origin, so likely `dns-prefetch` for external resources only) and defer Sentry init until after first paint.
+1. **EXP-7-1 (Code Quality):** Add tests for `lib/cn.ts`, `lib/format.ts`, `lib/api.ts` to push web coverage above 8%.
+2. **EXP-7-2 (Functionality):** Add defensive try/catch to CRM dashboard route with structured logging to catch the intermittent 500 root cause.
+3. **EXP-7-3 (Infrastructure):** Add `preconnect` to API origin and defer Sentry init until after first paint.
+4. **EXP-7-4 (Design/UX):** Ghost utility audit — scan all `text-*` and `bg-*` classes against `@theme` declarations to find other missing tokens.
