@@ -5,8 +5,8 @@
   "description": "BidStack 360° — Mantu's bid & presales CRM. Standalone build with future Twenty overlay path preserved under packages/twenty-bidstack.",
   "type": "module",
   "engines": {
-    "node": ">=20.0.0",
-    "pnpm": ">=9.0.0"
+    "node": ">=24.0.0 <25",
+    "pnpm": ">=10.0.0 <11"
   },
   "packageManager": "pnpm@10.0.0",
   "scripts": {
@@ -15,6 +15,7 @@
     "dev:api": "pnpm --filter @bidstack/api dev",
     "dev:worker": "pnpm --filter @bidstack/worker dev",
     "dev:mcp": "pnpm --filter @bidstack/mcp-server dev",
+    "preview": "pnpm --filter @bidstack/web preview",
     "build": "pnpm -r --stream build",
     "lint": "pnpm -r --stream lint",
     "typecheck": "pnpm db:generate && pnpm --filter @bidstack/shared build && pnpm --filter @bidstack/dust-client build && pnpm --filter @bidstack/odoo-mcp-client build && pnpm -r --stream typecheck",
@@ -35,6 +36,8 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.10.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "cross-env": "^10.1.0",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",
@@ -58,7 +61,9 @@
     ],
     "overrides": {
       "happy-dom": ">=20.8.9",
-      "esbuild": "~0.25.12"
+      "esbuild": "~0.25.12",
+      "d3-color@<3.1.0": ">=3.1.0",
+      "js-cookie": "3.0.7"
     }
   }
 }

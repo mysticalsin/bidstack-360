@@ -12,33 +12,38 @@
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { memo, useMemo, useState, type DragEvent, type KeyboardEvent } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { AnimatedNumber } from '@/components/motion/AnimatedNumber';
 import { KanbanSkeleton } from '@/components/skeletons/PageSkeletons';
 import { ErrorState } from '@/components/ui/StateMessages';
 import { Badge, stageTone } from '@/components/ui/Badge';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { Icon } from '@/components/ui/Icon';
 import { toast } from '@/components/ui/Toast';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { useStageMutation } from '@/hooks/useStageMutation';
 import { cn } from '@/lib/cn';
-import { formatMoney, formatStage } from '@/lib/format';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { formatDate, formatStage } from '@/lib/format';
 import { springLayout, springSnap } from '@/lib/motion';
 
 import type { Opportunity, OpportunityStage } from '@bidstack/shared';
 
 const STAGES: OpportunityStage[] = [
-  'discovery',
-  'qualified',
-  'proposal',
-  'negotiation',
+  's1_lead',
+  's1_ongoing',
+  's2_sent',
+  's3_technical_iteration',
+  's4_negotiation',
   'closed_won',
   'closed_lost',
 ];
 
 export function PipelinePage() {
   const reduced = useReducedMotion();
+  const navigate = useNavigate();
+  const { formatMoney } = useFormatMoney();
   const { data, isLoading, isError, error } = useOpportunities({ limit: 50 });
   const move = useStageMutation();
   // Stage filter via the URL. `?stage=qualified` collapses the board to a
@@ -122,6 +127,13 @@ export function PipelinePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate('/opportunities')}
+            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-1 text-xs text-[var(--fg-primary)] hover:bg-[var(--surface-hover)]"
+          >
+            List
+          </button>
           <label className="flex items-center gap-1.5 text-xs text-[var(--fg-tertiary)]">
             <span>Stage</span>
             <select
@@ -155,22 +167,28 @@ export function PipelinePage() {
           {(() => {
             const opps = data.items;
             const totalValue = opps.reduce((acc, o) => acc + o.value, 0);
-            const openValue = opps
-              .filter((o) => o.stage !== 'closed_won' && o.stage !== 'closed_lost')
-              .reduce((acc, o) => acc + o.value, 0);
-            const won = opps.filter((o) => o.stage === 'closed_won').length;
-            const lost = opps.filter((o) => o.stage === 'closed_lost').length;
-            const totalClosed = won + lost;
-            const winRate = totalClosed > 0 ? Math.round((won / totalClosed) * 100) : 0;
+            const openOpps = opps.filter(
+              (o) => o.stage !== 'closed_won' && o.stage !== 'closed_lost',
+            );
+            const openValue = openOpps.reduce((acc, o) => acc + o.value, 0);
+            const closedWon = opps.filter((o) => o.stage === 'closed_won').length;
+            const closedLost = opps.filter((o) => o.stage === 'closed_lost').length;
+            const closedTotal = closedWon + closedLost;
+            const winRate =
+              closedTotal > 0
+                ? `${Math.round((closedWon / closedTotal) * 100)}%`
+                : 'No closed bids';
             return [
-              { label: 'Total pipeline', value: formatMoney(totalValue), tone: 'blue' as const },
-              { label: 'Open value', value: formatMoney(openValue), tone: 'jade' as const },
-              { label: 'Win rate', value: `${winRate}%`, tone: 'amber' as const },
+              {
+                label: 'Total pipeline',
+                value: formatMoney(totalValue, 'EUR'),
+                tone: 'blue' as const,
+              },
+              { label: 'Open value', value: formatMoney(openValue, 'EUR'), tone: 'jade' as const },
+              { label: 'Win rate', value: winRate, tone: 'amber' as const },
               {
                 label: 'Active deals',
-                value: String(
-                  opps.filter((o) => o.stage !== 'closed_won' && o.stage !== 'closed_lost').length,
-                ),
+                value: String(openOpps.length),
                 tone: 'purple' as const,
               },
             ];
@@ -214,7 +232,7 @@ export function PipelinePage() {
             // keep the 6-column funnel.
             stageFilter
               ? 'grid gap-3 grid-cols-1'
-              : 'grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6'
+              : 'grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-7'
           }
         >
           {(stageFilter ? [stageFilter] : STAGES).map((stage) => {
@@ -347,7 +365,7 @@ const StageColumn = memo(function StageColumn({
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         animate={{
-          backgroundColor: isHoverTarget ? 'var(--brand-primary-tint)' : 'transparent',
+          backgroundColor: isHoverTarget ? 'var(--brand-primary-tint)' : 'rgba(0,0,0,0)',
           borderColor: isHoverTarget ? 'var(--brand-primary)' : 'var(--border-subtle)',
         }}
         transition={springSnap}
@@ -406,12 +424,14 @@ const PipelineCard = memo(function PipelineCard({
   onKey: (e: KeyboardEvent<HTMLAnchorElement>, opp: Opportunity) => void;
 }) {
   const reduced = useReducedMotion();
+  const { formatMoney } = useFormatMoney();
+  const isStalled =
+    opp.dueDate != null &&
+    new Date(opp.dueDate) < new Date() &&
+    opp.stage !== 'closed_won' &&
+    opp.stage !== 'closed_lost';
   return (
     <motion.li
-      // `layout` makes the card glide to its new column on a successful drop
-      // (the optimistic-update cache change triggers a re-render where the
-      // card appears in the destination column — framer-motion animates
-      // the position change instead of jumping).
       layout
       initial={{ opacity: 0, y: 6 }}
       animate={{
@@ -435,36 +455,62 @@ const PipelineCard = memo(function PipelineCard({
         onFocus={() => onFocus(opp.id)}
         onBlur={() => onBlur(opp.id)}
         onKeyDown={(e) => onKey(e, opp)}
-        aria-grabbed={isDragging || undefined}
+        aria-roledescription="draggable opportunity"
         aria-label={`${opp.code}: ${opp.name}, ${formatStage(opp.stage)}, ${formatMoney(opp.value, 'EUR')}. Use left or right arrows to move stage.`}
         className={cn(
           'block cursor-grab active:cursor-grabbing rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-3 shadow-[var(--shadow-xs)] transition-shadow hover:shadow-[var(--shadow-sm)]',
           isFocused &&
             'ring-2 ring-offset-1 ring-[var(--brand-primary)] ring-offset-[var(--surface-page)]',
+          isStalled && 'border-red-300/40 bg-red-50/40 dark:border-red-900/30 dark:bg-red-950/20',
         )}
       >
-        <div className="font-mono text-[10px] text-[var(--fg-tertiary)]">{opp.code}</div>
-        <div className="mt-1 text-xs font-medium text-[var(--fg-primary)] line-clamp-2">
-          {opp.name}
-        </div>
-        <div className="mt-2 flex items-center justify-between text-[10px]">
-          <span className="text-[var(--fg-tertiary)] truncate">{opp.customer}</span>
-          <span className="tabular-nums font-semibold text-[var(--fg-primary)] shrink-0 ml-2">
+        {/* Company name + value */}
+        <div className="flex items-start justify-between gap-2">
+          <span className="text-[11px] font-semibold text-[var(--fg-primary)] truncate">
+            {opp.customer}
+          </span>
+          <span className="tabular-nums text-[11px] font-bold text-[var(--fg-primary)] shrink-0">
             {formatMoney(opp.value, 'EUR')}
           </span>
         </div>
-        <div className="mt-2 h-1 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
-          <motion.div
-            className="h-full bg-[var(--brand-primary)]"
-            initial={{ width: 0 }}
-            animate={{ width: `${opp.probability}%` }}
-            transition={{ duration: 0.4, ease: [0, 0.72, 0.32, 1] }}
-            role="meter"
-            aria-valuenow={opp.probability}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label={`${opp.probability}% win probability`}
-          />
+
+        {/* Opportunity title */}
+        <div className="mt-1 text-xs font-medium text-[var(--fg-secondary)] line-clamp-2">
+          {opp.name}
+        </div>
+
+        {/* Territory badge */}
+        {opp.territoryName && (
+          <div className="mt-1.5">
+            <Badge tone="teal" className="text-[9px] px-1.5 py-0">
+              {opp.territoryName}
+            </Badge>
+          </div>
+        )}
+
+        {/* Activity row */}
+        <div className="mt-2 flex items-center gap-3 text-[var(--fg-tertiary)]">
+          <span className="inline-flex items-center gap-0.5 text-[10px]" title="Views">
+            <Icon name="eye" size={12} strokeWidth={2} />
+            <span className="tabular-nums">{opp.viewCount ?? 0}</span>
+          </span>
+          <span className="inline-flex items-center gap-0.5 text-[10px]" title="Comments">
+            <Icon name="messageCircle" size={12} strokeWidth={2} />
+            <span className="tabular-nums">{opp.commentCount ?? 0}</span>
+          </span>
+          <span className="inline-flex items-center gap-0.5 text-[10px]" title="Tasks">
+            <Icon name="checkCircle" size={12} strokeWidth={2} />
+            <span className="tabular-nums">{opp.taskCount ?? 0}</span>
+          </span>
+        </div>
+
+        {/* Date + code */}
+        <div className="mt-2 flex items-center justify-between text-[10px] text-[var(--fg-tertiary)]">
+          <span className="inline-flex items-center gap-1">
+            <Icon name="clock" size={10} strokeWidth={2} />
+            {opp.dueDate ? formatDate(opp.dueDate) : 'No date'}
+          </span>
+          <span className="font-mono">{opp.code}</span>
         </div>
       </Link>
     </motion.li>
