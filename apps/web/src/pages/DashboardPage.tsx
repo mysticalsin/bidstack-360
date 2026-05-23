@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useMemo } from 'react';
+import { Link, useParams } from 'react-router-dom';
 
 import {
   ActivityTimelineCard,
@@ -19,6 +19,7 @@ import {
   TechStackCard,
   UpsellFilesCard,
 } from '@/components/cockpit';
+import { OrgDashboard } from '@/components/dashboard/OrgDashboard';
 import { FilesPanel } from '@/components/files/FilesPanel';
 import { AccountIntelPanel } from '@/components/account-intel/AccountIntelPanel';
 import { Reveal } from '@/components/motion/Reveal';
@@ -32,7 +33,8 @@ import { useSalesIntelligence } from '@/hooks/useSalesIntelligence';
 import { useTasks } from '@/hooks/useTasks';
 import { daysUntil } from '@/lib/format';
 import { useAccountHistory } from '@/stores/accountHistory';
-import { AccountsPage } from './AccountsPage';
+import { useIsAdmin } from '@/lib/auth';
+import { useEnrichCompany } from '@/hooks/useEnrichCompany';
 
 // DashboardPage doubles as both the org-wide /dashboard view (no
 // accountId) and the per-customer /accounts/:accountId cockpit. The
@@ -41,8 +43,12 @@ import { AccountsPage } from './AccountsPage';
 // for the right company — we only need to render the layout here.
 export function DashboardPage() {
   const { accountId } = useParams<{ accountId?: string }>();
-  if (!accountId) return <AccountsPage />;
-  return <AccountCockpitPage accountId={accountId} />;
+  return (
+    <>
+      <h1 className="sr-only">Dashboard</h1>
+      {!accountId ? <OrgDashboard /> : <AccountCockpitPage accountId={accountId} />}
+    </>
+  );
 }
 
 function AccountCockpitPage({ accountId }: { accountId: string }) {
@@ -62,6 +68,44 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
     if (accountId && visitName) visit(accountId, visitName);
   }, [accountId, visitName, visit]);
 
+  const isAdmin = useIsAdmin();
+  const enrich = useEnrichCompany();
+  const company = dashboard.data?.cockpit.company;
+  const companyId = company?.id;
+  const companyName = company?.name;
+  const companyDomain = company?.domain;
+  const companyIndustry = company?.industry;
+  const companyWebsite = company?.website;
+
+  useEffect(() => {
+    if (
+      isAdmin &&
+      companyId &&
+      companyName &&
+      !companyDomain &&
+      !companyIndustry &&
+      enrich.status === 'idle'
+    ) {
+      enrich.mutate({
+        id: companyId,
+        name: companyName,
+        ...(companyDomain ? { domain: companyDomain } : {}),
+        ...(companyWebsite ? { website: companyWebsite } : {}),
+      });
+    }
+  }, [isAdmin, companyId, companyName, companyDomain, companyIndustry, companyWebsite, enrich]);
+
+  // Truly overdue (daysUntil < 0) only — matches the Sidebar badge so the two
+  // counts can't disagree. Tasks with no dueDate are excluded.
+  const overdueCount = useMemo(
+    () =>
+      tasks.data?.items.filter((t) => {
+        const d = daysUntil(t.dueDate);
+        return d !== null && d < 0 && t.status !== 'done';
+      }).length ?? 0,
+    [tasks.data?.items],
+  );
+
   if (dashboard.isLoading) {
     return <DashboardSkeleton />;
   }
@@ -70,6 +114,20 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
       <ErrorState
         title="Couldn't load the CRM cockpit"
         message={dashboard.error?.message ?? 'The CRM dashboard endpoint did not respond.'}
+        action={
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => void dashboard.refetch()}
+            >
+              Retry
+            </button>
+            <Link to="/accounts" className="btn btn-secondary">
+              Back to accounts
+            </Link>
+          </div>
+        }
       />
     );
   }
@@ -77,14 +135,9 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
   const snapshot = dashboard.data;
   const cockpit = snapshot.cockpit;
   const isAccountView = Boolean(accountId);
-
-  // Truly overdue (daysUntil < 0) only — matches the Sidebar badge so the two
-  // counts can't disagree. Tasks with no dueDate are excluded.
-  const overdueCount =
-    tasks.data?.items.filter((t) => {
-      const d = daysUntil(t.dueDate);
-      return d !== null && d < 0 && t.status !== 'done';
-    }).length ?? 0;
+  const accountOpps = opps.data?.items.filter(
+    (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
+  );
 
   return (
     <>
@@ -111,7 +164,11 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
           </Reveal>
 
           <Reveal delay={0.12}>
-            <RecentOpportunitiesCard opps={opps} />
+            <RecentOpportunitiesCard
+              opps={opps}
+              accountName={cockpit.company.name}
+              items={accountOpps}
+            />
           </Reveal>
 
           <Reveal delay={0.16}>

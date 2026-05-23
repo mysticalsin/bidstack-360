@@ -1,9 +1,9 @@
 {
   "version": "1.0.2",
-  "last_updated": "2026-05-23T02:48:00-04:00",
-  "cycle": 4,
-  "status": "building",
-  "composite_score": 64,
+  "last_updated": "2026-05-23T04:48:00-04:00",
+  "cycle": 6,
+  "status": "scored",
+  "composite_score": 66,
   "target_score": 98,
   "dimensions": {
     "functionality": {
@@ -43,19 +43,20 @@
       }
     },
     "design_ux": {
-      "score": 16,
+      "score": 17,
       "max": 25,
       "weight": 1,
       "subscores": {
         "visual_design": 5,
         "interaction_design": 4,
-        "accessibility": 4,
+        "accessibility": 6,
         "performance_perceived": 3
       },
       "verifiers": {
         "lighthouse_performance": 64,
-        "lighthouse_accessibility": 96,
-        "axe_core_violations": null,
+        "lighthouse_accessibility": 100,
+        "axe_core_violations": 0,
+        "axe_core_critical_serious": 0,
         "bundle_size_kb": 47,
         "bundle_size_kb_raw": 175,
         "inp_ms": null,
@@ -118,10 +119,67 @@
       "composite_score": 64,
       "delta": 1,
       "note": "EXP-3-1: Lighthouse baseline captured (Perf 64, A11y 96, BP 77, SEO 83). EXP-4-1: Added 9 shared schema tests (Company, Contact, Task)."
+    },
+    {
+      "cycle": 5,
+      "timestamp": "2026-05-23T04:48:00-04:00",
+      "composite_score": 65,
+      "delta": 1,
+      "note": "EXP-5-2: axe-core audit + fixes. 36→10 violations, 5→0 critical/serious. Fixed sidebar role, select labels, color contrast (tags, muted text), missing --color-fg-on-brand theme token. Dashboard a11y 96→100."
+    },
+    {
+      "cycle": 6,
+      "timestamp": "2026-05-23T11:30:00-04:00",
+      "composite_score": 66,
+      "delta": 1,
+      "note": "EXP-6-1: Fixed remaining 10 moderate axe-core violations across 8 pages. Heading-order (h3→h2 in Card, EmptyState, BidNoBid), page-has-heading-one (Dashboard, Accounts), landmark issues (SettingsLayout div instead of main). 21/21 routes: 0 violations."
     }
   ],
   "active_experiments": [],
   "completed_experiments": [
+    {
+      "experiment_id": "EXP-6-1",
+      "status": "committed",
+      "dimension_target": "design_ux",
+      "agents_assigned": ["#4", "#5"],
+      "proposal": {
+        "hypothesis": "Fixing remaining moderate heading-order and landmark violations eliminates all axe-core violations across 21 routes.",
+        "expected_delta": 1,
+        "files_to_touch": [
+          "apps/web/src/components/ui/Card.tsx",
+          "apps/web/src/components/ui/StateMessages.tsx",
+          "apps/web/src/pages/BidNoBidPage.tsx",
+          "apps/web/src/pages/DashboardPage.tsx",
+          "apps/web/src/pages/AccountsPage.tsx",
+          "apps/web/src/components/settings/SettingsLayout.tsx"
+        ]
+      },
+      "score_delta": 1,
+      "learning_id": "L-7-1",
+      "committed_ref": null
+    },
+    {
+      "experiment_id": "EXP-5-2",
+      "status": "committed",
+      "dimension_target": "design_ux",
+      "agents_assigned": ["#5", "#11", "#4"],
+      "proposal": {
+        "hypothesis": "Running axe-core across all 21 pages and fixing violations pushes accessibility subscore from 4→5.",
+        "expected_delta": 1,
+        "files_to_touch": [
+          "apps/web/src/components/layout/Sidebar.tsx",
+          "apps/web/src/pages/ServiceDeskPage.tsx",
+          "apps/web/src/pages/BidNoBidPage.tsx",
+          "apps/web/src/pages/AgentsPage.tsx",
+          "apps/web/src/pages/IntakePage.tsx",
+          "apps/web/src/pages/SearchPage.tsx",
+          "apps/web/src/index.css"
+        ]
+      },
+      "score_delta": 1,
+      "learning_id": "L-6-1",
+      "committed_ref": null
+    },
     {
       "experiment_id": "EXP-1-1",
       "status": "committed",

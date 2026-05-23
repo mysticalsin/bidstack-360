@@ -28,7 +28,7 @@ export function EmptyState({ title, message, action }: BaseProps) {
       >
         ✨
       </motion.div>
-      <h3 className="text-sm font-semibold text-[var(--fg-primary)]">{title}</h3>
+      <h2 className="text-sm font-semibold text-[var(--fg-primary)]">{title}</h2>
       {message ? (
         <p className="mt-1 max-w-sm text-xs text-[var(--fg-secondary)]">{message}</p>
       ) : null}
@@ -50,7 +50,7 @@ export function ErrorState({ title, message, action }: BaseProps) {
       <div className="text-3xl mb-3" aria-hidden>
         ⚠
       </div>
-      <h3 className="text-sm font-semibold text-[var(--danger)]">{title}</h3>
+      <h2 className="text-sm font-semibold text-[var(--danger)]">{title}</h2>
       {message ? (
         <p className="mt-1 max-w-sm text-xs text-[var(--fg-secondary)]">{message}</p>
       ) : null}

@@ -5,7 +5,8 @@ import { cn } from '@/lib/cn';
 import { springSnap } from '@/lib/motion';
 
 const CARD_BASE =
-  'rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] shadow-[var(--shadow-xs)]';
+  'rounded-xl dark:rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] shadow-[var(--shadow-xs)] ' +
+  'dark:bg-[var(--surface-glass)] dark:backdrop-blur-md dark:shadow-[0_0_0_1px_rgba(255,255,255,0.05)] dark:inner-glow dark:card-shimmer';
 
 /** Static, non-interactive card. Use for content blocks the user reads. */
 export function Card({ className, children, ...rest }: HTMLAttributes<HTMLDivElement>) {
@@ -32,14 +33,12 @@ export const InteractiveCard = forwardRef<HTMLDivElement, InteractiveCardProps>(
     return (
       <motion.div
         ref={ref}
-        whileHover={
-          reduced ? undefined : { y: -3, boxShadow: '0 16px 40px rgba(16, 24, 40, 0.10)' }
-        }
+        whileHover={reduced ? undefined : { y: -3 }}
         whileTap={reduced ? undefined : { y: -1, scale: 0.997 }}
         transition={springSnap}
         className={cn(
           CARD_BASE,
-          'cursor-pointer transition-colors hover:border-[var(--border-default)]',
+          'cursor-pointer transition-colors hover:border-[var(--border-default)] dark:hover:border-[var(--border-glow-strong)] dark:hover:shadow-[0_0_24px_rgba(168,85,247,0.15)]',
           showFocusRing &&
             'focus-within:ring-2 focus-within:ring-[var(--brand-primary)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--surface-page)]',
           className,
@@ -63,7 +62,7 @@ export function SectionHeader({ title, caption, action }: SectionHeaderProps) {
   return (
     <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-[var(--border-subtle)]">
       <div>
-        <h3 className="text-sm font-semibold text-[var(--fg-primary)]">{title}</h3>
+        <h2 className="text-sm font-semibold text-[var(--fg-primary)]">{title}</h2>
         {caption ? <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">{caption}</p> : null}
       </div>
       {action}

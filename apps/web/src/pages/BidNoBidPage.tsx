@@ -1,5 +1,6 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSearchParams } from 'react-router-dom';
 
 import { GlassCard } from '@/components/ui/GlassCard';
 import { ProgressRing } from '@/components/ui/ProgressRing';
@@ -8,6 +9,14 @@ import { Reveal } from '@/components/motion/Reveal';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { Icon } from '@/components/ui/Icon';
+import { Button } from '@/components/ui/Button';
+import {
+  useBidScoreLatest,
+  useCreateBidScore,
+  useAICalibrate,
+  useBidScoreDefend,
+} from '@/hooks/useBidScore';
+import { useOpportunities } from '@/hooks/useOpportunities';
 
 // --- Criterion definitions ---
 
@@ -155,8 +164,54 @@ function getRecommendation(score: number): {
 export function BidNoBidPage() {
   useDocumentTitle();
   const reduced = useReducedMotion();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const opportunityId = searchParams.get('opportunityId') ?? undefined;
   const [scores, setScores] = useState<Scores>({});
   const [notes, setNotes] = useState('');
+  const [defenseReasoning, setDefenseReasoning] = useState<string | null>(null);
+
+  const { data: latestScore } = useBidScoreLatest(opportunityId);
+  const createScore = useCreateBidScore();
+  const aiCalibrate = useAICalibrate();
+  const defendScore = useBidScoreDefend();
+  const { data: opps } = useOpportunities({ limit: 50 });
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  // Synchronize editable form state when the fetched score changes.
+  // This is intentional: scores/notes are user-editable drafts that must reset
+  // to the latest persisted values when the opportunity or score changes.
+  useEffect(() => {
+    if (latestScore?.criteria) {
+      setScores(latestScore.criteria as Scores);
+      if (latestScore.notes) setNotes(latestScore.notes);
+    }
+  }, [latestScore]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const handleSave = useCallback(() => {
+    if (!opportunityId) return;
+    createScore.mutate({ opportunityId, criteria: scores, notes: notes || undefined });
+  }, [opportunityId, scores, notes, createScore]);
+
+  const handleAICalibrate = useCallback(() => {
+    if (!opportunityId) return;
+    setDefenseReasoning(null);
+    aiCalibrate.mutate(opportunityId, {
+      onSuccess: (data) => {
+        setScores(data.criteria as Scores);
+      },
+    });
+  }, [opportunityId, aiCalibrate]);
+
+  const handleDefend = useCallback(() => {
+    if (!latestScore?.id) return;
+    setDefenseReasoning(null);
+    defendScore.mutate(latestScore.id, {
+      onSuccess: (data) => {
+        setDefenseReasoning(data.reasoning);
+      },
+    });
+  }, [latestScore, defendScore]);
 
   const handleScore = useCallback((criterionId: string, value: ScoreValue) => {
     setScores((prev) => ({ ...prev, [criterionId]: value }));
@@ -207,7 +262,72 @@ export function BidNoBidPage() {
             {ratedCount > 0 && ` ${ratedCount}/${CRITERIA.length} criteria rated.`}
           </p>
         </div>
+        <div className="flex items-center gap-3">
+          {opportunityId && (
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleAICalibrate}
+                disabled={aiCalibrate.isPending}
+                aria-label="AI calibrate scores"
+              >
+                {aiCalibrate.isPending ? 'Calibrating…' : 'AI Calibrate'}
+              </Button>
+              {latestScore && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleDefend}
+                  disabled={defendScore.isPending}
+                  aria-label="Defend score with AI"
+                >
+                  {defendScore.isPending ? 'Analyzing…' : 'Defend Score'}
+                </Button>
+              )}
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleSave}
+                disabled={createScore.isPending || ratedCount === 0}
+                aria-label="Save bid score"
+              >
+                {createScore.isPending ? 'Saving…' : 'Save Score'}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
+
+      {/* Opportunity Selector */}
+      <GlassCard className="mb-4">
+        <label className="text-sm font-medium text-fg-secondary block mb-2">Opportunity</label>
+        <select
+          className="dialog-input w-full"
+          value={opportunityId ?? ''}
+          onChange={(e) => {
+            const id = e.target.value;
+            if (id) {
+              setSearchParams({ opportunityId: id });
+            } else {
+              setSearchParams({});
+            }
+          }}
+          aria-label="Select opportunity"
+        >
+          <option value="">— Select an opportunity —</option>
+          {opps?.items.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.customer} — {o.name} ({o.stage})
+            </option>
+          ))}
+        </select>
+        {!opportunityId && (
+          <p className="text-xs text-fg-tertiary mt-2">
+            Select an opportunity to enable saving and AI calibration.
+          </p>
+        )}
+      </GlassCard>
 
       {/* Score Summary Strip */}
       <Reveal>
@@ -291,12 +411,12 @@ export function BidNoBidPage() {
                         <Icon name={criterion.icon} size={16} style={{ color: catInfo?.color }} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-semibold text-fg-primary">{criterion.label}</h3>
+                        <h2 className="text-sm font-semibold text-fg-primary">{criterion.label}</h2>
                         <p className="text-xs text-fg-tertiary mt-0.5 leading-relaxed">
                           {criterion.description}
                         </p>
                       </div>
-                      <span className="flex-shrink-0 text-[10px] font-mono text-fg-muted bg-surface-sunken px-1.5 py-0.5 rounded">
+                      <span className="flex-shrink-0 text-[10px] font-mono text-fg-secondary bg-surface-sunken px-1.5 py-0.5 rounded">
                         w:{criterion.weight}
                       </span>
                     </div>
@@ -340,6 +460,21 @@ export function BidNoBidPage() {
           })}
         </AnimatePresence>
       </div>
+
+      {/* AI Defense Panel */}
+      {defenseReasoning && (
+        <Reveal>
+          <GlassCard padding="lg" className="mb-6 border-l-4 border-l-brand-primary">
+            <div className="flex items-center gap-2 mb-2">
+              <Icon name="sparkle" size={16} className="text-brand-primary" />
+              <h2 className="text-sm font-semibold text-fg-primary">AI Score Defense</h2>
+            </div>
+            <p className="text-sm text-fg-secondary leading-relaxed whitespace-pre-wrap">
+              {defenseReasoning}
+            </p>
+          </GlassCard>
+        </Reveal>
+      )}
 
       {/* Notes Section */}
       <Reveal delay={0.2}>

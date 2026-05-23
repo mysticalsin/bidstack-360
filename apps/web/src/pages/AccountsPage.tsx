@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from 'framer-motion';
-import { useMemo, useState, type CSSProperties } from 'react';
+import { memo, useMemo, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 
 import { CompanyLogo } from '@/components/company/CompanyLogo';
@@ -9,9 +9,10 @@ import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { toast } from '@/components/ui/Toast';
 import { useAutopopulateSalesCompanies } from '@/hooks/useAutopopulateSalesCompanies';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
-import { formatMoneyMicros } from '@/lib/format';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springLayout, springSnap, springSoft } from '@/lib/motion';
 
 import type { CrmCompany, CrmDeal } from '@bidstack/shared';
@@ -23,19 +24,21 @@ interface AccountRow {
   openDeals: number;
   pipelineMicros: number;
   totalDeals: number;
-  // Coarse health proxy until real enrichment lands: weighted-pipeline / open-deals
+  // Coarse health proxy until real data enhancement lands: weighted-pipeline / open-deals
   // banded into 4 buckets. Real CompanyHealth lives in cockpit; per-account here
   // is derived because we only have aggregate signal at the list level.
   health: 'strong' | 'good' | 'needs_attention' | 'critical';
 }
 
 export function AccountsPage() {
+  const { formatMoneyMicros } = useFormatMoney();
   const dashboard = useCrmDashboard();
   const autopopulate = useAutopopulateSalesCompanies();
   const reducedMotion = useReducedMotion();
   const [search, setSearch] = useState('');
   const [industry, setIndustry] = useState<string | null>(null);
   const [sort, setSort] = useState<SortKey>('pipeline');
+  const syncError = autopopulate.error instanceof Error ? autopopulate.error.message : null;
 
   const rows = useMemo<AccountRow[]>(() => {
     if (!dashboard.data) return [];
@@ -64,28 +67,62 @@ export function AccountsPage() {
     ].sort();
   }, [dashboard.data]);
 
-  if (dashboard.isLoading) return <LoadingSkeleton rows={10} />;
-  if (dashboard.isError) {
+  if (dashboard.isLoading) {
     return (
-      <ErrorState
-        title="Couldn't load accounts"
-        message={dashboard.error?.message ?? 'The CRM dashboard endpoint did not respond.'}
-      />
+      <>
+        <h1 className="sr-only">Accounts</h1>
+        <LoadingSkeleton rows={10} />
+      </>
     );
   }
-  if (!dashboard.data) return <EmptyState title="No accounts yet" />;
+  if (dashboard.isError) {
+    return (
+      <>
+        <h1 className="sr-only">Accounts</h1>
+        <ErrorState
+          title="Couldn't load accounts"
+          message={dashboard.error?.message ?? 'The CRM dashboard endpoint did not respond.'}
+        />
+      </>
+    );
+  }
+  if (!dashboard.data) {
+    return (
+      <>
+        <h1 className="sr-only">Accounts</h1>
+        <EmptyState title="No accounts yet" />
+      </>
+    );
+  }
 
   const totalPipeline = rows.reduce((acc, r) => acc + r.pipelineMicros, 0);
   const totalOpen = rows.reduce((acc, r) => acc + r.openDeals, 0);
   const logoCoverage = rows.filter((r) => Boolean(r.company.logo?.url)).length;
-  const enrichedAccounts = rows.filter((r) => r.company.source === 'enrichment').length;
+  const enrichedAccounts = rows.filter((r) => r.company.source === 'verified_data').length;
   const healthyProviders = dashboard.data.providerHealth.filter(
     (p) => p.status === 'healthy',
   ).length;
   const providerCount = dashboard.data.providerHealth.length;
+  const syncErpAccounts = () => {
+    autopopulate.mutate(
+      { limit: 20 },
+      {
+        onError: (error) => {
+          toast.error('ERP account sync failed', {
+            description:
+              error instanceof Error
+                ? error.message
+                : 'The latest ERP customer pull could not complete.',
+            action: { label: 'Retry', onClick: syncErpAccounts },
+          });
+        },
+      },
+    );
+  };
 
   return (
     <>
+      <h1 className="sr-only">Accounts</h1>
       <motion.div
         className="page-head motion-page-head"
         initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, filter: 'blur(6px)' }}
@@ -93,7 +130,7 @@ export function AccountsPage() {
         transition={springSoft}
       >
         <div>
-          <h1 className="page-title">Account Dashboard</h1>
+          <h1 className="page-title gradient-text">Accounts</h1>
           <div className="page-sub">
             {rows.length} {rows.length === 1 ? 'company' : 'companies'} · {totalOpen} open deals ·{' '}
             {formatMoneyMicros(totalPipeline, 'EUR')} weighted pipeline
@@ -109,8 +146,8 @@ export function AccountsPage() {
             type="button"
             className="btn btn-secondary"
             disabled={autopopulate.isPending}
-            onClick={() => autopopulate.mutate({ limit: 20 })}
-            title="Sync top Odoo sale.order customers into enriched CRM accounts"
+            onClick={syncErpAccounts}
+            title="Sync top ERP sale.order customers into verified CRM accounts"
           >
             {autopopulate.isPending ? (
               <span
@@ -120,7 +157,7 @@ export function AccountsPage() {
             ) : (
               <Icon name="download" size={14} />
             )}
-            {autopopulate.isPending ? 'Syncing...' : 'Sync Odoo accounts'}
+            {autopopulate.isPending ? 'Syncing...' : 'Sync ERP accounts'}
           </button>
           <SmartCompanyDialog
             trigger={
@@ -133,12 +170,34 @@ export function AccountsPage() {
         </div>
       </motion.div>
 
+      {autopopulate.isError ? (
+        <div
+          role="alert"
+          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--danger)] bg-[var(--danger-tint)] px-4 py-3 text-sm"
+        >
+          <div>
+            <div className="font-semibold text-[var(--danger)]">ERP account sync failed</div>
+            <div className="mt-0.5 text-xs text-[var(--fg-secondary)]">
+              {syncError ?? 'The last sync could not pull the top 20 ERP customers.'}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={autopopulate.isPending}
+            onClick={syncErpAccounts}
+          >
+            Retry sync
+          </button>
+        </div>
+      ) : null}
+
       <section className="account-dashboard-strip" aria-label="Account source coverage">
         <SourceStat label="Accounts" value={rows.length.toLocaleString()} detail="portfolio" />
         <SourceStat
           label="Open deals"
           value={totalOpen.toLocaleString()}
-          detail="Twenty pipeline"
+          detail="External CRM pipeline"
         />
         <SourceStat
           label="Weighted pipeline"
@@ -153,7 +212,7 @@ export function AccountsPage() {
         <SourceStat
           label="Enriched profiles"
           value={enrichedAccounts.toLocaleString()}
-          detail="open-source cache"
+          detail="verified data cache"
         />
         <SourceStat
           label="Sources healthy"
@@ -228,7 +287,8 @@ export function AccountsPage() {
   );
 }
 
-function AccountCard({ row, index }: { row: AccountRow; index: number }) {
+const AccountCard = memo(function AccountCard({ row, index }: { row: AccountRow; index: number }) {
+  const { formatMoneyMicros } = useFormatMoney();
   const { company, openDeals, pipelineMicros, totalDeals, health } = row;
   const sources = sourcePillsFor(company);
   return (
@@ -321,13 +381,13 @@ function AccountCard({ row, index }: { row: AccountRow; index: number }) {
           </div>
 
           <div className="account-card-foot">
-            View Stack360 cockpit <Icon name="arrow" size={11} />
+            Open account cockpit <Icon name="arrow" size={11} />
           </div>
         </Link>
       </div>
     </motion.div>
   );
-}
+});
 
 function SourceStat({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
@@ -349,14 +409,14 @@ function IntegrationMotionRail({
   const visible = providers.length
     ? providers.slice(0, 8)
     : [
-        { name: 'Odoo', status: 'healthy' },
-        { name: 'Twenty', status: 'healthy' },
+        { name: 'ERP', status: 'healthy' },
+        { name: 'External CRM', status: 'healthy' },
         { name: 'Apollo', status: 'disabled' },
         { name: 'TradingView', status: 'healthy' },
       ];
   return (
-    <div className="integration-motion-rail" aria-label="Live CRM integration orchestration">
-      <span className="rail-label">Live integration flow</span>
+    <div className="integration-motion-rail" aria-label="CRM integration status">
+      <span className="rail-label">Integration activity</span>
       <div className="rail-track" aria-hidden>
         {visible.map((provider, index) => (
           <span
@@ -368,7 +428,7 @@ function IntegrationMotionRail({
           </span>
         ))}
       </div>
-      <span className="rail-caption">Odoo, Twenty, open APIs, enrichment jobs</span>
+      <span className="rail-caption">ERP, External CRM, verified data connectors</span>
     </div>
   );
 }
@@ -442,26 +502,26 @@ function titleCase(s: string): string {
 
 function sourcePillsFor(company: CrmCompany): string[] {
   const pills = new Set<string>();
-  pills.add(company.source === 'enrichment' ? 'Enriched' : sourceLabel(company.source));
+  pills.add(company.source === 'verified_data' ? 'Verified' : sourceLabel(company.source));
   if (company.logo?.source) pills.add(`Logo: ${logoSourceLabel(company.logo.source)}`);
   for (const source of company.sourceAttribution.slice(0, 2)) {
     pills.add(sourceLabel(source.source));
   }
-  if (company.sourceAttribution.length === 0) pills.add('Twenty');
+  if (company.sourceAttribution.length === 0) pills.add('External CRM');
   return [...pills].slice(0, 4);
 }
 
 function sourceLabel(source: string): string {
   const normalized = source.toLowerCase();
-  if (normalized.includes('odoo')) return 'Odoo';
-  if (normalized.includes('twenty')) return 'Twenty';
+  if (normalized.includes('external_erp')) return 'ERP';
+  if (normalized.includes('external_crm')) return 'External CRM';
   if (normalized.includes('apollo')) return 'Apollo';
   if (normalized.includes('brandfetch')) return 'Brandfetch';
   if (normalized.includes('logo_dev')) return 'Logo.dev';
   if (normalized.includes('official')) return 'Official';
   if (normalized.includes('favicon')) return 'Favicon';
   if (normalized.includes('bidstack')) return 'BidStack';
-  if (normalized.includes('enrichment')) return 'Enriched';
+  if (normalized.includes('verified_data')) return 'Verified';
   return titleCase(source.replace(/[-.]/g, ' '));
 }
 
