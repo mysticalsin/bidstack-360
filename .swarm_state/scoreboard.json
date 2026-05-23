@@ -1,9 +1,9 @@
 {
-  "version": "1.0.1",
-  "last_updated": "2026-05-22T22:18:00-04:00",
-  "cycle": 1,
+  "version": "1.0.2",
+  "last_updated": "2026-05-23T02:48:00-04:00",
+  "cycle": 4,
   "status": "building",
-  "composite_score": 62,
+  "composite_score": 64,
   "target_score": 98,
   "dimensions": {
     "functionality": {
@@ -24,18 +24,18 @@
       }
     },
     "code_quality": {
-      "score": 16,
+      "score": 17,
       "max": 25,
       "weight": 1,
       "subscores": {
-        "test_coverage": 5,
+        "test_coverage": 6,
         "type_safety": 5,
         "architecture": 4,
         "documentation": 2
       },
       "verifiers": {
-        "line_coverage_percent": 35.2,
-        "branch_coverage_percent": 47.3,
+        "line_coverage_percent": 36.1,
+        "branch_coverage_percent": 48.5,
         "typescript_errors": 0,
         "lint_errors": 0,
         "cyclomatic_complexity_avg": null,
@@ -43,23 +43,23 @@
       }
     },
     "design_ux": {
-      "score": 15,
+      "score": 16,
       "max": 25,
       "weight": 1,
       "subscores": {
         "visual_design": 5,
-        "interaction_design": 3,
+        "interaction_design": 4,
         "accessibility": 4,
         "performance_perceived": 3
       },
       "verifiers": {
-        "lighthouse_performance": null,
-        "lighthouse_accessibility": null,
+        "lighthouse_performance": 64,
+        "lighthouse_accessibility": 96,
         "axe_core_violations": null,
         "bundle_size_kb": 47,
         "bundle_size_kb_raw": 175,
         "inp_ms": null,
-        "cls": null
+        "cls": 0.004
       }
     },
     "infrastructure": {
@@ -89,20 +89,42 @@
       "timestamp": "2026-05-22T21:57:55-04:00",
       "composite_score": 59,
       "delta": 0,
-      "note": "Initialization baseline. Honest assessment based on existing audits."
+      "note": "Initialization baseline."
     },
     {
       "cycle": 1,
       "timestamp": "2026-05-22T22:18:00-04:00",
       "composite_score": 62,
       "delta": 3,
-      "note": "Baseline correction after real metric capture. API coverage 63.68%, build passes, bundle 47KB gzipped."
+      "note": "Baseline correction after real metrics. API coverage 63.68%, build passes, bundle 47KB gzipped."
+    },
+    {
+      "cycle": 2,
+      "timestamp": "2026-05-22T22:22:00-04:00",
+      "composite_score": 63,
+      "delta": 1,
+      "note": "EXP-1-1: Framer Motion transparent fix + favicon + coverage-v8 alignment. Console warning eliminated."
+    },
+    {
+      "cycle": 3,
+      "timestamp": "2026-05-22T22:37:00-04:00",
+      "composite_score": 63,
+      "delta": 0,
+      "note": "EXP-2-1/2: Added 24 web component/hook tests (Badge, Card, Dialog, Toast, useCommandPalette). Web tests 31→55."
+    },
+    {
+      "cycle": 4,
+      "timestamp": "2026-05-23T02:48:00-04:00",
+      "composite_score": 64,
+      "delta": 1,
+      "note": "EXP-3-1: Lighthouse baseline captured (Perf 64, A11y 96, BP 77, SEO 83). EXP-4-1: Added 9 shared schema tests (Company, Contact, Task)."
     }
   ],
-  "active_experiments": [
+  "active_experiments": [],
+  "completed_experiments": [
     {
       "experiment_id": "EXP-1-1",
-      "status": "building",
+      "status": "committed",
       "dimension_target": "design_ux",
       "agents_assigned": ["#4", "#5"],
       "proposal": {
@@ -110,15 +132,78 @@
         "expected_delta": 1,
         "files_to_touch": ["apps/web/src/pages/PipelinePage.tsx", "apps/web/public/favicon.ico"]
       },
-      "build_output": null,
-      "qa_output": null,
-      "verification": null,
-      "score_delta": null,
-      "learning_id": null,
-      "committed_ref": null
+      "score_delta": 1,
+      "learning_id": "L-2-1",
+      "committed_ref": "273ca1f6"
+    },
+    {
+      "experiment_id": "EXP-2-1",
+      "status": "committed",
+      "dimension_target": "code_quality",
+      "agents_assigned": ["#12"],
+      "proposal": {
+        "hypothesis": "Adding component tests for Badge, Card, and useCommandPalette improves coverage and verifies functionality.",
+        "expected_delta": 0.5,
+        "files_to_touch": [
+          "apps/web/src/components/ui/Badge.test.tsx",
+          "apps/web/src/components/ui/Card.test.tsx",
+          "apps/web/src/hooks/useCommandPalette.test.ts"
+        ]
+      },
+      "score_delta": 0.5,
+      "learning_id": "L-3-1",
+      "committed_ref": "a0a8c77d"
+    },
+    {
+      "experiment_id": "EXP-2-2",
+      "status": "committed",
+      "dimension_target": "code_quality",
+      "agents_assigned": ["#12"],
+      "proposal": {
+        "hypothesis": "Adding Dialog and Toaster tests increases coverage for UI primitives.",
+        "expected_delta": 0.5,
+        "files_to_touch": [
+          "apps/web/src/components/ui/Dialog.test.tsx",
+          "apps/web/src/components/ui/Toast.test.tsx"
+        ]
+      },
+      "score_delta": 0.5,
+      "learning_id": "L-3-2",
+      "committed_ref": "82a4fd23"
+    },
+    {
+      "experiment_id": "EXP-3-1",
+      "status": "committed",
+      "dimension_target": "infrastructure",
+      "agents_assigned": ["#8"],
+      "proposal": {
+        "hypothesis": "Capturing Lighthouse baseline reveals exact performance gaps to target.",
+        "expected_delta": 0,
+        "files_to_touch": [".swarm_state/baseline_lighthouse.json"]
+      },
+      "score_delta": 0,
+      "learning_id": "L-4-1",
+      "committed_ref": "07442e3e"
+    },
+    {
+      "experiment_id": "EXP-4-1",
+      "status": "committed",
+      "dimension_target": "code_quality",
+      "agents_assigned": ["#12"],
+      "proposal": {
+        "hypothesis": "Testing shared Zod schemas prevents drift and documents expected shapes.",
+        "expected_delta": 0.5,
+        "files_to_touch": [
+          "packages/shared/src/schemas/company.test.ts",
+          "packages/shared/src/schemas/contact.test.ts",
+          "packages/shared/src/schemas/task.test.ts"
+        ]
+      },
+      "score_delta": 0.5,
+      "learning_id": "L-5-1",
+      "committed_ref": "5879568d"
     }
   ],
-  "completed_experiments": [],
   "crisis_flags": {
     "security_below_12": false,
     "consecutive_failures": 0,
@@ -132,7 +217,7 @@
     "actual_cost_per_user_action_usd": null,
     "tokens_consumed_this_cycle": 0,
     "tokens_budget_per_cycle": 120000,
-    "parallel_builds_quota": { "max": 5, "active": 1 },
+    "parallel_builds_quota": { "max": 5, "active": 0 },
     "parallel_qa_quota": { "max": 3, "active": 0 },
     "parallel_security_quota": { "max": 2, "active": 0 }
   }
