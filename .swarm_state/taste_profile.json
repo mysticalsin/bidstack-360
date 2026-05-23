@@ -1,0 +1,64 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-05-22T21:57:55-04:00",
+  "decay_rate_per_week": 0.05,
+  "preferences": {
+    "color_temperature": "cool",
+    "density": "comfortable",
+    "motion_amount": "subtle",
+    "radius_sharpness": "moderate",
+    "typography_personality": "technical_clean",
+    "elevation_style": "flat_with_depth"
+  },
+  "component_votes": {
+    "button": {
+      "primary_corner": { "8px": 1, "12px": 0, "full": 0 },
+      "primary_shadow": { "none": 1, "sm": 0, "md": 0 },
+      "primary_weight": { "medium": 1, "semibold": 0, "bold": 0 }
+    },
+    "card": {
+      "corner": { "10px": 0, "14px": 1, "16px": 0 },
+      "shadow": { "none": 0, "sm": 1, "md": 0 },
+      "border": { "none": 0, "subtle": 1, "visible": 0 }
+    },
+    "table": {
+      "row_hover": { "tint": 1, "shadow": 0, "underline": 0 },
+      "header_style": { "subtle": 1, "bold": 0, "bordered": 0 },
+      "zebra": { "yes": 0, "no": 1 }
+    }
+  },
+  "rejected_patterns": [
+    {
+      "pattern": "glassmorphism",
+      "reason": "Reduces readability on complex dashboards",
+      "timestamp": "2026-05-22T21:57:55-04:00",
+      "confidence": 0.7
+    },
+    {
+      "pattern": "rounded_full_on_cards",
+      "reason": "Too playful for enterprise CRM",
+      "timestamp": "2026-05-22T21:57:55-04:00",
+      "confidence": 0.8
+    }
+  ],
+  "approved_patterns": [
+    {
+      "pattern": "subtle_elevation",
+      "reason": "Cards float slightly without heavy shadows; professional",
+      "timestamp": "2026-05-22T21:57:55-04:00",
+      "confidence": 0.9
+    },
+    {
+      "pattern": "tabular_numbers_for_money",
+      "reason": "Prevents column jitter on financial data",
+      "timestamp": "2026-05-22T21:57:55-04:00",
+      "confidence": 1.0
+    }
+  ],
+  "inspiration_references": [
+    "Linear.app — command palette, keyboard nav, minimal chrome",
+    "Raycast — list density, quick actions, subtle motion",
+    "Stripe Dashboard — data density, trust signals, empty states",
+    "GitHub Projects — kanban simplicity, column customization"
+  ]
+}
