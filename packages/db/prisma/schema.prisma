@@ -1419,11 +1419,22 @@ model Reference {
 // ─── Activity & Communication (Salesforce Activity Parity) ─────────────────
 
 enum ActivityType {
+  // Original scheduling/communication types
   email
   meeting
   call
   note
   task
+  // Wave 4 — timeline event types (system-generated + user-logged)
+  stage_change
+  field_edit
+  file_upload
+  task_completed
+  email_opened
+  email_clicked
+  cadence_started
+  cadence_completed
+  custom
 
   @@map("activity_type")
 }
@@ -1434,6 +1445,15 @@ enum ActivityStatus {
   cancelled
 
   @@map("activity_status")
+}
+
+// Who (or what) caused the activity
+enum ActivityActorType {
+  user
+  system
+  agent
+
+  @@map("activity_actor_type")
 }
 
 model Activity {
@@ -1453,6 +1473,17 @@ model Activity {
   ownerId  String? @map("owner_id") @db.Uuid
   metadata Json?   @default("{}")
 
+  // Wave 4 — timeline / chatter feed extensions
+  // actorId mirrors ownerId when actor is a user; null for pure system events
+  actorId        String?           @map("actor_id") @db.Uuid
+  actorType      ActivityActorType @default(user) @map("actor_type")
+  // Flexible per-type payload (stage_change diff, field_edit before/after, etc.)
+  body           Json?             @default("{}")
+  // When the underlying event happened (may differ from DB insert time)
+  occurredAt     DateTime          @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  // Idempotency key — callers that replay events set this to avoid duplicates
+  idempotencyKey String?           @unique @map("idempotency_key") @db.VarChar(128)
+
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
@@ -1461,7 +1492,10 @@ model Activity {
   owner     User?              @relation(fields: [ownerId], references: [id])
   attendees ActivityAttendee[]
 
-  @@index([orgId, entityType, entityId])
+  // Primary timeline scan: entity feed ordered by occurrence time
+  @@index([orgId, entityType, entityId, occurredAt(sort: Desc)], map: "activities_org_entity_occurred_idx")
+  // Actor feed (e.g. all things user X did)
+  @@index([orgId, actorId, occurredAt(sort: Desc)], map: "activities_org_actor_occurred_idx")
   @@index([orgId, type])
   @@index([orgId, startTime])
   @@index([orgId, ownerId])
