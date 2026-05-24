@@ -79,6 +79,8 @@ import { microsoftWebhookRoutes } from './routes/integrations/microsoft-webhook.
 import { onboardingRoutes } from './routes/onboarding.js';
 // Wave 5 — Help center feedback
 import { helpRoutes } from './routes/help.js';
+// Wave 7 — Custom Objects (Salesforce parity)
+import { customObjectRoutes } from './routes/custom-objects.js';
 
 const CONNECT_SRC = [
   "'self'",
@@ -319,6 +321,9 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(onboardingRoutes, { prefix: '/api/v1' });
   // Wave 5 — Help center article feedback
   await server.register(helpRoutes, { prefix: '/api/v1' });
+
+  // Wave 7 — Custom Objects (Salesforce parity)
+  await server.register(customObjectRoutes, { prefix: '/api/v1' });
 
   return server;
 }
