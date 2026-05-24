@@ -62,6 +62,14 @@ export const envSchema = z.object({
   TRUSTED_PROXIES: z.string().optional().or(z.literal('')),
   BIDSTACK_JOB_SIGNING_SECRET: z.string().min(1).optional().or(z.literal('')),
   JOB_SIGNING_SECRET: z.string().min(1).optional().or(z.literal('')),
+
+  // ─── Migration connectors (Wave 3) ────────────────────────────────────
+  // HubSpot OAuth — create app at https://app.hubspot.com/developer
+  HUBSPOT_CLIENT_ID: z.string().min(1).optional().or(z.literal('')),
+  HUBSPOT_CLIENT_SECRET: z.string().min(1).optional().or(z.literal('')),
+  HUBSPOT_REDIRECT_URI: z.string().url().optional().or(z.literal('')),
+  // AES-256-GCM key for encrypting OAuth tokens at rest.
+  INTEGRATION_TOKEN_KEY: z.string().min(1).optional().or(z.literal('')),
 });
 
 export type Env = z.infer<typeof envSchema>;

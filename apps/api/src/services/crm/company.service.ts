@@ -160,6 +160,7 @@ export async function autopopulateCompanies({
       orgId,
       normalizedName: { in: candidates.map((item) => normalizeName(item.name)) },
     },
+    take: Math.max(candidates.length, 1),
   });
   const existingByName = new Map(existingRows.map((row) => [row.normalizedName, row]));
   const items: z.infer<typeof CompanyAutopopulateResponse>['items'] = [];

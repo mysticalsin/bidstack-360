@@ -16,6 +16,7 @@ export const pluginRoutes: FastifyPluginAsyncZod = async (server) => {
       const rows = await prisma.plugin.findMany({
         where: { orgId: req.auth.orgId, deletedAt: null },
         orderBy: { installedAt: 'desc' },
+        take: 500,
       });
       return {
         items: rows.map((r) => ({

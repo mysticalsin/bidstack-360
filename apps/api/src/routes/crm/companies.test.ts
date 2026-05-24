@@ -210,7 +210,6 @@ describe('crm companies routes', () => {
         url: '/api/crm/companies/autopopulate-from-sales',
         payload: {},
       });
-
       expect(res.statusCode).toBe(200);
       const body = res.json();
       expect(body.requested).toBeGreaterThan(0);

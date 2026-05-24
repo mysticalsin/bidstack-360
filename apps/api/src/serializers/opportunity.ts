@@ -8,12 +8,22 @@ import type {
 } from '@bidstack/shared';
 
 type SerializedOwner = { id: string; name: string | null; email: string };
+type SerializedPipelineStage = {
+  id: string;
+  name: string;
+  probability: number;
+  color: string | null;
+  isWon: boolean;
+  isLost: boolean;
+};
 type SerializedOpportunity = {
   id: string;
   code: string;
   customer: string;
   name: string;
   stage: OpportunityStage;
+  pipelineStageId: string | null;
+  pipelineStage: { id: string; name: string; probability: number | unknown; color: string | null; isWon?: boolean; isLost?: boolean } | null;
   valueMicros: bigint | number;
   probability: number;
   dueDate: Date | null;
@@ -37,6 +47,20 @@ export interface OpportunityCounts {
   commentCount?: number;
 }
 
+function serializePipelineStage(
+  ps: { id: string; name: string; probability: number | bigint | unknown; color: string | null; isWon?: boolean; isLost?: boolean } | null | undefined,
+): SerializedPipelineStage | null {
+  if (!ps) return null;
+  return {
+    id: ps.id,
+    name: ps.name,
+    probability: typeof ps.probability === 'number' ? ps.probability : Number(ps.probability),
+    color: ps.color ?? null,
+    isWon: ps.isWon ?? false,
+    isLost: ps.isLost ?? false,
+  };
+}
+
 export function serializeOpportunity(
   o: WithOwner & { territory?: { name: string } | null },
   counts?: OpportunityCounts,
@@ -46,7 +70,9 @@ export function serializeOpportunity(
     code: o.code,
     customer: o.customer,
     name: o.name,
-    stage: o.stage,
+    stage: o.pipelineStage?.name ?? o.stage ?? null,
+    pipelineStageId: o.pipelineStageId ?? null,
+    pipelineStage: serializePipelineStage(o.pipelineStage),
     value: Number(o.valueMicros) / 1_000_000,
     probability: o.probability,
     dueDate: o.dueDate ? o.dueDate.toISOString().slice(0, 10) : null,

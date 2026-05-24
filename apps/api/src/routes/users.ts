@@ -24,6 +24,7 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
       const rows = await prisma.user.findMany({
         where: { orgId: req.auth.orgId },
         orderBy: { createdAt: 'asc' },
+        take: 1000,
       });
       return rows.map((u) => ({
         id: u.id,

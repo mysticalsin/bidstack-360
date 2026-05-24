@@ -1,0 +1,205 @@
+// Integration tests for /api/leads/*.
+// Covers list, detail, CRUD, conversion, and soft-delete.
+
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+import { prisma } from '@bidstack/db';
+
+import { buildServer } from '../server.js';
+
+let server: Awaited<ReturnType<typeof buildServer>>;
+let dbReachable = false;
+const createdLeadIds: string[] = [];
+
+beforeAll(async () => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    dbReachable = true;
+  } catch {
+    dbReachable = false;
+    return;
+  }
+  server = await buildServer();
+  await server.ready();
+});
+
+afterAll(async () => {
+  if (server) await server.close();
+  if (dbReachable) {
+    for (const id of createdLeadIds) {
+      try {
+        await prisma.lead.deleteMany({ where: { id } });
+      } catch {
+        /* ignore */
+      }
+    }
+    await prisma.$disconnect();
+  }
+});
+
+const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
+  it(name, async () => {
+    if (!dbReachable) {
+      console.warn(`[skip] ${name} — DATABASE_URL not reachable`);
+      return;
+    }
+    await fn();
+  });
+
+describe('leads routes', () => {
+  skipIfNoDb('GET /api/leads returns seeded fixtures', async () => {
+    const res = await server.inject({ method: 'GET', url: '/api/leads?limit=20' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(Array.isArray(body.items)).toBe(true);
+    expect(body.items.length).toBeGreaterThanOrEqual(4);
+    expect(body.items[0]).toMatchObject({
+      id: expect.any(String),
+      firstName: expect.any(String),
+      lastName: expect.any(String),
+      status: expect.stringMatching(/^(new|contacted|qualified|nurture|disqualified|converted)$/),
+      score: expect.any(Number),
+    });
+  });
+
+  skipIfNoDb('GET /api/leads supports status filter', async () => {
+    const res = await server.inject({ method: 'GET', url: '/api/leads?status=new&limit=10' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.items.every((l: { status: string }) => l.status === 'new')).toBe(true);
+  });
+
+  skipIfNoDb('GET /api/leads supports search', async () => {
+    const res = await server.inject({ method: 'GET', url: '/api/leads?search=TechFlow' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.items.some((l: { companyName: string }) => l.companyName === 'TechFlow Inc')).toBe(true);
+  });
+
+  skipIfNoDb('GET /api/leads/:id returns full detail', async () => {
+    const list = (await server.inject({ method: 'GET', url: '/api/leads?limit=1' })).json();
+    const id = list.items[0].id;
+    const res = await server.inject({ method: 'GET', url: `/api/leads/${id}` });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.notes).toBeDefined();
+    expect(body.budget).toBeDefined();
+    expect(body.intel).toBeDefined();
+  });
+
+  skipIfNoDb('POST /api/leads creates a lead and writes audit_log', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/leads',
+      payload: {
+        firstName: 'Integration',
+        lastName: 'TestLead',
+        companyName: 'Integration Corp',
+        source: 'website',
+        priority: 'medium',
+        score: 50,
+      },
+    });
+    expect(res.statusCode).toBe(201);
+    const body = res.json();
+    expect(body.id).toBeDefined();
+    expect(body.firstName).toBe('Integration');
+    expect(body.status).toBe('new');
+    createdLeadIds.push(body.id);
+
+    const audit = await prisma.auditLog.findFirst({
+      where: { targetType: 'lead', targetId: body.id, action: 'lead.create' },
+    });
+    expect(audit).toBeTruthy();
+  });
+
+  skipIfNoDb('PATCH /api/leads/:id updates fields', async () => {
+    const createRes = await server.inject({
+      method: 'POST',
+      url: '/api/leads',
+      payload: {
+        firstName: 'Patch',
+        lastName: 'Me',
+        companyName: 'PatchCorp',
+        source: 'referral',
+        priority: 'low',
+        score: 10,
+      },
+    });
+    const id = createRes.json().id;
+    createdLeadIds.push(id);
+
+    const patch = await server.inject({
+      method: 'PATCH',
+      url: `/api/leads/${id}`,
+      payload: { score: 99, status: 'qualified' },
+    });
+    expect(patch.statusCode).toBe(200);
+    expect(patch.json()).toMatchObject({ id, score: 99, status: 'qualified' });
+  });
+
+  skipIfNoDb('POST /api/leads/:id/convert creates opp + contact', async () => {
+    const createRes = await server.inject({
+      method: 'POST',
+      url: '/api/leads',
+      payload: {
+        firstName: 'Convert',
+        lastName: 'Me',
+        companyName: 'ConvertCorp',
+        source: 'event',
+        priority: 'high',
+        score: 80,
+      },
+    });
+    const id = createRes.json().id;
+    createdLeadIds.push(id);
+
+    const convert = await server.inject({
+      method: 'POST',
+      url: `/api/leads/${id}/convert`,
+      payload: { opportunityName: 'Convert Opp', opportunityValueMicros: 1_000_000_000, stage: 's1_lead' },
+    });
+    expect(convert.statusCode).toBe(200);
+    const body = convert.json();
+    expect(body.leadId).toBe(id);
+    expect(body.opportunityId).toBeDefined();
+    expect(body.contactId).toBeDefined();
+
+    // Lead should now be converted
+    const leadRes = await server.inject({ method: 'GET', url: `/api/leads/${id}` });
+    expect(leadRes.json().status).toBe('converted');
+    expect(leadRes.json().convertedToOpportunityId).toBe(body.opportunityId);
+  });
+
+  skipIfNoDb('DELETE /api/leads/:id soft-deletes and returns 404 on get', async () => {
+    const createRes = await server.inject({
+      method: 'POST',
+      url: '/api/leads',
+      payload: {
+        firstName: 'Delete',
+        lastName: 'Me',
+        companyName: 'DeleteCorp',
+        source: 'other',
+        priority: 'low',
+        score: 5,
+      },
+    });
+    const id = createRes.json().id;
+    createdLeadIds.push(id);
+
+    const del = await server.inject({ method: 'DELETE', url: `/api/leads/${id}` });
+    expect(del.statusCode).toBe(204);
+
+    const get = await server.inject({ method: 'GET', url: `/api/leads/${id}` });
+    expect(get.statusCode).toBe(404);
+  });
+
+  skipIfNoDb('PATCH /api/leads/:id returns 404 for unknown id', async () => {
+    const res = await server.inject({
+      method: 'PATCH',
+      url: '/api/leads/11111111-2222-3333-4444-555555555555',
+      payload: { score: 50 },
+    });
+    expect(res.statusCode).toBe(404);
+  });
+});

@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 import {
   prisma,
-  type Prisma,
+  Prisma,
   type OpportunityStage as PrismaStage,
   type LeadStatus,
   type LeadPriority,
@@ -99,6 +99,10 @@ export const leadRoutes: FastifyPluginAsyncZod = async (server) => {
         include: { owner: { select: { name: true } } },
       });
       if (!lead) throw server.httpErrors.notFound('Lead not found');
+      const customFieldValues = await prisma.customFieldValue.findMany({
+        where: { orgId: req.auth.orgId, entityType: 'lead', entityId: lead.id },
+        select: { id: true, definitionId: true, value: true },
+      });
       return {
         id: lead.id,
         firstName: lead.firstName,
@@ -122,6 +126,7 @@ export const leadRoutes: FastifyPluginAsyncZod = async (server) => {
         need: lead.need,
         timeline: lead.timeline,
         intel: lead.intel as Record<string, unknown> | null,
+        customFieldValues,
       };
     },
   );
@@ -260,6 +265,30 @@ export const leadRoutes: FastifyPluginAsyncZod = async (server) => {
           include: { owner: { select: { name: true } } },
         });
       });
+
+      if (body.customFieldValues !== undefined) {
+        for (const { definitionId, value } of body.customFieldValues) {
+          await prisma.customFieldValue.upsert({
+            where: {
+              orgId_entityType_entityId_definitionId: {
+                orgId: req.auth.orgId,
+                entityType: 'lead',
+                entityId: existing.id,
+                definitionId,
+              },
+            },
+            update: { value: value as Prisma.InputJsonValue },
+            create: {
+              orgId: req.auth.orgId,
+              definitionId,
+              entityType: 'lead',
+              entityId: existing.id,
+              value: value as Prisma.InputJsonValue,
+            },
+          });
+        }
+      }
+
       // Fire-and-forget push to Dust on update.
       void pushLeadToDust(updated.id);
 
@@ -329,13 +358,36 @@ export const leadRoutes: FastifyPluginAsyncZod = async (server) => {
 
         // 2. Create Opportunity
         const code = `OP-${Date.now().toString().slice(-4)}`;
+        let pipelineStageId: string | undefined;
+        let stageKey = 's1_lead';
+        if (body.pipelineStageId) {
+          const ps = await tx.pipelineStage.findFirst({
+            where: { id: body.pipelineStageId, orgId: req.auth.orgId, deletedAt: null },
+            select: { key: true },
+          });
+          if (ps) {
+            pipelineStageId = body.pipelineStageId;
+            stageKey = ps.key;
+          }
+        } else {
+          const defaultStage = await tx.pipelineStage.findFirst({
+            where: { orgId: req.auth.orgId, deletedAt: null },
+            orderBy: { orderIndex: 'asc' },
+            select: { id: true, key: true },
+          });
+          if (defaultStage) {
+            pipelineStageId = defaultStage.id;
+            stageKey = defaultStage.key;
+          }
+        }
         const opp = await tx.opportunity.create({
           data: {
             orgId: req.auth.orgId,
             code,
             customer: lead.companyName,
             name: body.opportunityName ?? `${lead.companyName} — ${lead.title ?? 'Opportunity'}`,
-            stage: (body.stage ?? 's1_lead') as PrismaStage,
+            stage: stageKey as 's1_lead',
+            pipelineStageId,
             valueMicros: BigInt(Math.round(body.opportunityValueMicros ?? 0)),
             probability: 20,
             ownerId: lead.ownerId,

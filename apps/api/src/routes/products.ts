@@ -26,6 +26,7 @@ export const productsRoutes: FastifyPluginAsyncZod = async (server) => {
       const rows = await prisma.productCategory.findMany({
         where: { orgId: req.auth.orgId, deletedAt: null },
         orderBy: { name: 'asc' },
+        take: 500,
       });
       return rows.map((r) => ({
         id: r.id,

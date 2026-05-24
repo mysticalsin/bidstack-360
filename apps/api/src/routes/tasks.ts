@@ -1,7 +1,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { prisma } from '@bidstack/db';
+import { prisma, Prisma } from '@bidstack/db';
 import { Task, TaskCreate, TaskFilter, TaskPage, TaskPatch } from '@bidstack/shared';
 
 export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -59,6 +59,10 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
         include: { assignee: true },
       });
       if (!task) throw server.httpErrors.notFound('Task not found');
+      const customFieldValues = await prisma.customFieldValue.findMany({
+        where: { orgId: req.auth.orgId, entityType: 'task', entityId: task.id },
+        select: { id: true, definitionId: true, value: true },
+      });
       return {
         id: task.id,
         oppId: task.oppId,
@@ -67,6 +71,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
         status: task.status,
         assignee: task.assignee?.email ?? null,
         createdAt: task.createdAt.toISOString(),
+        customFieldValues,
       };
     },
   );
@@ -180,6 +185,30 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
           diff: req.body as object,
         },
       });
+
+      if (req.body.customFieldValues !== undefined) {
+        for (const { definitionId, value } of req.body.customFieldValues) {
+          await prisma.customFieldValue.upsert({
+            where: {
+              orgId_entityType_entityId_definitionId: {
+                orgId: req.auth.orgId,
+                entityType: 'task',
+                entityId: existing.id,
+                definitionId,
+              },
+            },
+            update: { value: value as Prisma.InputJsonValue },
+            create: {
+              orgId: req.auth.orgId,
+              definitionId,
+              entityType: 'task',
+              entityId: existing.id,
+              value: value as Prisma.InputJsonValue,
+            },
+          });
+        }
+      }
+
       return {
         id: updated.id,
         oppId: updated.oppId,

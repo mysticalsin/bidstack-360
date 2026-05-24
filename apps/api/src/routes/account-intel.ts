@@ -19,10 +19,12 @@ export const accountIntelRoutes: FastifyPluginAsyncZod = async (server) => {
         prisma.accountSolution.findMany({
           where: { orgId: req.auth.orgId, accountId: req.params.accountId, deletedAt: null },
           orderBy: { updatedAt: 'desc' },
+          take: 500,
         }),
         prisma.accountProduct.findMany({
           where: { orgId: req.auth.orgId, accountId: req.params.accountId, deletedAt: null },
           orderBy: { updatedAt: 'desc' },
+          take: 500,
         }),
         prisma.documentExtraction.findMany({
           where: { orgId: req.auth.orgId, accountId: req.params.accountId, deletedAt: null },

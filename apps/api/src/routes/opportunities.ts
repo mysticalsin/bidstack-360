@@ -15,27 +15,11 @@ import {
   OpportunityImportResult,
   OpportunityPage,
   OpportunityPatch,
-  OpportunityStage,
 } from '@bidstack/shared';
 
 import { serializeOpportunity, serializeOpportunityFull } from '../serializers/opportunity.js';
 
-/** Allowed stage transitions. Any stage not listed as a key is unrestricted. */
-const STAGE_TRANSITIONS: Record<string, string[]> = {
-  s1_lead: ['s1_ongoing', 's2_sent', 's3_technical_iteration', 's4_negotiation', 'closed_lost'],
-  s1_ongoing: ['s2_sent', 's3_technical_iteration', 's4_negotiation', 'closed_lost'],
-  s2_sent: ['s3_technical_iteration', 's4_negotiation', 'closed_lost'],
-  s3_technical_iteration: ['s4_negotiation', 'closed_lost'],
-  s4_negotiation: ['closed_won', 'closed_lost'],
-  closed_won: ['s1_ongoing'], // reopen
-  closed_lost: ['s1_ongoing'], // reopen
-};
 
-function isValidStageTransition(from: string, to: string): boolean {
-  const allowed = STAGE_TRANSITIONS[from];
-  if (!allowed) return true; // unrestricted
-  return allowed.includes(to);
-}
 
 export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
   // GET /api/opportunities
@@ -48,12 +32,12 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const { stage, owner, industry, search, cursor, limit } = req.query;
+      const { pipelineStageId, owner, industry, search, cursor, limit } = req.query;
       const items = await prisma.opportunity.findMany({
         where: {
           orgId: req.auth.orgId,
           deletedAt: null,
-          ...(stage ? { stage: stage as PrismaStage } : {}),
+          ...(pipelineStageId ? { pipelineStageId } : {}),
           ...(industry ? { industry } : {}),
           ...(owner ? { owner: { email: owner } } : {}),
           ...(search
@@ -69,6 +53,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         include: {
           owner: { select: { id: true, name: true, email: true } },
           territory: { select: { name: true } },
+          pipelineStage: { select: { id: true, name: true, probability: true, color: true, isWon: true, isLost: true } },
           _count: { select: { tasks: true } },
         },
         orderBy: { updatedAt: 'desc' },
@@ -109,18 +94,18 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       schema: {
         querystring: z.object({
-          stage: OpportunityStage.optional(),
+          pipelineStageId: z.string().uuid().optional(),
           excludeClosed: z.coerce.boolean().optional(),
         }),
         response: { 200: z.object({ count: z.number().int() }) },
       },
     },
     async (req) => {
-      const { stage, excludeClosed } = req.query;
+      const { pipelineStageId, excludeClosed } = req.query;
       const count = await prisma.opportunity.count({
         where: {
           orgId: req.auth.orgId,
-          ...(stage ? { stage: stage as PrismaStage } : {}),
+          ...(pipelineStageId ? { pipelineStageId } : {}),
           ...(excludeClosed
             ? { stage: { notIn: ['closed_won', 'closed_lost'] as PrismaStage[] } }
             : {}),
@@ -169,6 +154,28 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         if (territory) territoryId = territory.id;
       }
 
+      // Resolve pipeline stage — validate provided or look up default.
+      let pipelineStageId = body.pipelineStageId;
+      let stageKey: PrismaStage = 's1_lead';
+      if (pipelineStageId) {
+        const ps = await prisma.pipelineStage.findFirst({
+          where: { id: pipelineStageId, orgId: req.auth.orgId, deletedAt: null },
+          select: { key: true },
+        });
+        if (!ps) throw server.httpErrors.badRequest('Invalid pipeline stage');
+        stageKey = ps.key as PrismaStage;
+      } else {
+        const defaultStage = await prisma.pipelineStage.findFirst({
+          where: { orgId: req.auth.orgId, deletedAt: null },
+          orderBy: { orderIndex: 'asc' },
+          select: { id: true, key: true },
+        });
+        if (defaultStage) {
+          pipelineStageId = defaultStage.id;
+          stageKey = defaultStage.key as PrismaStage;
+        }
+      }
+
       // Mint code + create + audit atomically; retry on Q-NNNN unique
       // collision with bounded attempts (mirrors sales-orders pattern).
       let createdId: string | null = null;
@@ -182,7 +189,8 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
                 code,
                 customer: body.customer,
                 name: body.name,
-                stage: body.stage as PrismaStage,
+                stage: stageKey,
+                pipelineStageId,
                 valueMicros: BigInt(Math.round(body.value * 1_000_000)),
                 probability: body.probability,
                 dueDate: body.dueDate ? new Date(body.dueDate) : null,
@@ -205,7 +213,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
                   code,
                   customer: body.customer,
                   name: body.name,
-                  stage: body.stage,
+                  pipelineStageId,
                   country: body.country,
                   territoryId,
                 },
@@ -226,7 +234,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       // is org-scoped and we don't want to break that invariant.
       const created = await prisma.opportunity.findFirstOrThrow({
         where: { id: createdId, orgId: req.auth.orgId },
-        include: { owner: true, territory: { select: { name: true } } },
+        include: { owner: true, territory: { select: { name: true } }, pipelineStage: { select: { id: true, name: true, probability: true, color: true, isWon: true, isLost: true } } },
       });
       return reply.code(201).send(serializeOpportunity(created));
     },
@@ -247,6 +255,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         include: {
           owner: true,
           territory: { select: { name: true } },
+          pipelineStage: { select: { id: true, name: true, probability: true, color: true, isWon: true, isLost: true } },
           tasks: { orderBy: { createdAt: 'desc' }, take: 50 },
           documents: { orderBy: { createdAt: 'desc' }, take: 50 },
         },
@@ -258,7 +267,11 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: opp.id },
         data: { viewCount: { increment: 1 } },
       });
-      return serializeOpportunityFull(opp);
+      const customFieldValues = await prisma.customFieldValue.findMany({
+        where: { orgId: req.auth.orgId, entityType: 'opportunity', entityId: opp.id },
+        select: { id: true, definitionId: true, value: true },
+      });
+      return { ...serializeOpportunityFull(opp), customFieldValues };
     },
   );
 
@@ -298,13 +311,31 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         territoryId = territory?.id ?? null;
       }
 
+      // Resolve pipeline stage change — validate and sync legacy enum.
+      let stageUpdate: PrismaStage | undefined;
+      if (req.body.pipelineStageId !== undefined) {
+        if (req.body.pipelineStageId === null) {
+          // Unsetting pipeline stage is allowed; keep legacy stage unchanged.
+        } else {
+          const ps = await prisma.pipelineStage.findFirst({
+            where: { id: req.body.pipelineStageId, orgId: req.auth.orgId, deletedAt: null },
+            select: { key: true },
+          });
+          if (!ps) throw server.httpErrors.badRequest('Invalid pipeline stage');
+          stageUpdate = ps.key as PrismaStage;
+        }
+      }
+
       const [updated] = await prisma.$transaction([
         prisma.opportunity.update({
           where: { id: before.id },
           data: {
             ...(req.body.customer ? { customer: req.body.customer } : {}),
             ...(req.body.name ? { name: req.body.name } : {}),
-            ...(req.body.stage ? { stage: req.body.stage as PrismaStage } : {}),
+            ...(stageUpdate ? { stage: stageUpdate } : {}),
+            ...(req.body.pipelineStageId !== undefined
+              ? { pipelineStageId: req.body.pipelineStageId }
+              : {}),
             ...(req.body.value !== undefined
               ? { valueMicros: BigInt(Math.round(req.body.value * 1_000_000)) }
               : {}),
@@ -329,7 +360,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
                 ? { ownerId: null }
                 : {}),
           },
-          include: { owner: true, territory: { select: { name: true } } },
+          include: { owner: true, territory: { select: { name: true } }, pipelineStage: { select: { id: true, name: true, probability: true, color: true, isWon: true, isLost: true } } },
         }),
         prisma.auditLog.create({
           data: {
@@ -342,6 +373,29 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
           },
         }),
       ]);
+
+      if (req.body.customFieldValues !== undefined) {
+        for (const { definitionId, value } of req.body.customFieldValues) {
+          await prisma.customFieldValue.upsert({
+            where: {
+              orgId_entityType_entityId_definitionId: {
+                orgId: req.auth.orgId,
+                entityType: 'opportunity',
+                entityId: before.id,
+                definitionId,
+              },
+            },
+            update: { value: value as Prisma.InputJsonValue },
+            create: {
+              orgId: req.auth.orgId,
+              definitionId,
+              entityType: 'opportunity',
+              entityId: before.id,
+              value: value as Prisma.InputJsonValue,
+            },
+          });
+        }
+      }
 
       // Fire-and-forget push to Dust on any field update.
       void pushOpportunityToDust(updated.id);
@@ -363,7 +417,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req, reply) => {
       const opp = await prisma.opportunity.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
-        select: { id: true, code: true, customer: true, name: true, stage: true },
+        select: { id: true, code: true, customer: true, name: true, pipelineStageId: true },
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
 
@@ -382,7 +436,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
               code: opp.code,
               customer: opp.customer,
               name: opp.name,
-              stage: opp.stage,
+              pipelineStageId: opp.pipelineStageId,
             },
           },
         }),
@@ -399,9 +453,9 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       schema: {
         params: z.object({ id: z.string().uuid() }),
-        body: z.object({ stage: OpportunityStage }),
+        body: z.object({ pipelineStageId: z.string().uuid() }),
         response: {
-          200: z.object({ id: z.string().uuid(), stage: OpportunityStage }),
+          200: z.object({ id: z.string().uuid(), pipelineStageId: z.string().uuid() }),
         },
       },
     },
@@ -411,18 +465,16 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
 
-      const fromStage = opp.stage;
-      const toStage = req.body.stage;
-      if (!isValidStageTransition(fromStage, toStage)) {
-        throw server.httpErrors.badRequest(
-          `Invalid stage transition: ${fromStage} → ${toStage}. Allowed: ${STAGE_TRANSITIONS[fromStage]?.join(', ') ?? 'any'}`,
-        );
-      }
+      const toStage = await prisma.pipelineStage.findFirst({
+        where: { id: req.body.pipelineStageId, orgId: req.auth.orgId, deletedAt: null },
+      });
+      if (!toStage) throw server.httpErrors.badRequest('Invalid pipeline stage');
 
+      // Any stage can move to any stage within the same pipeline for now.
       const [updated] = await prisma.$transaction([
         prisma.opportunity.update({
           where: { id: opp.id },
-          data: { stage: toStage as PrismaStage },
+          data: { pipelineStageId: toStage.id, stage: toStage.key as PrismaStage },
         }),
         prisma.auditLog.create({
           data: {
@@ -431,13 +483,13 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
             action: 'opportunity.stage',
             targetType: 'opportunity',
             targetId: opp.id,
-            diff: { from: fromStage, to: toStage },
+            diff: { fromPipelineStageId: opp.pipelineStageId, toPipelineStageId: toStage.id },
           },
         }),
       ]);
       // Fire-and-forget push to Dust on stage change.
       void pushOpportunityToDust(updated.id);
-      return { id: updated.id, stage: updated.stage as z.infer<typeof OpportunityStage> };
+      return { id: updated.id, pipelineStageId: updated.pipelineStageId ?? toStage.id };
     },
   );
 
@@ -489,6 +541,31 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
             if (territory) territoryId = territory.id;
           }
 
+          // Resolve pipeline stage — validate provided or look up default.
+          let pipelineStageId = row.pipelineStageId;
+          let stageKey: PrismaStage = 's1_lead';
+          if (pipelineStageId) {
+            const ps = await prisma.pipelineStage.findFirst({
+              where: { id: pipelineStageId, orgId: req.auth.orgId, deletedAt: null },
+              select: { key: true },
+            });
+            if (!ps) {
+              errors.push({ index: i, message: `Invalid pipeline stage: ${pipelineStageId}` });
+              continue;
+            }
+            stageKey = ps.key as PrismaStage;
+          } else {
+            const defaultStage = await prisma.pipelineStage.findFirst({
+              where: { orgId: req.auth.orgId, deletedAt: null },
+              orderBy: { orderIndex: 'asc' },
+              select: { id: true, key: true },
+            });
+            if (defaultStage) {
+              pipelineStageId = defaultStage.id;
+              stageKey = defaultStage.key as PrismaStage;
+            }
+          }
+
           let createdId: string | null = null;
           for (let attempt = 0; attempt < 5 && !createdId; attempt += 1) {
             try {
@@ -500,7 +577,8 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
                     code,
                     customer: row.customer,
                     name: row.name,
-                    stage: row.stage as PrismaStage,
+                    stage: stageKey,
+                    pipelineStageId,
                     valueMicros: BigInt(Math.round(row.value * 1_000_000)),
                     probability: row.probability,
                     dueDate: row.dueDate ? new Date(row.dueDate) : null,
@@ -523,7 +601,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
                       code,
                       customer: row.customer,
                       name: row.name,
-                      stage: row.stage,
+                      pipelineStageId,
                       source: 'import',
                     },
                   },
@@ -566,13 +644,14 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const opp = await prisma.opportunity.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        include: { pipelineStage: { select: { name: true } } },
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
 
       const brief = `# Exec brief — ${opp.customer}
 
 **Opportunity:** ${opp.name} (${opp.code})
-**Stage:** ${opp.stage}  ·  **Value:** €${(Number(opp.valueMicros) / 1_000_000).toString()}  ·  **Probability:** ${opp.probability}%
+**Stage:** ${opp.pipelineStage?.name ?? opp.stage}  ·  **Value:** €${(Number(opp.valueMicros) / 1_000_000).toString()}  ·  **Probability:** ${opp.probability}%
 
 > Stub brief generated locally. Set \`DUST_API_KEY\` and \`DUST_AGENT_EXEC_BRIEF\` to enable the live agent path.
 `;

@@ -276,6 +276,7 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
       const keys = await prisma.apiKey.findMany({
         where: { orgId: req.auth.orgId, revokedAt: null },
         orderBy: { createdAt: 'desc' },
+        take: 500,
       });
       return {
         items: keys.map((k) => ({

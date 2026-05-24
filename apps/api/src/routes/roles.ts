@@ -37,6 +37,7 @@ export const roleRoutes: FastifyPluginAsyncZod = async (server) => {
           },
         },
         orderBy: { createdAt: 'asc' },
+        take: 500,
       });
       return {
         items: roles.map((r) => ({
@@ -62,6 +63,7 @@ export const roleRoutes: FastifyPluginAsyncZod = async (server) => {
     async () => {
       const permissions = await prisma.permission.findMany({
         orderBy: { name: 'asc' },
+        take: 500,
       });
       return {
         items: permissions.map((p) => ({
@@ -95,12 +97,20 @@ export const roleRoutes: FastifyPluginAsyncZod = async (server) => {
           orgId: req.auth.orgId,
           name: req.body.name,
           description: req.body.description ?? null,
-          permissions: {
-            create: req.body.permissionIds.map((pid) => ({
-              permission: { connect: { id: pid } },
-            })),
-          },
         },
+      });
+      if (req.body.permissionIds.length > 0) {
+        await prisma.rolePermission.createMany({
+          data: req.body.permissionIds.map((pid) => ({
+            roleId: role.id,
+            permissionId: pid,
+            orgId: req.auth.orgId,
+          })),
+          skipDuplicates: true,
+        });
+      }
+      const roleWithPerms = await prisma.role.findFirstOrThrow({
+        where: { id: role.id, orgId: req.auth.orgId, deletedAt: null },
         include: {
           permissions: {
             include: { permission: { select: { id: true, key: true, name: true } } },
@@ -109,12 +119,12 @@ export const roleRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       reply.status(201);
       return {
-        id: role.id,
-        name: role.name,
-        description: role.description,
-        isSystem: role.isSystem,
-        createdAt: role.createdAt.toISOString(),
-        permissions: role.permissions.map((rp) => rp.permission),
+        id: roleWithPerms.id,
+        name: roleWithPerms.name,
+        description: roleWithPerms.description,
+        isSystem: roleWithPerms.isSystem,
+        createdAt: roleWithPerms.createdAt.toISOString(),
+        permissions: roleWithPerms.permissions.map((rp) => rp.permission),
       };
     },
   );
@@ -167,7 +177,9 @@ export const roleRoutes: FastifyPluginAsyncZod = async (server) => {
             data: req.body.permissionIds.map((pid) => ({
               roleId: req.params.id,
               permissionId: pid,
+              orgId: req.auth.orgId,
             })),
+            skipDuplicates: true,
           });
         }
       }

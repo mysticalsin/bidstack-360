@@ -14,6 +14,7 @@ import { authPlugin } from './plugins/auth.js';
 import { cacheHeadersPlugin } from './plugins/cache-headers.js';
 import { errorHandlerPlugin } from './plugins/error-handler.js';
 import { idempotencyPlugin } from './plugins/idempotency.js';
+import { queryGuardPlugin } from './plugins/query-guard.js';
 import { redisCachePlugin } from './plugins/redis-cache.js';
 import { config } from './config.js';
 import { rbacPlugin } from './plugins/rbac.js';
@@ -64,6 +65,8 @@ import { bidScoreRoutes } from './routes/bid-scores.js';
 import { proposalRoutes } from './routes/proposals.js';
 import { activityRoutes } from './routes/activities.js';
 import { bidWorkspaceRoutes } from './routes/bid-workspace.js';
+import { calendarRoutes } from './routes/calendar.js';
+import { bookingsRoutes } from './routes/bookings.js';
 
 const CONNECT_SRC = [
   "'self'",
@@ -203,6 +206,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(rbacPlugin);
   await server.register(idempotencyPlugin);
   await server.register(cacheHeadersPlugin);
+  await server.register(queryGuardPlugin);
   await server.register(redisCachePlugin);
   await server.register(healthRoute);
   if (config.NODE_ENV !== 'test') {
@@ -274,6 +278,13 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(activityRoutes, { prefix: '/api/v1' });
   await server.register(bidWorkspaceRoutes, { prefix: '/api/v1' });
   await server.register(exchangeRatesRoutes, { prefix: '/api/v1' });
+  // Wave 3 — calendar + booking
+  await server.register(calendarRoutes, { prefix: '/api/v1' });
+  // Public booking routes skip auth middleware — register without /api/v1 prefix
+  // so /book/:slug resolves cleanly for the public page
+  await server.register(bookingsRoutes, { prefix: '/api/v1' });
+  // Public booking page route (no auth): /book/:slug — served by the frontend SPA.
+  // The API backing it is /api/v1/booking-pages/:slug/availability (above).
 
   return server;
 }

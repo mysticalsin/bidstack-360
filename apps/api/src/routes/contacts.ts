@@ -6,7 +6,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { prisma, type Sentiment as PrismaSentiment } from '@bidstack/db';
+import { prisma, Prisma, type Sentiment as PrismaSentiment } from '@bidstack/db';
 import { Contact, ContactCreate, ContactFilter, ContactPage, ContactPatch } from '@bidstack/shared';
 
 function serializeContact(c: {
@@ -84,7 +84,11 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!contact) throw req.server.httpErrors.notFound('Contact not found');
-      return serializeContact(contact);
+      const customFieldValues = await prisma.customFieldValue.findMany({
+        where: { orgId: req.auth.orgId, entityType: 'contact', entityId: contact.id },
+        select: { id: true, definitionId: true, value: true },
+      });
+      return { ...serializeContact(contact), customFieldValues };
     },
   );
 
@@ -172,6 +176,30 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
         });
         return contact;
       });
+
+      if (req.body.customFieldValues !== undefined) {
+        for (const { definitionId, value } of req.body.customFieldValues) {
+          await prisma.customFieldValue.upsert({
+            where: {
+              orgId_entityType_entityId_definitionId: {
+                orgId: req.auth.orgId,
+                entityType: 'contact',
+                entityId: existing.id,
+                definitionId,
+              },
+            },
+            update: { value: value as Prisma.InputJsonValue },
+            create: {
+              orgId: req.auth.orgId,
+              definitionId,
+              entityType: 'contact',
+              entityId: existing.id,
+              value: value as Prisma.InputJsonValue,
+            },
+          });
+        }
+      }
+
       return serializeContact(updated);
     },
   );

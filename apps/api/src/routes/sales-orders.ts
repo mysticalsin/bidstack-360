@@ -164,6 +164,7 @@ export const salesOrdersRoutes: FastifyPluginAsyncZod = async (server) => {
           deletedAt: null,
         },
         include: { category: { select: { name: true } } },
+        take: productIds.length || 1,
       });
       if (products.length !== new Set(productIds).size) {
         throw server.httpErrors.badRequest(

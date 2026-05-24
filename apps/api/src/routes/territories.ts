@@ -240,6 +240,7 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { orgId: req.auth.orgId, active: true },
         include: { owner: { select: { name: true } } },
         orderBy: { name: 'asc' },
+        take: 500,
       });
       return {
         items: rows.map((r) => ({
@@ -371,6 +372,7 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
       const rows = await prisma.leadRoutingRule.findMany({
         where: { orgId: req.auth.orgId, active: true },
         orderBy: { priority: 'desc' },
+        take: 500,
       });
       return {
         items: rows.map((r) => ({
@@ -534,6 +536,7 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
       const rules = await prisma.leadRoutingRule.findMany({
         where: { orgId: req.auth.orgId, active: true },
         orderBy: { priority: 'desc' },
+        take: 500,
       });
       for (const rule of rules) {
         const criteria = rule.criteria as Record<string, unknown>;
@@ -587,6 +590,7 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
         },
         include: { owner: { select: { name: true } } },
         orderBy: { period: 'desc' },
+        take: 500,
       });
       return {
         items: rows.map((r) => ({
@@ -705,6 +709,7 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
           owner: { select: { name: true } },
           territory: { select: { name: true, countryCodes: true } },
         },
+        take: 1000,
       });
 
       const byCountry = new Map<

@@ -2,51 +2,8 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma, type Prisma } from '@bidstack/db';
-import { Company, CompanyCreate, CompanyDetail, CompanyPatch } from '@bidstack/shared';
-
-function serializeCompany(c: {
-  id: string;
-  orgId: string;
-  name: string;
-  legalName: string | null;
-  domain: string | null;
-  industry: string | null;
-  employeeCount: number | null;
-  countryCode: string | null;
-  address: unknown;
-  billingEmail: string | null;
-  taxId: string | null;
-  logoUrl: string | null;
-  website: string | null;
-  source: string;
-  confidence: number;
-  enrichedAt: Date | null;
-  tier: string;
-  createdAt: Date;
-  updatedAt: Date;
-}): z.infer<typeof Company> {
-  return {
-    id: c.id,
-    orgId: c.orgId,
-    name: c.name,
-    legalName: c.legalName,
-    domain: c.domain,
-    industry: c.industry,
-    employeeCount: c.employeeCount,
-    countryCode: c.countryCode,
-    address: c.address as Record<string, unknown> | null,
-    billingEmail: c.billingEmail,
-    taxId: c.taxId,
-    logoUrl: c.logoUrl,
-    website: c.website,
-    source: c.source,
-    confidence: c.confidence,
-    enrichedAt: c.enrichedAt?.toISOString() ?? null,
-    tier: c.tier as 'key' | 'top' | 'standard',
-    createdAt: c.createdAt.toISOString(),
-    updatedAt: c.updatedAt.toISOString(),
-  };
-}
+import { Company, CompanyCreate, CompanyDetail, CompanyPatch, CompanyHierarchy, type CompanyHierarchyNode } from '@bidstack/shared';
+import { serializeCompany, serializeCompanyDetail } from '../serializers/company.js';
 
 export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
@@ -108,6 +65,8 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       const c = await prisma.company.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
         include: {
+          parent: { select: { id: true, name: true } },
+          children: { where: { deletedAt: null }, select: { id: true, name: true } },
           contacts: {
             where: { deletedAt: null },
             select: { id: true, name: true, role: true, email: true, phone: true },
@@ -138,22 +97,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!c) throw server.httpErrors.notFound('Company not found');
 
-      return {
-        ...serializeCompany(c),
-        contacts: c.contacts.map((x) => ({ ...x, email: x.email ?? null, phone: x.phone ?? null })),
-        opportunities: c.opportunities.map((x) => ({
-          ...x,
-          valueMicros: x.valueMicros.toString(),
-          dueDate: x.dueDate?.toISOString() ?? null,
-        })),
-        openCases: c.serviceCases.map((x) => ({ ...x })),
-        notes: c.notes.map((x) => ({
-          id: x.id,
-          title: x.title,
-          authorName: x.author?.name ?? null,
-          createdAt: x.createdAt.toISOString(),
-        })),
-      };
+      return serializeCompanyDetail(c);
     },
   );
 
@@ -168,6 +112,13 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const body = req.body;
+      if (body.parentId) {
+        const parent = await prisma.company.findFirst({
+          where: { id: body.parentId, orgId: req.auth.orgId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!parent) throw server.httpErrors.badRequest('Parent company not found');
+      }
       const c = await prisma.company.create({
         data: {
           name: body.name,
@@ -182,6 +133,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           logoUrl: body.logoUrl,
           website: body.website,
           tier: body.tier,
+          parentId: body.parentId,
           orgId: req.auth.orgId,
           source: 'manual',
           confidence: 1,
@@ -204,6 +156,25 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const patch = req.body;
+      if (patch.parentId !== undefined && patch.parentId !== null) {
+        const parent = await prisma.company.findFirst({
+          where: { id: patch.parentId, orgId: req.auth.orgId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!parent) throw server.httpErrors.badRequest('Parent company not found');
+        // Prevent circular reference
+        let currentId: string | null = patch.parentId;
+        while (currentId) {
+          if (currentId === req.params.id) {
+            throw server.httpErrors.badRequest('Circular reference detected');
+          }
+          const row: { parentId: string | null } | null = await prisma.company.findFirst({
+            where: { id: currentId, orgId: req.auth.orgId, deletedAt: null },
+            select: { parentId: true },
+          });
+          currentId = row?.parentId ?? null;
+        }
+      }
       const updateResult = await prisma.company.updateMany({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
         data: {
@@ -221,13 +192,96 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           ...(patch.logoUrl !== undefined && { logoUrl: patch.logoUrl }),
           ...(patch.website !== undefined && { website: patch.website }),
           ...(patch.tier !== undefined && patch.tier !== null && { tier: patch.tier }),
+          ...(patch.parentId !== undefined && { parentId: patch.parentId }),
         },
       });
       if (updateResult.count === 0) throw server.httpErrors.notFound('Company not found');
+      if (patch.customFieldValues !== undefined) {
+        for (const { definitionId, value } of patch.customFieldValues) {
+          await prisma.customFieldValue.upsert({
+            where: {
+              orgId_entityType_entityId_definitionId: {
+                orgId: req.auth.orgId,
+                entityType: 'company',
+                entityId: req.params.id,
+                definitionId,
+              },
+            },
+            update: { value: value as Prisma.InputJsonValue },
+            create: {
+              orgId: req.auth.orgId,
+              definitionId,
+              entityType: 'company',
+              entityId: req.params.id,
+              value: value as Prisma.InputJsonValue,
+            },
+          });
+        }
+      }
+
       const updated = await prisma.company.findFirstOrThrow({
         where: { id: req.params.id, orgId: req.auth.orgId },
       });
       return serializeCompany(updated);
+    },
+  );
+
+  server.get(
+    '/companies/:id/hierarchy',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: { 200: CompanyHierarchy },
+      },
+    },
+    async (req) => {
+      const root = await prisma.company.findFirst({
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        select: { id: true, name: true, parentId: true },
+      });
+      if (!root) throw server.httpErrors.notFound('Company not found');
+
+      // Build ancestors
+      const ancestors: Array<{ id: string; name: string }> = [];
+      let ancestorId: string | null = root.parentId;
+      while (ancestorId) {
+        const row = await prisma.company.findFirst({
+          where: { id: ancestorId, orgId: req.auth.orgId, deletedAt: null },
+          select: { id: true, name: true, parentId: true },
+        });
+        if (!row) break;
+        ancestors.unshift({ id: row.id, name: row.name });
+        ancestorId = row.parentId;
+      }
+
+      // Build direct children
+      const directChildren = await prisma.company.findMany({
+        where: { parentId: root.id, orgId: req.auth.orgId, deletedAt: null },
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' },
+        take: 500,
+      });
+
+      // Build full tree recursively
+      async function buildTree(
+        id: string,
+        name: string,
+        parentId: string | null,
+      ): Promise<CompanyHierarchyNode> {
+        const kids = await prisma.company.findMany({
+          where: { parentId: id, orgId: req.auth.orgId, deletedAt: null },
+          select: { id: true, name: true },
+          orderBy: { name: 'asc' },
+          take: 500,
+        });
+        const children: CompanyHierarchyNode[] = await Promise.all(
+          kids.map((k): Promise<CompanyHierarchyNode> => buildTree(k.id, k.name, id)),
+        );
+        return { id, name, parentId, children };
+      }
+      const tree = await buildTree(root.id, root.name, root.parentId);
+
+      return { ancestors, directChildren, tree };
     },
   );
 

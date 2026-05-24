@@ -16,6 +16,7 @@ import { z } from 'zod';
 import { prisma, Prisma } from '@bidstack/db';
 import type { InvoiceState as PrismaInvoiceState } from '@bidstack/db';
 import type { PaymentMethod as PrismaPaymentMethod } from '@bidstack/db';
+import type { CustomFieldValueInput } from '@bidstack/shared';
 import {
   INVOICE_STATE_TRANSITIONS,
   ArAgingReport,
@@ -93,6 +94,11 @@ async function loadInvoiceDetail(
     take: 50,
   });
 
+  const customFieldValues = await prisma.customFieldValue.findMany({
+    where: { orgId, entityType: 'invoice', entityId: id },
+    select: { id: true, definitionId: true, value: true },
+  });
+
   const state = invoice.state as z.infer<typeof InvoiceState>;
   const totalMicros = invoice.totalMicros;
   const paidMicros = invoice.paidMicros;
@@ -151,6 +157,7 @@ async function loadInvoiceDetail(
         createdAt: row.at.toISOString(),
       };
     }),
+    customFieldValues,
   };
 }
 
@@ -162,6 +169,9 @@ const InvoiceUpdate = z.object({
   notes: z.string().max(2000).optional().nullable(),
   dueDate: z.string().datetime().optional(),
   lines: z.array(InvoiceCreateLine).min(1).max(100).optional(),
+  customFieldValues: z.array(
+    z.object({ definitionId: z.string().uuid(), value: z.unknown() }),
+  ).optional(),
 });
 
 export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -427,6 +437,29 @@ export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
           },
         }),
       ]);
+
+      if (req.body.customFieldValues !== undefined) {
+        for (const { definitionId, value } of req.body.customFieldValues) {
+          await prisma.customFieldValue.upsert({
+            where: {
+              orgId_entityType_entityId_definitionId: {
+                orgId: req.auth.orgId,
+                entityType: 'invoice',
+                entityId: invoice.id,
+                definitionId,
+              },
+            },
+            update: { value: value as Prisma.InputJsonValue },
+            create: {
+              orgId: req.auth.orgId,
+              definitionId,
+              entityType: 'invoice',
+              entityId: invoice.id,
+              value: value as Prisma.InputJsonValue,
+            },
+          });
+        }
+      }
 
       return loadInvoiceDetail(req.auth.orgId, invoice.id);
     },
@@ -806,6 +839,7 @@ export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
           paidMicros: true,
           dueDate: true,
         },
+        take: 2000,
       });
 
       const BUCKETS = [

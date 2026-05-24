@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { type PrismaClient, type OpportunityStage as PrismaStage } from '@bidstack/db';
+import { type PrismaClient } from '@bidstack/db';
 import {
   type AccountCockpitSnapshot,
   type CrmDashboardSnapshot,
@@ -131,6 +131,7 @@ export async function buildDashboardSnapshot(
           customer: true,
           name: true,
           stage: true,
+          pipelineStageId: true,
           valueMicros: true,
           probability: true,
           dueDate: true,
@@ -139,6 +140,7 @@ export async function buildDashboardSnapshot(
           industry: true,
           logoUrl: true,
           owner: { select: { name: true, email: true } },
+          pipelineStage: { select: { id: true, key: true, name: true, probability: true, color: true, isWon: true, isLost: true } },
         },
         orderBy: { updatedAt: 'desc' },
         take: 100,
@@ -517,7 +519,8 @@ function buildCockpit({
     id: string;
     customer: string;
     name: string;
-    stage: PrismaStage;
+    stage: string;
+    pipelineStage: { key: string; name: string; probability: number | unknown; color: string | null; isWon: boolean; isLost: boolean } | null;
     valueMicros: bigint | number | unknown;
     probability: number;
     dueDate: Date | null;
@@ -562,7 +565,7 @@ function buildCockpit({
 }): z.infer<typeof AccountCockpitSnapshot> {
   const companyOpps = opportunities.filter((opp) => opp.customer === company.name);
   const openDeals = companyOpps.filter(
-    (opp) => opp.stage !== 'closed_won' && opp.stage !== 'closed_lost',
+    (opp) => !opp.pipelineStage?.isWon && !opp.pipelineStage?.isLost,
   );
   const annualRevenue = company.annualRevenueMicros
     ? formatMicrosCompact(company.annualRevenueMicros)
@@ -666,7 +669,8 @@ function serializeDeal(opportunity: {
   id: string;
   customer: string;
   name: string;
-  stage: PrismaStage;
+  stage: string;
+  pipelineStage: { key: string; name: string; probability: number | unknown; color: string | null; isWon: boolean; isLost: boolean } | null;
   valueMicros: bigint | number | unknown;
   probability: number;
   dueDate: Date | null;
@@ -680,7 +684,7 @@ function serializeDeal(opportunity: {
     companyId: normalizeName(opportunity.customer),
     companyName: opportunity.customer,
     name: opportunity.name,
-    stage: mapDealStage(opportunity.stage),
+    stage: mapDealStage(opportunity.pipelineStage?.key ?? opportunity.stage),
     amountMicros: Math.round(Number(opportunity.valueMicros ?? 0)),
     currencyCode: 'EUR',
     probability: opportunity.probability,
@@ -1377,7 +1381,7 @@ function isValidDomain(domain: string) {
   return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(domain);
 }
 
-function mapDealStage(stage: PrismaStage): z.infer<typeof CrmDeal>['stage'] {
+function mapDealStage(stage: string): z.infer<typeof CrmDeal>['stage'] {
   switch (stage) {
     case 's1_lead':
       return 'new';
@@ -1593,6 +1597,7 @@ export async function getCompaniesOnly(
         sourceAttribution: true,
         updatedAt: true,
       },
+      take: 500,
     }),
   ]);
   return buildCompanies(opportunities, enrichments);

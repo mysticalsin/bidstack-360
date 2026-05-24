@@ -52,6 +52,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
       const rows = await prisma.webhookSubscription.findMany({
         where: { orgId: req.auth.orgId, deletedAt: null },
         orderBy: { createdAt: 'desc' },
+        take: 500,
       });
       return rows.map((s) => ({
         id: s.id,

@@ -43,6 +43,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
           active: true,
         },
         orderBy: { orderIndex: 'asc' },
+        take: 500,
       });
       return {
         items: items.map((d) => ({
@@ -220,6 +221,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
           entityId: req.query.entityId,
         },
         include: { definition: true },
+        take: 500,
       });
       return {
         items: items.map((v) => ({
@@ -261,6 +263,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
           entityType: req.query.entityType,
           entityId: { in: ids },
         },
+        take: 500,
       });
       return {
         items: items.map((v) => ({
@@ -301,6 +304,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
           active: true,
         },
         select: { id: true },
+        take: 500,
       });
       const allowedIds = new Set(defs.map((d) => d.id));
 

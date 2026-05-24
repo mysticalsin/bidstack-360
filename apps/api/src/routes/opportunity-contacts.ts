@@ -66,6 +66,7 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
           contact: { select: { id: true, name: true, email: true, phone: true, role: true } },
         },
         orderBy: { isPrimary: 'desc' },
+        take: 500,
       });
       return { items: items.map(serialize) };
     },
