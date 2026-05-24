@@ -134,6 +134,9 @@ model Org {
   customObjectDefs       CustomObjectDef[]
   customObjectRecords    CustomObjectRecord[]
   customObjectRelations  CustomObjectRelation[]
+  // Wave 7 — Twilio SMS
+  smsMessages            SmsMessage[]
+  smsConsents            SmsConsent[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -2865,11 +2868,13 @@ model PipelineStage {
 /// - google_workspace  — Google Calendar
 /// - gmail             — Gmail send+read (gmail.send, gmail.readonly scopes)
 /// - slack             — Slack workspace bot (chat:write, channels:read)
+/// - twilio            — Twilio SMS (accountSid + authToken stored in accessTokenEncrypted as JSON)
 enum IntegrationProvider {
   microsoft_graph
   google_workspace
   gmail
   slack
+  twilio
 
   @@map("integration_provider")
 }
@@ -2912,6 +2917,8 @@ model IntegrationToken {
   user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   // Wave 5 — MS Graph webhook subscriptions (one token → many subscriptions over lifetime)
   graphSubscriptions GraphSubscription[]
+  // Wave 7 — Twilio SMS messages sent via this credential
+  smsMessages        SmsMessage[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -3478,4 +3485,90 @@ model CustomObjectRelation {
   @@unique([orgId, customObjectDefId, relationKey])
   @@index([orgId, customObjectDefId])
   @@map("custom_object_relations")
+}
+
+// ─── Wave 7 — Twilio SMS ──────────────────────────────────────────────────
+
+/// Outbound/inbound message status as reported by Twilio.
+enum SmsStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  UNDELIVERED
+
+  @@map("sms_status")
+}
+
+/// TCPA opt-out source: how the consent record was created.
+enum SmsConsentSource {
+  USER_REQUEST  /// Rep toggled off via UI
+  STOP_KEYWORD  /// Contact replied STOP/UNSUBSCRIBE/END/QUIT
+  MANUAL        /// Admin override
+
+  @@map("sms_consent_source")
+}
+
+/// Polymorphic entity type for SMS → CRM record linkage.
+enum SmsEntityType {
+  CONTACT
+  LEAD
+
+  @@map("sms_entity_type")
+}
+
+/// Every SMS sent or received via Twilio.
+/// Cost is stored in micros (int × 1e6) per BidStack money convention.
+model SmsMessage {
+  id                   String          @id @default(uuid()) @db.Uuid
+  orgId                String          @map("org_id") @db.Uuid
+  userId               String          @map("user_id") @db.Uuid
+  integrationTokenId   String          @map("integration_token_id") @db.Uuid
+  fromNumber           String          @map("from_number") @db.VarChar(32)
+  toNumber             String          @map("to_number") @db.VarChar(32)
+  body                 String          @db.Text
+  status               SmsStatus       @default(QUEUED)
+  /// Twilio message SID (e.g. "SMxxx"). Null until Twilio acknowledges send.
+  twilioSid            String?         @unique @map("twilio_sid") @db.VarChar(64)
+  /// Twilio error code integer. Non-null only on FAILED/UNDELIVERED.
+  errorCode            Int?            @map("error_code")
+  /// Number of 160-char SMS segments consumed.
+  segments             Int             @default(1)
+  /// Cost in micros (USD). Populated from Twilio status callback price field.
+  costMicros           BigInt?         @map("cost_micros")
+  sentAt               DateTime?       @map("sent_at") @db.Timestamptz(6)
+  deliveredAt          DateTime?       @map("delivered_at") @db.Timestamptz(6)
+  /// Polymorphic back-link to the CRM entity this SMS is about.
+  entityType           SmsEntityType?  @map("entity_type")
+  entityId             String?         @map("entity_id") @db.Uuid
+  createdAt            DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org              Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  integrationToken IntegrationToken @relation(fields: [integrationTokenId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, toNumber])
+  @@index([orgId, entityType, entityId])
+  @@index([orgId, status])
+  @@map("sms_messages")
+}
+
+/// Per-phone-number TCPA opt-out record. One row per (org, phoneNumber).
+/// Opted-out contacts MUST NOT receive outbound SMS.
+model SmsConsent {
+  id          String           @id @default(uuid()) @db.Uuid
+  orgId       String           @map("org_id") @db.Uuid
+  phoneNumber String           @map("phone_number") @db.VarChar(32)
+  optedOut    Boolean          @default(false) @map("opted_out")
+  optedOutAt  DateTime?        @map("opted_out_at") @db.Timestamptz(6)
+  source      SmsConsentSource @default(MANUAL)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  /// One consent record per (org, phone). Upserted on each interaction.
+  @@unique([orgId, phoneNumber], map: "sms_consents_org_phone_key")
+  @@index([orgId, optedOut])
+  @@map("sms_consents")
 }
