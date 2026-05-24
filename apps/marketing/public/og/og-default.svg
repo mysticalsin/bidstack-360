@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1B2C7A"/>
+      <stop offset="50%" stop-color="#2C4BFF"/>
+      <stop offset="100%" stop-color="#6E59FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect x="60" y="60" width="64" height="64" rx="14" fill="#ffffff" opacity="0.15"/>
+  <text x="92" y="105" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="36" fill="#fff">B</text>
+  <text x="140" y="105" font-family="Arial, Helvetica, sans-serif" font-weight="600" font-size="28" fill="#fff">BidStack 360°</text>
+  <text x="60" y="320" font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-weight="400" font-size="84" fill="#fff">The CRM built for</text>
+  <text x="60" y="420" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="96" fill="#fff">winning bids.</text>
+  <text x="60" y="560" font-family="Arial, Helvetica, sans-serif" font-weight="400" font-size="28" fill="#ffffff" opacity="0.75">Pipeline · Proposals · AI co-pilots — for teams who live in RFPs.</text>
+</svg>
