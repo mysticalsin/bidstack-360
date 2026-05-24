@@ -59,10 +59,12 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
 
       if (assignedPermissionCount > 0) return;
 
-      // Transitional fallback for seeded/dev accounts while system roles are being
-      // backfilled into UserRole. New route gates should rely on requirePermission.
-      if (req.auth.role === 'admin') return;
-
+      // No claim-based fallback. The previous code allowed `req.auth.role === 'admin'`
+      // through unconditionally, which bypassed every granular check whenever the
+      // UserRole rows had not been backfilled. Admins must hold an explicit UserRole
+      // grant — see docs/adr/0001-rbac-no-claim-fallback.md and the JIT provisioning
+      // in apps/api/src/plugins/auth.ts that ensures Clerk org-admins receive the
+      // seeded "Admin" Role on first sign-in.
       throw req.server.httpErrors.forbidden(`Requires permission: ${permission}`);
     },
   );

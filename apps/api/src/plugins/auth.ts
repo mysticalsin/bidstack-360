@@ -72,6 +72,41 @@ function mapClerkRole(orgRole: string | undefined): string {
   return mapped;
 }
 
+/**
+ * Idempotently assign the seeded `Admin` role to a user. Called on every
+ * sign-in for users whose mapped Clerk role is `admin`, so the rbac plugin's
+ * UserRole-based permission check always has something to find.
+ *
+ * If the org has no `Admin` row yet (fresh tenant that hasn't run the seed),
+ * we log and skip — the operator will need to seed roles before admins can use
+ * permission-gated endpoints. We do NOT auto-create the Role here because the
+ * full Role row also requires its RolePermission mappings, which are managed
+ * centrally in `packages/db/src/seed.ts`.
+ */
+async function ensureAdminRoleGrant(
+  userId: string,
+  orgId: string,
+  req: FastifyRequest,
+): Promise<void> {
+  const adminRole = await prisma.role.findFirst({
+    where: { orgId, name: 'Admin', isSystem: true, deletedAt: null },
+    select: { id: true },
+  });
+  if (!adminRole) {
+    req.log.warn(
+      { orgId, userId },
+      'JIT admin grant skipped: org has no seeded Admin role (run pnpm db:seed)',
+    );
+    return;
+  }
+  // upsert on the composite PK so concurrent sign-ins don't race
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId, roleId: adminRole.id } },
+    create: { userId, roleId: adminRole.id, orgId },
+    update: { deletedAt: null },
+  });
+}
+
 async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
   const secretKey = process.env.CLERK_SECRET_KEY;
   if (!secretKey) {
@@ -183,6 +218,16 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
       },
       update: { name, role: clerkRole },
     });
+
+    // Ensure Clerk org-admins have an explicit `Admin` UserRole grant. The
+    // rbac plugin no longer falls back to the legacy `req.auth.role === 'admin'`
+    // claim, so without this row a freshly-provisioned admin would be 403'd on
+    // every permission gate. We only touch the row when the user is currently
+    // an admin — non-admins keep whatever assignments the operator made via the
+    // /api/roles endpoints.
+    if (clerkRole === 'admin') {
+      await ensureAdminRoleGrant(user.id, org.id, req);
+    }
 
     return {
       orgId: org.id,
