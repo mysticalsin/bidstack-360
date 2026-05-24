@@ -31,6 +31,9 @@ jobs:
           fetch-depth: 0
 
       - name: Run gitleaks
+        # gitleaks-action@v2 is fully env-driven (no CLI args input). The
+        # action invokes `gitleaks detect --redact --verbose --no-banner`
+        # under the hood; we configure behaviour through env vars below.
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -41,11 +44,3 @@ jobs:
           GITLEAKS_NOTIFY_USER_LIST: ''
           GITLEAKS_ENABLE_COMMENTS: 'true'
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: 'true'
-        with:
-          # `--no-banner` is the only literal flag this action forwards;
-          # everything else comes from env vars.
-          args: >-
-            detect
-            --no-banner
-            --redact
-            --verbose
