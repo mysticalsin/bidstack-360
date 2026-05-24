@@ -28,17 +28,15 @@ import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { formatDate, formatStage } from '@/lib/format';
 import { springLayout, springSnap } from '@/lib/motion';
 
-import type { Opportunity, OpportunityStage } from '@bidstack/shared';
+import type { Opportunity } from '@bidstack/shared';
 
-const STAGES: OpportunityStage[] = [
-  's1_lead',
-  's1_ongoing',
-  's2_sent',
-  's3_technical_iteration',
-  's4_negotiation',
-  'closed_won',
-  'closed_lost',
-];
+function getStageId(opp: Opportunity): string {
+  return opp.pipelineStageId ?? 'none';
+}
+
+function getStageName(opp: Opportunity): string {
+  return opp.pipelineStage?.name ?? 'Unknown';
+}
 
 export function PipelinePage() {
   const reduced = useReducedMotion();
@@ -46,69 +44,82 @@ export function PipelinePage() {
   const { formatMoney } = useFormatMoney();
   const { data, isLoading, isError, error } = useOpportunities({ limit: 50 });
   const move = useStageMutation();
-  // Stage filter via the URL. `?stage=qualified` collapses the board to a
+  // Stage filter via the URL. `?pipelineStageId=...` collapses the board to a
   // single column so the user can focus that slice and share the link.
-  // Anything we don't recognize falls back to "all stages visible".
   const [searchParams, setSearchParams] = useSearchParams();
-  const stageFilterRaw = searchParams.get('stage');
-  const stageFilter = STAGES.includes(stageFilterRaw as OpportunityStage)
-    ? (stageFilterRaw as OpportunityStage)
-    : null;
-  const setStageFilter = (next: OpportunityStage | null) => {
+  const stageFilterRaw = searchParams.get('pipelineStageId');
+  const stageFilter = stageFilterRaw ?? null;
+  const setStageFilter = (next: string | null) => {
     const params = new URLSearchParams(searchParams);
-    if (next) params.set('stage', next);
-    else params.delete('stage');
+    if (next) params.set('pipelineStageId', next);
+    else params.delete('pipelineStageId');
     setSearchParams(params, { replace: true });
   };
 
   // Track which opportunity is being dragged + which column is being hovered.
   // Drives drop-target affordances; never sent to the server.
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [hoverStage, setHoverStage] = useState<OpportunityStage | null>(null);
+  const [hoverStageId, setHoverStageId] = useState<string | null>(null);
 
   // Keyboard alternative: focused card + ←/→ moves between stages. Required
   // for a11y — drag-and-drop is unreachable by keyboard alone (WCAG 2.1.1).
   const [focusedId, setFocusedId] = useState<string | null>(null);
 
-  // Group items by stage once per data change so each column doesn't filter
+  // Derive stage columns from the loaded opportunities (sorted by name).
+  const stages = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; color: string | null }>();
+    for (const opp of data?.items ?? []) {
+      if (opp.pipelineStage && !map.has(opp.pipelineStage.id)) {
+        map.set(opp.pipelineStage.id, opp.pipelineStage);
+      }
+    }
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [data?.items]);
+
+  // Group items by pipelineStageId once per data change so each column doesn't filter
   // the whole list on every render.
   const byStage = useMemo(() => {
-    const map = new Map<OpportunityStage, Opportunity[]>();
-    for (const stage of STAGES) map.set(stage, []);
+    const map = new Map<string, Opportunity[]>();
+    for (const stage of stages) map.set(stage.id, []);
+    map.set('none', []);
     for (const opp of data?.items ?? []) {
-      map.get(opp.stage)?.push(opp);
+      const sid = getStageId(opp);
+      const arr = map.get(sid) ?? [];
+      arr.push(opp);
+      map.set(sid, arr);
     }
     return map;
-  }, [data?.items]);
+  }, [data?.items, stages]);
 
   const handleKey = (e: KeyboardEvent<HTMLAnchorElement>, opp: Opportunity) => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-    const idx = STAGES.indexOf(opp.stage);
+    const ids = stages.map((s) => s.id);
+    const idx = ids.indexOf(getStageId(opp));
     const nextIdx = e.key === 'ArrowRight' ? idx + 1 : idx - 1;
-    if (nextIdx < 0 || nextIdx >= STAGES.length) return;
+    if (nextIdx < 0 || nextIdx >= ids.length) return;
     e.preventDefault();
-    const nextStage = STAGES[nextIdx];
-    if (nextStage) {
+    const nextStageId = ids[nextIdx];
+    if (nextStageId) {
       move.mutate(
-        { id: opp.id, stage: nextStage },
+        { id: opp.id, pipelineStageId: nextStageId },
         {
-          onSuccess: () => toast.success(`Moved to ${formatStage(nextStage)}`),
+          onSuccess: () => toast.success(`Moved to ${stages.find((s) => s.id === nextStageId)?.name ?? nextStageId}`),
         },
       );
     }
   };
 
-  const handleDrop = (e: DragEvent<HTMLDivElement>, stage: OpportunityStage) => {
+  const handleDrop = (e: DragEvent<HTMLDivElement>, stageId: string) => {
     e.preventDefault();
-    setHoverStage(null);
+    setHoverStageId(null);
     const id = e.dataTransfer.getData('text/plain');
     if (!id) return;
     const item = data?.items.find((o) => o.id === id);
-    if (!item || item.stage === stage) return;
+    if (!item || getStageId(item) === stageId) return;
     move.mutate(
-      { id, stage },
+      { id, pipelineStageId: stageId },
       {
-        onSuccess: () => toast.success(`Moved "${item.name}" to ${formatStage(stage)}`),
+        onSuccess: () => toast.success(`Moved "${item.name}" to ${getStageName(item)}`),
         onError: (err) =>
           toast.error('Could not move opportunity', {
             description: err instanceof Error ? err.message : 'The server rejected the request.',
@@ -116,6 +127,8 @@ export function PipelinePage() {
       },
     );
   };
+
+  const visibleStages = stageFilter ? stages.filter((s) => s.id === stageFilter) : stages;
 
   return (
     <div className="space-y-6">
@@ -139,13 +152,13 @@ export function PipelinePage() {
             <select
               aria-label="Filter pipeline by stage"
               value={stageFilter ?? ''}
-              onChange={(e) => setStageFilter((e.target.value as OpportunityStage) || null)}
+              onChange={(e) => setStageFilter(e.target.value || null)}
               className="rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-1 text-xs text-[var(--fg-primary)]"
             >
               <option value="">All</option>
-              {STAGES.map((s) => (
-                <option key={s} value={s}>
-                  {formatStage(s)}
+              {stages.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
                 </option>
               ))}
             </select>
@@ -163,16 +176,16 @@ export function PipelinePage() {
       </header>
 
       {!isLoading && data && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-tour="pipeline-kanban">
           {(() => {
             const opps = data.items;
             const totalValue = opps.reduce((acc, o) => acc + o.value, 0);
             const openOpps = opps.filter(
-              (o) => o.stage !== 'closed_won' && o.stage !== 'closed_lost',
+              (o) => o.pipelineStage?.name !== 'Closed Won' && o.pipelineStage?.name !== 'Closed Lost',
             );
             const openValue = openOpps.reduce((acc, o) => acc + o.value, 0);
-            const closedWon = opps.filter((o) => o.stage === 'closed_won').length;
-            const closedLost = opps.filter((o) => o.stage === 'closed_lost').length;
+            const closedWon = opps.filter((o) => o.pipelineStage?.name === 'Closed Won').length;
+            const closedLost = opps.filter((o) => o.pipelineStage?.name === 'Closed Lost').length;
             const closedTotal = closedWon + closedLost;
             const winRate =
               closedTotal > 0
@@ -229,32 +242,34 @@ export function PipelinePage() {
           className={
             // When filtered to one stage, collapse to a single column so it
             // dominates the screen — the "focus mode" affordance. Otherwise
-            // keep the 6-column funnel.
+            // keep the columns flowing.
             stageFilter
               ? 'grid gap-3 grid-cols-1'
               : 'grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-7'
           }
         >
-          {(stageFilter ? [stageFilter] : STAGES).map((stage) => {
-            const stageIdx = STAGES.indexOf(stage);
-            const items = byStage.get(stage) ?? [];
+          {visibleStages.map((stage) => {
+            const stageIdx = stages.findIndex((s) => s.id === stage.id);
+            const items = byStage.get(stage.id) ?? [];
             const total = items.reduce((acc, o) => acc + o.value, 0);
-            const isHover = hoverStage === stage;
+            const isHover = hoverStageId === stage.id;
             // Funnel ratio: how many opps advanced past this stage into any
             // later one. We exclude closed_lost from the "advanced" pool so
             // it isn't counted as forward progress — losses are terminal.
             // The closed_* stages themselves get no chip (no "next" stage).
-            const nextStages = STAGES.slice(stageIdx + 1).filter((s) => s !== 'closed_lost');
-            const advanced = nextStages.reduce((acc, s) => acc + (byStage.get(s)?.length ?? 0), 0);
+            const nextStages = stages.slice(stageIdx + 1).filter((s) => s.name !== 'Closed Lost');
+            const advanced = nextStages.reduce((acc, s) => acc + (byStage.get(s.id)?.length ?? 0), 0);
             const totalReached = items.length + advanced;
             const conversion =
-              stage === 'closed_won' || stage === 'closed_lost' || totalReached === 0
+              stage.name === 'Closed Won' || stage.name === 'Closed Lost' || totalReached === 0
                 ? null
                 : Math.round((advanced / totalReached) * 100);
             return (
               <StageColumn
-                key={stage}
-                stage={stage}
+                key={stage.id}
+                stageId={stage.id}
+                stageName={stage.name}
+                stageColor={stage.color}
                 items={items}
                 total={total}
                 conversion={conversion}
@@ -263,14 +278,14 @@ export function PipelinePage() {
                 focusedId={focusedId}
                 onDragOver={(e) => {
                   e.preventDefault();
-                  setHoverStage(stage);
+                  setHoverStageId(stage.id);
                 }}
-                onDragLeave={() => setHoverStage(null)}
-                onDrop={(e) => handleDrop(e, stage)}
+                onDragLeave={() => setHoverStageId(null)}
+                onDrop={(e) => handleDrop(e, stage.id)}
                 onCardDragStart={(id) => setDraggingId(id)}
                 onCardDragEnd={() => {
                   setDraggingId(null);
-                  setHoverStage(null);
+                  setHoverStageId(null);
                 }}
                 onCardFocus={(id) => setFocusedId(id)}
                 onCardBlur={(id) => setFocusedId((f) => (f === id ? null : f))}
@@ -288,7 +303,9 @@ export function PipelinePage() {
 // re-render the other 5 columns — only the source/destination columns
 // actually change.
 const StageColumn = memo(function StageColumn({
-  stage,
+  stageId,
+  stageName,
+  stageColor,
   items,
   total,
   conversion,
@@ -304,7 +321,9 @@ const StageColumn = memo(function StageColumn({
   onCardBlur,
   onCardKey,
 }: {
-  stage: OpportunityStage;
+  stageId: string;
+  stageName: string;
+  stageColor: string | null;
   items: Opportunity[];
   total: number;
   /** % of opps that have advanced past this stage (excludes closed_lost). */
@@ -323,12 +342,12 @@ const StageColumn = memo(function StageColumn({
 }) {
   return (
     <section
-      aria-label={`${formatStage(stage)} column with ${items.length} opportunities`}
+      aria-label={`${stageName} column with ${items.length} opportunities`}
       className="min-w-0"
     >
       <div className="flex items-center justify-between mb-2 px-1">
         <div className="flex items-center gap-1.5">
-          <Badge tone={stageTone(stage)}>{formatStage(stage)}</Badge>
+          <Badge tone={stageTone(stageName)}>{stageName}</Badge>
           {conversion !== null ? (
             <span
               title={`${conversion}% of opps in this stage or later have advanced past it`}
@@ -425,11 +444,12 @@ const PipelineCard = memo(function PipelineCard({
 }) {
   const reduced = useReducedMotion();
   const { formatMoney } = useFormatMoney();
+  const stageName = getStageName(opp);
   const isStalled =
     opp.dueDate != null &&
     new Date(opp.dueDate) < new Date() &&
-    opp.stage !== 'closed_won' &&
-    opp.stage !== 'closed_lost';
+    stageName !== 'Closed Won' &&
+    stageName !== 'Closed Lost';
   return (
     <motion.li
       layout
@@ -456,7 +476,7 @@ const PipelineCard = memo(function PipelineCard({
         onBlur={() => onBlur(opp.id)}
         onKeyDown={(e) => onKey(e, opp)}
         aria-roledescription="draggable opportunity"
-        aria-label={`${opp.code}: ${opp.name}, ${formatStage(opp.stage)}, ${formatMoney(opp.value, 'EUR')}. Use left or right arrows to move stage.`}
+        aria-label={`${opp.code}: ${opp.name}, ${stageName}, ${formatMoney(opp.value, 'EUR')}. Use left or right arrows to move stage.`}
         className={cn(
           'block cursor-grab active:cursor-grabbing rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-3 shadow-[var(--shadow-xs)] transition-shadow hover:shadow-[var(--shadow-sm)]',
           isFocused &&

@@ -33,7 +33,7 @@ export function ReportsPage() {
         </p>
       </header>
 
-      <div className="flex flex-wrap items-center gap-1">
+      <div className="flex flex-wrap items-center gap-1" data-tour="reports-new">
         {TABS.map((t) => (
           <button
             key={t.key}

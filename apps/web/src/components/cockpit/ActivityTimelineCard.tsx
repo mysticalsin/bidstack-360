@@ -74,7 +74,7 @@ export const ActivityTimelineCard = memo(function ActivityTimelineCard({
   }
 
   return (
-    <Card role="region" aria-label="Recent activity">
+    <Card role="region" aria-label="Recent activity" data-tour="activity-timeline">
       <SectionHeader title="Recent activity" caption={`Last ${items.length} items`} />
       <div className="relative px-5 pb-5 pt-3">
         {/* The vertical rail that the dots sit on. Drawn once, sits behind

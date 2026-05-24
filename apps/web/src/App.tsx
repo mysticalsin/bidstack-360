@@ -22,6 +22,9 @@ import { useCommandPalette } from '@/hooks/useCommandPalette';
 import { useGlobalShortcuts } from '@/hooks/useGlobalShortcuts';
 import { usePreferences } from '@/stores/preferences';
 import { useGlobalUndoHotkey } from '@/stores/undoStack';
+import { ProductTour } from '@/components/onboarding/ProductTour';
+import { SampleDataBanner } from '@/components/onboarding/SampleDataBanner';
+import { TemplatePicker } from '@/components/onboarding/TemplatePicker';
 
 const DashboardPage = lazy(() =>
   import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })),
@@ -122,6 +125,9 @@ const ForecastsPage = lazy(() =>
 );
 
 const LoginPage = lazy(() => import('@/pages/LoginPage').then((m) => ({ default: m.LoginPage })));
+const QuickStartPage = lazy(() =>
+  import('@/pages/QuickStartPage').then((m) => ({ default: m.QuickStartPage })),
+);
 
 const SsoCallbackPage = lazy(() =>
   import('@clerk/clerk-react').then((m) => ({
@@ -454,6 +460,14 @@ function AnimatedRoutes() {
           />
           <Route path="/sso-callback" element={<SsoCallbackPage />} />
           <Route
+            path="/quick-start"
+            element={
+              <RequireAuth>
+                <QuickStartPage />
+              </RequireAuth>
+            }
+          />
+          <Route
             path="*"
             element={
               <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
@@ -523,6 +537,10 @@ export function App() {
           <ConfettiHost />
           <LiveAnnouncer />
           <WebVitalsHud />
+          {/* Onboarding — tour overlay, sample data banner, template picker */}
+          <ProductTour />
+          <SampleDataBanner />
+          <TemplatePicker />
         </AppShell>
       )}
     </MotionConfig>

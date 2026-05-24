@@ -92,6 +92,7 @@ export function Sidebar() {
       <nav
         className={cn('sidebar', collapsed && 'is-collapsed')}
         aria-label="Primary navigation"
+        data-tour="nav-sidebar"
         style={{ position: 'relative' }}
       >
         <button

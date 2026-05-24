@@ -12,6 +12,7 @@ import { useRecentSearches } from '@/stores/recentSearches';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useMentions, useMarkMentionRead } from '@/hooks/useMentions';
 import { useUiStore } from '@/stores/ui';
+import { useOnboardingStore } from '@/stores/onboarding';
 import { CurrencySelector } from './CurrencySelector';
 
 // Breadcrumb labels by first-path segment. Nested routes inherit their parent.
@@ -68,6 +69,7 @@ export function Topbar() {
   const openHelp = useHelpDrawer((s) => s.setOpen);
   const mobileNavOpen = useUiStore((s) => s.mobileNavOpen);
   const toggleMobileNav = useUiStore((s) => s.toggleMobileNav);
+  const startTour = useOnboardingStore((s) => s.startTour);
 
   const seed = user?.fullName || user?.primaryEmailAddress?.emailAddress || 'Guest';
 
@@ -151,6 +153,17 @@ export function Topbar() {
             {user?.primaryEmailAddress?.emailAddress ?? 'Not signed in'}
           </div>
         </div>
+        <Tooltip content="Take the product tour">
+          <button
+            type="button"
+            onClick={startTour}
+            className="tb-signout"
+            aria-label="Take product tour"
+            title="Take product tour"
+          >
+            <Icon name="play" size={14} ariaHidden />
+          </button>
+        </Tooltip>
         <button
           type="button"
           onClick={() => signOut(() => navigate('/login'))}

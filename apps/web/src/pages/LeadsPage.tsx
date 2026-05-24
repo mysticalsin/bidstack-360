@@ -182,7 +182,7 @@ export function LeadsPage() {
             <Icon name="download" size={14} />
             Export CSV
           </LiquidGlassButton>
-          <LiquidGlassButton onClick={() => nav('/leads/new')} size="sm">
+          <LiquidGlassButton onClick={() => nav('/leads/new')} size="sm" data-tour="leads-page-add">
             <Icon name="plus" size={14} />
             New lead
           </LiquidGlassButton>
