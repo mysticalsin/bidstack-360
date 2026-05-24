@@ -105,6 +105,12 @@ model Org {
   userRoles              UserRole[]
   orgSettings            OrgSettings?
   tenantExports          TenantExport[]
+  // Wave 2 — calendar integration
+  integrationTokens      IntegrationToken[]
+  calendarEvents         CalendarEvent[]
+  // Wave 3 — booking pages
+  bookingPages           BookingPage[]
+  bookings               Booking[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -145,7 +151,12 @@ model User {
   tenantExports     TenantExport[]     @relation("TenantExportRequestedBy")
 
   deletedAt DateTime?  @map("deleted_at") @db.Timestamptz(6)
-  userRoles UserRole[]
+  userRoles         UserRole[]
+  // Wave 2 — calendar integration
+  integrationTokens IntegrationToken[]
+  calendarEvents    CalendarEvent[]
+  // Wave 3 — booking pages
+  bookingPages      BookingPage[]
 
   @@index([orgId])
   @@index([deletedAt])
@@ -184,10 +195,13 @@ model Company {
   keyAccountOwnerId String?     @map("key_account_owner_id") @db.Uuid
   keyAccountNotes   String?     @map("key_account_notes")
   topAccountRank    Int?        @map("top_account_rank")
+  parentId          String?     @map("parent_id") @db.Uuid
   createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   org                 Org                  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  parent              Company?             @relation("CompanyHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children            Company[]            @relation("CompanyHierarchy")
   contacts            Contact[]
   opportunities       Opportunity[]
   notes               Note[]
@@ -2694,4 +2708,194 @@ model PipelineStage {
   @@index([orgId])
   @@index([deletedAt])
   @@map("pipeline_stages")
+}
+
+// ─── Wave 2: Calendar Integration ─────────────────────────────────────────
+
+/// OAuth provider. microsoft_graph covers Outlook Calendar + Teams;
+/// google_workspace covers Google Calendar.
+enum IntegrationProvider {
+  microsoft_graph
+  google_workspace
+
+  @@map("integration_provider")
+}
+
+/// Lifecycle of a stored OAuth grant.
+/// `error` is a transient terminal state for refresh-token failures (5xx from
+/// the provider). Worker retries `error` rows on backoff; `revoked` rows are
+/// never retried — the user must reconnect.
+enum IntegrationTokenStatus {
+  active
+  expired
+  revoked
+  error
+
+  @@map("integration_token_status")
+}
+
+model IntegrationToken {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  orgId                 String                 @map("org_id") @db.Uuid
+  userId                String                 @map("user_id") @db.Uuid
+  provider              IntegrationProvider
+  /// AES-256-GCM ciphertext (base64url) — see packages/shared/src/crypto/token-cipher.ts
+  accessTokenEncrypted  String                 @map("access_token_encrypted")
+  refreshTokenEncrypted String?                @map("refresh_token_encrypted")
+  scope                 String[]               @default([])
+  expiresAt             DateTime?              @map("expires_at") @db.Timestamptz(6)
+  lastRefreshedAt       DateTime?              @map("last_refreshed_at") @db.Timestamptz(6)
+  status                IntegrationTokenStatus @default(active)
+  errorMessage          String?                @map("error_message")
+  externalAccountId     String?                @map("external_account_id")
+  externalAccountEmail  String?                @map("external_account_email")
+  /// Per-resource sync cursors. Shape: { calendarDeltaLink?, calendarSyncToken?, watchChannelId?, watchChannelExpiry? }
+  deltaState            Json                   @default("{}") @map("delta_state")
+  lastSyncedAt          DateTime?              @map("last_synced_at") @db.Timestamptz(6)
+  createdAt             DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  /// One active grant per (org, user, provider). Reconnecting updates the row.
+  @@unique([orgId, userId, provider], map: "integration_tokens_org_user_provider_key")
+  @@index([orgId, provider, status])
+  @@index([orgId])
+  @@index([deletedAt])
+  @@map("integration_tokens")
+}
+
+/// Direction of propagation for a sync operation.
+enum SyncState {
+  PENDING_PUSH    /// Created locally, not yet pushed to provider
+  SYNCED          /// Local and remote are in agreement
+  CONFLICT        /// etag mismatch on push — needs user resolution
+  DELETED_REMOTE  /// Provider deleted the event; pending local soft-delete
+
+  @@map("sync_state")
+}
+
+model CalendarEvent {
+  id                String              @id @default(uuid()) @db.Uuid
+  orgId             String              @map("org_id") @db.Uuid
+  ownerId           String              @map("owner_id") @db.Uuid
+  /// Stable provider id (Graph `id`, Google `id`). Null for locally-created events pre-push.
+  externalId        String?             @map("external_id")
+  provider          IntegrationProvider
+  subject           String
+  bodyPreview       String?             @map("body_preview")
+  startAt           DateTime            @map("start_at") @db.Timestamptz(6)
+  endAt             DateTime            @map("end_at") @db.Timestamptz(6)
+  location          String?
+  isAllDay          Boolean             @default(false) @map("is_all_day")
+  isCancelled       Boolean             @default(false) @map("is_cancelled")
+  /// Attendee list: [{ email, displayName?, responseStatus? }]
+  attendees         Json                @default("[]")
+  organizerEmail    String?             @map("organizer_email")
+  /// CRM linkage — set when the worker maps the event to a known entity.
+  relatedEntityType String?             @map("related_entity_type")
+  relatedEntityId   String?             @map("related_entity_id") @db.Uuid
+  externalUpdatedAt DateTime?           @map("external_updated_at") @db.Timestamptz(6)
+  lastSyncedAt      DateTime?           @map("last_synced_at") @db.Timestamptz(6)
+  /// Provider-side ETag (Google: @odata.etag, Graph: @odata.etag). Used for
+  /// optimistic concurrency: push fails with CONFLICT if etag mismatch.
+  etag              String?
+  syncState         SyncState           @default(SYNCED) @map("sync_state")
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org   Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@unique([provider, externalId], map: "calendar_events_provider_external_key")
+  @@index([orgId, ownerId, startAt])
+  @@index([orgId, startAt])
+  @@index([orgId, syncState])
+  @@index([orgId])
+  @@index([deletedAt])
+  @@map("calendar_events")
+}
+
+// ─── Wave 3: Booking Pages ─────────────────────────────────────────────────
+
+model BookingPage {
+  id                  String   @id @default(uuid()) @db.Uuid
+  orgId               String   @map("org_id") @db.Uuid
+  userId              String   @map("user_id") @db.Uuid
+  /// URL-safe slug, unique within the org. Used in /book/:slug
+  slug                String
+  name                String
+  description         String?
+  durationMinutes     Int      @default(30) @map("duration_minutes")
+  bufferBeforeMinutes Int      @default(0) @map("buffer_before_minutes")
+  bufferAfterMinutes  Int      @default(0) @map("buffer_after_minutes")
+  /// Minimum advance notice in hours before booking
+  minNoticeHours      Int      @default(2) @map("min_notice_hours")
+  /// How many calendar days ahead the slot picker shows
+  maxAdvanceDays      Int      @default(60) @map("max_advance_days")
+  /// Weekly availability windows: [{ dayOfWeek: 0-6, startTime: "HH:mm", endTime: "HH:mm" }]
+  availabilityRules   Json     @default("[]") @map("availability_rules")
+  isActive            Boolean  @default(true) @map("is_active")
+  /// Extra form fields: [{ id, label, type: text|select|phone, required, options? }]
+  customQuestions     Json     @default("[]") @map("custom_questions")
+  redirectUrl         String?  @map("redirect_url")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org      Org       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@unique([orgId, slug], map: "booking_pages_org_slug_key")
+  @@index([orgId, userId, isActive])
+  @@index([orgId])
+  @@index([deletedAt])
+  @@map("booking_pages")
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+  NO_SHOW
+
+  @@map("booking_status")
+}
+
+model Booking {
+  id              String        @id @default(uuid()) @db.Uuid
+  bookingPageId   String        @map("booking_page_id") @db.Uuid
+  /// Denormalised so queries don't require a join through BookingPage
+  orgId           String        @map("org_id") @db.Uuid
+  attendeeName    String        @map("attendee_name")
+  attendeeEmail   String        @map("attendee_email") @db.Citext
+  attendeePhone   String?       @map("attendee_phone")
+  startAt         DateTime      @map("start_at") @db.Timestamptz(6)
+  endAt           DateTime      @map("end_at") @db.Timestamptz(6)
+  /// Answers to customQuestions: { [questionId]: value }
+  answers         Json          @default("{}")
+  status          BookingStatus @default(CONFIRMED)
+  /// UUID token for the public self-cancel link — never exposed in auth'd APIs
+  cancelToken     String        @unique @default(uuid()) @map("cancel_token") @db.Uuid
+  /// CalendarEvent created when the booking is confirmed (nullable until push completes)
+  calendarEventId String?       @map("calendar_event_id") @db.Uuid
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org         Org          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  bookingPage BookingPage  @relation(fields: [bookingPageId], references: [id], onDelete: Cascade)
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([orgId, bookingPageId, startAt])
+  @@index([orgId, attendeeEmail])
+  @@index([orgId])
+  @@index([deletedAt])
+  @@map("bookings")
 }
