@@ -124,6 +124,10 @@ model Org {
   zapierApps             ZapierApp[]
   zapierTriggers         ZapierTrigger[]
   zapierActions          ZapierAction[]
+  // Wave 5 — Slack workspace + Zapier subscriptions
+  slackWorkspace         SlackWorkspace?
+  slackUserMappings      SlackUserMapping[]
+  zapierSubscriptions    ZapierSubscription[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -173,6 +177,8 @@ model User {
   migrationJobs     MigrationJob[]
   // Wave 4 — integration hub
   emailMessages     EmailMessage[]
+  // Wave 5 — Slack user mapping
+  slackUserMapping  SlackUserMapping?
 
   @@index([orgId])
   @@index([deletedAt])
@@ -3190,37 +3196,90 @@ model EmailTrackingPixel {
   @@map("email_tracking_pixels")
 }
 
+// ─── Wave 5: Slack workspace + user mapping ───────────────────────────────
+
+/// Slack workspace connected to an org via OAuth v2 (bot token).
+/// One active workspace per org — reconnecting updates the row.
+model SlackWorkspace {
+  id                 String   @id @default(uuid()) @db.Uuid
+  orgId              String   @unique @map("org_id") @db.Uuid
+  integrationTokenId String   @map("integration_token_id") @db.Uuid
+  /// Slack team id (e.g. "T01234ABCDE")
+  slackTeamId        String   @map("slack_team_id") @db.VarChar(32)
+  teamName           String   @map("team_name")
+  /// Bot's own Slack user id — used to avoid self-messaging loops
+  botUserId          String   @map("bot_user_id") @db.VarChar(32)
+  /// Granted scopes from oauth.v2.access response (JSON string array)
+  botScopes          Json     @default("[]") @map("bot_scopes")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org      Org            @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  channels SlackChannel[]
+
+  @@index([orgId])
+  @@map("slack_workspaces")
+}
+
 /// Slack channel populated when the user connects their workspace.
 model SlackChannel {
-  id                 String   @id @default(uuid()) @db.Uuid
-  orgId              String   @map("org_id") @db.Uuid
-  integrationTokenId String   @map("integration_token_id") @db.Uuid
+  id                 String  @id @default(uuid()) @db.Uuid
+  orgId              String  @map("org_id") @db.Uuid
+  slackWorkspaceId   String? @map("slack_workspace_id") @db.Uuid
+  /// Legacy direct link to integration token (kept for backward compat)
+  integrationTokenId String  @map("integration_token_id") @db.Uuid
   /// Slack channel id (e.g. "C01234ABCDE")
-  channelId          String   @map("channel_id") @db.VarChar(32)
-  channelName        String   @map("channel_name")
-  isShared           Boolean  @default(false) @map("is_shared")
+  channelId          String  @map("channel_id") @db.VarChar(32)
+  channelName        String  @map("channel_name")
+  isShared           Boolean @default(false) @map("is_shared")
+  isPrivate          Boolean @default(false) @map("is_private")
+  isMember           Boolean @default(false) @map("is_member")
+  isArchived         Boolean @default(false) @map("is_archived")
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  org            Org             @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  slackWorkspace SlackWorkspace? @relation(fields: [slackWorkspaceId], references: [id], onDelete: SetNull)
 
   @@unique([orgId, channelId], map: "slack_channels_org_channel_key")
   @@index([orgId])
   @@map("slack_channels")
 }
 
+/// Maps a BidStack user to their Slack user id, enabling direct messages.
+/// Populated during OAuth callback when users:read.email scope is granted.
+model SlackUserMapping {
+  id          String   @id @default(uuid()) @db.Uuid
+  orgId       String   @map("org_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  slackUserId String   @map("slack_user_id") @db.VarChar(32)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, userId], map: "slack_user_mappings_org_user_key")
+  @@index([orgId, slackUserId])
+  @@map("slack_user_mappings")
+}
+
 /// One Zapier app registration per org.
 /// apiKeyHash is SHA-256(rawKey) — raw key shown exactly once at creation.
 model ZapierApp {
-  id         String   @id @default(uuid()) @db.Uuid
-  orgId      String   @map("org_id") @db.Uuid
+  id         String    @id @default(uuid()) @db.Uuid
+  orgId      String    @map("org_id") @db.Uuid
   /// SHA-256(rawApiKey) hex string — never stored in plaintext
-  apiKeyHash String   @map("api_key_hash") @db.VarChar(64)
-  name       String   @default("BidStack Zapier App")
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  apiKeyHash String    @map("api_key_hash") @db.VarChar(64)
+  name       String    @default("BidStack Zapier App")
+  /// Allowed scopes for this app key (JSON string array)
+  scopes     Json      @default("[\"read\",\"write\"]")
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  org      Org             @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  triggers ZapierTrigger[]
-  actions  ZapierAction[]
+  org           Org                  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  triggers      ZapierTrigger[]
+  actions       ZapierAction[]
+  subscriptions ZapierSubscription[]
 
   @@unique([orgId], map: "zapier_apps_org_key")
   @@index([orgId])
@@ -3262,4 +3321,27 @@ model ZapierAction {
   @@unique([orgId, actionType], map: "zapier_actions_org_action_key")
   @@index([orgId])
   @@map("zapier_actions")
+}
+
+// ─── Wave 5: Zapier REST-hook subscriptions ───────────────────────────────
+
+/// REST-hook subscription: Zapier POSTs to BidStack to subscribe to an event.
+/// BidStack then delivers HMAC-SHA256-signed payloads to targetUrl on each event.
+/// This is the Zapier-recommended pattern (distinct from ZapierTrigger which
+/// stores the per-subscription HMAC secret; ZapierSubscription uses the app key).
+model ZapierSubscription {
+  id          String   @id @default(uuid()) @db.Uuid
+  orgId       String   @map("org_id") @db.Uuid
+  zapierAppId String   @map("zapier_app_id") @db.Uuid
+  /// REST-hook event type. Enum-like string kept flexible for forward compat.
+  /// Values: NEW_LEAD | DEAL_STAGE_CHANGE | NEW_CONTACT | NEW_OPPORTUNITY | NEW_TASK
+  eventType   String   @map("event_type") @db.VarChar(64)
+  targetUrl   String   @map("target_url")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org       Org       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  zapierApp ZapierApp @relation(fields: [zapierAppId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, eventType])
+  @@map("zapier_subscriptions")
 }
