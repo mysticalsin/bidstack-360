@@ -94,6 +94,8 @@ model Org {
   quotes                 Quote[]
   quoteLines             QuoteLine[]
   quoteVersions          QuoteVersion[]
+  pipelines              Pipeline[]
+  pipelineStages         PipelineStage[]
   SubscriptionEvent      SubscriptionEvent[]
   customFieldDefinitions CustomFieldDefinition[]
   customFieldValues      CustomFieldValue[]
@@ -102,6 +104,7 @@ model Org {
   rolePermissions        RolePermission[]
   userRoles              UserRole[]
   orgSettings            OrgSettings?
+  tenantExports          TenantExport[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -139,6 +142,7 @@ model User {
   leads             Lead[]
   activities        Activity[]
   activityAttendees ActivityAttendee[]
+  tenantExports     TenantExport[]     @relation("TenantExportRequestedBy")
 
   deletedAt DateTime?  @map("deleted_at") @db.Timestamptz(6)
   userRoles UserRole[]
@@ -210,6 +214,10 @@ model Company {
 
 // ─── Core entities ────────────────────────────────────────────────────────
 
+/// @deprecated (Phase 5) Use Opportunity.pipelineStageId → PipelineStage
+/// instead. The enum + Opportunity.stage column are kept for backward-compat
+/// with apps/api/src/routes/opportunities.ts STAGE_TRANSITIONS until all
+/// callers migrate to the new pipeline-stage table.
 enum OpportunityStage {
   s1_lead
   s1_ongoing
@@ -249,7 +257,9 @@ model Opportunity {
   customer         String
   companyId        String?          @map("company_id") @db.Uuid
   name             String
+  /// @deprecated (Phase 5) Use pipelineStageId. Kept for STAGE_TRANSITIONS.
   stage            OpportunityStage
+  pipelineStageId  String?          @map("pipeline_stage_id") @db.Uuid
   valueMicros      BigInt           @default(0) @map("value_micros")
   probability      Int              @default(0)
   dueDate          DateTime?        @map("due_date") @db.Date
@@ -268,6 +278,7 @@ model Opportunity {
   org                  Org                   @relation(fields: [orgId], references: [id], onDelete: Cascade)
   owner                User?                 @relation(fields: [ownerId], references: [id])
   territory            Territory?            @relation(fields: [territoryId], references: [id])
+  pipelineStage        PipelineStage?        @relation(fields: [pipelineStageId], references: [id])
   proposals            Proposal[]
   bidScores            BidScore[]
   company              Company?              @relation(fields: [companyId], references: [id])
@@ -286,6 +297,7 @@ model Opportunity {
   @@unique([orgId, code])
   @@index([orgId, country], map: "opps_org_country_idx")
   @@index([orgId, stage], map: "opps_org_stage_idx")
+  @@index([orgId, pipelineStageId], map: "opps_org_pipeline_stage_idx")
   @@index([orgId, ownerId], map: "opps_org_owner_idx")
   @@index([orgId, customer], map: "opps_org_customer_idx")
   @@index([orgId])
@@ -485,6 +497,54 @@ model AuditLog {
   @@index([orgId, targetType, targetId, at(sort: Desc)])
   @@index([deletedAt])
   @@map("audit_log")
+}
+
+// ─── GDPR tenant export ───────────────────────────────────────────────────
+// Tracks a tenant-scoped data-export job (Art. 20 portability). Created by
+// the API when an org-admin hits POST /api/orgs/:id/export; driven through
+// states by the tenant-export BullMQ worker. Download URLs are short-lived
+// (24h) and the underlying S3 object should be lifecycle-deleted on expiry.
+
+enum TenantExportStatus {
+  pending
+  running
+  ready
+  failed
+  expired
+
+  @@map("tenant_export_status")
+}
+
+model TenantExport {
+  id              String             @id @default(uuid()) @db.Uuid
+  orgId           String             @map("org_id") @db.Uuid
+  requestedById   String             @map("requested_by_id") @db.Uuid
+  status          TenantExportStatus @default(pending)
+  // Pre-signed S3 URL the requester downloads from. Null until status=ready.
+  downloadUrl     String?            @map("download_url")
+  // When the pre-signed URL (and the underlying storage object) expire.
+  expiresAt       DateTime?          @map("expires_at") @db.Timestamptz(6)
+  // Failure reason. Truncated to 2000 chars by the worker before write.
+  error           String?
+  // Size of the produced zip in bytes; null until status=ready.
+  sizeBytes       BigInt?            @map("size_bytes")
+  // Storage key of the zip object — used by the worker to issue fresh
+  // download URLs and by the cleanup job to lifecycle the object.
+  storageKey      String?            @map("storage_key")
+  startedAt       DateTime?          @map("started_at") @db.Timestamptz(6)
+  completedAt     DateTime?          @map("completed_at") @db.Timestamptz(6)
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org         Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  requestedBy User @relation("TenantExportRequestedBy", fields: [requestedById], references: [id])
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([orgId, createdAt(sort: Desc)])
+  @@index([orgId, status])
+  @@index([deletedAt])
+  @@map("tenant_exports")
 }
 
 model CompanyEnrichment {
@@ -2569,4 +2629,69 @@ model QuoteVersion {
   @@index([orgId])
   @@index([deletedAt])
   @@map("quote_versions")
+}
+
+// ─── Pipeline / Pipeline Stage (Phase 5 — promote enum to table) ──────────
+// The legacy `OpportunityStage` enum + `OrgSettings.pipelineStages` JSON
+// blob is preserved for backward-compat (existing routes/STAGE_TRANSITIONS
+// still operate on the enum). These new tables let orgs configure multiple
+// pipelines, custom stage labels, probability, forecast category, win/lost
+// flags, and per-stage colour.
+//
+// Forward compat path: opportunities gain `pipelineStageId` (nullable,
+// backfilled in the migration from the existing enum value via SQL UPDATE).
+// Future work: switch routes to use pipelineStageId as the primary state.
+
+model Pipeline {
+  id        String   @id @default(uuid()) @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  name      String
+  isDefault Boolean  @default(false) @map("is_default")
+  archived  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org    Org             @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  stages PipelineStage[]
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@unique([orgId, name])
+  @@index([orgId, archived])
+  @@index([orgId])
+  @@index([deletedAt])
+  @@map("pipelines")
+}
+
+model PipelineStage {
+  id               String   @id @default(uuid()) @db.Uuid
+  orgId            String   @map("org_id") @db.Uuid
+  pipelineId       String   @map("pipeline_id") @db.Uuid
+  /// Stable machine key (e.g. "s1_lead"). Used to map legacy enum values
+  /// to the new row during the backfill migration.
+  key              String
+  name             String
+  orderIndex       Int      @default(0) @map("order_index")
+  probability      Decimal  @default(0) @db.Decimal(5, 2)
+  /// One of: pipeline | best_case | commit | closed_won | closed_lost | omitted
+  forecastCategory String   @default("pipeline") @map("forecast_category")
+  isWon            Boolean  @default(false) @map("is_won")
+  isLost           Boolean  @default(false) @map("is_lost")
+  color            String?
+  archived         Boolean  @default(false)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org           Org           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  pipeline      Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  opportunities Opportunity[]
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@unique([orgId, pipelineId, key])
+  @@index([orgId, pipelineId, orderIndex])
+  @@index([orgId, forecastCategory])
+  @@index([orgId])
+  @@index([deletedAt])
+  @@map("pipeline_stages")
 }
