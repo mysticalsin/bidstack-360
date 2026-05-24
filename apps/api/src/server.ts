@@ -17,6 +17,9 @@ import { idempotencyPlugin } from './plugins/idempotency.js';
 import { openapiPlugin } from './plugins/openapi.js';
 import { queryGuardPlugin } from './plugins/query-guard.js';
 import { redisCachePlugin } from './plugins/redis-cache.js';
+// Wave 7 — Real-time collaboration
+import { realtimePlugin } from './plugins/realtime.js';
+import { realtimeRoutes } from './routes/realtime.js';
 import { config } from './config.js';
 import { rbacPlugin } from './plugins/rbac.js';
 import { redis } from './redis.js';
@@ -81,6 +84,8 @@ import { onboardingRoutes } from './routes/onboarding.js';
 import { helpRoutes } from './routes/help.js';
 // Wave 7 — Custom Objects (Salesforce parity)
 import { customObjectRoutes } from './routes/custom-objects.js';
+// Wave 7 — Twilio SMS (webhook = unauthenticated, sms routes = authenticated)
+import { twilioWebhookRoutes, smsRoutes } from './routes/integrations/twilio.js';
 
 const CONNECT_SRC = [
   "'self'",
@@ -324,6 +329,12 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   // Wave 7 — Custom Objects (Salesforce parity)
   await server.register(customObjectRoutes, { prefix: '/api/v1' });
+
+  // Wave 7 — Twilio SMS
+  // WHY /api/v1/integrations for webhook: unauthenticated, Twilio calls it; consistent with
+  // microsoft-webhook pattern. WHY /api/v1 for sms routes: user-facing, needs auth middleware.
+  await server.register(twilioWebhookRoutes, { prefix: '/api/v1/integrations' });
+  await server.register(smsRoutes, { prefix: '/api/v1' });
 
   return server;
 }
