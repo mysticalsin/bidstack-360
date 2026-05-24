@@ -15,10 +15,19 @@ interface Props {
   oppId?: string;
   /** Optional trigger element. Defaults to a primary button "+ New task". */
   trigger?: React.ReactNode;
+  /**
+   * Controlled open state. When provided, the caller owns open/close.
+   * Used by the command palette contextual action (Twenty pattern A3).
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function CreateTaskDialog({ oppId, trigger }: Props) {
-  const [open, setOpen] = useState(false);
+export function CreateTaskDialog({ oppId, trigger, open: controlledOpen, onOpenChange }: Props) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  // Support both controlled (command palette) and uncontrolled (trigger button) modes.
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = onOpenChange !== undefined ? onOpenChange : setInternalOpen;
   const create = useCreateTask();
   const opps = useOpportunities({ limit: 100 });
 

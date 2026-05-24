@@ -14,6 +14,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 
 import { CompanyLogo } from '@/components/company/CompanyLogo';
+import { useCommandContextStore } from '@/hooks/useCommandContext';
 import { useContacts } from '@/hooks/useContacts';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
 import { useGlobalSearch } from '@/hooks/useGlobalSearch';
@@ -164,6 +165,10 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   const contacts = useContacts();
   const tasks = useTasks();
   const agents = useAgents();
+  // Contextual commands registered by the currently mounted page (A3 — Twenty pattern).
+  // These appear at the top of the list (above nav) so page-specific actions are
+  // immediately reachable without scrolling or querying.
+  const contextualCommands = useCommandContextStore((s) => s.commands);
 
   const selectNavTarget = useCallback(
     (target: NavTarget) => {
@@ -183,6 +188,25 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   const items: Item[] = useMemo(() => {
     const out: Item[] = [];
     const q = query.trim().toLowerCase();
+
+    // Contextual commands from the active page (e.g. "Create task for this opp").
+    // Shown at the very top — before recents — so they are immediately reachable.
+    // Filtered by query when one is typed.
+    for (const cmd of contextualCommands) {
+      if (!q || cmd.label.toLowerCase().includes(q) || (cmd.hint?.toLowerCase().includes(q) ?? false)) {
+        out.push({
+          id: `ctx:${cmd.id}`,
+          group: 'action',
+          label: cmd.label,
+          hint: cmd.hint,
+          onSelect: () => {
+            cmd.onSelect();
+            onClose();
+          },
+        });
+      }
+    }
+
     // When the query is empty and the user has a history, show recents at
     // the very top of the list — Spotlight/macOS-style "continue where you
     // left off" surface.
@@ -382,6 +406,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
     accountRecents,
     agents.data?.items,
     selectNavTarget,
+    contextualCommands,
   ]);
 
   // Auto-scroll the active row into view when arrowing through long result

@@ -16,6 +16,7 @@ import {
 } from '@/components/opportunity/InlineEdit';
 import { OpportunityTabs } from '@/components/opportunity/OpportunityTabs';
 import { OpportunityAccountIntel } from '@/components/opportunity/OpportunityAccountIntel';
+import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CreateTaskDialog } from '@/components/task/CreateTaskDialog';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Icon } from '@/components/ui/Icon';
@@ -23,6 +24,7 @@ import { MagneticButton } from '@/components/ui/MagneticButton';
 import { usePatchOpportunity, useOpportunity } from '@/hooks/useOpportunities';
 import { useOpportunityTimeline } from '@/hooks/useOpportunityTimeline';
 import { useBidScoreLatest } from '@/hooks/useBidScore';
+import { useCommandContext } from '@/hooks/useCommandContext';
 import { formatDate, formatMoney, formatStage } from '@/lib/format';
 
 import type { OpportunityStage, IntelPayload } from '@bidstack/shared';
@@ -44,6 +46,29 @@ export function OpportunityDetailPage() {
   const timeline = useOpportunityTimeline(id);
   const [briefOpen, setBriefOpen] = useState(false);
   const intel: IntelPayload = data?.intel ?? {};
+
+  // Register contextual commands for this page in the global Cmd+K palette.
+  // WHY: Twenty's command menu surfaces page-specific actions; we adapt the
+  // pattern so the palette becomes a true action hub, not just navigation.
+  const [taskOpen, setTaskOpen] = useState(false);
+  useCommandContext(
+    data
+      ? [
+          {
+            id: 'opp-create-task',
+            label: `Create task for ${data.name}`,
+            hint: 'Add a to-do linked to this opportunity',
+            onSelect: () => setTaskOpen(true),
+          },
+          {
+            id: 'opp-open-briefing',
+            label: `Open AI briefing for ${data.name}`,
+            hint: 'Generate a Dust AI briefing document',
+            onSelect: () => setBriefOpen(true),
+          },
+        ]
+      : [],
+  );
 
   if (isLoading) return <DetailPageSkeleton tabs columns={2} cards={3} />;
   if (isError)
@@ -238,6 +263,15 @@ export function OpportunityDetailPage() {
         intelDecisionUnit={intel.decisionUnit ?? []}
         documents={data.documents}
         timeline={timelineItems}
+      />
+
+      <CustomFieldValuesSection entityType="opportunity" entityId={id!} />
+
+      {/* Controlled CreateTaskDialog driven by the command palette (A3). */}
+      <CreateTaskDialog
+        oppId={data.id}
+        open={taskOpen}
+        onOpenChange={setTaskOpen}
       />
     </div>
   );
