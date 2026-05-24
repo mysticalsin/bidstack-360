@@ -29,6 +29,15 @@ import type { Prisma } from '../../generated/client/index.js';
 
 // ----- Config ---------------------------------------------------------------
 
+/**
+ * Returns `true` when PII field encryption is active.
+ *
+ * Controlled by the `PII_FIELD_ENCRYPTION=true` environment variable.
+ * Default is `false` for backward compatibility with existing plaintext data.
+ * Run `scripts/encrypt-existing-pii.ts` before enabling in production.
+ *
+ * @returns `true` if `PII_FIELD_ENCRYPTION=true`, `false` otherwise.
+ */
 export function isPiiEncryptionEnabled(): boolean {
   return process.env.PII_FIELD_ENCRYPTION === 'true';
 }

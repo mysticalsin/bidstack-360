@@ -1,6 +1,21 @@
 /**
- * SSRF guard — rejects URLs that resolve to private/internal addresses.
- * Used before storing or fetching user-supplied URLs.
+ * Returns `true` if `hostname` is a publicly routable address.
+ *
+ * Rejects loopback (`127.*`, `localhost`), link-local (`169.254.*`),
+ * private ranges (RFC 1918: `10.*`, `172.16-31.*`, `192.168.*`),
+ * and `.local` mDNS domains.
+ *
+ * Use this before storing or fetching any user-supplied URL to prevent
+ * Server-Side Request Forgery (SSRF) attacks against internal services.
+ *
+ * @param hostname - The `URL.hostname` value (without port).
+ * @returns `true` if the hostname appears publicly routable, `false` if internal.
+ * @example
+ * ```ts
+ * if (!isPublicHostname(new URL(userUrl).hostname)) {
+ *   throw new Error('URL must not point to an internal address');
+ * }
+ * ```
  */
 export function isPublicHostname(hostname: string): boolean {
   const h = hostname.toLowerCase();

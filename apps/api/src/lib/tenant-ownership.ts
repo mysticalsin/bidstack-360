@@ -66,11 +66,27 @@ const ENTITY_ALIASES: Record<string, TenantEntityType> = {
   workflows: 'workflow',
 };
 
+/**
+ * Normalizes a caller-supplied entity type string to the canonical internal form.
+ *
+ * @param entityType - Raw string (e.g. `"leads"`, `"Contact"`, `"opportunity"`).
+ * @returns The canonical `TenantEntityType` or `null` if unrecognized.
+ */
 export function normalizeTenantEntityType(entityType: string): TenantEntityType | null {
   const normalized = entityType.trim().toLowerCase();
   return ENTITY_ALIASES[normalized] ?? null;
 }
 
+/**
+ * Checks that a single entity row belongs to the requesting organisation.
+ * Multi-tenancy guard — call before returning or mutating any record.
+ *
+ * @param entityType - Entity type string (see {@link normalizeTenantEntityType}).
+ * @param id - Primary key of the record.
+ * @param orgId - The authenticated organisation's ID.
+ * @param db - Optional Prisma client (defaults to shared singleton).
+ * @returns `true` if the record exists and belongs to `orgId`, `false` otherwise.
+ */
 export async function tenantEntityBelongsToOrg(
   entityType: string,
   id: string,
@@ -117,6 +133,16 @@ export async function tenantEntityBelongsToOrg(
   }
 }
 
+/**
+ * Bulk variant of {@link tenantEntityBelongsToOrg}.
+ * Returns `true` only if **all** IDs belong to `orgId`.
+ *
+ * @param entityType - Entity type string.
+ * @param ids - Array of primary keys to check (duplicates are deduplicated).
+ * @param orgId - The authenticated organisation's ID.
+ * @param db - Optional Prisma client (defaults to shared singleton).
+ * @returns `true` if every ID belongs to `orgId`, `false` if any is foreign or missing.
+ */
 export async function tenantEntitiesBelongToOrg(
   entityType: string,
   ids: readonly string[],

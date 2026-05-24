@@ -1,0 +1,139 @@
+name: TSDoc Coverage
+
+on:
+  pull_request:
+    paths:
+      - 'packages/**/*.ts'
+      - 'packages/**/*.tsx'
+      - 'apps/api/src/**/*.ts'
+      - 'apps/web/src/**/*.ts'
+      - 'apps/web/src/**/*.tsx'
+      - 'scripts/audit-tsdoc.mjs'
+      - '.github/workflows/tsdoc-coverage.yml'
+
+jobs:
+  tsdoc-coverage:
+    name: TSDoc Coverage Audit
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Capture baseline from the target branch (main/develop)
+      - name: Compute base branch coverage
+        id: base
+        run: |
+          git fetch origin ${{ github.base_ref }} --depth=1
+          git stash
+          git checkout origin/${{ github.base_ref }} -- scripts/audit-tsdoc.mjs 2>/dev/null || true
+          BASE_JSON=$(node scripts/audit-tsdoc.mjs --json 2>/dev/null || echo '{"overallCoverage":0}')
+          echo "coverage=$(echo $BASE_JSON | node -e "const d=require('fs').readFileSync('/dev/stdin','utf-8');console.log(JSON.parse(d).overallCoverage)")" >> $GITHUB_OUTPUT
+          git checkout HEAD -- scripts/audit-tsdoc.mjs 2>/dev/null || true
+          git stash pop 2>/dev/null || true
+
+      # Compute PR branch coverage
+      - name: Compute PR coverage
+        id: pr
+        run: |
+          PR_JSON=$(node scripts/audit-tsdoc.mjs --json)
+          echo "$PR_JSON" > /tmp/tsdoc-report.json
+          echo "coverage=$(echo $PR_JSON | node -e "const d=require('fs').readFileSync('/dev/stdin','utf-8');console.log(JSON.parse(d).overallCoverage)")" >> $GITHUB_OUTPUT
+
+      # Post a comment on the PR with coverage delta
+      - name: Post coverage comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const baseCov = parseFloat('${{ steps.base.outputs.coverage }}') || 0;
+            const prCov   = parseFloat('${{ steps.pr.outputs.coverage }}') || 0;
+            const delta   = (prCov - baseCov).toFixed(1);
+            const arrow   = delta >= 0 ? '▲' : '▼';
+            const status  = prCov >= baseCov ? '✅' : '⚠️';
+
+            const { readFileSync } = require('fs');
+            let report;
+            try {
+              report = JSON.parse(readFileSync('/tmp/tsdoc-report.json', 'utf-8'));
+            } catch {
+              report = { overallCoverage: prCov, packages: [] };
+            }
+
+            const pkgTable = report.packages.map(p => {
+              const indicator = p.coverage >= 80 ? '✅' : p.coverage >= 40 ? '⚠️' : '❌';
+              return `| ${indicator} | \`${p.label}\` | ${p.coverage}% | ${p.documented}/${p.documented + p.undocumented} |`;
+            }).join('\n');
+
+            const body = [
+              '## TSDoc Coverage Report',
+              '',
+              `${status} **Overall: ${prCov}%** (base: ${baseCov}% ${arrow} ${Math.abs(delta)}%)`,
+              '',
+              '| | Package | Coverage | Documented/Total |',
+              '|---|---------|----------|-----------------|',
+              pkgTable,
+              '',
+              `> Baseline target: **${process.env.TSDOC_FAIL_BELOW || 4}%**. ` +
+              `Coverage should not decrease from the base branch.`,
+            ].join('\n');
+
+            // Find and update existing comment if present
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('TSDoc Coverage Report')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      # Fail if coverage drops below baseline (not below 80% yet — we gate on regression)
+      - name: Enforce no coverage regression
+        env:
+          BASE_COV: ${{ steps.base.outputs.coverage }}
+          PR_COV: ${{ steps.pr.outputs.coverage }}
+        run: |
+          node -e "
+            const base = parseFloat(process.env.BASE_COV) || 0;
+            const pr   = parseFloat(process.env.PR_COV)   || 0;
+            const FAIL_BELOW = parseFloat(process.env.TSDOC_FAIL_BELOW || '0');
+            if (pr < base - 0.5) {
+              console.error('TSDoc coverage dropped from ' + base + '% to ' + pr + '% (>' + 0.5 + '% regression). Add TSDoc to new exports.');
+              process.exit(1);
+            }
+            if (FAIL_BELOW > 0 && pr < FAIL_BELOW) {
+              console.error('TSDoc coverage ' + pr + '% is below minimum ' + FAIL_BELOW + '%.');
+              process.exit(1);
+            }
+            console.log('TSDoc coverage OK: ' + pr + '% (base: ' + base + '%)');
+          "

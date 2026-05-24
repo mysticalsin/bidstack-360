@@ -7,6 +7,11 @@
 // @bidstack/shared free of a runtime bullmq dependency — only apps that
 // actually enqueue/process jobs need bullmq installed.
 
+/**
+ * Default job options applied to every job enqueued in a BullMQ queue.
+ * Deliberately excludes the bullmq `JobsOptions` type so this package
+ * remains free of a runtime bullmq dependency.
+ */
 export interface QueueDefaults {
   attempts: number;
   backoff: { type: 'exponential' | 'fixed'; delay: number };
@@ -14,6 +19,11 @@ export interface QueueDefaults {
   removeOnFail: { age: number; count?: number };
 }
 
+/**
+ * Complete queue configuration shared between producer (API) and consumer (worker).
+ * Import the named constant (e.g. {@link COMPANY_ENRICH_APOLLO}) rather than
+ * constructing this directly to ensure producer/consumer parity.
+ */
 export interface QueueConfig {
   /** BullMQ queue name. Single string identifier shared producer ↔ worker. */
   name: string;

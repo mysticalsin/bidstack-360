@@ -28,6 +28,18 @@ function getKey(): Buffer {
   return Buffer.from(hex, 'hex');
 }
 
+/**
+ * Encrypts an OAuth access or refresh token for database storage.
+ *
+ * @param plaintext - The raw token string from the OAuth provider.
+ * @returns Base64url-encoded AES-256-GCM envelope (iv + auth-tag + ciphertext).
+ * @throws If `INTEGRATION_TOKEN_KEY` is not set or is not 64 hex characters.
+ * @example
+ * ```ts
+ * const stored = encryptToken(accessToken);
+ * await db.integration.update({ data: { accessTokenEncrypted: stored } });
+ * ```
+ */
 export function encryptToken(plaintext: string): string {
   const key = getKey();
   const iv = randomBytes(IV_BYTES);
@@ -44,6 +56,18 @@ export function encryptToken(plaintext: string): string {
   return packed.toString('base64url');
 }
 
+/**
+ * Decrypts an AES-256-GCM encrypted OAuth token previously produced by {@link encryptToken}.
+ *
+ * @param ciphertext - Base64url-encoded envelope from the database.
+ * @returns The original plaintext token string.
+ * @throws If the ciphertext is malformed, the auth tag fails, or the key is missing.
+ * @example
+ * ```ts
+ * const token = decryptToken(row.accessTokenEncrypted);
+ * // Use token for API call
+ * ```
+ */
 export function decryptToken(ciphertext: string): string {
   const key = getKey();
   const packed = Buffer.from(ciphertext, 'base64url');

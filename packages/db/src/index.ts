@@ -37,6 +37,20 @@ function buildPrismaClient(): PrismaClient {
 
 const globalForPrisma2 = globalForPrisma as unknown as { prisma?: PrismaClient };
 
+/**
+ * Shared Prisma client singleton.
+ *
+ * Reuses an existing client instance in development (hot reload) and creates
+ * a fresh client in production. Always import `prisma` from `@bidstack/db`
+ * rather than instantiating `PrismaClient` directly — that avoids connection
+ * pool exhaustion from multiple instances.
+ *
+ * @example
+ * ```ts
+ * import { prisma } from '@bidstack/db';
+ * const leads = await prisma.lead.findMany({ where: { orgId, deletedAt: null } });
+ * ```
+ */
 export const prisma =
   globalForPrisma2.prisma ?? buildPrismaClient();
 

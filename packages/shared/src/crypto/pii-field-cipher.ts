@@ -34,6 +34,10 @@ const ENC_PREFIX = 'enc:v1:';
 const EMAIL_MASK = '***@***.***';
 const PHONE_MASK = '***-***-****';
 
+/**
+ * Discriminates which type of PII field is being processed.
+ * Used to select the appropriate masking string on decryption failure.
+ */
 export type PiiFieldType = 'email' | 'phone';
 
 function getMasterKeyBuffer(): Buffer {
@@ -59,6 +63,12 @@ function deriveOrgKey(orgId: string): Buffer {
   );
 }
 
+/**
+ * Returns `true` if the value is an `enc:v1:` envelope produced by {@link encryptPiiField}.
+ *
+ * @param value - The string read from the database column.
+ * @returns `true` if the value is already encrypted, `false` if plaintext.
+ */
 export function isEncrypted(value: string): boolean {
   return value.startsWith(ENC_PREFIX);
 }
