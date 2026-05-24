@@ -128,6 +128,12 @@ model Org {
   slackWorkspace         SlackWorkspace?
   slackUserMappings      SlackUserMapping[]
   zapierSubscriptions    ZapierSubscription[]
+  // Wave 5 — MS Graph webhook subscriptions
+  graphSubscriptions     GraphSubscription[]
+  // Wave 7 — Custom Objects
+  customObjectDefs       CustomObjectDef[]
+  customObjectRecords    CustomObjectRecord[]
+  customObjectRelations  CustomObjectRelation[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -177,8 +183,8 @@ model User {
   migrationJobs     MigrationJob[]
   // Wave 4 — integration hub
   emailMessages     EmailMessage[]
-  // Wave 5 — Slack user mapping
-  slackUserMapping  SlackUserMapping?
+  // Wave 5 — Slack user mapping (one-to-many; compound @@unique on [orgId,userId])
+  slackUserMappings SlackUserMapping[]
 
   @@index([orgId])
   @@index([deletedAt])
@@ -2512,7 +2518,9 @@ model SubscriptionEvent {
 model CustomFieldDefinition {
   id           String   @id @default(uuid()) @db.Uuid
   orgId        String   @map("org_id") @db.Uuid
-  entityType   String   @map("entity_type") // company | contact | opportunity | lead | task | invoice
+  /// Standard entity types: company | contact | opportunity | lead | task | invoice
+  /// Wave 7: also "CUSTOM_OBJECT" — in which case customObjectDefId must be set.
+  entityType   String   @map("entity_type")
   fieldKey     String   @map("field_key")
   label        String
   fieldType    String   @map("field_type") // text | number | date | boolean | select | multi_select | currency | url | email | phone
@@ -2521,6 +2529,8 @@ model CustomFieldDefinition {
   required     Boolean  @default(false)
   orderIndex   Int      @default(0) @map("order_index")
   active       Boolean  @default(true)
+  /// Wave 7: set when entityType = 'CUSTOM_OBJECT'. Scopes the field to a specific custom object def.
+  customObjectDefId String? @map("custom_object_def_id") @db.Uuid
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -2531,6 +2541,7 @@ model CustomFieldDefinition {
 
   @@unique([orgId, entityType, fieldKey])
   @@index([orgId, entityType, active])
+  @@index([orgId, customObjectDefId, active])
   @@index([deletedAt])
   @@map("custom_field_definitions")
 }
@@ -2897,8 +2908,10 @@ model IntegrationToken {
   createdAt             DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org                Org                @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Wave 5 — MS Graph webhook subscriptions (one token → many subscriptions over lifetime)
+  graphSubscriptions GraphSubscription[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -3344,4 +3357,125 @@ model ZapierSubscription {
 
   @@index([orgId, eventType])
   @@map("zapier_subscriptions")
+}
+
+// ─── Wave 5: Microsoft Graph webhook subscriptions ───────────────────────────
+
+/// Tracks active Microsoft Graph change-notification subscriptions.
+/// WHY a separate table: renewal worker queries by expiresAt (needs an index);
+/// clientState must be retrievable by subscriptionId alone — separate row = O(1).
+/// Lifecycle: created post-OAuth, renewed daily, deleted on disconnect.
+model GraphSubscription {
+  id                 String   @id @default(uuid()) @db.Uuid
+  orgId              String   @map("org_id") @db.Uuid
+  integrationTokenId String   @map("integration_token_id") @db.Uuid
+  /// Remote Graph subscription id — used for PATCH/DELETE on renewal/disconnect
+  subscriptionId     String   @unique @map("subscription_id") @db.VarChar(64)
+  /// Graph resource being watched (e.g. /me/messages)
+  resource           String   @db.VarChar(128)
+  /// Comma-separated change types (e.g. "created,updated,deleted")
+  changeType         String   @map("change_type") @db.VarChar(64)
+  /// Random secret stored here and sent with every notification for anti-forgery
+  clientState        String   @map("client_state") @db.VarChar(128)
+  expiresAt          DateTime @map("expires_at") @db.Timestamptz(6)
+  /// Incremented on each successful renewal for observability
+  renewalCount       Int      @default(0) @map("renewal_count")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org              Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  integrationToken IntegrationToken @relation(fields: [integrationTokenId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([integrationTokenId])
+  /// Index for renewal worker: find subscriptions expiring within 26 h
+  @@index([expiresAt])
+  @@map("graph_subscriptions")
+}
+
+// ─── Wave 7: Custom Objects ───────────────────────────────────────────────
+
+/// Defines a user-created entity type (e.g. Project, Vendor, Asset).
+/// Analogous to a Salesforce Custom Object definition.
+/// WHY: Customers need first-class entity types beyond the standard CRM set
+/// without waiting for an engineering sprint. Admins define the schema;
+/// the engine stores/validates records against it dynamically.
+model CustomObjectDef {
+  id             String   @id @default(uuid()) @db.Uuid
+  orgId          String   @map("org_id") @db.Uuid
+  /// URL-safe slug — unique per org (e.g. "project", "vendor").
+  /// Used as the route segment (/o/:key) and activity entity type prefix.
+  key            String   @db.VarChar(64)
+  labelSingular  String   @map("label_singular") @db.VarChar(128)
+  labelPlural    String   @map("label_plural") @db.VarChar(128)
+  description    String?  @db.VarChar(512)
+  /// Lucide icon name (e.g. "folder", "package"). Validated client-side.
+  icon           String   @default("box") @db.VarChar(64)
+  /// CSS hex color for the sidebar dot and record header accent.
+  color          String   @default("#6366f1") @db.VarChar(16)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org                  Org                    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  records              CustomObjectRecord[]
+  relations            CustomObjectRelation[]
+
+  @@unique([orgId, key])
+  @@index([orgId])
+  @@map("custom_object_defs")
+}
+
+/// A single record of a user-defined custom object type.
+/// Values are stored as JSON keyed by field key; field defs supply the schema.
+/// Soft-delete preserves records for audit and potential restore.
+model CustomObjectRecord {
+  id                String    @id @default(uuid()) @db.Uuid
+  orgId             String    @map("org_id") @db.Uuid
+  customObjectDefId String    @map("custom_object_def_id") @db.Uuid
+  /// Human-readable auto key per object type: PRJ-0001, VND-0002 …
+  /// Monotonically increasing even after deletion (never reused).
+  recordKey         String    @map("record_key") @db.VarChar(32)
+  /// Freeform map of fieldKey → value.  Validated on write against active field defs.
+  valuesJson        Json      @default("{}") @map("values_json")
+  createdById       String?   @map("created_by_id") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  org             Org             @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  customObjectDef CustomObjectDef @relation(fields: [customObjectDefId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, customObjectDefId, recordKey])
+  @@index([orgId, customObjectDefId, deletedAt])
+  @@index([deletedAt])
+  @@map("custom_object_records")
+}
+
+/// Defines a lookup or junction between a custom object and another entity.
+/// WHY a separate table: relation metadata is complex (cardinality, required,
+/// junction table schema) and benefits from versioning; embedding in JSON
+/// would lose indexability and referential semantics.
+model CustomObjectRelation {
+  id                String   @id @default(uuid()) @db.Uuid
+  orgId             String   @map("org_id") @db.Uuid
+  customObjectDefId String   @map("custom_object_def_id") @db.Uuid
+  /// Slug key for the relation (e.g. "primary_contact")
+  relationKey       String   @map("relation_key") @db.VarChar(64)
+  label             String   @db.VarChar(128)
+  /// Target entity: standard slug ("contact", "opportunity") or custom object key.
+  relatedEntityType String   @map("related_entity_type") @db.VarChar(64)
+  /// ONE_TO_ONE | ONE_TO_MANY | MANY_TO_MANY
+  cardinality       String   @default("ONE_TO_MANY") @db.VarChar(16)
+  required          Boolean  @default(false)
+  /// For MANY_TO_MANY: schema hint for the junction table (JSON).
+  junctionTableSchema Json?  @map("junction_table_schema")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org             Org             @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  customObjectDef CustomObjectDef @relation(fields: [customObjectDefId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, customObjectDefId, relationKey])
+  @@index([orgId, customObjectDefId])
+  @@map("custom_object_relations")
 }
