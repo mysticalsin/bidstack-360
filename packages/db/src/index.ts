@@ -68,6 +68,7 @@ export type {
   SyncEvent,
   ApiKey,
   WebhookSubscription,
+  WebhookDelivery,
   AuditLog,
   Note,
   FileAttachment,
