@@ -122,3 +122,47 @@ export const MIGRATION: QueueConfig = {
     removeOnFail: { age: 86_400 * 30, count: 200 },
   },
 };
+
+// ─── Wave 4: Integration Hub queues ──────────────────────────────────────
+
+/**
+ * Email incremental pull — fetches new/changed messages via Gmail history API
+ * or MS Graph delta query. Runs every 5 min per active integration token.
+ */
+export const EMAIL_PULL_INCREMENTAL: QueueConfig = {
+  name: 'email-pull-incremental',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 10_000 },
+    removeOnComplete: { age: 86_400, count: 200 },
+    removeOnFail: { age: 604_800, count: 100 },
+  },
+};
+
+/**
+ * Email tracking open — queued by the pixel endpoint to batch DB writes.
+ * Low priority; a few seconds of latency is acceptable.
+ */
+export const EMAIL_TRACK_OPEN: QueueConfig = {
+  name: 'email-track-open',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'fixed', delay: 2_000 },
+    removeOnComplete: { age: 86_400, count: 1_000 },
+    removeOnFail: { age: 86_400 * 7, count: 200 },
+  },
+};
+
+/**
+ * Zapier webhook fan-out — delivers HMAC-signed POST to each active ZapierTrigger
+ * subscription. Exponential backoff, dead-letter after 5 failures.
+ */
+export const ZAPIER_WEBHOOK: QueueConfig = {
+  name: 'zapier-webhook',
+  defaultJobOptions: {
+    attempts: 5,
+    backoff: { type: 'exponential', delay: 5_000 },
+    removeOnComplete: { age: 86_400, count: 500 },
+    removeOnFail: { age: 604_800 * 2, count: 200 }, // keep failures 14d for DLQ
+  },
+};
