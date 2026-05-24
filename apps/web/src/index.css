@@ -84,6 +84,16 @@
   --tag-gray-bg: #eceef3;
   --tag-gray-fg: #4b5366;
 
+  /* Chart palette — sequential, accessible, dark-mode ready */
+  --chart-1: #2c4bff;
+  --chart-2: #1f8a5b;
+  --chart-3: #d08a00;
+  --chart-4: #8b5cf6;
+  --chart-5: #0ea5e9;
+  --chart-6: #f43f5e;
+  --chart-7: #10b981;
+  --chart-8: #f97316;
+
   /* Elevation — Apple-style layered shadows */
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.03), 0 0 1px rgba(0, 0, 0, 0.02);
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
@@ -156,6 +166,16 @@
   --tag-rose-fg: #f9a8d4;
   --tag-gray-bg: rgba(113, 113, 122, 0.16);
   --tag-gray-fg: #a1a1aa;
+
+  /* Chart palette — vivid neons against near-black */
+  --chart-1: #6366f1;
+  --chart-2: #34d399;
+  --chart-3: #fbbf24;
+  --chart-4: #a78bfa;
+  --chart-5: #38bdf8;
+  --chart-6: #fb7185;
+  --chart-7: #4ade80;
+  --chart-8: #fb923c;
 
   /* Shadows — glow-forward instead of drop-shadow */
   --shadow-xs: 0 0 0 1px rgba(255, 255, 255, 0.03);
