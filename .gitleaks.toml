@@ -1,0 +1,105 @@
+# gitleaks configuration for BidStack 360°.
+#
+# Layered on top of the gitleaks default rules (Stripe, AWS, GitHub, generic
+# high-entropy strings). This file adds the patterns enforced by
+# scripts/check-secrets.sh so the CI scan and the pre-commit hook share a
+# single source of truth.
+#
+# Path allowlist: example envs, markdown docs, fixtures, vendor lockfiles,
+# and the existing scanners themselves are not secret sources.
+
+title = "BidStack 360° gitleaks rules"
+
+[extend]
+# Pull in gitleaks' built-in catalogue — covers AWS, GitHub, Stripe, JWT,
+# Slack, PEM keys, generic high-entropy strings, and ~150 more providers.
+useDefault = true
+
+# -----------------------------------------------------------------------------
+# Custom rules — mirror scripts/check-secrets.sh patterns exactly.
+# -----------------------------------------------------------------------------
+
+[[rules]]
+id = "bidstack-stripe-live-secret"
+description = "Stripe live secret key"
+regex = '''sk_live_[A-Za-z0-9]{20,}'''
+tags = ["key", "stripe", "live"]
+
+[[rules]]
+id = "bidstack-stripe-test-secret"
+description = "Stripe test secret key"
+regex = '''sk_test_[A-Za-z0-9]{20,}'''
+tags = ["key", "stripe", "test"]
+
+[[rules]]
+id = "bidstack-stripe-publishable-live"
+description = "Stripe live publishable key"
+regex = '''pk_live_[A-Za-z0-9]{20,}'''
+tags = ["key", "stripe"]
+
+[[rules]]
+id = "bidstack-stripe-webhook"
+description = "Stripe webhook signing secret"
+regex = '''whsec_[A-Za-z0-9]{20,}'''
+tags = ["key", "stripe", "webhook"]
+
+[[rules]]
+id = "bidstack-openai-key"
+description = "OpenAI / Anthropic-style API key (sk-…)"
+regex = '''sk-[A-Za-z0-9]{20,}'''
+tags = ["key", "openai"]
+
+[[rules]]
+id = "bidstack-aws-access-key"
+description = "AWS access key ID"
+regex = '''AKIA[0-9A-Z]{16}'''
+tags = ["key", "aws"]
+
+[[rules]]
+id = "bidstack-github-pat"
+description = "GitHub personal access token"
+regex = '''ghp_[A-Za-z0-9]{30,}'''
+tags = ["key", "github"]
+
+[[rules]]
+id = "bidstack-github-oauth"
+description = "GitHub OAuth token"
+regex = '''gho_[A-Za-z0-9]{30,}'''
+tags = ["key", "github"]
+
+[[rules]]
+id = "bidstack-pem-private-key"
+description = "PEM-encoded private key block"
+regex = '''-----BEGIN (RSA|OPENSSH|EC|DSA|PRIVATE) PRIVATE KEY-----'''
+tags = ["key", "pem"]
+
+[[rules]]
+id = "bidstack-clerk-secret"
+description = "Clerk secret key"
+regex = '''sk_(live|test)_[A-Za-z0-9_-]{40,}'''
+tags = ["key", "clerk"]
+
+# -----------------------------------------------------------------------------
+# Path allowlist — known-safe files that contain pattern-shaped placeholders.
+# -----------------------------------------------------------------------------
+
+[allowlist]
+description = "Documentation, examples, fixtures, lockfiles, and the scanners themselves"
+paths = [
+  '''(^|/)\.env\.example$''',
+  '''(^|/)\.gitleaks\.toml$''',
+  '''(^|/)scripts/check-secrets\.sh$''',
+  '''(^|/)\.claude/hooks/scan-secrets\.sh$''',
+  '''(^|/)pnpm-lock\.yaml$''',
+  '''(^|/)package-lock\.json$''',
+  '''(^|/)apps/api/src/security/penetration\.test\.ts$''',
+  '''(^|/)apps/api/src/plugins/auth\.test\.ts$''',
+  '''(^|/)apps/api/src/routes/webhooks\.integration\.test\.ts$''',
+  '''\.md$''',
+]
+# Common documentation strings that look like keys but aren't.
+regexes = [
+  '''EXAMPLE-KEY-DO-NOT-USE''',
+  '''your[-_]?api[-_]?key[-_]?here''',
+  '''xxxxxxxxxxxxxxxxxxxx''',
+]

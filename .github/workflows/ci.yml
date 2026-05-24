@@ -79,6 +79,21 @@ jobs:
             exit 1
           fi
 
+  # Full-tree secret scan — catches credentials that slipped past the
+  # pre-commit hook (e.g. branch imports, partial reverts). Independent of
+  # gitleaks: this enforces the BidStack-specific pattern set from
+  # scripts/check-secrets.sh on every tracked file.
+  secrets-full-scan:
+    name: Full-tree secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Scan tracked files
+        run: bash scripts/check-secrets.sh --full
+
   # Heavy integration tests against real Postgres + Redis.
   # Runs on PRs only (skipped on main pushes since main is post-merge).
   integration:

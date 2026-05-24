@@ -1,0 +1,61 @@
+# Semgrep SAST — runs on every push to main and every PR.
+# Rulesets are the OWASP curated bundles + language-specific high-signal sets.
+# Why fail on ERROR only: WARNING-tier results live in the SARIF artefact for
+# review on the Security tab, but only ERROR-tier findings should ever block
+# a merge. ERROR maps to the "code-as-vulnerability" tier in Semgrep's taxonomy.
+
+name: Semgrep SAST
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Limit GITHUB_TOKEN to the minimum surface needed: read source + write SARIF
+# results into GitHub Security. Anything broader is a privilege escalation
+# surface for compromised workflow dependencies.
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: semgrep-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  semgrep:
+    name: Semgrep scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Skip on Dependabot updates — they don't change application source.
+    if: github.actor != 'dependabot[bot]'
+    container:
+      image: returntocorp/semgrep
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        env:
+          # Fail the build on ERROR-severity findings only. WARNING + INFO
+          # are visible in the SARIF report but don't block the PR.
+          SEMGREP_RULES: >-
+            p/typescript
+            p/owasp-top-ten
+            p/secrets
+            p/javascript
+            p/dockerfile
+        run: |
+          semgrep ci \
+            --sarif \
+            --output=semgrep.sarif \
+            --severity=ERROR \
+            --error \
+            --metrics=off
+
+      - name: Upload SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep

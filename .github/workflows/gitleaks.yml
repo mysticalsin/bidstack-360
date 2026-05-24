@@ -1,0 +1,51 @@
+# gitleaks — secret scanning across the full git history.
+# Runs on every PR and every push (including main) so a re-pushed branch with
+# a previously committed secret still triggers the alarm.
+#
+# `--no-banner` keeps the log clean for inline GitHub annotations.
+# fetch-depth: 0 is required so gitleaks can walk every commit on the branch.
+
+name: gitleaks
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+concurrency:
+  group: gitleaks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gitleaks:
+    name: gitleaks secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Custom config layers BidStack-specific patterns on top of the
+          # gitleaks default ruleset (Stripe, AWS, GitHub, PEM, generic
+          # high-entropy strings).
+          GITLEAKS_CONFIG: .gitleaks.toml
+          GITLEAKS_NOTIFY_USER_LIST: ''
+          GITLEAKS_ENABLE_COMMENTS: 'true'
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: 'true'
+        with:
+          # `--no-banner` is the only literal flag this action forwards;
+          # everything else comes from env vars.
+          args: >-
+            detect
+            --no-banner
+            --redact
+            --verbose

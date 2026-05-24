@@ -1,0 +1,41 @@
+# Dependency review — blocks PRs that introduce CRITICAL or HIGH severity
+# CVE-affected dependencies. Read-only; no install side effects.
+#
+# This complements the `pnpm audit --audit-level high` step in ci.yml by
+# producing an inline GitHub-native PR comment showing exactly which dep
+# triggered the block and the CVE chain. The pnpm step is a release gate;
+# this is a PR-time advisory + fail.
+
+name: Dependency Review
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: dep-review-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-review:
+    name: Dependency review (block CRITICAL/HIGH CVEs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/dependency-review-action@v4
+        with:
+          # Fail the PR if any added dependency carries an open CVE at this
+          # severity or worse. "moderate" or "low" CVEs are noted in the PR
+          # comment but do not block.
+          fail-on-severity: high
+          # License compliance is governed elsewhere; this gate is CVE-only.
+          # If we add a license allow-list later, populate `allow-licenses`
+          # and turn `fail-on-licenses` to a hard list.
+          comment-summary-in-pr: on-failure
+          warn-only: false
