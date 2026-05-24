@@ -20,6 +20,7 @@
     "@bidstack/shared": "workspace:*",
     "bullmq": "^5.34.6",
     "dotenv-flow": "^4.1.0",
+    "expo-server-sdk": "^3.10.0",
     "ioredis": "^5.4.2",
     "mammoth": "^1.12.0",
     "node-pptx-parser": "^1.0.1",

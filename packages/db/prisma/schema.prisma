@@ -141,6 +141,8 @@ model Org {
   savedViews             SavedView[]
   // Wave 7 — Real-time collaboration
   entityEditLocks        EntityEditLock[]
+  // Wave 7 — Mobile native push tokens (Expo / APNs / FCM)
+  nativePushTokens       NativePushToken[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -194,6 +196,8 @@ model User {
   slackUserMappings SlackUserMapping[]
   // Wave 7 — Saved Views
   savedViews        SavedView[]
+  // Wave 7 — Mobile native push tokens
+  nativePushTokens  NativePushToken[]
 
   @@index([orgId])
   @@index([deletedAt])
@@ -3651,4 +3655,40 @@ model SavedView {
   @@index([orgId, entity, shared], map: "saved_views_org_entity_shared_idx")
   @@index([deletedAt])
   @@map("saved_views")
+}
+
+// ─── Wave 7: Mobile native push tokens ────────────────────────────────────
+
+/// Stores Expo / APNs / FCM push tokens registered from the native mobile shell.
+/// WHY a separate table (not re-using WebPushSubscription): native push uses a
+/// different token format and delivery path (expo-server-sdk, not web-push).
+/// One token per (org, user, deviceId) — updating the row on re-register keeps
+/// stale tokens from accumulating.
+model NativePushToken {
+  id       String @id @default(uuid()) @db.Uuid
+  orgId    String @map("org_id") @db.Uuid
+  userId   String @map("user_id") @db.Uuid
+  /// Stable device identifier (Expo's `Constants.installationId` or custom UUID
+  /// persisted in SecureStore). Used to upsert rather than insert duplicates.
+  deviceId String @map("device_id") @db.VarChar(128)
+  /// Expo push token string (ExponentPushToken[xxxxxxxx]).
+  token    String @db.VarChar(256)
+  /// EXPO | APNS | FCM — always EXPO in the initial implementation; left open
+  /// for direct APNs / FCM integration without Expo in future.
+  provider String @default("EXPO") @db.VarChar(16)
+  /// iOS | android | web
+  platform String @db.VarChar(16)
+  /// Set to false (soft-delete) when the user signs out or disables push.
+  active   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// One active token per (org, user, device). Re-registration updates the row.
+  @@unique([orgId, userId, deviceId], map: "native_push_tokens_org_user_device_key")
+  @@index([orgId, active])
+  @@index([userId, active])
+  @@map("native_push_tokens")
 }

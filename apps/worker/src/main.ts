@@ -16,6 +16,7 @@ import { startDocumentExtract } from './queues/document-extract.js';
 import { startCalendarSync } from './queues/calendar-sync.js';
 import { startEmailSync } from './queues/email-sync.js';
 import { startSmsWorker } from './queues/sms.js';
+import { startNativePushWorker } from './queues/notifications.js';
 
 const log = pino({
   level: process.env.LOG_LEVEL ?? 'info',
@@ -46,10 +47,11 @@ await Promise.all([
   startCalendarSync(connection, log, workers, queues),
   startEmailSync(connection, log, workers, queues),
   startSmsWorker(connection, log, workers as never, queues),
+  startNativePushWorker(connection, log, workers, queues),
 ]);
 
 log.info(
-  'BidStack worker ready (dust-poll + webhook-processor + company-enrich-apollo + document-extract + calendar-sync + email-sync + sms)',
+  'BidStack worker ready (dust-poll + webhook-processor + company-enrich-apollo + document-extract + calendar-sync + email-sync + sms + native-push)',
 );
 
 const healthPort = Number(process.env.WORKER_HEALTH_PORT || 4002);

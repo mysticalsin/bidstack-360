@@ -86,6 +86,8 @@ import { helpRoutes } from './routes/help.js';
 import { customObjectRoutes } from './routes/custom-objects.js';
 // Wave 7 — Twilio SMS (webhook = unauthenticated, sms routes = authenticated)
 import { twilioWebhookRoutes, smsRoutes } from './routes/integrations/twilio.js';
+// Wave 7 — Mobile native push registration
+import { nativePushRoutes } from './routes/notifications.js';
 
 const CONNECT_SRC = [
   "'self'",
@@ -232,6 +234,8 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(cacheHeadersPlugin);
   await server.register(queryGuardPlugin);
   await server.register(redisCachePlugin);
+  // Wave 7 — Real-time WebSocket plugin (must come before route registration)
+  await server.register(realtimePlugin);
   await server.register(healthRoute);
   if (config.NODE_ENV !== 'test') {
     await server.register(rateLimit, {
@@ -335,6 +339,14 @@ export async function buildServer(): Promise<FastifyInstance> {
   // microsoft-webhook pattern. WHY /api/v1 for sms routes: user-facing, needs auth middleware.
   await server.register(twilioWebhookRoutes, { prefix: '/api/v1/integrations' });
   await server.register(smsRoutes, { prefix: '/api/v1' });
+
+  // Wave 7 — Real-time collaboration REST endpoints (lock + presence snapshot)
+  // WHY /api/v1: consistent with other authenticated endpoints.
+  // The WebSocket endpoint /api/realtime is registered by the realtimePlugin above.
+  await server.register(realtimeRoutes, { prefix: '/api/v1' });
+
+  // Wave 7 — Mobile native push token registration (Expo push service)
+  await server.register(nativePushRoutes, { prefix: '/api/v1' });
 
   return server;
 }
