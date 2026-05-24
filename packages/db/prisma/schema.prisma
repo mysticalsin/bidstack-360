@@ -111,6 +111,9 @@ model Org {
   // Wave 3 — booking pages
   bookingPages           BookingPage[]
   bookings               Booking[]
+  // Wave 3 — migration connectors
+  migrationJobs          MigrationJob[]
+  migrationMappings      MigrationMapping[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -155,8 +158,9 @@ model User {
   // Wave 2 — calendar integration
   integrationTokens IntegrationToken[]
   calendarEvents    CalendarEvent[]
-  // Wave 3 — booking pages
+  // Wave 3 — booking pages & migration
   bookingPages      BookingPage[]
+  migrationJobs     MigrationJob[]
 
   @@index([orgId])
   @@index([deletedAt])
@@ -1514,6 +1518,81 @@ model IntegrationConfig {
   @@index([orgId, isActive], map: "integration_configs_org_active_idx")
   @@index([deletedAt])
   @@map("integration_configs")
+}
+
+// ─── Migration Connectors (Wave 3) ─────────────────────────────────────────
+// MigrationJob tracks every import attempt: Salesforce CSV, HubSpot OAuth, or
+// generic CSV. Progress is polled by the frontend every 2s while RUNNING.
+// Idempotency: re-imports with the same external_id column are detected in the
+// worker and counted as 'updated' rather than 'created'.
+//
+// MigrationMapping persists column-mapping decisions so users don't re-map on
+// retry. Keyed by (orgId, source, sourceEntity) — one mapping per entity type.
+
+enum MigrationSource {
+  SALESFORCE_CSV
+  HUBSPOT_OAUTH
+  CSV
+
+  @@map("migration_source")
+}
+
+enum MigrationStatus {
+  PENDING
+  RUNNING
+  COMPLETE
+  FAILED
+  CANCELLED
+
+  @@map("migration_status")
+}
+
+model MigrationJob {
+  id            String          @id @default(uuid()) @db.Uuid
+  orgId         String          @map("org_id") @db.Uuid
+  userId        String          @map("user_id") @db.Uuid
+  source        MigrationSource
+  // Status drives the frontend progress bar.
+  status        MigrationStatus @default(PENDING)
+  // Totals are filled in at job start once we know the row count.
+  totalRows     Int             @default(0) @map("total_rows")
+  processedRows Int             @default(0) @map("processed_rows")
+  errorRows     Int             @default(0) @map("error_rows")
+  startedAt     DateTime?       @map("started_at") @db.Timestamptz(6)
+  completedAt   DateTime?       @map("completed_at") @db.Timestamptz(6)
+  // JSON array of { row, field, message } — downloaded by user as CSV.
+  errorSummary  Json            @default("[]") @map("error_summary")
+  // Stores entity counts discovered during HubSpot OAuth discovery phase.
+  meta          Json            @default("{}") @map("meta")
+  // Allows the "Undo this migration" action within 24h. Set when job completes.
+  undoableUntil DateTime?       @map("undoable_until") @db.Timestamptz(6)
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, status])
+  @@index([orgId, createdAt(sort: Desc)])
+  @@map("migration_jobs")
+}
+
+model MigrationMapping {
+  id           String          @id @default(uuid()) @db.Uuid
+  orgId        String          @map("org_id") @db.Uuid
+  source       MigrationSource
+  // Entity name as it comes from the source system, e.g. "Account", "Contact".
+  sourceEntity String          @map("source_entity")
+  // JSON object: { sourceColumn: targetField }. Persisted so re-imports reuse.
+  mappings     Json            @default("{}") @map("mappings")
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, source, sourceEntity], map: "migration_mappings_org_source_entity_key")
+  @@index([orgId, source])
+  @@map("migration_mappings")
 }
 
 // ─── Agents ────────────────────────────────────────────────────────────────

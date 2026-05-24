@@ -29,3 +29,4 @@ export * from './rfp-document.js';
 export * from './bid-score.js';
 export * from './proposal.js';
 export * from './activity.js';
+export * from './migration.js';

@@ -106,3 +106,19 @@ export const CALENDAR_WATCH_RENEW: QueueConfig = {
     removeOnFail: { age: 604_800, count: 50 },
   },
 };
+
+/**
+ * Migration connector — Salesforce CSV, HubSpot OAuth, and generic CSV.
+ * Processes rows in chunks of 100. Long backoff because HubSpot API 429s
+ * require waiting 10+ seconds before retrying (Burst tier: 100 req/10s).
+ * Jobs are idempotent via external_id deduplication in the worker.
+ */
+export const MIGRATION: QueueConfig = {
+  name: 'migration',
+  defaultJobOptions: {
+    attempts: 5,
+    backoff: { type: 'exponential', delay: 10_000 },
+    removeOnComplete: { age: 86_400 * 7, count: 500 }, // keep 7d for audit
+    removeOnFail: { age: 86_400 * 30, count: 200 },
+  },
+};
