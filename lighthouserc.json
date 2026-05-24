@@ -1,0 +1,62 @@
+{
+  "ci": {
+    "collect": {
+      "startServerCommand": "pnpm --filter @bidstack/web preview --port 4173",
+      "startServerReadyPattern": "ready in",
+      "startServerReadyTimeout": 30000,
+      "url": [
+        "http://localhost:4173/",
+        "http://localhost:4173/login",
+        "http://localhost:4173/dashboard",
+        "http://localhost:4173/leads",
+        "http://localhost:4173/pipeline",
+        "http://localhost:4173/contacts",
+        "http://localhost:4173/reports",
+        "http://localhost:4173/integrations",
+        "http://localhost:4173/settings",
+        "http://localhost:4173/book/sample-slug"
+      ],
+      "numberOfRuns": 1,
+      "settings": {
+        "chromeFlags": "--no-sandbox --headless --disable-dev-shm-usage",
+        "preset": "desktop",
+        "throttling": {
+          "rttMs": 40,
+          "throughputKbps": 10240,
+          "cpuSlowdownMultiplier": 1
+        }
+      }
+    },
+    "assert": {
+      "preset": "lighthouse:recommended",
+      "assertions": {
+        "categories:performance": ["warn", { "minScore": 0.9 }],
+        "categories:accessibility": ["warn", { "minScore": 1.0 }],
+        "categories:best-practices": ["warn", { "minScore": 0.95 }],
+        "categories:seo": ["warn", { "minScore": 0.95 }],
+        "first-contentful-paint": ["warn", { "maxNumericValue": 2500 }],
+        "largest-contentful-paint": ["warn", { "maxNumericValue": 2500 }],
+        "interactive": ["warn", { "maxNumericValue": 5000 }],
+        "total-blocking-time": ["warn", { "maxNumericValue": 300 }],
+        "cumulative-layout-shift": ["warn", { "maxNumericValue": 0.1 }],
+        "uses-rel-preconnect": "off",
+        "uses-text-compression": "warn",
+        "uses-optimized-images": "warn",
+        "uses-webp-images": "warn",
+        "unused-javascript": "warn",
+        "unused-css-rules": "warn",
+        "color-contrast": "warn",
+        "image-alt": "error",
+        "link-name": "error",
+        "button-name": "error",
+        "document-title": "error",
+        "html-has-lang": "error",
+        "meta-description": "warn",
+        "is-crawlable": "warn"
+      }
+    },
+    "upload": {
+      "target": "temporary-public-storage"
+    }
+  }
+}
