@@ -12,11 +12,12 @@ import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
 import { SpotlightTable, SpotlightTableRow } from '@/components/ui/SpotlightTable';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
+import { InlineEditSelect } from '@/components/opportunity/InlineEdit';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
-import { useDeleteLead, useLeads } from '@/hooks/useLeads';
+import { useDeleteLead, useLeads, useUpdateLeadById } from '@/hooks/useLeads';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { LeadStatus, LeadPriority } from '@bidstack/shared';
-import type { LeadSummary } from '@bidstack/shared';
+import type { LeadPatch, LeadSummary } from '@bidstack/shared';
 
 const STATUS_OPTIONS: { value: LeadStatus | ''; label: string }[] = [
   { value: '', label: 'All statuses' },
@@ -49,6 +50,9 @@ export function LeadsPage() {
     limit: 50,
   });
   const del = useDeleteLead();
+  // A2 — inline cell editing (Twenty pattern). One mutation instance fans
+  // across the whole table via optimistic updates keyed to lead id.
+  const updateLead = useUpdateLeadById();
 
   const items = useMemo(() => data?.items ?? [], [data?.items]);
   const bulk = useBulkSelection(items);
@@ -331,6 +335,7 @@ export function LeadsPage() {
                   selected={bulk.isSelected(lead.id)}
                   query={deferredSearch}
                   onToggle={() => bulk.toggleOne(lead.id)}
+                  onPatch={(patch) => updateLead.mutate({ id: lead.id, patch })}
                   onDelete={async () => {
                     const ok = await confirm({
                       title: 'Delete lead?',
@@ -354,17 +359,38 @@ export function LeadsPage() {
   );
 }
 
+// Status options for InlineEditSelect — defined at module level to keep the
+// component's identity stable and avoid creating new arrays on each render.
+const LEAD_STATUS_OPTS = [
+  { value: 'new' as const, label: 'New' },
+  { value: 'contacted' as const, label: 'Contacted' },
+  { value: 'qualified' as const, label: 'Qualified' },
+  { value: 'nurture' as const, label: 'Nurture' },
+  { value: 'disqualified' as const, label: 'Disqualified' },
+  { value: 'converted' as const, label: 'Converted' },
+];
+
+const LEAD_PRIORITY_OPTS = [
+  { value: 'low' as const, label: 'Low' },
+  { value: 'medium' as const, label: 'Medium' },
+  { value: 'high' as const, label: 'High' },
+  { value: 'critical' as const, label: 'Critical' },
+];
+
 function LeadRow({
   lead,
   selected,
   query,
   onToggle,
+  onPatch,
   onDelete,
 }: {
   lead: LeadSummary;
   selected: boolean;
   query: string;
   onToggle: () => void;
+  /** A2: called when an inline edit is committed; patch fan is handled by useUpdateLeadById. */
+  onPatch: (patch: LeadPatch) => void;
   onDelete: () => void;
 }) {
   return (
@@ -399,11 +425,26 @@ function LeadRow({
         {lead.email && <div className="text-xs text-[var(--fg-tertiary)]">{lead.email}</div>}
       </td>
       <td className="px-4 py-3 text-[var(--fg-secondary)]">{lead.companyName ?? '—'}</td>
+      {/* A2 — status is inline-editable. Read mode shows the styled badge;
+          edit mode swaps in a <select> and blur/Enter commits immediately. */}
       <td className="px-4 py-3">
-        <LeadStatusBadge status={lead.status} />
+        <InlineEditSelect
+          value={lead.status}
+          options={LEAD_STATUS_OPTS}
+          onSave={(next) => onPatch({ status: next })}
+          label={`Edit status for ${lead.firstName} ${lead.lastName}`}
+          display={(v) => <LeadStatusBadge status={v as LeadSummary['status']} />}
+        />
       </td>
+      {/* A2 — priority is inline-editable. */}
       <td className="px-4 py-3">
-        <LeadPriorityBadge priority={lead.priority} />
+        <InlineEditSelect
+          value={lead.priority}
+          options={LEAD_PRIORITY_OPTS}
+          onSave={(next) => onPatch({ priority: next })}
+          label={`Edit priority for ${lead.firstName} ${lead.lastName}`}
+          display={(v) => <LeadPriorityBadge priority={v as LeadSummary['priority']} />}
+        />
       </td>
       <td className="px-4 py-3">
         <span className="font-mono text-xs">{lead.score}</span>

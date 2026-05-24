@@ -8,7 +8,6 @@ import type {
   LeadFilter,
   LeadPage,
   LeadPatch,
-  OpportunityStage,
 } from '@bidstack/shared';
 
 const LEADS_KEY = 'leads';
@@ -68,7 +67,7 @@ export function useConvertLead(id: string) {
     mutationFn: (body: {
       opportunityName?: string;
       opportunityValueMicros?: number;
-      stage?: OpportunityStage;
+      pipelineStageId?: string;
     }) =>
       api<{ leadId: string; opportunityId: string; contactId: string }>(
         `/api/leads/${id}/convert`,
@@ -83,6 +82,34 @@ export function useConvertLead(id: string) {
       qc.invalidateQueries({ queryKey: ['opportunities'] });
       qc.invalidateQueries({ queryKey: ['contacts'] });
     },
+  });
+}
+
+// A2 (Twenty pattern) — variable-id variant for inline cell edits in the
+// leads list. Unlike useUpdateLead(id), this receives {id, patch} per call
+// so a single hook instance serves the whole table without mounting N mutations.
+export function useUpdateLeadById() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: LeadPatch }) =>
+      api<LeadDetail>(`/api/leads/${id}`, { method: 'PATCH', body: patch }),
+    onMutate: async ({ id, patch }) => {
+      await qc.cancelQueries({ queryKey: [LEADS_KEY] });
+      const snapshots: Array<readonly [readonly unknown[], LeadPage | undefined]> = [];
+      qc.getQueriesData<LeadPage>({ queryKey: [LEADS_KEY] }).forEach(([key, value]) => {
+        snapshots.push([key, value]);
+        if (!value) return;
+        qc.setQueryData<LeadPage>(key, {
+          ...value,
+          items: value.items.map((l) => (l.id === id ? { ...l, ...patch } : l)),
+        });
+      });
+      return { snapshots };
+    },
+    onError: (_err, _vars, ctx) => {
+      ctx?.snapshots.forEach(([key, value]) => qc.setQueryData(key, value));
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: [LEADS_KEY] }),
   });
 }
 

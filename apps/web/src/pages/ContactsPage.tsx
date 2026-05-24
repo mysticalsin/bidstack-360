@@ -5,6 +5,11 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { ContactCsvImportDialog } from '@/components/contact/ContactCsvImportDialog';
 import { ContactDialog } from '@/components/contact/ContactDialog';
 import { ContactQuickLook } from '@/components/contact/ContactQuickLook';
+import {
+  InlineEditNumber,
+  InlineEditSelect,
+  InlineEditText,
+} from '@/components/opportunity/InlineEdit';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -17,7 +22,7 @@ import { SortableHeader, getSortableHeaderAriaSort } from '@/components/ui/Sorta
 import { SpotlightTable, SpotlightTableRow } from '@/components/ui/SpotlightTable';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
-import { useContacts, useCreateContact, useDeleteContact } from '@/hooks/useContacts';
+import { useContacts, useCreateContact, useDeleteContact, useUpdateContact } from '@/hooks/useContacts';
 import { useTableSort } from '@/hooks/useTableSort';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { pushUndo } from '@/stores/undoStack';
@@ -30,6 +35,14 @@ const SENTIMENT_TONE: Record<Sentiment, BadgeTone> = {
   cold: 'blue',
 };
 
+// Module-level constants avoid creating new arrays inside render (stable identity for memoization).
+const SENTIMENT_OPTS = [
+  { value: 'hot' as Sentiment, label: 'Hot' },
+  { value: 'warm' as Sentiment, label: 'Warm' },
+  { value: 'neutral' as Sentiment, label: 'Neutral' },
+  { value: 'cold' as Sentiment, label: 'Cold' },
+];
+
 export function ContactsPage() {
   const [search, setSearch] = useState('');
   // useDeferredValue keeps typing snappy; the table re-renders on the next
@@ -40,6 +53,9 @@ export function ContactsPage() {
     search: deferredSearch.trim() || undefined,
   });
   const del = useDeleteContact();
+  // A2 — inline cell editing (Twenty pattern). One mutation instance covers
+  // the whole table; onMutate fans across every cached contacts list.
+  const updateContact = useUpdateContact();
   // Undo path: re-creates the contact from the snapshot we still have in
   // memory after a successful delete. Server treats it as a fresh insert
   // and the audit log captures both events — that's the truth.
@@ -570,7 +586,18 @@ export function ContactsPage() {
                       {c.name}
                     </Link>
                   </td>
-                  <td className="px-5 py-3 text-[var(--fg-secondary)]">{c.role ?? '—'}</td>
+                  {/* A2 — role is inline-editable: click cell to enter text, blur/Enter commits. */}
+                  <td className="px-5 py-3 text-[var(--fg-secondary)]">
+                    <InlineEditText
+                      value={c.role ?? ''}
+                      onSave={(next) =>
+                        updateContact.mutate({ id: c.id, patch: { role: next || null } })
+                      }
+                      label={`Edit role for ${c.name}`}
+                      placeholder="Add role…"
+                      display={(v) => v || <span className="text-[var(--fg-tertiary)]">—</span>}
+                    />
+                  </td>
                   <td className="px-5 py-3 text-[var(--fg-secondary)]">{c.customer}</td>
                   <td className="px-5 py-3 text-[var(--fg-secondary)]">
                     <div className="flex flex-col">
@@ -588,15 +615,45 @@ export function ContactsPage() {
                       {!c.email && !c.phone ? '—' : null}
                     </div>
                   </td>
+                  {/* A2 — influence (1–5) is inline-editable. */}
                   <td className="px-5 py-3 tabular-nums text-[var(--fg-primary)]">
-                    {c.influence ? `${c.influence}/5` : '—'}
+                    <InlineEditNumber
+                      value={c.influence ?? 0}
+                      min={0}
+                      max={5}
+                      step={1}
+                      onSave={(next) =>
+                        updateContact.mutate({
+                          id: c.id,
+                          patch: { influence: next === 0 ? null : next },
+                        })
+                      }
+                      label={`Edit influence for ${c.name}`}
+                      display={(v) =>
+                        v ? `${v}/5` : <span className="text-[var(--fg-tertiary)]">—</span>
+                      }
+                    />
                   </td>
+                  {/* A2 — sentiment is inline-editable via select. Read mode shows the badge. */}
                   <td className="px-5 py-3">
-                    {c.sentiment ? (
-                      <Badge tone={SENTIMENT_TONE[c.sentiment]}>{c.sentiment}</Badge>
-                    ) : (
-                      '—'
-                    )}
+                    <InlineEditSelect
+                      value={c.sentiment ?? ''}
+                      options={[{ value: '' as Sentiment, label: '—' }, ...SENTIMENT_OPTS]}
+                      onSave={(next) =>
+                        updateContact.mutate({
+                          id: c.id,
+                          patch: { sentiment: (next as Sentiment) || null },
+                        })
+                      }
+                      label={`Edit sentiment for ${c.name}`}
+                      display={(v) =>
+                        v ? (
+                          <Badge tone={SENTIMENT_TONE[v as Sentiment]}>{v}</Badge>
+                        ) : (
+                          <span className="text-[var(--fg-tertiary)]">—</span>
+                        )
+                      }
+                    />
                   </td>
                   <td className="px-5 py-3 text-right">
                     <div className="inline-flex items-center gap-1">
