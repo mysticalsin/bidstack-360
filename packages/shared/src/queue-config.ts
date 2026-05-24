@@ -166,3 +166,34 @@ export const ZAPIER_WEBHOOK: QueueConfig = {
     removeOnFail: { age: 604_800 * 2, count: 200 }, // keep failures 14d for DLQ
   },
 };
+
+// ─── Wave 5: Slack notification queues ───────────────────────────────────
+
+/**
+ * Slack channel message — posts Block Kit message to a channel.
+ * Rate-limited per Slack Tier 3 (≤50 req/sec burst; per-channel 1 msg/s).
+ * WHY separate from DM queue: different per-channel rate limits apply.
+ */
+export const SLACK_SEND_MESSAGE: QueueConfig = {
+  name: 'slack.send-message',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 2_000 },
+    removeOnComplete: { age: 86_400, count: 500 },
+    removeOnFail: { age: 604_800, count: 200 },
+  },
+};
+
+/**
+ * Slack DM — opens a 1:1 IM channel via conversations.open and posts.
+ * Kept separate from channel messages for rate-limit accounting.
+ */
+export const SLACK_DM_USER: QueueConfig = {
+  name: 'slack.dm-user',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 2_000 },
+    removeOnComplete: { age: 86_400, count: 500 },
+    removeOnFail: { age: 604_800, count: 200 },
+  },
+};
