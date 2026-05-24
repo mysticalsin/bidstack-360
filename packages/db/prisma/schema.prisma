@@ -91,6 +91,9 @@ model Org {
   memosPolicies          MemosPolicy[]
   memosWorldModels       MemosWorldModel[]
   bidScores              BidScore[]
+  quotes                 Quote[]
+  quoteLines             QuoteLine[]
+  quoteVersions          QuoteVersion[]
   SubscriptionEvent      SubscriptionEvent[]
   customFieldDefinitions CustomFieldDefinition[]
   customFieldValues      CustomFieldValue[]
@@ -923,17 +926,19 @@ model AccountProduct {
 // Tracks LLM extraction jobs run against account documents.
 
 model DocumentExtraction {
-  id            String   @id @default(uuid()) @db.Uuid
-  orgId         String   @map("org_id") @db.Uuid
-  documentId    String   @map("document_id") @db.Uuid
-  accountId     String   @map("account_id") @db.VarChar(255)
-  companyId     String?  @map("company_id") @db.Uuid
-  status        String   @default("pending") // pending | running | done | error
-  extractedData Json     @default("{}") @map("extracted_data")
+  id            String    @id @default(uuid()) @db.Uuid
+  orgId         String    @map("org_id") @db.Uuid
+  documentId    String    @map("document_id") @db.Uuid
+  accountId     String    @map("account_id") @db.VarChar(255)
+  companyId     String?   @map("company_id") @db.Uuid
+  status        String    @default("pending") // pending | running | done | error
+  extractedData Json      @default("{}") @map("extracted_data")
   error         String?
-  dustRunId     String?  @map("dust_run_id")
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  dustRunId     String?   @map("dust_run_id")
+  startedAt     DateTime? @map("started_at") @db.Timestamptz(6)
+  heartbeatAt   DateTime? @map("heartbeat_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   org     Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
   company Company? @relation(fields: [companyId], references: [id])
@@ -942,6 +947,7 @@ model DocumentExtraction {
 
   @@index([orgId, accountId, status], map: "doc_extractions_org_account_status_idx")
   @@index([orgId, companyId])
+  @@index([status, startedAt], map: "doc_extractions_status_started_idx")
   @@index([deletedAt])
   @@map("document_extractions")
 }
@@ -2085,6 +2091,8 @@ model Role {
   @@map("roles")
 }
 
+// Permission is a global reference table (not tenant-scoped).
+// Org-level access control is enforced via RolePermission junction table.
 model Permission {
   id          String  @id @default(uuid()) @db.Uuid
   key         String  @unique
@@ -2456,4 +2464,109 @@ model BidScore {
   @@index([orgId, recommendation])
   @@index([deletedAt])
   @@map("bid_scores")
+}
+
+// ─── Quotes (Phase 5 — CRM core depth) ────────────────────────────────────
+// First-class quote entity, separate from SalesOrder (Odoo-style draft→order
+// model). Quotes are the formal pricing offer to a prospect; on acceptance
+// they materialise into a SalesOrder (linked via a follow-up migration).
+// Version history is immutable — each PATCH that changes pricing snapshots
+// the full Quote+QuoteLine payload into QuoteVersion.
+
+enum QuoteState {
+  draft
+  sent
+  accepted
+  rejected
+  expired
+
+  @@map("quote_state")
+}
+
+model Quote {
+  id             String     @id @default(uuid()) @db.Uuid
+  orgId          String     @map("org_id") @db.Uuid
+  opportunityId  String?    @map("opportunity_id") @db.Uuid
+  accountId      String?    @map("account_id") @db.Uuid
+  ownerId        String     @map("owner_id") @db.Uuid
+  version        Int        @default(1)
+  state          QuoteState @default(draft)
+  number         String?
+  totalMicros    BigInt     @default(0) @map("total_micros")
+  taxMicros      BigInt     @default(0) @map("tax_micros")
+  currency       String     @default("CAD") @db.VarChar(3)
+  validUntil     DateTime?  @map("valid_until") @db.Timestamptz(6)
+  sentAt         DateTime?  @map("sent_at") @db.Timestamptz(6)
+  acceptedAt     DateTime?  @map("accepted_at") @db.Timestamptz(6)
+  rejectedAt     DateTime?  @map("rejected_at") @db.Timestamptz(6)
+  expiredAt      DateTime?  @map("expired_at") @db.Timestamptz(6)
+  terms          String?
+  notes          String?
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org      Org            @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  lines    QuoteLine[]
+  versions QuoteVersion[]
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@unique([orgId, number])
+  @@index([orgId, state, updatedAt(sort: Desc)])
+  @@index([orgId, opportunityId])
+  @@index([orgId, accountId])
+  @@index([orgId, ownerId])
+  @@index([orgId])
+  @@index([deletedAt])
+  @@map("quotes")
+}
+
+model QuoteLine {
+  id               String   @id @default(uuid()) @db.Uuid
+  orgId            String   @map("org_id") @db.Uuid
+  quoteId          String   @map("quote_id") @db.Uuid
+  productId        String?  @map("product_id") @db.Uuid
+  name             String
+  description      String?
+  quantity         Decimal  @default(1) @db.Decimal(12, 3)
+  unitPriceMicros  BigInt   @map("unit_price_micros")
+  discountPct      Decimal? @map("discount_pct") @db.Decimal(5, 2)
+  lineTotalMicros  BigInt   @map("line_total_micros")
+  sortOrder        Int      @default(0) @map("sort_order")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org   Org   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([orgId, quoteId, sortOrder])
+  @@index([orgId, productId])
+  @@index([orgId])
+  @@index([deletedAt])
+  @@map("quote_lines")
+}
+
+model QuoteVersion {
+  id          String   @id @default(uuid()) @db.Uuid
+  orgId       String   @map("org_id") @db.Uuid
+  quoteId     String   @map("quote_id") @db.Uuid
+  version     Int
+  /// Full snapshot of the Quote + QuoteLines at the moment of the version cut.
+  /// Immutable. Keep wire-shape identical to the QuoteDetail Zod schema so
+  /// versions can be rehydrated by the frontend without translation.
+  snapshot    Json
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org   Org   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@unique([orgId, quoteId, version])
+  @@index([orgId, quoteId, createdAt(sort: Desc)])
+  @@index([orgId])
+  @@index([deletedAt])
+  @@map("quote_versions")
 }
