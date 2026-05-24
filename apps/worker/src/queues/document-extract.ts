@@ -14,7 +14,12 @@ import { prisma, type Prisma } from '@bidstack/db';
 
 import { DOCUMENT_EXTRACT } from '@bidstack/shared';
 import { DustClient } from '@bidstack/dust-client';
-import { extractTextFromBuffer } from '../lib/extract-text.js';
+// Use the sandboxed wrapper so untrusted upload bytes are parsed inside a
+// worker_thread with a memory ceiling and a hard timeout, isolated from the
+// queue worker's heap. See docs/audits/2026-05-24-twenty-agent-deep-audit.md
+// HIGH-2 for the threat model. The direct (in-process) export remains
+// available for unit tests that don't need sandboxing.
+import { extractTextFromBufferSandboxed } from '../lib/extract-text-sandbox.js';
 import { readStoredDocument } from '../lib/storage-read.js';
 
 const QUEUE_NAME = DOCUMENT_EXTRACT.name;
@@ -258,7 +263,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
   }
 
   const stored = await readStoredDocument({ orgId, storageKey });
-  const extractedText = await extractTextFromBuffer({
+  const extractedText = await extractTextFromBufferSandboxed({
     buffer: stored.buffer,
     contentType,
     name,

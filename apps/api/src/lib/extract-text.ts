@@ -58,7 +58,7 @@ async function runOcrCommand(binary: string, args: string[]): Promise<{ stdout: 
   }
 }
 
-interface ExtractOptions {
+export interface ExtractOptions {
   buffer: Buffer;
   contentType: string;
   name?: string;
