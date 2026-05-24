@@ -197,3 +197,49 @@ export const SLACK_DM_USER: QueueConfig = {
     removeOnFail: { age: 604_800, count: 200 },
   },
 };
+
+// ─── Wave 5: Outlook (Microsoft Graph Mail) queues ────────────────────────
+
+/**
+ * Outlook incremental pull — delta query via @odata.deltaLink.
+ * Triggered by Graph webhook notification or fallback 5-min cron.
+ * Respects Retry-After on 429 by moving job to delayed state.
+ */
+export const OUTLOOK_PULL_INCREMENTAL: QueueConfig = {
+  name: 'email.outlook.pull-incremental',
+  defaultJobOptions: {
+    attempts: 5,
+    backoff: { type: 'exponential', delay: 10_000 },
+    removeOnComplete: { age: 86_400, count: 500 },
+    removeOnFail: { age: 604_800, count: 100 },
+  },
+};
+
+/**
+ * Outlook historical backfill — runs once after first OAuth connection.
+ * Resets deltaLink and pulls the full inbox (last ~100 messages).
+ */
+export const OUTLOOK_PULL_HISTORICAL: QueueConfig = {
+  name: 'email.outlook.pull-historical',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'fixed', delay: 30_000 },
+    removeOnComplete: { age: 86_400, count: 100 },
+    removeOnFail: { age: 604_800, count: 50 },
+  },
+};
+
+/**
+ * Outlook subscription renewal — daily cron at 02:00 UTC.
+ * Renews GraphSubscription rows expiring within 26 h.
+ * Idempotent: re-running is safe.
+ */
+export const OUTLOOK_SUBSCRIPTION_RENEW: QueueConfig = {
+  name: 'email.outlook.subscription-renew',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 60_000 },
+    removeOnComplete: { age: 86_400, count: 50 },
+    removeOnFail: { age: 604_800, count: 50 },
+  },
+};

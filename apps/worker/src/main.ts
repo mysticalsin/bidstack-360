@@ -14,6 +14,7 @@ import { startDustPoller } from './queues/dust-poll.js';
 import { startWebhookProcessor } from './queues/webhook-processor.js';
 import { startDocumentExtract } from './queues/document-extract.js';
 import { startCalendarSync } from './queues/calendar-sync.js';
+import { startEmailSync } from './queues/email-sync.js';
 
 const log = pino({
   level: process.env.LOG_LEVEL ?? 'info',
@@ -42,10 +43,11 @@ await Promise.all([
   startCompanyEnrichApollo(connection, log, workers, queues),
   startDocumentExtract(connection, log, workers, queues),
   startCalendarSync(connection, log, workers, queues),
+  startEmailSync(connection, log, workers, queues),
 ]);
 
 log.info(
-  'BidStack worker ready (dust-poll + webhook-processor + company-enrich-apollo + document-extract + calendar-sync)',
+  'BidStack worker ready (dust-poll + webhook-processor + company-enrich-apollo + document-extract + calendar-sync + email-sync)',
 );
 
 const healthPort = Number(process.env.WORKER_HEALTH_PORT || 4002);
