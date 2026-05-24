@@ -73,3 +73,10 @@ apps/api/.uploads/**
 # Large source bundles (kept out of repo; the unpacked tree under handoff/ is canonical)
 *.zip
 .tmp/
+
+# Mobile — EAS credentials and secrets (never commit)
+apps/mobile/google-service-account.json
+apps/mobile/google-services.json
+apps/mobile/*.p8
+apps/mobile/*.p12
+apps/mobile/*.mobileprovision
