@@ -1,7 +1,7 @@
-import { describe, expect, it, beforeAll, afterAll } from 'vitest';
+import { describe, expect, it, beforeAll, afterAll, afterEach } from 'vitest';
 import { PrismaClient } from '@bidstack/db';
 import { createHash, randomBytes } from 'node:crypto';
-import { mcpAuth, requireMcpScope } from './auth.js';
+import { __setApikeyUsedSampleForTest, mcpAuth, requireMcpScope } from './auth.js';
 
 // Tests need a live Postgres. CI without docker stays green via skipIfNoDb.
 const hasDb = !!process.env.DATABASE_URL;
@@ -11,7 +11,13 @@ const prisma = new PrismaClient();
 
 function mockRequest(token?: string) {
   return {
-    headers: token ? { authorization: `Bearer ${token}` } : {},
+    headers: token
+      ? { authorization: `Bearer ${token}`, 'user-agent': 'vitest/1' }
+      : { 'user-agent': 'vitest/1' },
+    ip: '127.0.0.1',
+    method: 'POST',
+    url: '/mcp',
+    log: { warn: () => {} },
     server: {
       httpErrors: {
         unauthorized: (msg: string) => new Error(msg),
@@ -20,6 +26,11 @@ function mockRequest(token?: string) {
     },
   } as unknown as Parameters<typeof mcpAuth>[0];
 }
+
+afterEach(() => {
+  // Always clear the sampling override so one test can't bleed into the next.
+  __setApikeyUsedSampleForTest(null);
+});
 
 describe('requireMcpScope', () => {
   it('allows keys with the requested read/write scope', () => {
@@ -110,5 +121,55 @@ describeDb('mcpAuth', () => {
 
   it('rejects a key without mcp scope', async () => {
     await expect(mcpAuth(mockRequest(noScopeToken), prisma)).rejects.toThrow('lacks `mcp` scope');
+  });
+
+  it('emits an apikey.used audit-log row when the sampling roll selects', async () => {
+    // Force sampling on so the assertion is deterministic. Without the
+    // override the test would either be flaky (1% chance of producing a
+    // row) or have to run hundreds of iterations to be statistically
+    // meaningful.
+    __setApikeyUsedSampleForTest(true);
+    const before = await prisma.auditLog.count({
+      where: { orgId, action: 'apikey.used' },
+    });
+    await mcpAuth(mockRequest(validToken), prisma);
+
+    // Fire-and-forget audit write — give it a tick to land.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const after = await prisma.auditLog.count({
+      where: { orgId, action: 'apikey.used' },
+    });
+    expect(after).toBeGreaterThan(before);
+
+    // The most recent row should carry the keyPrefix in its diff and have
+    // a null userId (the key is the actor — no human user attached).
+    const latest = await prisma.auditLog.findFirst({
+      where: { orgId, action: 'apikey.used' },
+      orderBy: { id: 'desc' },
+    });
+    expect(latest).not.toBeNull();
+    expect(latest?.userId).toBeNull();
+    expect(latest?.targetType).toBe('api_key');
+    const diff = latest?.diff as Record<string, unknown> | null;
+    expect(diff?.keyPrefix).toBe(validToken.slice(0, 12));
+
+    // Cleanup so we don't pollute later test runs.
+    if (latest) {
+      await prisma.auditLog.deleteMany({ where: { id: latest.id } });
+    }
+  });
+
+  it('skips the apikey.used audit-log row when the sampling roll excludes', async () => {
+    __setApikeyUsedSampleForTest(false);
+    const before = await prisma.auditLog.count({
+      where: { orgId, action: 'apikey.used' },
+    });
+    await mcpAuth(mockRequest(validToken), prisma);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const after = await prisma.auditLog.count({
+      where: { orgId, action: 'apikey.used' },
+    });
+    expect(after).toBe(before);
   });
 });

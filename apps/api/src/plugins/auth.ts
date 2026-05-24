@@ -13,6 +13,8 @@ import * as Sentry from '@sentry/node';
 
 import { prisma } from '@bidstack/db';
 
+import { writeAuthAudit } from './auth-audit.js';
+
 declare module 'fastify' {
   interface FastifyRequest {
     auth: AuthContext;
@@ -142,6 +144,9 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
     // SSO domain restriction: if SSO_ALLOWED_EMAIL_DOMAINS is set, reject
     // sign-ins from unlisted domains. This enforces corporate Microsoft Entra
     // ID boundaries even when Clerk's dashboard allows broader providers.
+    // We do NOT audit-log this rejection because we don't have a verified
+    // orgId yet at this point in the flow (Clerk org claim hasn't been
+    // matched to a tenant row). The Pino warn line is the durable record.
     const allowedDomains = process.env.SSO_ALLOWED_EMAIL_DOMAINS?.split(',')
       .map((d) => d.trim().toLowerCase())
       .filter(Boolean);
@@ -171,6 +176,12 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
       if (err instanceof Error && err.message.startsWith('UNRECOGNIZED_CLERK_ROLE:')) {
         const roleName = err.message.split(':')[1];
         req.log.warn({ role: roleName }, 'Unknown Clerk role mapping encountered');
+        await writeAuthAudit(req, {
+          action: 'auth.login_failed',
+          orgId: org.id,
+          actorUserId: null,
+          diff: { reason: 'unknown_clerk_role', attemptedRole: roleName ?? null },
+        });
         throw req.server.httpErrors.forbidden(`Unrecognized organization role: ${roleName}`);
       }
       throw err;
@@ -181,13 +192,25 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
 
     const existingUser = await prisma.user.findUnique({
       where: { clerkUser: clerkUserId },
-      select: { id: true, orgId: true },
+      select: { id: true, orgId: true, role: true },
     });
     if (existingUser && existingUser.orgId !== org.id) {
       req.log.warn(
         { clerkOrgId, clerkUserId, existingOrgId: existingUser.orgId, tokenOrgId: org.id },
         'clerk user attempted cross-organization auth before org-scoped identity migration',
       );
+      await writeAuthAudit(req, {
+        action: 'auth.login_failed',
+        orgId: org.id,
+        actorUserId: existingUser.id,
+        targetType: 'user',
+        targetId: existingUser.id,
+        diff: {
+          reason: 'cross_org_attempt',
+          attemptedOrgId: org.id,
+          existingOrgId: existingUser.orgId,
+        },
+      });
       throw req.server.httpErrors.forbidden('User is already registered in another organization');
     }
 
@@ -201,6 +224,18 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
           { clerkOrgId, clerkUserId, existingOrgId: existingEmail.orgId, tokenOrgId: org.id },
           'email attempted cross-organization auth before org-scoped identity migration',
         );
+        await writeAuthAudit(req, {
+          action: 'auth.login_failed',
+          orgId: org.id,
+          actorUserId: null,
+          targetType: 'email',
+          targetId: email,
+          diff: {
+            reason: 'cross_org_email',
+            attemptedOrgId: org.id,
+            existingOrgId: existingEmail.orgId,
+          },
+        });
         throw req.server.httpErrors.forbidden(
           'Email is already registered in another organization',
         );
@@ -219,6 +254,26 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
       update: { name, role: clerkRole },
     });
 
+    // Detect a role change against the previous-known value so we can emit
+    // auth.role_change separately from auth.login. The new user case
+    // (`existingUser === null`) is not a role *change* — that's covered by
+    // the first auth.login entry below.
+    const roleChanged = existingUser !== null && existingUser.role !== clerkRole;
+    if (roleChanged) {
+      await writeAuthAudit(req, {
+        action: 'auth.role_change',
+        orgId: org.id,
+        actorUserId: user.id,
+        targetType: 'user',
+        targetId: user.id,
+        diff: {
+          source: 'clerk_jit',
+          previousRole: existingUser?.role ?? null,
+          newRole: clerkRole,
+        },
+      });
+    }
+
     // Ensure Clerk org-admins have an explicit `Admin` UserRole grant. The
     // rbac plugin no longer falls back to the legacy `req.auth.role === 'admin'`
     // claim, so without this row a freshly-provisioned admin would be 403'd on
@@ -229,6 +284,23 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
       await ensureAdminRoleGrant(user.id, org.id, req);
     }
 
+    // Successful sign-in. Fire-and-forget so the audit write can't slow the
+    // critical path or fail the request. The diff intentionally omits PII
+    // beyond email (which is already in the user row) — token claims and
+    // session ids stay out of the table.
+    await writeAuthAudit(req, {
+      action: 'auth.login',
+      orgId: org.id,
+      actorUserId: user.id,
+      targetType: 'user',
+      targetId: user.id,
+      diff: {
+        clerkUserId,
+        role: clerkRole,
+        newUser: existingUser === null,
+      },
+    });
+
     return {
       orgId: org.id,
       userId: user.id,
@@ -237,6 +309,11 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
       email: email || undefined,
     };
   } catch (err) {
+    // Note: token-signature failures (no `org_id`, expired, wrong issuer)
+    // cannot be safely audit-logged because we have no validated orgId to
+    // attribute them to. They surface in Pino logs and Sentry. The auth
+    // events we DO log above all happen *after* signature verification
+    // succeeded but before/while a session was being established.
     req.log.warn({ err }, 'clerk verification failed');
     throw req.server.httpErrors.unauthorized('Invalid or expired token');
   }
