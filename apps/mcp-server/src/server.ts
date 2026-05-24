@@ -18,6 +18,7 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 
 import { mcpAuth, requireMcpScope, type McpAuthCtx } from './auth.js';
 import { hourlyRateLimitPlugin } from './plugins/hourly-rate-limit.js';
+import { redis } from './redis.js';
 import { requiredScopeForTool, tools, type ToolName } from './tools/index.js';
 
 type LooseTool = {
@@ -93,6 +94,16 @@ export async function buildMcpServer(): Promise<FastifyInstance> {
   await server.register(rateLimit, {
     max: 60,
     timeWindow: '1 minute',
+    // Redis-backed store so the per-minute budget is shared across replicas.
+    // Without this, every pod ran its own LRU cache and the effective budget
+    // scaled linearly with replica count — see 2026-05-24 audit HIGH-1.
+    redis,
+    // Namespace under our own prefix so it can't collide with the hourly
+    // plugin's keys or with any future app reuse of the same Redis.
+    nameSpace: 'bidstack:mcp:perminute:',
+    // If Redis is briefly unreachable, allow the request through rather than
+    // 503 every MCP call. The hourly window is also fail-open by design.
+    skipOnError: true,
     keyGenerator: (req) => {
       const auth = req.headers.authorization ?? '';
       const token = auth.startsWith('Bearer ') ? auth.slice(7) : 'anon';

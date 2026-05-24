@@ -66,11 +66,11 @@ if [ -z "$FILES" ]; then
   exit 0
 fi
 
-# Stream files through grep one at a time so we can attach the path to each
-# hit. `printf '%s\n'` then xargs grep is fastest portable shape.
-HITS=$(printf "%s\n" "$FILES" | xargs -I{} sh -c '
-  grep -HEn '"'"$PATTERNS"'"' "$1" 2>/dev/null || true
-' _ {} || true)
+# Stream files through grep so we can attach the path to each hit. We export
+# PATTERNS so the inner sh inherits it as an env var — this dodges the quoting
+# nightmare of passing a regex that contains pipes through xargs.
+export PATTERNS
+HITS=$(printf "%s\n" "$FILES" | xargs -I{} sh -c 'grep -HEn "$PATTERNS" "$1" 2>/dev/null || true' _ {} || true)
 
 if [ -n "$HITS" ]; then
   echo "Full-tree secret-scan found suspicious strings in committed files."
