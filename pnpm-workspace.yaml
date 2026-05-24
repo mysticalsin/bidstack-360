@@ -1,4 +1,5 @@
 packages:
+  # apps/* covers api, web, worker, mcp-server, marketing, and mobile (Wave 7)
   - 'apps/*'
   - 'packages/*'
   # twenty-bidstack is preserved verbatim from the handoff zip as a future

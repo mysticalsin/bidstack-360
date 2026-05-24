@@ -12,6 +12,7 @@ export type SettingsSection =
   | 'notifications'
   | 'security'
   | 'microsoft'
+  | 'mobile'
   | 'workspace'
   | 'advanced';
 
@@ -32,7 +33,10 @@ const GROUPS: Group[] = [
   },
   {
     label: 'Integrations',
-    items: [{ id: 'microsoft', label: 'Microsoft 365', icon: 'building' }],
+    items: [
+      { id: 'microsoft', label: 'Microsoft 365', icon: 'building' },
+      { id: 'mobile', label: 'Mobile App', icon: 'phone' },
+    ],
   },
   {
     label: 'Workspace',

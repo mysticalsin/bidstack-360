@@ -1,5 +1,5 @@
 // CRM-style Settings page with left sidebar navigation.
-// Sections: Profile, Appearance, Notifications, Security, Microsoft 365, Workspace, Advanced.
+// Sections: Profile, Appearance, Notifications, Security, Microsoft 365, Mobile, Workspace, Advanced.
 
 import { useState } from 'react';
 import { SettingsLayout, type SettingsSection } from '@/components/settings/SettingsLayout';
@@ -8,6 +8,7 @@ import { AppearanceSection } from '@/components/settings/AppearanceSection';
 import { NotificationPrefsSection } from '@/components/settings/NotificationPrefsSection';
 import { SecuritySection } from '@/components/settings/SecuritySection';
 import { MicrosoftSection } from '@/components/settings/MicrosoftSection';
+import { MobileSection } from '@/components/settings/MobileSection';
 import { WorkspaceSection } from '@/components/settings/WorkspaceSection';
 import { AdvancedSection } from '@/components/settings/AdvancedSection';
 
@@ -17,6 +18,7 @@ const SECTIONS: Record<SettingsSection, React.ReactNode> = {
   notifications: <NotificationPrefsSection />,
   security: <SecuritySection />,
   microsoft: <MicrosoftSection />,
+  mobile: <MobileSection />,
   workspace: <WorkspaceSection />,
   advanced: <AdvancedSection />,
 };
@@ -27,6 +29,7 @@ const SECTION_TITLES: Record<SettingsSection, string> = {
   notifications: 'Notifications',
   security: 'Security',
   microsoft: 'Microsoft 365',
+  mobile: 'Mobile App',
   workspace: 'Workspace',
   advanced: 'Advanced',
 };
