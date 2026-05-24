@@ -1,8 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState, type FormEvent } from 'react';
+import { useCallback, useMemo, useState, type FormEvent } from 'react';
 
 import { Button } from '@/components/ui/Button';
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from '@/components/ui/Dialog';
+import { LookupFieldPicker, type LookupOption } from '@/components/ui/LookupFieldPicker';
 import { api } from '@/lib/api';
 import {
   INDUSTRIES,
@@ -29,6 +30,28 @@ export function CreateOpportunityDialog({ trigger, defaultCustomer }: Props = {}
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
+  // Company lookup (Twenty pattern A4 — LookupFieldPicker).
+  // We track the selected company separately so we can pass its name as the
+  // `customer` field value while also storing the UUID for the API.
+  const [selectedCompany, setSelectedCompany] = useState<LookupOption | null>(
+    defaultCustomer ? { id: '', label: defaultCustomer } : null,
+  );
+
+  // Search companies by name via the existing /api/companies endpoint.
+  const searchCompanies = useCallback(async (q: string): Promise<LookupOption[]> => {
+    const data = await api<{ items: { id: string; name: string; domain?: string }[] }>(
+      `/api/companies?search=${encodeURIComponent(q)}&limit=8`,
+    );
+    return (data.items ?? []).map((c) => ({
+      id: c.id,
+      label: c.name,
+      hint: c.domain,
+    }));
+  }, []);
+
+  // Recent company options — empty for now; could be wired to accountHistory.
+  const recentCompanies = useMemo<LookupOption[]>(() => [], []);
+
   const create = useMutation({
     mutationFn: (body: OpportunityCreate) =>
       api<Opportunity>('/api/opportunities', { method: 'POST', body }),
@@ -38,6 +61,7 @@ export function CreateOpportunityDialog({ trigger, defaultCustomer }: Props = {}
       setOpen(false);
       setError(null);
       setFieldErrors({});
+      setSelectedCompany(defaultCustomer ? { id: '', label: defaultCustomer } : null);
     },
     onError: (err: Error) => setError(err.message),
   });
@@ -47,8 +71,10 @@ export function CreateOpportunityDialog({ trigger, defaultCustomer }: Props = {}
     setError(null);
     setFieldErrors({});
     const fd = new FormData(e.currentTarget);
+    // A4: customer name comes from the LookupFieldPicker selection; fall back to
+    // the hidden input value so FormData serialisation also works.
     const candidate = {
-      customer: String(fd.get('customer') ?? '').trim(),
+      customer: (selectedCompany?.label ?? String(fd.get('customer') ?? '')).trim(),
       name: String(fd.get('name') ?? '').trim(),
       stage: fd.get('stage'),
       value: Number(fd.get('value') ?? 0),
@@ -71,7 +97,18 @@ export function CreateOpportunityDialog({ trigger, defaultCustomer }: Props = {}
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        // Reset picker when dialog closes without submitting.
+        if (!next) {
+          setSelectedCompany(defaultCustomer ? { id: '', label: defaultCustomer } : null);
+          setError(null);
+          setFieldErrors({});
+        }
+      }}
+    >
       <DialogTrigger asChild>
         {trigger ?? <Button size="sm">+ New opportunity</Button>}
       </DialogTrigger>
@@ -80,14 +117,23 @@ export function CreateOpportunityDialog({ trigger, defaultCustomer }: Props = {}
         description="Add a bid to your pipeline. You can refine intel after Dust data verification runs."
       >
         <form onSubmit={submit} className="space-y-4">
-          <Field label="Customer" htmlFor="customer" error={fieldErrors.customer?.[0]}>
-            <Input
-              id="customer"
+          {/* A4 — LookupFieldPicker replaces plain text input for company relation field.
+              Hidden input carries the selected label for FormData fallback. */}
+          <Field label="Customer" htmlFor="customer-picker" error={fieldErrors.customer?.[0]}>
+            <LookupFieldPicker
+              value={selectedCompany}
+              onChange={setSelectedCompany}
+              onSearch={searchCompanies}
+              recentOptions={recentCompanies}
+              placeholder="Search companies…"
+              label="Customer"
+            />
+            {/* Hidden input feeds the customer name into FormData for the submit handler's fallback path */}
+            <input
+              type="hidden"
               name="customer"
-              required
-              minLength={1}
-              placeholder="Acme Corp"
-              defaultValue={defaultCustomer}
+              value={selectedCompany?.label ?? ''}
+              aria-hidden="true"
             />
           </Field>
           <Field label="Opportunity name" htmlFor="name" error={fieldErrors.name?.[0]}>
