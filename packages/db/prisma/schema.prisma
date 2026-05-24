@@ -114,6 +114,9 @@ model Org {
   // Wave 3 — migration connectors
   migrationJobs          MigrationJob[]
   migrationMappings      MigrationMapping[]
+  // Wave 4 — AI assistant
+  aiAssistantSessions    AiAssistantSession[]
+  aiPromptTemplates      AiPromptTemplate[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -346,6 +349,8 @@ model Contact {
   phone     String?
   influence Int?
   sentiment Sentiment?
+  /// When true: PII for this contact MUST NOT be included in AI prompts.
+  aiOptOut  Boolean    @default(false) @map("ai_opt_out")
   createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
 
   org     Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -2304,6 +2309,8 @@ model OrgSettings {
   emailFromAddress  String?   @map("email_from_address") @db.Citext
   pipelineStages    Json      @default("[]") @map("pipeline_stages")
   notificationPrefs Json      @default("{}") @map("notification_prefs")
+  /// Per-org daily AI cost cap in micros (default 5 000 000 = $5.00). 0 = unlimited.
+  aiCostCapDailyMicros BigInt @default(5000000) @map("ai_cost_cap_daily_micros")
   updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt         DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -2977,4 +2984,79 @@ model Booking {
   @@index([orgId])
   @@index([deletedAt])
   @@map("bookings")
+}
+
+// ─── Wave 4: AI Assistant ─────────────────────────────────────────────────
+
+/// Which AI capability produced this session.
+enum AiAssistantKind {
+  EMAIL_DRAFT
+  DEAL_INSIGHT
+  MEETING_PREP
+  DATA_ENRICH
+  SENTIMENT
+
+  @@map("ai_assistant_kind")
+}
+
+model AiAssistantSession {
+  id          String           @id @default(uuid()) @db.Uuid
+  orgId       String           @map("org_id") @db.Uuid
+  userId      String           @map("user_id") @db.Uuid
+  kind        AiAssistantKind
+  /// Optional: "opportunity" | "contact" | "company" | "calendar_event" …
+  entityType  String?          @map("entity_type")
+  /// Optional FK into the entity table identified by entityType.
+  entityId    String?          @map("entity_id") @db.Uuid
+  /// Sanitised prompt actually sent to the LLM (PII stripped).
+  prompt      String
+  /// Full LLM response stored for audit / replay.
+  response    String
+  tokenInput  Int              @map("token_input")
+  tokenOutput Int              @map("token_output")
+  /// Cost in micros (integer × 1 000 000) so we can store sub-cent values.
+  costMicros  BigInt           @default(0) @map("cost_micros")
+  model       String
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org      Org                   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  feedback AiAssistantFeedback[]
+
+  @@index([orgId, userId, createdAt(sort: Desc)])
+  @@index([orgId])
+  @@map("ai_assistant_sessions")
+}
+
+model AiAssistantFeedback {
+  id        String   @id @default(uuid()) @db.Uuid
+  sessionId String   @map("session_id") @db.Uuid
+  rating    Int      // 1–5
+  comment   String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  session AiAssistantSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("ai_assistant_feedback")
+}
+
+/// Org-customisable prompt templates per AI kind.
+model AiPromptTemplate {
+  id        String          @id @default(uuid()) @db.Uuid
+  orgId     String          @map("org_id") @db.Uuid
+  kind      AiAssistantKind
+  name      String
+  /// Handlebars-style template: {{ contactName }}, {{ dealName }}, …
+  prompt    String
+  /// JSON Schema describing the available variables so the UI can render a form.
+  variables Json            @default("{}")
+  isDefault Boolean         @default(false) @map("is_default")
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, kind, name], map: "ai_prompt_templates_org_kind_name_key")
+  @@index([orgId, kind])
+  @@map("ai_prompt_templates")
 }
