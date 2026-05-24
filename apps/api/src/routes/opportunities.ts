@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 import { prisma, Prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 import { pushOpportunityToDust } from '../lib/dust-push.js';
+import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import {
   Opportunity,
   OpportunityCreate,
@@ -489,6 +490,12 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       ]);
       // Fire-and-forget push to Dust on stage change.
       void pushOpportunityToDust(updated.id);
+      // Fan-out webhook event for stage change.
+      void fanOutWebhookEvent(req.auth.orgId, 'opportunity.stage_changed', {
+        id: updated.id,
+        pipelineStageId: updated.pipelineStageId ?? toStage.id,
+        stageName: toStage.name,
+      });
       return { id: updated.id, pipelineStageId: updated.pipelineStageId ?? toStage.id };
     },
   );

@@ -44,6 +44,7 @@ const WORKSPACE: NavItem[] = [
 
 const ADMIN_SETTINGS: NavItem[] = [
   { to: '/integrations', label: 'Integrations', icon: 'link' },
+  { to: '/webhooks', label: 'Webhooks', icon: 'zap' },
   { to: '/audit-log', label: 'Audit log', icon: 'reports' },
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ];

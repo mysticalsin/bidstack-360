@@ -12,6 +12,7 @@ import {
   type LeadPriority,
 } from '@bidstack/db';
 import { pushLeadToDust } from '../lib/dust-push.js';
+import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import {
   LeadCreate,
   LeadDetail,
@@ -178,6 +179,13 @@ export const leadRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       // Fire-and-forget push to Dust on create.
       void pushLeadToDust(created.id);
+      // Fan-out webhook event to all active subscriptions — fire-and-forget.
+      void fanOutWebhookEvent(req.auth.orgId, 'lead.created', {
+        id: created.id,
+        companyName: created.companyName,
+        source: created.source,
+        priority: created.priority,
+      });
 
       return reply.code(201).send({
         id: created.id,

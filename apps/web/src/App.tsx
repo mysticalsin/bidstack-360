@@ -62,6 +62,7 @@ const SettingsPage = lazy(() =>
 const AuditLogPage = lazy(() =>
   import('@/pages/AuditLogPage').then((m) => ({ default: m.AuditLogPage })),
 );
+const WebhooksPage = lazy(() => import('@/pages/WebhooksPage'));
 const IntakePage = lazy(() =>
   import('@/pages/IntakePage').then((m) => ({ default: m.IntakePage })),
 );
@@ -368,6 +369,14 @@ function AnimatedRoutes() {
               <RequireAdmin>
                 <AuditLogPage />
               </RequireAdmin>
+            }
+          />
+          <Route
+            path="/webhooks"
+            element={
+              <RequireAuth>
+                <WebhooksPage />
+              </RequireAuth>
             }
           />
           <Route

@@ -169,6 +169,12 @@ const PATHS: Record<string, JSX.Element> = {
     </>
   ),
   download: <path d="M12 3v13M6 11l6 6 6-6M5 21h14" />,
+  copy: (
+    <>
+      <rect x="8" y="8" width="12" height="12" rx="2" />
+      <path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2" />
+    </>
+  ),
   building: (
     <>
       <path d="M3 21h18M5 21V5a2 2 0 012-2h10a2 2 0 012 2v16M9 8h.01M9 12h.01M9 16h.01M15 8h.01M15 12h.01M15 16h.01" />
@@ -246,6 +252,39 @@ const PATHS: Record<string, JSX.Element> = {
   'git-branch': (
     <>
       <path d="M6 3v12M18 9a3 3 0 100-6 3 3 0 000 6zM6 21a3 3 0 100-6 3 3 0 000 6zM18 9a3 3 0 01-3 3H9a3 3 0 00-3 3" />
+    </>
+  ),
+  // Additional icons for webhooks + general use
+  zap: <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />,
+  pause: (
+    <>
+      <rect x="6" y="4" width="4" height="16" />
+      <rect x="14" y="4" width="4" height="16" />
+    </>
+  ),
+  play: <path d="M5 3l14 9-14 9V3z" />,
+  list: (
+    <>
+      <path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" />
+    </>
+  ),
+  webhook: (
+    <>
+      <path d="M18 16.016c1.245.53 2 1.487 2 2.484C20 20.43 18.21 22 16 22s-4-1.57-4-3.5c0-.637.22-1.232.61-1.747M6 7.984C4.755 7.454 4 6.497 4 5.5 4 3.57 5.79 2 8 2s4 1.57 4 3.5c0 .637-.22 1.232-.61 1.747M8 13a5 5 0 005 5M16 11a5 5 0 00-5-5" />
+    </>
+  ),
+  loader: (
+    <>
+      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+    </>
+  ),
+  'chevron-down': <path d="M6 9l6 6 6-6" />,
+  check: <path d="M20 6L9 17l-5-5" />,
+  x: <path d="M18 6L6 18M6 6l12 12" />,
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 8h.01M12 11v5" />
     </>
   ),
 };
