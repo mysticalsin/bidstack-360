@@ -137,6 +137,10 @@ model Org {
   // Wave 7 — Twilio SMS
   smsMessages            SmsMessage[]
   smsConsents            SmsConsent[]
+  // Wave 7 — Saved Views (Twenty pattern adaptation)
+  savedViews             SavedView[]
+  // Wave 7 — Real-time collaboration
+  entityEditLocks        EntityEditLock[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -188,6 +192,8 @@ model User {
   emailMessages     EmailMessage[]
   // Wave 5 — Slack user mapping (one-to-many; compound @@unique on [orgId,userId])
   slackUserMappings SlackUserMapping[]
+  // Wave 7 — Saved Views
+  savedViews        SavedView[]
 
   @@index([orgId])
   @@index([deletedAt])
@@ -2149,6 +2155,30 @@ model UserPresence {
   @@map("user_presence")
 }
 
+// ─── Real-time Collaboration ───────────────────────────────────────────────
+
+// Soft edit lock: "User X is currently editing this entity".
+// Unique per (entityType, entityId) — only one active editor at a time.
+// TTL is enforced at the application layer (5 min default); cron or service
+// purges rows past expiresAt.
+model EntityEditLock {
+  id          String   @id @default(uuid()) @db.Uuid
+  orgId       String   @map("org_id") @db.Uuid
+  entityType  String   @map("entity_type") @db.VarChar(64)
+  entityId    String   @map("entity_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  sessionId   String   @map("session_id") @db.VarChar(128)
+  acquiredAt  DateTime @default(now()) @map("acquired_at") @db.Timestamptz(6)
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([entityType, entityId])
+  @@index([orgId])
+  @@index([expiresAt])
+  @@map("entity_edit_locks")
+}
+
 // ─── Service Desk ─────────────────────────────────────────────────────────
 
 enum CasePriority {
@@ -3571,4 +3601,54 @@ model SmsConsent {
   @@unique([orgId, phoneNumber], map: "sms_consents_org_phone_key")
   @@index([orgId, optedOut])
   @@map("sms_consents")
+}
+
+// ─── Saved Views (Wave 7 — adapted from Twenty CRM pattern) ───────────────
+// A saved view is a named, persisted combination of: entity type, active
+// filters, sort field + direction, and visible columns. Views are user-owned
+// by default; setting `shared = true` makes them visible to all workspace
+// members. Inspired by Twenty's view-persistence architecture — re-implemented
+// from architectural understanding, not copied from AGPL source.
+//
+// NOTE: pending `pnpm db:migrate` — schema added here as groundwork.
+// See docs/research/twenty-patterns.md A1 for rationale.
+
+enum SavedViewEntity {
+  OPPORTUNITY
+  CONTACT
+  LEAD
+  COMPANY
+  TASK
+
+  @@map("saved_view_entity")
+}
+
+model SavedView {
+  id          String          @id @default(uuid()) @db.Uuid
+  orgId       String          @map("org_id") @db.Uuid
+  userId      String          @map("user_id") @db.Uuid
+  entity      SavedViewEntity
+  name        String          @db.VarChar(120)
+  /// JSON array of filter specs: [{field, operator, value}]
+  filters     Json            @default("[]")
+  /// JSON sort spec: {field, direction} | null
+  sort        Json?
+  /// JSON ordered array of visible column keys; null = show all defaults
+  columns     Json?
+  /// When true: visible to all org members (read-only for non-owners)
+  shared      Boolean         @default(false)
+  /// Display order within the view picker (lower = higher in list)
+  sortOrder   Int             @default(0) @map("sort_order")
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([orgId, userId, entity], map: "saved_views_org_user_entity_idx")
+  @@index([orgId, entity, shared], map: "saved_views_org_entity_shared_idx")
+  @@index([deletedAt])
+  @@map("saved_views")
 }
