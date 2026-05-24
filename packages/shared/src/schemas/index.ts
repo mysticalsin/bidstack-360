@@ -32,3 +32,4 @@ export * from './activity.js';
 export * from './migration.js';
 export * from './integration-hub.js';
 export * from './esignature.js';
+export * from './custom-objects.js';
