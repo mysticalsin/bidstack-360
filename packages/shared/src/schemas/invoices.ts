@@ -15,6 +15,7 @@
 // uses these to show "what's owed and how stale."
 
 import { z } from 'zod';
+import { CustomFieldValueLite } from './custom-fields.js';
 
 export const InvoiceState = z.enum(['draft', 'sent', 'paid', 'overdue', 'cancelled']);
 export type InvoiceState = z.infer<typeof InvoiceState>;
@@ -113,6 +114,7 @@ export const InvoiceDetail = InvoiceSummary.extend({
   lines: z.array(InvoiceLineDetail),
   payments: z.array(PaymentEntry),
   audit: z.array(InvoiceAuditEntry),
+  customFieldValues: z.array(CustomFieldValueLite).optional(),
 });
 export type InvoiceDetail = z.infer<typeof InvoiceDetail>;
 

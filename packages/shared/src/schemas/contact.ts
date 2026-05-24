@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CustomFieldValueLite, CustomFieldValueInput } from './custom-fields.js';
 
 export const Sentiment = z.enum(['hot', 'warm', 'neutral', 'cold']);
 export type Sentiment = z.infer<typeof Sentiment>;
@@ -13,6 +14,7 @@ export const Contact = z.object({
   influence: z.number().int().min(1).max(5).nullable(),
   sentiment: Sentiment.nullable(),
   createdAt: z.string().datetime(),
+  customFieldValues: z.array(CustomFieldValueLite).optional(),
 });
 export type Contact = z.infer<typeof Contact>;
 
@@ -65,6 +67,7 @@ export const ContactPatch = z
     phone: z.string().nullable().optional(),
     influence: z.number().int().min(1).max(5).nullable().optional(),
     sentiment: Sentiment.nullable().optional(),
+    customFieldValues: z.array(CustomFieldValueInput).optional(),
   })
   .refine((v) => Object.keys(v).length > 0, {
     message: 'PATCH body must contain at least one field',

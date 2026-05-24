@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import { CustomFieldValueLite, CustomFieldValueInput } from './custom-fields.js';
 import { IntelPayload } from './intel.js';
 
+/** @deprecated Use PipelineStage table instead of enum. Kept for seed-data and UI transition. */
 export const OpportunityStage = z.enum([
   's1_lead',
   's1_ongoing',
@@ -11,6 +13,16 @@ export const OpportunityStage = z.enum([
   'closed_lost',
 ]);
 export type OpportunityStage = z.infer<typeof OpportunityStage>;
+
+export const PipelineStage = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  probability: z.number(),
+  color: z.string().nullable(),
+  isWon: z.boolean().default(false),
+  isLost: z.boolean().default(false),
+});
+export type PipelineStage = z.infer<typeof PipelineStage>;
 
 // Industry is stored as an unrestricted string in the database so Dust
 // data verification and manual inserts can add new verticals without a schema
@@ -41,7 +53,9 @@ export const Opportunity = z.object({
   code: z.string().regex(/^OP-\d{4}$/),
   customer: z.string().min(1).max(255),
   name: z.string().min(1).max(255),
-  stage: OpportunityStage,
+  stage: z.string().nullable(),
+  pipelineStageId: z.string().uuid().nullable(),
+  pipelineStage: PipelineStage.nullable(),
   value: z.number().nonnegative().max(1_000_000_000_000),
   probability: z.number().int().min(0).max(100),
   dueDate: z.string().date().nullable(),
@@ -65,11 +79,14 @@ export const OpportunityCreate = Opportunity.omit({
   commentCount: true,
   viewCount: true,
   territoryName: true,
+  pipelineStage: true,
 }).extend({
   code: z
     .string()
     .regex(/^OP-\d{4}$/)
     .optional(),
+  stage: z.string().nullable().optional(),
+  pipelineStageId: z.string().uuid().optional().nullable(),
 });
 export type OpportunityCreate = z.infer<typeof OpportunityCreate>;
 
@@ -81,6 +98,9 @@ export const OpportunityPatch = Opportunity.partial().omit({
   commentCount: true,
   viewCount: true,
   territoryName: true,
+  pipelineStage: true,
+}).extend({
+  customFieldValues: z.array(CustomFieldValueInput).optional(),
 });
 export type OpportunityPatch = z.infer<typeof OpportunityPatch>;
 
@@ -108,7 +128,7 @@ export type OpportunityImportResult = z.infer<typeof OpportunityImportResult>;
 // Filter is consumed from query strings — coerce numerics so callers can pass
 // `?limit=20` without manual casting.
 export const OpportunityFilter = z.object({
-  stage: OpportunityStage.optional(),
+  pipelineStageId: z.string().uuid().optional(),
   owner: z.string().optional(),
   industry: Industry.optional(),
   search: z.string().max(100).optional(),
@@ -144,6 +164,7 @@ export const OpportunityFull = Opportunity.extend({
     }),
   ),
   timeline: z.array(z.record(z.unknown())).default([]),
+  customFieldValues: z.array(CustomFieldValueLite).optional(),
 });
 export type OpportunityFull = z.infer<typeof OpportunityFull>;
 

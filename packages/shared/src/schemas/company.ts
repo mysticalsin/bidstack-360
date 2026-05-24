@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CustomFieldValueLite, CustomFieldValueInput } from './custom-fields.js';
 
 export const Company = z.object({
   id: z.string().uuid(),
@@ -18,6 +19,7 @@ export const Company = z.object({
   confidence: z.number(),
   enrichedAt: z.string().datetime().nullable(),
   tier: z.enum(['key', 'top', 'standard']).nullable(),
+  parentId: z.string().uuid().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -33,6 +35,7 @@ export const CompanyCreate = Company.omit({
   source: true,
 }).extend({
   tier: z.enum(['key', 'top', 'standard']).optional(),
+  parentId: z.string().uuid().optional(),
 });
 export type CompanyCreate = z.infer<typeof CompanyCreate>;
 
@@ -50,11 +53,36 @@ export const CompanyPatch = z
     logoUrl: z.string().nullable().optional(),
     website: z.string().nullable().optional(),
     tier: z.enum(['key', 'top', 'standard']).nullable().optional(),
+    parentId: z.string().uuid().nullable().optional(),
+    customFieldValues: z.array(CustomFieldValueInput).optional(),
   })
   .refine((v) => Object.keys(v).length > 0, {
     message: 'PATCH body must contain at least one field',
   });
 export type CompanyPatch = z.infer<typeof CompanyPatch>;
+
+export interface CompanyHierarchyNode {
+  id: string;
+  name: string;
+  parentId: string | null;
+  children: CompanyHierarchyNode[];
+}
+
+export const CompanyHierarchyNodeSchema = z.lazy(() =>
+  z.object({
+    id: z.string().uuid(),
+    name: z.string(),
+    parentId: z.string().uuid().nullable(),
+    children: z.array(CompanyHierarchyNodeSchema),
+  }),
+) as z.ZodSchema<CompanyHierarchyNode>;
+
+export const CompanyHierarchy = z.object({
+  ancestors: z.array(z.object({ id: z.string().uuid(), name: z.string() })),
+  directChildren: z.array(z.object({ id: z.string().uuid(), name: z.string() })),
+  tree: CompanyHierarchyNodeSchema,
+});
+export type CompanyHierarchy = z.infer<typeof CompanyHierarchy>;
 
 export const CompanyDetail = Company.extend({
   contacts: z.array(
@@ -94,5 +122,8 @@ export const CompanyDetail = Company.extend({
       createdAt: z.string().datetime(),
     }),
   ),
+  parent: z.object({ id: z.string().uuid(), name: z.string() }).nullable(),
+  children: z.array(z.object({ id: z.string().uuid(), name: z.string() })),
+  customFieldValues: z.array(CustomFieldValueLite).optional(),
 });
 export type CompanyDetail = z.infer<typeof CompanyDetail>;

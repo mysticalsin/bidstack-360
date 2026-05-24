@@ -21,6 +21,7 @@ describe('Company schema', () => {
       confidence: 0.95,
       enrichedAt: null,
       tier: 'key',
+      parentId: null,
       createdAt: '2024-01-01T00:00:00Z',
       updatedAt: '2024-01-01T00:00:00Z',
     });

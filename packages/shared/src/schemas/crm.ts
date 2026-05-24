@@ -37,7 +37,7 @@ export const TechnicalStackItem = z.object({
   source: z.string().min(1),
   confidence: z.number().min(0).max(1),
 });
-export type TechnicalStackItem = z.infer<typeof TechnicalStackItem>;
+export type TechnicalStackItemType = z.infer<typeof TechnicalStackItem>;
 
 export const TechnicalStackCategory = z.object({
   label: z.string().min(1),

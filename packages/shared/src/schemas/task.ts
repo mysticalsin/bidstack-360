@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CustomFieldValueLite, CustomFieldValueInput } from './custom-fields.js';
 
 export const TaskStatus = z.enum(['open', 'in_progress', 'done', 'blocked']);
 export type TaskStatus = z.infer<typeof TaskStatus>;
@@ -11,6 +12,7 @@ export const Task = z.object({
   status: TaskStatus,
   assignee: z.string().email().nullable(),
   createdAt: z.string().datetime(),
+  customFieldValues: z.array(CustomFieldValueLite).optional(),
 });
 export type Task = z.infer<typeof Task>;
 
@@ -27,6 +29,7 @@ export const TaskPatch = z
     dueDate: z.string().date().nullable().optional(),
     status: TaskStatus.optional(),
     assignee: z.string().email().nullable().optional(),
+    customFieldValues: z.array(CustomFieldValueInput).optional(),
   })
   .refine((v) => Object.keys(v).length > 0, {
     message: 'PATCH body must contain at least one field',

@@ -95,3 +95,18 @@ export const CustomFieldValueBulkList = z.object({
   items: z.array(CustomFieldValue),
 });
 export type CustomFieldValueBulkList = z.infer<typeof CustomFieldValueBulkList>;
+
+// Lightweight shape used inside entity detail responses.
+export const CustomFieldValueLite = z.object({
+  id: z.string().uuid(),
+  definitionId: z.string().uuid(),
+  value: z.unknown(),
+});
+export type CustomFieldValueLite = z.infer<typeof CustomFieldValueLite>;
+
+// Input shape for PATCHing custom fields through a parent record.
+export const CustomFieldValueInput = z.object({
+  definitionId: z.string().uuid(),
+  value: z.unknown(),
+});
+export type CustomFieldValueInput = z.infer<typeof CustomFieldValueInput>;

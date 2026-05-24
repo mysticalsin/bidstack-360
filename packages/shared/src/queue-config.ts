@@ -64,3 +64,45 @@ export const DOCUMENT_EXTRACT: QueueConfig = {
     removeOnFail: { age: 604_800, count: 100 },
   },
 };
+
+/**
+ * Calendar push — fires when an event is created/updated/deleted locally.
+ * Short backoff because conflicts (412/etag mismatch) need fast resolution.
+ */
+export const CALENDAR_PUSH: QueueConfig = {
+  name: 'calendar-push',
+  defaultJobOptions: {
+    attempts: 4,
+    backoff: { type: 'exponential', delay: 3_000 },
+    removeOnComplete: { age: 86_400, count: 500 },
+    removeOnFail: { age: 604_800, count: 200 },
+  },
+};
+
+/**
+ * Calendar incremental pull — drains changed events from Google sync token
+ * or MS Graph delta link. Runs frequently (every ~2 min via scheduler).
+ */
+export const CALENDAR_PULL_INCREMENTAL: QueueConfig = {
+  name: 'calendar-pull-incremental',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 5_000 },
+    removeOnComplete: { age: 86_400, count: 200 },
+    removeOnFail: { age: 604_800, count: 100 },
+  },
+};
+
+/**
+ * Calendar watch renewal — Google push channels expire after 7 days.
+ * This job renews them daily. Enqueued by the worker bootstrap cron.
+ */
+export const CALENDAR_WATCH_RENEW: QueueConfig = {
+  name: 'calendar-watch-renew',
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'fixed', delay: 30_000 },
+    removeOnComplete: { age: 86_400, count: 50 },
+    removeOnFail: { age: 604_800, count: 50 },
+  },
+};

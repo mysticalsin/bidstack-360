@@ -1,6 +1,7 @@
 // Wire-format schemas for /api/leads/* (list + detail + mutations + conversion).
 
 import { z } from 'zod';
+import { CustomFieldValueLite, CustomFieldValueInput } from './custom-fields.js';
 
 export const LeadStatus = z.enum([
   'new',
@@ -70,6 +71,7 @@ export const LeadDetail = LeadSummary.extend({
   need: z.string().nullable(),
   timeline: z.string().nullable(),
   intel: z.record(z.unknown()).nullable(),
+  customFieldValues: z.array(CustomFieldValueLite).optional(),
 });
 export type LeadDetail = z.infer<typeof LeadDetail>;
 
@@ -110,6 +112,7 @@ export const LeadPatch = z
     authority: z.string().max(20).optional().nullable(),
     need: z.string().max(20).optional().nullable(),
     timeline: z.string().max(20).optional().nullable(),
+    customFieldValues: z.array(CustomFieldValueInput).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: 'At least one field must be provided',
@@ -119,17 +122,7 @@ export type LeadPatch = z.infer<typeof LeadPatch>;
 export const LeadConvertBody = z.object({
   opportunityName: z.string().min(1).max(255).optional(),
   opportunityValueMicros: z.number().min(0).max(1_000_000_000_000).optional(),
-  stage: z
-    .enum([
-      's1_lead',
-      's1_ongoing',
-      's2_sent',
-      's3_technical_iteration',
-      's4_negotiation',
-      'closed_won',
-      'closed_lost',
-    ])
-    .optional(),
+  pipelineStageId: z.string().uuid().optional(),
 });
 export type LeadConvertBody = z.infer<typeof LeadConvertBody>;
 

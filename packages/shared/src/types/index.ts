@@ -6,7 +6,7 @@ export type {
   OpportunityPatch,
   OpportunityFilter,
   OpportunityPage,
-  OpportunityStage,
+  PipelineStage,
   Industry,
 } from '../schemas/opportunity.js';
 

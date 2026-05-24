@@ -4,30 +4,18 @@ import {
   Opportunity,
   OpportunityCreate,
   OpportunityFilter,
-  OpportunityStage,
+  PipelineStage,
 } from './opportunity.js';
 
-describe('OpportunityStage', () => {
-  it('accepts every canonical stage', () => {
-    for (const s of [
-      's1_lead',
-      's1_ongoing',
-      's2_sent',
-      's3_technical_iteration',
-      's4_negotiation',
-      'closed_won',
-      'closed_lost',
-    ]) {
-      expect(() => OpportunityStage.parse(s)).not.toThrow();
-    }
-  });
-
-  it('rejects prototype-era stage names ("won"/"lost") — they must be normalized at the seed layer', () => {
-    // Why: the prototype data.js used "qualifying"/"won"/"lost"; we standardize
-    // on the SPEC enum so REST + MCP + DB all share one vocabulary.
-    expect(() => OpportunityStage.parse('won')).toThrow();
-    expect(() => OpportunityStage.parse('lost')).toThrow();
-    expect(() => OpportunityStage.parse('qualifying')).toThrow();
+describe('PipelineStage', () => {
+  it('accepts a valid pipeline stage', () => {
+    const stage = {
+      id: '00000000-0000-0000-0000-000000000001',
+      name: 'Technical Iteration',
+      probability: 50,
+      color: '#3b82f6',
+    };
+    expect(() => PipelineStage.parse(stage)).not.toThrow();
   });
 });
 
@@ -37,7 +25,14 @@ describe('Opportunity', () => {
     code: 'OP-2041',
     customer: 'CI Financial',
     name: 'CI Financial — IT Modernization',
-    stage: 's3_technical_iteration',
+    stage: 's1_ongoing',
+    pipelineStageId: '00000000-0000-0000-0000-000000000002',
+    pipelineStage: {
+      id: '00000000-0000-0000-0000-000000000002',
+      name: 'Technical Iteration',
+      probability: 65,
+      color: '#3b82f6',
+    },
     value: 1_240_000,
     probability: 65,
     dueDate: '2026-07-22',
@@ -48,6 +43,9 @@ describe('Opportunity', () => {
     territoryId: null,
     territoryName: null,
     updatedAt: '2026-05-10T08:00:00.000Z',
+    taskCount: 0,
+    commentCount: 0,
+    viewCount: 0,
   };
 
   it('parses a representative seed row', () => {
@@ -69,7 +67,7 @@ describe('OpportunityCreate', () => {
       OpportunityCreate.parse({
         customer: 'X',
         name: 'X bid',
-        stage: 's1_ongoing',
+        pipelineStageId: '00000000-0000-0000-0000-000000000001',
         value: 100,
         probability: 30,
         dueDate: null,
