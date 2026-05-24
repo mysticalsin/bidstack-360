@@ -237,6 +237,14 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: createdId, orgId: req.auth.orgId },
         include: { owner: true, territory: { select: { name: true } }, pipelineStage: { select: { id: true, name: true, probability: true, color: true, isWon: true, isLost: true } } },
       });
+      // Fan-out opportunity.created — fire-and-forget (fail-open).
+      void fanOutWebhookEvent(req.auth.orgId, 'opportunity.created', {
+        id: created.id,
+        name: created.name,
+        valueMicros: created.valueMicros,
+        pipelineStageId: created.pipelineStage?.id ?? null,
+        stageName: created.pipelineStage?.name ?? null,
+      });
       return reply.code(201).send(serializeOpportunity(created));
     },
   );

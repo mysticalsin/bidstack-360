@@ -15,6 +15,7 @@ import {
 import { MemOSService } from '@bidstack/memos';
 import { draftProposalSection } from '../services/ai/dust-agent.service.js';
 import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
+import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 
 const DEFAULT_SECTIONS = [
   { key: 'executive_summary', title: 'Executive Summary', sortOrder: 0, required: true },
@@ -206,6 +207,14 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
             : {}),
         },
       });
+      // Fan-out proposal.submitted when status transitions to submitted — fire-and-forget.
+      if (req.body.status === 'submitted' && updated.status === 'submitted') {
+        void fanOutWebhookEvent(req.auth.orgId, 'proposal.submitted', {
+          id: updated.id,
+          name: updated.name,
+          opportunityId: updated.opportunityId,
+        });
+      }
       return serializeProposal(updated);
     },
   );

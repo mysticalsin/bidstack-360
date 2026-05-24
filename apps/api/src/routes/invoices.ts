@@ -31,6 +31,7 @@ import {
 import type { InvoiceState, PaymentMethod } from '@bidstack/shared';
 
 import { tenantEntitiesBelongToOrg } from '../lib/tenant-ownership.js';
+import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 
 const ArAgingQuery = z.object({ currency: z.string().length(3).optional() });
 
@@ -508,6 +509,12 @@ export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
             },
           }),
         ]);
+        // Fan-out invoice.sent — fire-and-forget (fail-open).
+        if (to === 'sent') {
+          void fanOutWebhookEvent(req.auth.orgId, 'invoice.sent', {
+            id: invoice.id,
+          });
+        }
         return loadInvoiceDetail(req.auth.orgId, invoice.id);
       },
     );
@@ -555,6 +562,10 @@ export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
           },
         }),
       ]);
+      // Fan-out invoice.paid — fire-and-forget (fail-open).
+      void fanOutWebhookEvent(req.auth.orgId, 'invoice.paid', {
+        id: invoice.id,
+      });
       return loadInvoiceDetail(req.auth.orgId, invoice.id);
     },
   );

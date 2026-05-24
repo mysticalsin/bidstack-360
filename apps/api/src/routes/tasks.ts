@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { prisma, Prisma } from '@bidstack/db';
 import { Task, TaskCreate, TaskFilter, TaskPage, TaskPatch } from '@bidstack/shared';
 
+import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
+
 export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/tasks',
@@ -111,6 +113,13 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
         },
         include: { assignee: true },
       });
+      // Fan-out webhook event — fire-and-forget (fail-open).
+      void fanOutWebhookEvent(req.auth.orgId, 'task.created', {
+        id: created.id,
+        title: created.title,
+        status: created.status,
+        oppId: created.oppId,
+      });
       return reply.code(201).send({
         id: created.id,
         oppId: created.oppId,
@@ -207,6 +216,16 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
             },
           });
         }
+      }
+
+      // Fan-out task.completed when status transitions to 'done' — fire-and-forget.
+      // WHY 'done': TaskStatus enum uses 'done', not 'completed'; map to the published event name.
+      if (req.body.status === 'done' && updated.status === 'done') {
+        void fanOutWebhookEvent(req.auth.orgId, 'task.completed', {
+          id: updated.id,
+          title: updated.title,
+          oppId: updated.oppId,
+        });
       }
 
       return {

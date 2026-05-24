@@ -9,6 +9,8 @@ import { z } from 'zod';
 import { prisma, Prisma, type Sentiment as PrismaSentiment } from '@bidstack/db';
 import { Contact, ContactCreate, ContactFilter, ContactPage, ContactPatch } from '@bidstack/shared';
 
+import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
+
 function serializeContact(c: {
   id: string;
   customer: string;
@@ -125,6 +127,12 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
           },
         });
         return contact;
+      });
+      // Fan-out webhook event — fire-and-forget (fail-open).
+      void fanOutWebhookEvent(req.auth.orgId, 'contact.created', {
+        id: created.id,
+        name: created.name,
+        customer: created.customer,
       });
       return reply.code(201).send(serializeContact(created));
     },
