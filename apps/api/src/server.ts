@@ -14,6 +14,7 @@ import { authPlugin } from './plugins/auth.js';
 import { cacheHeadersPlugin } from './plugins/cache-headers.js';
 import { errorHandlerPlugin } from './plugins/error-handler.js';
 import { idempotencyPlugin } from './plugins/idempotency.js';
+import { openapiPlugin } from './plugins/openapi.js';
 import { queryGuardPlugin } from './plugins/query-guard.js';
 import { redisCachePlugin } from './plugins/redis-cache.js';
 import { config } from './config.js';
@@ -67,6 +68,17 @@ import { activityRoutes } from './routes/activities.js';
 import { bidWorkspaceRoutes } from './routes/bid-workspace.js';
 import { calendarRoutes } from './routes/calendar.js';
 import { bookingsRoutes } from './routes/bookings.js';
+// Wave 4 — AI assistant
+import { aiAssistantRoutes } from './routes/ai-assistant.js';
+// Wave 5 — Outlook / Microsoft Graph Mail
+import { gmailOAuthRoutes } from './routes/integrations/gmail.js';
+import { microsoftMailOAuthRoutes } from './routes/integrations/microsoft-mail.js';
+import { emailRoutes } from './routes/integrations/email.js';
+import { microsoftWebhookRoutes } from './routes/integrations/microsoft-webhook.js';
+// Wave 5 — Onboarding (templates + sample data)
+import { onboardingRoutes } from './routes/onboarding.js';
+// Wave 5 — Help center feedback
+import { helpRoutes } from './routes/help.js';
 
 const CONNECT_SRC = [
   "'self'",
@@ -200,6 +212,11 @@ export async function buildServer(): Promise<FastifyInstance> {
     );
   });
 
+  // OpenAPI: register BEFORE route plugins so swagger sees all schemas.
+  // Endpoints (/api/docs, /api/openapi.json, /api/openapi.yaml) only expose
+  // when OPENAPI_DOCS_ENABLED=true — see plugins/openapi.ts.
+  await server.register(openapiPlugin);
+
   await server.register(apiVersioningPlugin);
   await server.register(errorHandlerPlugin);
   await server.register(authPlugin);
@@ -285,6 +302,23 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(bookingsRoutes, { prefix: '/api/v1' });
   // Public booking page route (no auth): /book/:slug — served by the frontend SPA.
   // The API backing it is /api/v1/booking-pages/:slug/availability (above).
+
+  // Wave 4 — AI Assistant
+  await server.register(aiAssistantRoutes, { prefix: '/api/v1' });
+
+  // Wave 5 — Outlook (Microsoft Graph Mail) + Gmail OAuth flows
+  // WHY /api/v1/integrations prefix: consistent with other integration routes (dust, erp)
+  await server.register(gmailOAuthRoutes, { prefix: '/api/v1/integrations' });
+  await server.register(microsoftMailOAuthRoutes, { prefix: '/api/v1/integrations' });
+  await server.register(emailRoutes, { prefix: '/api/v1' });
+  // Webhook endpoint: NO auth prefix — Graph calls this as an unauthenticated third party.
+  // clientState secret provides the anti-forgery verification layer.
+  await server.register(microsoftWebhookRoutes, { prefix: '/api/v1/integrations' });
+
+  // Wave 5 — Onboarding templates + sample data management
+  await server.register(onboardingRoutes, { prefix: '/api/v1' });
+  // Wave 5 — Help center article feedback
+  await server.register(helpRoutes, { prefix: '/api/v1' });
 
   return server;
 }

@@ -48,6 +48,9 @@ const ConfigSchema = z.object({
   VITE_SSO_MICROSOFT_ENABLED: z.enum(['true', 'false']).default('false'),
   VITE_SSO_MICROSOFT_LABEL: z.string().optional(),
   SSO_ALLOWED_EMAIL_DOMAINS: z.string().optional(),
+
+  // OpenAPI / Swagger UI — enable with OPENAPI_DOCS_ENABLED=true (admin only)
+  OPENAPI_DOCS_ENABLED: z.enum(['true', 'false']).default('false'),
 });
 
 function parseConfig(): z.infer<typeof ConfigSchema> {
