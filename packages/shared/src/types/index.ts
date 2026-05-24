@@ -14,6 +14,8 @@ export type { Contact, ContactCreate, Sentiment } from '../schemas/contact.js';
 export type { Task, TaskCreate, TaskPatch, TaskStatus } from '../schemas/task.js';
 export type { PermissionKey } from './permissions.js';
 export { PERMISSION_KEYS, isPermissionKey } from './permissions.js';
+export type { SystemRoleName, MatrixResource } from './rbac-matrix.js';
+export { SYSTEM_ROLE_NAMES, RBAC_MATRIX, MATRIX_RESOURCES } from './rbac-matrix.js';
 export type {
   IntelPayload,
   Financial,

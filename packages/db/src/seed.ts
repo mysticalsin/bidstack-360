@@ -205,6 +205,83 @@ const ROLE_SEEDS = [
   role('External Partner', 'Restricted proposal collaboration access for approved partners.', [
     ...readKeys('documents', 'proposals', 'tasks'),
   ]),
+  // ─── Wave 4 spec roles ────────────────────────────────────────────────────
+  // Named exactly as the product spec requires so UI role pickers and
+  // feature-flag checks can reference them by canonical string.
+  role(
+    'Sales Manager',
+    'Manages the sales team; full CRM read/write + territory + reports + workflow.',
+    [
+      ...READ_PERMISSION_KEYS,
+      ...writeKeys(
+        'accounts',
+        'activities',
+        'contacts',
+        'leads',
+        'opportunities',
+        'reports',
+        'sales-orders',
+        'tasks',
+        'territories',
+        'workflows',
+      ),
+    ],
+  ),
+  role(
+    'Account Executive',
+    'Owns a set of accounts and opportunities; full CRM read/write on core objects.',
+    [
+      ...readKeys(
+        'accounts',
+        'activities',
+        'companies',
+        'contacts',
+        'leads',
+        'opportunities',
+        'products',
+        'proposals',
+        'reports',
+        'sales-orders',
+        'tasks',
+      ),
+      ...writeKeys(
+        'accounts',
+        'activities',
+        'contacts',
+        'leads',
+        'opportunities',
+        'proposals',
+        'sales-orders',
+        'tasks',
+      ),
+    ],
+  ),
+  role('SDR', 'Inbound/outbound lead development; limited to leads and early-stage pipeline.', [
+    ...readKeys('accounts', 'activities', 'companies', 'contacts', 'leads', 'tasks'),
+    ...writeKeys('activities', 'contacts', 'leads', 'tasks'),
+  ]),
+  role(
+    'Customer Success',
+    'Post-sale relationship management; accounts, contacts, service, tasks.',
+    [
+      ...readKeys(
+        'accounts',
+        'activities',
+        'companies',
+        'contacts',
+        'opportunities',
+        'reports',
+        'service-desk',
+        'tasks',
+      ),
+      ...writeKeys('accounts', 'activities', 'contacts', 'service-desk', 'tasks'),
+    ],
+  ),
+  role(
+    'Read-Only',
+    'Read-only access to all non-MCP, non-audit resources.',
+    READ_PERMISSION_KEYS.filter((key) => !key.startsWith('mcp:') && key !== 'audit-log:read'),
+  ),
 ] as const;
 
 const LEGACY_ROLE_ASSIGNMENTS: Record<string, readonly string[]> = {
@@ -582,6 +659,7 @@ async function seedRolesAndPermissions(orgId: string, usersByInitials: Map<strin
     await prisma.rolePermission.deleteMany({ where: { roleId: row.id } });
     await prisma.rolePermission.createMany({
       data: r.permissionKeys.map((key) => ({
+        orgId,
         roleId: row.id,
         permissionId: permissionIds.get(key)!,
       })),
@@ -603,6 +681,7 @@ async function seedRolesAndPermissions(orgId: string, usersByInitials: Map<strin
     });
     await prisma.userRole.createMany({
       data: assignedRoleNames.map((name) => ({
+        orgId,
         userId,
         roleId: roleIds.get(name)!,
       })),
