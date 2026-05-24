@@ -117,6 +117,13 @@ model Org {
   // Wave 4 — AI assistant
   aiAssistantSessions    AiAssistantSession[]
   aiPromptTemplates      AiPromptTemplate[]
+  // Wave 4 — integration hub (email, slack, zapier)
+  emailMessages          EmailMessage[]
+  emailTrackingPixels    EmailTrackingPixel[]
+  slackChannels          SlackChannel[]
+  zapierApps             ZapierApp[]
+  zapierTriggers         ZapierTrigger[]
+  zapierActions          ZapierAction[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -164,6 +171,8 @@ model User {
   // Wave 3 — booking pages & migration
   bookingPages      BookingPage[]
   migrationJobs     MigrationJob[]
+  // Wave 4 — integration hub
+  emailMessages     EmailMessage[]
 
   @@index([orgId])
   @@index([deletedAt])
@@ -2834,9 +2843,16 @@ model PipelineStage {
 
 /// OAuth provider. microsoft_graph covers Outlook Calendar + Teams;
 /// google_workspace covers Google Calendar.
+/// OAuth provider.
+/// - microsoft_graph   — Outlook Calendar + Outlook Mail (MS Graph API)
+/// - google_workspace  — Google Calendar
+/// - gmail             — Gmail send+read (gmail.send, gmail.readonly scopes)
+/// - slack             — Slack workspace bot (chat:write, channels:read)
 enum IntegrationProvider {
   microsoft_graph
   google_workspace
+  gmail
+  slack
 
   @@map("integration_provider")
 }
@@ -3093,4 +3109,157 @@ model AiPromptTemplate {
   @@unique([orgId, kind, name], map: "ai_prompt_templates_org_kind_name_key")
   @@index([orgId, kind])
   @@map("ai_prompt_templates")
+}
+
+// ─── Wave 4: Integration Hub ───────────────────────────────────────────────
+
+/// Email provider sub-type for display / routing.
+/// GMAIL   → Gmail API (googleapis)
+/// OUTLOOK → MS Graph Mail endpoint (IntegrationToken provider = microsoft_graph)
+enum EmailProvider {
+  GMAIL
+  OUTLOOK
+
+  @@map("email_provider")
+}
+
+/// Single sent or received email message.
+/// Outbound written synchronously on send; inbound pulled by email-sync worker.
+model EmailMessage {
+  id                 String        @id @default(uuid()) @db.Uuid
+  orgId              String        @map("org_id") @db.Uuid
+  userId             String        @map("user_id") @db.Uuid
+  integrationTokenId String        @map("integration_token_id") @db.Uuid
+  provider           EmailProvider
+  /// Provider message id (Gmail messageId / Graph id)
+  externalMessageId  String        @map("external_message_id")
+  /// Gmail threadId or Graph conversationId — groups messages into threads
+  threadId           String?       @map("thread_id")
+  fromEmail          String        @map("from_email") @db.Citext
+  /// Array of { email: string; name?: string }
+  toEmails           Json          @default("[]") @map("to_emails")
+  /// Array of { email: string; name?: string }
+  ccEmails           Json          @default("[]") @map("cc_emails")
+  subject            String        @default("")
+  bodyText           String?       @map("body_text")
+  bodyHtml           String?       @map("body_html")
+  sentAt             DateTime?     @map("sent_at") @db.Timestamptz(6)
+  receivedAt         DateTime?     @map("received_at") @db.Timestamptz(6)
+  /// true = sent by BidStack user; false = inbound from contact
+  isOutbound         Boolean       @default(true) @map("is_outbound")
+  /// First pixel open (set by track-open worker)
+  openedAt           DateTime?     @map("opened_at") @db.Timestamptz(6)
+  /// First tracked link click
+  clickedAt          DateTime?     @map("clicked_at") @db.Timestamptz(6)
+  /// Polymorphic CRM linkage: "deal" | "contact" | "lead"
+  entityType         String?       @map("entity_type") @db.VarChar(32)
+  entityId           String?       @map("entity_id") @db.Uuid
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org            Org                  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trackingPixels EmailTrackingPixel[]
+
+  /// Prevent duplicate imports on re-pull
+  @@unique([orgId, externalMessageId], map: "email_messages_org_external_key")
+  @@index([orgId, threadId])
+  @@index([orgId, entityType, entityId])
+  @@index([orgId, userId])
+  @@map("email_messages")
+}
+
+/// One tracking pixel per outbound EmailMessage.
+/// Hit endpoint: GET /track/email/open/:token → 1×1 transparent GIF
+model EmailTrackingPixel {
+  id             String    @id @default(uuid()) @db.Uuid
+  /// Owning org — enforces multi-tenant isolation on pixel hits
+  orgId          String    @map("org_id") @db.Uuid
+  emailMessageId String    @map("email_message_id") @db.Uuid
+  /// URL-safe random token embedded in the pixel URL (stored in email HTML)
+  token          String    @unique @db.VarChar(64)
+  openCount      Int       @default(0) @map("open_count")
+  lastOpenedAt   DateTime? @map("last_opened_at") @db.Timestamptz(6)
+  firstOpenedIp  String?   @map("first_opened_ip") @db.VarChar(45)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org          Org          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  emailMessage EmailMessage @relation(fields: [emailMessageId], references: [id], onDelete: Cascade)
+
+  @@index([emailMessageId])
+  @@map("email_tracking_pixels")
+}
+
+/// Slack channel populated when the user connects their workspace.
+model SlackChannel {
+  id                 String   @id @default(uuid()) @db.Uuid
+  orgId              String   @map("org_id") @db.Uuid
+  integrationTokenId String   @map("integration_token_id") @db.Uuid
+  /// Slack channel id (e.g. "C01234ABCDE")
+  channelId          String   @map("channel_id") @db.VarChar(32)
+  channelName        String   @map("channel_name")
+  isShared           Boolean  @default(false) @map("is_shared")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, channelId], map: "slack_channels_org_channel_key")
+  @@index([orgId])
+  @@map("slack_channels")
+}
+
+/// One Zapier app registration per org.
+/// apiKeyHash is SHA-256(rawKey) — raw key shown exactly once at creation.
+model ZapierApp {
+  id         String   @id @default(uuid()) @db.Uuid
+  orgId      String   @map("org_id") @db.Uuid
+  /// SHA-256(rawApiKey) hex string — never stored in plaintext
+  apiKeyHash String   @map("api_key_hash") @db.VarChar(64)
+  name       String   @default("BidStack Zapier App")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org      Org             @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  triggers ZapierTrigger[]
+  actions  ZapierAction[]
+
+  @@unique([orgId], map: "zapier_apps_org_key")
+  @@index([orgId])
+  @@map("zapier_apps")
+}
+
+/// REST-hook subscription: Zapier subscribes to an event type and BidStack
+/// delivers HMAC-SHA256-signed POST requests to webhookUrl on each occurrence.
+model ZapierTrigger {
+  id              String   @id @default(uuid()) @db.Uuid
+  orgId           String   @map("org_id") @db.Uuid
+  zapierAppId     String   @map("zapier_app_id") @db.Uuid
+  /// e.g. "lead.created", "deal.stage_changed", "contact.created"
+  eventType       String   @map("event_type") @db.VarChar(64)
+  webhookUrl      String   @map("webhook_url")
+  /// AES-256-GCM encrypted HMAC-SHA256 signing secret (base64url)
+  secretEncrypted String   @map("secret_encrypted")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org       Org       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  zapierApp ZapierApp @relation(fields: [zapierAppId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, eventType])
+  @@map("zapier_triggers")
+}
+
+/// Zapier action registration — authorises Zapier to POST to /api/zapier/actions/:actionType.
+model ZapierAction {
+  id          String   @id @default(uuid()) @db.Uuid
+  orgId       String   @map("org_id") @db.Uuid
+  zapierAppId String   @map("zapier_app_id") @db.Uuid
+  /// e.g. "create_deal", "create_contact", "log_activity"
+  actionType  String   @map("action_type") @db.VarChar(64)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org       Org       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  zapierApp ZapierApp @relation(fields: [zapierAppId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, actionType], map: "zapier_actions_org_action_key")
+  @@index([orgId])
+  @@map("zapier_actions")
 }
