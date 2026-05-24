@@ -1,0 +1,688 @@
+/* BidStack 360° Marketing — design tokens (mirrored from apps/web for brand parity).
+   Kept narrower than the app: only the tokens a marketing surface actually uses.
+   ============================================================ */
+
+@import 'tailwindcss';
+
+/* ---------- Light theme (default) ---------- */
+:root,
+[data-theme='light'] {
+  /* Brand */
+  --brand-primary: #2c4bff;
+  --brand-primary-hover: #2540e0;
+  --brand-primary-press: #1f38c7;
+  --brand-primary-tint: #eaeefe;
+  --brand-deep: #1b2c7a;
+  --brand-gradient: linear-gradient(135deg, #2c4bff 0%, #6e59ff 100%);
+
+  /* Surface */
+  --surface-page: #fafbfd;
+  --surface-card: #ffffff;
+  --surface-sunken: #edeff5;
+  --surface-overlay: rgba(16, 24, 40, 0.32);
+
+  /* Foreground */
+  --fg-primary: #1a1f36;
+  --fg-secondary: #5a6478;
+  /* fg-tertiary = #6b7280 (4.6:1 on white — WCAG 1.4.3 normal text). */
+  --fg-tertiary: #6b7280;
+  --fg-muted: #a0a8b8;
+  --fg-on-brand: #ffffff;
+
+  /* Borders */
+  --border-subtle: #edeff5;
+  --border-default: #dde1eb;
+  --border-strong: #c2c8d6;
+  --border-focus: #2c4bff;
+
+  /* Semantic */
+  --success: #1f8a5b;
+  --warning: #d08a00;
+  --danger: #d93849;
+  --info: #6e59ff;
+
+  /* Elevation — Apple-style layered shadows */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.03), 0 0 1px rgba(0, 0, 0, 0.02);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.09), 0 4px 12px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 32px 64px rgba(0, 0, 0, 0.12), 0 8px 24px rgba(0, 0, 0, 0.06);
+  --focus-ring: 0 0 0 3px rgba(44, 75, 255, 0.14);
+}
+
+/* ---------- Dark theme — Linear-style premium void aesthetic ---------- */
+[data-theme='dark'] {
+  --brand-primary: #5e6ad2;
+  --brand-primary-hover: #7882e7;
+  --brand-primary-press: #4d58ba;
+  --brand-primary-tint: rgba(94, 106, 210, 0.18);
+  --brand-deep: #7882e7;
+  --brand-gradient: linear-gradient(135deg, #5e6ad2 0%, #7882e7 100%);
+
+  --surface-page: #010102;
+  --surface-card: #0c0c0e;
+  --surface-sunken: #070708;
+  --surface-overlay: rgba(0, 0, 0, 0.85);
+
+  --fg-primary: #f8fafc;
+  --fg-secondary: #a1a1aa;
+  --fg-tertiary: #a1a1aa;
+  --fg-muted: #52525b;
+  --fg-on-brand: #ffffff;
+
+  --border-subtle: #22242a;
+  --border-default: #2d3039;
+  --border-strong: #3e424f;
+  --border-focus: #5e6ad2;
+
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #fb7185;
+  --info: #818cf8;
+
+  --shadow-xs: 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --shadow-sm: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 30px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 16px 60px rgba(0, 0, 0, 0.6);
+  --focus-ring: 0 0 0 3px rgba(94, 106, 210, 0.22);
+}
+
+/* ---------- Tailwind theme bridge ---------- */
+@theme {
+  --color-brand: var(--brand-primary);
+  --color-brand-hover: var(--brand-primary-hover);
+  --color-brand-press: var(--brand-primary-press);
+  --color-brand-tint: var(--brand-primary-tint);
+  --color-brand-deep: var(--brand-deep);
+
+  --color-surface-page: var(--surface-page);
+  --color-surface-card: var(--surface-card);
+  --color-surface-sunken: var(--surface-sunken);
+
+  --color-fg-primary: var(--fg-primary);
+  --color-fg-secondary: var(--fg-secondary);
+  --color-fg-tertiary: var(--fg-tertiary);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-on-brand: var(--fg-on-brand);
+
+  --color-border-subtle: var(--border-subtle);
+  --color-border-default: var(--border-default);
+  --color-border-strong: var(--border-strong);
+  --color-border-focus: var(--border-focus);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+
+  /* Same Apple-first stack as apps/web: SF Pro on Apple, Segoe Variable on
+     Windows 11, Roboto on Android, Barlow as web-font fallback. */
+  --font-sans:
+    'Barlow', system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text',
+    'Segoe UI Variable', 'Segoe UI', Helvetica, Arial, sans-serif;
+  --font-display:
+    'Barlow', -apple-system, BlinkMacSystemFont, 'SF Pro Display',
+    'Segoe UI Variable Display', system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  --font-mono:
+    ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 24px;
+
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+}
+
+/* ---------- Base ---------- */
+html,
+body {
+  font-family: var(--font-sans);
+  background: var(--surface-page);
+  color: var(--fg-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  /* Smooth scroll between in-page anchors (CTAs → pricing teaser, etc). */
+  scroll-behavior: smooth;
+  transition:
+    background-color 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Apple HIG focus ring — visible 2px + soft halo. Same treatment as apps/web. */
+*:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
+  border-radius: 6px;
+}
+
+/* WCAG 2.3.3: honour OS reduced-motion preference. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* WCAG 2.5.5 AA: 44×44 minimum touch targets. */
+button,
+[role='button'],
+a {
+  min-height: 44px;
+  min-width: 44px;
+}
+/* Inline nav links inside paragraphs / footer columns shouldn't carry the
+   44px floor — that would shred body copy. Opt-out class for those. */
+a.link-inline {
+  min-height: 0;
+  min-width: 0;
+  display: inline;
+}
+
+/* Visually hidden — available to screen readers. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Skip-to-content link — invisible until focused. */
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: 8px;
+  transform: translateY(-200%);
+  background: var(--brand-primary);
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 100;
+  transition: transform 0.14s ease-out;
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+/* ---------- Marketing-specific utilities ---------- */
+
+/* Page-width container — generous on landing, tighter on legal. */
+.mkt-container {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+@media (min-width: 768px) {
+  .mkt-container {
+    padding-inline: 2rem;
+  }
+}
+
+.mkt-container-narrow {
+  width: 100%;
+  max-width: 760px;
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+@media (min-width: 768px) {
+  .mkt-container-narrow {
+    padding-inline: 2rem;
+  }
+}
+
+/* Display headline — used on hero and legal page titles. */
+.mkt-display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+}
+
+/* Serif accent — italic Instrument Serif emphasis in the hero. */
+.mkt-serif-italic {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* Hero gradient orb backdrop — pure CSS, no images, no JS. */
+.mkt-hero-orbs {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.mkt-hero-orbs::before,
+.mkt-hero-orbs::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.5;
+}
+.mkt-hero-orbs::before {
+  top: -10%;
+  left: -10%;
+  width: 480px;
+  height: 480px;
+  background: radial-gradient(circle, var(--brand-primary), transparent 70%);
+  animation: orb-float-a 18s ease-in-out infinite;
+}
+.mkt-hero-orbs::after {
+  bottom: -20%;
+  right: -10%;
+  width: 560px;
+  height: 560px;
+  background: radial-gradient(circle, var(--info), transparent 70%);
+  animation: orb-float-b 22s ease-in-out infinite;
+}
+[data-theme='dark'] .mkt-hero-orbs::before {
+  opacity: 0.28;
+}
+[data-theme='dark'] .mkt-hero-orbs::after {
+  opacity: 0.3;
+}
+
+@keyframes orb-float-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(60px, 80px) scale(1.1); }
+}
+@keyframes orb-float-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-80px, -60px) scale(1.08); }
+}
+
+/* Buttons — same liquid-glass language as apps/web at lower complexity. */
+.mkt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  min-height: 44px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    transform 0.15s,
+    box-shadow 0.15s;
+}
+.mkt-btn-primary {
+  background: var(--brand-primary);
+  color: var(--fg-on-brand);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--brand-primary) 28%, transparent);
+}
+.mkt-btn-primary:hover {
+  background: var(--brand-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--brand-primary) 34%, transparent);
+}
+.mkt-btn-primary:active {
+  transform: translateY(0);
+  background: var(--brand-primary-press);
+}
+.mkt-btn-secondary {
+  background: var(--surface-card);
+  color: var(--fg-primary);
+  border-color: var(--border-default);
+}
+.mkt-btn-secondary:hover {
+  background: var(--surface-sunken);
+  border-color: var(--border-strong);
+}
+.mkt-btn-ghost {
+  background: transparent;
+  color: var(--fg-primary);
+}
+.mkt-btn-ghost:hover {
+  background: var(--surface-sunken);
+}
+.mkt-btn-lg {
+  padding: 0.875rem 1.5rem;
+  font-size: 1rem;
+}
+.mkt-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Cards used on landing / pricing / legal. */
+.mkt-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: 14px;
+  padding: 1.5rem;
+  transition:
+    border-color 0.18s,
+    box-shadow 0.18s,
+    transform 0.18s;
+}
+.mkt-card-hover:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+[data-theme='dark'] .mkt-card-hover:hover {
+  border-color: color-mix(in srgb, var(--brand-primary) 40%, var(--border-default));
+  box-shadow:
+    0 0 24px color-mix(in srgb, var(--brand-primary) 14%, transparent),
+    var(--shadow-md);
+}
+
+/* Eyebrow label above section headings. */
+.mkt-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand-primary);
+}
+
+/* Subtle dot grid — used as backdrop on the comparison + AI sections. */
+.mkt-dot-grid {
+  background-image:
+    radial-gradient(circle, color-mix(in srgb, var(--fg-tertiary) 30%, transparent) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: center;
+}
+
+/* Logo-bar style — desaturated by default, full color on hover. */
+.mkt-logo {
+  height: 28px;
+  filter: grayscale(1) brightness(0.6);
+  opacity: 0.7;
+  transition: filter 0.2s, opacity 0.2s;
+}
+.mkt-logo:hover {
+  filter: none;
+  opacity: 1;
+}
+
+/* Gradient text utility. */
+.mkt-text-gradient {
+  background: var(--brand-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* Animated kanban demo — pure CSS marquee of cards drifting across columns. */
+.mkt-kanban {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 14px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-default);
+  overflow: hidden;
+}
+.mkt-kanban-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  min-height: 220px;
+}
+.mkt-kanban-col h4 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-tertiary);
+  margin: 0 0 0.25rem;
+  font-family: var(--font-sans);
+}
+.mkt-kanban-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.8125rem;
+  box-shadow: var(--shadow-xs);
+  animation: mkt-kanban-drift 12s cubic-bezier(0.3, 0.7, 0.3, 1) infinite;
+  opacity: 0;
+}
+.mkt-kanban-card-2 { animation-delay: 1s; }
+.mkt-kanban-card-3 { animation-delay: 2.2s; }
+.mkt-kanban-card-4 { animation-delay: 3.6s; }
+.mkt-kanban-card-5 { animation-delay: 5.4s; }
+.mkt-kanban-card-6 { animation-delay: 7s; }
+.mkt-kanban-amount {
+  display: block;
+  margin-top: 4px;
+  font-weight: 700;
+  color: var(--brand-primary);
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes mkt-kanban-drift {
+  0% { opacity: 0; transform: translateY(8px) scale(0.97); }
+  10% { opacity: 1; transform: translateY(0) scale(1); }
+  85% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-8px) scale(0.97); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mkt-kanban-card {
+    animation: none;
+    opacity: 1;
+  }
+  .mkt-hero-orbs::before,
+  .mkt-hero-orbs::after {
+    animation: none;
+  }
+}
+
+/* FAQ accordion — uses <details>/<summary> for zero-JS, a11y-friendly markup. */
+.mkt-faq {
+  border-top: 1px solid var(--border-default);
+}
+.mkt-faq details {
+  border-bottom: 1px solid var(--border-default);
+}
+.mkt-faq summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 1.125rem 0;
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--fg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 44px;
+}
+.mkt-faq summary::-webkit-details-marker {
+  display: none;
+}
+.mkt-faq summary::after {
+  content: '+';
+  font-size: 1.5rem;
+  font-weight: 300;
+  color: var(--fg-tertiary);
+  line-height: 1;
+  transition: transform 0.18s;
+}
+.mkt-faq details[open] summary::after {
+  content: '−';
+  transform: none;
+}
+.mkt-faq-body {
+  padding: 0 0 1.25rem;
+  color: var(--fg-secondary);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+/* Comparison table — semantic <table> with sticky leading column. */
+.mkt-compare {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.mkt-compare thead th {
+  background: var(--surface-sunken);
+  color: var(--fg-primary);
+  font-weight: 600;
+  text-align: left;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--border-default);
+}
+.mkt-compare thead th:first-child {
+  width: 36%;
+}
+.mkt-compare tbody td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--fg-secondary);
+}
+.mkt-compare tbody tr:last-child td {
+  border-bottom: 0;
+}
+.mkt-compare tbody td:first-child {
+  font-weight: 500;
+  color: var(--fg-primary);
+}
+.mkt-check {
+  color: var(--success);
+  font-weight: 600;
+}
+.mkt-cross {
+  color: var(--fg-muted);
+  font-weight: 400;
+}
+.mkt-partial {
+  color: var(--warning);
+  font-weight: 500;
+}
+
+/* "Most popular" pricing badge ribbon. */
+.mkt-popular {
+  position: absolute;
+  top: -0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--brand-primary);
+  color: var(--fg-on-brand);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.375rem 0.875rem;
+  border-radius: 999px;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--brand-primary) 30%, transparent);
+}
+
+/* Legal page typography. */
+.mkt-prose {
+  color: var(--fg-secondary);
+  font-size: 1rem;
+  line-height: 1.7;
+}
+.mkt-prose h2 {
+  font-size: 1.5rem;
+  color: var(--fg-primary);
+  margin-top: 2.5rem;
+  margin-bottom: 0.75rem;
+}
+.mkt-prose h3 {
+  font-size: 1.125rem;
+  color: var(--fg-primary);
+  margin-top: 1.75rem;
+  margin-bottom: 0.5rem;
+}
+.mkt-prose p {
+  margin: 0 0 1rem;
+}
+.mkt-prose ul {
+  margin: 0 0 1rem;
+  padding-left: 1.5rem;
+  list-style: disc;
+}
+.mkt-prose ol {
+  margin: 0 0 1rem;
+  padding-left: 1.5rem;
+  list-style: decimal;
+}
+.mkt-prose li {
+  margin-bottom: 0.25rem;
+}
+.mkt-prose a {
+  color: var(--brand-primary);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  min-height: 0;
+  min-width: 0;
+  display: inline;
+}
+.mkt-prose strong {
+  color: var(--fg-primary);
+}
+.mkt-prose hr {
+  margin: 2rem 0;
+  border: 0;
+  border-top: 1px solid var(--border-default);
+}
+.mkt-prose code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: var(--surface-sunken);
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+}

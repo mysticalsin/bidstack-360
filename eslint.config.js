@@ -126,6 +126,28 @@ export default tseslint.config(
     rules: { 'react-refresh/only-export-components': 'off' },
   },
 
+  // 6b. Marketing site (apps/marketing) — same React + browser config as
+  // apps/web. Separate workspace so it can deploy to bidstack.dev independently.
+  {
+    files: ['apps/marketing/**/*.{ts,tsx}'],
+    languageOptions: {
+      globals: { ...globals.browser, ...globals.es2022 },
+    },
+    plugins: {
+      react: reactPlugin,
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
+    },
+    settings: { react: { version: 'detect' } },
+    rules: {
+      ...reactPlugin.configs.recommended.rules,
+      ...reactHooks.configs.recommended.rules,
+      'react/react-in-jsx-scope': 'off',
+      'react/prop-types': 'off',
+      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+    },
+  },
+
   // 7. Test files: relax a couple rules.
   {
     files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', 'apps/web/e2e/**/*.{ts,tsx}'],

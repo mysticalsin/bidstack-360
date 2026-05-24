@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#2C4BFF" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#010102" media="(prefers-color-scheme: dark)" />
+    <!-- Google Fonts — same Barlow + Instrument Serif pairing as apps/web for brand parity. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+    <title>BidStack 360° — The CRM built for winning bids</title>
+    <meta
+      name="description"
+      content="Pipeline, proposals, and AI co-pilots for sales teams who live in RFPs. Start free."
+    />
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="BidStack 360° — The CRM built for winning bids" />
+    <meta
+      property="og:description"
+      content="Pipeline, proposals, and AI co-pilots for sales teams who live in RFPs."
+    />
+    <meta property="og:url" content="https://bidstack.dev" />
+    <meta property="og:image" content="https://bidstack.dev/og/og-default.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="canonical" href="https://bidstack.dev/" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script>
+      // Apply persisted theme before paint to prevent FOUC.
+      (function () {
+        try {
+          var saved = localStorage.getItem('bidstack-theme');
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var theme = saved || (prefersDark ? 'dark' : 'light');
+          document.documentElement.dataset.theme = theme;
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body class="h-full antialiased">
+    <div id="root" class="h-full"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
