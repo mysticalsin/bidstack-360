@@ -90,6 +90,13 @@ import { customObjectRoutes } from './routes/custom-objects.js';
 import { twilioWebhookRoutes, smsRoutes } from './routes/integrations/twilio.js';
 // Wave 7 — Mobile native push registration
 import { nativePushRoutes } from './routes/notifications.js';
+// Wave 8 — Voice + Video calls
+import { callsRoutes } from './routes/calls.js';
+import {
+  zoomCallWebhookRoutes,
+  teamsCallWebhookRoutes,
+  twilioVoiceWebhookRoutes,
+} from './routes/integrations/calls-webhooks.js';
 
 const CONNECT_SRC = [
   "'self'",
@@ -99,6 +106,13 @@ const CONNECT_SRC = [
   'https://*.dust.tt',
   'https://*.sentry.io',
   'https://api.apollo.io',
+  // Wave 8 — Video call providers
+  'https://api.zoom.us',
+  'https://zoom.us',
+  'https://api.deepgram.com',
+  'https://graph.microsoft.com',
+  'https://www.googleapis.com',
+  'https://api.twilio.com',
 ];
 
 const FRAME_SRC = ["'self'", 'https://*.clerk.accounts.dev', 'https://challenges.cloudflare.com'];
@@ -351,6 +365,14 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   // Wave 7 — Mobile native push token registration (Expo push service)
   await server.register(nativePushRoutes, { prefix: '/api/v1' });
+
+  // Wave 8 — Voice + Video calls
+  // Authenticated call management routes
+  await server.register(callsRoutes, { prefix: '/api/v1' });
+  // Unauthenticated webhook routes (signature-validated per provider)
+  await server.register(zoomCallWebhookRoutes, { prefix: '/api/v1/integrations' });
+  await server.register(teamsCallWebhookRoutes, { prefix: '/api/v1/integrations' });
+  await server.register(twilioVoiceWebhookRoutes, { prefix: '/api/v1/integrations' });
 
   return server;
 }
