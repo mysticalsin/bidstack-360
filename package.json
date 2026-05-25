@@ -22,6 +22,8 @@
     "test": "pnpm --filter @bidstack/shared build && pnpm --filter @bidstack/dust-client build && pnpm --filter @bidstack/odoo-mcp-client build && pnpm -r --stream test",
     "test:watch": "pnpm -r --parallel --stream test:watch",
     "e2e": "pnpm --filter @bidstack/web e2e",
+    "load-test": "k6 run scripts/load-test.js",
+    "db:analyze-queries": "tsx packages/db/scripts/analyze-slow-queries.ts",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\" --ignore-path .prettierignore",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\" --ignore-path .prettierignore",
     "db:generate": "pnpm --filter @bidstack/db generate",
@@ -31,7 +33,13 @@
     "db:reset": "pnpm --filter @bidstack/db reset",
     "db:studio": "pnpm --filter @bidstack/db studio",
     "clean": "pnpm -r exec rimraf dist build .turbo .vite",
-    "prepare": "husky"
+    "prepare": "husky",
+    "merge:status": "node scripts/merge/merge-status.mjs",
+    "merge:predict": "node scripts/merge/predict-conflicts.mjs",
+    "merge:next": "bash scripts/merge/merge-next.sh",
+    "merge:all": "bash scripts/merge/merge-all.sh",
+    "merge:rollback": "bash scripts/merge/rollback.sh",
+    "merge:cherry-pick": "bash scripts/merge/cherry-pick-leaked.sh"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
