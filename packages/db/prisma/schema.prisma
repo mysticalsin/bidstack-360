@@ -143,12 +143,22 @@ model Org {
   entityEditLocks        EntityEditLock[]
   // Wave 7 — Mobile native push tokens (Expo / APNs / FCM)
   nativePushTokens       NativePushToken[]
+  // Wave 8 — Y.js CRDT collaborative text editing
+  yjsDocuments           YjsDocument[]
+  yjsUpdates             YjsUpdate[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   // Wave 8 — Voice + Video calls
   callSessions           CallSession[]
   callSummaries          CallSummary[]
+  // Wave 8 — Customer Success
+  subscriptions          Subscription[]
+  renewalOpportunities   RenewalOpportunity[]
+  healthScores           HealthScore[]
+  npsSurveys             NpsSurvey[]
+  churnSignals           ChurnSignal[]
+  expansionOpportunities ExpansionOpportunity[]
 
   @@index([deletedAt])
   @@map("orgs")
@@ -3835,4 +3845,54 @@ model CallSummary {
   @@index([callSessionId])
   @@index([orgId, key])
   @@map("call_summaries")
+}
+
+// ─── Wave 8 — Y.js CRDT collaborative text editing ────────────────────────
+
+/// Canonical Y.Doc snapshot for a single rich-text field.
+/// One row per (orgId, entityType, entityId, fieldKey).
+/// The ydocBinary column stores the merged Y.Doc state vector encoded with
+/// Y.encodeStateAsUpdate — never raw JS objects.
+/// When PII_FIELD_ENCRYPTION=true the binary is AES-256-GCM encrypted at the
+/// application layer before write and decrypted after read.
+model YjsDocument {
+  id         String   @id @default(uuid()) @db.Uuid
+  orgId      String   @map("org_id") @db.Uuid
+  entityType String   @map("entity_type") @db.VarChar(64)
+  entityId   String   @map("entity_id") @db.Uuid
+  fieldKey   String   @map("field_key") @db.VarChar(128)
+  /// Binary-encoded Y.Doc state (Y.encodeStateAsUpdate result).
+  ydocBinary Bytes    @map("ydoc_binary")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  updates YjsUpdate[]
+
+  @@unique([orgId, entityType, entityId, fieldKey])
+  @@index([orgId])
+  @@index([orgId, entityType, entityId])
+  @@map("yjs_documents")
+}
+
+/// Append-only log of incremental Y.js updates.
+/// Used for catch-up when a client reconnects after a gap.
+/// The compaction worker merges these into the parent YjsDocument snapshot
+/// and prunes rows older than 30 days (configurable).
+model YjsUpdate {
+  id        String   @id @default(uuid()) @db.Uuid
+  ydocId    String   @map("ydoc_id") @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  /// Opaque client identifier — used for dedup and audit; not a FK to User.
+  clientId  String   @map("client_id") @db.VarChar(256)
+  /// Raw incremental update bytes from Y.applyUpdate / Y.encodeStateAsUpdate.
+  update    Bytes
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  ydoc YjsDocument @relation(fields: [ydocId], references: [id], onDelete: Cascade)
+  org  Org         @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([ydocId, createdAt])
+  @@index([orgId, createdAt])
+  @@map("yjs_updates")
 }

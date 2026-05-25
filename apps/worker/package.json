@@ -14,20 +14,22 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.947.0",
-    "@e965/xlsx": "^0.20.3",
     "@bidstack/db": "workspace:*",
     "@bidstack/dust-client": "workspace:*",
     "@bidstack/shared": "workspace:*",
+    "@e965/xlsx": "^0.20.3",
     "bullmq": "^5.34.6",
     "dotenv-flow": "^4.1.0",
     "expo-server-sdk": "^3.10.0",
     "ioredis": "^5.4.2",
+    "lib0": "^0.2.117",
     "mammoth": "^1.12.0",
     "node-pptx-parser": "^1.0.1",
     "pdf-parse": "^2.4.5",
     "pino": "^9.5.0",
     "pino-pretty": "^13.0.0",
     "word-extractor": "^1.0.4",
+    "yjs": "^13.6.30",
     "zod": "^3.24.1"
   },
   "devDependencies": {
