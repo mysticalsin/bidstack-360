@@ -100,6 +100,8 @@ import {
 } from './routes/integrations/calls-webhooks.js';
 // Wave 8 — Customer Success
 import { csRoutes } from './routes/cs.js';
+// Wave 9 — Public NPS response page (server-rendered HTML, no auth, no JS)
+import { publicNpsRoutes } from './routes/public-nps.js';
 
 const CONNECT_SRC = [
   "'self'",
@@ -380,6 +382,11 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   // Wave 8 — Customer Success (authenticated + NPS public respond endpoint)
   await server.register(csRoutes, { prefix: '/api/v1' });
+
+  // Wave 9 — Public NPS response page (server-rendered HTML, no auth)
+  // Mounted at /api/v1/public/nps/:token. The /api → /api/v1 rewrite hook
+  // means email links can use the shorter /api/public/nps/:token form.
+  await server.register(publicNpsRoutes, { prefix: '/api/v1' });
 
   return server;
 }

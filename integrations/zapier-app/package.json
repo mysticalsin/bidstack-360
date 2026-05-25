@@ -1,0 +1,23 @@
+{
+  "name": "bidstack-zapier-app",
+  "version": "0.1.0",
+  "description": "BidStack CRM — official Zapier integration. Connect BidStack to 6,000+ apps via Zapier.",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test test/",
+    "validate": "zapier validate",
+    "deploy": "zapier push",
+    "promote": "zapier promote"
+  },
+  "engines": {
+    "node": ">=20",
+    "npm": ">=10"
+  },
+  "dependencies": {
+    "zapier-platform-core": "16.4.1"
+  },
+  "devDependencies": {
+    "zapier-platform-cli": "16.4.1"
+  },
+  "private": true
+}
