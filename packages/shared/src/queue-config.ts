@@ -336,3 +336,39 @@ export const WEBHOOK_DELIVERY: QueueConfig = {
     removeOnFail: { age: 86_400 * 30, count: 500 },
   },
 };
+
+// ─── Wave 8: Predictive scoring ML queues ────────────────────────────────
+
+/**
+ * predictive.retrain — triggered weekly by cron OR manually via
+ * POST /admin/predictive/retrain. Trains one logistic-regression model per
+ * (orgId, entityType) on the last 12 months of closed deals.
+ *
+ * WHY single queue, not fan-out per org: jobs are idempotent (modelVersion
+ * is content-addressed from trainedAt timestamp). Weekly cadence means low
+ * job volume — no per-org queue overhead needed at this scale.
+ */
+export const PREDICTIVE_RETRAIN: QueueConfig = {
+  name: 'predictive.retrain',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 60_000 },
+    removeOnComplete: { age: 86_400 * 7, count: 200 },
+    removeOnFail: { age: 86_400 * 30, count: 100 },
+  },
+};
+
+/**
+ * predictive.score — on-demand scoring job, enqueued after lead/opp update.
+ * Low latency target: should complete in < 500 ms (pure in-process inference).
+ * Result cached in Redis for 1 h under key predictive:score:<orgId>:<type>:<entityId>.
+ */
+export const PREDICTIVE_SCORE: QueueConfig = {
+  name: 'predictive.score',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'fixed', delay: 5_000 },
+    removeOnComplete: { age: 3_600, count: 500 },
+    removeOnFail: { age: 86_400, count: 100 },
+  },
+};
