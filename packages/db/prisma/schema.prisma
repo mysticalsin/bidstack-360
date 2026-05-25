@@ -268,10 +268,16 @@ model Company {
   serviceCases        ServiceCase[]
   accountSolutions    AccountSolution[]
   accountProducts     AccountProduct[]
-  documentExtractions DocumentExtraction[]
-  bidDocuments        BidDocument[]
-  references          Reference[]
-  leads               Lead[]
+  documentExtractions   DocumentExtraction[]
+  bidDocuments          BidDocument[]
+  references            Reference[]
+  leads                 Lead[]
+  // Wave 8 — Customer Success
+  subscriptions         Subscription[]
+  healthScores          HealthScore[]
+  npsSurveys            NpsSurvey[]
+  churnSignals          ChurnSignal[]
+  expansionOpportunities ExpansionOpportunity[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -3845,6 +3851,241 @@ model CallSummary {
   @@index([callSessionId])
   @@index([orgId, key])
   @@map("call_summaries")
+}
+
+// ─── Wave 8 — Customer Success ────────────────────────────────────────────
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  CHURNED
+  PAUSED
+
+  @@map("subscription_status")
+}
+
+/// Represents a recurring revenue contract for an account.
+/// Amounts stored in micros (×1e6) per Twenty/Stripe convention.
+model Subscription {
+  id                  String             @id @default(uuid()) @db.Uuid
+  orgId               String             @map("org_id") @db.Uuid
+  accountId           String             @map("account_id") @db.Uuid   // FK → Company
+  productId           String?            @map("product_id") @db.Uuid   // FK → Product
+  planTier            String             @map("plan_tier") @db.VarChar(64)
+  status              SubscriptionStatus @default(ACTIVE)
+  arrAmountMicros     BigInt             @map("arr_amount_micros")
+  currency            String             @default("EUR") @db.VarChar(3)
+  startedAt           DateTime           @map("started_at") @db.Timestamptz(6)
+  currentPeriodEnd    DateTime           @map("current_period_end") @db.Timestamptz(6)
+  renewalDate         DateTime           @map("renewal_date") @db.Timestamptz(6)
+  autoRenew           Boolean            @default(true) @map("auto_renew")
+  /// Structured churn context captured on cancellation: { reason, altProduct?, notes }
+  churnReason         Json?              @map("churn_reason")
+  ownerId             String?            @map("owner_id") @db.Uuid      // account manager
+  createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org                  Org                  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  account              Company              @relation(fields: [accountId], references: [id])
+  renewalOpportunities RenewalOpportunity[]
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([orgId, accountId])
+  @@index([orgId, status])
+  @@index([orgId, renewalDate])
+  @@index([deletedAt])
+  @@map("subscriptions")
+}
+
+enum RenewalOpportunityStatus {
+  UPCOMING
+  ENGAGED
+  AT_RISK
+  WON
+  LOST
+
+  @@map("renewal_opportunity_status")
+}
+
+/// Auto-created 90/60/30 days before currentPeriodEnd. Links to Opportunity for forecast.
+model RenewalOpportunity {
+  id             String                  @id @default(uuid()) @db.Uuid
+  orgId          String                  @map("org_id") @db.Uuid
+  subscriptionId String                  @map("subscription_id") @db.Uuid
+  opportunityId  String?                 @map("opportunity_id") @db.Uuid  // FK → Opportunity
+  status         RenewalOpportunityStatus @default(UPCOMING)
+  /// Days before renewal when this row was created (90 | 60 | 30).
+  daysOutTrigger Int                     @map("days_out_trigger")
+  ownerId        String?                 @map("owner_id") @db.Uuid
+  notes          String?
+  createdAt      DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org          Org          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([orgId, status])
+  @@index([orgId, subscriptionId])
+  @@index([deletedAt])
+  @@map("renewal_opportunities")
+}
+
+enum HealthTrend {
+  IMPROVING
+  STABLE
+  DECLINING
+
+  @@map("health_trend")
+}
+
+/// Point-in-time health score snapshot for an account.
+/// factors keys: engagement | productUsage | supportTickets | nps | contractValue | decisionMakerChange
+model HealthScore {
+  id          String      @id @default(uuid()) @db.Uuid
+  orgId       String      @map("org_id") @db.Uuid
+  accountId   String      @map("account_id") @db.Uuid   // FK → Company
+  score       Int         // 0–100
+  factors     Json        @default("{}")
+  trend       HealthTrend @default(STABLE)
+  capturedAt  DateTime    @default(now()) @map("captured_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  account Company @relation(fields: [accountId], references: [id])
+
+  @@index([orgId, accountId, capturedAt(sort: Desc)])
+  @@index([orgId, capturedAt(sort: Desc)])
+  @@map("health_scores")
+}
+
+enum NpsCategory {
+  PROMOTER
+  PASSIVE
+  DETRACTOR
+
+  @@map("nps_category")
+}
+
+/// NPS survey response. score is Net Promoter (−100..100 aggregate); score11 is raw 0–10 response.
+model NpsSurvey {
+  id          String      @id @default(uuid()) @db.Uuid
+  orgId       String      @map("org_id") @db.Uuid
+  accountId   String      @map("account_id") @db.Uuid    // FK → Company
+  contactId   String?     @map("contact_id") @db.Uuid    // FK → Contact
+  /// Signed JWT token for the public response URL. Hashed for lookup.
+  tokenHash   String      @unique @map("token_hash") @db.VarChar(64)
+  /// Net Promoter Score contribution from this response (−100..100).
+  score       Int?        // null until responded
+  /// Raw 0–10 rating the respondent selected.
+  score11     Int?        @map("score_11")
+  feedback    String?
+  category    NpsCategory?
+  sentAt      DateTime    @default(now()) @map("sent_at") @db.Timestamptz(6)
+  respondedAt DateTime?   @map("responded_at") @db.Timestamptz(6)
+  expiresAt   DateTime    @map("expires_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  account Company @relation(fields: [accountId], references: [id])
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([orgId, accountId, sentAt(sort: Desc)])
+  @@index([orgId, category])
+  @@index([deletedAt])
+  @@map("nps_surveys")
+}
+
+enum ChurnSignalKind {
+  LOW_USAGE
+  SUPPORT_VOLUME_SPIKE
+  CHAMPION_DEPARTED
+  COMPETITOR_MENTION
+  FEATURE_REQUEST_UNRESOLVED
+  EXEC_SPONSOR_LOST
+
+  @@map("churn_signal_kind")
+}
+
+enum ChurnSignalSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+
+  @@map("churn_signal_severity")
+}
+
+/// A detected risk event indicating potential churn. Created by nightly cron or NPS detractor webhook.
+model ChurnSignal {
+  id             String              @id @default(uuid()) @db.Uuid
+  orgId          String              @map("org_id") @db.Uuid
+  accountId      String              @map("account_id") @db.Uuid   // FK → Company
+  kind           ChurnSignalKind
+  severity       ChurnSignalSeverity @default(MEDIUM)
+  /// Structured evidence: { metric?, threshold?, actual?, source? }
+  evidence       Json                @default("{}")
+  detectedAt     DateTime            @default(now()) @map("detected_at") @db.Timestamptz(6)
+  acknowledgedAt DateTime?           @map("acknowledged_at") @db.Timestamptz(6)
+  resolvedAt     DateTime?           @map("resolved_at") @db.Timestamptz(6)
+  /// Free-text resolution summary captured on resolve.
+  resolution     String?
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  account Company @relation(fields: [accountId], references: [id])
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([orgId, accountId, detectedAt(sort: Desc)])
+  @@index([orgId, severity, resolvedAt])
+  @@index([deletedAt])
+  @@map("churn_signals")
+}
+
+enum ExpansionKind {
+  UPSELL
+  CROSS_SELL
+  SEAT_EXPANSION
+  FEATURE_UPSELL
+  RENEWAL_UPLIFT
+
+  @@map("expansion_kind")
+}
+
+enum ExpansionStatus {
+  IDENTIFIED
+  ENGAGED
+  PROPOSED
+  WON
+  LOST
+
+  @@map("expansion_status")
+}
+
+/// Surfaced upsell / cross-sell / seat-expansion opportunity for a healthy account.
+model ExpansionOpportunity {
+  id          String          @id @default(uuid()) @db.Uuid
+  orgId       String          @map("org_id") @db.Uuid
+  accountId   String          @map("account_id") @db.Uuid   // FK → Company
+  kind        ExpansionKind
+  valueMicros BigInt?         @map("value_micros")
+  currency    String          @default("EUR") @db.VarChar(3)
+  status      ExpansionStatus @default(IDENTIFIED)
+  notes       String?
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  account Company @relation(fields: [accountId], references: [id])
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([orgId, accountId])
+  @@index([orgId, status])
+  @@index([deletedAt])
+  @@map("expansion_opportunities")
 }
 
 // ─── Wave 8 — Y.js CRDT collaborative text editing ────────────────────────
