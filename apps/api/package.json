@@ -45,6 +45,7 @@
     "fastify-plugin": "^5.0.1",
     "fastify-type-provider-zod": "^4.0.2",
     "ioredis": "^5.4.2",
+    "js-base64": "^3.7.8",
     "lib0": "^0.2.117",
     "mammoth": "^1.12.0",
     "node-pptx-parser": "^1.0.1",

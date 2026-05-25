@@ -20,6 +20,8 @@ import { redisCachePlugin } from './plugins/redis-cache.js';
 // Wave 7 — Real-time collaboration
 import { realtimePlugin } from './plugins/realtime.js';
 import { realtimeRoutes } from './routes/realtime.js';
+// Wave 8 — Y.js CRDT collaborative text editing
+import { yjsCollabPlugin } from './plugins/yjs-collab.js';
 import { config } from './config.js';
 import { rbacPlugin } from './plugins/rbac.js';
 import { redis } from './redis.js';
@@ -236,6 +238,8 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(redisCachePlugin);
   // Wave 7 — Real-time WebSocket plugin (must come before route registration)
   await server.register(realtimePlugin);
+  // Wave 8 — Y.js CRDT WebSocket plugin (depends on realtime for @fastify/websocket)
+  await server.register(yjsCollabPlugin);
   await server.register(healthRoute);
   if (config.NODE_ENV !== 'test') {
     await server.register(rateLimit, {
