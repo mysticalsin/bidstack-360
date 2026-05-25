@@ -35,6 +35,7 @@ import * as Haptics from 'expo-haptics';
 import { BiometricGate } from './src/components/BiometricGate';
 import { NetworkBanner } from './src/components/NetworkBanner';
 import {
+  authenticate,
   checkBiometricCapability,
   isBiometricEnabled,
   type BiometricType,
@@ -243,7 +244,6 @@ export default function App() {
       }
 
       case 'biometric': {
-        const { authenticate } = await import('./src/bridge/biometric');
         const result = await authenticate(payload.reason as string | undefined);
         resolve(result);
         break;

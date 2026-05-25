@@ -22,7 +22,7 @@
  */
 
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import { prisma as defaultPrisma, type PrismaClient } from '@bidstack/db';
+import { prisma as defaultPrisma, Prisma, type PrismaClient } from '@bidstack/db';
 import pino from 'pino';
 
 import { extractLeadFeatures, extractOpportunityFeatures } from './feature-extraction.js';
@@ -307,7 +307,7 @@ export async function trainOrgModel(
   let X: number[][] = [];
   let y: number[] = [];
   let featureNames: string[] = [];
-  let sampleCount = 0;
+  let sampleCount: number;
 
   if (entityType === 'lead') {
     const closedLeads = await db.lead.findMany({
@@ -449,7 +449,7 @@ export async function trainOrgModel(
       orgId,
       entityType,
       version: prevVersion + 1,
-      accuracyMetrics: metrics,
+      accuracyMetrics: metrics as unknown as Prisma.InputJsonValue,
       trainedAt: new Date(trainedAt),
       sampleCount,
       modelArtifactS3Key: s3Key,

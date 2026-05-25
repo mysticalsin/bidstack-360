@@ -33,6 +33,14 @@ test('command palette opens via Ctrl+K and navigates', async ({ page, gotoAndWai
   await expect(page).toHaveURL(/\/pipeline/);
 });
 
+test('agents page is reachable from product routes', async ({ page, gotoAndWait }) => {
+  await gotoAndWait('/agents');
+  await expect(page.getByRole('heading', { level: 1, name: 'Agents' })).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(page.getByText(/RFP agent squad/i)).toBeVisible();
+});
+
 test('dark mode toggle persists across reload', async ({ page, gotoAndWait }) => {
   await gotoAndWait('/settings');
   const toggle = page.getByRole('button', { name: /theme|dark|light/i }).first();

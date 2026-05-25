@@ -1,0 +1,256 @@
+/**
+ * PredictiveAdminPage — Settings → Predictive Scoring.
+ *
+ * Shows per-entity-type model status: accuracy metrics, last train time,
+ * sample count, model history, and "Retrain Now" button.
+ *
+ * Admin-only: rendered behind the admin permission gate in the router.
+ *
+ * WCAG 2.2 AA:
+ *   - Table has caption + th scope.
+ *   - Buttons have descriptive aria-label.
+ *   - Metric badges include text (not color alone).
+ *   - Dark mode via CSS variables.
+ *   - Reduced motion: no spinner animation.
+ */
+
+import { useState } from 'react';
+import {
+  usePredictiveModels,
+  useRetrainModel,
+} from '@/hooks/usePredictiveScore';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────
+
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+}
+
+function MetricPill({ label, value }: { label: string; value: number }) {
+  const pct = Math.round(value * 100);
+  const colorClass =
+    pct >= 70
+      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
+      : pct >= 50
+      ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+      : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${colorClass}`}
+      aria-label={`${label}: ${pct}%`}
+    >
+      {label} {pct}%
+    </span>
+  );
+}
+
+// ─── Model table ──────────────────────────────────────────────────────────
+
+function ModelTable({ filter }: { filter: 'lead' | 'opportunity' }) {
+  const { data, isLoading } = usePredictiveModels(filter);
+  const models = data?.items ?? [];
+
+  if (isLoading) {
+    return (
+      <div
+        className="animate-pulse h-24 rounded-lg bg-[var(--color-neutral-200)] dark:bg-[var(--color-neutral-700)]"
+        aria-busy="true"
+        aria-label="Loading models..."
+      />
+    );
+  }
+
+  if (models.length === 0) {
+    return (
+      <p className="text-sm text-[var(--color-neutral-500)] py-4">
+        No {filter} models trained yet. Click &quot;Retrain Now&quot; to train the first model.
+      </p>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm border-collapse">
+        <caption className="sr-only">{filter} predictive model history</caption>
+        <thead>
+          <tr className="border-b border-[var(--color-border)] dark:border-[var(--color-border-dark)]">
+            <th scope="col" className="py-2 pr-4 text-left text-xs font-semibold text-[var(--color-neutral-500)] uppercase tracking-wide">
+              Version
+            </th>
+            <th scope="col" className="py-2 pr-4 text-left text-xs font-semibold text-[var(--color-neutral-500)] uppercase tracking-wide">
+              Accuracy Metrics
+            </th>
+            <th scope="col" className="py-2 pr-4 text-right text-xs font-semibold text-[var(--color-neutral-500)] uppercase tracking-wide">
+              Samples
+            </th>
+            <th scope="col" className="py-2 pr-4 text-left text-xs font-semibold text-[var(--color-neutral-500)] uppercase tracking-wide">
+              Trained
+            </th>
+            <th scope="col" className="py-2 text-center text-xs font-semibold text-[var(--color-neutral-500)] uppercase tracking-wide">
+              Active
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {models.map((m) => (
+            <tr
+              key={m.id}
+              className={[
+                'border-b border-[var(--color-border)] dark:border-[var(--color-border-dark)]',
+                m.isActive ? 'bg-[var(--color-primary-50)] dark:bg-[var(--color-primary-900)]/10' : '',
+              ].join(' ')}
+            >
+              <td className="py-3 pr-4 font-mono text-[var(--color-neutral-700)] dark:text-[var(--color-neutral-300)]">
+                v{m.version}
+              </td>
+              <td className="py-3 pr-4">
+                <div className="flex flex-wrap gap-1">
+                  <MetricPill label="AUC" value={m.accuracyMetrics.auc} />
+                  <MetricPill label="F1" value={m.accuracyMetrics.f1} />
+                  <MetricPill label="Prec" value={m.accuracyMetrics.precision} />
+                  <MetricPill label="Rec" value={m.accuracyMetrics.recall} />
+                </div>
+              </td>
+              <td className="py-3 pr-4 text-right tabular-nums text-[var(--color-neutral-700)] dark:text-[var(--color-neutral-300)]">
+                {m.sampleCount.toLocaleString()}
+              </td>
+              <td className="py-3 pr-4 text-[var(--color-neutral-600)] dark:text-[var(--color-neutral-400)]">
+                {formatDateTime(m.trainedAt)}
+              </td>
+              <td className="py-3 text-center">
+                {m.isActive ? (
+                  <span
+                    className="inline-block w-2 h-2 rounded-full bg-emerald-500"
+                    aria-label="Active model"
+                  />
+                ) : (
+                  <span
+                    className="inline-block w-2 h-2 rounded-full bg-[var(--color-neutral-300)]"
+                    aria-label="Inactive"
+                  />
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── Entity section ────────────────────────────────────────────────────────
+
+function EntitySection({ entityType }: { entityType: 'lead' | 'opportunity' }) {
+  const retrain = useRetrainModel();
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const handleRetrain = async () => {
+    setSuccess(null);
+    try {
+      const res = await retrain.mutateAsync({ entityType });
+      setSuccess(res.message);
+    } catch {
+      // error surfaced via retrain.isError
+    }
+  };
+
+  return (
+    <section className="rounded-xl border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-surface)] dark:bg-[var(--color-surface-elevated)] p-6">
+      <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
+        <div>
+          <h2 className="font-semibold text-[var(--color-neutral-900)] dark:text-[var(--color-neutral-100)] capitalize">
+            {entityType} Scoring Model
+          </h2>
+          <p className="text-xs text-[var(--color-neutral-500)] mt-0.5">
+            Logistic regression · per-org · retrained weekly
+          </p>
+        </div>
+
+        <button
+          type="button"
+          aria-label={`Retrain ${entityType} model now`}
+          onClick={handleRetrain}
+          disabled={retrain.isPending}
+          className={[
+            'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium',
+            'min-h-[44px] min-w-[44px]',
+            'bg-[var(--color-primary-600)] text-white',
+            'hover:bg-[var(--color-primary-700)]',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-500)] focus-visible:ring-offset-1',
+            'disabled:opacity-50 disabled:cursor-not-allowed',
+            'transition-colors motion-reduce:transition-none',
+          ].join(' ')}
+        >
+          {retrain.isPending ? (
+            <>
+              <span
+                className="inline-block h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin motion-reduce:animate-none"
+                aria-hidden="true"
+              />
+              Queuing…
+            </>
+          ) : (
+            'Retrain Now'
+          )}
+        </button>
+      </div>
+
+      {/* Status messages */}
+      {success && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mb-4 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300 text-sm"
+        >
+          {success}
+        </div>
+      )}
+      {retrain.isError && (
+        <div
+          role="alert"
+          className="mb-4 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 text-sm"
+        >
+          Retrain failed. Please try again.
+        </div>
+      )}
+
+      <ModelTable filter={entityType} />
+    </section>
+  );
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────
+
+export default function PredictiveAdminPage() {
+  return (
+    <main className="max-w-4xl mx-auto px-4 py-8 space-y-8">
+      {/* Page header */}
+      <div>
+        <h1 className="text-2xl font-bold text-[var(--color-neutral-900)] dark:text-[var(--color-neutral-100)]">
+          Predictive Scoring
+        </h1>
+        <p className="text-sm text-[var(--color-neutral-500)] mt-1">
+          ML-based lead and opportunity scoring — trained on your org&apos;s closed deal history.
+          Models are automatically retrained every Sunday at 02:00 UTC.
+        </p>
+      </div>
+
+      {/* Info banner */}
+      <div className="rounded-xl border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-neutral-50)] dark:bg-[var(--color-neutral-800)]/50 p-4">
+        <p className="text-sm text-[var(--color-neutral-700)] dark:text-[var(--color-neutral-300)]">
+          <strong>Data privacy:</strong> Model artifacts contain only learned weights — no raw
+          deal data, names, or emails. Each org trains its own isolated model.
+          Scores are cached for 1 hour in Redis and invalidated on record updates.
+        </p>
+      </div>
+
+      {/* Entity sections */}
+      <EntitySection entityType="lead" />
+      <EntitySection entityType="opportunity" />
+    </main>
+  );
+}

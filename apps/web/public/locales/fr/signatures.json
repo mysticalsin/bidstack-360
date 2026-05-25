@@ -1,0 +1,57 @@
+{
+  "title": "Signatures électroniques",
+  "send": {
+    "title": "Envoyer pour signature",
+    "recipients": "Destinataires",
+    "addRecipient": "Ajouter un destinataire",
+    "recipientName": "Nom",
+    "recipientEmail": "Adresse e-mail",
+    "recipientRole": "Rôle",
+    "message": "Message personnalisé",
+    "messagePlaceholder": "Ajoutez un message pour les signataires (optionnel)",
+    "send": "Envoyer pour signature",
+    "sending": "Envoi en cours…",
+    "cancel": "Annuler",
+    "document": "Document",
+    "selectDocument": "Sélectionner un document"
+  },
+  "status": {
+    "pending": "En attente",
+    "sent": "Envoyé",
+    "viewed": "Consulté",
+    "signed": "Signé",
+    "declined": "Refusé",
+    "expired": "Expiré",
+    "completed": "Complété",
+    "cancelled": "Annulé"
+  },
+  "pad": {
+    "title": "Signer le document",
+    "instruction": "Signez dans la zone ci-dessous",
+    "clear": "Effacer",
+    "sign": "Apposer ma signature",
+    "signing": "Signature en cours…",
+    "decline": "Refuser",
+    "declineReason": "Motif du refus (optionnel)",
+    "typedSignature": "Signature tapée",
+    "drawnSignature": "Signature dessinée",
+    "typeNamePlaceholder": "Tapez votre nom complet",
+    "agreed": "J'accepte que cette signature électronique soit légalement équivalente à ma signature manuscrite."
+  },
+  "timeline": {
+    "title": "Historique des signatures",
+    "sent": "Envoyé à {{name}}",
+    "viewed": "Consulté par {{name}}",
+    "signed": "Signé par {{name}}",
+    "declined": "Refusé par {{name}}",
+    "completed": "Tous les signataires ont signé",
+    "reminder": "Relance envoyée à {{name}}"
+  },
+  "actions": {
+    "remind": "Relancer",
+    "download": "Télécharger",
+    "cancel": "Annuler la demande",
+    "viewCertificate": "Voir le certificat",
+    "confirmCancel": "Annuler cette demande de signature ? Les signataires en seront informés."
+  }
+}

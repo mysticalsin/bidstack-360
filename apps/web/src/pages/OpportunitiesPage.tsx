@@ -40,18 +40,14 @@ import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { prefetchRoute } from '@/lib/prefetch';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { formatDate, formatStage } from '@/lib/format';
+import {
+  getPipelineStages,
+  isLegacyOpportunityStage,
+  isPipelineStageIdUuid,
+  resolvePipelineStage,
+} from '@/lib/pipeline-stages';
 
-import type { Opportunity, OpportunityStage } from '@bidstack/shared';
-
-const STAGES: OpportunityStage[] = [
-  's1_lead',
-  's1_ongoing',
-  's2_sent',
-  's3_technical_iteration',
-  's4_negotiation',
-  'closed_won',
-  'closed_lost',
-];
+import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
 export function OpportunitiesPage() {
   const navigate = useNavigate();
@@ -64,14 +60,12 @@ export function OpportunitiesPage() {
   const [, startTransition] = useTransition();
 
   // Stage filter chips (CRM-style quick filters)
-  const stageFilterRaw = searchParams.get('stage');
-  const stageFilter = STAGES.includes(stageFilterRaw as OpportunityStage)
-    ? (stageFilterRaw as OpportunityStage)
-    : null;
-  const setStageFilter = (next: OpportunityStage | null) => {
+  const stageFilterRaw = searchParams.get('pipelineStageId');
+  const stageFilter = stageFilterRaw ?? null;
+  const setStageFilter = (next: string | null) => {
     const params = new URLSearchParams(searchParams);
-    if (next) params.set('stage', next);
-    else params.delete('stage');
+    if (next) params.set('pipelineStageId', next);
+    else params.delete('pipelineStageId');
     params.delete('search'); // clear search when switching stage filter
     setSearchParams(params, { replace: true });
   };
@@ -79,7 +73,13 @@ export function OpportunitiesPage() {
   const { data, isLoading, isError, error } = useOpportunities({
     limit: 100,
     ...(search ? { search } : {}),
-    ...(stageFilter ? { stage: stageFilter } : {}),
+    ...(stageFilter
+      ? isPipelineStageIdUuid(stageFilter)
+        ? { pipelineStageId: stageFilter }
+        : isLegacyOpportunityStage(stageFilter)
+          ? { stage: stageFilter }
+          : {}
+      : {}),
   });
 
   // Sortable. Default sort = none (server returns by recent activity); the
@@ -87,12 +87,13 @@ export function OpportunitiesPage() {
   // funnel order rather than alphabetically — that's what users mean when
   // they sort by stage.
   const rawItems = useMemo(() => data?.items ?? [], [data?.items]);
+  const stageOptions = useMemo(() => getPipelineStages(rawItems), [rawItems]);
   const accessors = useMemo(
     () => ({
       code: (o: Opportunity) => o.code,
       name: (o: Opportunity) => o.name,
       customer: (o: Opportunity) => o.customer,
-      stage: (o: Opportunity) => STAGES.indexOf(o.stage),
+      stage: (o: Opportunity) => resolvePipelineStage(o).name,
       value: (o: Opportunity) => o.value,
       probability: (o: Opportunity) => o.probability,
       dueDate: (o: Opportunity) => o.dueDate,
@@ -154,20 +155,20 @@ export function OpportunitiesPage() {
 
   const patch = usePatchOpportunity();
   const stageMove = useStageMutation();
-  const bulkStageChange = async (stage: OpportunityStage) => {
+  const bulkStageChange = async (pipelineStageId: string) => {
     if (selectedOpps.length === 0) return;
     const snapshot = [...selectedOpps];
     let failed = 0;
     await Promise.all(
       snapshot.map((o) =>
-        stageMove.mutateAsync({ id: o.id, stage }).catch(() => {
+        stageMove.mutateAsync({ id: o.id, pipelineStageId }).catch(() => {
           failed += 1;
         }),
       ),
     );
     if (failed === 0) {
       toast.success(
-        `Moved ${snapshot.length} opportunit${snapshot.length === 1 ? 'y' : 'ies'} to ${formatStage(stage)}`,
+        `Moved ${snapshot.length} opportunit${snapshot.length === 1 ? 'y' : 'ies'}`,
       );
       clearSelection();
     } else {
@@ -228,7 +229,7 @@ export function OpportunitiesPage() {
         code: opp.code,
         name: opp.name,
         customer: opp.customer,
-        stage: formatStage(opp.stage),
+        stage: resolvePipelineStage(opp).name,
         value: formatMoney(opp.value, 'EUR'),
         probability: `${opp.probability}%`,
         dueDate: opp.dueDate ?? '',
@@ -258,7 +259,7 @@ export function OpportunitiesPage() {
             const opps = data.items;
             const totalValue = opps.reduce((acc, o) => acc + o.value, 0);
             const openOpps = opps.filter(
-              (o) => o.stage !== 'closed_won' && o.stage !== 'closed_lost',
+              (o) => !o.pipelineStage?.isWon && !o.pipelineStage?.isLost,
             );
             const openValue = openOpps.reduce((acc, o) => acc + o.value, 0);
             const weighted = openOpps.reduce((acc, o) => acc + o.value * (o.probability / 100), 0);
@@ -368,21 +369,21 @@ export function OpportunitiesPage() {
           >
             All
           </button>
-          {STAGES.map((s) => (
-            <button
-              key={s}
-              type="button"
-              aria-pressed={stageFilter === s}
-              onClick={() => setStageFilter(stageFilter === s ? null : s)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] ${
-                stageFilter === s
-                  ? 'bg-[var(--fg-primary)] text-[var(--surface-page)]'
-                  : 'bg-[var(--surface-sunken)] text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)]'
-              }`}
-            >
-              {formatStage(s)}
-            </button>
-          ))}
+          {stageOptions.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                aria-pressed={stageFilter === s.id}
+                onClick={() => setStageFilter(stageFilter === s.id ? null : s.id)}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] ${
+                  stageFilter === s.id
+                    ? 'bg-[var(--fg-primary)] text-[var(--surface-page)]'
+                    : 'bg-[var(--surface-sunken)] text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)]'
+                }`}
+              >
+                {s.name}
+              </button>
+            ))}
         </div>
       )}
 
@@ -400,7 +401,7 @@ export function OpportunitiesPage() {
               aria-label="Move selection to stage"
               defaultValue=""
               onChange={(e) => {
-                const next = e.target.value as OpportunityStage | '';
+                const next = e.target.value;
                 if (next) {
                   void bulkStageChange(next);
                   e.target.value = '';
@@ -409,11 +410,11 @@ export function OpportunitiesPage() {
               className="dialog-input"
             >
               <option value="">Move to stage…</option>
-              {STAGES.map((s) => (
-                <option key={s} value={s}>
-                  {formatStage(s)}
-                </option>
-              ))}
+              {stageOptions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
             </select>
             <Button
               size="sm"
@@ -542,6 +543,7 @@ export function OpportunitiesPage() {
                   <Row
                     key={opp.id}
                     opp={opp}
+                    stageOptions={stageOptions}
                     isSelected={selectedIds.has(opp.id)}
                     onToggleSelect={toggleOne}
                     patch={patch}
@@ -560,11 +562,13 @@ export function OpportunitiesPage() {
 // useMutation hooks (one per row) which is expensive for React Query.
 const Row = memo(function Row({
   opp,
+  stageOptions,
   isSelected,
   onToggleSelect,
   patch,
 }: {
   opp: Opportunity;
+  stageOptions: PipelineStage[];
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
   patch: ReturnType<typeof usePatchOpportunity>;
@@ -647,10 +651,17 @@ const Row = memo(function Row({
       </td>
       <td className="px-5 py-3">
         <StageCell
-          value={opp.stage}
-          onSave={(next) => {
+          stage={resolvePipelineStage(opp)}
+          options={stageOptions}
+          onSave={(nextId) => {
+            const nextStage = stageOptions.find((s) => s.id === nextId);
             patch.mutate(
-              { id: opp.id, patch: { stage: next } },
+              {
+                id: opp.id,
+                patch: isPipelineStageIdUuid(nextId)
+                  ? { pipelineStageId: nextId }
+                  : { stage: nextId, pipelineStageId: null },
+              },
               {
                 onSuccess: () => {
                   savedToast('Stage');
@@ -658,14 +669,14 @@ const Row = memo(function Row({
                   // The "you won this one" moment — confetti only on
                   // closed_won, never on closed_lost (no celebration for
                   // a lost bid).
-                  if (next === 'closed_won') {
+                  if (nextStage?.isWon) {
                     fireConfetti();
                     toast.success(`🎉 Won "${opp.name}"!`, { duration: 5000 });
                   }
                   // Announce every stage move to screen readers — this is
                   // the most consequential edit on the page and the live
                   // region keeps SR users in sync.
-                  announceStageChange(`${opp.name} moved to ${formatStage(next)}`);
+                  announceStageChange(`${opp.name} moved to ${nextStage?.name ?? nextId}`);
                 },
                 onError: errorToast,
               },
@@ -745,20 +756,23 @@ const Row = memo(function Row({
 // ── Inline-edit cells ────────────────────────────────────────────────────
 
 function StageCell({
-  value,
+  stage,
+  options,
   onSave,
 }: {
-  value: OpportunityStage;
-  onSave: (next: OpportunityStage) => void;
+  stage: PipelineStage | null;
+  options: PipelineStage[];
+  onSave: (nextId: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const value = stage?.id ?? '';
   if (!editing) {
     return (
       <button
         type="button"
         onClick={() => setEditing(true)}
         className="inline-edit-trigger"
-        aria-label={`Stage: ${formatStage(value)}. Click to change.`}
+        aria-label={`Stage: ${stage?.name ?? 'Unknown'}. Click to change.`}
       >
         {/* Key on `value` so the badge remounts when the stage changes —
             the spring then plays from scale 0.85 to 1, signalling the
@@ -770,7 +784,7 @@ function StageCell({
           transition={{ type: 'spring', stiffness: 360, damping: 22 }}
           className="inline-block"
         >
-          <Badge tone={stageTone(value)}>{formatStage(value)}</Badge>
+          <Badge tone={stageTone(stage?.name ?? '')}>{stage?.name ?? 'Unknown'}</Badge>
         </motion.span>
       </button>
     );
@@ -780,7 +794,7 @@ function StageCell({
       autoFocus
       value={value}
       onChange={(e: ChangeEvent<HTMLSelectElement>) => {
-        const next = e.target.value as OpportunityStage;
+        const next = e.target.value;
         setEditing(false);
         if (next !== value) onSave(next);
       }}
@@ -794,9 +808,9 @@ function StageCell({
       className="dialog-input"
       style={{ width: 'auto' }}
     >
-      {STAGES.map((s) => (
-        <option key={s} value={s}>
-          {formatStage(s)}
+      {options.map((s) => (
+        <option key={s.id} value={s.id}>
+          {s.name}
         </option>
       ))}
     </select>

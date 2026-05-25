@@ -7,7 +7,6 @@ import { z } from 'zod';
 import {
   prisma,
   Prisma,
-  type OpportunityStage as PrismaStage,
   type LeadStatus,
   type LeadPriority,
 } from '@bidstack/db';
@@ -103,6 +102,7 @@ export const leadRoutes: FastifyPluginAsyncZod = async (server) => {
       const customFieldValues = await prisma.customFieldValue.findMany({
         where: { orgId: req.auth.orgId, entityType: 'lead', entityId: lead.id },
         select: { id: true, definitionId: true, value: true },
+        take: 100,
       });
       return {
         id: lead.id,

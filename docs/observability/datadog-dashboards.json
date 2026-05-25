@@ -1,0 +1,161 @@
+{
+  "title": "BidStack 360° — API & Worker Overview",
+  "description": "Pre-built Datadog dashboard for BidStack 360°. Import via Datadog UI → Dashboards → New Dashboard → Import JSON.",
+  "layout_type": "ordered",
+  "widgets": [
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "API Request Rate (req/min by route)",
+        "show_legend": true,
+        "requests": [
+          {
+            "formulas": [{ "formula": "query1" }],
+            "queries": [
+              {
+                "name": "query1",
+                "data_source": "metrics",
+                "query": "sum:bidstack.api.requests.total{*} by {route}.as_rate()"
+              }
+            ],
+            "response_format": "timeseries",
+            "display_type": "line"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "API Latency Heatmap (p50 / p95 / p99 ms)",
+        "show_legend": true,
+        "requests": [
+          {
+            "formulas": [
+              { "formula": "query_p50", "alias": "p50" },
+              { "formula": "query_p95", "alias": "p95" },
+              { "formula": "query_p99", "alias": "p99" }
+            ],
+            "queries": [
+              { "name": "query_p50", "data_source": "metrics", "query": "p50:bidstack.api.latency{*}", "aggregator": "percentile" },
+              { "name": "query_p95", "data_source": "metrics", "query": "p95:bidstack.api.latency{*}", "aggregator": "percentile" },
+              { "name": "query_p99", "data_source": "metrics", "query": "p99:bidstack.api.latency{*}", "aggregator": "percentile" }
+            ],
+            "response_format": "timeseries",
+            "display_type": "line"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "API Error Rate (4xx / 5xx)",
+        "show_legend": true,
+        "requests": [
+          {
+            "formulas": [
+              { "formula": "q4xx / total * 100", "alias": "4xx %" },
+              { "formula": "q5xx / total * 100", "alias": "5xx %" }
+            ],
+            "queries": [
+              { "name": "q4xx", "data_source": "metrics", "query": "sum:bidstack.api.requests.total{status:4*}.as_rate()" },
+              { "name": "q5xx", "data_source": "metrics", "query": "sum:bidstack.api.requests.total{status:5*}.as_rate()" },
+              { "name": "total", "data_source": "metrics", "query": "sum:bidstack.api.requests.total{*}.as_rate()" }
+            ],
+            "response_format": "timeseries",
+            "display_type": "bars"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "toplist",
+        "title": "Top 10 Slowest Endpoints (p99 ms)",
+        "requests": [
+          {
+            "formulas": [{ "formula": "query1", "limit": { "count": 10, "order": "desc" } }],
+            "queries": [
+              { "name": "query1", "data_source": "metrics", "query": "p99:bidstack.api.latency{*} by {route}", "aggregator": "percentile" }
+            ],
+            "response_format": "scalar"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "BullMQ Queue Depth (waiting + active)",
+        "show_legend": true,
+        "requests": [
+          {
+            "formulas": [{ "formula": "query1" }],
+            "queries": [
+              { "name": "query1", "data_source": "metrics", "query": "max:bidstack.workers.queue.depth{*} by {queue}" }
+            ],
+            "response_format": "timeseries",
+            "display_type": "area"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "Worker Job Processing Rate (success vs failed)",
+        "show_legend": true,
+        "requests": [
+          {
+            "formulas": [
+              { "formula": "q_success", "alias": "success/min" },
+              { "formula": "q_failed", "alias": "failed/min" }
+            ],
+            "queries": [
+              { "name": "q_success", "data_source": "metrics", "query": "sum:bidstack.workers.jobs.processed{status:success} by {queue}.as_rate()" },
+              { "name": "q_failed", "data_source": "metrics", "query": "sum:bidstack.workers.jobs.processed{status:failed} by {queue}.as_rate()" }
+            ],
+            "response_format": "timeseries",
+            "display_type": "bars"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "Integration API Call Success Rate by Provider",
+        "show_legend": true,
+        "requests": [
+          {
+            "formulas": [{ "formula": "success / (success + failed) * 100", "alias": "success %" }],
+            "queries": [
+              { "name": "success", "data_source": "metrics", "query": "sum:bidstack.integrations.calls{success:true} by {provider}.as_rate()" },
+              { "name": "failed", "data_source": "metrics", "query": "sum:bidstack.integrations.calls{success:false} by {provider}.as_rate()" }
+            ],
+            "response_format": "timeseries",
+            "display_type": "line"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "query_value",
+        "title": "SMS Sent (last 24h)",
+        "requests": [
+          {
+            "formulas": [{ "formula": "query1" }],
+            "queries": [
+              { "name": "query1", "data_source": "metrics", "query": "sum:bidstack.integrations.calls{provider:twilio,success:true}", "aggregator": "sum" }
+            ],
+            "response_format": "scalar"
+          }
+        ],
+        "time": { "live_span": "1d" }
+      }
+    }
+  ],
+  "_comment": "Import this file via Datadog UI → Dashboards → New Dashboard → Import JSON (paste contents). Widget IDs are auto-assigned on import."
+}

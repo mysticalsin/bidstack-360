@@ -19,7 +19,6 @@
  * would cause 429 responses and force Twilio to retry, causing delays.
  */
 
-import { timingSafeEqual } from 'node:crypto';
 import type { FastifyPluginAsync } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -55,7 +54,11 @@ export const twilioWebhookRoutes: FastifyPluginAsync = async (fastify) => {
           Price: z.string().optional(),
           NumSegments: z.string().optional(),
         }),
-        response: { 200: z.object({ ok: z.boolean() }) },
+        response: {
+          200: z.object({ ok: z.boolean() }),
+          403: z.object({ ok: z.boolean() }),
+          404: z.object({ ok: z.boolean() }),
+        },
       },
     },
     async (req, reply) => {
@@ -128,7 +131,11 @@ export const twilioWebhookRoutes: FastifyPluginAsync = async (fastify) => {
           Body: z.string(),
           NumSegments: z.string().optional(),
         }),
-        response: { 200: z.object({ ok: z.boolean() }) },
+        response: {
+          200: z.object({ ok: z.boolean() }),
+          403: z.object({ ok: z.boolean() }),
+          404: z.object({ ok: z.boolean() }),
+        },
       },
     },
     async (req, reply) => {

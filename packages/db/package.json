@@ -21,7 +21,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "analyze-queries": "tsx scripts/analyze-slow-queries.ts"
   },
   "prisma": {
     "schema": "prisma/schema.prisma",

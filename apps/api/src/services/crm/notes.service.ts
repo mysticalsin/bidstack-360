@@ -273,6 +273,7 @@ export async function persistContacts(
       ],
     },
     select: { email: true, name: true },
+    take: 1000,
   });
   const existingEmails = new Set(existing.map((e) => e.email?.toLowerCase()).filter(Boolean));
   const existingNames = new Set(existing.map((e) => e.name.toLowerCase()));
@@ -313,6 +314,7 @@ export async function persistRisks(
       title: { in: titles, mode: 'insensitive' },
     },
     select: { title: true },
+    take: 1000,
   });
   const existingTitles = new Set(existing.map((e) => e.title.toLowerCase()));
   const newRisks = risks.filter((r) => !existingTitles.has(r.title.toLowerCase()));
@@ -344,6 +346,7 @@ export async function persistCompliance(
   const existing = await tx.complianceCheck.findMany({
     where: { orgId, label: { in: labels, mode: 'insensitive' } },
     select: { id: true, label: true },
+    take: 1000,
   });
   const existingByLabel = new Map(existing.map((e) => [e.label.toLowerCase(), e.id]));
   const toUpdate = compliance.filter((c) => existingByLabel.has(c.label.toLowerCase()));
@@ -386,6 +389,7 @@ export async function persistTasks(
   const existing = await tx.task.findMany({
     where: { orgId, title: { in: titles, mode: 'insensitive' } },
     select: { title: true },
+    take: 1000,
   });
   const existingTitles = new Set(existing.map((e) => e.title.toLowerCase()));
   const newTasks = tasks.filter((t) => !existingTitles.has(t.title.toLowerCase()));

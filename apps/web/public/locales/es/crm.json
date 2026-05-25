@@ -1,0 +1,114 @@
+{
+  "entities": {
+    "account": "Cuenta",
+    "accounts": "Cuentas",
+    "company": "Empresa",
+    "companies": "Empresas",
+    "contact": "Contacto",
+    "contacts": "Contactos",
+    "opportunity": "Oportunidad",
+    "opportunities": "Oportunidades",
+    "lead": "Prospecto",
+    "leads": "Prospectos",
+    "task": "Tarea",
+    "tasks": "Tareas",
+    "invoice": "Factura",
+    "invoices": "Facturas",
+    "quote": "Cotización",
+    "quotes": "Cotizaciones",
+    "product": "Producto",
+    "products": "Productos",
+    "territory": "Territorio",
+    "territories": "Territorios"
+  },
+  "stages": {
+    "qualifying": "Calificación",
+    "discovery": "Descubrimiento",
+    "proposal": "Propuesta",
+    "negotiation": "Negociación",
+    "closedWon": "Ganado",
+    "closedLost": "Perdido"
+  },
+  "kpi": {
+    "openBids": "Licitaciones abiertas",
+    "overdueTasks": "Tareas vencidas",
+    "weightedPipeline": "Pipeline ponderado",
+    "winRate": "Tasa de éxito",
+    "averageDealSize": "Valor promedio de negocio",
+    "newThisWeek": "Nuevos esta semana"
+  },
+  "fields": {
+    "name": "Nombre",
+    "subject": "Asunto",
+    "stage": "Etapa",
+    "amount": "Importe",
+    "currency": "Divisa",
+    "closeDate": "Fecha de cierre",
+    "owner": "Responsable",
+    "createdAt": "Creado",
+    "updatedAt": "Actualizado",
+    "dueDate": "Fecha límite",
+    "status": "Estado",
+    "priority": "Prioridad"
+  },
+  "detail": {
+    "opportunity": "Detalle de oportunidad",
+    "contact": "Detalle de contacto",
+    "lead": "Detalle de prospecto",
+    "company": "Detalle de empresa",
+    "task": "Detalle de tarea",
+    "invoice": "Detalle de factura",
+    "quote": "Detalle de cotización o pedido",
+    "serviceCase": "Detalle de caso de servicio",
+    "account": "Cuenta: {{name}}"
+  },
+  "empty": {
+    "opportunities": "Sin oportunidades por ahora",
+    "contacts": "Sin contactos por ahora",
+    "tasks": "Sin tareas por ahora",
+    "leads": "Sin prospectos por ahora",
+    "companies": "Sin empresas por ahora",
+    "ctaCreate": "Crea tu primer(a) {{entity}}"
+  },
+  "pipeline": {
+    "title": "Pipeline de ventas",
+    "filterBy": "Filtrar por",
+    "groupBy": "Agrupar por",
+    "allStages": "Todas las etapas",
+    "addOpportunity": "Agregar oportunidad",
+    "dragToMove": "Arrastrar para mover",
+    "totalValue": "Valor total"
+  },
+  "leads": {
+    "title": "Prospectos",
+    "new": "Nuevo prospecto",
+    "qualify": "Calificar",
+    "disqualify": "Descalificar",
+    "convert": "Convertir en oportunidad",
+    "source": "Fuente",
+    "score": "Puntuación",
+    "assignTo": "Asignar a"
+  },
+  "tasks": {
+    "title": "Tareas",
+    "new": "Nueva tarea",
+    "dueToday": "Para hoy",
+    "overdue": "Vencida",
+    "completed": "Completada",
+    "markComplete": "Marcar como completada",
+    "assignedTo": "Asignado a",
+    "relatedTo": "Relacionado con",
+    "addNote": "Agregar nota"
+  },
+  "activities": {
+    "title": "Actividades",
+    "note": "Nota",
+    "call": "Llamada",
+    "email": "Correo",
+    "meeting": "Reunión",
+    "task": "Tarea",
+    "logActivity": "Registrar actividad",
+    "timeline": "Historial",
+    "noActivities": "Sin actividades registradas"
+  }
+}

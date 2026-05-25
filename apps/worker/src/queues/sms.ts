@@ -28,7 +28,7 @@ import type IORedis from 'ioredis';
 import type pino from 'pino';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
-import { decryptToken } from '@bidstack/shared';
+import { decryptToken } from '@bidstack/shared/token-crypto';
 
 // ─── Queue names ───────────────────────────────────────────────────────────
 
@@ -64,8 +64,6 @@ const SmsBulkSendJobData = z.object({
 
 // ─── STOP keywords (CTIA) ─────────────────────────────────────────────────
 
-const STOP_KEYWORDS = new Set(['stop', 'stopall', 'unsubscribe', 'end', 'quit', 'cancel']);
-
 // ─── Twilio REST helper ────────────────────────────────────────────────────
 
 async function twilioSend(
@@ -76,6 +74,7 @@ async function twilioSend(
   body: string,
   log: pino.Logger,
 ): Promise<{ sid: string; numSegments: number }> {
+  log.debug({ to }, 'Sending SMS via Twilio');
   const basicAuth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
   const formBody = new URLSearchParams({
     From: from,
@@ -200,7 +199,6 @@ export async function startSmsWorker(
   // worker replicas. 1 message/second is conservative for A2P 10DLC.
   const smsSendQueue = new Queue(SMS_SEND_QUEUE, {
     connection,
-    limiter: { max: 1, duration: 1_000 },
     defaultJobOptions: {
       attempts: 3,
       backoff: { type: 'exponential', delay: 5_000 },
@@ -222,7 +220,7 @@ export async function startSmsWorker(
   const smsSendWorker = new Worker(
     SMS_SEND_QUEUE,
     async (job) => processSingleSend(job.data, log.child({ jobId: job.id })),
-    { connection, concurrency: 1 }, // concurrency=1 respects queue limiter intent
+    { connection, concurrency: 1, limiter: { max: 1, duration: 1_000 } },
   );
 
   const smsBulkWorker = new Worker(

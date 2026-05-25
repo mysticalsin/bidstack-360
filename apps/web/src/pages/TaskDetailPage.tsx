@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useTasks, useUpdateTask } from '@/hooks/useTasks';
+import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { formatDate } from '@/lib/format';
 
 export function TaskDetailPage() {
@@ -92,6 +93,8 @@ export function TaskDetailPage() {
           )}
         </div>
       </header>
+
+      <CustomFieldValuesSection entityType="task" entityId={id!} />
 
       <Card className="p-5">
         <div className="space-y-4">

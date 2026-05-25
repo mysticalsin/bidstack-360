@@ -1,0 +1,55 @@
+{
+  "title": "Integrations",
+  "subtitle": "Connect BidStack to your tools and services",
+  "connected": "Connected",
+  "disconnected": "Disconnected",
+  "connect": "Connect",
+  "disconnect": "Disconnect",
+  "configure": "Configure",
+  "reconnect": "Reconnect",
+  "lastSync": "Last synced {{when}}",
+  "syncNow": "Sync now",
+  "syncing": "Syncing…",
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive",
+    "error": "Error",
+    "pending": "Pending"
+  },
+  "gmail": {
+    "name": "Gmail",
+    "description": "Sync your Gmail emails and activities with BidStack.",
+    "permissionsRequired": "Read-access to emails required",
+    "connectViaGoogle": "Connect via Google"
+  },
+  "microsoft": {
+    "name": "Microsoft 365",
+    "description": "Sync Outlook, Calendar and Teams with BidStack.",
+    "connectViaMicrosoft": "Connect via Microsoft"
+  },
+  "slack": {
+    "name": "Slack",
+    "description": "Receive notifications and share updates in Slack.",
+    "workspace": "Slack workspace",
+    "connectViaSlack": "Connect via Slack",
+    "notifyChannel": "Notification channel"
+  },
+  "zapier": {
+    "name": "Zapier",
+    "description": "Automate BidStack with thousands of apps via Zapier.",
+    "apiKey": "Zapier API key",
+    "viewZaps": "View my Zaps"
+  },
+  "dust": {
+    "name": "Dust",
+    "description": "Connect your Dust workspace to enable AI agents.",
+    "workspace": "Dust workspace",
+    "apiKey": "Dust API key",
+    "status": "Dust connection status"
+  },
+  "errors": {
+    "connectFailed": "Connection failed. Check your credentials.",
+    "syncFailed": "Sync failed.",
+    "disconnectFailed": "Disconnect failed."
+  }
+}

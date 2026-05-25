@@ -1,0 +1,39 @@
+{
+  "agents": {
+    "title": "Agentes Dust",
+    "ask": "Preguntar a un agente",
+    "placeholder": "¿Qué te gustaría saber o preparar?",
+    "submit": "Enviar",
+    "thinking": "Pensando…",
+    "noAgents": "Sin agentes Dust configurados",
+    "configureFirst": "Configura tu conexión Dust en los ajustes de integración.",
+    "error": "El agente no pudo responder. Por favor, inténtalo de nuevo.",
+    "copyResponse": "Copiar respuesta",
+    "newConversation": "Nueva conversación",
+    "selectAgent": "Seleccionar agente",
+    "regenerate": "Regenerar"
+  },
+  "meetingPrep": {
+    "title": "Preparación de reunión",
+    "generate": "Generar ficha de preparación",
+    "generating": "Generando…",
+    "attendees": "Asistentes",
+    "agenda": "Orden del día",
+    "context": "Contexto de cuenta",
+    "keyTopics": "Puntos clave a tratar",
+    "recentActivity": "Actividad reciente",
+    "noMeetingSelected": "Selecciona una reunión para generar la ficha."
+  },
+  "feedback": {
+    "helpful": "Útil",
+    "notHelpful": "No útil",
+    "thanks": "Gracias por tu opinión"
+  },
+  "intel": {
+    "title": "Inteligencia de cuenta",
+    "loading": "Analizando…",
+    "lastUpdated": "Actualizado {{when}}",
+    "refresh": "Actualizar",
+    "noData": "Sin datos de inteligencia disponibles"
+  }
+}

@@ -28,6 +28,7 @@ import { initiateVoiceCall } from '../services/calls/twilio-voice.service.js';
 import { getSignedRecordingUrl } from '../services/calls/recording-storage.service.js';
 import { Queue } from 'bullmq';
 import { CALL_ANALYZE } from '@bidstack/shared';
+import { redis } from '../redis.js';
 
 // ─── Shared Zod schemas ───────────────────────────────────────────────────
 
@@ -480,7 +481,6 @@ export const callsRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       // Enqueue analysis job
-      const redis = fastify.redis;
       const queue = new Queue(CALL_ANALYZE.name, {
         connection: redis,
         defaultJobOptions: CALL_ANALYZE.defaultJobOptions,

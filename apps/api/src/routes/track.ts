@@ -142,7 +142,7 @@ export function createTrackRoutes(emailTrackQueue?: Queue): FastifyPluginAsync {
           throw server.httpErrors.badRequest('Only http/https URLs are allowed');
         }
 
-        return reply.redirect(302, redirectUrl.toString());
+        return reply.redirect(redirectUrl.toString(), 302);
       },
     });
   };

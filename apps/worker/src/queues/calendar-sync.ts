@@ -25,8 +25,8 @@ import {
   CALENDAR_PUSH,
   CALENDAR_PULL_INCREMENTAL,
   CALENDAR_WATCH_RENEW,
-  decryptToken,
 } from '@bidstack/shared';
+import { decryptToken } from '@bidstack/shared/token-crypto';
 
 // ─── Job data schemas ──────────────────────────────────────────────────────
 
@@ -41,10 +41,6 @@ const PushJobData = z.object({
 const PullJobData = z.object({
   orgId: z.string().uuid(),
   userId: z.string().uuid(),
-  integrationTokenId: z.string().uuid(),
-});
-
-const WatchRenewJobData = z.object({
   integrationTokenId: z.string().uuid(),
 });
 

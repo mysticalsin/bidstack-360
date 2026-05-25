@@ -1,0 +1,69 @@
+{
+  "tour": {
+    "start": "Iniciar tour guiado",
+    "skip": "Saltar tour",
+    "next": "Siguiente",
+    "previous": "Anterior",
+    "finish": "Finalizar",
+    "stepOf": "Paso {{current}} de {{total}}",
+    "welcome": {
+      "title": "Bienvenido a BidStack 360°",
+      "body": "La plataforma Mantu para gestionar licitaciones y preventa. Completa el tour en menos de 2 minutos."
+    },
+    "pipeline": {
+      "title": "Tu pipeline de ventas",
+      "body": "Visualiza y avanza tus oportunidades por las etapas, desde el primer contacto hasta la firma."
+    },
+    "bidMatrix": {
+      "title": "Matriz Oferta/No oferta",
+      "body": "Evalúa objetivamente cada licitación con los criterios ponderados de Mantu antes de decidir si presentas oferta."
+    },
+    "dustAgents": {
+      "title": "Agentes IA Dust",
+      "body": "Pide a tus agentes IA que preparen propuestas, resuman reuniones o enriquezcan cuentas."
+    },
+    "integrations": {
+      "title": "Conecta tus herramientas",
+      "body": "Sincroniza Gmail, Microsoft 365, Slack y tus herramientas de negocio para centralizar la información."
+    },
+    "quickStart": {
+      "title": "Comenzar ahora",
+      "body": "Crea tu primera oportunidad, invita a tu equipo y explora tus paneles personalizados."
+    }
+  },
+  "quickStart": {
+    "title": "Inicio rápido",
+    "subtitle": "Completa estos pasos para sacar el máximo partido a BidStack 360°",
+    "progress": "{{done}} de {{total}} pasos completados",
+    "steps": {
+      "createOpportunity": {
+        "label": "Crear una oportunidad",
+        "description": "Agrega tu primera licitación al pipeline"
+      },
+      "inviteTeam": {
+        "label": "Invitar al equipo",
+        "description": "Añade a tus colegas al espacio de trabajo"
+      },
+      "connectIntegration": {
+        "label": "Conectar una integración",
+        "description": "Sincroniza tu correo o calendario"
+      },
+      "runBidMatrix": {
+        "label": "Ejecutar una matriz Oferta/No oferta",
+        "description": "Evalúa tu primera oportunidad"
+      },
+      "configureStages": {
+        "label": "Configurar etapas",
+        "description": "Adapta el pipeline a tu proceso de venta"
+      }
+    },
+    "completed": "¡Inicio rápido completado!",
+    "completedBody": "Ya dominas lo esencial de BidStack 360°. Mucha suerte con tus licitaciones.",
+    "dismiss": "Ocultar"
+  },
+  "sampleData": {
+    "banner": "Estás viendo datos de demostración.",
+    "clear": "Eliminar datos de demo",
+    "confirmClear": "¿Eliminar todos los datos de demostración? Esta acción es irreversible."
+  }
+}

@@ -5,6 +5,8 @@
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { ErrorState, LoadingSkeleton, EmptyState } from '@/components/ui/StateMessages';
+import { Button } from '@/components/ui/Button';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useProviderHealth } from '@/hooks/useCrmIntegrations';
 import { relativeTime } from '@/lib/format';
 import type { ProviderHealth } from '@bidstack/shared';
@@ -38,55 +40,161 @@ export function ProviderHealthSection() {
   });
 
   return (
-    <Card>
-      <SectionHeader title="Provider health" caption={caption} />
+    <Card className="overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-primary)]">
+      <SectionHeader
+        title="Provider health"
+        caption={caption}
+        action={
+          <Badge tone={downCount > 0 ? 'tomato' : degradedCount > 0 ? 'amber' : 'jade'}>
+            {isFetching ? 'refreshing' : downCount + degradedCount > 0 ? 'attention' : 'stable'}
+          </Badge>
+        }
+      />
       {isLoading ? (
-        <LoadingSkeleton rows={3} />
+        <div className="p-5">
+          <LoadingSkeleton rows={4} />
+        </div>
       ) : isError ? (
         <ErrorState
           title="Could not load provider health"
           message={error instanceof Error ? error.message : undefined}
           action={
-            <button
-              type="button"
-              className="text-xs text-[var(--brand-primary)] underline"
-              onClick={() => refetch()}
-            >
+            <Button variant="secondary" size="sm" onClick={() => refetch()}>
               Try again
-            </button>
+            </Button>
           }
         />
       ) : items.length === 0 ? (
         <EmptyState title="No providers wired yet" />
       ) : (
-        <ul className="divide-y divide-[var(--border-subtle)]">
-          {items.map((p) => (
-            <li
-              key={p.provider}
-              className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"
-            >
-              <div className="min-w-0">
-                <div className="text-sm font-medium text-[var(--fg-primary)]">{p.provider}</div>
-                <div className="mt-0.5 flex items-center gap-2 text-xs text-[var(--fg-tertiary)]">
-                  <span>Checked {relativeTime(p.lastCheckedAt)}</span>
-                  {p.latencyMs !== null ? (
-                    <>
-                      <span aria-hidden>.</span>
-                      <span className="tabular-nums">{p.latencyMs}ms</span>
-                    </>
-                  ) : null}
-                </div>
-                {p.message ? (
-                  <p className="mt-0.5 text-xs text-[var(--fg-secondary)]">{p.message}</p>
-                ) : null}
-              </div>
-              <Badge tone={STATUS_TONE[p.status]}>{p.status}</Badge>
-            </li>
-          ))}
-        </ul>
+        <>
+          <div className="grid gap-3 p-5 md:grid-cols-4">
+            <ProviderStat
+              icon="globe"
+              label="Providers"
+              value={String(items.length)}
+              tone="blue"
+            />
+            <ProviderStat
+              icon="checkCircle"
+              label="Healthy"
+              value={String(items.filter((p) => p.status === 'healthy').length)}
+              tone="jade"
+            />
+            <ProviderStat
+              icon="warning"
+              label="Attention"
+              value={String(downCount + degradedCount)}
+              tone={downCount > 0 ? 'tomato' : degradedCount > 0 ? 'amber' : 'gray'}
+            />
+            <ProviderStat
+              icon="clock"
+              label="Median latency"
+              value={medianLatencyLabel(items)}
+              tone="teal"
+            />
+          </div>
+          <div className="overflow-x-auto" role="region" aria-label="Provider health table">
+            <table className="w-full min-w-[760px] border-collapse text-left text-sm">
+              <caption className="sr-only">Provider health statuses</caption>
+              <thead className="bg-[var(--surface-secondary)] text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                <tr>
+                  <th scope="col" className="px-5 py-3 font-semibold">
+                    Provider
+                  </th>
+                  <th scope="col" className="px-5 py-3 font-semibold">
+                    Signal
+                  </th>
+                  <th scope="col" className="px-5 py-3 font-semibold">
+                    Checked
+                  </th>
+                  <th scope="col" className="px-5 py-3 text-right font-semibold">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((provider) => (
+                  <ProviderRow key={provider.provider} provider={provider} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </Card>
   );
+}
+
+function ProviderStat({
+  icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: IconName;
+  label: string;
+  value: string;
+  tone: BadgeTone;
+}) {
+  return (
+    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--text-muted)]">
+          {label}
+        </span>
+        <span className="grid size-8 place-items-center rounded-xl bg-[var(--surface-primary)] text-[var(--text-secondary)]">
+          <Icon name={icon} className="size-4" />
+        </span>
+      </div>
+      <div className="mt-4 text-xl font-semibold tabular-nums text-[var(--text-primary)]">
+        {value}
+      </div>
+      <Badge tone={tone} className="mt-2">
+        live
+      </Badge>
+    </div>
+  );
+}
+
+function ProviderRow({ provider }: { provider: ProviderHealth }) {
+  return (
+    <tr className="border-b border-[var(--border-subtle)] align-top transition hover:bg-[var(--surface-secondary)]/70">
+      <td className="px-5 py-4">
+        <div className="flex items-start gap-3">
+          <span className="mt-1 grid size-9 shrink-0 place-items-center rounded-2xl bg-[var(--surface-secondary)] text-[var(--text-secondary)]">
+            <Icon name={provider.status === 'down' ? 'warning' : 'globe'} className="size-4" />
+          </span>
+          <div className="min-w-0">
+            <div className="font-semibold text-[var(--text-primary)]">{provider.provider}</div>
+            <div className="mt-1 text-xs tabular-nums text-[var(--text-muted)]">
+              {provider.latencyMs !== null ? `${provider.latencyMs}ms response` : 'No latency'}
+            </div>
+          </div>
+        </div>
+      </td>
+      <td className="px-5 py-4">
+        <p className="max-w-xl text-sm leading-6 text-[var(--text-secondary)]">
+          {provider.message || 'Provider returned a normal health response.'}
+        </p>
+      </td>
+      <td className="px-5 py-4 text-xs tabular-nums text-[var(--text-secondary)]">
+        {relativeTime(provider.lastCheckedAt)}
+      </td>
+      <td className="px-5 py-4 text-right">
+        <Badge tone={STATUS_TONE[provider.status]}>{provider.status}</Badge>
+      </td>
+    </tr>
+  );
+}
+
+function medianLatencyLabel(items: ProviderHealth[]) {
+  const latencies = items
+    .map((item) => item.latencyMs)
+    .filter((value): value is number => typeof value === 'number')
+    .sort((a, b) => a - b);
+  if (latencies.length === 0) return 'n/a';
+  return `${latencies[Math.floor(latencies.length / 2)]}ms`;
 }
 
 function getCaption({

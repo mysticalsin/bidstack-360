@@ -22,6 +22,7 @@ export default defineConfig(({ command, mode }) => {
     }
   }
   const apiUrl = env.VITE_API_URL ?? process.env.VITE_API_URL ?? 'http://localhost:4000';
+  const assetBase = env.VITE_ASSET_BASE ?? process.env.ASSET_CDN_URL ?? '/';
   // Bundle analyzer fires only in `--mode analyze`; keeps prod builds clean.
   const analyze = mode === 'analyze';
 
@@ -66,11 +67,13 @@ export default defineConfig(({ command, mode }) => {
         '/webhooks': { target: apiUrl, changeOrigin: true },
       },
     },
+    base: assetBase,
     build: {
       sourcemap: process.env.NODE_ENV === 'development',
       target: 'es2022',
       cssCodeSplit: true,
       cssMinify: 'esbuild',
+      assetsInlineLimit: 4096,
       // React DOM is the largest legitimate vendor chunk in this app. Keep the
       // limit tight enough to catch app-code creep without warning on framework
       // bytes we intentionally isolate below.
@@ -82,6 +85,18 @@ export default defineConfig(({ command, mode }) => {
       reportCompressedSize: true,
       rollupOptions: {
         output: {
+          entryFileNames: 'assets/[name]-[hash].js',
+          chunkFileNames: 'assets/[name]-[hash].js',
+          assetFileNames: (assetInfo) => {
+            const info = assetInfo.name ?? '';
+            if (/\.(woff2?|ttf|otf)$/.test(info)) {
+              return 'assets/fonts/[name]-[hash][extname]';
+            }
+            if (/\.(png|jpe?g|gif|svg|webp|avif)$/.test(info)) {
+              return 'assets/images/[name]-[hash][extname]';
+            }
+            return 'assets/[name]-[hash][extname]';
+          },
           manualChunks(id) {
             // Rollup hands us OS-native paths; Windows uses backslashes which
             // break every `/foo/` substring check below. Normalize once.

@@ -6,6 +6,8 @@
 
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useDataQuality } from '@/hooks/useCrmIntegrations';
 import { relativeTime } from '@/lib/format';
@@ -35,9 +37,12 @@ export function DataQualitySection() {
   const { data, isLoading, isError, error, refetch } = useDataQuality();
 
   const issues = data ? [...data.issues].sort(byPriority) : [];
+  const highCount = issues.filter((issue) => issue.severity === 'high').length;
+  const mediumCount = issues.filter((issue) => issue.severity === 'medium').length;
+  const score = qualityScore(issues);
 
   return (
-    <Card>
+    <Card className="overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-primary)]">
       <SectionHeader
         title="Data quality"
         caption={
@@ -47,56 +52,130 @@ export function DataQualitySection() {
               }`
             : 'Detects duplicate companies, stale data, missing owners, and bad domains.'
         }
+        action={
+          <Badge tone={score >= 90 ? 'jade' : score >= 70 ? 'amber' : 'tomato'}>
+            {score}/100
+          </Badge>
+        }
       />
       {isLoading ? (
-        <LoadingSkeleton rows={4} />
+        <div className="p-5">
+          <LoadingSkeleton rows={4} />
+        </div>
       ) : isError ? (
         <ErrorState
           title="Could not load data quality report"
           message={error instanceof Error ? error.message : undefined}
           action={
-            <button
-              type="button"
-              className="text-xs text-[var(--brand-primary)] underline"
-              onClick={() => refetch()}
-            >
+            <Button variant="secondary" size="sm" onClick={() => refetch()}>
               Try again
-            </button>
+            </Button>
           }
         />
-      ) : !data || issues.length === 0 ? (
+      ) : !data ? (
         <EmptyState
-          title="No data quality issues"
-          message="No duplicate domains, stale data, missing owners, invalid domains, or missing logos were detected in this scan."
+          title="No data quality scan"
+          message="Run the data quality scan to see duplicate domains, stale records, missing owners, invalid domains, and logo coverage."
         />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 px-5 pt-4 sm:grid-cols-5">
-            {(Object.keys(KIND_LABEL) as DataQualityIssue['kind'][]).map((kind) => (
-              <KindStat
-                key={kind}
-                label={KIND_LABEL[kind]}
-                count={data.counts[kind] ?? 0}
-                kind={kind}
-              />
-            ))}
+          <div className="grid gap-3 p-5 md:grid-cols-4">
+            <DataQualityStat
+              icon="shield"
+              label="Quality score"
+              value={`${score}/100`}
+              tone={score >= 90 ? 'jade' : score >= 70 ? 'amber' : 'tomato'}
+            />
+            <DataQualityStat
+              icon="warning"
+              label="High severity"
+              value={String(highCount)}
+              tone={highCount > 0 ? 'tomato' : 'gray'}
+            />
+            <DataQualityStat
+              icon="clock"
+              label="Medium severity"
+              value={String(mediumCount)}
+              tone={mediumCount > 0 ? 'amber' : 'gray'}
+            />
+            <DataQualityStat
+              icon="reports"
+              label="Total issues"
+              value={String(issues.length)}
+              tone="blue"
+            />
           </div>
-          <ul className="mt-3 divide-y divide-[var(--border-subtle)]">
-            {issues.map((issue) => (
-              <IssueRow key={issue.id} issue={issue} />
-            ))}
-          </ul>
+          {issues.length === 0 ? (
+            <div className="border-t border-[var(--border-subtle)]">
+              <EmptyState
+                title="No data quality issues"
+                message="No duplicate domains, stale data, missing owners, invalid domains, or missing logos were detected in this scan."
+              />
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3 border-t border-[var(--border-subtle)] px-5 pt-4 sm:grid-cols-5">
+                {(Object.keys(KIND_LABEL) as DataQualityIssue['kind'][]).map((kind) => (
+                  <KindStat
+                    key={kind}
+                    label={KIND_LABEL[kind]}
+                    count={data.counts[kind] ?? 0}
+                    kind={kind}
+                  />
+                ))}
+              </div>
+              <ul className="mt-3 divide-y divide-[var(--border-subtle)]">
+                {issues.map((issue) => (
+                  <IssueRow key={issue.id} issue={issue} />
+                ))}
+              </ul>
+            </>
+          )}
         </>
       )}
     </Card>
   );
 }
 
+function DataQualityStat({
+  icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: IconName;
+  label: string;
+  value: string;
+  tone: BadgeTone;
+}) {
+  return (
+    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--text-muted)]">
+          {label}
+        </span>
+        <span className="grid size-8 place-items-center rounded-xl bg-[var(--surface-primary)] text-[var(--text-secondary)]">
+          <Icon name={icon} className="size-4" />
+        </span>
+      </div>
+      <div className="mt-4 text-xl font-semibold tabular-nums text-[var(--text-primary)]">
+        {value}
+      </div>
+      <Badge tone={tone} className="mt-2">
+        data
+      </Badge>
+    </div>
+  );
+}
+
 function IssueRow({ issue }: { issue: DataQualityIssue }) {
   return (
-    <li className="flex flex-wrap items-start justify-between gap-3 px-5 py-3">
+    <li className="flex flex-wrap items-start justify-between gap-4 px-5 py-4 transition hover:bg-[var(--surface-secondary)]/70">
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="grid size-9 place-items-center rounded-2xl bg-[var(--surface-secondary)] text-[var(--text-secondary)]">
+            <Icon name={issue.severity === 'high' ? 'warning' : 'info'} className="size-4" />
+          </span>
           <span className="text-sm font-medium text-[var(--fg-primary)]">{issue.title}</span>
           <Badge tone="gray">{KIND_LABEL[issue.kind]}</Badge>
         </div>
@@ -138,6 +217,15 @@ function KindStat({
       </div>
     </div>
   );
+}
+
+function qualityScore(issues: DataQualityIssue[]) {
+  const penalty = issues.reduce((total, issue) => {
+    if (issue.severity === 'high') return total + 14;
+    if (issue.severity === 'medium') return total + 7;
+    return total + 3;
+  }, 0);
+  return Math.max(0, 100 - penalty);
 }
 
 function byPriority(a: DataQualityIssue, b: DataQualityIssue) {

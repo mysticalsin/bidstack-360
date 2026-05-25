@@ -1,0 +1,138 @@
+{
+  "app": {
+    "name": "BidStack",
+    "tagline": "Mantu · Licitaciones y preventa",
+    "guest": "Invitado",
+    "notSignedIn": "No conectado"
+  },
+  "nav": {
+    "primary": "Navegación principal",
+    "breadcrumb": "Ruta de navegación",
+    "workspace": "Espacio de trabajo",
+    "settings": "Configuración",
+    "starred": "Favoritos",
+    "recent": "Recientes",
+    "openNavigation": "Abrir navegación",
+    "closeNavigation": "Cerrar navegación",
+    "expandSidebar": "Expandir barra lateral",
+    "collapseSidebar": "Contraer barra lateral",
+    "dashboard": "Panel de control",
+    "sales": "Ventas",
+    "salesOrders": "Cotizaciones y pedidos",
+    "products": "Productos",
+    "invoices": "Facturas",
+    "accounts": "Cuentas",
+    "companies": "Empresas",
+    "opportunities": "Oportunidades",
+    "pipeline": "Pipeline",
+    "forecasts": "Previsiones",
+    "bidMatrix": "Matriz Oferta/No oferta",
+    "leads": "Prospectos",
+    "contacts": "Contactos",
+    "tasks": "Tareas",
+    "territories": "Territorios",
+    "serviceDesk": "Mesa de servicio",
+    "workflows": "Flujos de trabajo",
+    "intake": "Recepción",
+    "reports": "Informes",
+    "integrations": "Integraciones",
+    "auditLog": "Registro de auditoría",
+    "agents": "Agentes Dust",
+    "search": "Buscar",
+    "references": "Biblioteca de referencias",
+    "settingsPage": "Configuración"
+  },
+  "crumbs": {
+    "portfolio": "Cartera",
+    "detail": "Detalle"
+  },
+  "actions": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "close": "Cerrar",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "create": "Crear",
+    "update": "Actualizar",
+    "submit": "Enviar",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "sort": "Ordenar",
+    "clear": "Limpiar",
+    "loading": "Cargando…",
+    "retry": "Reintentar",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "previous": "Anterior",
+    "viewAll": "Ver todo",
+    "markRead": "Marcar como leído",
+    "signOut": "Cerrar sesión",
+    "skipToContent": "Ir al contenido"
+  },
+  "search": {
+    "placeholder": "Buscar o ir a…",
+    "label": "Buscar oportunidades, contactos, tareas",
+    "recent": "Recientes",
+    "clear": "Limpiar",
+    "shortcut": "Ctrl+/"
+  },
+  "theme": {
+    "switchToLight": "Cambiar a modo claro",
+    "switchToDark": "Cambiar a modo oscuro"
+  },
+  "notifications": {
+    "title": "Menciones",
+    "unread_one": "{{count}} mención sin leer",
+    "unread_other": "{{count}} menciones sin leer",
+    "noUnread": "Sin menciones sin leer",
+    "loading": "Cargando…",
+    "couldNotLoad": "No se pudieron cargar las menciones",
+    "ariaLabel": "Notificaciones",
+    "ariaLabelWithCount": "Notificaciones, {{count}} sin leer",
+    "mentionTooltip": "Notificaciones",
+    "youWereMentioned": "Alguien te mencionó en un comentario"
+  },
+  "help": {
+    "tooltip": "Ayuda y atajos (?)",
+    "ariaLabel": "Ayuda y atajos de teclado"
+  },
+  "states": {
+    "loading": "Cargando…",
+    "empty": "Nada que mostrar",
+    "error": "Algo salió mal",
+    "noResults": "Sin resultados"
+  },
+  "toast": {
+    "saved": "Guardado",
+    "updated": "Actualizado",
+    "created": "Creado",
+    "deleted": "Eliminado",
+    "copied": "Copiado al portapapeles",
+    "genericError": "Algo salió mal. Por favor, inténtelo de nuevo.",
+    "networkError": "Error de red. Comprueba tu conexión."
+  },
+  "validation": {
+    "required": "Este campo es obligatorio",
+    "invalidEmail": "Introduce un correo electrónico válido",
+    "tooShort": "Debe tener al menos {{min}} caracteres",
+    "tooLong": "Debe tener como máximo {{max}} caracteres",
+    "invalidUrl": "Introduce una URL válida",
+    "invalidNumber": "Introduce un número válido",
+    "invalidDate": "Introduce una fecha válida"
+  },
+  "offline": {
+    "title": "Estás sin conexión",
+    "message": "Los cambios se sincronizarán cuando vuelvas a estar en línea."
+  },
+  "page": {
+    "titleSuffix": "BidStack 360°"
+  },
+  "routeAnnouncer": {
+    "nowOn": "Ahora en {{title}}"
+  },
+  "footer": {
+    "createdBy": "Creado por Tony Walteur",
+    "dustConnected": "Dust conectado",
+    "dustSynced": "sincronizado {{when}}"
+  }
+}

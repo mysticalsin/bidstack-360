@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { CALENDAR_PUSH } from '@bidstack/shared';
 import { Queue } from 'bullmq';
+import { redis } from '../redis.js';
 
 const CalendarEventCreate = z.object({
   subject: z.string().min(1).max(300),
@@ -28,6 +29,9 @@ const CalendarEventCreate = z.object({
 });
 
 const CalendarEventPatch = CalendarEventCreate.partial();
+type CalendarProvider = z.infer<typeof CalendarEventCreate>['provider'] extends infer P
+  ? Exclude<P, undefined>
+  : never;
 
 const CalendarEventResponse = z.object({
   id: z.string().uuid(),
@@ -43,7 +47,6 @@ const CalendarEventResponse = z.object({
 
 export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
   function getPushQueue(): Queue {
-    const redis = server.redis as InstanceType<typeof import('ioredis').default>;
     return new Queue(CALENDAR_PUSH.name, {
       connection: redis,
       defaultJobOptions: CALENDAR_PUSH.defaultJobOptions,
@@ -122,14 +125,20 @@ export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
       const { orgId, userId } = req.auth;
 
       // Resolve which provider to use (default to the first active integration)
-      let provider = req.body.provider;
-      if (!provider) {
+      let provider: CalendarProvider = req.body.provider ?? 'google_workspace';
+      if (!req.body.provider) {
         const token = await prisma.integrationToken.findFirst({
-          where: { orgId, userId, status: 'active', deletedAt: null },
+          where: {
+            orgId,
+            userId,
+            status: 'active',
+            deletedAt: null,
+            provider: { in: ['google_workspace', 'microsoft_graph'] },
+          },
           select: { provider: true },
           orderBy: { createdAt: 'asc' },
         });
-        provider = token?.provider ?? 'google_workspace';
+        provider = (token?.provider as CalendarProvider | undefined) ?? 'google_workspace';
       }
 
       const event = await prisma.calendarEvent.create({

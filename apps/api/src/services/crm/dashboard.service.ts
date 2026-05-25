@@ -563,9 +563,17 @@ function buildCockpit({
     sourceAttribution: unknown;
   }>;
 }): z.infer<typeof AccountCockpitSnapshot> {
-  const companyOpps = opportunities.filter((opp) => opp.customer === company.name);
+  const companyOpps = opportunities.filter((opp) => {
+    const opportunityCompanyKey = normalizeName(opp.customer);
+    return opp.customer === company.name || opportunityCompanyKey === company.id;
+  });
   const openDeals = companyOpps.filter(
-    (opp) => !opp.pipelineStage?.isWon && !opp.pipelineStage?.isLost,
+    (opp) =>
+      !opp.pipelineStage?.isWon &&
+      !opp.pipelineStage?.isLost &&
+      opp.stage !== 'customer' &&
+      opp.stage !== 'closed_won' &&
+      opp.stage !== 'closed_lost',
   );
   const annualRevenue = company.annualRevenueMicros
     ? formatMicrosCompact(company.annualRevenueMicros)

@@ -129,6 +129,7 @@ export type OpportunityImportResult = z.infer<typeof OpportunityImportResult>;
 // `?limit=20` without manual casting.
 export const OpportunityFilter = z.object({
   pipelineStageId: z.string().uuid().optional(),
+  stage: OpportunityStage.optional(),
   owner: z.string().optional(),
   industry: Industry.optional(),
   search: z.string().max(100).optional(),

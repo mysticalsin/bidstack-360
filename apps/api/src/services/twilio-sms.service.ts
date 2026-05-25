@@ -18,7 +18,8 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { prisma } from '@bidstack/db';
 import { decryptToken } from '@bidstack/shared/token-crypto';
 import type pino from 'pino';
-import type { SmsEntityType } from '@bidstack/db/generated/client';
+type SmsEntityType = 'CONTACT' | 'LEAD';
+type ServiceLogger = Pick<pino.Logger, 'debug' | 'error' | 'info' | 'warn'>;
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
@@ -110,7 +111,7 @@ async function loadCredentials(orgId: string): Promise<TwilioCredentials & { tok
  * 4. Persist SmsMessage row (status=QUEUED)
  * 5. Log Activity on the linked entity
  */
-export async function sendSms(params: SendSmsParams, log: pino.Logger): Promise<{ messageId: string }> {
+export async function sendSms(params: SendSmsParams, log: ServiceLogger): Promise<{ messageId: string }> {
   const { orgId, userId, toNumber, body, entityType, entityId } = params;
 
   // Step 2: Consent check
@@ -176,15 +177,16 @@ export async function sendSms(params: SendSmsParams, log: pino.Logger): Promise<
 
   // Step 5: Log Activity (best-effort; don't fail send on activity error)
   if (entityId && entityType) {
-    const entityField = entityType === 'CONTACT' ? { contactId: entityId } : { leadId: entityId };
     await prisma.activity
       .create({
         data: {
           orgId,
-          userId,
-          type: 'sms_sent',
+          ownerId: userId,
+          actorId: userId,
+          type: 'custom',
+          entityType: entityType.toLowerCase(),
+          entityId,
           body: `SMS sent to ${toNumber}: "${body.slice(0, 80)}${body.length > 80 ? '…' : ''}"`,
-          ...entityField,
         },
       })
       .catch((err: unknown) => log.warn({ err }, 'Failed to log SMS activity'));
@@ -202,7 +204,7 @@ export async function sendSms(params: SendSmsParams, log: pino.Logger): Promise<
  */
 export async function handleStatusCallback(
   payload: TwilioStatusCallbackPayload,
-  log: pino.Logger,
+  log: ServiceLogger,
 ): Promise<void> {
   const { MessageSid, MessageStatus, ErrorCode, Price, NumSegments } = payload;
 
@@ -251,7 +253,7 @@ export async function handleStatusCallback(
 export async function handleInboundSms(
   orgId: string,
   payload: TwilioInboundSmsPayload,
-  log: pino.Logger,
+  log: ServiceLogger,
 ): Promise<void> {
   const { MessageSid, From, To, Body, NumSegments } = payload;
   const trimmedBody = Body.trim();
@@ -310,10 +312,12 @@ export async function handleInboundSms(
           .create({
             data: {
               orgId,
-              userId: adminUser.id,
-              type: 'sms_received',
+              ownerId: adminUser.id,
+              actorId: adminUser.id,
+              type: 'custom',
+              entityType: 'contact',
+              entityId: contact.id,
               body: `Inbound SMS from ${From}: "${trimmedBody.slice(0, 80)}${trimmedBody.length > 80 ? '…' : ''}"`,
-              contactId: contact.id,
             },
           })
           .catch((err: unknown) => log.warn({ err }, 'Failed to log inbound SMS activity'));

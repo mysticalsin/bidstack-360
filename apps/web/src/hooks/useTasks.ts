@@ -37,9 +37,10 @@ export function useUpdateTask() {
       await qc.cancelQueries({ queryKey: ['tasks'] });
       const snapshot = qc.getQueryData<TasksPayload>(['tasks']);
       if (snapshot) {
+        const { customFieldValues: _cf, ...rest } = patch as Record<string, unknown>;
         qc.setQueryData<TasksPayload>(['tasks'], {
           ...snapshot,
-          items: snapshot.items.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+          items: snapshot.items.map((t) => (t.id === id ? { ...t, ...rest } : t)),
         });
       }
       return { snapshot };

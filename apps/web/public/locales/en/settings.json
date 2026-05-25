@@ -1,0 +1,61 @@
+{
+  "page": {
+    "title": "Settings"
+  },
+  "sections": {
+    "workspace": {
+      "title": "Workspace",
+      "caption": "Workspace name, logo, and branding."
+    },
+    "team": {
+      "title": "Team",
+      "caption": "Invite and manage workspace members."
+    },
+    "roles": {
+      "title": "Roles & permissions",
+      "caption": "Define what each role can do."
+    },
+    "pipelineStages": {
+      "title": "Pipeline stages",
+      "caption": "Customize the stages opportunities flow through."
+    },
+    "customFields": {
+      "title": "Custom fields",
+      "caption": "Add organization-specific fields to records."
+    },
+    "currencyLocale": {
+      "title": "Currency & locale",
+      "caption": "Default currency, language, date format, and timezone for your workspace.",
+      "currencyLabel": "Default currency",
+      "languageLabel": "Language",
+      "dateFormatLabel": "Date format",
+      "timezoneLabel": "Timezone"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "caption": "Choose what you want to be notified about."
+    },
+    "apiKeys": {
+      "title": "API keys",
+      "caption": "Issue and revoke API keys for integrations."
+    },
+    "webhooks": {
+      "title": "Webhooks",
+      "caption": "Receive event payloads at your endpoints."
+    }
+  },
+  "languages": {
+    "en": "English",
+    "fr": "Français",
+    "es": "Español",
+    "ar": "العربية"
+  },
+  "currencies": {
+    "CAD": "CAD — Canadian Dollar",
+    "USD": "USD — US Dollar",
+    "EUR": "EUR — Euro",
+    "GBP": "GBP — British Pound",
+    "AUD": "AUD — Australian Dollar",
+    "JPY": "JPY — Japanese Yen"
+  }
+}

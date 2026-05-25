@@ -122,6 +122,10 @@ function Legend() {
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 
 type Tab = 'matrix' | 'custom';
+const ROLE_TABS: Array<{ id: Tab; label: string; adminOnly?: boolean }> = [
+  { id: 'matrix', label: 'System Roles Matrix' },
+  { id: 'custom', label: 'Custom Roles', adminOnly: true },
+];
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -147,12 +151,7 @@ export function RolesPage() {
         aria-label="Roles views"
         className="flex gap-1 border-b border-[var(--border-subtle)]"
       >
-        {(
-          [
-            { id: 'matrix' as Tab, label: 'System Roles Matrix' },
-            { id: 'custom' as Tab, label: 'Custom Roles', adminOnly: true },
-          ] as const
-        ).map(({ id, label, adminOnly }) => {
+        {ROLE_TABS.map(({ id, label, adminOnly }) => {
           if (adminOnly && !isAdmin) return null;
           return (
             <button

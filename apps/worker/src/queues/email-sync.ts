@@ -28,11 +28,10 @@
 import { Queue, Worker } from 'bullmq';
 import type IORedis from 'ioredis';
 import type pino from 'pino';
-import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
-import { decryptToken, encryptToken } from '@bidstack/shared';
+import { decryptToken, encryptToken } from '@bidstack/shared/token-crypto';
 import {
   OUTLOOK_PULL_INCREMENTAL,
   OUTLOOK_PULL_HISTORICAL,
@@ -230,8 +229,7 @@ async function pullDelta(
 
       await prisma.emailMessage.upsert({
         where: {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          email_messages_org_external_key: { orgId: params.orgId, externalMessageId: msg.id } as any,
+          orgId_externalMessageId: { orgId: params.orgId, externalMessageId: msg.id },
         },
         create: {
           orgId: params.orgId,

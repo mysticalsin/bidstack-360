@@ -1,0 +1,93 @@
+# BidStack 360° — Slack App Manifest
+# Reference: https://api.slack.com/reference/manifests
+# Version: 1.0.0
+
+display_information:
+  name: BidStack 360°
+  description: >
+    BidStack 360° is a bid-focused CRM for presales teams. Use /bidstack commands
+    to create leads, search CRM records, and check your tasks — without leaving Slack.
+  background_color: "#4f46e5"
+  long_description: >
+    BidStack 360° brings your CRM into Slack so your presales team can capture
+    leads, track deal progress, and stay on top of tasks without context switching.
+
+    COMMANDS:
+    /bidstack lead create <name> — Instantly create a new CRM lead from Slack.
+    /bidstack search <query> — Search your CRM for leads, contacts, and deals.
+    /bidstack tasks today — See all your tasks due today.
+
+    NOTIFICATIONS:
+    Receive real-time alerts in any channel when a lead is created, a deal stage
+    changes, or a new opportunity is assigned to you. Set up notification routing
+    in the BidStack app under Settings → Integrations → Slack.
+
+    PRIVACY:
+    BidStack never reads message content from channels where the bot is not invited.
+    Notifications are one-way (BidStack → Slack). User data is processed per the
+    BidStack Privacy Policy: https://bidstack.io/privacy
+
+features:
+  app_home:
+    home_tab_enabled: false
+    messages_tab_enabled: true
+    messages_tab_read_only_enabled: false
+
+  bot_user:
+    display_name: BidStack
+    always_online: false
+
+  slash_commands:
+    - command: /bidstack
+      url: https://api.bidstack.io/integrations/slack/commands
+      description: "Interact with BidStack CRM — create leads, search, tasks"
+      usage_hint: "lead create <name> | search <query> | tasks today"
+      should_escape: false
+
+  incoming_webhooks:
+    # Incoming webhooks enable BidStack to POST notifications to channels.
+    # Users configure which channel receives which event type in the BidStack UI.
+    enabled: true
+
+oauth_config:
+  redirect_urls:
+    - https://api.bidstack.io/integrations/slack/callback
+
+  scopes:
+    bot:
+      # WHY chat:write — required to post deal/lead notifications to channels
+      - chat:write
+      # WHY chat:write.public — allows posting to public channels without the bot
+      #   being a member; reduces onboarding friction (user doesn't need to /invite)
+      - chat:write.public
+      # WHY commands — exposes the /bidstack slash command to workspace users
+      - commands
+      # WHY incoming-webhook — enables posting to a specific channel configured by the installer
+      - incoming-webhook
+      # WHY users:read — used to resolve Slack user IDs to BidStack user records
+      #   for assignment notifications (e.g., "A lead was assigned to @you")
+      - users:read
+      # WHY users:read.email — maps BidStack users to Slack users by email at install
+      #   time so DM notifications work automatically without manual linking
+      - users:read.email
+      # WHY im:write — required for conversations.open before sending a DM
+      - im:write
+
+settings:
+  event_subscriptions:
+    request_url: https://api.bidstack.io/integrations/slack/events
+    bot_events:
+      # WHY app_mention — allows users to @mention BidStack to trigger commands
+      - app_mention
+      # WHY member_joined_channel — used to refresh channel list when bot is added
+      - member_joined_channel
+
+  interactivity:
+    is_enabled: true
+    request_url: https://api.bidstack.io/integrations/slack/interactive
+
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  is_hosted: false
+
+  token_rotation_enabled: false

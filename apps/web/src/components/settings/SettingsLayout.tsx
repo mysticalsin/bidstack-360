@@ -14,6 +14,7 @@ export type SettingsSection =
   | 'microsoft'
   | 'mobile'
   | 'workspace'
+  | 'language'
   | 'advanced';
 
 interface Group {
@@ -27,6 +28,7 @@ const GROUPS: Group[] = [
     items: [
       { id: 'profile', label: 'Profile', icon: 'user' },
       { id: 'appearance', label: 'Appearance', icon: 'palette' },
+      { id: 'language', label: 'Language', icon: 'globe' },
       { id: 'notifications', label: 'Notifications', icon: 'bell' },
       { id: 'security', label: 'Security', icon: 'shield' },
     ],

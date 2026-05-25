@@ -6,7 +6,7 @@
 // cannot crash the entire dashboard.
 
 import { Component, type ReactNode, useCallback } from 'react';
-import { Download, RefreshCw, Settings, Copy, Trash2 } from 'lucide-react';
+import { Download, Settings, Copy, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { ChartContainer } from '@/components/charts/ChartContainer';

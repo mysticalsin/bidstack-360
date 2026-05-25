@@ -55,7 +55,7 @@ async function getGoogleAccessToken(orgId: string, userId: string): Promise<stri
     where: {
       orgId,
       userId,
-      provider: 'google',
+      provider: 'google_workspace',
       status: 'active',
     },
     select: { accessTokenEncrypted: true },

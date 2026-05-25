@@ -23,7 +23,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
-import { encryptToken } from '@bidstack/shared';
+import { encryptToken } from '@bidstack/shared/token-crypto';
 
 const GMAIL_AUTH_BASE = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GMAIL_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -73,7 +73,7 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
       await prisma.integrationToken.upsert({
         where: {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          integration_tokens_org_user_provider_key: { orgId, userId, provider: 'gmail' as any },
+          orgId_userId_provider: { orgId, userId, provider: 'gmail' as any },
         },
         create: {
           orgId,
@@ -132,7 +132,7 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
       const record = await prisma.integrationToken.findUnique({
         where: {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          integration_tokens_org_user_provider_key: { orgId, userId, provider: 'gmail' as any },
+          orgId_userId_provider: { orgId, userId, provider: 'gmail' as any },
         },
       });
       const storedPayload = (record?.deltaState as Record<string, string> | null)?.oauthState;
@@ -196,7 +196,7 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
       await prisma.integrationToken.update({
         where: {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          integration_tokens_org_user_provider_key: { orgId, userId, provider: 'gmail' as any },
+          orgId_userId_provider: { orgId, userId, provider: 'gmail' as any },
         },
         data: {
           accessTokenEncrypted: encryptToken(tokens.access_token),
@@ -236,7 +236,7 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
         },
         data: { status: 'revoked', deletedAt: new Date() },
       });
-      return reply.status(204).send();
+      return reply.status(204).send(null);
     },
   });
 };

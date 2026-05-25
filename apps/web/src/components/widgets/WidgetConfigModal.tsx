@@ -5,7 +5,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { useState } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 import { cn } from '@/lib/cn';
 import { fadeScale } from '@/lib/motion';
@@ -35,7 +35,6 @@ interface Props {
 }
 
 export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props) {
-  const reduced = useReducedMotion();
   const { data: reports = [] } = useAnalyticsReportsList();
 
   const [type, setType] = useState<WidgetType>(initial?.type ?? 'bar');

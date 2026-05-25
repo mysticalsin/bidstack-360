@@ -179,9 +179,11 @@ export function AuthProvider({
   children: ReactNode;
 }) {
   const hasKey = publishableKey !== undefined && publishableKey !== null && publishableKey !== '';
+  const authMode = import.meta.env.VITE_AUTH_MODE;
+  const forceClerkAuth = authMode === 'clerk';
   if (!hasKey) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('VITE_CLERK_PUBLISHABLE_KEY is required in production');
+    if (forceClerkAuth) {
+      throw new Error('VITE_CLERK_PUBLISHABLE_KEY is required when VITE_AUTH_MODE=clerk');
     }
     return <StubAuthProvider>{children}</StubAuthProvider>;
   }

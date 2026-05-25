@@ -1,0 +1,51 @@
+{
+  "agents": {
+    "title": "Dust Agents",
+    "ask": "Ask an agent",
+    "placeholder": "What would you like to know or prepare?",
+    "submit": "Send",
+    "thinking": "Thinking…",
+    "noAgents": "No Dust agents configured",
+    "configureFirst": "Configure your Dust connection in integration settings.",
+    "error": "The agent could not respond. Please try again.",
+    "copyResponse": "Copy response",
+    "newConversation": "New conversation",
+    "selectAgent": "Select agent",
+    "sources": "Sources",
+    "confidence": "Confidence",
+    "regenerate": "Regenerate"
+  },
+  "meetingPrep": {
+    "title": "Meeting preparation",
+    "generate": "Generate prep brief",
+    "generating": "Generating…",
+    "attendees": "Attendees",
+    "agenda": "Agenda",
+    "context": "Account context",
+    "keyTopics": "Key topics to cover",
+    "recentActivity": "Recent activity",
+    "risks": "Identified risks",
+    "opportunities": "Opportunities",
+    "noMeetingSelected": "Select a meeting to generate the prep brief."
+  },
+  "feedback": {
+    "helpful": "Helpful",
+    "notHelpful": "Not helpful",
+    "reportIssue": "Report an issue",
+    "thanks": "Thank you for your feedback"
+  },
+  "intel": {
+    "title": "Account intelligence",
+    "loading": "Analysing…",
+    "lastUpdated": "Updated {{when}}",
+    "refresh": "Refresh",
+    "noData": "No intelligence data available",
+    "signals": {
+      "hiring": "Recent hires",
+      "funding": "Funding rounds",
+      "news": "News",
+      "technographics": "Technologies in use",
+      "executives": "Executives"
+    }
+  }
+}

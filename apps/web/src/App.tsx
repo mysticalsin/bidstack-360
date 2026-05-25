@@ -56,6 +56,9 @@ const ReportsPage = lazy(() =>
 const IntegrationsPage = lazy(() =>
   import('@/pages/IntegrationsPage').then((m) => ({ default: m.IntegrationsPage })),
 );
+const AgentsPage = lazy(() =>
+  import('@/pages/AgentsPage').then((m) => ({ default: m.AgentsPage })),
+);
 const SettingsPage = lazy(() =>
   import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 );
@@ -352,6 +355,14 @@ function AnimatedRoutes() {
             element={
               <RequireAuth>
                 <IntegrationsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/agents"
+            element={
+              <RequireAuth>
+                <AgentsPage />
               </RequireAuth>
             }
           />

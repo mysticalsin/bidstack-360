@@ -1,0 +1,47 @@
+{
+  "title": "Informes",
+  "list": {
+    "title": "Biblioteca de informes",
+    "create": "Nuevo informe",
+    "noReports": "Sin informes creados",
+    "recent": "Informes recientes",
+    "starred": "Informes favoritos"
+  },
+  "builder": {
+    "title": "Constructor de informes",
+    "metric": "Métrica",
+    "dimension": "Dimensión",
+    "filter": "Filtro",
+    "groupBy": "Agrupar por",
+    "orderBy": "Ordenar por",
+    "addFilter": "Añadir filtro",
+    "addMetric": "Añadir métrica",
+    "run": "Ejecutar informe",
+    "running": "Ejecutando…",
+    "save": "Guardar informe",
+    "exportCsv": "Exportar como CSV",
+    "exportXlsx": "Exportar como Excel",
+    "noData": "Sin datos para esta selección",
+    "error": "Error al ejecutar el informe"
+  },
+  "periods": {
+    "today": "Hoy",
+    "yesterday": "Ayer",
+    "last7Days": "Últimos 7 días",
+    "last30Days": "Últimos 30 días",
+    "thisMonth": "Este mes",
+    "lastMonth": "Mes pasado",
+    "thisQuarter": "Este trimestre",
+    "thisYear": "Este año",
+    "custom": "Personalizado"
+  },
+  "metrics": {
+    "revenue": "Ingresos",
+    "deals": "Negocios",
+    "winRate": "Tasa de éxito",
+    "avgDealSize": "Valor promedio",
+    "leads": "Prospectos",
+    "conversionRate": "Tasa de conversión",
+    "activities": "Actividades"
+  }
+}

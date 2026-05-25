@@ -85,8 +85,8 @@ export function initSentry(): void {
         event.extra = scrubPii(event.extra) as Record<string, unknown>;
       }
       // Strip PII from breadcrumb data
-      if (event.breadcrumbs?.values) {
-        event.breadcrumbs.values = event.breadcrumbs.values.map((bc) => ({
+      if (event.breadcrumbs) {
+        event.breadcrumbs = event.breadcrumbs.map((bc) => ({
           ...bc,
           data: bc.data ? (scrubPii(bc.data) as typeof bc.data) : bc.data,
         }));

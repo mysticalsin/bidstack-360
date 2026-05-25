@@ -1,0 +1,400 @@
+/**
+ * CallsPage — /calls
+ *
+ * Full-page list of all call sessions in the org, with filters:
+ *  - Entity type (DEAL / CONTACT / OPPORTUNITY / LEAD)
+ *  - Provider (ZOOM / TEAMS / GOOGLE_MEET / TWILIO_VOICE)
+ *  - Status (SCHEDULED / LIVE / COMPLETED / FAILED / CANCELLED)
+ *  - Date range (This week / This month / Custom)
+ *
+ * Clicking a row opens a slide-over detail panel with CallSummaryPanel
+ * and CallTranscriptViewer tabs.
+ *
+ * WHY no server-side date filter: the GET /calls route doesn't yet expose
+ * a date param; client-side filter is a safe MVP that can be promoted later.
+ *
+ * WCAG 2.2 AA: table with aria-sort on sortable columns, 44×44px row tap
+ * targets, keyboard-focusable rows, aria-live region for filter result count.
+ * Dark mode via CSS variables.
+ */
+
+import { useState, useRef, useMemo } from 'react';
+
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Select } from '@/components/ui/Select';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { Dialog, DialogContent } from '@/components/ui/Dialog';
+import { CallSummaryPanel } from '@/components/calls/CallSummaryPanel';
+import { CallTranscriptViewer } from '@/components/calls/CallTranscriptViewer';
+import {
+  useCalls,
+  useCall,
+  type CallProvider,
+  type CallEntityType,
+  type CallStatus,
+  type CallSession,
+} from '@/hooks/useCalls';
+import { formatDate } from '@/lib/format';
+import { cn } from '@/lib/cn';
+import type { BadgeTone } from '@/components/ui/Badge';
+
+// ─── Constants / maps ─────────────────────────────────────────────────────────
+
+const PROVIDER_OPTIONS: { value: CallProvider | ''; label: string }[] = [
+  { value: '', label: 'All providers' },
+  { value: 'ZOOM', label: 'Zoom' },
+  { value: 'TEAMS', label: 'Teams' },
+  { value: 'GOOGLE_MEET', label: 'Google Meet' },
+  { value: 'TWILIO_VOICE', label: 'Twilio Voice' },
+];
+
+const ENTITY_OPTIONS: { value: CallEntityType | ''; label: string }[] = [
+  { value: '', label: 'All types' },
+  { value: 'DEAL', label: 'Deal' },
+  { value: 'CONTACT', label: 'Contact' },
+  { value: 'OPPORTUNITY', label: 'Opportunity' },
+  { value: 'LEAD', label: 'Lead' },
+];
+
+const STATUS_OPTIONS: { value: CallStatus | ''; label: string }[] = [
+  { value: '', label: 'All statuses' },
+  { value: 'SCHEDULED', label: 'Scheduled' },
+  { value: 'LIVE', label: 'Live' },
+  { value: 'COMPLETED', label: 'Completed' },
+  { value: 'FAILED', label: 'Failed' },
+  { value: 'CANCELLED', label: 'Cancelled' },
+];
+
+const DATE_OPTIONS = [
+  { value: 'all', label: 'All time' },
+  { value: 'week', label: 'This week' },
+  { value: 'month', label: 'This month' },
+];
+
+const PROVIDER_ICON: Record<string, string> = {
+  ZOOM: '📹',
+  TEAMS: '💼',
+  GOOGLE_MEET: '🎥',
+  TWILIO_VOICE: '📞',
+};
+
+function statusTone(status: string): BadgeTone {
+  switch (status) {
+    case 'LIVE': return 'jade';
+    case 'COMPLETED': return 'blue';
+    case 'FAILED': return 'tomato';
+    case 'CANCELLED': return 'gray';
+    default: return 'amber';
+  }
+}
+
+function formatDuration(sec: number | null): string {
+  if (sec === null) return '—';
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+// Client-side date filter
+function isInDateRange(isoDate: string | null, range: string): boolean {
+  if (range === 'all' || !isoDate) return true;
+  const date = new Date(isoDate);
+  const now = new Date();
+  if (range === 'week') {
+    const weekAgo = new Date(now);
+    weekAgo.setDate(now.getDate() - 7);
+    return date >= weekAgo;
+  }
+  if (range === 'month') {
+    const monthAgo = new Date(now);
+    monthAgo.setMonth(now.getMonth() - 1);
+    return date >= monthAgo;
+  }
+  return true;
+}
+
+// ─── Detail panel ─────────────────────────────────────────────────────────────
+
+type DetailTab = 'summary' | 'transcript';
+
+interface DetailPanelProps {
+  callSessionId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+function DetailPanel({ callSessionId, open, onOpenChange }: DetailPanelProps) {
+  const [tab, setTab] = useState<DetailTab>('summary');
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const { data: call } = useCall(callSessionId);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent title="Call detail" className="w-[min(720px,96vw)] max-h-[90vh]">
+        {/* Tab bar */}
+        <div className="flex gap-1 border-b border-[var(--border-subtle)] px-5 pb-0 pt-3">
+          {(['summary', 'transcript'] as DetailTab[]).map((t) => (
+            <button
+              key={t}
+              role="tab"
+              aria-selected={tab === t}
+              onClick={() => setTab(t)}
+              className={cn(
+                '-mb-px border-b-2 px-4 py-2 text-sm font-medium capitalize transition-colors',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring-color)]',
+                'min-h-[44px]',
+                tab === t
+                  ? 'border-[var(--brand-primary)] text-[var(--brand-primary)]'
+                  : 'border-transparent text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)]',
+              )}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab content */}
+        <div className="overflow-y-auto p-5">
+          {/* Audio player (shared across tabs — visible on summary tab) */}
+          {tab === 'summary' && call?.signedRecordingUrl && (
+            <div className="mb-5">
+              <audio
+                ref={audioRef}
+                src={call.signedRecordingUrl}
+                controls
+                className="w-full rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
+                aria-label="Call recording"
+              />
+            </div>
+          )}
+
+          {tab === 'summary' && <CallSummaryPanel callSessionId={callSessionId} />}
+
+          {tab === 'transcript' && (
+            <CallTranscriptViewer
+              segments={call?.transcriptStructured ?? []}
+              transcriptText={call?.transcriptText ?? undefined}
+              audioRef={audioRef}
+              callId={callSessionId}
+            />
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── CallsPage ────────────────────────────────────────────────────────────────
+
+export default function CallsPage() {
+  const [entityType, setEntityType] = useState<CallEntityType | ''>('');
+  const [provider, setProvider] = useState<CallProvider | ''>('');
+  const [status, setStatus] = useState<CallStatus | ''>('');
+  const [dateRange, setDateRange] = useState('all');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useCalls({
+      entityType: entityType || undefined,
+      provider: provider || undefined,
+    });
+
+  // Flatten all pages
+  const allCalls = useMemo(
+    () => data?.pages.flatMap((p) => p.calls) ?? [],
+    [data],
+  );
+
+  // Client-side status + date filter (server doesn't support these params yet)
+  const filtered = useMemo(() => {
+    return allCalls.filter((c) => {
+      if (status && c.status !== status) return false;
+      const when = c.scheduledAt ?? c.createdAt;
+      if (!isInDateRange(when, dateRange)) return false;
+      return true;
+    });
+  }, [allCalls, status, dateRange]);
+
+  const handleRowClick = (call: CallSession) => {
+    setSelectedId(call.id);
+  };
+
+  if (isLoading) return <LoadingSkeleton rows={8} />;
+  if (isError) {
+    return (
+      <ErrorState
+        title="Failed to load calls"
+        message={error instanceof Error ? error.message : 'Something went wrong'}
+      />
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-5 p-6">
+      {/* Page header */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-[var(--fg-primary)]">Calls</h1>
+        <p className="text-sm text-[var(--fg-tertiary)]" role="status" aria-live="polite">
+          {filtered.length} {filtered.length === 1 ? 'call' : 'calls'}
+        </p>
+      </div>
+
+      {/* Filter row */}
+      <div className="flex flex-wrap gap-3" role="group" aria-label="Filter calls">
+        <Select
+          aria-label="Filter by entity type"
+          value={entityType}
+          onChange={(e) => setEntityType(e.target.value as CallEntityType | '')}
+          options={ENTITY_OPTIONS}
+          size="sm"
+          className="min-h-[44px]"
+        />
+        <Select
+          aria-label="Filter by provider"
+          value={provider}
+          onChange={(e) => setProvider(e.target.value as CallProvider | '')}
+          options={PROVIDER_OPTIONS}
+          size="sm"
+          className="min-h-[44px]"
+        />
+        <Select
+          aria-label="Filter by status"
+          value={status}
+          onChange={(e) => setStatus(e.target.value as CallStatus | '')}
+          options={STATUS_OPTIONS}
+          size="sm"
+          className="min-h-[44px]"
+        />
+        <Select
+          aria-label="Filter by date range"
+          value={dateRange}
+          onChange={(e) => setDateRange(e.target.value)}
+          options={DATE_OPTIONS}
+          size="sm"
+          className="min-h-[44px]"
+        />
+      </div>
+
+      {/* Table */}
+      {filtered.length === 0 ? (
+        <EmptyState
+          title="No calls found"
+          message="Try adjusting your filters, or start a call from a Contact or Deal page."
+        />
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-[var(--border-default)]">
+          <table
+            className="w-full text-sm border-collapse"
+            aria-label="Calls list"
+          >
+            <thead>
+              <tr className="border-b border-[var(--border-default)] bg-[var(--surface-sunken)]">
+                {[
+                  'Provider',
+                  'Entity',
+                  'Scheduled',
+                  'Duration',
+                  'Sentiment',
+                  'Status',
+                ].map((col) => (
+                  <th
+                    key={col}
+                    scope="col"
+                    className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]"
+                  >
+                    {col}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((call) => (
+                <tr
+                  key={call.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${PROVIDER_ICON[call.provider] ?? ''} ${call.provider} call — ${call.status}`}
+                  onClick={() => handleRowClick(call)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleRowClick(call);
+                    }
+                  }}
+                  className={cn(
+                    'border-b border-[var(--border-subtle)] transition-colors cursor-pointer',
+                    'hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring-color)]',
+                    'min-h-[44px]',
+                  )}
+                >
+                  <td className="px-4 py-3">
+                    <span className="flex items-center gap-2">
+                      <span aria-hidden>{PROVIDER_ICON[call.provider] ?? '📞'}</span>
+                      <span className="text-[var(--fg-primary)]">
+                        {call.provider.replace('_', ' ')}
+                      </span>
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-[var(--fg-secondary)]">
+                    {call.entityType}
+                  </td>
+                  <td className="px-4 py-3 text-[var(--fg-secondary)]">
+                    {formatDate(call.scheduledAt ?? call.createdAt)}
+                  </td>
+                  <td className="px-4 py-3 text-[var(--fg-secondary)]">
+                    {formatDuration(call.durationSec)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {call.sentimentScore !== null ? (
+                      <Badge
+                        tone={
+                          call.sentimentScore >= 0.7
+                            ? 'jade'
+                            : call.sentimentScore >= 0.4
+                            ? 'amber'
+                            : 'tomato'
+                        }
+                      >
+                        {Math.round(call.sentimentScore * 100)}%
+                      </Badge>
+                    ) : (
+                      <span className="text-[var(--fg-tertiary)]">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge tone={statusTone(call.status)}>{call.status}</Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Load more */}
+      {hasNextPage && (
+        <div className="text-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => void fetchNextPage()}
+            disabled={isFetchingNextPage}
+            aria-busy={isFetchingNextPage}
+          >
+            {isFetchingNextPage ? 'Loading…' : 'Load more'}
+          </Button>
+        </div>
+      )}
+
+      {/* Detail panel */}
+      {selectedId && (
+        <DetailPanel
+          callSessionId={selectedId}
+          open={Boolean(selectedId)}
+          onOpenChange={(open) => !open && setSelectedId(null)}
+        />
+      )}
+    </div>
+  );
+}

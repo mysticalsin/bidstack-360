@@ -1,0 +1,67 @@
+{
+  "title": "Rapports",
+  "list": {
+    "title": "Bibliothèque de rapports",
+    "create": "Nouveau rapport",
+    "noReports": "Aucun rapport créé",
+    "recent": "Rapports récents",
+    "starred": "Rapports favoris"
+  },
+  "builder": {
+    "title": "Générateur de rapports",
+    "metric": "Métrique",
+    "dimension": "Dimension",
+    "filter": "Filtre",
+    "groupBy": "Regrouper par",
+    "orderBy": "Trier par",
+    "limit": "Limite",
+    "addFilter": "Ajouter un filtre",
+    "addMetric": "Ajouter une métrique",
+    "run": "Exécuter le rapport",
+    "running": "Exécution en cours…",
+    "save": "Enregistrer le rapport",
+    "export": "Exporter",
+    "exportCsv": "Exporter en CSV",
+    "exportXlsx": "Exporter en Excel",
+    "schedule": "Planifier",
+    "noData": "Aucune donnée pour cette sélection",
+    "error": "Erreur lors de l'exécution du rapport"
+  },
+  "charts": {
+    "bar": "Barres",
+    "line": "Courbes",
+    "pie": "Camembert",
+    "donut": "Anneau",
+    "area": "Aires",
+    "scatter": "Nuage de points",
+    "funnel": "Entonnoir",
+    "heatmap": "Carte thermique",
+    "table": "Tableau"
+  },
+  "periods": {
+    "today": "Aujourd'hui",
+    "yesterday": "Hier",
+    "last7Days": "7 derniers jours",
+    "last30Days": "30 derniers jours",
+    "thisMonth": "Ce mois",
+    "lastMonth": "Le mois dernier",
+    "thisQuarter": "Ce trimestre",
+    "lastQuarter": "Le trimestre dernier",
+    "thisYear": "Cette année",
+    "lastYear": "L'année dernière",
+    "custom": "Personnalisé"
+  },
+  "metrics": {
+    "revenue": "Chiffre d'affaires",
+    "deals": "Affaires",
+    "winRate": "Taux de gain",
+    "avgDealSize": "Valeur moyenne",
+    "salesCycle": "Durée du cycle de vente",
+    "leads": "Prospects",
+    "conversionRate": "Taux de conversion",
+    "activities": "Activités",
+    "calls": "Appels",
+    "emails": "E-mails",
+    "meetings": "Réunions"
+  }
+}

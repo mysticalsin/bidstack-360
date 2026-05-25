@@ -15,19 +15,12 @@
 //   - WCAG 2.2 AA contrast on all UI text (cursor labels: bg is user colour,
 //     text is white — checked at ≥ 4.5:1 for the default palette).
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Collaboration from '@tiptap/extension-collaboration';
 import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
-import * as Y from 'yjs';
 import { useYjsField, type UseYjsFieldOptions } from '@/hooks/useYjsField';
 import type { RemoteCursor, ConnectionState } from '@/lib/yjs-client';
 
@@ -50,7 +43,7 @@ function colorForUser(userId: string): string {
   for (let i = 0; i < userId.length; i++) {
     hash = ((hash << 5) - hash + userId.charCodeAt(i)) | 0;
   }
-  return CURSOR_COLORS[Math.abs(hash) % CURSOR_COLORS.length];
+  return CURSOR_COLORS[Math.abs(hash) % CURSOR_COLORS.length] ?? CURSOR_COLORS[0]!;
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────
@@ -96,16 +89,12 @@ export function CollaborativeRichTextEditor({
     cursorName: userName,
   });
 
-  // Build awareness for cursor extension when ydoc is ready.
-  // WHY useRef: the editor instance doesn't need to re-render on awareness change.
-  const editorRef = useRef<ReturnType<typeof useEditor>>(null);
-
   const extensions = useMemo(() => {
     if (!ydoc) return [StarterKit];
 
     return [
       // WHY history: false — Y.js handles undo/redo natively via UndoManager.
-      StarterKit.configure({ history: false }),
+      StarterKit.configure({ undoRedo: false }),
       Collaboration.configure({ document: ydoc }),
       CollaborationCursor.configure({
         provider: {

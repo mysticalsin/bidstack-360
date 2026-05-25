@@ -57,6 +57,12 @@ function serializeDef(
   };
 }
 
+function isSerializedDef(
+  value: ReturnType<typeof serializeDef>,
+): value is NonNullable<ReturnType<typeof serializeDef>> {
+  return value !== null;
+}
+
 function serializeRecord(r: NonNullable<Awaited<ReturnType<typeof svc.getRecord>>>) {
   return {
     id: r.id,
@@ -108,7 +114,7 @@ export const customObjectRoutes: FastifyPluginAsyncZod = async (server) => {
     { schema: { response: { 200: CustomObjectDefList } } },
     async (req) => {
       const defs = await svc.listObjectDefs(req.auth.orgId);
-      return { items: defs.map(serializeDef).filter(Boolean) };
+      return { items: defs.map(serializeDef).filter(isSerializedDef) };
     },
   );
 
@@ -141,7 +147,10 @@ export const customObjectRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const updated = await svc.updateObjectDef(req.auth.orgId, req.params.id, req.body);
+      const updated = await svc.updateObjectDef(req.auth.orgId, req.params.id, {
+        ...req.body,
+        description: req.body.description ?? undefined,
+      });
       if (!updated) throw server.httpErrors.notFound('Custom object not found');
       const serialized = serializeDef(updated);
       if (!serialized) throw server.httpErrors.internalServerError();
@@ -239,6 +248,7 @@ export const customObjectRoutes: FastifyPluginAsyncZod = async (server) => {
         orgId: req.auth.orgId,
         objectId: req.params.id,
         ...req.body,
+        junctionTableSchema: req.body.junctionTableSchema ?? undefined,
       });
       if (!relation) throw server.httpErrors.notFound('Custom object not found');
 

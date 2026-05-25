@@ -20,6 +20,7 @@
  *   job_failed_total{queue}
  */
 
+import type { FastifyRequest } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
@@ -183,6 +184,16 @@ function exposeAllMetrics(): string {
   );
 }
 
+export function metricsAccessAllowed(
+  headers: FastifyRequest['headers'],
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  if (env.NODE_ENV !== 'production') return true;
+  const token = env.METRICS_BEARER_TOKEN?.trim();
+  if (!token) return false;
+  return headers.authorization === `Bearer ${token}`;
+}
+
 // ── Health probe helpers ────────────────────────────────────────────────────
 
 async function probeCoreHealth(): Promise<z.infer<typeof CoreHealthSchema>> {
@@ -259,12 +270,19 @@ export const healthRoute: FastifyPluginAsyncZod = async (server) => {
     async () => probeCoreHealth(),
   );
 
-  // Prometheus metrics exposition.
-  // WHY: /metrics is not restricted to internal networks in this version —
-  // add IP allowlist or basic auth before exposing to the public internet.
+  // Prometheus metrics exposition. This stays outside user auth so Prometheus
+  // can scrape it, but production requires an explicit bearer token.
   server.get(
     '/metrics',
-    { config: { public: true } },
+    {
+      config: { public: true },
+      preHandler: async (req, reply) => {
+        if (!metricsAccessAllowed(req.headers)) {
+          reply.code(process.env.METRICS_BEARER_TOKEN ? 401 : 404);
+          return reply.send('Not found');
+        }
+      },
+    },
     async (_req, reply) => {
       reply.type('text/plain; version=0.0.4; charset=utf-8');
       return exposeAllMetrics();

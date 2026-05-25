@@ -76,6 +76,8 @@ export function usePatchOpportunity() {
       await qc.cancelQueries({ queryKey: ['opportunities'] });
       await qc.cancelQueries({ queryKey: ['opportunity', id] });
 
+      const { customFieldValues: _cf, ...rest } = patch as Record<string, unknown>;
+
       // Snapshot every active list query so we can roll back on error.
       const listSnapshots: Array<readonly [readonly unknown[], OpportunityPage | undefined]> = [];
       qc.getQueriesData<OpportunityPage>({ queryKey: ['opportunities'] }).forEach(
@@ -84,7 +86,7 @@ export function usePatchOpportunity() {
           if (!value) return;
           qc.setQueryData<OpportunityPage>(key, {
             ...value,
-            items: value.items.map((o) => (o.id === id ? { ...o, ...patch } : o)),
+            items: value.items.map((o) => (o.id === id ? { ...o, ...rest } : o)),
           });
         },
       );
@@ -92,7 +94,7 @@ export function usePatchOpportunity() {
       const detailKey = ['opportunity', id] as const;
       const detailSnap = qc.getQueryData<OpportunityFull>(detailKey);
       if (detailSnap) {
-        qc.setQueryData<OpportunityFull>(detailKey, { ...detailSnap, ...patch });
+        qc.setQueryData<OpportunityFull>(detailKey, { ...detailSnap, ...rest });
       }
       return { listSnapshots, detailSnap, id };
     },

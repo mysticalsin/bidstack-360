@@ -1,3 +1,10 @@
+// Activity routes — CRUD for activities plus entity-scoped timeline feed.
+//
+// WHY two surfaces:
+//  - GET /activities (generic filter) — used by the cockpit recent feed
+//  - GET /entities/:entityType/:entityId/activities — timeline for a specific entity,
+//    cursor-paginated, uses the activity service for consistent business logic
+
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, type Prisma } from '@bidstack/db';
@@ -7,10 +14,13 @@ import {
   ActivityPatch,
   ActivityFilter,
   ActivityList,
+  TimelinePage,
 } from '@bidstack/shared';
 import { normalizeTenantEntityType, tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
+import { logActivity, getTimeline } from '../services/activity.service.js';
+import type { ActivityEventType } from '../services/activity.service.js';
 
-function serializeActivity(row: {
+type ActivityRow = {
   id: string;
   orgId: string;
   type: string;
@@ -23,9 +33,15 @@ function serializeActivity(row: {
   entityId: string;
   ownerId: string | null;
   metadata: unknown;
+  actorId: string | null;
+  actorType: string;
+  body: unknown;
+  occurredAt: Date;
   createdAt: Date;
   updatedAt: Date;
-}): z.infer<typeof Activity> {
+};
+
+function serializeActivity(row: ActivityRow): z.infer<typeof Activity> {
   return {
     id: row.id,
     orgId: row.orgId,
@@ -39,12 +55,63 @@ function serializeActivity(row: {
     entityId: row.entityId,
     ownerId: row.ownerId,
     metadata: row.metadata as Record<string, unknown> | null,
+    actorId: row.actorId,
+    actorType: (row.actorType ?? 'user') as 'user' | 'system' | 'agent',
+    body: (row.body as Record<string, unknown>) ?? null,
+    occurredAt: row.occurredAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
 }
 
 export const activityRoutes: FastifyPluginAsyncZod = async (server) => {
+  // ── Entity-scoped timeline (cursor pagination) ──────────────────────────
+  // GET /api/v1/entities/:entityType/:entityId/activities
+  server.get(
+    '/entities/:entityType/:entityId/activities',
+    {
+      schema: {
+        params: z.object({
+          entityType: z.string().min(1).max(50),
+          entityId: z.string().uuid(),
+        }),
+        querystring: z.object({
+          cursor: z.string().datetime().optional(),
+          limit: z.coerce.number().int().min(1).max(100).optional().default(25),
+          typeFilter: z
+            .string()
+            .optional()
+            .transform((v) => (v ? (v.split(',') as ActivityEventType[]) : undefined)),
+        }),
+        response: { 200: TimelinePage },
+      },
+    },
+    async (req, reply) => {
+      const { entityType, entityId } = req.params;
+      const { cursor, limit, typeFilter } = req.query;
+
+      // Verify the entity belongs to this org (no cross-tenant reads)
+      if (
+        normalizeTenantEntityType(entityType) &&
+        !(await tenantEntityBelongsToOrg(entityType, entityId, req.auth.orgId))
+      ) {
+        return reply.notFound('Entity not found');
+      }
+
+      const page = await getTimeline({
+        orgId: req.auth.orgId,
+        entityType,
+        entityId,
+        cursor,
+        limit,
+        typeFilter,
+      });
+
+      return page;
+    },
+  );
+
+  // ── Generic activity filter feed ─────────────────────────────────────────
   // GET /api/v1/activities
   server.get(
     '/activities',
@@ -55,8 +122,10 @@ export const activityRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const { entityType, entityId, type, status, ownerId, limit, offset } = req.query;
-      const where = {
+      const { entityType, entityId, type, status, ownerId, actorId, limit, offset, cursor } =
+        req.query;
+
+      const where: Prisma.ActivityWhereInput = {
         orgId: req.auth.orgId,
         deletedAt: null,
         ...(entityType ? { entityType } : {}),
@@ -64,17 +133,25 @@ export const activityRoutes: FastifyPluginAsyncZod = async (server) => {
         ...(type ? { type } : {}),
         ...(status ? { status } : {}),
         ...(ownerId ? { ownerId } : {}),
+        ...(actorId ? { actorId } : {}),
+        ...(cursor ? { occurredAt: { lt: new Date(cursor) } } : {}),
       };
+
       const [items, total] = await Promise.all([
         prisma.activity.findMany({
           where,
-          orderBy: { startTime: 'desc' },
+          orderBy: { occurredAt: 'desc' },
           take: limit,
           skip: offset,
         }),
         prisma.activity.count({ where }),
       ]);
-      return { items: items.map(serializeActivity), total };
+
+      const serialized = items.map(serializeActivity);
+      const nextCursor =
+        items.length > 0 ? items[items.length - 1]?.occurredAt.toISOString() ?? null : null;
+
+      return { items: serialized, total, nextCursor };
     },
   );
 
@@ -92,7 +169,7 @@ export const activityRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { orgId: req.auth.orgId, id: req.params.id, deletedAt: null },
       });
       if (!row) return reply.notFound('Activity not found');
-      return serializeActivity(row);
+      return serializeActivity(row as ActivityRow);
     },
   );
 
@@ -108,7 +185,9 @@ export const activityRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       if (!normalizeTenantEntityType(req.body.entityType)) {
-        throw server.httpErrors.badRequest(`Unsupported activity entity type: ${req.body.entityType}`);
+        throw server.httpErrors.badRequest(
+          `Unsupported activity entity type: ${req.body.entityType}`,
+        );
       }
       if (
         !(await tenantEntityBelongsToOrg(
@@ -126,23 +205,28 @@ export const activityRoutes: FastifyPluginAsyncZod = async (server) => {
         return reply.notFound('Activity owner not found');
       }
 
-      const row = await prisma.activity.create({
-        data: {
-          orgId: req.auth.orgId,
-          type: req.body.type,
-          subject: req.body.subject ?? null,
-          description: req.body.description ?? null,
-          startTime: req.body.startTime ? new Date(req.body.startTime) : null,
-          endTime: req.body.endTime ? new Date(req.body.endTime) : null,
-          status: req.body.status ?? 'planned',
-          entityType: req.body.entityType,
-          entityId: req.body.entityId,
-          ownerId: req.body.ownerId ?? req.auth.userId,
-          metadata: (req.body.metadata ?? {}) as Prisma.JsonObject,
-        },
+      const item = await logActivity({
+        orgId: req.auth.orgId,
+        entityType: req.body.entityType as ActivityEventType extends string ? never : string,
+        entityId: req.body.entityId,
+        type: req.body.type as ActivityEventType,
+        actorId: req.body.actorId ?? req.auth.userId,
+        actorType: (req.body.actorType as 'user' | 'system' | 'agent') ?? 'user',
+        subject: req.body.subject,
+        description: req.body.description,
+        startTime: req.body.startTime ? new Date(req.body.startTime) : null,
+        endTime: req.body.endTime ? new Date(req.body.endTime) : null,
+        status: req.body.status ?? 'planned',
+        metadata: req.body.metadata,
+        body: req.body.body,
+        occurredAt: req.body.occurredAt ? new Date(req.body.occurredAt) : new Date(),
+        idempotencyKey: req.body.idempotencyKey,
       });
+
+      // Re-fetch the full row to satisfy the Activity schema (startTime, endTime, etc.)
+      const row = await prisma.activity.findUniqueOrThrow({ where: { id: item.id } });
       reply.status(201);
-      return serializeActivity(row);
+      return serializeActivity(row as ActivityRow);
     },
   );
 
@@ -178,9 +262,10 @@ export const activityRoutes: FastifyPluginAsyncZod = async (server) => {
           ...(req.body.metadata !== undefined
             ? { metadata: req.body.metadata as Prisma.JsonObject }
             : {}),
+          ...(req.body.body !== undefined ? { body: req.body.body as Prisma.JsonObject } : {}),
         },
       });
-      return serializeActivity(updated);
+      return serializeActivity(updated as ActivityRow);
     },
   );
 

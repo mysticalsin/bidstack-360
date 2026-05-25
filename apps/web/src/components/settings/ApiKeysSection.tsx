@@ -126,7 +126,7 @@ export function ApiKeysSection() {
                         <input
                           type="checkbox"
                           name={`scope-${s}`}
-                          defaultChecked={s === 'read'}
+                          defaultChecked={s === 'read' || s === 'mcp'}
                           className="mt-0.5 accent-[var(--brand-primary)]"
                         />
                         <span>
@@ -241,5 +241,5 @@ export function ApiKeysSection() {
 const SCOPE_HELP: Record<ApiKeyScope, string> = {
   read: 'Read-only access to all org data.',
   write: 'Create / update / delete records.',
-  mcp: 'Call MCP tools (read + write + tool invocations).',
+  mcp: 'Enable MCP transport. Pair with read or write for tool permissions.',
 };

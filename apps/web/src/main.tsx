@@ -1,4 +1,7 @@
 import './index.css';
+// i18n must be imported before App so the i18next instance is bootstrapped
+// before any component that calls useTranslation() renders.
+import './i18n';
 
 import React from 'react';
 import { createRoot } from 'react-dom/client';
@@ -94,9 +97,9 @@ window.addEventListener('error', (event) => {
 const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 const authMode = import.meta.env.VITE_AUTH_MODE;
 
-if (!clerkKey && authMode !== 'stub') {
+if (!clerkKey && authMode === 'clerk') {
   throw new Error(
-    'VITE_CLERK_PUBLISHABLE_KEY is missing. Set VITE_AUTH_MODE=stub only for local/test runs.',
+    'VITE_CLERK_PUBLISHABLE_KEY is missing while VITE_AUTH_MODE=clerk.',
   );
 }
 

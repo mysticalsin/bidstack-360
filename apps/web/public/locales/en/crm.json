@@ -1,0 +1,73 @@
+{
+  "entities": {
+    "account": "Account",
+    "accounts": "Accounts",
+    "company": "Company",
+    "companies": "Companies",
+    "contact": "Contact",
+    "contacts": "Contacts",
+    "opportunity": "Opportunity",
+    "opportunities": "Opportunities",
+    "lead": "Lead",
+    "leads": "Leads",
+    "task": "Task",
+    "tasks": "Tasks",
+    "invoice": "Invoice",
+    "invoices": "Invoices",
+    "quote": "Quote",
+    "quotes": "Quotes",
+    "product": "Product",
+    "products": "Products",
+    "territory": "Territory",
+    "territories": "Territories"
+  },
+  "stages": {
+    "qualifying": "Qualifying",
+    "discovery": "Discovery",
+    "proposal": "Proposal",
+    "negotiation": "Negotiation",
+    "closedWon": "Closed Won",
+    "closedLost": "Closed Lost"
+  },
+  "kpi": {
+    "openBids": "Open bids",
+    "overdueTasks": "Overdue tasks",
+    "weightedPipeline": "Weighted pipeline",
+    "winRate": "Win rate",
+    "averageDealSize": "Average deal size",
+    "newThisWeek": "New this week"
+  },
+  "fields": {
+    "name": "Name",
+    "subject": "Subject",
+    "stage": "Stage",
+    "amount": "Amount",
+    "currency": "Currency",
+    "closeDate": "Close date",
+    "owner": "Owner",
+    "createdAt": "Created",
+    "updatedAt": "Updated",
+    "dueDate": "Due date",
+    "status": "Status",
+    "priority": "Priority"
+  },
+  "detail": {
+    "opportunity": "Opportunity detail",
+    "contact": "Contact detail",
+    "lead": "Lead detail",
+    "company": "Company detail",
+    "task": "Task detail",
+    "invoice": "Invoice detail",
+    "quote": "Quote or order detail",
+    "serviceCase": "Service desk case detail",
+    "account": "Account: {{name}}"
+  },
+  "empty": {
+    "opportunities": "No opportunities yet",
+    "contacts": "No contacts yet",
+    "tasks": "No tasks yet",
+    "leads": "No leads yet",
+    "companies": "No companies yet",
+    "ctaCreate": "Create your first {{entity}}"
+  }
+}

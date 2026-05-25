@@ -1,11 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
-import type { Opportunity, OpportunityPage, OpportunityStage } from '@bidstack/shared';
+import { isPipelineStageIdUuid } from '@/lib/pipeline-stages';
+import type { Opportunity, OpportunityPage } from '@bidstack/shared';
 
 interface MoveArgs {
   id: string;
-  stage: OpportunityStage;
+  pipelineStageId: string;
 }
 
 // Wraps POST /api/opportunities/:id/stage with optimistic UI:
@@ -14,12 +15,14 @@ export function useStageMutation() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, stage }: MoveArgs) =>
-      api<{ id: string; stage: OpportunityStage }>(`/api/opportunities/${id}/stage`, {
+    mutationFn: ({ id, pipelineStageId }: MoveArgs) =>
+      api<{ id: string; pipelineStageId: string | null; stage: string }>(`/api/opportunities/${id}/stage`, {
         method: 'POST',
-        body: { stage },
+        body: isPipelineStageIdUuid(pipelineStageId)
+          ? { pipelineStageId }
+          : { stage: pipelineStageId },
       }),
-    onMutate: async ({ id, stage }) => {
+    onMutate: async ({ id, pipelineStageId }) => {
       // Snapshot every active opportunities query so we can roll back.
       await qc.cancelQueries({ queryKey: ['opportunities'] });
       const snapshots: Array<readonly [readonly unknown[], OpportunityPage | undefined]> = [];
@@ -29,7 +32,13 @@ export function useStageMutation() {
           if (!value) return;
           qc.setQueryData<OpportunityPage>(key, {
             ...value,
-            items: value.items.map((o) => (o.id === id ? { ...o, stage } : o)),
+            items: value.items.map((o) =>
+              o.id === id
+                ? isPipelineStageIdUuid(pipelineStageId)
+                  ? { ...o, pipelineStageId }
+                  : { ...o, stage: pipelineStageId, pipelineStageId: null, pipelineStage: null }
+                : o,
+            ),
           });
         },
       );
@@ -37,7 +46,12 @@ export function useStageMutation() {
       const detailKey = ['opportunity', id] as const;
       const detailSnap = qc.getQueryData<Opportunity>(detailKey);
       if (detailSnap) {
-        qc.setQueryData<Opportunity>(detailKey, { ...detailSnap, stage });
+        qc.setQueryData<Opportunity>(
+          detailKey,
+          isPipelineStageIdUuid(pipelineStageId)
+            ? { ...detailSnap, pipelineStageId }
+            : { ...detailSnap, stage: pipelineStageId, pipelineStageId: null, pipelineStage: null },
+        );
       }
       return { snapshots, detailSnap };
     },

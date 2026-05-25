@@ -27,8 +27,10 @@
 
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { prisma } from '@bidstack/db';
-import { decryptToken, encryptToken } from '@bidstack/shared';
+import { decryptToken, encryptToken } from '@bidstack/shared/token-crypto';
 import type pino from 'pino';
+
+type ServiceLogger = Pick<pino.Logger, 'debug' | 'error' | 'info' | 'warn'>;
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
@@ -73,7 +75,7 @@ type TokenRow = {
  * Returns a live access token for the given token record, refreshing
  * via the OAuth refresh_token grant if the token is within 60 s of expiry.
  */
-export async function getAccessToken(row: TokenRow, log: pino.Logger): Promise<string> {
+export async function getAccessToken(row: TokenRow, log: ServiceLogger): Promise<string> {
   const isExpired = row.expiresAt
     ? row.expiresAt.getTime() < Date.now() + 60_000
     : false;
@@ -93,7 +95,7 @@ export async function getAccessToken(row: TokenRow, log: pino.Logger): Promise<s
 async function refreshMsGraphToken(
   tokenId: string,
   refreshToken: string,
-  log: pino.Logger,
+  log: ServiceLogger,
 ): Promise<string> {
   const res = await fetch(
     `${TOKEN_ENDPOINT_BASE}/${tenant()}/oauth2/v2.0/token`,
@@ -198,7 +200,7 @@ function buildRecipients(
  */
 export async function sendEmail(
   params: GraphSendEmailParams,
-  log: pino.Logger,
+  log: ServiceLogger,
 ): Promise<{ messageId: string }> {
   const token = await prisma.integrationToken.findUnique({
     where: { id: params.integrationTokenId },
@@ -345,7 +347,7 @@ export async function pullIncrementalSync(
     userId,
     integrationTokenId,
   }: { orgId: string; userId: string; integrationTokenId: string },
-  log: pino.Logger,
+  log: ServiceLogger,
 ): Promise<{ persisted: number }> {
   const token = await prisma.integrationToken.findUnique({
     where: { id: integrationTokenId },
@@ -369,7 +371,7 @@ export async function pullIncrementalSync(
  */
 export async function pullHistoricalInitial(
   params: { orgId: string; userId: string; integrationTokenId: string },
-  log: pino.Logger,
+  log: ServiceLogger,
 ): Promise<{ persisted: number }> {
   // Reset delta link to force a full pull
   await prisma.integrationToken.update({
@@ -386,7 +388,7 @@ async function fetchDeltaPage(
   orgId: string,
   userId: string,
   accountEmail: string,
-  log: pino.Logger,
+  log: ServiceLogger,
 ): Promise<{ persisted: number }> {
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -443,7 +445,7 @@ async function fetchDeltaPage(
       await prisma.emailMessage.upsert({
         where: {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          email_messages_org_external_key: { orgId, externalMessageId: msg.id } as any,
+          orgId_externalMessageId: { orgId, externalMessageId: msg.id },
         },
         create: {
           orgId,
@@ -505,7 +507,7 @@ async function fetchDeltaPage(
  */
 export async function createSubscription(
   { integrationTokenId, orgId }: { integrationTokenId: string; orgId: string },
-  log: pino.Logger,
+  log: ServiceLogger,
 ): Promise<string | null> {
   const token = await prisma.integrationToken.findUnique({
     where: { id: integrationTokenId },
@@ -568,7 +570,7 @@ export async function createSubscription(
  */
 export async function renewSubscription(
   subscriptionId: string,
-  log: pino.Logger,
+  log: ServiceLogger,
 ): Promise<void> {
   const sub = await prisma.graphSubscription.findUnique({
     where: { subscriptionId },
@@ -626,7 +628,7 @@ export async function renewSubscription(
 export async function deleteSubscription(
   subscriptionId: string,
   accessToken: string,
-  log: pino.Logger,
+  log: ServiceLogger,
 ): Promise<void> {
   try {
     const res = await fetch(`${GRAPH_BASE}/subscriptions/${subscriptionId}`, {

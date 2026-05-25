@@ -118,7 +118,9 @@ function TemplateStep({
 
   // Extract {{var}} placeholders from the selected template's body
   const vars = template
-    ? [...template.bodyHtml.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1])
+    ? [...template.bodyHtml.matchAll(/\{\{(\w+)\}\}/g)]
+        .map((m) => m[1])
+        .filter((value): value is string => Boolean(value))
     : [];
   const uniqueVars = [...new Set(vars)];
 
@@ -227,7 +229,9 @@ function RecipientsStep({
 
   const updateRecipient = (i: number, patch: Partial<Recipient>) => {
     const next = recipients.slice();
-    next[i] = { ...next[i], ...patch };
+    const current = next[i];
+    if (!current) return;
+    next[i] = { ...current, ...patch };
     onChangeRecipients(next);
   };
 
@@ -476,11 +480,16 @@ export function SendForSignatureModal({
 
   const handleSend = () => {
     if (!documentId && !templateId) return;
+    const signatureRecipients: SignatureRecipient[] = recipients.map(({ email, name, role }) => ({
+      email,
+      name,
+      role,
+    }));
     send.mutate(
       {
         documentId: documentId ?? templateId, // fallback — real API may differ
         templateId: templateId || undefined,
-        recipients: recipients as SignatureRecipient[],
+        recipients: signatureRecipients,
         message: message || undefined,
         variables,
         provider: 'DOCUSIGN',

@@ -22,7 +22,9 @@ import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
-import { encryptToken } from '@bidstack/shared';
+import { encryptToken } from '@bidstack/shared/token-crypto';
+import { outlookHistoricalQueue } from '../../queues/email-outlook.js';
+import { createSubscription, deleteSubscription, getAccessToken } from '../../services/microsoft-graph.service.js';
 
 function tenant(): string {
   return process.env.MICROSOFT_TENANT_ID ?? 'common';
@@ -70,7 +72,7 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
       await prisma.integrationToken.upsert({
         where: {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          integration_tokens_org_user_provider_key: { orgId, userId, provider: 'microsoft_graph' as any },
+          orgId_userId_provider: { orgId, userId, provider: 'microsoft_graph' as any },
         },
         create: {
           orgId,
@@ -128,7 +130,7 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
       const record = await prisma.integrationToken.findUnique({
         where: {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          integration_tokens_org_user_provider_key: { orgId, userId, provider: 'microsoft_graph' as any },
+          orgId_userId_provider: { orgId, userId, provider: 'microsoft_graph' as any },
         },
       });
       const stored = (record?.deltaState as Record<string, string> | null)?.mailOAuthState;
@@ -191,7 +193,7 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
       await prisma.integrationToken.update({
         where: {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          integration_tokens_org_user_provider_key: { orgId, userId, provider: 'microsoft_graph' as any },
+          orgId_userId_provider: { orgId, userId, provider: 'microsoft_graph' as any },
         },
         data: {
           accessTokenEncrypted: encryptToken(tokens.access_token),
@@ -207,6 +209,27 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
         },
       });
 
+      // Fetch the saved token record to get its id for queue/subscription
+      const savedToken = await prisma.integrationToken.findUnique({
+        where: {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          orgId_userId_provider: { orgId, userId, provider: 'microsoft_graph' as any },
+        },
+        select: { id: true },
+      });
+
+      if (savedToken) {
+        // Schedule one-shot historical backfill
+        await outlookHistoricalQueue.add(
+          'email.outlook.pull-historical',
+          { orgId, userId, integrationTokenId: savedToken.id },
+          { jobId: `historical-${savedToken.id}` },
+        );
+
+        // Create Graph webhook subscription (best-effort — incremental poll fallback if it fails)
+        void createSubscription({ integrationTokenId: savedToken.id, orgId }, server.log);
+      }
+
       server.log.info({ orgId, userId, email: externalEmail }, 'Outlook Mail connected');
 
       return reply.redirect(
@@ -220,6 +243,34 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
     schema: { response: { 204: z.null() } },
     handler: async (req, reply) => {
       const { userId, orgId } = req.auth;
+
+      // Find token record first so we can read the access token for subscription cleanup
+      const token = await prisma.integrationToken.findUnique({
+        where: {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          orgId_userId_provider: { orgId, userId, provider: 'microsoft_graph' as any },
+        },
+        include: {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          graphSubscriptions: { select: { subscriptionId: true } } as any,
+        },
+      });
+
+      // Best-effort: delete all active Graph subscriptions before revoking
+      if (token && token.status === 'active') {
+        try {
+          const accessToken = await getAccessToken(token, server.log);
+          const subs = (token as typeof token & { graphSubscriptions?: { subscriptionId: string }[] })
+            .graphSubscriptions ?? [];
+          await Promise.all(
+            subs.map((sub) => deleteSubscription(sub.subscriptionId, accessToken, server.log)),
+          );
+        } catch (err) {
+          // Non-fatal — continue to revoke token even if subscription cleanup fails
+          server.log.warn({ err, orgId, userId }, 'Could not clean up Graph subscriptions on disconnect');
+        }
+      }
+
       await prisma.integrationToken.updateMany({
         where: {
           orgId,
@@ -229,7 +280,8 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
         },
         data: { status: 'revoked', deletedAt: new Date() },
       });
-      return reply.status(204).send();
+
+      return reply.status(204).send(null);
     },
   });
 };

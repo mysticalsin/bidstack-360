@@ -147,7 +147,7 @@ export const predictiveScoringRoutes: FastifyPluginAsyncZod = async (server) => 
     '/admin/predictive/retrain',
     {
       config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
-      preHandler: server.requirePermission('admin:write'),
+      preHandler: server.requirePermission('settings:write'),
       schema: {
         body: RetrainBody,
         response: {
@@ -192,7 +192,7 @@ export const predictiveScoringRoutes: FastifyPluginAsyncZod = async (server) => 
   server.get(
     '/admin/predictive/models',
     {
-      preHandler: server.requirePermission('admin:read'),
+      preHandler: server.requirePermission('settings:read'),
       schema: {
         querystring: z.object({
           entityType: z.enum(['lead', 'opportunity']).optional(),

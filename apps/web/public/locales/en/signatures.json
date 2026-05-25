@@ -1,0 +1,57 @@
+{
+  "title": "Electronic signatures",
+  "send": {
+    "title": "Send for signature",
+    "recipients": "Recipients",
+    "addRecipient": "Add recipient",
+    "recipientName": "Name",
+    "recipientEmail": "Email address",
+    "recipientRole": "Role",
+    "message": "Custom message",
+    "messagePlaceholder": "Add a message for signers (optional)",
+    "send": "Send for signature",
+    "sending": "Sending…",
+    "cancel": "Cancel",
+    "document": "Document",
+    "selectDocument": "Select a document"
+  },
+  "status": {
+    "pending": "Pending",
+    "sent": "Sent",
+    "viewed": "Viewed",
+    "signed": "Signed",
+    "declined": "Declined",
+    "expired": "Expired",
+    "completed": "Completed",
+    "cancelled": "Cancelled"
+  },
+  "pad": {
+    "title": "Sign the document",
+    "instruction": "Sign in the area below",
+    "clear": "Clear",
+    "sign": "Apply signature",
+    "signing": "Signing…",
+    "decline": "Decline",
+    "declineReason": "Reason for declining (optional)",
+    "typedSignature": "Typed signature",
+    "drawnSignature": "Drawn signature",
+    "typeNamePlaceholder": "Type your full name",
+    "agreed": "I agree that this electronic signature is legally equivalent to my handwritten signature."
+  },
+  "timeline": {
+    "title": "Signature history",
+    "sent": "Sent to {{name}}",
+    "viewed": "Viewed by {{name}}",
+    "signed": "Signed by {{name}}",
+    "declined": "Declined by {{name}}",
+    "completed": "All signers have signed",
+    "reminder": "Reminder sent to {{name}}"
+  },
+  "actions": {
+    "remind": "Send reminder",
+    "download": "Download",
+    "cancel": "Cancel request",
+    "viewCertificate": "View certificate",
+    "confirmCancel": "Cancel this signature request? Signers will be notified."
+  }
+}

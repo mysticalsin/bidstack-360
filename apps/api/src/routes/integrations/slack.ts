@@ -31,7 +31,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
-import { encryptToken } from '@bidstack/shared';
+import { encryptToken } from '@bidstack/shared/token-crypto';
 
 const SLACK_AUTH_URL = 'https://slack.com/oauth/v2/authorize';
 const SLACK_TOKEN_URL = 'https://slack.com/api/oauth.v2.access';
@@ -130,7 +130,7 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
       // Persist pending state for CSRF verification
       await prisma.integrationToken.upsert({
         where: {
-          integration_tokens_org_user_provider_key: {
+          orgId_userId_provider: {
             orgId,
             userId,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -188,7 +188,7 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
       // CSRF state verification
       const record = await prisma.integrationToken.findUnique({
         where: {
-          integration_tokens_org_user_provider_key: {
+          orgId_userId_provider: {
             orgId,
             userId,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -242,7 +242,7 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
       // Persist the bot token
       const savedToken = await prisma.integrationToken.update({
         where: {
-          integration_tokens_org_user_provider_key: {
+          orgId_userId_provider: {
             orgId,
             userId,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -383,7 +383,7 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
           },
         });
         if (token) {
-          const { decryptToken: _dec } = await import('@bidstack/shared');
+          const { decryptToken: _dec } = await import('@bidstack/shared/token-crypto');
           const botToken = _dec(token.accessTokenEncrypted);
           await fetch('https://slack.com/api/auth.revoke', {
             method: 'POST',
@@ -411,7 +411,7 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
       await prisma.slackWorkspace.deleteMany({ where: { orgId } });
 
       server.log.info({ orgId, userId }, 'Slack workspace disconnected');
-      return reply.status(204).send();
+      return reply.status(204).send(null);
     },
   });
 
@@ -469,7 +469,7 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
 async function handleChannelCreated(
   event: Record<string, unknown>,
   teamId: string,
-  log: pino.Logger,
+  log: SlackRouteLogger,
 ): Promise<void> {
   const channel = event.channel as
     | { id?: string; name?: string; is_private?: boolean }
@@ -484,7 +484,7 @@ async function handleChannelCreated(
   await prisma.slackChannel
     .upsert({
       where: {
-        slack_channels_org_channel_key: {
+        orgId_channelId: {
           orgId: workspace.orgId,
           channelId: channel.id,
         },
@@ -507,7 +507,7 @@ async function handleChannelCreated(
 async function handleMemberJoinedChannel(
   event: Record<string, unknown>,
   teamId: string,
-  log: pino.Logger,
+  log: SlackRouteLogger,
 ): Promise<void> {
   const channelId = event.channel as string | undefined;
   if (!channelId) return;
@@ -536,7 +536,7 @@ async function syncChannels(
   orgId: string,
   integrationTokenId: string,
   accessToken: string,
-  log: pino.Logger,
+  log: SlackRouteLogger,
 ): Promise<void> {
   // Resolve workspace id once
   const workspace = await prisma.slackWorkspace.findUnique({ where: { orgId } });
@@ -561,7 +561,7 @@ async function syncChannels(
   for (const ch of channelsData.channels.slice(0, 200)) {
     await prisma.slackChannel
       .upsert({
-        where: { slack_channels_org_channel_key: { orgId, channelId: ch.id } },
+        where: { orgId_channelId: { orgId, channelId: ch.id } },
         create: {
           orgId,
           integrationTokenId,
@@ -590,7 +590,7 @@ async function syncChannels(
 async function buildUserMappings(
   orgId: string,
   accessToken: string,
-  log: pino.Logger,
+  log: SlackRouteLogger,
 ): Promise<void> {
   // Fetch Slack user list (paginated — first page only on connect for speed)
   const usersData = await slackGet<{
@@ -622,7 +622,7 @@ async function buildUserMappings(
 
     await prisma.slackUserMapping
       .upsert({
-        where: { slack_user_mappings_org_user_key: { orgId, userId: user.id } },
+        where: { orgId_userId: { orgId, userId: user.id } },
         create: { orgId, userId: user.id, slackUserId },
         update: { slackUserId },
       })
@@ -634,3 +634,4 @@ async function buildUserMappings(
 
 // pino type alias — avoids importing the heavy pino dep at the route level
 import type pino from 'pino';
+type SlackRouteLogger = Pick<pino.Logger, 'debug' | 'error' | 'info' | 'warn'>;

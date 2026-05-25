@@ -309,11 +309,11 @@ export async function draftEmail(
   if (input.dealId) {
     const opp = await prisma.opportunity.findFirst({
       where: { id: input.dealId, orgId: input.orgId, deletedAt: null },
-      select: { title: true, stage: true, valueMicros: true },
+      select: { name: true, stage: true, valueMicros: true },
     });
     if (opp) {
       const valueStr = opp.valueMicros ? `$${(Number(opp.valueMicros) / 1_000_000).toFixed(0)}` : '';
-      parts.push(`Deal: "${opp.title}" — stage: ${opp.stage}${valueStr ? `, value: ${valueStr}` : ''}`);
+      parts.push(`Deal: "${opp.name}" — stage: ${opp.stage}${valueStr ? `, value: ${valueStr}` : ''}`);
     }
   }
 
@@ -325,9 +325,6 @@ export async function draftEmail(
   const dust = buildDustClient(childLog);
 
   let responseText = '';
-  let tokenInput = 0;
-  let tokenOutput = 0;
-
   if (dust && process.env.DUST_AGENT_EMAIL_DRAFT) {
     try {
       const run = await dust.runAgent(process.env.DUST_AGENT_EMAIL_DRAFT, prompt);
@@ -362,8 +359,8 @@ export async function draftEmail(
   }
 
   // Rough token count: 4 chars ≈ 1 token.
-  tokenInput = Math.ceil(prompt.length / 4);
-  tokenOutput = Math.ceil(responseText.length / 4);
+  const tokenInput = Math.ceil(prompt.length / 4);
+  const tokenOutput = Math.ceil(responseText.length / 4);
   const costMicros = estimateCost(tokenInput, tokenOutput);
 
   let drafts: [EmailDraft, EmailDraft, EmailDraft];
@@ -418,7 +415,7 @@ export async function analyzeDealSentiment(
 
   const opp = await prisma.opportunity.findFirst({
     where: { id: opts.dealId, orgId: opts.orgId, deletedAt: null },
-    select: { id: true, title: true, stage: true },
+    select: { id: true, name: true, stage: true },
   });
   if (!opp) {
     throw Object.assign(new Error('Deal not found'), { statusCode: 404 });
@@ -440,7 +437,7 @@ export async function analyzeDealSentiment(
     .join('\n');
 
   const prompt =
-    `Analyse deal sentiment for "${opp.title}" (stage: ${opp.stage}).\n` +
+    `Analyse deal sentiment for "${opp.name}" (stage: ${opp.stage}).\n` +
     `Recent activities (newest first):\n${activitiesSummary || 'No activities recorded.'}\n\n` +
     `Return JSON: {"score": <-1..1>, "label": "positive|neutral|negative", "summary": "...", "riskFlags": [...], "suggestedActions": [...]}`;
 
@@ -591,12 +588,12 @@ export async function prepMeeting(
         stage: { not: 'closed_lost' },
         deletedAt: null,
       },
-      select: { id: true, title: true, stage: true },
+      select: { id: true, name: true, stage: true },
       take: 5,
     });
     openOpps = opps.map((o) => ({
       id: o.id,
-      title: o.title,
+      title: o.name,
       stage: String(o.stage),
     }));
   }
@@ -821,7 +818,7 @@ export async function summarizeAccountIntel(
   const [opps, contacts] = await Promise.all([
     prisma.opportunity.findMany({
       where: { orgId: opts.orgId, companyId: opts.accountId, deletedAt: null },
-      select: { id: true, title: true, stage: true, valueMicros: true },
+      select: { id: true, name: true, stage: true, valueMicros: true },
       orderBy: { createdAt: 'desc' },
       take: 20,
     }),
@@ -833,7 +830,7 @@ export async function summarizeAccountIntel(
   ]);
 
   const oppSummary = opps
-    .map((o) => `"${o.title}" (${o.stage}${o.valueMicros ? `, $${(Number(o.valueMicros) / 1_000_000).toFixed(0)}` : ''})`)
+    .map((o) => `"${o.name}" (${o.stage}${o.valueMicros ? `, $${(Number(o.valueMicros) / 1_000_000).toFixed(0)}` : ''})`)
     .join(', ');
 
   // Safe contact list — opt-out contacts only show their role.

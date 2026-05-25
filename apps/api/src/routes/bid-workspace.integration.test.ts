@@ -12,6 +12,7 @@ const createdIds = {
   opportunities: [] as string[],
   files: [] as string[],
   bidDocuments: [] as string[],
+  documentExtractions: [] as string[],
 };
 
 beforeAll(async () => {
@@ -40,6 +41,7 @@ afterAll(async () => {
     await prisma.requirement.deleteMany({ where: { bidDocumentId: { in: createdIds.bidDocuments } } });
     await prisma.documentVersion.deleteMany({ where: { bidDocumentId: { in: createdIds.bidDocuments } } });
     await prisma.bidDocument.deleteMany({ where: { id: { in: createdIds.bidDocuments } } });
+    await prisma.documentExtraction.deleteMany({ where: { id: { in: createdIds.documentExtractions } } });
     await prisma.fileAttachment.deleteMany({ where: { id: { in: createdIds.files } } });
     await prisma.opportunity.deleteMany({ where: { id: { in: createdIds.opportunities } } });
   }
@@ -102,6 +104,18 @@ describe('bid workspace routes', () => {
     expect(document.status).toBe('pending_extraction');
     expect(document.documentType).toBe('rfp');
 
+    const version = await prisma.documentVersion.findFirst({
+      where: { orgId: orgId!, bidDocumentId: document.id, fileAttachmentId: file.id },
+    });
+    expect(version?.extractionStatus).toBe('pending');
+    expect(version?.ocrStatus).toBe('queued');
+    const extraction = await prisma.documentExtraction.findFirst({
+      where: { orgId: orgId!, documentId: file.id, accountId: file.accountId },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(extraction?.status).toBe('pending');
+    if (extraction) createdIds.documentExtractions.push(extraction.id);
+
     const snapshot = await server.inject({
       method: 'GET',
       url: `/api/v1/bid-workspaces/${opportunity.id}`,
@@ -124,6 +138,11 @@ describe('bid workspace routes', () => {
     });
     const document = register.json();
     createdIds.bidDocuments.push(document.id);
+    const extraction = await prisma.documentExtraction.findFirst({
+      where: { orgId: orgId!, documentId: file.id, accountId: file.accountId },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (extraction) createdIds.documentExtractions.push(extraction.id);
 
     const createRequirement = await server.inject({
       method: 'POST',

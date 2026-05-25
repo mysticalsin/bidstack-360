@@ -1,0 +1,45 @@
+{
+  "title": "Integraciones",
+  "subtitle": "Conecta BidStack a tus herramientas y servicios",
+  "connected": "Conectado",
+  "disconnected": "Desconectado",
+  "connect": "Conectar",
+  "disconnect": "Desconectar",
+  "configure": "Configurar",
+  "reconnect": "Reconectar",
+  "lastSync": "Última sincronización: {{when}}",
+  "syncNow": "Sincronizar ahora",
+  "syncing": "Sincronizando…",
+  "status": {
+    "active": "Activo",
+    "inactive": "Inactivo",
+    "error": "Error",
+    "pending": "Pendiente"
+  },
+  "gmail": {
+    "name": "Gmail",
+    "description": "Sincroniza tus correos y actividades de Gmail con BidStack.",
+    "connectViaGoogle": "Conectar con Google"
+  },
+  "microsoft": {
+    "name": "Microsoft 365",
+    "description": "Sincroniza Outlook, Calendar y Teams con BidStack.",
+    "connectViaMicrosoft": "Conectar con Microsoft"
+  },
+  "slack": {
+    "name": "Slack",
+    "description": "Recibe notificaciones y comparte actualizaciones en Slack.",
+    "connectViaSlack": "Conectar con Slack"
+  },
+  "dust": {
+    "name": "Dust",
+    "description": "Conecta tu espacio de trabajo Dust para activar los agentes IA.",
+    "workspace": "Espacio de trabajo Dust",
+    "apiKey": "Clave API Dust"
+  },
+  "errors": {
+    "connectFailed": "La conexión falló. Comprueba tus credenciales.",
+    "syncFailed": "La sincronización falló.",
+    "disconnectFailed": "La desconexión falló."
+  }
+}

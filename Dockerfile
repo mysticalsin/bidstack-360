@@ -79,6 +79,14 @@ EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget --quiet --tries=1 --spider http://localhost/ || exit 1
 
+# CDN configuration:
+# 1. Build the web app with ASSET_CDN_URL=https://cdn.example.com
+#    to rewrite asset URLs in the generated HTML/JS.
+# 2. Upload the contents of /app/apps/web/dist/assets to your CDN.
+# 3. Serve index.html and non-asset files from this nginx container.
+# 4. For CloudFront/S3: set Cache-Control: max-age=31536000, immutable on assets.
+# 5. For Cloudflare: enable Auto Minify + Brotli.
+
 # ─── Worker ─────────────────────────────────────────────────────────────────
 FROM node:${NODE_VERSION} AS worker
 ENV NODE_ENV=production

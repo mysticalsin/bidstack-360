@@ -1,0 +1,77 @@
+{
+  "tour": {
+    "start": "Start guided tour",
+    "skip": "Skip tour",
+    "next": "Next",
+    "previous": "Previous",
+    "finish": "Finish",
+    "stepOf": "Step {{current}} of {{total}}",
+    "welcome": {
+      "title": "Welcome to BidStack 360°",
+      "body": "Mantu's platform for bid and presales management. Get up to speed in under 2 minutes."
+    },
+    "pipeline": {
+      "title": "Your sales pipeline",
+      "body": "Visualise and advance your opportunities through stages, from first contact to signed deal."
+    },
+    "bidMatrix": {
+      "title": "Bid/No-Bid Matrix",
+      "body": "Objectively evaluate every bid using Mantu's weighted criteria before deciding to respond."
+    },
+    "dustAgents": {
+      "title": "Dust AI Agents",
+      "body": "Ask your AI agents to prepare proposals, summarise meetings, or enrich accounts."
+    },
+    "integrations": {
+      "title": "Connect your tools",
+      "body": "Sync Gmail, Microsoft 365, Slack and your business tools to centralise information."
+    },
+    "quickStart": {
+      "title": "Start now",
+      "body": "Create your first opportunity, invite your team and explore your personalised dashboards."
+    }
+  },
+  "quickStart": {
+    "title": "Quick start",
+    "subtitle": "Complete these steps to get the most out of BidStack 360°",
+    "progress": "{{done}} of {{total}} steps completed",
+    "steps": {
+      "createOpportunity": {
+        "label": "Create an opportunity",
+        "description": "Add your first bid to the pipeline"
+      },
+      "inviteTeam": {
+        "label": "Invite your team",
+        "description": "Add colleagues to the workspace"
+      },
+      "connectIntegration": {
+        "label": "Connect an integration",
+        "description": "Sync your email or calendar"
+      },
+      "runBidMatrix": {
+        "label": "Run a Bid/No-Bid Matrix",
+        "description": "Evaluate your first opportunity"
+      },
+      "configureStages": {
+        "label": "Configure stages",
+        "description": "Tailor the pipeline to your sales process"
+      }
+    },
+    "completed": "Quick start complete!",
+    "completedBody": "You now know the essentials of BidStack 360°. Good luck with your bids.",
+    "dismiss": "Dismiss"
+  },
+  "templates": {
+    "title": "Templates",
+    "subtitle": "Choose a template to get started quickly",
+    "use": "Use this template",
+    "preview": "Preview",
+    "blank": "Blank",
+    "blankDesc": "Start from scratch"
+  },
+  "sampleData": {
+    "banner": "You are viewing demonstration data.",
+    "clear": "Clear demo data",
+    "confirmClear": "Delete all demonstration data? This action cannot be undone."
+  }
+}

@@ -112,6 +112,7 @@ export function SmsComposerModal({
   // Re-check consent when the phone number changes (debounce 600ms)
   useEffect(() => {
     if (!isValidE164(phone)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- invalid phone clears stale consent state.
       setConsent({ optedOut: false, checked: false });
       return;
     }
@@ -122,10 +123,15 @@ export function SmsComposerModal({
   // Reset state when modal closes
   useEffect(() => {
     if (!open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- closing the modal resets form state for the next open.
       setPhone(defaultPhone);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- closing the modal resets form state for the next open.
       setBody('');
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- closing the modal resets form state for the next open.
       setSendState('idle');
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- closing the modal resets form state for the next open.
       setErrorMessage('');
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- closing the modal resets form state for the next open.
       setConsent({ optedOut: false, checked: false });
     }
   }, [open, defaultPhone]);
@@ -194,6 +200,7 @@ export function SmsComposerModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        title="Send SMS"
         className="w-full max-w-md bg-[var(--color-surface)] rounded-2xl p-6 shadow-xl"
         aria-labelledby="sms-composer-title"
         aria-describedby="sms-composer-desc"

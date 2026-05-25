@@ -65,6 +65,7 @@ export function useYjsField({
     });
 
     clientRef.current = client;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the Yjs document is created by the external collaboration client.
     setYdoc(client.doc);
 
     // Obtain a Clerk JWT for the WS auth handshake.

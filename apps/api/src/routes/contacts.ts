@@ -89,6 +89,7 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
       const customFieldValues = await prisma.customFieldValue.findMany({
         where: { orgId: req.auth.orgId, entityType: 'contact', entityId: contact.id },
         select: { id: true, definitionId: true, value: true },
+        take: 100,
       });
       return { ...serializeContact(contact), customFieldValues };
     },

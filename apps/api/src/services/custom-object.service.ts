@@ -12,7 +12,7 @@
  *   are naturally namespaced without schema changes.
  */
 
-import { prisma, type Prisma } from '@bidstack/db';
+import { prisma, Prisma } from '@bidstack/db';
 import { logActivity } from './activity.service.js';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -410,7 +410,7 @@ export async function createRecord(input: CreateRecordInput) {
     orgId: input.orgId,
     entityType: `custom_object_${def.key}`,
     entityId: record.id,
-    type: 'note_added', // closest generic type available
+    type: 'note',
     actorId: input.actorId,
     actorType: 'user',
     subject: `${def.labelSingular} ${recordKey} created`,
@@ -458,7 +458,7 @@ export async function updateRecord(input: UpdateRecordInput) {
     orgId: input.orgId,
     entityType: `custom_object_${record.customObjectDef.key}`,
     entityId: input.recordId,
-    type: 'note_added',
+    type: 'note',
     actorId: input.actorId,
     actorType: 'user',
     subject: `${record.customObjectDef.labelSingular} ${record.recordKey} updated`,
@@ -484,7 +484,7 @@ export async function deleteRecord(input: DeleteRecordInput) {
     orgId: input.orgId,
     entityType: `custom_object_${record.customObjectDef.key}`,
     entityId: input.recordId,
-    type: 'note_added',
+    type: 'note',
     actorId: input.actorId,
     actorType: 'user',
     subject: `${record.customObjectDef.labelSingular} ${record.recordKey} deleted`,
@@ -508,7 +508,7 @@ export async function listRecords(input: ListRecordsInput) {
       valuesJson: { path: [k], equals: v as Prisma.InputJsonValue },
     }));
     if (conditions.length === 1) {
-      valuesFilter = conditions[0];
+      valuesFilter = conditions[0] ?? {};
     } else if (conditions.length > 1) {
       valuesFilter = { AND: conditions };
     }

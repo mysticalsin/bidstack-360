@@ -28,14 +28,14 @@ import type IORedis from 'ioredis';
 import type pino from 'pino';
 import { z } from 'zod';
 
-import { prisma } from '@bidstack/db';
+import { prisma, Prisma } from '@bidstack/db';
 import {
   CALL_FETCH_RECORDING,
   CALL_TRANSCRIBE,
   CALL_ANALYZE,
   CALL_UPDATE_DEAL,
 } from '@bidstack/shared';
-import { transcribeAudioUrl, transcribeAudioBuffer } from '../../src/services/calls/transcription.service.js';
+import { transcribeAudioUrl } from '../../src/services/calls/transcription.service.js';
 import { analyzeCallTranscript, meddicDimensionToKey } from '../../src/services/calls/analysis.service.js';
 import { uploadRecording, getSignedRecordingUrl } from '../../src/services/calls/recording-storage.service.js';
 import { downloadTwilioRecording } from '../../src/services/calls/twilio-voice.service.js';
@@ -205,7 +205,7 @@ async function processTranscribe(
     where: { id: callSessionId },
     data: {
       transcriptText: result.text,
-      transcriptStructured: result.segments as object[],
+      transcriptStructured: result.segments as unknown as Prisma.InputJsonValue,
     },
   });
 
@@ -258,9 +258,9 @@ async function processAnalyze(
     where: { id: callSessionId },
     data: {
       summary: insights.summary,
-      actionItems: insights.actionItems as object[],
+      actionItems: insights.actionItems as unknown as Prisma.InputJsonValue,
       sentimentScore: insights.sentimentScore,
-      talkRatio: insights.talkRatio as object,
+      talkRatio: insights.talkRatio as unknown as Prisma.InputJsonValue,
     },
   });
 
@@ -322,14 +322,18 @@ async function processUpdateDeal(job: Job, log: pino.Logger): Promise<void> {
     await prisma.aiInsight.create({
       data: {
         orgId,
-        entityType,
-        entityId,
-        insightType: `CALL_DEAL_SUGGESTION_${suggestion.field.toUpperCase()}`,
-        content: `AI suggestion (${Math.round(suggestion.confidence * 100)}% confidence): ${suggestion.rationale}`,
-        suggestedValue: suggestion.suggestedValue,
-        confidence: suggestion.confidence,
-        sourceId: callSessionId,
-        sourceType: 'CALL_SESSION',
+        kind: `CALL_DEAL_SUGGESTION_${suggestion.field.toUpperCase()}`,
+        title: `Call suggestion: ${suggestion.field}`,
+        summary: `AI suggestion (${Math.round(suggestion.confidence * 100)}% confidence): ${suggestion.rationale}`,
+        opportunityId: entityType.toLowerCase() === 'opportunity' ? entityId : null,
+        confidenceBps: Math.round(suggestion.confidence * 10_000),
+        sourceAttribution: [
+          {
+            sourceType: 'CALL_SESSION',
+            sourceId: callSessionId,
+            suggestedValue: suggestion.suggestedValue,
+          },
+        ],
         status: 'PENDING',
       },
     });
@@ -345,7 +349,6 @@ async function processUpdateDeal(job: Job, log: pino.Logger): Promise<void> {
  * Call from apps/worker/src/index.ts.
  */
 export function startCallWorkers(redis: IORedis, log: pino.Logger): Worker[] {
-  const fetchQueue = makeQueue(CALL_FETCH_RECORDING, redis);
   const transcribeQueue = makeQueue(CALL_TRANSCRIBE, redis);
   const analyzeQueue = makeQueue(CALL_ANALYZE, redis);
   const updateDealQueue = makeQueue(CALL_UPDATE_DEAL, redis);

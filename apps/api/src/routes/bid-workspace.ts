@@ -18,6 +18,7 @@ import type {
 } from '@bidstack/shared';
 
 import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
+import { enqueueDocumentExtract } from '../queues/document-extract.js';
 
 const WorkspaceParams = z.object({ opportunityId: z.string().uuid() });
 const MatrixParams = z.object({
@@ -342,7 +343,7 @@ export const bidWorkspaceRoutes: FastifyPluginAsyncZod = async (server) => {
         throw server.httpErrors.badRequest('File belongs to a different company than the opportunity');
       }
 
-      const document = await prisma.$transaction(async (tx) => {
+      const result = await prisma.$transaction(async (tx) => {
         const bidDocument = await tx.bidDocument.create({
           data: {
             orgId: req.auth.orgId,
@@ -354,18 +355,29 @@ export const bidWorkspaceRoutes: FastifyPluginAsyncZod = async (server) => {
             status: 'pending_extraction',
             source: req.body.source,
             metadata: req.body.metadata as Prisma.InputJsonValue,
-            versions: {
-              create: {
-                orgId: req.auth.orgId,
-                versionNo: 1,
-                fileAttachmentId: file.id,
-                storageKey: file.storageKey,
-                contentType: file.contentType,
-                bytes: file.bytes,
-                extractionStatus: 'queued',
-                ocrStatus: 'pending',
-              },
-            },
+          },
+        });
+        const version = await tx.documentVersion.create({
+          data: {
+            orgId: req.auth.orgId,
+            bidDocumentId: bidDocument.id,
+            versionNo: 1,
+            fileAttachmentId: file.id,
+            storageKey: file.storageKey,
+            contentType: file.contentType,
+            bytes: file.bytes,
+            extractionStatus: 'queued',
+            ocrStatus: 'queued',
+          },
+        });
+        const extraction = await tx.documentExtraction.create({
+          data: {
+            orgId: req.auth.orgId,
+            documentId: file.id,
+            accountId: file.accountId ?? opportunity.customer,
+            companyId: file.companyId ?? opportunity.companyId,
+            status: 'pending',
+            extractedData: {},
           },
         });
         await tx.auditLog.create({
@@ -375,14 +387,38 @@ export const bidWorkspaceRoutes: FastifyPluginAsyncZod = async (server) => {
             action: 'bid_document.register',
             targetType: 'bid_document',
             targetId: bidDocument.id,
-            diff: { opportunityId: opportunity.id, fileAttachmentId: file.id },
+            diff: {
+              opportunityId: opportunity.id,
+              fileAttachmentId: file.id,
+              documentVersionId: version.id,
+              extractionId: extraction.id,
+            },
           },
         });
-        return bidDocument;
+        return { bidDocument, version, extraction };
       });
 
+      const jobId = await enqueueDocumentExtract({
+        orgId: req.auth.orgId,
+        accountId: result.extraction.accountId,
+        documentId: file.id,
+        extractionId: result.extraction.id,
+        storageKey: file.storageKey,
+        contentType: file.contentType,
+        name: file.name,
+        opportunityId: opportunity.id,
+        bidDocumentId: result.bidDocument.id,
+        documentVersionId: result.version.id,
+      });
+      if (!jobId) {
+        await prisma.documentVersion.updateMany({
+          where: { id: result.version.id, orgId: req.auth.orgId, bidDocumentId: result.bidDocument.id },
+          data: { extractionStatus: 'pending' },
+        });
+      }
+
       reply.status(201);
-      return serializeBidDocument(document);
+      return serializeBidDocument(result.bidDocument);
     },
   );
 

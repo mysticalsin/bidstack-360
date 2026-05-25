@@ -97,10 +97,13 @@ export function LookupFieldPicker({
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     if (query.trim().length < MIN_QUERY_LEN) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- short queries clear stale async search results.
       setResults([]);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- short queries are never loading.
       setLoading(false);
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- effect owns the debounced async lookup state.
     setLoading(true);
     timerRef.current = setTimeout(() => {
       void onSearch(query.trim()).then((r) => {

@@ -10,11 +10,17 @@ import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import { Badge } from '@/components/ui/Badge';
+import { confirm } from '@/components/ui/ConfirmDialog';
+import { toast } from '@/components/ui/Toast';
 
 const EVENT_OPTIONS = [
   'opportunity.created',
   'opportunity.updated',
   'opportunity.stage_changed',
+  'bid.score_updated',
+  'proposal.submitted',
+  'document.extracted',
+  'dust.agent.completed',
   'contact.created',
   'task.created',
   'task.completed',
@@ -61,7 +67,21 @@ export function WebhooksSection() {
         ) : (
           <div className="space-y-2">
             {subs.data.map((s) => (
-              <WebhookRow key={s.id} subscription={s} onDelete={(id) => del.mutate(id)} />
+              <WebhookRow
+                key={s.id}
+                subscription={s}
+                onDelete={async (id) => {
+                  try {
+                    await del.mutateAsync(id);
+                    toast.success('Webhook subscription deleted');
+                  } catch (err) {
+                    toast.error('Delete failed', {
+                      description:
+                        err instanceof Error ? err.message : 'The server rejected the request.',
+                    });
+                  }
+                }}
+              />
             ))}
           </div>
         )}
@@ -75,7 +95,7 @@ function WebhookRow({
   onDelete,
 }: {
   subscription: { id: string; url: string; events: string[]; active: boolean };
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => Promise<void> | void;
 }) {
   const update = useUpdateWebhookSubscription(subscription.id);
 
@@ -104,8 +124,15 @@ function WebhookRow({
         <Button
           variant="destructive"
           size="sm"
-          onClick={() => {
-            if (confirm('Delete this webhook subscription?')) onDelete(subscription.id);
+          onClick={async () => {
+            const ok = await confirm({
+              title: 'Delete webhook subscription?',
+              description:
+                'The endpoint will stop receiving BidStack events immediately. Existing audit history is kept.',
+              confirmLabel: 'Delete webhook',
+              destructive: true,
+            });
+            if (ok) await onDelete(subscription.id);
           }}
         >
           Delete

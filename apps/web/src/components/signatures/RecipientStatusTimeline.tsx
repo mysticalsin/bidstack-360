@@ -8,7 +8,6 @@
 
 import { cn } from '@/lib/cn';
 import type { SignatureEvent, SignatureEventType, SignatureRecipient } from '@bidstack/shared';
-import { format } from 'date-fns';
 
 // ─── Event colour mapping ─────────────────────────────────────────────────────
 
@@ -70,11 +69,21 @@ function EventRow({ event }: { event: SignatureEvent }) {
           dateTime={event.occurredAt}
           className="block text-xs text-[var(--fg-tertiary)]"
         >
-          {format(new Date(event.occurredAt), 'PPp')}
+          {formatSignatureTimestamp(event.occurredAt)}
         </time>
       </div>
     </li>
   );
+}
+
+function formatSignatureTimestamp(iso: string): string {
+  return new Date(iso).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }
 
 // ─── Recipient block ──────────────────────────────────────────────────────────

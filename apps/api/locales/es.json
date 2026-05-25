@@ -1,0 +1,30 @@
+{
+  "errors": {
+    "badRequest": "Solicitud incorrecta",
+    "unauthorized": "No autorizado",
+    "forbidden": "Prohibido",
+    "notFound": "No se encontró el registro solicitado.",
+    "conflict": "Ya existe un registro con este valor único.",
+    "validationFailed": "La validación falló",
+    "tooManyRequests": "Demasiadas solicitudes",
+    "internal": "Algo salió mal",
+    "foreignKey": "La restricción de clave foránea falló.",
+    "dbValidation": "La validación de la consulta falló."
+  },
+  "zod": {
+    "invalid_type": "Tipo esperado: {{expected}}",
+    "too_small": "Al menos {{min}}",
+    "too_big": "Como máximo {{max}}",
+    "invalid_string": "Cadena inválida",
+    "invalid_enum_value": "Valor inválido",
+    "custom": "Valor inválido"
+  },
+  "audit": {
+    "created": "Creado",
+    "updated": "Actualizado",
+    "deleted": "Eliminado",
+    "viewed": "Visto",
+    "signedIn": "Sesión iniciada",
+    "signedOut": "Sesión cerrada"
+  }
+}

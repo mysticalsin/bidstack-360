@@ -1,0 +1,30 @@
+{
+  "errors": {
+    "badRequest": "Bad request",
+    "unauthorized": "Unauthorized",
+    "forbidden": "Forbidden",
+    "notFound": "The requested record was not found.",
+    "conflict": "A record with this unique value already exists.",
+    "validationFailed": "Validation failed",
+    "tooManyRequests": "Too many requests",
+    "internal": "Something went wrong",
+    "foreignKey": "Foreign key constraint failed.",
+    "dbValidation": "Database query validation failed."
+  },
+  "zod": {
+    "invalid_type": "Expected {{expected}}",
+    "too_small": "Must be at least {{min}}",
+    "too_big": "Must be at most {{max}}",
+    "invalid_string": "Invalid string",
+    "invalid_enum_value": "Invalid value",
+    "custom": "Invalid value"
+  },
+  "audit": {
+    "created": "Created",
+    "updated": "Updated",
+    "deleted": "Deleted",
+    "viewed": "Viewed",
+    "signedIn": "Signed in",
+    "signedOut": "Signed out"
+  }
+}

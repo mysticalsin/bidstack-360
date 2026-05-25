@@ -1,0 +1,30 @@
+{
+  "errors": {
+    "badRequest": "طلب غير صحيح",
+    "unauthorized": "غير مصرح",
+    "forbidden": "ممنوع",
+    "notFound": "السجل المطلوب غير موجود.",
+    "conflict": "يوجد سجل بهذه القيمة الفريدة بالفعل.",
+    "validationFailed": "فشل التحقق",
+    "tooManyRequests": "طلبات كثيرة جداً",
+    "internal": "حدث خطأ ما",
+    "foreignKey": "فشل قيد المفتاح الأجنبي.",
+    "dbValidation": "فشل التحقق من استعلام قاعدة البيانات."
+  },
+  "zod": {
+    "invalid_type": "النوع المتوقع: {{expected}}",
+    "too_small": "يجب ألا يقل عن {{min}}",
+    "too_big": "يجب ألا يزيد عن {{max}}",
+    "invalid_string": "سلسلة غير صحيحة",
+    "invalid_enum_value": "قيمة غير صحيحة",
+    "custom": "قيمة غير صحيحة"
+  },
+  "audit": {
+    "created": "تم الإنشاء",
+    "updated": "تم التحديث",
+    "deleted": "تم الحذف",
+    "viewed": "تمت المشاهدة",
+    "signedIn": "تم تسجيل الدخول",
+    "signedOut": "تم تسجيل الخروج"
+  }
+}

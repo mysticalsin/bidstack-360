@@ -27,6 +27,20 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 <!-- New entries appended at the top of this section. -->
 
+### 2026-05-25 UX: Local CRM was allowed to render while auth mode emitted Clerk-key errors
+
+- **What went wrong:** A bare `vite` local server could show CRM pages while the browser console still recorded `VITE_CLERK_PUBLISHABLE_KEY` auth failures, making the app look functional but poisoning QA signal.
+- **Root cause:** The runtime auth guard mixed production fail-closed behavior with local stub fallback, while the real production guarantee already belongs in the Vite production build gate.
+- **Prevention rule:** Keep runtime auth mode explicit: `VITE_AUTH_MODE=clerk` requires a Clerk key, while local/stub execution must remain deterministic and quiet. Verify served source and page state when browser console history is sticky.
+- **Files affected:** `apps/web/src/lib/auth.tsx`, `apps/web/src/main.tsx`.
+
+### 2026-05-25 TESTING: RFP extraction test over-claimed critical risk
+
+- **What went wrong:** The new worker test expected `must provide SOC 2 Type II evidence` to classify as `critical`, but the implemented classifier correctly treats ordinary mandatory/security evidence as `high` unless it also carries hard-disqualifier, deadline, breach, or privacy language.
+- **Root cause:** I wrote the assertion before aligning the test with the risk rubric encoded in `requirementPriority`.
+- **Prevention rule:** When adding tests for heuristics, first name the rubric boundaries in the assertion and reserve `critical` for explicit critical signals, not every mandatory requirement.
+- **Files affected:** `apps/worker/src/queues/document-extract.test.ts`.
+
 ### 2026-05-22 SECURITY: Invoice lines validated product IDs too late
 
 - **What went wrong:** `POST /api/invoices` accepted a line item `productId` from another tenant and only failed when Prisma hit the invoice-line foreign key, returning a generic 400/500-shaped persistence failure instead of a tenant-aware 404.
@@ -747,3 +761,24 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 - **Root cause:** I used broad recursion instead of limiting inspection to the top-level command/config folders.
 - **Prevention rule:** For `.claude` and `.codex`, inspect only known shallow paths first: settings, commands, agents, hooks, and rules. Exclude `worktrees`.
 - **Files affected:** none.
+
+### 2026-05-25 TESTING: Async webhook fan-out still ran inside query guard context
+
+- **What went wrong:** Route tests failed after successful mutations because fire-and-forget webhook fan-out executed unbounded `findMany` calls inside the same guarded async context.
+- **Root cause:** I focused on the foreground mutation path first and missed background work launched by the route.
+- **Prevention rule:** Any database query reachable from a request, including queued or fire-and-forget fan-out, must use explicit pagination or bounded `take` values before running integration tests.
+- **Files affected:** `apps/api/src/queues/webhook-delivery.ts`.
+
+### 2026-05-25 BUILD: Shared schema changes require built dist refresh
+
+- **What went wrong:** The API kept using stale shared package output until the shared package was rebuilt.
+- **Root cause:** Consumer packages resolve `@bidstack/shared` through `dist`, not directly from source.
+- **Prevention rule:** After changing shared schemas or exports, run `pnpm --filter @bidstack/shared build` before downstream typecheck/test gates.
+- **Files affected:** `packages/shared/src/schemas/opportunity.ts`, `packages/shared/dist/*`.
+
+### 2026-05-25 AUDIT: Transitive mobile advisories blocked root high audit
+
+- **What went wrong:** High-severity advisories from transitive Expo mobile dependencies kept `pnpm audit --audit-level high` failing even though the CRM app code did not import those packages directly.
+- **Root cause:** I treated the audit as an app-only gate at first instead of the root workspace dependency graph.
+- **Prevention rule:** For root audit failures in transitive packages, prefer targeted `pnpm.overrides` plus a lockfile refresh, then rerun the root audit gate.
+- **Files affected:** `package.json`, `pnpm-lock.yaml`.

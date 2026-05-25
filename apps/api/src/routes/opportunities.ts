@@ -33,12 +33,13 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const { pipelineStageId, owner, industry, search, cursor, limit } = req.query;
+      const { pipelineStageId, stage, owner, industry, search, cursor, limit } = req.query;
       const items = await prisma.opportunity.findMany({
         where: {
           orgId: req.auth.orgId,
           deletedAt: null,
           ...(pipelineStageId ? { pipelineStageId } : {}),
+          ...(stage ? { stage } : {}),
           ...(industry ? { industry } : {}),
           ...(owner ? { owner: { email: owner } } : {}),
           ...(search
@@ -279,6 +280,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       const customFieldValues = await prisma.customFieldValue.findMany({
         where: { orgId: req.auth.orgId, entityType: 'opportunity', entityId: opp.id },
         select: { id: true, definitionId: true, value: true },
+        take: 100,
       });
       return { ...serializeOpportunityFull(opp), customFieldValues };
     },
@@ -324,7 +326,11 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       let stageUpdate: PrismaStage | undefined;
       if (req.body.pipelineStageId !== undefined) {
         if (req.body.pipelineStageId === null) {
-          // Unsetting pipeline stage is allowed; keep legacy stage unchanged.
+          // Unsetting pipeline stage is allowed; legacy stage may still be
+          // supplied by older clients that have not migrated to PipelineStage.
+          if (req.body.stage !== undefined && req.body.stage !== null) {
+            stageUpdate = req.body.stage as PrismaStage;
+          }
         } else {
           const ps = await prisma.pipelineStage.findFirst({
             where: { id: req.body.pipelineStageId, orgId: req.auth.orgId, deletedAt: null },
@@ -333,6 +339,8 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
           if (!ps) throw server.httpErrors.badRequest('Invalid pipeline stage');
           stageUpdate = ps.key as PrismaStage;
         }
+      } else if (req.body.stage !== undefined && req.body.stage !== null) {
+        stageUpdate = req.body.stage as PrismaStage;
       }
 
       const [updated] = await prisma.$transaction([
@@ -462,9 +470,30 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       schema: {
         params: z.object({ id: z.string().uuid() }),
-        body: z.object({ pipelineStageId: z.string().uuid() }),
+        body: z
+          .object({
+            pipelineStageId: z.string().uuid().optional(),
+            stage: z
+              .enum([
+                's1_lead',
+                's1_ongoing',
+                's2_sent',
+                's3_technical_iteration',
+                's4_negotiation',
+                'closed_won',
+                'closed_lost',
+              ])
+              .optional(),
+          })
+          .refine((body) => body.pipelineStageId || body.stage, {
+            message: 'pipelineStageId or stage is required',
+          }),
         response: {
-          200: z.object({ id: z.string().uuid(), pipelineStageId: z.string().uuid() }),
+          200: z.object({
+            id: z.string().uuid(),
+            pipelineStageId: z.string().uuid().nullable(),
+            stage: z.string(),
+          }),
         },
       },
     },
@@ -474,16 +503,27 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
 
+      const requestedStage = req.body.stage as PrismaStage | undefined;
       const toStage = await prisma.pipelineStage.findFirst({
-        where: { id: req.body.pipelineStageId, orgId: req.auth.orgId, deletedAt: null },
+        where: {
+          orgId: req.auth.orgId,
+          deletedAt: null,
+          ...(req.body.pipelineStageId
+            ? { id: req.body.pipelineStageId }
+            : { key: requestedStage }),
+        },
       });
-      if (!toStage) throw server.httpErrors.badRequest('Invalid pipeline stage');
+      if (!toStage && req.body.pipelineStageId) {
+        throw server.httpErrors.badRequest('Invalid pipeline stage');
+      }
+      const nextStage = (toStage?.key ?? requestedStage) as PrismaStage | undefined;
+      if (!nextStage) throw server.httpErrors.badRequest('Invalid pipeline stage');
 
       // Any stage can move to any stage within the same pipeline for now.
       const [updated] = await prisma.$transaction([
         prisma.opportunity.update({
           where: { id: opp.id },
-          data: { pipelineStageId: toStage.id, stage: toStage.key as PrismaStage },
+          data: { pipelineStageId: toStage?.id ?? null, stage: nextStage },
         }),
         prisma.auditLog.create({
           data: {
@@ -492,7 +532,12 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
             action: 'opportunity.stage',
             targetType: 'opportunity',
             targetId: opp.id,
-            diff: { fromPipelineStageId: opp.pipelineStageId, toPipelineStageId: toStage.id },
+            diff: {
+              fromPipelineStageId: opp.pipelineStageId,
+              toPipelineStageId: toStage?.id ?? null,
+              fromStage: opp.stage,
+              toStage: nextStage,
+            },
           },
         }),
       ]);
@@ -501,10 +546,15 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       // Fan-out webhook event for stage change.
       void fanOutWebhookEvent(req.auth.orgId, 'opportunity.stage_changed', {
         id: updated.id,
-        pipelineStageId: updated.pipelineStageId ?? toStage.id,
-        stageName: toStage.name,
+        pipelineStageId: updated.pipelineStageId,
+        stage: nextStage,
+        stageName: toStage?.name ?? nextStage,
       });
-      return { id: updated.id, pipelineStageId: updated.pipelineStageId ?? toStage.id };
+      return {
+        id: updated.id,
+        pipelineStageId: updated.pipelineStageId,
+        stage: nextStage,
+      };
     },
   );
 

@@ -14,7 +14,7 @@
  */
 import type { Logger as PinoLogger } from 'pino';
 
-import { prisma } from '@bidstack/db';
+import { prisma, Prisma } from '@bidstack/db';
 
 // ─── Weight constants ──────────────────────────────────────────────────────
 
@@ -28,7 +28,7 @@ const WEIGHTS = {
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
-export interface HealthFactors {
+export interface HealthFactors extends Record<string, unknown> {
   productUsage: number;       // 0–100
   engagement: number;         // 0–100
   supportTickets: number;     // 0–100 (100 = zero tickets, lower = more tickets)
@@ -57,8 +57,9 @@ async function computeEngagementScore(
     where: {
       orgId,
       // Activities are linked via company through opportunity — use companyId path
-      opportunity: { companyId: accountId },
-      happenedAt: { gte: thirtyDaysAgo },
+      entityType: 'company',
+      entityId: accountId,
+      occurredAt: { gte: thirtyDaysAgo },
     },
   });
   // 10+ activities = 100, 0 = 10 (never 0 to avoid false positives)
@@ -137,8 +138,9 @@ async function computeProductUsageScore(
   const count = await prisma.activity.count({
     where: {
       orgId,
-      opportunity: { companyId: accountId },
-      happenedAt: { gte: sevenDaysAgo },
+      entityType: 'company',
+      entityId: accountId,
+      occurredAt: { gte: sevenDaysAgo },
     },
   });
   return Math.min(100, Math.max(5, count * 15));
@@ -217,7 +219,7 @@ export async function computeAndPersistHealthScore(
       orgId,
       accountId,
       score,
-      factors,
+      factors: factors as unknown as Prisma.InputJsonValue,
       trend,
     },
   });
@@ -240,7 +242,7 @@ export async function getLatestHealthScore(
   return {
     accountId,
     score: row.score,
-    factors: row.factors as HealthFactors,
+    factors: row.factors as unknown as HealthFactors,
     trend: row.trend as 'IMPROVING' | 'STABLE' | 'DECLINING',
   };
 }

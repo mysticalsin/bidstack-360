@@ -27,7 +27,7 @@ export function CollaborativeNotesSection({
   entityType,
   entityId,
   fieldKey = 'notes',
-  label = 'Collaborative Notes',
+  label = 'Live collaboration',
   readOnly = false,
 }: Props) {
   const { user } = useUser();

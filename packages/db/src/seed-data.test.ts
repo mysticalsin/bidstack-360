@@ -15,7 +15,8 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { INDUSTRIES, OpportunityStage, Sentiment, TaskStatus } from '@bidstack/shared';
+import { INDUSTRIES, Sentiment, TaskStatus } from '@bidstack/shared';
+import { OpportunityStage } from '../generated/client/index.js';
 
 import {
   fixtureCompanyEnrichments,
@@ -36,11 +37,11 @@ describe('seed-data ↔ shared schema drift guard', () => {
     }
   });
 
-  it('every fixtureOpp.stage parses against shared.OpportunityStage', () => {
+  it('every fixtureOpp.stage is a valid OpportunityStage enum value', () => {
+    const validStages = Object.values(OpportunityStage) as string[];
     for (const o of fixtureOpps) {
-      const result = OpportunityStage.safeParse(o.stage);
       expect(
-        result.success,
+        validStages.includes(o.stage),
         `fixture ${o.code} (${o.customer}) stage "${o.stage}" not in OpportunityStage enum`,
       ).toBe(true);
     }

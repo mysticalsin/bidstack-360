@@ -11,6 +11,7 @@ import type { Logger as PinoLogger } from 'pino';
 import { DustClient } from '@bidstack/dust-client';
 
 import { config } from '../config.js';
+import { isPublicHostname } from '../lib/ssrf-guard.js';
 import { enqueueDustResync } from '../queues/dust-poll.js';
 
 interface DustAgentStatus {
@@ -67,7 +68,247 @@ const ApiKeySummary = z.object({
   createdAt: z.string().datetime(),
 });
 
+const IntegrationSetupGuide = z.object({
+  generatedAt: z.string().datetime(),
+  dust: z.object({
+    configured: z.boolean(),
+    workspaceId: z.string().nullable(),
+    dataSourceConfigured: z.boolean(),
+    webhookReceiverUrl: z.string(),
+  }),
+  mcp: z.object({
+    publicUrl: z.string(),
+    healthUrl: z.string(),
+    wellKnownUrl: z.string(),
+    transport: z.literal('streamable-http'),
+    configured: z.boolean(),
+    readScopes: z.array(z.string()),
+    writeScopes: z.array(z.string()),
+  }),
+  rest: z.object({
+    baseUrl: z.string(),
+    authHeader: z.literal('Authorization: Bearer <BIDSTACK_API_KEY>'),
+    recommendedScopes: z.array(z.string()),
+  }),
+  webhooks: z.object({
+    subscriptionsUrl: z.string(),
+    receiverUrl: z.string(),
+    requiredHeaders: z.array(z.string()),
+    recommendedEvents: z.array(z.string()),
+  }),
+  snippets: z.object({
+    dustMcpToolConfig: z.string(),
+    mcpHealthCheck: z.string(),
+    restOpportunitySearch: z.string(),
+    webhookReceiver: z.string(),
+  }),
+});
+
+const IntegrationProbeBody = z.object({
+  kind: z.enum(['mcp', 'rest', 'webhook']),
+  url: z.string().url().max(500),
+});
+
+const IntegrationProbeResult = z.object({
+  ok: z.boolean(),
+  status: z.number().int().nullable(),
+  latencyMs: z.number().int().nonnegative(),
+  checkedUrl: z.string(),
+  message: z.string(),
+  warnings: z.array(z.string()),
+});
+
 const DUST_STATUS_RATE_LIMIT_MAX = Math.max(120, Math.min(config.API_RATE_LIMIT_MAX, 1_000));
+const INTEGRATION_PROBE_TIMEOUT_MS = 5_000;
+
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '');
+}
+
+function envString(name: string): string | null {
+  const value = process.env[name];
+  return value && value.trim() ? value.trim() : null;
+}
+
+function publicApiBaseUrl(): string {
+  return trimTrailingSlash(envString('PUBLIC_API_URL') ?? 'http://localhost:4000');
+}
+
+function normalizeMcpUrl(value: string): string {
+  const trimmed = trimTrailingSlash(value);
+  return trimmed.endsWith('/mcp') ? trimmed : `${trimmed}/mcp`;
+}
+
+function publicMcpUrl(): string {
+  const configured = envString('DUST_MCP_PUBLIC_URL');
+  if (configured) return normalizeMcpUrl(configured);
+  const port = envString('PORT_MCP') ?? '4001';
+  return normalizeMcpUrl(`http://localhost:${port}/mcp`);
+}
+
+function isLocalDevelopmentHostname(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  return h === 'localhost' || h.startsWith('127.') || h === '::1' || h === '[::1]';
+}
+
+function sanitizeProbeUrl(value: string): string {
+  const url = new URL(value);
+  url.username = '';
+  url.password = '';
+  url.hash = '';
+  url.search = '';
+  return url.toString();
+}
+
+function assertProbeUrlAllowed(value: string): string {
+  const sanitized = sanitizeProbeUrl(value);
+  const url = new URL(sanitized);
+  const isLocal = isLocalDevelopmentHostname(url.hostname);
+  const isDevLike = process.env.NODE_ENV !== 'production';
+
+  if (url.protocol !== 'https:' && !(isDevLike && isLocal && url.protocol === 'http:')) {
+    throw new Error('Probe URL must use HTTPS, except localhost during local development.');
+  }
+
+  if (!isLocal && !isPublicHostname(url.hostname)) {
+    throw new Error('Probe URL cannot target localhost, private networks, or internal hostnames.');
+  }
+
+  if (isLocal && !isDevLike) {
+    throw new Error('Probe URL cannot target localhost or loopback addresses in production.');
+  }
+
+  return sanitized;
+}
+
+function probeMessage(status: number | null): string {
+  if (status === null) return 'Endpoint did not respond.';
+  if (status >= 200 && status < 400) return 'Endpoint is reachable.';
+  if (status === 401 || status === 403) return 'Endpoint is reachable and requires authentication.';
+  if (status === 404) return 'Endpoint responded, but this path was not found.';
+  if (status >= 500) return 'Endpoint responded with a server error.';
+  return `Endpoint responded with HTTP ${status}.`;
+}
+
+async function probeIntegrationEndpoint(kind: z.infer<typeof IntegrationProbeBody>['kind'], url: string) {
+  const checkedUrl = assertProbeUrlAllowed(url);
+  const warnings: string[] = [];
+  if (kind === 'mcp' && !new URL(checkedUrl).pathname.endsWith('/mcp')) {
+    warnings.push('MCP Streamable HTTP endpoints usually end with /mcp.');
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), INTEGRATION_PROBE_TIMEOUT_MS);
+  const startedAt = Date.now();
+
+  try {
+    const res = await fetch(checkedUrl, {
+      method: 'GET',
+      redirect: 'manual',
+      signal: controller.signal,
+      headers: {
+        Accept:
+          kind === 'mcp'
+            ? 'application/json, text/event-stream;q=0.9, */*;q=0.1'
+            : 'application/json, */*;q=0.1',
+        Range: 'bytes=0-0',
+      },
+    });
+    const status = res.status;
+    if (status === 401 || status === 403) {
+      warnings.push('Authentication is required, which is expected for protected MCP/API targets.');
+    }
+    if (status >= 300 && status < 400) {
+      warnings.push('Redirects are not followed during probes; configure the final public URL.');
+    }
+    return {
+      ok: status >= 200 && status < 500 && status !== 404,
+      status,
+      latencyMs: Date.now() - startedAt,
+      checkedUrl,
+      message: probeMessage(status),
+      warnings,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      status: null,
+      latencyMs: Date.now() - startedAt,
+      checkedUrl,
+      message:
+        err instanceof Error && err.name === 'AbortError'
+          ? 'Probe timed out after 5 seconds.'
+          : 'Endpoint could not be reached from the API service.',
+      warnings,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function buildIntegrationSetupGuide() {
+  const apiBase = publicApiBaseUrl();
+  const restBase = `${apiBase}/api/v1`;
+  const mcpUrl = publicMcpUrl();
+  const mcpBase = trimTrailingSlash(mcpUrl.replace(/\/mcp$/, ''));
+  const receiverUrl = `${apiBase}/api/webhooks/dust`;
+  const workspaceId = envString('DUST_WORKSPACE_ID');
+  const dustMcpToolConfig = JSON.stringify(
+    {
+      name: 'BidStack 360 CRM',
+      transport: 'streamable-http',
+      url: mcpUrl,
+      headers: {
+        Authorization: 'Bearer <BIDSTACK_API_KEY>',
+      },
+    },
+    null,
+    2,
+  );
+
+  return {
+    generatedAt: new Date().toISOString(),
+    dust: {
+      configured: Boolean(envString('DUST_API_KEY') && workspaceId),
+      workspaceId,
+      dataSourceConfigured: Boolean(envString('DUST_DATA_SOURCE_ID')),
+      webhookReceiverUrl: receiverUrl,
+    },
+    mcp: {
+      publicUrl: mcpUrl,
+      healthUrl: `${mcpBase}/health`,
+      wellKnownUrl: `${mcpBase}/.well-known/mcp`,
+      transport: 'streamable-http' as const,
+      configured: Boolean(envString('DUST_MCP_PUBLIC_URL')),
+      readScopes: ['mcp', 'read'],
+      writeScopes: ['mcp', 'write'],
+    },
+    rest: {
+      baseUrl: restBase,
+      authHeader: 'Authorization: Bearer <BIDSTACK_API_KEY>' as const,
+      recommendedScopes: ['read', 'write'],
+    },
+    webhooks: {
+      subscriptionsUrl: `${restBase}/webhook-subscriptions`,
+      receiverUrl,
+      requiredHeaders: ['x-dust-signature', 'x-dust-event', 'x-dust-event-id', 'x-dust-timestamp'],
+      recommendedEvents: [
+        'opportunity.created',
+        'opportunity.stage_changed',
+        'bid.score_updated',
+        'proposal.submitted',
+        'dust.agent.completed',
+        'document.extracted',
+      ],
+    },
+    snippets: {
+      dustMcpToolConfig,
+      mcpHealthCheck: `curl -H "Authorization: Bearer <BIDSTACK_API_KEY>" ${mcpUrl}`,
+      restOpportunitySearch: `curl -H "Authorization: Bearer <BIDSTACK_API_KEY>" "${restBase}/opportunities?limit=25"`,
+      webhookReceiver: `curl -X POST "${receiverUrl}" \\\n  -H "x-dust-event: dust.agent.completed" \\\n  -H "x-dust-event-id: evt_example" \\\n  -H "x-dust-timestamp: <epoch_ms>" \\\n  -H "x-dust-signature: sha256=<hmac>" \\\n  -d '{"orgId":"<org_id>"}'`,
+    },
+  };
+}
 
 function serializeOpportunityToMarkdown(opp: Opportunity): string {
   const value =
@@ -97,6 +338,56 @@ function serializeOpportunityToMarkdown(opp: Opportunity): string {
 }
 
 export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
+  // GET /api/integrations/setup-guide
+  server.get(
+    '/setup-guide',
+    {
+      config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
+      preHandler: server.requirePermission('integrations:read'),
+      schema: { response: { 200: IntegrationSetupGuide } },
+    },
+    async () => buildIntegrationSetupGuide(),
+  );
+
+  // POST /api/integrations/probe
+  server.post(
+    '/probe',
+    {
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+      preHandler: server.requirePermission('integrations:write'),
+      schema: {
+        body: IntegrationProbeBody,
+        response: { 200: IntegrationProbeResult },
+      },
+    },
+    async (req) => {
+      try {
+        const result = await probeIntegrationEndpoint(req.body.kind, req.body.url);
+        await prisma.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'integration.probe',
+            targetType: 'integration_probe',
+            diff: {
+              kind: req.body.kind,
+              checkedUrl: result.checkedUrl,
+              ok: result.ok,
+              status: result.status,
+              latencyMs: result.latencyMs,
+            },
+          },
+        });
+        return result;
+      } catch (err) {
+        if (err instanceof Error) {
+          throw server.httpErrors.badRequest(err.message);
+        }
+        throw err;
+      }
+    },
+  );
+
   // POST /api/integrations/dust/push-deal/:id
   server.post(
     '/dust/push-deal/:id',

@@ -1,0 +1,442 @@
+/* ─── Org Dashboard Premium Styles ─────────────────────────────────────── */
+
+/* Health gauge card */
+.health-gauge-card {
+  position: relative;
+}
+
+.health-gauge-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.health-gauge-visual {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.health-gauge-visual svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.health-gauge-visual .health-gauge-track {
+  fill: none;
+  stroke: var(--surface-sunken);
+  stroke-width: 10;
+  stroke-linecap: round;
+}
+
+.health-gauge-visual .health-gauge-progress {
+  fill: none;
+  stroke-width: 10;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+}
+
+.health-gauge-core {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.health-gauge-core span {
+  font-size: 32px;
+  font-weight: 800;
+  font-family: var(--font-display);
+  line-height: 1;
+}
+
+.health-gauge-core small {
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  font-weight: 500;
+}
+
+.health-gauge-legend {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.health-gauge-stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.health-gauge-stat span {
+  color: var(--fg-secondary);
+}
+
+.health-gauge-stat strong {
+  font-weight: 700;
+  font-family: var(--font-display);
+}
+
+/* Insights bar */
+.insights-bar {
+  position: relative;
+  overflow: hidden;
+}
+
+.insights-bar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--brand-primary), var(--success), var(--warning));
+  opacity: 0.6;
+}
+
+.insights-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.insight-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.insight-pill-rose {
+  background: var(--tag-rose-bg);
+  color: var(--tag-rose-fg);
+}
+
+.insight-pill-amber {
+  background: var(--tag-amber-bg);
+  color: var(--tag-amber-fg);
+}
+
+.insight-pill-jade {
+  background: var(--tag-jade-bg);
+  color: var(--tag-jade-fg);
+}
+
+.insight-pill-blue {
+  background: var(--tag-blue-bg);
+  color: var(--tag-blue-fg);
+}
+
+.insight-pill:hover {
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* Enhanced glass card hover shine */
+.glass-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-card.glass-shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.1),
+    transparent 40%,
+    transparent 60%,
+    rgba(255, 255, 255, 0.05)
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.glass-card.glass-shine:hover::after {
+  opacity: 1;
+}
+
+/* KPI meta with trend */
+.kpi-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.kpi-trend {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.kpi-trend.trend-up {
+  color: var(--success);
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.kpi-trend.trend-down {
+  color: var(--danger);
+  background: rgba(244, 63, 94, 0.12);
+  border: 1px solid rgba(244, 63, 94, 0.2);
+}
+
+.dashboard-kpi-card {
+  min-height: 112px;
+}
+
+.kpi-signal {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  width: 64px;
+  height: 38px;
+  padding: 7px 8px;
+  border: 1px solid color-mix(in srgb, var(--border-default) 78%, transparent);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-raised) 94%, transparent), transparent),
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, currentColor 10%, transparent), transparent 62%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 10px 24px rgba(0, 0, 0, 0.05);
+}
+
+.kpi-signal-bar {
+  display: block;
+  width: 7px;
+  min-height: 7px;
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, white 32%, var(--signal-color)), var(--signal-color));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--signal-color) 20%, transparent),
+    0 6px 16px color-mix(in srgb, var(--signal-color) 24%, transparent);
+  transform-origin: bottom;
+}
+
+.kpi-signal-empty span {
+  display: block;
+  width: 7px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--border-default);
+  opacity: 0.5;
+}
+
+.pipeline-live-visual {
+  margin: 14px auto 0;
+  width: min(100%, 180px);
+  border: 1px solid color-mix(in srgb, var(--border-default) 78%, transparent);
+  border-radius: 16px;
+  padding: 9px 10px 8px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-raised) 92%, transparent), transparent),
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--tag-teal-fg) 12%, transparent), transparent 66%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 14px 28px rgba(0, 0, 0, 0.06);
+}
+
+.pipeline-live-chart {
+  display: block;
+  width: 100%;
+  height: 52px;
+  overflow: visible;
+}
+
+.pipeline-stage-strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+  height: 4px;
+  margin-top: 5px;
+}
+
+.pipeline-stage-tick {
+  display: block;
+  min-width: 8px;
+  border-radius: 999px;
+  background: var(--stage-color);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--stage-color) 28%, transparent);
+  transform-origin: center bottom;
+}
+
+.pipeline-live-empty {
+  margin: 14px auto 0;
+  width: min(100%, 180px);
+  border: 1px dashed var(--border-default);
+  border-radius: 14px;
+  padding: 14px 10px;
+  color: var(--fg-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Quick action buttons */
+.quick-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-secondary);
+  background: var(--surface-sunken);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.quick-action-btn:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-default);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--action-glow, rgba(0, 0, 0, 0.06));
+}
+
+/* ─── Sales Funnel Visualization ─────────────────────────────────────────── */
+
+.funnel-viz {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.funnel-stage {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  justify-content: center;
+}
+
+.funnel-stage-bar-outer {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.funnel-stage-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 160px;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.funnel-stage-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.funnel-stage-bar:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.funnel-stage-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.funnel-stage-value {
+  font-size: 16px;
+  font-weight: 800;
+  font-family: var(--font-display);
+}
+
+/* ─── Health Gauge Pulse ─────────────────────────────────────────────────── */
+
+.health-gauge-visual::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%);
+  animation: health-pulse 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes health-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.3;
+  }
+}
+
+/* ─── Win Rate Ring ──────────────────────────────────────────────────────── */
+
+.win-rate-ring {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+}
+
+.win-rate-ring svg {
+  width: 100%;
+  height: 100%;
+}
+
+.win-rate-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--font-display);
+}

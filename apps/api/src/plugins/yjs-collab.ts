@@ -82,7 +82,7 @@ type ClientMessage = YjsInitMessage | YjsUpdateMessage | YjsSyncMessage | YjsCur
 
 // ─── Plugin ────────────────────────────────────────────────────────────────
 
-const yjsCollabPlugin: FastifyPluginAsync = async (server) => {
+const yjsCollabPluginImpl: FastifyPluginAsync = async (server) => {
   // WHY we do NOT re-register @fastify/websocket here: it's already registered
   // by the realtime plugin (fastify-plugin removes encapsulation for shared
   // decorators). We just add a new websocket route.
@@ -313,7 +313,7 @@ async function resolveEntityOrg(
   return record?.orgId ?? null;
 }
 
-export const yjsCollabPlugin = fp(yjsCollabPlugin, {
+export const yjsCollabPlugin = fp(yjsCollabPluginImpl, {
   name: 'yjs-collab',
   // WHY auth + realtime: auth provides req.auth; realtime registers @fastify/websocket.
   dependencies: ['auth', 'realtime'],

@@ -29,10 +29,14 @@ import { prisma } from '@bidstack/db';
 import { rbacPlugin } from '../plugins/rbac.js';
 
 const findMany = vi.mocked(prisma.userRole.findMany);
-const count = vi.mocked(prisma.userRole.count);
+const count = vi.mocked(prisma.userRole.count) as unknown as {
+  mockImplementation: (fn: () => Promise<number>) => void;
+  mockReset: () => void;
+  mockResolvedValueOnce: (value: number) => void;
+};
 
 // Build a minimal Fastify server wired for permission testing.
-async function buildServer(grantedPermissions: string[]) {
+async function _buildServer(grantedPermissions: string[]) {
   const server = Fastify({ logger: false });
   await server.register(sensible);
   await server.register(rbacPlugin);

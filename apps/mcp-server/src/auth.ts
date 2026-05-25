@@ -90,11 +90,10 @@ export async function mcpAuth(req: FastifyRequest, prisma: PrismaClient): Promis
   prisma.apiKey.update({ where: { id: key.id }, data: { lastUsedAt: new Date() } }).catch(() => {});
 
   // Sampled audit-log entry — see APIKEY_USED_SAMPLE_RATE comment for why
-  // this isn't 100%. Fire-and-forget so a write failure can't 5xx the MCP
-  // request; the catch swallows so the surrounding scope-check error
-  // semantics stay clean.
+  // this isn't 100%. Await it for deterministic audit semantics, but swallow
+  // failures so an audit outage cannot 5xx the MCP request.
   if (shouldSample()) {
-    prisma.auditLog
+    await prisma.auditLog
       .create({
         data: {
           orgId: key.orgId,

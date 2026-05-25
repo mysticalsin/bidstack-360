@@ -1,0 +1,30 @@
+{
+  "errors": {
+    "badRequest": "Requête incorrecte",
+    "unauthorized": "Non autorisé",
+    "forbidden": "Interdit",
+    "notFound": "L'enregistrement demandé est introuvable.",
+    "conflict": "Un enregistrement avec cette valeur unique existe déjà.",
+    "validationFailed": "La validation a échoué",
+    "tooManyRequests": "Trop de requêtes",
+    "internal": "Une erreur est survenue",
+    "foreignKey": "La contrainte de clé étrangère a échoué.",
+    "dbValidation": "La validation de la requête a échoué."
+  },
+  "zod": {
+    "invalid_type": "Type attendu : {{expected}}",
+    "too_small": "Au moins {{min}} requis",
+    "too_big": "Au plus {{max}} autorisé",
+    "invalid_string": "Chaîne invalide",
+    "invalid_enum_value": "Valeur invalide",
+    "custom": "Valeur invalide"
+  },
+  "audit": {
+    "created": "Créé",
+    "updated": "Mis à jour",
+    "deleted": "Supprimé",
+    "viewed": "Consulté",
+    "signedIn": "Connecté",
+    "signedOut": "Déconnecté"
+  }
+}

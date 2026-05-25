@@ -15,9 +15,10 @@
  *   GET  /cs/dashboard                     (CS team summary view)
  */
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
+import type { Logger as PinoLogger } from 'pino';
 import { z } from 'zod';
 
-import { prisma } from '@bidstack/db';
+import { prisma, Prisma } from '@bidstack/db';
 import { getLatestHealthScore } from '../services/cs/health-score.service.js';
 import { listRenewalOpportunities } from '../services/cs/renewal.service.js';
 import { recordNpsResponse } from '../services/cs/nps.service.js';
@@ -53,6 +54,7 @@ const HealthScoreResponse = z.object({
 });
 
 const MessageResponse = z.object({ message: z.string() });
+const asPinoLog = (log: unknown): PinoLogger => log as PinoLogger;
 
 // ─── Route plugin ─────────────────────────────────────────────────────────
 
@@ -109,7 +111,7 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
       const { id: accountId } = req.params;
       const { status } = req.query;
 
-      const where: Parameters<typeof prisma.churnSignal.findMany>[0]['where'] = {
+      const where: Prisma.ChurnSignalWhereInput = {
         orgId,
         accountId,
         deletedAt: null,
@@ -139,7 +141,7 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       schema: {
         params: SignalParams,
-        response: { 200: MessageResponse },
+        response: { 200: MessageResponse, 404: MessageResponse },
       },
     },
     async (req, reply) => {
@@ -166,7 +168,7 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         params: SignalParams,
         body: ResolveBody,
-        response: { 200: MessageResponse },
+        response: { 200: MessageResponse, 404: MessageResponse },
       },
     },
     async (req, reply) => {
@@ -224,7 +226,7 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
       const { token, score11, feedback } = req.body;
 
       try {
-        const result = await recordNpsResponse({ token, score11, feedback }, req.log);
+        const result = await recordNpsResponse({ token, score11, feedback }, asPinoLog(req.log));
         return { message: 'Thank you for your feedback!', category: result.category };
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Invalid request';

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
-import type { Company, CompanyCreate, CompanyDetail, CompanyPatch } from '@bidstack/shared';
+import type { Company, CompanyCreate, CompanyDetail, CompanyPatch, CompanyHierarchy } from '@bidstack/shared';
 
 interface CompaniesParams {
   search?: string;
@@ -60,5 +60,14 @@ export function useDeleteCompany() {
   return useMutation({
     mutationFn: (id: string) => api<null>(`/api/companies/${id}`, { method: 'DELETE' }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['companies'] }),
+  });
+}
+
+export function useCompanyHierarchy(id: string | undefined) {
+  return useQuery({
+    queryKey: ['company-hierarchy', id],
+    queryFn: ({ signal }) => api<CompanyHierarchy>(`/api/companies/${id}/hierarchy`, { signal }),
+    enabled: Boolean(id),
+    staleTime: 30_000,
   });
 }

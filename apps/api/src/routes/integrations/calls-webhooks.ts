@@ -28,12 +28,11 @@ import {
   validateZoomWebhook,
   zoomUrlValidationResponse,
 } from '../../services/calls/zoom.service.js';
-import { validateTwilioVoiceSignature, generateDialTwiml } from '../../services/calls/twilio-voice.service.js';
+import { validateTwilioVoiceSignature } from '../../services/calls/twilio-voice.service.js';
 import {
   CALL_FETCH_RECORDING,
-  CALL_TRANSCRIBE,
-  CALL_ANALYZE,
 } from '@bidstack/shared';
+import { redis } from '../../redis.js';
 
 // ─── Zoom webhook routes ─────────────────────────────────────────────────────
 
@@ -64,6 +63,7 @@ export const zoomCallWebhookRoutes: FastifyPluginAsync = async (fastify) => {
             z.object({ ok: z.boolean() }),
             z.object({ plainToken: z.string(), encryptedToken: z.string() }),
           ]),
+          403: z.object({ ok: z.boolean() }),
         },
       },
     },
@@ -76,7 +76,10 @@ export const zoomCallWebhookRoutes: FastifyPluginAsync = async (fastify) => {
       // URL validation handshake (no signature required for initial setup)
       if (req.body.event === 'endpoint.url_validation') {
         const plainToken = (req.body.payload as { plainToken?: string })?.plainToken ?? '';
-        return reply.send(zoomUrlValidationResponse(plainToken));
+        return reply.send(zoomUrlValidationResponse(plainToken) as {
+          plainToken: string;
+          encryptedToken: string;
+        });
       }
 
       // Validate signature for all other events
@@ -111,7 +114,7 @@ export const zoomCallWebhookRoutes: FastifyPluginAsync = async (fastify) => {
 
         if (session) {
           const queue = new Queue(CALL_FETCH_RECORDING.name, {
-            connection: fastify.redis,
+            connection: redis,
             defaultJobOptions: CALL_FETCH_RECORDING.defaultJobOptions,
           });
           await queue.add('zoom-recording', {
@@ -226,7 +229,7 @@ export const twilioVoiceWebhookRoutes: FastifyPluginAsync = async (fastify) => {
           To: z.string().optional(),
           From: z.string().optional(),
         }),
-        response: { 200: z.object({ ok: z.boolean() }) },
+        response: { 200: z.object({ ok: z.boolean() }), 403: z.object({ ok: z.boolean() }) },
       },
     },
     async (req, reply) => {
@@ -282,7 +285,7 @@ export const twilioVoiceWebhookRoutes: FastifyPluginAsync = async (fastify) => {
       // Recording available — enqueue fetch + transcribe
       if (req.body.RecordingUrl && req.body.RecordingStatus === 'completed') {
         const fetchQueue = new Queue(CALL_FETCH_RECORDING.name, {
-          connection: fastify.redis,
+          connection: redis,
           defaultJobOptions: CALL_FETCH_RECORDING.defaultJobOptions,
         });
         await fetchQueue.add('twilio-recording', {
@@ -311,7 +314,7 @@ export const twilioVoiceWebhookRoutes: FastifyPluginAsync = async (fastify) => {
         tags: ['webhooks', 'calls'],
         params: z.object({ callSessionId: z.string().uuid() }),
         body: z.record(z.string()).optional(),
-        response: { 200: z.string() },
+        response: { 200: z.string(), 403: z.string() },
       },
     },
     async (req, reply) => {

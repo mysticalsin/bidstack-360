@@ -16,8 +16,10 @@
 
 import { randomBytes } from 'node:crypto';
 import { prisma } from '@bidstack/db';
-import { decryptToken, encryptToken } from '@bidstack/shared';
+import { decryptToken, encryptToken } from '@bidstack/shared/token-crypto';
 import type pino from 'pino';
+
+type ServiceLogger = Pick<pino.Logger, 'debug' | 'error' | 'info' | 'warn'>;
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -51,7 +53,7 @@ export interface PullEmailsParams {
 async function refreshGmailToken(
   tokenId: string,
   refreshToken: string,
-  log: pino.Logger,
+  log: ServiceLogger,
 ): Promise<string> {
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -94,7 +96,7 @@ async function refreshGmailToken(
 async function refreshMsGraphToken(
   tokenId: string,
   refreshToken: string,
-  log: pino.Logger,
+  log: ServiceLogger,
 ): Promise<string> {
   const tenant = process.env.MICROSOFT_TENANT_ID ?? 'common';
   const res = await fetch(
@@ -151,7 +153,7 @@ async function getAccessToken(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     provider: any;
   },
-  log: pino.Logger,
+  log: ServiceLogger,
 ): Promise<string> {
   const isExpired = tokenRecord.expiresAt
     ? tokenRecord.expiresAt.getTime() < Date.now() + 60_000 // 1 min buffer
@@ -189,7 +191,7 @@ async function sendViaGmail(
   accessToken: string,
   params: SendEmailParams,
   pixelToken: string,
-  log: pino.Logger,
+  log: ServiceLogger,
 ): Promise<{ externalMessageId: string; threadId?: string }> {
   const baseUrl = process.env.PUBLIC_API_URL ?? 'http://localhost:4000';
   const htmlWithPixel = params.html ? injectTrackingPixel(params.html, pixelToken, baseUrl) : undefined;
@@ -237,7 +239,7 @@ async function sendViaMsGraph(
   accessToken: string,
   params: SendEmailParams,
   pixelToken: string,
-  log: pino.Logger,
+  log: ServiceLogger,
 ): Promise<{ externalMessageId: string; threadId?: string }> {
   const baseUrl = process.env.PUBLIC_API_URL ?? 'http://localhost:4000';
   const htmlWithPixel = params.html ? injectTrackingPixel(params.html, pixelToken, baseUrl) : undefined;
@@ -284,7 +286,7 @@ async function sendViaMsGraph(
 
 export async function sendEmail(
   params: SendEmailParams,
-  log: pino.Logger,
+  log: ServiceLogger,
 ): Promise<{ messageId: string }> {
   // Find the user's active integration token (prefer gmail, fallback microsoft_graph)
   const token = await prisma.integrationToken.findFirst({
@@ -363,7 +365,7 @@ async function pullGmail(
   orgId: string,
   userId: string,
   deltaState: Record<string, unknown>,
-  log: pino.Logger,
+  log: ServiceLogger,
 ): Promise<void> {
   let historyId = deltaState.gmailHistoryId as string | undefined;
   let messages: GmailMessage[] = [];
@@ -458,7 +460,7 @@ async function pullGmail(
       await prisma.emailMessage.upsert({
         where: {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          emailMessages_org_external_key: { orgId, externalMessageId: detail.id } as any,
+          orgId_externalMessageId: { orgId, externalMessageId: detail.id },
         },
         create: {
           orgId,
@@ -503,7 +505,7 @@ async function pullMsGraphMail(
   orgId: string,
   userId: string,
   deltaState: Record<string, unknown>,
-  log: pino.Logger,
+  log: ServiceLogger,
 ): Promise<void> {
   const deltaLink = deltaState.mailDeltaLink as string | undefined;
   const url = deltaLink ?? 'https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages/delta?$top=50&$select=id,conversationId,from,toRecipients,subject,receivedDateTime,sentDateTime,body,isDraft';
@@ -547,7 +549,7 @@ async function pullMsGraphMail(
       await prisma.emailMessage.upsert({
         where: {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          emailMessages_org_external_key: { orgId, externalMessageId: msg.id } as any,
+          orgId_externalMessageId: { orgId, externalMessageId: msg.id },
         },
         create: {
           orgId,
@@ -587,7 +589,7 @@ async function pullMsGraphMail(
   }
 }
 
-export async function pullEmails(params: PullEmailsParams, log: pino.Logger): Promise<void> {
+export async function pullEmails(params: PullEmailsParams, log: ServiceLogger): Promise<void> {
   const token = await prisma.integrationToken.findUnique({
     where: { id: params.integrationTokenId },
   });

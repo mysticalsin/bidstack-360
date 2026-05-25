@@ -93,7 +93,7 @@ export function computeSlots(opts: SlotComputeOptions): Slot[] {
         const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60_000);
 
         // Minimum notice check
-        if (slotStart.getTime() - now.getTime() < noticeMs) {
+        if (minNoticeHours > 0 && slotStart.getTime() - now.getTime() < noticeMs) {
           slotStart = new Date(slotStart.getTime() + durationMinutes * 60_000);
           continue;
         }
@@ -203,8 +203,6 @@ function applyTimeInTz(dayMidnight: Date, hhmm: string, tz: string): Date {
 
   // We use a trick: format a known UTC time to the target TZ and back to
   // measure the UTC offset, then apply it to the desired wall-clock time.
-  const localStr = `${year}-${month}-${day}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00`;
-
   // Construct a Date by parsing without a timezone suffix (treated as local
   // by V8) — this is intentional: we want the wall-clock interpretation.
   // We then correct with the TZ offset.
@@ -218,7 +216,7 @@ function applyTimeInTz(dayMidnight: Date, hhmm: string, tz: string): Date {
     month: '2-digit',
     day: '2-digit',
   });
-  const formatted = formatter.format(utcForOffset);
+  formatter.format(utcForOffset);
   // The naive approach: compose the date string and parse via Date.
   // This is reliable because we always work in the same TZ for a given day.
   const naive = new Date(`${year}-${month}-${day}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00Z`);

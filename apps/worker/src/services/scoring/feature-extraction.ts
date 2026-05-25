@@ -259,7 +259,7 @@ export async function extractOpportunityFeatures(
       pipelineStage: {
         select: { name: true, probability: true, isWon: true, isLost: true },
       },
-      _count: { select: { contacts: true } },
+      _count: { select: { contactLinks: true } },
       intel: true,
     },
   });
@@ -331,7 +331,7 @@ export async function extractOpportunityFeatures(
   push('log_value_micros', valueMicros > 0 ? Math.log10(valueMicros) : 0);
 
   // Stage probability from pipeline (if set)
-  push('stage_probability', (opp.pipelineStage?.probability ?? opp.probability) / 100);
+  push('stage_probability', Number(opp.pipelineStage?.probability ?? opp.probability) / 100);
 
   // Time-based features
   push('days_in_current_stage', daysBetween(lastStageChangeDate, now));
@@ -339,7 +339,7 @@ export async function extractOpportunityFeatures(
   push('days_to_expected_close', opp.dueDate ? daysBetween(opp.dueDate, now) : 365);
 
   // Relationship features
-  push('num_contacts_on_account', opp._count.contacts);
+  push('num_contacts_on_account', opp._count.contactLinks);
   push('num_meetings_held', meetings.length);
   push('num_emails_sent_received', emails.length);
   push('last_activity_days_ago', daysSince(lastActivity?.occurredAt ?? null, now));

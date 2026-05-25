@@ -20,6 +20,9 @@ export interface DocumentExtractJob {
   storageKey: string;
   contentType: string;
   name: string;
+  opportunityId?: string;
+  bidDocumentId?: string;
+  documentVersionId?: string;
   /** Optional custom prompt override. */
   prompt?: string;
 }
@@ -53,9 +56,16 @@ function getQueue(): Queue {
  * Redis is unreachable (fail-open so the API route still responds).
  */
 export async function enqueueDocumentExtract(job: DocumentExtractJob): Promise<string | null> {
+  if (process.env.NODE_ENV === 'test' && process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS !== 'true') {
+    log.info(
+      { orgId: job.orgId, documentId: job.documentId },
+      'Document extract enqueue skipped in test mode',
+    );
+    return null;
+  }
   try {
     const queued = await getQueue().add('document.extract', job, {
-      jobId: `${job.orgId}--${job.documentId}`,
+      jobId: [job.orgId, job.documentId, job.bidDocumentId ?? job.extractionId].join('--'),
     });
     log.info(
       { jobId: queued.id, orgId: job.orgId, documentId: job.documentId },

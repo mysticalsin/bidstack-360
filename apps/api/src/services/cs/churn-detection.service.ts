@@ -14,7 +14,7 @@
  */
 import type { Logger as PinoLogger } from 'pino';
 
-import { prisma } from '@bidstack/db';
+import { prisma, Prisma } from '@bidstack/db';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -52,7 +52,7 @@ async function upsertSignal(
   if (existing) return false; // already open signal within window
 
   await prisma.churnSignal.create({
-    data: { orgId, accountId, kind, severity, evidence },
+    data: { orgId, accountId, kind, severity, evidence: evidence as Prisma.InputJsonObject },
   });
   log.warn({ orgId, accountId, kind, severity }, 'cs: churn signal created');
   return true;
@@ -71,13 +71,19 @@ async function detectLowUsage(
 
   const [recent, prior] = await Promise.all([
     prisma.activity.count({
-      where: { orgId, opportunity: { companyId: accountId }, happenedAt: { gte: thirtyDaysAgo } },
+      where: {
+        orgId,
+        entityType: 'company',
+        entityId: accountId,
+        occurredAt: { gte: thirtyDaysAgo },
+      },
     }),
     prisma.activity.count({
       where: {
         orgId,
-        opportunity: { companyId: accountId },
-        happenedAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
+        entityType: 'company',
+        entityId: accountId,
+        occurredAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
       },
     }),
   ]);
@@ -130,7 +136,7 @@ async function detectUnresolvedFeatureRequests(
       orgId,
       companyId: accountId,
       // Match feature request cases that are still open after 60d
-      status: { in: ['open', 'in_progress'] },
+      status: { in: ['open', 'waiting_internal'] },
       createdAt: { lte: sixtyDaysAgo },
     },
   });
@@ -158,8 +164,9 @@ async function detectCompetitorMentions(
   const activities = await prisma.activity.findMany({
     where: {
       orgId,
-      opportunity: { companyId: accountId },
-      happenedAt: { gte: thirtyDaysAgo },
+      entityType: 'company',
+      entityId: accountId,
+      occurredAt: { gte: thirtyDaysAgo },
     },
     select: { subject: true },
   });

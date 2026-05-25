@@ -227,7 +227,7 @@ export function ContactDetailPage() {
         entityType="contact"
         entityId={id}
         fieldKey="notes"
-        label="Collaborative Notes"
+        label="Live collaboration"
       />
     </div>
   );

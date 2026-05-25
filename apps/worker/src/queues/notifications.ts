@@ -29,7 +29,6 @@ import { prisma } from '@bidstack/db';
 // ── Constants ────────────────────────────────────────────────────────────────
 
 export const NATIVE_PUSH_QUEUE = 'notification.native-push';
-const EXPO_BATCH_SIZE = 100;
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -141,6 +140,7 @@ export async function startNativePushWorker(
       for (let i = 0; i < allTickets.length; i++) {
         const ticket = allTickets[i];
         const tokenRow = validTokens[i];
+        if (!ticket) continue;
         if (!tokenRow) continue;
 
         if (ticket.status === 'error') {

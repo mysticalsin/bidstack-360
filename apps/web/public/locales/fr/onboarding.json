@@ -1,0 +1,77 @@
+{
+  "tour": {
+    "start": "Démarrer la visite guidée",
+    "skip": "Passer la visite",
+    "next": "Suivant",
+    "previous": "Précédent",
+    "finish": "Terminer",
+    "stepOf": "Étape {{current}} sur {{total}}",
+    "welcome": {
+      "title": "Bienvenue dans BidStack 360°",
+      "body": "La plateforme Mantu pour gérer vos appels d'offres et votre avant-vente. Faites-vous guider en moins de 2 minutes."
+    },
+    "pipeline": {
+      "title": "Votre pipeline commercial",
+      "body": "Visualisez et faites progresser vos opportunités à travers les étapes, du premier contact jusqu'à la signature."
+    },
+    "bidMatrix": {
+      "title": "Matrice Bid/No-Bid",
+      "body": "Évaluez objectivement chaque appel d'offres grâce aux critères pondérés de Mantu avant de décider de répondre."
+    },
+    "dustAgents": {
+      "title": "Agents Dust IA",
+      "body": "Demandez à vos agents IA de préparer vos propositions, résumer des réunions ou enrichir vos comptes."
+    },
+    "integrations": {
+      "title": "Connectez vos outils",
+      "body": "Synchronisez Gmail, Microsoft 365, Slack et vos outils métier pour centraliser l'information."
+    },
+    "quickStart": {
+      "title": "Commencer maintenant",
+      "body": "Créez votre première opportunité, invitez votre équipe et explorez vos tableaux de bord personnalisés."
+    }
+  },
+  "quickStart": {
+    "title": "Démarrage rapide",
+    "subtitle": "Complétez ces étapes pour tirer parti de BidStack 360°",
+    "progress": "{{done}} sur {{total}} étapes complétées",
+    "steps": {
+      "createOpportunity": {
+        "label": "Créer une opportunité",
+        "description": "Ajoutez votre premier appel d'offres au pipeline"
+      },
+      "inviteTeam": {
+        "label": "Inviter l'équipe",
+        "description": "Ajoutez vos collègues à l'espace de travail"
+      },
+      "connectIntegration": {
+        "label": "Connecter une intégration",
+        "description": "Synchronisez votre messagerie ou agenda"
+      },
+      "runBidMatrix": {
+        "label": "Lancer une matrice Bid/No-Bid",
+        "description": "Évaluez votre première opportunité"
+      },
+      "configureStages": {
+        "label": "Configurer les étapes",
+        "description": "Adaptez le pipeline à votre processus de vente"
+      }
+    },
+    "completed": "Démarrage rapide terminé !",
+    "completedBody": "Vous maîtrisez maintenant l'essentiel de BidStack 360°. Bonne chance pour vos appels d'offres.",
+    "dismiss": "Masquer"
+  },
+  "templates": {
+    "title": "Modèles",
+    "subtitle": "Choisissez un modèle pour démarrer rapidement",
+    "use": "Utiliser ce modèle",
+    "preview": "Aperçu",
+    "blank": "Vierge",
+    "blankDesc": "Partir de zéro"
+  },
+  "sampleData": {
+    "banner": "Vous visualisez des données de démonstration.",
+    "clear": "Supprimer les données de démo",
+    "confirmClear": "Supprimer toutes les données de démonstration ? Cette action est irréversible."
+  }
+}

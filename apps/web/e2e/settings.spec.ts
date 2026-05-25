@@ -40,7 +40,7 @@ test.describe('Settings page', () => {
 
   test('visual effects preference persists after navigation', async ({ page, gotoAndWait }) => {
     await openAppearance(page, gotoAndWait);
-    const visualEffects = page.getByRole('checkbox', { name: 'BidStack neural background' });
+    const visualEffects = page.getByRole('checkbox', { name: 'Premium visual effects' });
 
     await visualEffects.check();
     await visualEffects.uncheck();
@@ -53,7 +53,7 @@ test.describe('Settings page', () => {
 
     await openAppearance(page, gotoAndWait);
     const persistedVisualEffects = page.getByRole('checkbox', {
-      name: 'BidStack neural background',
+      name: 'Premium visual effects',
     });
     await expect(persistedVisualEffects).not.toBeChecked();
 

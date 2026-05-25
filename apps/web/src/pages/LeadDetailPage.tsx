@@ -408,7 +408,7 @@ export function LeadDetailPage() {
         entityType="lead"
         entityId={id}
         fieldKey="notes"
-        label="Collaborative Notes"
+        label="Live collaboration"
       />
     </div>
   );

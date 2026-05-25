@@ -28,6 +28,7 @@ export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
   const opens = await prisma.opportunity.findMany({
     where: { orgId, deletedAt: null, stage: { notIn: ['closed_won', 'closed_lost'] } },
     select: { valueMicros: true, probability: true },
+    take: 1000,
   });
   const weighted = opens.reduce(
     (acc, o) => acc + (Number(o.valueMicros) / 1_000_000) * (o.probability / 100),
@@ -41,6 +42,7 @@ export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
   const allOpen = await prisma.opportunity.findMany({
     where: { orgId, deletedAt: null, stage: { notIn: ['closed_won', 'closed_lost'] } },
     select: { createdAt: true },
+    take: 1000,
   });
   const avgDaysOpen =
     allOpen.length > 0

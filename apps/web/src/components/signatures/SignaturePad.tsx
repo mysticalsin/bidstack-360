@@ -60,9 +60,11 @@ function getPos(
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
   if ('touches' in e) {
+    const point = e.touches[0] ?? e.changedTouches[0];
+    if (!point) return { x: 0, y: 0 };
     return {
-      x: (e.touches[0].clientX - rect.left) * scaleX,
-      y: (e.touches[0].clientY - rect.top) * scaleY,
+      x: (point.clientX - rect.left) * scaleX,
+      y: (point.clientY - rect.top) * scaleY,
     };
   }
   return {
@@ -179,6 +181,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
 
       // Set canvas internal resolution to match CSS display size
       const observer = new ResizeObserver(([entry]) => {
+        if (!entry) return;
         const { width, height } = entry.contentRect;
         if (c.width !== Math.floor(width) || c.height !== Math.floor(height)) {
           c.width = Math.max(CANVAS_MIN_W, Math.floor(width));

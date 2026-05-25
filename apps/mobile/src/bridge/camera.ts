@@ -6,7 +6,6 @@
  * across the webview boundary without a file:// scheme (which is sandboxed).
  * For large attachments the web layer should POST to /api/files directly.
  */
-import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 
 export interface CaptureResult {

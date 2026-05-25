@@ -90,14 +90,13 @@ function encryptPayload(
 
   const result = { ...data };
 
-  for (const { name, type } of config.fields) {
+  for (const { name } of config.fields) {
     const val = result[name];
     if (typeof val === 'string' && val.length > 0 && !isEncrypted(val)) {
       result[name] = encryptPiiField(val, orgId);
     }
     // Track raw value for hashing before we overwrite
     if (config.hashField?.source === name && typeof val === 'string' && val.length > 0) {
-      const plaintext = isEncrypted(val) ? val : val; // still plaintext at this point
       result[config.hashField.hashColumn] = hashPiiField(
         isEncrypted(val) ? val : val, // plaintext before encryption
         orgId,

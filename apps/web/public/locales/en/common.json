@@ -1,0 +1,138 @@
+{
+  "app": {
+    "name": "BidStack",
+    "tagline": "Mantu · Bid & presales",
+    "guest": "Guest",
+    "notSignedIn": "Not signed in"
+  },
+  "nav": {
+    "primary": "Primary navigation",
+    "breadcrumb": "Breadcrumb",
+    "workspace": "Workspace",
+    "settings": "Settings",
+    "starred": "Starred",
+    "recent": "Recent",
+    "openNavigation": "Open navigation",
+    "closeNavigation": "Close navigation",
+    "expandSidebar": "Expand sidebar",
+    "collapseSidebar": "Collapse sidebar",
+    "dashboard": "Dashboard",
+    "sales": "Sales",
+    "salesOrders": "Quotations & Orders",
+    "products": "Products",
+    "invoices": "Invoices",
+    "accounts": "Accounts",
+    "companies": "Companies",
+    "opportunities": "Opportunities",
+    "pipeline": "Pipeline",
+    "forecasts": "Forecasts",
+    "bidMatrix": "Bid/No-Bid Matrix",
+    "leads": "Leads",
+    "contacts": "Contacts",
+    "tasks": "Tasks",
+    "territories": "Territories",
+    "serviceDesk": "Service Desk",
+    "workflows": "Workflows",
+    "intake": "Intake",
+    "reports": "Reports",
+    "integrations": "Integrations",
+    "auditLog": "Audit log",
+    "agents": "Dust Agents",
+    "search": "Search",
+    "references": "Reference Library",
+    "settingsPage": "Settings"
+  },
+  "crumbs": {
+    "portfolio": "Portfolio",
+    "detail": "Detail"
+  },
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "edit": "Edit",
+    "delete": "Delete",
+    "create": "Create",
+    "update": "Update",
+    "submit": "Submit",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort",
+    "clear": "Clear",
+    "loading": "Loading…",
+    "retry": "Retry",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "viewAll": "View all",
+    "markRead": "Mark read",
+    "signOut": "Sign out",
+    "skipToContent": "Skip to content"
+  },
+  "search": {
+    "placeholder": "Search or jump to…",
+    "label": "Search opportunities, contacts, tasks",
+    "recent": "Recent",
+    "clear": "Clear",
+    "shortcut": "Ctrl+/"
+  },
+  "theme": {
+    "switchToLight": "Switch to light mode",
+    "switchToDark": "Switch to dark mode"
+  },
+  "notifications": {
+    "title": "Mentions",
+    "unread_one": "{{count}} unread mention",
+    "unread_other": "{{count}} unread mentions",
+    "noUnread": "No unread mentions",
+    "loading": "Loading…",
+    "couldNotLoad": "Could not load mentions",
+    "ariaLabel": "Notifications",
+    "ariaLabelWithCount": "Notifications, {{count}} unread",
+    "mentionTooltip": "Notifications",
+    "youWereMentioned": "Someone mentioned you in a comment"
+  },
+  "help": {
+    "tooltip": "Help & shortcuts (?)",
+    "ariaLabel": "Help and keyboard shortcuts"
+  },
+  "states": {
+    "loading": "Loading…",
+    "empty": "Nothing to show",
+    "error": "Something went wrong",
+    "noResults": "No results"
+  },
+  "toast": {
+    "saved": "Saved",
+    "updated": "Updated",
+    "created": "Created",
+    "deleted": "Deleted",
+    "copied": "Copied to clipboard",
+    "genericError": "Something went wrong. Please try again.",
+    "networkError": "Network error. Check your connection."
+  },
+  "validation": {
+    "required": "This field is required",
+    "invalidEmail": "Enter a valid email address",
+    "tooShort": "Must be at least {{min}} characters",
+    "tooLong": "Must be at most {{max}} characters",
+    "invalidUrl": "Enter a valid URL",
+    "invalidNumber": "Enter a valid number",
+    "invalidDate": "Enter a valid date"
+  },
+  "offline": {
+    "title": "You are offline",
+    "message": "Changes will sync when you are back online."
+  },
+  "page": {
+    "titleSuffix": "BidStack 360°"
+  },
+  "routeAnnouncer": {
+    "nowOn": "Now on {{title}}"
+  },
+  "footer": {
+    "createdBy": "Created by Tony Walteur",
+    "dustConnected": "Dust connected",
+    "dustSynced": "synced {{when}}"
+  }
+}

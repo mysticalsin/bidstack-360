@@ -273,7 +273,7 @@ export function OpportunityDetailPage() {
         entityType="opportunity"
         entityId={id}
         fieldKey="notes"
-        label="Collaborative Notes"
+        label="Live collaboration"
       />
 
       {/* Controlled CreateTaskDialog driven by the command palette (A3). */}

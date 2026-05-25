@@ -244,6 +244,7 @@ export async function getTopProducts(orgId: string, limit: number) {
   const products = await prisma.product.findMany({
     where: { orgId, id: { in: grouped.map((g) => g.product_id) } },
     include: { category: { select: { name: true } } },
+    take: grouped.length,
   });
   const productById = new Map(products.map((p) => [p.id, p]));
   return {
@@ -291,7 +292,7 @@ export async function getTopCategories(orgId: string, limit: number) {
   const ids = grouped.map((g) => g.category_id).filter((id): id is string => id !== null);
   const [categories, currency] = await Promise.all([
     ids.length
-      ? prisma.productCategory.findMany({ where: { orgId, id: { in: ids } } })
+      ? prisma.productCategory.findMany({ where: { orgId, id: { in: ids } }, take: ids.length })
       : Promise.resolve([] as Awaited<ReturnType<typeof prisma.productCategory.findMany>>),
     dominantCurrency(orgId),
   ]);

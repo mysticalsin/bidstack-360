@@ -6,7 +6,7 @@ import {
 } from 'fastify-type-provider-zod';
 import { describe, expect, it } from 'vitest';
 
-import { healthRoute, storageConfigReady } from './health.js';
+import { healthRoute, metricsAccessAllowed, storageConfigReady } from './health.js';
 
 describe('health route contract', () => {
   it('keeps liveness separate from dependency readiness', async () => {
@@ -35,5 +35,21 @@ describe('health route contract', () => {
         S3_BUCKET: 'bidstack-prod-files',
       }),
     ).toBe(true);
+  });
+
+  it('does not expose metrics publicly in production without an explicit bearer token', () => {
+    expect(metricsAccessAllowed({}, { NODE_ENV: 'production' })).toBe(false);
+    expect(
+      metricsAccessAllowed(
+        { authorization: 'Bearer correct-token' },
+        { NODE_ENV: 'production', METRICS_BEARER_TOKEN: 'correct-token' },
+      ),
+    ).toBe(true);
+    expect(
+      metricsAccessAllowed(
+        { authorization: 'Bearer wrong-token' },
+        { NODE_ENV: 'production', METRICS_BEARER_TOKEN: 'correct-token' },
+      ),
+    ).toBe(false);
   });
 });

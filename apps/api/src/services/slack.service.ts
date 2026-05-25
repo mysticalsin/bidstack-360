@@ -14,8 +14,10 @@
 
 import { createHash } from 'node:crypto';
 import { prisma } from '@bidstack/db';
-import { decryptToken } from '@bidstack/shared';
+import { decryptToken } from '@bidstack/shared/token-crypto';
 import type pino from 'pino';
+
+type ServiceLogger = Pick<pino.Logger, 'debug' | 'error' | 'info' | 'warn'>;
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -85,7 +87,7 @@ async function slackPost(
   method: string,
   token: string,
   body: Record<string, unknown>,
-  log?: pino.Logger,
+  log?: ServiceLogger,
 ): Promise<{ ok: boolean; ts?: string; channel?: string; error?: string }> {
   const res = await fetch(`${SLACK_API}/${method}`, {
     method: 'POST',
@@ -125,7 +127,7 @@ async function slackPost(
  */
 export async function postMessage(
   params: PostMessageParams,
-  log?: pino.Logger,
+  log?: ServiceLogger,
 ): Promise<SlackResult> {
   const { orgId, channelId, blocks, text } = params;
 
@@ -153,7 +155,7 @@ export async function postMessage(
  */
 export async function postReply(
   params: PostReplyParams,
-  log?: pino.Logger,
+  log?: ServiceLogger,
 ): Promise<SlackResult> {
   const { orgId, channelId, threadTs, blocks, text } = params;
 
@@ -179,12 +181,12 @@ export async function postReply(
  * Send a direct message to a BidStack user via their SlackUserMapping.
  * Opens an IM channel with conversations.open first (idempotent per Slack API).
  */
-export async function dmUser(params: DmUserParams, log?: pino.Logger): Promise<SlackResult> {
+export async function dmUser(params: DmUserParams, log?: ServiceLogger): Promise<SlackResult> {
   const { orgId, userId, blocks, text } = params;
 
   // Resolve BidStack user → Slack user id
   const mapping = await prisma.slackUserMapping.findUnique({
-    where: { slack_user_mappings_org_user_key: { orgId, userId } },
+    where: { orgId_userId: { orgId, userId } },
   });
 
   if (!mapping) {

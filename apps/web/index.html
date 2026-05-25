@@ -14,11 +14,21 @@
     <link rel="preconnect" href="https://clerk.bidstack.dev" />
     <link rel="preconnect" href="https://clerk.accounts.dev" crossorigin />
     <link rel="preconnect" href="https://sentry.io" crossorigin />
+    <!-- Preload critical font CSS to avoid render-blocking; swap to all once loaded -->
     <link
+      rel="preload"
       href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap"
-      rel="stylesheet"
+      as="style"
+      onload="this.onload=null;this.rel='stylesheet'"
     />
-    <!-- Preload fonts already handled by Google Fonts CSS -->
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap"
+      />
+    </noscript>
+    <!-- Preload the manifest for PWA installability -->
+    <link rel="preload" href="/manifest.json" as="fetch" crossorigin />
     <title>BidStack 360°</title>
     <script>
       // Apply persisted theme before paint to prevent flash.
@@ -34,6 +44,6 @@
   </head>
   <body class="h-full antialiased">
     <div id="root" class="h-full"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module" src="/src/main.tsx" fetchpriority="high"></script>
   </body>
 </html>

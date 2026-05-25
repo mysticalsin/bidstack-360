@@ -35,13 +35,21 @@ const log = pino({
 });
 
 const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6380';
+const redisEndpoint = (() => {
+  try {
+    const url = new URL(redisUrl);
+    return `${url.protocol}//${url.hostname}${url.port ? `:${url.port}` : ''}`;
+  } catch {
+    return 'redis://<invalid-url>';
+  }
+})();
 
 const connection = new IORedis(redisUrl, {
   maxRetriesPerRequest: null,
 });
 
 connection.on('error', (err) => log.error({ err }, 'redis error'));
-connection.on('connect', () => log.info({ redisUrl }, 'redis connected'));
+connection.on('connect', () => log.info({ redisEndpoint }, 'redis connected'));
 
 const workers: Worker[] = [];
 const queues: Queue[] = [];

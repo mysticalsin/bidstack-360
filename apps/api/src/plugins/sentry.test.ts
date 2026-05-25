@@ -65,7 +65,10 @@ describe('scrubPii', () => {
       },
     };
     const output = scrubPii(input) as Record<string, unknown>;
-    const contact = (output as Record<string, Record<string, Record<string, unknown>>>).opportunity.contact;
+    const opportunity = (output as { opportunity?: { contact?: Record<string, unknown> } }).opportunity;
+    const contact = opportunity?.contact;
+    expect(contact).toBeDefined();
+    if (!contact) throw new Error('Expected nested contact to survive scrubbing');
     expect(contact.name).toBe('[REDACTED]');
     expect(contact.email).toBe('[REDACTED]');
     expect(contact.company).toBe('Acme'); // not a PII field

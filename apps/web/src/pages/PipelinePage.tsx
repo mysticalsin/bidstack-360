@@ -25,17 +25,18 @@ import { useOpportunities } from '@/hooks/useOpportunities';
 import { useStageMutation } from '@/hooks/useStageMutation';
 import { cn } from '@/lib/cn';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
-import { formatDate, formatStage } from '@/lib/format';
+import { formatDate } from '@/lib/format';
 import { springLayout, springSnap } from '@/lib/motion';
+import { getPipelineStages, resolvePipelineStage } from '@/lib/pipeline-stages';
 
 import type { Opportunity } from '@bidstack/shared';
 
 function getStageId(opp: Opportunity): string {
-  return opp.pipelineStageId ?? 'none';
+  return resolvePipelineStage(opp).id;
 }
 
 function getStageName(opp: Opportunity): string {
-  return opp.pipelineStage?.name ?? 'Unknown';
+  return resolvePipelineStage(opp).name;
 }
 
 export function PipelinePage() {
@@ -65,15 +66,10 @@ export function PipelinePage() {
   // for a11y — drag-and-drop is unreachable by keyboard alone (WCAG 2.1.1).
   const [focusedId, setFocusedId] = useState<string | null>(null);
 
-  // Derive stage columns from the loaded opportunities (sorted by name).
+  // Derive stage columns from canonical PipelineStage rows, with a legacy
+  // fallback for tenants that still only carry the old stage enum.
   const stages = useMemo(() => {
-    const map = new Map<string, { id: string; name: string; color: string | null }>();
-    for (const opp of data?.items ?? []) {
-      if (opp.pipelineStage && !map.has(opp.pipelineStage.id)) {
-        map.set(opp.pipelineStage.id, opp.pipelineStage);
-      }
-    }
-    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+    return getPipelineStages(data?.items ?? []);
   }, [data?.items]);
 
   // Group items by pipelineStageId once per data change so each column doesn't filter
@@ -303,9 +299,9 @@ export function PipelinePage() {
 // re-render the other 5 columns — only the source/destination columns
 // actually change.
 const StageColumn = memo(function StageColumn({
-  stageId,
+  stageId: _stageId,
   stageName,
-  stageColor,
+  stageColor: _stageColor,
   items,
   total,
   conversion,

@@ -81,7 +81,7 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
                   <span className="proto-row-money">
                     <AnimatedMetric value={formatMoney(o.value, 'EUR')} />
                   </span>
-                  <Badge tone="purple">{formatStage(o.stage)}</Badge>
+                  <Badge tone="purple">{formatStage(o.stage ?? 'unknown')}</Badge>
                 </div>
               </Link>
             </motion.li>

@@ -72,6 +72,7 @@ export default tseslint.config(
       'apps/web/dist/**',
       'apps/web/playwright-report/**',
       'apps/web/test-results/**',
+      'apps/web/scratch-*.js',
       'handoff/**',
       '.tmp/**', // extracted prototype zips kept for cross-referencing only
       '.audit-screens/**',
@@ -164,6 +165,7 @@ export default tseslint.config(
       '**/vite.config.ts',
       '**/vitest.config.ts',
       '**/playwright.config.ts',
+      'apps/marketing/scripts/**/*.mjs',
       'packages/db/src/seed.ts',
     ],
     rules: {

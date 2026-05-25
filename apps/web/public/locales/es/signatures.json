@@ -1,0 +1,57 @@
+{
+  "title": "Firmas electrónicas",
+  "send": {
+    "title": "Enviar para firma",
+    "recipients": "Destinatarios",
+    "addRecipient": "Añadir destinatario",
+    "recipientName": "Nombre",
+    "recipientEmail": "Correo electrónico",
+    "recipientRole": "Rol",
+    "message": "Mensaje personalizado",
+    "messagePlaceholder": "Agrega un mensaje para los firmantes (opcional)",
+    "send": "Enviar para firma",
+    "sending": "Enviando…",
+    "cancel": "Cancelar",
+    "document": "Documento",
+    "selectDocument": "Seleccionar documento"
+  },
+  "status": {
+    "pending": "Pendiente",
+    "sent": "Enviado",
+    "viewed": "Visto",
+    "signed": "Firmado",
+    "declined": "Rechazado",
+    "expired": "Expirado",
+    "completed": "Completado",
+    "cancelled": "Cancelado"
+  },
+  "pad": {
+    "title": "Firmar el documento",
+    "instruction": "Firma en el área de abajo",
+    "clear": "Borrar",
+    "sign": "Aplicar firma",
+    "signing": "Firmando…",
+    "decline": "Rechazar",
+    "declineReason": "Motivo del rechazo (opcional)",
+    "typedSignature": "Firma escrita",
+    "drawnSignature": "Firma dibujada",
+    "typeNamePlaceholder": "Escribe tu nombre completo",
+    "agreed": "Acepto que esta firma electrónica tiene el mismo valor legal que mi firma manuscrita."
+  },
+  "timeline": {
+    "title": "Historial de firmas",
+    "sent": "Enviado a {{name}}",
+    "viewed": "Visto por {{name}}",
+    "signed": "Firmado por {{name}}",
+    "declined": "Rechazado por {{name}}",
+    "completed": "Todos los firmantes han firmado",
+    "reminder": "Recordatorio enviado a {{name}}"
+  },
+  "actions": {
+    "remind": "Recordar",
+    "download": "Descargar",
+    "cancel": "Cancelar solicitud",
+    "viewCertificate": "Ver certificado",
+    "confirmCancel": "¿Cancelar esta solicitud de firma? Se notificará a los firmantes."
+  }
+}

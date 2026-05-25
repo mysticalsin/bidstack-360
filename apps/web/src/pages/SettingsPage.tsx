@@ -11,10 +11,12 @@ import { MicrosoftSection } from '@/components/settings/MicrosoftSection';
 import { MobileSection } from '@/components/settings/MobileSection';
 import { WorkspaceSection } from '@/components/settings/WorkspaceSection';
 import { AdvancedSection } from '@/components/settings/AdvancedSection';
+import { LanguageSwitcher } from '@/components/settings/LanguageSwitcher';
 
 const SECTIONS: Record<SettingsSection, React.ReactNode> = {
   profile: <ProfileSection />,
   appearance: <AppearanceSection />,
+  language: <LanguageSwitcher />,
   notifications: <NotificationPrefsSection />,
   security: <SecuritySection />,
   microsoft: <MicrosoftSection />,
@@ -26,6 +28,7 @@ const SECTIONS: Record<SettingsSection, React.ReactNode> = {
 const SECTION_TITLES: Record<SettingsSection, string> = {
   profile: 'Profile',
   appearance: 'Appearance',
+  language: 'Language',
   notifications: 'Notifications',
   security: 'Security',
   microsoft: 'Microsoft 365',

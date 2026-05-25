@@ -17,6 +17,18 @@
     "./types": {
       "types": "./dist/types/index.d.ts",
       "default": "./dist/types/index.js"
+    },
+    "./server-crypto": {
+      "types": "./dist/utils/crypto.d.ts",
+      "default": "./dist/utils/crypto.js"
+    },
+    "./token-crypto": {
+      "types": "./dist/crypto/index.d.ts",
+      "default": "./dist/crypto/index.js"
+    },
+    "./crypto/pii-field-cipher": {
+      "types": "./dist/crypto/pii-field-cipher.d.ts",
+      "default": "./dist/crypto/pii-field-cipher.js"
     }
   },
   "scripts": {

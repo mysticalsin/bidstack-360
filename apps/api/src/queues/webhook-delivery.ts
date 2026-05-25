@@ -64,6 +64,7 @@ export async function fanOutWebhookEvent(
   const subs = await prisma.webhookSubscription.findMany({
     where: { orgId, active: true, deletedAt: null, events: { has: event } },
     select: { id: true },
+    take: 1000,
   });
 
   if (subs.length === 0) return;

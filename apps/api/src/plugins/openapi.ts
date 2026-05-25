@@ -24,7 +24,7 @@ import fp from 'fastify-plugin';
 
 import { config } from '../config.js';
 
-const openapiPlugin: FastifyPluginAsync = async (server) => {
+const openapiPluginImpl: FastifyPluginAsync = async (server) => {
   // Always register swagger (spec generation). The spec endpoint is only
   // exposed when OPENAPI_DOCS_ENABLED=true — it may contain internal route
   // names so we default-off in prod until explicitly enabled.
@@ -155,7 +155,7 @@ const openapiPlugin: FastifyPluginAsync = async (server) => {
  * Must be registered BEFORE route plugins so Swagger sees all route schemas.
  * Must be registered AFTER the Zod type-provider is set up (done in server.ts).
  */
-export const openapiPlugin = fp(openapiPlugin, {
+export const openapiPlugin = fp(openapiPluginImpl, {
   name: 'openapi',
   dependencies: [],
 });

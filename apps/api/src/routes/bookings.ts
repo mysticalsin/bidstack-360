@@ -13,10 +13,11 @@
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { prisma } from '@bidstack/db';
+import { prisma, Prisma } from '@bidstack/db';
 import { computeSlots, type AvailabilityRule, type BlockingEvent } from '@bidstack/shared';
 import { CALENDAR_PUSH } from '@bidstack/shared';
 import { Queue } from 'bullmq';
+import { redis } from '../redis.js';
 
 // ─── Zod schemas ──────────────────────────────────────────────────────────
 
@@ -71,7 +72,6 @@ const PublicBookingCreate = z.object({
 export const bookingsRoutes: FastifyPluginAsyncZod = async (server) => {
   // Lazily obtain the push queue — avoids importing Redis at module level
   function getPushQueue(): Queue {
-    const redis = server.redis as InstanceType<typeof import('ioredis').default>;
     return new Queue(CALENDAR_PUSH.name, {
       connection: redis,
       defaultJobOptions: CALENDAR_PUSH.defaultJobOptions,
@@ -113,9 +113,9 @@ export const bookingsRoutes: FastifyPluginAsyncZod = async (server) => {
           bufferAfterMinutes: req.body.bufferAfterMinutes,
           minNoticeHours: req.body.minNoticeHours,
           maxAdvanceDays: req.body.maxAdvanceDays,
-          availabilityRules: req.body.availabilityRules,
+          availabilityRules: req.body.availabilityRules as Prisma.InputJsonValue,
           isActive: req.body.isActive,
-          customQuestions: req.body.customQuestions,
+          customQuestions: req.body.customQuestions as Prisma.InputJsonValue,
           redirectUrl: req.body.redirectUrl ?? null,
         },
         select: { id: true, slug: true },
@@ -170,9 +170,9 @@ export const bookingsRoutes: FastifyPluginAsyncZod = async (server) => {
           ...(req.body.bufferAfterMinutes !== undefined ? { bufferAfterMinutes: req.body.bufferAfterMinutes } : {}),
           ...(req.body.minNoticeHours !== undefined ? { minNoticeHours: req.body.minNoticeHours } : {}),
           ...(req.body.maxAdvanceDays !== undefined ? { maxAdvanceDays: req.body.maxAdvanceDays } : {}),
-          ...(req.body.availabilityRules !== undefined ? { availabilityRules: req.body.availabilityRules } : {}),
+          ...(req.body.availabilityRules !== undefined ? { availabilityRules: req.body.availabilityRules as Prisma.InputJsonValue } : {}),
           ...(req.body.isActive !== undefined ? { isActive: req.body.isActive } : {}),
-          ...(req.body.customQuestions !== undefined ? { customQuestions: req.body.customQuestions } : {}),
+          ...(req.body.customQuestions !== undefined ? { customQuestions: req.body.customQuestions as Prisma.InputJsonValue } : {}),
           ...(req.body.redirectUrl !== undefined ? { redirectUrl: req.body.redirectUrl } : {}),
         },
         select: { id: true },
@@ -318,7 +318,7 @@ export const bookingsRoutes: FastifyPluginAsyncZod = async (server) => {
       ];
 
       const slots = computeSlots({
-        rules: page.availabilityRules as AvailabilityRule[],
+        rules: page.availabilityRules as unknown as AvailabilityRule[],
         existingEvents: allBlocking,
         rangeStart,
         rangeEnd,
@@ -411,7 +411,7 @@ export const bookingsRoutes: FastifyPluginAsyncZod = async (server) => {
       ];
 
       const availableSlots = computeSlots({
-        rules: page.availabilityRules as AvailabilityRule[],
+        rules: page.availabilityRules as unknown as AvailabilityRule[],
         existingEvents: allBlocking,
         rangeStart,
         rangeEnd,
@@ -436,7 +436,7 @@ export const bookingsRoutes: FastifyPluginAsyncZod = async (server) => {
           attendeePhone: attendeePhone ?? null,
           startAt,
           endAt,
-          answers: answers ?? {},
+          answers: (answers ?? {}) as Prisma.InputJsonValue,
           status: 'CONFIRMED',
         },
         select: { id: true, startAt: true, endAt: true, cancelToken: true },

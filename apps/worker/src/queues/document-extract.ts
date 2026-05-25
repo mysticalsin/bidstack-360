@@ -8,6 +8,7 @@ import type { Queue, Worker, Job } from 'bullmq';
 import type IORedis from 'ioredis';
 import type pino from 'pino';
 
+import { createHash } from 'node:crypto';
 import { Worker as BullWorker } from 'bullmq';
 import { z } from 'zod';
 import { prisma, type Prisma } from '@bidstack/db';
@@ -49,6 +50,22 @@ interface ExtractedItem {
 interface ExtractionResult {
   solutions: ExtractedItem[];
   products: ExtractedItem[];
+}
+
+interface SourceChunkCandidate {
+  chunkIndex: number;
+  text: string;
+  hash: string;
+}
+
+interface RequirementCandidate {
+  externalRef: string;
+  text: string;
+  requirementType: string;
+  mandatory: boolean;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  confidenceBps: number;
+  sourceChunkIndex: number;
 }
 
 const SOLUTION_KEYWORDS = [
@@ -214,6 +231,285 @@ function classifyAndPush(
   }
 }
 
+function hashText(text: string): string {
+  return createHash('sha256').update(text).digest('hex');
+}
+
+export function buildSourceChunks(text: string): SourceChunkCandidate[] {
+  const normalized = text.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  if (!normalized) return [];
+
+  const chunks: SourceChunkCandidate[] = [];
+  const paragraphs = normalized.split(/\n\s*\n/).map((part) => part.trim()).filter(Boolean);
+  let current = '';
+
+  for (const paragraph of paragraphs) {
+    const next = current ? `${current}\n\n${paragraph}` : paragraph;
+    if (next.length > 1800 && current) {
+      chunks.push({
+        chunkIndex: chunks.length,
+        text: current,
+        hash: hashText(current),
+      });
+      current = paragraph;
+    } else {
+      current = next;
+    }
+  }
+
+  if (current) {
+    chunks.push({
+      chunkIndex: chunks.length,
+      text: current,
+      hash: hashText(current),
+    });
+  }
+
+  if (chunks.length === 0 && normalized) {
+    chunks.push({ chunkIndex: 0, text: normalized.slice(0, 1800), hash: hashText(normalized) });
+  }
+
+  return chunks.slice(0, 250);
+}
+
+function splitRequirementSentences(text: string): string[] {
+  return text
+    .split(/\n+|(?<=[.!?])\s+(?=[A-Z0-9])/)
+    .map((line) => line.replace(/^[-•*\d.)\s]+/, '').trim())
+    .filter((line) => line.length >= 24 && line.length <= 700);
+}
+
+function looksLikeRequirement(text: string): boolean {
+  return /\b(must|shall|required|requires|requirement|mandatory|provide|submit|include|comply|compliance|evidence|deadline|due|response|supplier|vendor|bidder|proponent)\b/i.test(
+    text,
+  );
+}
+
+function classifyRequirementType(text: string): string {
+  const lower = text.toLowerCase();
+  if (/\b(price|pricing|commercial|cost|fee|discount|tax|invoice|payment)\b/.test(lower)) {
+    return 'commercial';
+  }
+  if (/\b(legal|contract|liability|indemnity|terms|privacy|gdpr|data protection)\b/.test(lower)) {
+    return 'legal';
+  }
+  if (/\b(security|soc 2|iso 27001|penetration|vulnerability|encryption|access control)\b/.test(lower)) {
+    return 'security';
+  }
+  if (/\b(sla|support|service desk|availability|incident|response time)\b/.test(lower)) {
+    return 'service';
+  }
+  if (/\b(deliverable|implementation|architecture|integration|technical|migration|cloud)\b/.test(lower)) {
+    return 'technical';
+  }
+  return 'general';
+}
+
+function requirementPriority(text: string): RequirementCandidate['priority'] {
+  const lower = text.toLowerCase();
+  if (/\b(disqualif|mandatory|must not|shall not|penalty|deadline|privacy|breach)\b/.test(lower)) {
+    return 'critical';
+  }
+  if (/\b(must|shall|required|security|compliance|legal|evidence)\b/.test(lower)) {
+    return 'high';
+  }
+  if (/\b(should|requested|prefer|include|provide)\b/.test(lower)) {
+    return 'medium';
+  }
+  return 'low';
+}
+
+export function extractRequirementCandidates(chunks: SourceChunkCandidate[]): RequirementCandidate[] {
+  const candidates: RequirementCandidate[] = [];
+  const seen = new Set<string>();
+
+  for (const chunk of chunks) {
+    for (const sentence of splitRequirementSentences(chunk.text)) {
+      if (!looksLikeRequirement(sentence)) continue;
+      const key = sentence.toLowerCase().replace(/\s+/g, ' ').slice(0, 240);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      candidates.push({
+        externalRef: `REQ-${String(candidates.length + 1).padStart(3, '0')}`,
+        text: sentence,
+        requirementType: classifyRequirementType(sentence),
+        mandatory: /\b(must|shall|required|mandatory)\b/i.test(sentence),
+        priority: requirementPriority(sentence),
+        confidenceBps: /\b(must|shall|required|mandatory|deadline)\b/i.test(sentence) ? 7800 : 6400,
+        sourceChunkIndex: chunk.chunkIndex,
+      });
+      if (candidates.length >= 120) return candidates;
+    }
+  }
+
+  return candidates;
+}
+
+async function writeBidWorkspaceArtifacts({
+  orgId,
+  opportunityId,
+  bidDocumentId,
+  documentVersionId,
+  text,
+  dustRunId,
+}: {
+  orgId: string;
+  opportunityId: string;
+  bidDocumentId: string;
+  documentVersionId: string;
+  text: string;
+  dustRunId: string | null;
+}): Promise<void> {
+  const chunks = buildSourceChunks(text);
+  const requirements = extractRequirementCandidates(chunks);
+
+  await prisma.$transaction(async (tx) => {
+    const version = await tx.documentVersion.findFirst({
+      where: { id: documentVersionId, orgId, bidDocumentId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!version) {
+      throw new Error('Bid document extraction job does not match an active tenant-scoped version');
+    }
+
+    const humanTouchedRequirements = await tx.requirement.count({
+      where: {
+        orgId,
+        documentVersionId,
+        deletedAt: null,
+        status: { not: 'suggested' },
+      },
+    });
+
+    if (humanTouchedRequirements === 0) {
+      await tx.complianceMatrixRow.deleteMany({
+        where: {
+          orgId,
+          requirement: { documentVersionId, status: 'suggested' },
+        },
+      });
+      await tx.requirement.deleteMany({
+        where: { orgId, documentVersionId, status: 'suggested' },
+      });
+      await tx.sourceChunk.deleteMany({ where: { orgId, documentVersionId } });
+
+      const createdChunks = new Map<number, string>();
+      for (const chunk of chunks) {
+        const row = await tx.sourceChunk.create({
+          data: {
+            orgId,
+            bidDocumentId,
+            documentVersionId,
+            chunkIndex: chunk.chunkIndex,
+            text: chunk.text,
+            hash: chunk.hash,
+            locator: { chunkIndex: chunk.chunkIndex },
+          },
+          select: { id: true, chunkIndex: true },
+        });
+        createdChunks.set(row.chunkIndex, row.id);
+      }
+
+      for (const requirementCandidate of requirements) {
+        const sourceChunkId = createdChunks.get(requirementCandidate.sourceChunkIndex) ?? null;
+        const requirement = await tx.requirement.create({
+          data: {
+            orgId,
+            opportunityId,
+            bidDocumentId,
+            documentVersionId,
+            sourceChunkId,
+            externalRef: requirementCandidate.externalRef,
+            text: requirementCandidate.text,
+            requirementType: requirementCandidate.requirementType,
+            mandatory: requirementCandidate.mandatory,
+            priority: requirementCandidate.priority,
+            confidenceBps: requirementCandidate.confidenceBps,
+            metadata: {
+              extractionManaged: true,
+              source: dustRunId ? 'dust_document_extract' : 'deterministic_document_extract',
+            },
+          },
+          select: { id: true, priority: true },
+        });
+        const citation = [
+          {
+            bidDocumentId,
+            documentVersionId,
+            sourceChunkId,
+            chunkIndex: requirementCandidate.sourceChunkIndex,
+            text: requirementCandidate.text.slice(0, 500),
+          },
+        ];
+        await tx.complianceMatrixRow.create({
+          data: {
+            orgId,
+            opportunityId,
+            requirementId: requirement.id,
+            risk: requirement.priority,
+            citations: citation,
+            evidence: citation,
+          },
+        });
+      }
+
+      if (requirements.length === 0) {
+        await tx.reviewIssue.create({
+          data: {
+            orgId,
+            opportunityId,
+            sourceChunkId: null,
+            category: 'extraction',
+            severity: 'medium',
+            title: 'No explicit requirements detected',
+            description:
+              'The document was parsed, but no requirement-like statements were detected. Review the source manually before moving this bid forward.',
+            recommendation: 'Assign a presales reviewer to inspect the document and add requirements manually.',
+          },
+        });
+      }
+    }
+
+    await tx.documentVersion.update({
+      where: { id: documentVersionId },
+      data: {
+        extractedText: text,
+        extractionStatus: 'succeeded',
+        ocrStatus: 'succeeded',
+        layoutJson: {
+          chunkCount: chunks.length,
+          requirementCount: requirements.length,
+        },
+        metadata: {
+          extractionManaged: true,
+          dustRunId,
+          skippedRewriteBecauseHumanTouched: humanTouchedRequirements > 0,
+        },
+      },
+    });
+    await tx.bidDocument.updateMany({
+      where: { id: bidDocumentId, orgId, deletedAt: null },
+      data: { status: 'ready' },
+    });
+    await tx.auditLog.create({
+      data: {
+        orgId,
+        userId: null,
+        action: 'bid_document.extracted',
+        targetType: 'bid_document',
+        targetId: bidDocumentId,
+        diff: {
+          opportunityId,
+          documentVersionId,
+          sourceChunks: chunks.length,
+          requirements: requirements.length,
+          dustRunId,
+        },
+      },
+    });
+  });
+}
+
 // ─── Prompt builder ────────────────────────────────────────────────────────
 
 const EXTRACTION_PROMPT = `You are a CRM intelligence extractor. Given the following company document, extract:
@@ -245,13 +541,27 @@ const JobData = z.object({
   storageKey: z.string().min(1),
   contentType: z.string().min(1),
   name: z.string().min(1),
+  opportunityId: z.string().uuid().optional(),
+  bidDocumentId: z.string().uuid().optional(),
+  documentVersionId: z.string().uuid().optional(),
   prompt: z.string().optional(),
 });
 type JobData = z.infer<typeof JobData>;
 
 async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
-  const { orgId, accountId, documentId, extractionId, storageKey, contentType, name, prompt } =
-    JobData.parse(job.data);
+  const {
+    orgId,
+    accountId,
+    documentId,
+    extractionId,
+    storageKey,
+    contentType,
+    name,
+    opportunityId,
+    bidDocumentId,
+    documentVersionId,
+    prompt,
+  } = JobData.parse(job.data);
 
   // Mark as running
   const runningUpdate = await prisma.documentExtraction.updateMany({
@@ -260,6 +570,16 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
   });
   if (runningUpdate.count !== 1) {
     throw new Error('Document extraction job does not match an active tenant-scoped extraction');
+  }
+  if (bidDocumentId && documentVersionId) {
+    await prisma.documentVersion.updateMany({
+      where: { id: documentVersionId, orgId, bidDocumentId, deletedAt: null },
+      data: { extractionStatus: 'running', ocrStatus: 'running' },
+    });
+    await prisma.bidDocument.updateMany({
+      where: { id: bidDocumentId, orgId, deletedAt: null },
+      data: { status: 'extracting' },
+    });
   }
 
   const stored = await readStoredDocument({ orgId, storageKey });
@@ -403,6 +723,17 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
       'Document extraction completion did not match an active tenant-scoped extraction',
     );
   }
+
+  if (bidDocumentId && documentVersionId && opportunityId) {
+    await writeBidWorkspaceArtifacts({
+      orgId,
+      opportunityId,
+      bidDocumentId,
+      documentVersionId,
+      text,
+      dustRunId,
+    });
+  }
 }
 
 // ─── BullMQ bootstrap ──────────────────────────────────────────────────────
@@ -445,6 +776,29 @@ export async function startDocumentExtract(
           data: { status: 'error', error: err.message.slice(0, 2000) },
         })
         .catch(() => undefined);
+      if (parsed.data.bidDocumentId && parsed.data.documentVersionId) {
+        prisma.documentVersion
+          .updateMany({
+            where: {
+              id: parsed.data.documentVersionId,
+              orgId,
+              bidDocumentId: parsed.data.bidDocumentId,
+              deletedAt: null,
+            },
+            data: {
+              extractionStatus: 'failed',
+              ocrStatus: 'failed',
+              metadata: { error: err.message.slice(0, 2000) },
+            },
+          })
+          .catch(() => undefined);
+        prisma.bidDocument
+          .updateMany({
+            where: { id: parsed.data.bidDocumentId, orgId, deletedAt: null },
+            data: { status: 'failed' },
+          })
+          .catch(() => undefined);
+      }
     }
   });
 

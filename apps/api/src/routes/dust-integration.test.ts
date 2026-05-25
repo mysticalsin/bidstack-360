@@ -34,6 +34,9 @@ beforeAll(async () => {
   await prisma.syncEvent.deleteMany({
     where: { orgId, source: 'manual', eventType: 'dust.resync.requested' },
   });
+  await prisma.auditLog.deleteMany({
+    where: { orgId, action: 'integration.probe' },
+  });
 
   server = await buildServer();
   await server.ready();
@@ -43,6 +46,9 @@ afterAll(async () => {
   if (orgId) {
     await prisma.syncEvent.deleteMany({
       where: { orgId, source: 'manual', eventType: 'dust.resync.requested' },
+    });
+    await prisma.auditLog.deleteMany({
+      where: { orgId, action: 'integration.probe' },
     });
   }
 
@@ -73,6 +79,19 @@ describe('dust integration routes', () => {
     });
   });
 
+  skipIfNoDb('GET /api/integrations/setup-guide returns copy-safe setup contract', async () => {
+    const res = await server.inject({ method: 'GET', url: '/api/integrations/setup-guide' });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.mcp.publicUrl).toMatch(/\/mcp$/);
+    expect(body.rest.authHeader).toBe('Authorization: Bearer <BIDSTACK_API_KEY>');
+    expect(body.webhooks.receiverUrl).toMatch(/\/api\/webhooks\/dust$/);
+    expect(body.mcp.readScopes).toEqual(['mcp', 'read']);
+    expect(body.mcp.writeScopes).toEqual(['mcp', 'write']);
+    expect(JSON.stringify(body)).not.toContain('DUST_API_KEY');
+  });
+
   skipIfNoDb('POST /api/integrations/dust/resync records the enqueue attempt', async () => {
     const res = await server.inject({ method: 'POST', url: '/api/integrations/dust/resync' });
 
@@ -84,6 +103,51 @@ describe('dust integration routes', () => {
       orderBy: { receivedAt: 'desc' },
     });
     expect(event?.payload).toMatchObject({ jobId: res.json().jobId });
+  });
+
+  skipIfNoDb('POST /api/integrations/probe rejects private network targets', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/integrations/probe',
+      payload: { kind: 'mcp', url: 'https://10.0.0.1/mcp' },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({ message: 'Bad Request' });
+    await expect(
+      prisma.auditLog.count({ where: { orgId: orgId!, action: 'integration.probe' } }),
+    ).resolves.toBe(0);
+  });
+
+  skipIfNoDb('POST /api/integrations/probe returns a safe structured result', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/integrations/probe',
+      payload: { kind: 'mcp', url: 'http://localhost:9/mcp?token=secret#frag' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body).toMatchObject({
+      ok: false,
+      status: null,
+      checkedUrl: 'http://localhost:9/mcp',
+      message: expect.any(String),
+      warnings: [],
+    });
+    expect(JSON.stringify(body)).not.toContain('secret');
+
+    const event = await prisma.auditLog.findFirst({
+      where: { orgId: orgId!, action: 'integration.probe' },
+      orderBy: { at: 'desc' },
+    });
+    expect(event?.diff).toMatchObject({
+      kind: 'mcp',
+      checkedUrl: 'http://localhost:9/mcp',
+      ok: false,
+      status: null,
+    });
+    expect(JSON.stringify(event?.diff)).not.toContain('secret');
   });
 });
 

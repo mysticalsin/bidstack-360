@@ -27,6 +27,7 @@ function useTargetRect(selector: string | undefined): TargetRect | null {
 
   useEffect(() => {
     if (!selector) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- selector removal should immediately remove the spotlight hole.
       setRect(null);
       return;
     }
@@ -34,10 +35,12 @@ function useTargetRect(selector: string | undefined): TargetRect | null {
     function measure() {
       const el = document.querySelector(selector as string);
       if (!el) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- DOM measurement result drives the overlay geometry.
         setRect(null);
         return;
       }
       const r = el.getBoundingClientRect();
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- DOM measurement result drives the overlay geometry.
       setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
     }
 

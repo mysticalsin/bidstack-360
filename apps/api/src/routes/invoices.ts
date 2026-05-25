@@ -16,7 +16,6 @@ import { z } from 'zod';
 import { prisma, Prisma } from '@bidstack/db';
 import type { InvoiceState as PrismaInvoiceState } from '@bidstack/db';
 import type { PaymentMethod as PrismaPaymentMethod } from '@bidstack/db';
-import type { CustomFieldValueInput } from '@bidstack/shared';
 import {
   INVOICE_STATE_TRANSITIONS,
   ArAgingReport,
@@ -98,6 +97,7 @@ async function loadInvoiceDetail(
   const customFieldValues = await prisma.customFieldValue.findMany({
     where: { orgId, entityType: 'invoice', entityId: id },
     select: { id: true, definitionId: true, value: true },
+    take: 100,
   });
 
   const state = invoice.state as z.infer<typeof InvoiceState>;
@@ -850,7 +850,7 @@ export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
           paidMicros: true,
           dueDate: true,
         },
-        take: 2000,
+        take: 1000,
       });
 
       const BUCKETS = [

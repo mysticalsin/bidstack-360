@@ -6,7 +6,8 @@
 import { useMemo, useState } from 'react';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
+import { Badge, type BadgeTone } from '@/components/ui/Badge';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { LoadingSkeleton, ErrorState, EmptyState } from '@/components/ui/StateMessages';
 import { useConnectorCatalog } from '@/hooks/useCrmIntegrations';
 import { relativeTime } from '@/lib/format';
@@ -28,14 +29,12 @@ const ALL: Category[] = ['company', 'market', 'procurement', 'logo', 'people', '
 export function ConnectorsSection() {
   const { data, isLoading, isError, error, refetch } = useConnectorCatalog();
   const [filter, setFilter] = useState<Category | 'all'>('all');
+  const items = useMemo(() => data?.items ?? [], [data?.items]);
 
-  // Reference `data?.items` directly in useMemo deps so React's hook linter
   // can verify stability — wrapping `items` in its own useMemo first would
-  // be equivalent but adds a redundant memo layer.
   const filtered = useMemo(() => {
-    const items = data?.items ?? [];
     return filter === 'all' ? items : items.filter((c) => c.category === filter);
-  }, [data?.items, filter]);
+  }, [filter, items]);
 
   // Counts feed the chip badges so the user can see how many connectors live
   // in each category without clicking through.
@@ -52,16 +51,33 @@ export function ConnectorsSection() {
     return acc;
   }, [data?.items]);
 
-  const items = data?.items ?? [];
+  const statusCounts = useMemo(() => {
+    const acc: Record<CrmConnector['status'], number> = {
+      healthy: 0,
+      degraded: 0,
+      down: 0,
+      disabled: 0,
+    };
+    for (const connector of items) acc[connector.status]++;
+    return acc;
+  }, [items]);
+  const credentialCount = items.filter((connector) => connector.requiresCredential).length;
 
   return (
-    <Card>
+    <Card className="overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-primary)]">
       <SectionHeader
         title="Connectors catalog"
         caption="External data sources the CRM can reach. Open feeds run without keys; licensed feeds need credentials."
+        action={
+          <Badge tone={statusCounts.down > 0 ? 'tomato' : statusCounts.degraded > 0 ? 'amber' : 'jade'}>
+            {items.length} sources
+          </Badge>
+        }
       />
       {isLoading ? (
-        <LoadingSkeleton rows={4} />
+        <div className="p-5">
+          <LoadingSkeleton rows={4} />
+        </div>
       ) : isError ? (
         <ErrorState
           title="Could not load connectors"
@@ -78,10 +94,36 @@ export function ConnectorsSection() {
         />
       ) : (
         <>
+          <div className="grid gap-3 p-5 md:grid-cols-4">
+            <ConnectorStat
+              icon="globe"
+              label="Total sources"
+              value={String(items.length)}
+              tone="blue"
+            />
+            <ConnectorStat
+              icon="checkCircle"
+              label="Healthy"
+              value={String(statusCounts.healthy)}
+              tone="jade"
+            />
+            <ConnectorStat
+              icon="shield"
+              label="Needs key"
+              value={String(credentialCount)}
+              tone={credentialCount > 0 ? 'amber' : 'gray'}
+            />
+            <ConnectorStat
+              icon="warning"
+              label="Degraded/down"
+              value={String(statusCounts.degraded + statusCounts.down)}
+              tone={statusCounts.down > 0 ? 'tomato' : statusCounts.degraded > 0 ? 'amber' : 'gray'}
+            />
+          </div>
           <div
             role="group"
             aria-label="Filter connectors by category"
-            className="flex flex-wrap gap-2 px-5 pt-4 text-xs"
+            className="flex flex-wrap gap-2 border-t border-[var(--border-subtle)] px-5 py-4 text-xs"
           >
             <FilterChip active={filter === 'all'} onClick={() => setFilter('all')}>
               All
@@ -109,11 +151,45 @@ export function ConnectorsSection() {
   );
 }
 
+function ConnectorStat({
+  icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: IconName;
+  label: string;
+  value: string;
+  tone: BadgeTone;
+}) {
+  return (
+    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--text-muted)]">
+          {label}
+        </span>
+        <span className="grid size-8 place-items-center rounded-xl bg-[var(--surface-primary)] text-[var(--text-secondary)]">
+          <Icon name={icon} className="size-4" />
+        </span>
+      </div>
+      <div className="mt-4 text-xl font-semibold tabular-nums text-[var(--text-primary)]">
+        {value}
+      </div>
+      <Badge tone={tone} className="mt-2">
+        catalog
+      </Badge>
+    </div>
+  );
+}
+
 function ConnectorRow({ connector }: { connector: CrmConnector }) {
   return (
-    <li className="flex flex-wrap items-start justify-between gap-3 px-5 py-3">
+    <li className="flex flex-wrap items-start justify-between gap-4 px-5 py-4 transition hover:bg-[var(--surface-secondary)]/70">
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="grid size-9 place-items-center rounded-2xl bg-[var(--surface-secondary)] text-[var(--text-secondary)]">
+            <Icon name={connector.category === 'ai' ? 'sparkle' : 'globe'} className="size-4" />
+          </span>
           <a
             href={connector.sourceUrl}
             target="_blank"
@@ -134,8 +210,8 @@ function ConnectorRow({ connector }: { connector: CrmConnector }) {
           <span>Checked {relativeTime(connector.lastCheckedAt)}</span>
           {connector.capabilities.length ? (
             <>
-              <span aria-hidden>·</span>
-              <span>{connector.capabilities.slice(0, 3).join(' · ')}</span>
+              <span aria-hidden>.</span>
+              <span>{connector.capabilities.slice(0, 3).join(' / ')}</span>
             </>
           ) : null}
           <a
@@ -186,7 +262,7 @@ function FilterChip({
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`rounded-full border px-3 py-1 transition-colors ${
+      className={`min-h-10 rounded-2xl border px-3 py-2 text-left transition-colors focus:outline-none focus:ring-4 focus:ring-[var(--accent-primary)]/15 ${
         active
           ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] text-[var(--brand-primary)]'
           : 'border-[var(--border-default)] bg-[var(--surface-card)] text-[var(--fg-secondary)] hover:border-[var(--border-strong)]'

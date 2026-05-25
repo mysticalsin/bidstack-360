@@ -1,0 +1,138 @@
+{
+  "app": {
+    "name": "BidStack",
+    "tagline": "Mantu · Avant-vente & appels d'offres",
+    "guest": "Invité",
+    "notSignedIn": "Non connecté"
+  },
+  "nav": {
+    "primary": "Navigation principale",
+    "breadcrumb": "Fil d'Ariane",
+    "workspace": "Espace de travail",
+    "settings": "Paramètres",
+    "starred": "Favoris",
+    "recent": "Récents",
+    "openNavigation": "Ouvrir la navigation",
+    "closeNavigation": "Fermer la navigation",
+    "expandSidebar": "Déplier la barre latérale",
+    "collapseSidebar": "Replier la barre latérale",
+    "dashboard": "Tableau de bord",
+    "sales": "Ventes",
+    "salesOrders": "Devis et commandes",
+    "products": "Produits",
+    "invoices": "Factures",
+    "accounts": "Comptes",
+    "companies": "Entreprises",
+    "opportunities": "Opportunités",
+    "pipeline": "Pipeline",
+    "forecasts": "Prévisions",
+    "bidMatrix": "Matrice Bid/No-Bid",
+    "leads": "Prospects",
+    "contacts": "Contacts",
+    "tasks": "Tâches",
+    "territories": "Territoires",
+    "serviceDesk": "Centre de services",
+    "workflows": "Workflows",
+    "intake": "Réception",
+    "reports": "Rapports",
+    "integrations": "Intégrations",
+    "auditLog": "Journal d'audit",
+    "agents": "Agents Dust",
+    "search": "Recherche",
+    "references": "Bibliothèque de références",
+    "settingsPage": "Paramètres"
+  },
+  "crumbs": {
+    "portfolio": "Portefeuille",
+    "detail": "Détail"
+  },
+  "actions": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "create": "Créer",
+    "update": "Mettre à jour",
+    "submit": "Soumettre",
+    "search": "Rechercher",
+    "filter": "Filtrer",
+    "sort": "Trier",
+    "clear": "Effacer",
+    "loading": "Chargement…",
+    "retry": "Réessayer",
+    "back": "Retour",
+    "next": "Suivant",
+    "previous": "Précédent",
+    "viewAll": "Tout afficher",
+    "markRead": "Marquer comme lu",
+    "signOut": "Se déconnecter",
+    "skipToContent": "Passer au contenu"
+  },
+  "search": {
+    "placeholder": "Rechercher ou accéder à…",
+    "label": "Rechercher des opportunités, contacts, tâches",
+    "recent": "Récents",
+    "clear": "Effacer",
+    "shortcut": "Ctrl+/"
+  },
+  "theme": {
+    "switchToLight": "Passer en mode clair",
+    "switchToDark": "Passer en mode sombre"
+  },
+  "notifications": {
+    "title": "Mentions",
+    "unread_one": "{{count}} mention non lue",
+    "unread_other": "{{count}} mentions non lues",
+    "noUnread": "Aucune mention non lue",
+    "loading": "Chargement…",
+    "couldNotLoad": "Impossible de charger les mentions",
+    "ariaLabel": "Notifications",
+    "ariaLabelWithCount": "Notifications, {{count}} non lue(s)",
+    "mentionTooltip": "Notifications",
+    "youWereMentioned": "Quelqu'un vous a mentionné dans un commentaire"
+  },
+  "help": {
+    "tooltip": "Aide & raccourcis (?)",
+    "ariaLabel": "Aide et raccourcis clavier"
+  },
+  "states": {
+    "loading": "Chargement…",
+    "empty": "Aucun élément à afficher",
+    "error": "Une erreur est survenue",
+    "noResults": "Aucun résultat"
+  },
+  "toast": {
+    "saved": "Enregistré",
+    "updated": "Mis à jour",
+    "created": "Créé",
+    "deleted": "Supprimé",
+    "copied": "Copié dans le presse-papiers",
+    "genericError": "Une erreur est survenue. Veuillez réessayer.",
+    "networkError": "Erreur réseau. Vérifiez votre connexion."
+  },
+  "validation": {
+    "required": "Ce champ est obligatoire",
+    "invalidEmail": "Saisissez une adresse e-mail valide",
+    "tooShort": "Doit comporter au moins {{min}} caractères",
+    "tooLong": "Doit comporter au plus {{max}} caractères",
+    "invalidUrl": "Saisissez une URL valide",
+    "invalidNumber": "Saisissez un nombre valide",
+    "invalidDate": "Saisissez une date valide"
+  },
+  "offline": {
+    "title": "Vous êtes hors ligne",
+    "message": "Les modifications seront synchronisées à votre reconnexion."
+  },
+  "page": {
+    "titleSuffix": "BidStack 360°"
+  },
+  "routeAnnouncer": {
+    "nowOn": "Vous êtes sur {{title}}"
+  },
+  "footer": {
+    "createdBy": "Créé par Tony Walteur",
+    "dustConnected": "Dust connecté",
+    "dustSynced": "synchronisé {{when}}"
+  }
+}

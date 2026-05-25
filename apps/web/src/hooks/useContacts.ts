@@ -57,9 +57,10 @@ export function useUpdateContact() {
       qc.getQueriesData<ContactsPayload>({ queryKey: ['contacts'] }).forEach(([key, value]) => {
         snapshots.push([key, value]);
         if (!value) return;
+        const { customFieldValues: _cf, ...rest } = patch as Record<string, unknown>;
         qc.setQueryData<ContactsPayload>(key, {
           ...value,
-          items: value.items.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+          items: value.items.map((c) => (c.id === id ? { ...c, ...rest } : c)),
         });
       });
       return { snapshots };

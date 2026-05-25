@@ -354,6 +354,6 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
     Sentry.setTag('userId', req.auth.userId);
     Sentry.setUser({ id: req.auth.userId, email: req.auth.email });
   });
-});
+}, { name: 'auth' });
 
 export const authPlugin = plugin;

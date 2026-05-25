@@ -7,15 +7,18 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
-import { useCompany, useUpdateCompany } from '@/hooks/useCompanies';
+import { AccountHierarchyTree } from '@/components/AccountHierarchyTree';
+import { useCompany, useUpdateCompany, useCompanyHierarchy } from '@/hooks/useCompanies';
+import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { formatMoneyMicros } from '@/lib/format';
 
-type TabKey = 'contacts' | 'opportunities' | 'cases' | 'notes';
+type TabKey = 'contacts' | 'opportunities' | 'cases' | 'notes' | 'hierarchy';
 
 export function CompanyDetailPage() {
   const { id } = useParams<{ id: string }>();
   const company = useCompany(id);
   const update = useUpdateCompany();
+  const hierarchy = useCompanyHierarchy(id);
   const [tab, setTab] = useState<TabKey>('contacts');
   const tabId = (key: TabKey) => `company-tab-${key}`;
   const panelId = (key: TabKey) => `company-panel-${key}`;
@@ -122,6 +125,18 @@ export function CompanyDetailPage() {
             {c.countryCode && <span>{c.countryCode}</span>}
             {c.employeeCount && <span>{c.employeeCount.toLocaleString()} employees</span>}
             {c.taxId && <span>Tax ID: {c.taxId}</span>}
+            {c.parent && (
+              <span className="flex items-center gap-1">
+                <Icon name="git-branch" size={12} />
+                Parent:
+                <Link
+                  to={`/companies/${c.parent.id}`}
+                  className="font-medium text-[var(--brand-primary)] hover:underline"
+                >
+                  {c.parent.name}
+                </Link>
+              </span>
+            )}
           </div>
           {editing && (
             <div className="mt-2 flex gap-3">
@@ -170,6 +185,7 @@ export function CompanyDetailPage() {
             { key: 'opportunities', label: `Opportunities (${c.opportunities.length})` },
             { key: 'cases', label: `Cases (${c.openCases.length})` },
             { key: 'notes', label: `Notes (${c.notes.length})` },
+            { key: 'hierarchy', label: `Hierarchy` },
           ] as { key: TabKey; label: string }[]
         ).map((t) => (
           <button
@@ -181,7 +197,7 @@ export function CompanyDetailPage() {
             tabIndex={tab === t.key ? 0 : -1}
             onClick={() => setTab(t.key)}
             onKeyDown={(e) => {
-              const keys = ['contacts', 'opportunities', 'cases', 'notes'] as const;
+              const keys = ['contacts', 'opportunities', 'cases', 'notes', 'hierarchy'] as const;
               const idx = keys.indexOf(t.key);
               if (e.key === 'ArrowRight') {
                 e.preventDefault();
@@ -226,6 +242,17 @@ export function CompanyDetailPage() {
           <NotesTab notes={c.notes} />
         </div>
       )}
+      {tab === 'hierarchy' && (
+        <div role="tabpanel" id={panelId('hierarchy')} aria-labelledby={tabId('hierarchy')}>
+          <HierarchyTab
+            hierarchy={hierarchy}
+            childrenList={c.children}
+            companyId={c.id}
+          />
+        </div>
+      )}
+
+      <CustomFieldValuesSection entityType="company" entityId={id!} />
     </div>
   );
 }
@@ -407,6 +434,42 @@ function NotesTab({
           )}
         </Card>
       ))}
+    </div>
+  );
+}
+
+function HierarchyTab({
+  hierarchy,
+  childrenList,
+}: {
+  hierarchy: ReturnType<typeof useCompanyHierarchy>;
+  childrenList: Array<{ id: string; name: string }>;
+  companyId: string;
+}) {
+  return (
+    <div className="space-y-6">
+      {childrenList.length > 0 && (
+        <div className="card p-4">
+          <h3 className="text-sm font-semibold text-[var(--fg-primary)] mb-3">Direct Children</h3>
+          <div className="flex flex-wrap gap-2">
+            {childrenList.map((child) => (
+              <Link
+                key={child.id}
+                to={`/companies/${child.id}`}
+                className="inline-flex items-center gap-1.5 rounded-md bg-[var(--surface-sunken)] px-3 py-1.5 text-sm font-medium text-[var(--fg-primary)] hover:bg-[var(--border-subtle)] transition-colors"
+              >
+                <Icon name="building" size={14} />
+                {child.name}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+      {hierarchy.isLoading && <DetailPageSkeleton tabs={false} columns={1} cards={1} />}
+      {hierarchy.isError && (
+        <ErrorState title="Couldn't load hierarchy" message="Unable to fetch account hierarchy." />
+      )}
+      {hierarchy.data && <AccountHierarchyTree tree={hierarchy.data.tree} />}
     </div>
   );
 }

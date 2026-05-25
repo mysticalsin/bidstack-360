@@ -14,6 +14,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.98.0",
     "@aws-sdk/client-s3": "^3.947.0",
     "@aws-sdk/s3-request-presigner": "^3.947.0",
     "@bidstack/db": "workspace:*",
