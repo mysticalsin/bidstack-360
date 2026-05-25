@@ -253,3 +253,86 @@ export const OUTLOOK_SUBSCRIPTION_RENEW: QueueConfig = {
     removeOnFail: { age: 604_800, count: 50 },
   },
 };
+
+// ─── Wave 8: Voice + Video call processing queues ────────────────────────
+
+/**
+ * call.fetch-recording — downloads provider MP4/WebM to S3 after recording.completed event.
+ * WHY exponential long backoff: S3 uploads can transiently fail; provider recording
+ * URLs may not be immediately available even after the webhook fires.
+ */
+export const CALL_FETCH_RECORDING: QueueConfig = {
+  name: 'call.fetch-recording',
+  defaultJobOptions: {
+    attempts: 5,
+    backoff: { type: 'exponential', delay: 15_000 },
+    removeOnComplete: { age: 86_400, count: 200 },
+    removeOnFail: { age: 604_800, count: 100 },
+  },
+};
+
+/**
+ * call.transcribe — submits audio file to Deepgram for speaker-diarized transcription.
+ * WHY separate from fetch-recording: transcription can start as soon as the file is
+ * available in S3, independently of any downstream analysis.
+ */
+export const CALL_TRANSCRIBE: QueueConfig = {
+  name: 'call.transcribe',
+  defaultJobOptions: {
+    attempts: 4,
+    backoff: { type: 'exponential', delay: 10_000 },
+    removeOnComplete: { age: 86_400, count: 200 },
+    removeOnFail: { age: 604_800, count: 100 },
+  },
+};
+
+/**
+ * call.analyze — LLM analysis pass: summary, action items, MEDDIC signals, sentiment.
+ * WHY separate queue: can be re-triggered manually via POST /calls/:id/extract-insights
+ * without re-fetching the recording or re-transcribing.
+ */
+export const CALL_ANALYZE: QueueConfig = {
+  name: 'call.analyze',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 10_000 },
+    removeOnComplete: { age: 86_400, count: 200 },
+    removeOnFail: { age: 604_800, count: 100 },
+  },
+};
+
+/**
+ * call.update-deal — proposes deal-stage updates based on high-confidence call signals.
+ * WHY HUMAN-IN-THE-LOOP: Auto-applying deal changes from AI is a business risk.
+ * This job creates an in-app notification with a suggested update; the rep decides.
+ */
+export const CALL_UPDATE_DEAL: QueueConfig = {
+  name: 'call.update-deal',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 5_000 },
+    removeOnComplete: { age: 86_400, count: 200 },
+    removeOnFail: { age: 604_800, count: 100 },
+  },
+};
+
+// ─── Wave 7: Outbound webhook delivery queues ─────────────────────────────
+
+/**
+ * Outbound webhook delivery — HTTP POST with HMAC-SHA256 signature to
+ * partner-registered subscription URLs.
+ *
+ * Retry schedule: immediate → 30 s → 2 min → 15 min → 1 h → 6 h (5 attempts).
+ * Dead-letters after 5 failures; increments `failureCount` on the subscription.
+ * WHY exponential with large initial delay: partners need time to recover from
+ * outages before we bombard them; 30 s covers most transient 500s.
+ */
+export const WEBHOOK_DELIVERY: QueueConfig = {
+  name: 'webhook.delivery',
+  defaultJobOptions: {
+    attempts: 5,
+    backoff: { type: 'exponential', delay: 30_000 },
+    removeOnComplete: { age: 86_400 * 7, count: 1_000 }, // 7 days for audit
+    removeOnFail: { age: 86_400 * 30, count: 500 },
+  },
+};
