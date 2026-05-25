@@ -6,7 +6,6 @@
  * customer workflows without any visible error.
  */
 import { test, expect } from '@playwright/test';
-import { CustomObjectsAdminPage } from '../pages/CustomObjectsAdminPage.js';
 
 test.describe('Custom fields', () => {
   test('custom fields definition is accessible from settings', async ({ page }) => {

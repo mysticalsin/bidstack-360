@@ -1,6 +1,6 @@
 import { prisma } from '@bidstack/db';
-import { Company, CompanyDetail } from '@bidstack/shared';
-import { z } from 'zod';
+import { type Company, type CompanyDetail } from '@bidstack/shared';
+import { type z } from 'zod';
 
 export function serializeCompany(c: {
   id: string;

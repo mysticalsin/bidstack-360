@@ -42,7 +42,7 @@ export function CustomFieldValuesSection({ entityType, entityId }: CustomFieldVa
       });
       // eslint-disable-next-line react-hooks/set-state-in-effect -- synchronizes editable draft from fetched field values.
       setDraft(map);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- fetched values are now the clean baseline.
+       
       setHasChanges(false);
     }
   }, [values.data]);

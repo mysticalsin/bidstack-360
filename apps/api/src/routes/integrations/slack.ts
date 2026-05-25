@@ -419,7 +419,7 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
   // Must NOT be behind auth middleware — Slack signs the request itself.
   // Registered at /api/v1/integrations/slack/events but public.
   app.post('/integrations/slack/events', {
-    config: { skipAuth: true },
+    config: { public: true },
     schema: {
       body: z.record(z.unknown()),
       response: { 200: z.object({ challenge: z.string().optional() }) },

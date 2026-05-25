@@ -459,7 +459,7 @@ async function pullGmail(
 
       await prisma.emailMessage.upsert({
         where: {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+           
           orgId_externalMessageId: { orgId, externalMessageId: detail.id },
         },
         create: {
@@ -548,7 +548,7 @@ async function pullMsGraphMail(
 
       await prisma.emailMessage.upsert({
         where: {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+           
           orgId_externalMessageId: { orgId, externalMessageId: msg.id },
         },
         create: {

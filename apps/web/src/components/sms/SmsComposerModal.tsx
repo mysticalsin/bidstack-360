@@ -125,13 +125,13 @@ export function SmsComposerModal({
     if (!open) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- closing the modal resets form state for the next open.
       setPhone(defaultPhone);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- closing the modal resets form state for the next open.
+       
       setBody('');
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- closing the modal resets form state for the next open.
+       
       setSendState('idle');
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- closing the modal resets form state for the next open.
+       
       setErrorMessage('');
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- closing the modal resets form state for the next open.
+       
       setConsent({ optedOut: false, checked: false });
     }
   }, [open, defaultPhone]);

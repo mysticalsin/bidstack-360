@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 import {
   prisma,
-  Prisma,
+  type Prisma,
   type LeadStatus,
   type LeadPriority,
 } from '@bidstack/db';

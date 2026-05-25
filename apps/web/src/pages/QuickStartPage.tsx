@@ -27,7 +27,7 @@ export function QuickStartPage() {
     skipToStep(stepIndex);
   }
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   const ITEMS: ChecklistItemDef[] = [
     {
       key: 'profile',

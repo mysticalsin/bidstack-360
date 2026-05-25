@@ -11,11 +11,20 @@ export interface Mention {
   createdAt: string;
 }
 
-export function useMentions(unreadOnly?: boolean) {
+export function useMentions(unreadOnly?: boolean, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ['mentions', unreadOnly ?? false],
     queryFn: ({ signal }) =>
       api<{ items: Mention[] }>(`/api/mentions${unreadOnly ? '?unreadOnly=true' : ''}`, { signal }),
+    enabled: options.enabled ?? true,
+    staleTime: 30_000,
+  });
+}
+
+export function useMentionSummary() {
+  return useQuery({
+    queryKey: ['mentions', 'summary'],
+    queryFn: ({ signal }) => api<{ unread: number }>('/api/mentions/summary', { signal }),
     staleTime: 30_000,
   });
 }
@@ -26,6 +35,7 @@ export function useMarkMentionRead() {
     mutationFn: (id: string) => api<Mention>(`/api/mentions/${id}/read`, { method: 'POST' }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['mentions'] });
+      qc.invalidateQueries({ queryKey: ['mentions', 'summary'] });
     },
   });
 }

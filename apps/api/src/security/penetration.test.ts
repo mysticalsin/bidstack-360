@@ -134,8 +134,7 @@ afterAll(async () => {
 const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
   it(name, async () => {
     if (!dbReachable || !seedOrgId) {
-      console.warn(`[skip] ${name} — DATABASE_URL not reachable or seed missing`);
-      return;
+      throw new Error(`[skip] ${name} — DATABASE_URL not reachable or seed missing`);
     }
     await fn();
   });

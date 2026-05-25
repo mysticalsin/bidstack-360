@@ -101,9 +101,7 @@ afterAll(async () => {
 const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
   it(name, async () => {
     if (!dbReachable) {
-      // Surface the skip — silent skips violate Rule 12 (Fail loud).
-      console.warn(`[skip] ${name} — DATABASE_URL not reachable`);
-      return;
+      throw new Error(`Database not reachable: ${name}`);
     }
     await fn();
   });

@@ -28,7 +28,7 @@ import type IORedis from 'ioredis';
 import type pino from 'pino';
 import { z } from 'zod';
 
-import { prisma, Prisma } from '@bidstack/db';
+import { prisma, type Prisma } from '@bidstack/db';
 import {
   CALL_FETCH_RECORDING,
   CALL_TRANSCRIBE,

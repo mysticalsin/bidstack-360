@@ -10,6 +10,7 @@ let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 const createdProductIds: string[] = [];
 const createdCategoryIds: string[] = [];
+const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`.toUpperCase();
 
 beforeAll(async () => {
   try {
@@ -47,8 +48,7 @@ afterAll(async () => {
 const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
   it(name, async () => {
     if (!dbReachable) {
-      console.warn(`[skip] ${name} — DATABASE_URL not reachable`);
-      return;
+      throw new Error(`[skip] ${name} — DATABASE_URL not reachable`);
     }
     await fn();
   });
@@ -68,15 +68,16 @@ describe('products routes', () => {
   });
 
   skipIfNoDb('POST /api/products/categories creates a category', async () => {
+    const name = `Audit Test Category ${runId}`;
     const res = await server.inject({
       method: 'POST',
       url: '/api/products/categories',
-      payload: { name: 'Audit Test Category' },
+      payload: { name },
     });
     expect(res.statusCode).toBe(201);
     const body = res.json();
     expect(body.id).toBeDefined();
-    expect(body.name).toBe('Audit Test Category');
+    expect(body.name).toBe(name);
     createdCategoryIds.push(body.id);
   });
 
@@ -124,8 +125,8 @@ describe('products routes', () => {
       method: 'POST',
       url: '/api/products',
       payload: {
-        sku: 'AUDIT-001',
-        name: 'Audit Test Product',
+        sku: `AUDIT-001-${runId}`,
+        name: `Audit Test Product ${runId}`,
         listPriceMicros: 99_000_000,
         currency: 'CAD',
         active: true,
@@ -134,7 +135,7 @@ describe('products routes', () => {
     expect(res.statusCode).toBe(201);
     const body = res.json();
     expect(body.id).toBeDefined();
-    expect(body.sku).toBe('AUDIT-001');
+    expect(body.sku).toBe(`AUDIT-001-${runId}`);
     expect(body.listPriceMicros).toBe('99000000');
     createdProductIds.push(body.id);
   });
@@ -144,13 +145,14 @@ describe('products routes', () => {
       method: 'POST',
       url: '/api/products',
       payload: {
-        sku: 'AUDIT-002',
-        name: 'Patch Me',
+        sku: `AUDIT-002-${runId}`,
+        name: `Patch Me ${runId}`,
         listPriceMicros: 10_000_000,
         currency: 'USD',
         active: true,
       },
     });
+    expect(createRes.statusCode).toBe(201);
     const id = createRes.json().id;
     createdProductIds.push(id);
 
@@ -168,13 +170,14 @@ describe('products routes', () => {
       method: 'POST',
       url: '/api/products',
       payload: {
-        sku: 'AUDIT-003',
-        name: 'Delete Me',
+        sku: `AUDIT-003-${runId}`,
+        name: `Delete Me ${runId}`,
         listPriceMicros: 5_000_000,
         currency: 'CAD',
         active: true,
       },
     });
+    expect(createRes.statusCode).toBe(201);
     const id = createRes.json().id;
     createdProductIds.push(id);
 

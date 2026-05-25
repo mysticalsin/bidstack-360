@@ -14,7 +14,7 @@
  */
 import type { Logger as PinoLogger } from 'pino';
 
-import { prisma, Prisma } from '@bidstack/db';
+import { prisma, type Prisma } from '@bidstack/db';
 
 // ─── Weight constants ──────────────────────────────────────────────────────
 

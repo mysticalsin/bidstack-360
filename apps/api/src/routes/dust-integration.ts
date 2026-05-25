@@ -58,6 +58,11 @@ const DustStatus = z.object({
     z.object({ id: z.string(), label: z.string(), description: z.string().nullable() }),
   ),
 });
+type DustStatusPayload = z.infer<typeof DustStatus>;
+type DustStatusCacheEntry = {
+  expiresAt: number;
+  promise: Promise<DustStatusPayload>;
+};
 
 const ApiKeySummary = z.object({
   id: z.string().uuid(),
@@ -119,7 +124,9 @@ const IntegrationProbeResult = z.object({
 });
 
 const DUST_STATUS_RATE_LIMIT_MAX = Math.max(120, Math.min(config.API_RATE_LIMIT_MAX, 1_000));
+const DUST_STATUS_CACHE_TTL_MS = 15_000;
 const INTEGRATION_PROBE_TIMEOUT_MS = 5_000;
+const dustStatusCache = new Map<string, DustStatusCacheEntry>();
 
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '');
@@ -144,6 +151,74 @@ function publicMcpUrl(): string {
   if (configured) return normalizeMcpUrl(configured);
   const port = envString('PORT_MCP') ?? '4001';
   return normalizeMcpUrl(`http://localhost:${port}/mcp`);
+}
+
+async function buildDustStatus(
+  orgId: string,
+  log: { warn: (a: object, msg?: string) => void },
+): Promise<DustStatusPayload> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const [pulled, pushed, lastErr, lastSync, agentStatus] = await Promise.all([
+    prisma.syncEvent.count({
+      where: {
+        orgId,
+        source: 'dust.poll',
+        receivedAt: { gte: since },
+      },
+    }),
+    prisma.syncEvent.count({
+      where: {
+        orgId,
+        source: 'dust.push',
+        receivedAt: { gte: since },
+      },
+    }),
+    prisma.syncEvent.findFirst({
+      where: { orgId, status: 'error' },
+      orderBy: { receivedAt: 'desc' },
+    }),
+    prisma.syncEvent.findFirst({
+      where: { orgId, source: 'dust.poll', status: 'processed' },
+      orderBy: { receivedAt: 'desc' },
+    }),
+    listDustAgents(log),
+  ]);
+
+  const configured = Boolean(process.env.DUST_API_KEY && process.env.DUST_WORKSPACE_ID);
+
+  return {
+    workspace: process.env.DUST_WORKSPACE_ID ?? 'mantu-presales',
+    lastSyncAt: lastSync?.processedAt?.toISOString() ?? lastSync?.receivedAt.toISOString() ?? null,
+    nextSyncAt: lastSync
+      ? new Date(lastSync.receivedAt.getTime() + 5 * 60 * 1000).toISOString()
+      : new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+    lastError: lastErr?.error ?? null,
+    pulled24h: pulled,
+    pushed24h: pushed,
+    configured,
+    agentsError: agentStatus.error,
+    agents: agentStatus.agents,
+  };
+}
+
+async function cachedDustStatus(
+  orgId: string,
+  log: { warn: (a: object, msg?: string) => void },
+): Promise<DustStatusPayload> {
+  const now = Date.now();
+  const cached = dustStatusCache.get(orgId);
+  if (cached && cached.expiresAt > now) {
+    return cached.promise;
+  }
+
+  const promise = buildDustStatus(orgId, log);
+  dustStatusCache.set(orgId, { expiresAt: now + DUST_STATUS_CACHE_TTL_MS, promise });
+  try {
+    return await promise;
+  } catch (err) {
+    dustStatusCache.delete(orgId);
+    throw err;
+  }
 }
 
 function isLocalDevelopmentHostname(hostname: string): boolean {
@@ -471,52 +546,7 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: { response: { 200: DustStatus } },
     },
     async (req) => {
-      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      const [pulled, pushed, lastErr, lastSync, agentStatus] = await Promise.all([
-        prisma.syncEvent.count({
-          where: {
-            orgId: req.auth.orgId,
-            source: 'dust.poll',
-            receivedAt: { gte: since },
-          },
-        }),
-        prisma.syncEvent.count({
-          where: {
-            orgId: req.auth.orgId,
-            source: 'dust.push',
-            receivedAt: { gte: since },
-          },
-        }),
-        prisma.syncEvent.findFirst({
-          where: { orgId: req.auth.orgId, status: 'error' },
-          orderBy: { receivedAt: 'desc' },
-        }),
-        prisma.syncEvent.findFirst({
-          where: { orgId: req.auth.orgId, source: 'dust.poll', status: 'processed' },
-          orderBy: { receivedAt: 'desc' },
-        }),
-        listDustAgents(req.log),
-      ]);
-
-      const configured = Boolean(process.env.DUST_API_KEY && process.env.DUST_WORKSPACE_ID);
-
-      return {
-        workspace: process.env.DUST_WORKSPACE_ID ?? 'mantu-presales',
-        lastSyncAt:
-          lastSync?.processedAt?.toISOString() ?? lastSync?.receivedAt.toISOString() ?? null,
-        // Best-effort next tick: the dust-poll worker's repeat interval is 5m,
-        // so we estimate from lastSync without coupling this route to BullMQ
-        // scheduler internals.
-        nextSyncAt: lastSync
-          ? new Date(lastSync.receivedAt.getTime() + 5 * 60 * 1000).toISOString()
-          : new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-        lastError: lastErr?.error ?? null,
-        pulled24h: pulled,
-        pushed24h: pushed,
-        configured,
-        agentsError: agentStatus.error,
-        agents: agentStatus.agents,
-      };
+      return cachedDustStatus(req.auth.orgId, req.log);
     },
   );
 
@@ -548,6 +578,7 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
           error: queuedId ? null : 'Redis unreachable; resync was not enqueued',
         },
       });
+      dustStatusCache.delete(req.auth.orgId);
       if (!queuedId) {
         req.log.warn({ orgId: req.auth.orgId }, 'dust resync: Redis unreachable, no real job');
       }

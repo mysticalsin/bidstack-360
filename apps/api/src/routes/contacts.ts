@@ -6,7 +6,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { prisma, Prisma, type Sentiment as PrismaSentiment } from '@bidstack/db';
+import { prisma, type Prisma, type Sentiment as PrismaSentiment } from '@bidstack/db';
 import { Contact, ContactCreate, ContactFilter, ContactPage, ContactPatch } from '@bidstack/shared';
 
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';

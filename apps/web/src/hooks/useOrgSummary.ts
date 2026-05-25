@@ -25,5 +25,6 @@ export function useOrgSummary() {
   return useQuery<OrgSummary>({
     queryKey: ['org-summary'],
     queryFn: async () => api('/api/crm/summary'),
+    staleTime: 30_000,
   });
 }

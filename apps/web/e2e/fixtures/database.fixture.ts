@@ -31,8 +31,8 @@ export type DatabaseFixtures = {
 };
 
 export const test = base.extend<DatabaseFixtures>({
-  resetDb: async ({}, use) => {
-    await use(async () => {
+  resetDb: async (_, runReset) => {
+    await runReset(async () => {
       const ok = await resetDatabase();
       return ok;
     });

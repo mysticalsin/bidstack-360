@@ -48,8 +48,7 @@ afterAll(async () => {
 const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
   it(name, async () => {
     if (!dbReachable || !orgId) {
-      console.warn(`[skip] ${name} — DATABASE_URL not reachable or seed org missing`);
-      return;
+      throw new Error(`[skip] ${name} — DATABASE_URL not reachable or seed org missing`);
     }
     await fn();
   });
@@ -64,6 +63,20 @@ describe('tasks routes', () => {
     for (const row of body.items) {
       expect(['open', 'in_progress', 'done', 'blocked']).toContain(row.status);
     }
+  });
+
+  skipIfNoDb('GET /api/tasks/summary returns badge counts without list payload', async () => {
+    const res = await server.inject({ method: 'GET', url: '/api/tasks/summary' });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as Record<string, unknown>;
+    expect(body).toMatchObject({
+      total: expect.any(Number),
+      open: expect.any(Number),
+      overdue: expect.any(Number),
+      dueSoon: expect.any(Number),
+    });
+    expect(body.items).toBeUndefined();
   });
 
   skipIfNoDb('POST /api/tasks creates a task', async () => {

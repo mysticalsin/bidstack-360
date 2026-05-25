@@ -40,8 +40,7 @@ afterAll(async () => {
 const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
   it(name, async () => {
     if (!dbReachable) {
-      console.warn(`[skip] ${name} — DATABASE_URL not reachable`);
-      return;
+      throw new Error(`[skip] ${name} — DATABASE_URL not reachable`);
     }
     await fn();
   });

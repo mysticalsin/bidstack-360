@@ -63,7 +63,7 @@ export const zapierRoutes: FastifyPluginAsync = async (fastify) => {
   app.post(
     '/zapier/auth/test',
     {
-      config: { skipAuth: true },
+      config: { public: true },
       schema: {
         summary: 'Zapier API key authentication test',
         tags: ['zapier'],
@@ -85,7 +85,7 @@ export const zapierRoutes: FastifyPluginAsync = async (fastify) => {
   app.post(
     '/zapier/subscribe',
     {
-      config: { skipAuth: true },
+      config: { public: true },
       schema: {
         summary: 'Subscribe to a BidStack event (REST-hook)',
         tags: ['zapier'],
@@ -134,7 +134,7 @@ export const zapierRoutes: FastifyPluginAsync = async (fastify) => {
   app.delete(
     '/zapier/subscribe/:id',
     {
-      config: { skipAuth: true },
+      config: { public: true },
       schema: {
         summary: 'Unsubscribe from a BidStack event (REST-hook)',
         tags: ['zapier'],
@@ -169,7 +169,7 @@ export const zapierRoutes: FastifyPluginAsync = async (fastify) => {
   app.get(
     '/zapier/triggers/NEW_LEAD',
     {
-      config: { skipAuth: true },
+      config: { public: true },
       schema: {
         summary: 'Polling fallback — recent leads',
         tags: ['zapier'],
@@ -209,7 +209,7 @@ export const zapierRoutes: FastifyPluginAsync = async (fastify) => {
   app.get(
     '/zapier/triggers/NEW_CONTACT',
     {
-      config: { skipAuth: true },
+      config: { public: true },
       schema: {
         summary: 'Polling fallback — recent contacts',
         tags: ['zapier'],

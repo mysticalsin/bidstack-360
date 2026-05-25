@@ -4,8 +4,8 @@ import { NavLink } from 'react-router-dom';
 import { Tooltip, TooltipProvider } from '@/components/ui/Tooltip';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useOpportunityCount } from '@/hooks/useOpportunities';
-import { useTasks } from '@/hooks/useTasks';
-import { daysUntil, relativeTime } from '@/lib/format';
+import { useTaskSummary } from '@/hooks/useTasks';
+import { relativeTime } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { prefetchRoute } from '@/lib/prefetch';
 import { useAccountHistory, type AccountEntry } from '@/stores/accountHistory';
@@ -56,7 +56,7 @@ const MEMBER_SETTINGS: NavItem[] = [
 
 export function Sidebar() {
   const oppsCount = useOpportunityCount({ excludeClosed: true });
-  const tasks = useTasks();
+  const taskSummary = useTaskSummary();
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
   const toggle = useUiStore((s) => s.toggleSidebar);
   const isAdmin = useIsAdmin();
@@ -77,14 +77,8 @@ export function Sidebar() {
   const favorites = useAccountHistory((s) => s.favorites);
 
   const openBids = oppsCount.data?.count ?? 0;
-  // Badge counts only truly overdue tasks (negative daysUntil) so its meaning
-  // matches the Dashboard KPI. A "due within 7 days" filter belongs to a
-  // separate upcoming surface; mixing the two confused what the count meant.
-  const overdueTasks =
-    tasks.data?.items.filter((t) => {
-      const d = daysUntil(t.dueDate);
-      return d !== null && d < 0 && t.status !== 'done';
-    }).length ?? 0;
+  // Badge counts only truly overdue tasks so its meaning matches the Dashboard KPI.
+  const overdueTasks = taskSummary.data?.overdue ?? 0;
 
   const badges = { openBids, overdueTasks };
 

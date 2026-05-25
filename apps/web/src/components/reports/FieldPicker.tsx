@@ -83,7 +83,14 @@ export function FieldPicker({ entity, value, onChange, placeholder = 'Pick a fie
     retry: false,
   });
 
-  const fields = remoteFields ?? FALLBACK_FIELDS[entity] ?? [];
+  // WHY useMemo on `fields`: the `remoteFields ?? FALLBACK ?? []` expression
+  // creates a fresh `[]` literal on every render when both sides are null,
+  // which busts the downstream `useMemo([fields, query])` deps and re-runs
+  // the filter every render. Memoizing on the explicit inputs prevents that.
+  const fields = useMemo(
+    () => remoteFields ?? FALLBACK_FIELDS[entity] ?? [],
+    [remoteFields, entity],
+  );
 
   const filtered = useMemo(
     () => fields.filter((f) => f.label.toLowerCase().includes(query.toLowerCase()) || f.key.includes(query.toLowerCase())),

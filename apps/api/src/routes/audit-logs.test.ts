@@ -71,8 +71,7 @@ async function seedAudit(orgId: string, action: string, targetId: string | null 
 const skipIfNoDb = (name: string, fn: () => Promise<void>) =>
   it(name, async () => {
     if (!dbReachable) {
-      console.warn(`[skip] ${name} — DATABASE_URL not reachable`);
-      return;
+      throw new Error(`[skip] ${name} — DATABASE_URL not reachable`);
     }
     await fn();
   });

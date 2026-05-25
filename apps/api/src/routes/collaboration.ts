@@ -1,7 +1,59 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
-import { Comment, CommentCreate, Mention, UserPresence, PresenceUpdate } from '@bidstack/shared';
+import {
+  Comment,
+  CommentCreate,
+  Mention,
+  MentionSummary,
+  UserPresence,
+  PresenceUpdate,
+} from '@bidstack/shared';
+
+type MentionSummaryPayload = z.infer<typeof MentionSummary>;
+type MentionSummaryCacheEntry = {
+  expiresAt: number;
+  promise: Promise<MentionSummaryPayload>;
+};
+
+const MENTION_SUMMARY_CACHE_TTL_MS = 15_000;
+const mentionSummaryCache = new Map<string, MentionSummaryCacheEntry>();
+
+function mentionSummaryCacheKey(orgId: string, userId: string): string {
+  return `${orgId}:${userId}`;
+}
+
+function clearMentionSummaryCache(orgId: string, userId: string): void {
+  mentionSummaryCache.delete(mentionSummaryCacheKey(orgId, userId));
+}
+
+async function buildMentionSummary(orgId: string, userId: string): Promise<MentionSummaryPayload> {
+  const unread = await prisma.mention.count({
+    where: {
+      orgId,
+      userId,
+      readAt: null,
+      deletedAt: null,
+    },
+  });
+  return { unread };
+}
+
+async function cachedMentionSummary(orgId: string, userId: string): Promise<MentionSummaryPayload> {
+  const key = mentionSummaryCacheKey(orgId, userId);
+  const now = Date.now();
+  const cached = mentionSummaryCache.get(key);
+  if (cached && cached.expiresAt > now) return cached.promise;
+
+  const promise = buildMentionSummary(orgId, userId);
+  mentionSummaryCache.set(key, { expiresAt: now + MENTION_SUMMARY_CACHE_TTL_MS, promise });
+  try {
+    return await promise;
+  } catch (err) {
+    mentionSummaryCache.delete(key);
+    throw err;
+  }
+}
 
 export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
   // GET /api/comments
@@ -160,6 +212,18 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
     },
   );
 
+  server.get(
+    '/mentions/summary',
+    {
+      schema: {
+        response: { 200: MentionSummary },
+      },
+    },
+    async (req) => {
+      return cachedMentionSummary(req.auth.orgId, req.auth.userId);
+    },
+  );
+
   // POST /api/mentions/:id/read
   server.post(
     '/mentions/:id/read',
@@ -172,6 +236,7 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
         data: { readAt: new Date() },
       });
       if (updated.count === 0) throw server.httpErrors.notFound('Mention not found');
+      clearMentionSummaryCache(req.auth.orgId, req.auth.userId);
       const row = await prisma.mention.findFirstOrThrow({
         where: { id: req.params.id, orgId: req.auth.orgId, userId: req.auth.userId },
       });

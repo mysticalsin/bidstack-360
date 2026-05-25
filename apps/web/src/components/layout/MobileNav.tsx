@@ -11,8 +11,7 @@ import { useUiStore } from '@/stores/ui';
 import { useAccountHistory } from '@/stores/accountHistory';
 import { useIsAdmin } from '@/lib/auth';
 import { useOpportunityCount } from '@/hooks/useOpportunities';
-import { useTasks } from '@/hooks/useTasks';
-import { daysUntil } from '@/lib/format';
+import { useTaskSummary } from '@/hooks/useTasks';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
 import { prefetchRoute } from '@/lib/prefetch';
@@ -114,17 +113,13 @@ export function MobileNav() {
 
 function MobileNavContent({ onClose }: { onClose: () => void }) {
   const oppsCount = useOpportunityCount({ excludeClosed: true });
-  const tasks = useTasks();
+  const taskSummary = useTaskSummary();
   const isAdmin = useIsAdmin();
   const recents = useAccountHistory((s) => s.recents);
   const favorites = useAccountHistory((s) => s.favorites);
 
   const openBids = oppsCount.data?.count ?? 0;
-  const overdueTasks =
-    tasks.data?.items.filter((t) => {
-      const d = daysUntil(t.dueDate);
-      return d !== null && d < 0 && t.status !== 'done';
-    }).length ?? 0;
+  const overdueTasks = taskSummary.data?.overdue ?? 0;
 
   const badges = { openBids, overdueTasks };
 

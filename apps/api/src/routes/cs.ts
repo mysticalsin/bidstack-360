@@ -18,7 +18,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Logger as PinoLogger } from 'pino';
 import { z } from 'zod';
 
-import { prisma, Prisma } from '@bidstack/db';
+import { prisma, type Prisma } from '@bidstack/db';
 import { getLatestHealthScore } from '../services/cs/health-score.service.js';
 import { listRenewalOpportunities } from '../services/cs/renewal.service.js';
 import { recordNpsResponse } from '../services/cs/nps.service.js';
@@ -211,7 +211,7 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
   app.post(
     '/nps/surveys/:id/respond',
     {
-      config: { skipAuth: true },
+      config: { public: true },
       schema: {
         params: SurveyParams,
         body: NpsRespondBody,

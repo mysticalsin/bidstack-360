@@ -71,8 +71,8 @@ export type MockFixtures = {
 };
 
 export const test = base.extend<MockFixtures>({
-  withMocks: async ({ page }, use) => {
-    await use(async () => {
+  withMocks: async ({ page }, installForTest) => {
+    await installForTest(async () => {
       await installMocks(page);
     });
   },

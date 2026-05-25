@@ -1,10 +1,59 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { prisma, Prisma } from '@bidstack/db';
-import { Task, TaskCreate, TaskFilter, TaskPage, TaskPatch } from '@bidstack/shared';
+import { prisma } from '@bidstack/db';
+import type { Prisma } from '@bidstack/db';
+import { Task, TaskCreate, TaskFilter, TaskPage, TaskPatch, TaskSummary } from '@bidstack/shared';
 
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
+
+type TaskSummaryPayload = z.infer<typeof TaskSummary>;
+type TaskSummaryCacheEntry = {
+  expiresAt: number;
+  promise: Promise<TaskSummaryPayload>;
+};
+
+const TASK_SUMMARY_CACHE_TTL_MS = 15_000;
+const taskSummaryCache = new Map<string, TaskSummaryCacheEntry>();
+
+function clearTaskSummaryCache(orgId: string): void {
+  taskSummaryCache.delete(orgId);
+}
+
+async function buildTaskSummary(orgId: string): Promise<TaskSummaryPayload> {
+  const today = new Date().toISOString().slice(0, 10);
+  const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const rows = await prisma.$queryRaw<Array<TaskSummaryPayload>>`
+    SELECT
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE status <> 'done')::int AS open,
+      COUNT(*) FILTER (WHERE status <> 'done' AND due_date < ${today}::date)::int AS overdue,
+      COUNT(*) FILTER (
+        WHERE status <> 'done'
+          AND due_date >= ${today}::date
+          AND due_date < ${nextWeek}::date
+      )::int AS "dueSoon"
+    FROM tasks
+    WHERE org_id = ${orgId}::uuid
+      AND deleted_at IS NULL
+  `;
+  return rows[0] ?? { total: 0, open: 0, overdue: 0, dueSoon: 0 };
+}
+
+async function cachedTaskSummary(orgId: string): Promise<TaskSummaryPayload> {
+  const now = Date.now();
+  const cached = taskSummaryCache.get(orgId);
+  if (cached && cached.expiresAt > now) return cached.promise;
+
+  const promise = buildTaskSummary(orgId);
+  taskSummaryCache.set(orgId, { expiresAt: now + TASK_SUMMARY_CACHE_TTL_MS, promise });
+  try {
+    return await promise;
+  } catch (err) {
+    taskSummaryCache.delete(orgId);
+    throw err;
+  }
+}
 
 export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
@@ -44,6 +93,18 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
         })),
         nextCursor,
       };
+    },
+  );
+
+  server.get(
+    '/tasks/summary',
+    {
+      schema: {
+        response: { 200: TaskSummary },
+      },
+    },
+    async (req) => {
+      return cachedTaskSummary(req.auth.orgId);
     },
   );
 
@@ -114,6 +175,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
         include: { assignee: true },
       });
       // Fan-out webhook event — fire-and-forget (fail-open).
+      clearTaskSummaryCache(req.auth.orgId);
       void fanOutWebhookEvent(req.auth.orgId, 'task.created', {
         id: created.id,
         title: created.title,
@@ -184,6 +246,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
         },
         include: { assignee: true },
       });
+      clearTaskSummaryCache(req.auth.orgId);
       await prisma.auditLog.create({
         data: {
           orgId: req.auth.orgId,
@@ -278,6 +341,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
           },
         }),
       ]);
+      clearTaskSummaryCache(req.auth.orgId);
       return reply.code(204).send(null);
     },
   );

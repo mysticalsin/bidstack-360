@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Task, TaskStatus } from './task';
+import { Task, TaskStatus, TaskSummary } from './task';
 
 describe('Task schema', () => {
   it('accepts a valid task', () => {
@@ -31,5 +31,18 @@ describe('TaskStatus enum', () => {
     expect(TaskStatus.enum.done).toBe('done');
     expect(TaskStatus.enum.in_progress).toBe('in_progress');
     expect(TaskStatus.enum.blocked).toBe('blocked');
+  });
+});
+
+describe('TaskSummary schema', () => {
+  it('keeps navigation badges numeric and non-negative', () => {
+    const result = TaskSummary.safeParse({
+      total: 12,
+      open: 8,
+      overdue: 2,
+      dueSoon: 4,
+    });
+
+    expect(result.success).toBe(true);
   });
 });

@@ -33,6 +33,11 @@ export const Mention = z.object({
 });
 export type Mention = z.infer<typeof Mention>;
 
+export const MentionSummary = z.object({
+  unread: z.number().int().nonnegative(),
+});
+export type MentionSummary = z.infer<typeof MentionSummary>;
+
 export const UserPresence = z.object({
   id: z.string().uuid(),
   orgId: z.string().uuid(),

@@ -49,3 +49,11 @@ export const TaskPage = z.object({
   nextCursor: z.string().nullable(),
 });
 export type TaskPage = z.infer<typeof TaskPage>;
+
+export const TaskSummary = z.object({
+  total: z.number().int().nonnegative(),
+  open: z.number().int().nonnegative(),
+  overdue: z.number().int().nonnegative(),
+  dueSoon: z.number().int().nonnegative(),
+});
+export type TaskSummary = z.infer<typeof TaskSummary>;

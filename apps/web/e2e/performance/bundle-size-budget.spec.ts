@@ -16,7 +16,7 @@
  *   pnpm e2e --grep @bundle
  */
 import { test, expect } from '@playwright/test';
-import { createReadStream, existsSync, readdirSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createGzip } from 'node:zlib';
 
@@ -136,7 +136,7 @@ test.describe('@bundle — JS chunk size budgets', () => {
     // WHY: The manifest verifies that code-splitting is working correctly.
     // If a manual chunk disappears (e.g. "react-dom" or "vendor"), it means
     // Rollup merged it back into the main bundle — silent size regression.
-    const raw = require('node:fs').readFileSync(MANIFEST_PATH, 'utf-8');
+    const raw = readFileSync(MANIFEST_PATH, 'utf-8');
     const manifest: Record<string, { file: string }> = JSON.parse(raw);
 
     const chunkFiles = Object.values(manifest).map((m) => m.file);

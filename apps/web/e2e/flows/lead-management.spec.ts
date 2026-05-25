@@ -7,7 +7,6 @@
  */
 import { test, expect } from '@playwright/test';
 import { LeadsPage } from '../pages/LeadsPage.js';
-import { DealDetailPage } from '../pages/DealDetailPage.js';
 
 test.describe('Lead management', () => {
   test('leads list renders with data or empty-state', async ({ page, baseURL }) => {

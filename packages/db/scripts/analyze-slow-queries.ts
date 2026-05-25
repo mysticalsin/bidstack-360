@@ -30,14 +30,14 @@ async function main() {
       `SELECT 1 FROM pg_extension WHERE extname = 'pg_stat_statements'`
     );
     if (!Array.isArray(extCheck) || extCheck.length === 0) {
-          // eslint-disable-next-line no-console
+           
       console.warn('pg_stat_statements extension is not installed.');
-      // eslint-disable-next-line no-console
+       
       console.warn('Enable it with: CREATE EXTENSION IF NOT EXISTS pg_stat_statements;');
       return;
     }
 
-    // eslint-disable-next-line no-console
+     
     console.warn('\n=== TOP 20 SLOWEST QUERIES (by total time) ===\n');
     const slow = await prisma.$queryRawUnsafe(`
       SELECT
@@ -56,7 +56,7 @@ async function main() {
     // eslint-disable-next-line no-console
     console.table(slow);
 
-    // eslint-disable-next-line no-console
+     
     console.warn('\n=== HIGH-CALL COUNT QUERIES (N+1 candidates) ===\n');
     const highCall = await prisma.$queryRawUnsafe(`
       SELECT
@@ -75,7 +75,7 @@ async function main() {
     // eslint-disable-next-line no-console
     console.table(highCall);
 
-    // eslint-disable-next-line no-console
+     
     console.warn('\n=== TABLE SCAN ANALYSIS (potential missing indexes) ===\n');
     const scans = await prisma.$queryRawUnsafe(`
       SELECT
@@ -100,7 +100,7 @@ async function main() {
     // eslint-disable-next-line no-console
     console.table(scans);
 
-    // eslint-disable-next-line no-console
+     
     console.warn('\n=== INDEX USAGE FOR TOP TABLES ===\n');
     const indexes = await prisma.$queryRawUnsafe(`
       SELECT

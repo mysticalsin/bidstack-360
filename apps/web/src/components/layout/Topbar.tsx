@@ -10,7 +10,7 @@ import { useSignOut, useUser, useRole } from '@/lib/auth';
 import { useThemeStore } from '@/stores/theme';
 import { useRecentSearches } from '@/stores/recentSearches';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
-import { useMentions, useMarkMentionRead } from '@/hooks/useMentions';
+import { useMentionSummary, useMentions, useMarkMentionRead } from '@/hooks/useMentions';
 import { useUiStore } from '@/stores/ui';
 import { useOnboardingStore } from '@/stores/onboarding';
 import { CurrencySelector } from './CurrencySelector';
@@ -299,9 +299,10 @@ function SearchBar() {
 function NotificationsBell() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const mentions = useMentions(true);
+  const mentionSummary = useMentionSummary();
+  const mentions = useMentions(true, { enabled: open });
   const markRead = useMarkMentionRead();
-  const unreadCount = mentions.data?.items.length ?? 0;
+  const unreadCount = mentionSummary.data?.unread ?? mentions.data?.items.length ?? 0;
 
   useEffect(() => {
     function onClick(e: MouseEvent) {

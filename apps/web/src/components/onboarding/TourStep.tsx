@@ -108,7 +108,7 @@ export function TourStepCard({
       aria-modal="true"
       aria-label={`Tour step ${stepIndex + 1} of ${TOUR_TOTAL}: ${step.title}`}
       onKeyDown={handleKeyDown}
-      // eslint-disable-next-line react/no-unknown-property
+       
       style={{ top: pos.top, left: pos.left, width: CARD_WIDTH }}
       className="fixed z-[9999] rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] p-5 shadow-[var(--shadow-xl)] outline-none"
     >

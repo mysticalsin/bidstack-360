@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 
-import { prisma, Prisma } from '@bidstack/db';
+import { prisma, type Prisma } from '@bidstack/db';
 import type pino from 'pino';
 
 type Logger = Pick<pino.Logger, 'debug' | 'info' | 'warn'>;

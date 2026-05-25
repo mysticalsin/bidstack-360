@@ -10,7 +10,7 @@
  * wait for page idle, then retrieve the collected entries. No third-party
  * tools required — pure browser APIs.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 /** Routes to measure — chosen as the highest-traffic journeys. */
 const PERF_ROUTES = [
@@ -31,7 +31,7 @@ const BUDGETS = {
  * Inject observers before page load so all events are captured from the start.
  * Results are stored on window.__cwvResults for later retrieval.
  */
-async function injectCwvObservers(page: import('@playwright/test').Page): Promise<void> {
+async function injectCwvObservers(page: Page): Promise<void> {
   await page.addInitScript(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).__cwvResults = { lcp: null, inp: null, cls: 0 };
@@ -82,7 +82,7 @@ async function injectCwvObservers(page: import('@playwright/test').Page): Promis
 }
 
 /** Wait for the page to reach a "quiet" state after load. */
-async function waitForPageIdle(page: import('@playwright/test').Page): Promise<void> {
+async function waitForPageIdle(page: Page): Promise<void> {
   await page.getByRole('main').waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
   // Give React lazy chunks and images time to finish painting
   await page.waitForLoadState('networkidle').catch(() => {});
@@ -95,7 +95,7 @@ interface CwvResults {
   cls: number;
 }
 
-async function collectCwv(page: import('@playwright/test').Page): Promise<CwvResults> {
+async function collectCwv(page: Page): Promise<CwvResults> {
   return page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (window as any).__cwvResults as CwvResults;

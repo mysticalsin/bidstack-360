@@ -52,8 +52,7 @@ afterAll(async () => {
 const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
   it(name, async () => {
     if (!dbReachable || !rfpTablesReady || !orgId) {
-      console.warn(`[skip] ${name} - DATABASE_URL or RFP tables not ready`);
-      return;
+      throw new Error(`[skip] ${name} - DATABASE_URL or RFP tables not ready`);
     }
     await fn();
   });

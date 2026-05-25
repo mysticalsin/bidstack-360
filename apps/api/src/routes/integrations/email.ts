@@ -10,7 +10,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import {
   SendEmailRequest,
-  EmailMessageDto,
+  type EmailMessageDto,
   EmailListResponse,
 } from '@bidstack/shared';
 import { sendEmail } from '../../services/email-integration.service.js';

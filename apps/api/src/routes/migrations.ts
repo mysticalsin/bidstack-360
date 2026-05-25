@@ -24,7 +24,7 @@ import {
   MigrationSourceEnum,
   MigrationStatusEnum,
   SaveMappingRequest,
-  MigrationJobPayload,
+  type MigrationJobPayload,
   HUBSPOT_COMPANY_DEFAULTS,
   HUBSPOT_CONTACT_DEFAULTS,
   HUBSPOT_DEAL_DEFAULTS,
@@ -109,7 +109,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       const { redis } = server as unknown as { redis: { status: string; duplicate: () => unknown } };
       // Use the shared Redis connection already attached to the server via the
       // redis-cache plugin. This avoids opening a second connection.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       migrationQueue = new Queue(MIGRATION.name, {
         connection: (redis as unknown as { duplicate: () => unknown }).duplicate() as never,
         defaultJobOptions: MIGRATION.defaultJobOptions as never,

@@ -37,6 +37,23 @@ describe('auth plugin', () => {
     await expect(server.register(authPlugin)).resolves.not.toThrow();
   });
 
+  it('does not resolve auth for routes explicitly marked public', async () => {
+    process.env.NODE_ENV = 'development';
+    const server = Fastify({ logger: false });
+
+    await server.register(authPlugin);
+    server.get('/public-probe', { config: { public: true } }, async () => ({ ok: true }));
+
+    try {
+      const response = await server.inject({ method: 'GET', url: '/public-probe' });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ ok: true });
+    } finally {
+      await server.close();
+    }
+  });
+
   it('refuses to start when NODE_ENV=production and CLERK_SECRET_KEY is missing', async () => {
     process.env.NODE_ENV = 'production';
     const server = Fastify({ logger: false });

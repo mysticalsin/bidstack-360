@@ -9,7 +9,7 @@
 // validate the WebSocket upgrade via req.auth.
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import * as Y from 'yjs';
+import type * as Y from 'yjs';
 import { YjsClient, type RemoteCursor, type ConnectionState } from '@/lib/yjs-client';
 
 export interface UseYjsFieldOptions {

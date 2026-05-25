@@ -22,7 +22,7 @@
  */
 
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import { prisma as defaultPrisma, Prisma, type PrismaClient } from '@bidstack/db';
+import { prisma as defaultPrisma, type Prisma, type PrismaClient } from '@bidstack/db';
 import pino from 'pino';
 
 import { extractLeadFeatures, extractOpportunityFeatures } from './feature-extraction.js';

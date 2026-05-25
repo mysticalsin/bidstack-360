@@ -6,7 +6,7 @@
  * tab order causes keyboard users to give up. This spec tab-walks through
  * key routes and verifies no traps exist and focus is always visible.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 const KEY_ROUTES = [
   '/dashboard',
@@ -17,7 +17,7 @@ const KEY_ROUTES = [
 ] as const;
 
 /** Tab forward N times, collecting focused elements. Detects traps via repeat. */
-async function tabForward(page: import('@playwright/test').Page, steps: number): Promise<string[]> {
+async function tabForward(page: Page, steps: number): Promise<string[]> {
   const focused: string[] = [];
   for (let i = 0; i < steps; i++) {
     await page.keyboard.press('Tab');
@@ -95,12 +95,6 @@ test('Escape key dismisses modals and returns focus', async ({ page }) => {
   await page.keyboard.press('Control+K');
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible({ timeout: 5_000 });
-
-  // Record which element had focus before the modal opened
-  const triggerSelector = await page.evaluate(() => {
-    const el = document.activeElement;
-    return el ? el.tagName + '#' + el.id : '';
-  });
 
   // Dismiss with Escape
   await page.keyboard.press('Escape');

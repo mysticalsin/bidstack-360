@@ -3,8 +3,7 @@ import { Socket } from 'node:net';
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 
 process.on('unhandledRejection', (err: unknown) => {
-  const msg = err instanceof Error ? err.message : String(err);
-  if (msg.includes('Connection is closed')) {
+  if (isRedisTeardownNoise(err)) {
     return; // BullMQ/ioredis cleanup noise in test teardown
   }
   throw err;
@@ -51,6 +50,12 @@ describe('Worker queues', () => {
     }
     await startDustPoller(connection, log, workers, queues);
     await startWebhookProcessor(connection, log, workers, queues);
+    for (const worker of workers) {
+      worker.on('error', swallowRedisTeardownNoise);
+    }
+    for (const queue of queues) {
+      queue.on('error', swallowRedisTeardownNoise);
+    }
   });
 
   afterAll(async () => {
@@ -88,6 +93,16 @@ describe('Worker queues', () => {
     }
   });
 });
+
+function isRedisTeardownNoise(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes('Connection is closed');
+}
+
+function swallowRedisTeardownNoise(err: Error): void {
+  if (isRedisTeardownNoise(err)) return;
+  throw err;
+}
 
 function canReachRedis(url: string): Promise<boolean> {
   const parsed = new URL(url);

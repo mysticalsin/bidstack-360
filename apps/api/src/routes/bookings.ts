@@ -13,7 +13,7 @@
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { prisma, Prisma } from '@bidstack/db';
+import { prisma, type Prisma } from '@bidstack/db';
 import { computeSlots, type AvailabilityRule, type BlockingEvent } from '@bidstack/shared';
 import { CALENDAR_PUSH } from '@bidstack/shared';
 import { Queue } from 'bullmq';

@@ -100,7 +100,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
     '/webhook-subscriptions',
     {
       config: { rateLimit: { max: 15, timeWindow: '1 minute' } },
-      preHandler: server.requirePermission('webhooks:write'),
+      preHandler: [server.requirePermission('webhooks:write'), server.requireRole('admin')],
       schema: {
         body: WebhookSubCreate,
         response: { 201: WebhookSub },
@@ -139,7 +139,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
   server.patch(
     '/webhook-subscriptions/:id',
     {
-      preHandler: server.requirePermission('webhooks:write'),
+      preHandler: [server.requirePermission('webhooks:write'), server.requireRole('admin')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: WebhookSubUpdate,
@@ -184,7 +184,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
   server.delete(
     '/webhook-subscriptions/:id',
     {
-      preHandler: server.requirePermission('webhooks:write'),
+      preHandler: [server.requirePermission('webhooks:write'), server.requireRole('admin')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 204: z.void() },
@@ -272,7 +272,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
     '/webhook-subscriptions/:id/test',
     {
       config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
-      preHandler: server.requirePermission('webhooks:write'),
+      preHandler: [server.requirePermission('webhooks:write'), server.requireRole('admin')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: {

@@ -34,9 +34,10 @@ export type AuthFixtures = {
 };
 
 export const test = base.extend<AuthFixtures>({
-  loginAs: async ({ context }, use) => {
-    await use(async (role: SupportedRole) => {
+  loginAs: async ({ context }, applyLogin) => {
+    await applyLogin(async (role: SupportedRole) => {
       const stateFile = STATE_FILE[role];
+      void stateFile;
       // In stub-auth mode, storage state is irrelevant — the app auto-auths.
       // We attempt to apply the state if the file exists; skip silently if not.
       try {
@@ -50,8 +51,8 @@ export const test = base.extend<AuthFixtures>({
     });
   },
 
-  gotoAndWait: async ({ page }, use) => {
-    await use(async (routePath: string) => {
+  gotoAndWait: async ({ page }, runNavigation) => {
+    await runNavigation(async (routePath: string) => {
       await page.goto(routePath, { waitUntil: 'load' });
       await expect(page.getByRole('main')).toBeVisible({ timeout: 15_000 });
     });

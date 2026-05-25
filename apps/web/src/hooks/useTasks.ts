@@ -4,11 +4,20 @@ import { api } from '@/lib/api';
 import type { Task, TaskCreate, TaskPatch } from '@bidstack/shared';
 
 type TasksPayload = { items: Task[] };
+type TaskSummaryPayload = { total: number; open: number; overdue: number; dueSoon: number };
 
 export function useTasks() {
   return useQuery({
     queryKey: ['tasks'],
     queryFn: ({ signal }) => api<TasksPayload>('/api/tasks', { signal }),
+  });
+}
+
+export function useTaskSummary() {
+  return useQuery({
+    queryKey: ['tasks', 'summary'],
+    queryFn: ({ signal }) => api<TaskSummaryPayload>('/api/tasks/summary', { signal }),
+    staleTime: 30_000,
   });
 }
 
@@ -18,6 +27,7 @@ export function useCreateTask() {
     mutationFn: (input: TaskCreate) => api<Task>('/api/tasks', { method: 'POST', body: input }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['tasks'] });
+      void qc.invalidateQueries({ queryKey: ['tasks', 'summary'] });
       // Also invalidate the opportunity detail because /opportunities/:id
       // bundles tasks into the same payload — without this the new task
       // would appear in the Tasks page but not the opportunity tab.
@@ -50,6 +60,7 @@ export function useUpdateTask() {
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ['tasks'] });
+      void qc.invalidateQueries({ queryKey: ['tasks', 'summary'] });
       void qc.invalidateQueries({ queryKey: ['opportunity'] });
     },
   });

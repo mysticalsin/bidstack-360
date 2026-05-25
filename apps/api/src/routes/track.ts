@@ -40,7 +40,7 @@ export function createTrackRoutes(emailTrackQueue?: Queue): FastifyPluginAsync {
     // Responds immediately with a 1×1 GIF; queues open event to worker.
     app.get('/track/email/open/:token', {
       // No auth — hit by mail client
-      config: { skipAuth: true },
+      config: { public: true },
       schema: {
         params: z.object({ token: z.string().min(8).max(128) }),
       },
@@ -103,7 +103,7 @@ export function createTrackRoutes(emailTrackQueue?: Queue): FastifyPluginAsync {
     // GET /track/email/click/:token?url=<encoded>
     // Logs click and redirects to the target URL.
     app.get('/track/email/click/:token', {
-      config: { skipAuth: true },
+      config: { public: true },
       schema: {
         params: z.object({ token: z.string().min(8).max(128) }),
         querystring: z.object({ url: z.string().min(1).max(2048) }),
