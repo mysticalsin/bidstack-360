@@ -1,0 +1,282 @@
+name: E2E (full suite)
+
+# WHY: The smoke job in ci.yml covers a quick single-shard pass to block PRs fast.
+# This workflow runs the FULL e2e suite — all 17 flow specs, a11y, responsive,
+# and performance — on a 3-shard matrix so it finishes in ~10 minutes rather
+# than ~30. It fires on every PR and on pushes to main/release branches.
+# Screenshots and traces are uploaded as artifacts on failure.
+
+on:
+  push:
+    branches: [main, 'release/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      update_snapshots:
+        description: 'Pass --update-snapshots to refresh visual baselines'
+        type: boolean
+        default: false
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PNPM_VERSION: '10'
+  NODE_VERSION_FILE: .nvmrc
+
+jobs:
+  # ─── Build & seed (shared across all shards) ────────────────────────────────
+  prepare:
+    name: Build + DB seed
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bidstack
+          POSTGRES_PASSWORD: bidstack_test
+          POSTGRES_DB: bidstack_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U bidstack"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://bidstack:bidstack_test@localhost:5432/bidstack_test
+      REDIS_URL: redis://localhost:6379
+      VITE_API_URL: http://localhost:4000
+      VITE_AUTH_MODE: stub
+      BIDSTACK_ALLOW_STUB_AUTH: 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ${{ env.NODE_VERSION_FILE }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
+      - name: Migrate database
+        run: pnpm db:migrate:deploy
+
+      - name: Seed E2E data
+        run: |
+          # Try the dedicated e2e seed; fall back to the standard seed if absent
+          if pnpm --filter @bidstack/db exec ts-node --esm prisma/seed-e2e.ts 2>/dev/null; then
+            echo "E2E seed complete"
+          else
+            echo "seed-e2e.ts not found — falling back to standard seed"
+            pnpm db:seed
+          fi
+
+      - name: Build web app
+        run: pnpm --filter @bidstack/web build
+        env:
+          VITE_AUTH_MODE: stub
+          BIDSTACK_ALLOW_STUB_AUTH: 'true'
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist/
+          retention-days: 1
+
+  # ─── E2E shards ─────────────────────────────────────────────────────────────
+  e2e:
+    name: E2E shard ${{ matrix.shard }}/${{ matrix.total }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: prepare
+
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+        total: [3]
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bidstack
+          POSTGRES_PASSWORD: bidstack_test
+          POSTGRES_DB: bidstack_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U bidstack"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://bidstack:bidstack_test@localhost:5432/bidstack_test
+      REDIS_URL: redis://localhost:6379
+      VITE_API_URL: http://localhost:4000
+      VITE_AUTH_MODE: stub
+      BIDSTACK_ALLOW_STUB_AUTH: 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ${{ env.NODE_VERSION_FILE }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
+      - name: Restore dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist/
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('apps/web/package.json') }}
+          restore-keys: playwright-${{ runner.os }}-
+
+      - name: Install Playwright browsers + system deps
+        # Install all browsers used by specs (chromium + mobile emulation uses chromium)
+        run: pnpm --filter @bidstack/web exec playwright install --with-deps chromium
+
+      - name: Migrate + seed database
+        run: |
+          pnpm db:migrate:deploy
+          if pnpm --filter @bidstack/db exec ts-node --esm prisma/seed-e2e.ts 2>/dev/null; then
+            echo "E2E seed complete"
+          else
+            pnpm db:seed
+          fi
+
+      - name: Start API server
+        run: |
+          pnpm --filter @bidstack/api dev &
+          echo "Waiting for API..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:4000/health > /dev/null; then
+              echo "API ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+        env:
+          DATABASE_URL: postgres://bidstack:bidstack_test@localhost:5432/bidstack_test
+          REDIS_URL: redis://localhost:6379
+
+      - name: Run E2E shard ${{ matrix.shard }}/${{ matrix.total }}
+        run: >
+          pnpm --filter @bidstack/web exec playwright test
+          --shard=${{ matrix.shard }}/${{ matrix.total }}
+          ${{ github.event.inputs.update_snapshots == 'true' && '--update-snapshots' || '' }}
+        env:
+          CI: 'true'
+          E2E_API_URL: http://localhost:4000
+          # These env vars allow individual flow specs to conditionally activate
+          # tests that require real seed data tokens (booking slug, sign token).
+          # Left empty in CI — those tests self-skip via test.skip() when blank.
+          E2E_BOOKING_SLUG: ''
+          E2E_SIGN_TOKEN: ''
+
+      - name: Upload Playwright report (always — for review even on pass)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-shard-${{ matrix.shard }}
+          path: apps/web/playwright-report/
+          retention-days: 14
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-screenshots-shard-${{ matrix.shard }}
+          path: |
+            apps/web/playwright-report/**/*.png
+            apps/web/test-results/**/*.png
+            apps/web/test-results/**/*.webm
+          retention-days: 7
+
+  # ─── Merge reports from all shards ──────────────────────────────────────────
+  merge-reports:
+    name: Merge Playwright reports
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: e2e
+    if: always()
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ${{ env.NODE_VERSION_FILE }}
+          cache: pnpm
+
+      - name: Install dependencies (for playwright CLI)
+        run: pnpm install --frozen-lockfile
+
+      - name: Download all shard reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: playwright-report-shard-*
+          path: all-reports/
+
+      - name: Merge reports
+        run: |
+          pnpm --filter @bidstack/web exec playwright merge-reports \
+            --reporter html \
+            --output apps/web/merged-playwright-report/ \
+            all-reports/
+
+      - name: Upload merged report
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-merged-report
+          path: apps/web/merged-playwright-report/
+          retention-days: 30

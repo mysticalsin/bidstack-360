@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json.schemastore.org/axe-result.json",
+  "_comment": "Known non-critical axe violations that are allowed but tracked. DO NOT add critical/serious violations here — those must be fixed. Add only moderate/minor violations with a justification and a due date.",
+  "_howToUpdate": "Run: pnpm e2e e2e/a11y/axe.spec.ts, capture non-blocking violations from HTML report, document each below with context + owner + due-date.",
+  "allowedViolations": [],
+  "lastUpdated": "2026-05-24",
+  "updatedBy": "wave8-e2e-baseline"
+}
