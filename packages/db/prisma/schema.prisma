@@ -146,6 +146,10 @@ model Org {
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
+  // Wave 8 — Voice + Video calls
+  callSessions           CallSession[]
+  callSummaries          CallSummary[]
+
   @@index([deletedAt])
   @@map("orgs")
 }
@@ -198,6 +202,8 @@ model User {
   savedViews        SavedView[]
   // Wave 7 — Mobile native push tokens
   nativePushTokens  NativePushToken[]
+  // Wave 8 — Voice + Video calls
+  callSessions      CallSession[]
 
   @@index([orgId])
   @@index([deletedAt])
@@ -519,21 +525,51 @@ model ApiKey {
 }
 
 model WebhookSubscription {
-  id        String   @id @default(uuid()) @db.Uuid
-  orgId     String   @map("org_id") @db.Uuid
-  url       String
-  secret    String
-  events    String[]
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id             String    @id @default(uuid()) @db.Uuid
+  orgId          String    @map("org_id") @db.Uuid
+  url            String
+  secret         String
+  events         String[]
+  active         Boolean   @default(true)
+  failureCount   Int       @default(0) @map("failure_count")
+  lastDeliveryAt DateTime? @map("last_delivery_at") @db.Timestamptz(6)
+  lastFailureAt  DateTime? @map("last_failure_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
 
-  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
-
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  org       Org               @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
 
   @@index([orgId])
   @@index([deletedAt])
   @@map("webhook_subscriptions")
+}
+
+/// Delivery attempt record for an outbound webhook.
+/// Created per delivery attempt so partners can debug failures.
+model WebhookDelivery {
+  id             String   @id @default(uuid()) @db.Uuid
+  subscriptionId String   @map("subscription_id") @db.Uuid
+  orgId          String   @map("org_id") @db.Uuid
+  /// The event type that triggered this delivery (e.g. "lead.created").
+  event          String
+  /// HTTP status code returned by the partner endpoint (null = timeout/network error).
+  statusCode     Int?     @map("status_code")
+  /// Whether the delivery was acknowledged (2xx response within 10 s).
+  success        Boolean
+  /// Round-trip duration in milliseconds.
+  durationMs     Int?     @map("duration_ms")
+  /// Attempt number (1–5).
+  attempt        Int      @default(1)
+  /// Error message if delivery failed.
+  errorMessage   String?  @map("error_message")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  subscription WebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId, createdAt(sort: Desc)])
+  @@index([orgId])
+  @@map("webhook_deliveries")
 }
 
 model AuditLog {
@@ -3691,4 +3727,112 @@ model NativePushToken {
   @@index([orgId, active])
   @@index([userId, active])
   @@map("native_push_tokens")
+}
+
+// ─── Wave 8: Voice + Video Calls ──────────────────────────────────────────
+
+/// Represents one voice or video call session linked to a CRM entity.
+/// WHY a single table for all providers: query patterns are identical;
+/// provider-specific payloads live in transcriptStructured (Json).
+/// WHY we store durationSec instead of deriving it: endedAt is nullable
+/// until the recording webhook arrives; durationSec may arrive separately.
+model CallSession {
+  id String @id @default(uuid()) @db.Uuid
+
+  orgId  String @map("org_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+
+  /// DEAL | CONTACT | OPPORTUNITY | LEAD
+  entityType String @map("entity_type") @db.VarChar(32)
+  entityId   String @map("entity_id") @db.Uuid
+
+  /// ZOOM | TEAMS | GOOGLE_MEET | TWILIO_VOICE
+  provider String @db.VarChar(32)
+
+  /// Provider-issued meeting/call identifier (e.g. Zoom meeting ID, Graph call ID).
+  externalMeetingId String? @map("external_meeting_id") @db.VarChar(256)
+
+  /// Attendee-side join URL (shared with participants).
+  joinUrl String? @map("join_url") @db.VarChar(2048)
+  /// Host join URL — contains host key; must NOT be shared with attendees.
+  hostJoinUrl String? @map("host_join_url") @db.VarChar(2048)
+
+  scheduledAt DateTime? @map("scheduled_at") @db.Timestamptz(6)
+  startedAt   DateTime? @map("started_at") @db.Timestamptz(6)
+  endedAt     DateTime? @map("ended_at") @db.Timestamptz(6)
+  /// Call duration in whole seconds. Set from provider webhook; may differ from
+  /// endedAt - startedAt when participants join late or hang up early.
+  durationSec Int? @map("duration_sec")
+
+  /// JSON array of participant email strings. Stored as Json for schema flexibility.
+  participantEmails Json? @map("participant_emails")
+
+  /// S3 signed URL base (without expiry query params — signed at serve time).
+  recordingUrl String? @map("recording_url") @db.VarChar(2048)
+
+  /// Full verbatim transcript text (concatenated, unsegmented).
+  transcriptText String? @map("transcript_text")
+
+  /// Speaker-tagged segments: [{ speaker, startMs, endMs, text }]
+  transcriptStructured Json? @map("transcript_structured")
+
+  /// AI-generated executive summary (≤ 300 words).
+  summary String?
+
+  /// Extracted action items: [{ owner, description, dueDate? }]
+  actionItems Json? @map("action_items")
+
+  /// −1.0 … +1.0 sentiment score produced by the LLM analysis pass.
+  sentimentScore Float? @map("sentiment_score")
+
+  /// Per-speaker talk ratio: { "John Smith": 0.42, "Jane Doe": 0.58 }
+  talkRatio Json? @map("talk_ratio")
+
+  /// SCHEDULED | LIVE | COMPLETED | FAILED
+  status String @default("SCHEDULED") @db.VarChar(32)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org          Org           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id])
+  callSummaries CallSummary[]
+
+  @@index([orgId, entityType, entityId, scheduledAt(sort: Desc)], map: "call_sessions_org_entity_scheduled_idx")
+  @@index([orgId, status])
+  @@index([orgId, provider])
+  @@map("call_sessions")
+}
+
+/// AI-extracted structured insights from a CallSession.
+/// WHY a separate table: multiple insights per call; each has confidence + citation.
+/// Key examples: EXECUTIVE_BUYER_PRESENT, BUDGET_DISCUSSED, TIMELINE_DEFINED, BLOCKER_RAISED,
+/// NEXT_STEP_AGREED, DEAL_STAGE_SUGGESTED, MEDDIC_METRIC, MEDDIC_ECONOMIC_BUYER, etc.
+model CallSummary {
+  id            String @id @default(uuid()) @db.Uuid
+  callSessionId String @map("call_session_id") @db.Uuid
+
+  /// Structured insight key, e.g. 'BUDGET_DISCUSSED', 'BLOCKER_RAISED'.
+  key String @db.VarChar(64)
+
+  /// Human-readable value for the insight (text, amount, date, etc.).
+  value String
+
+  /// 0.0 … 1.0 confidence score from the LLM.
+  confidence Float @default(0)
+
+  /// Verbatim quote from the transcript that supports this insight.
+  sourceQuoteRef String? @map("source_quote_ref")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  callSession CallSession @relation(fields: [callSessionId], references: [id], onDelete: Cascade)
+
+  // Include orgId for multi-tenant queries without joining call_sessions.
+  orgId String @map("org_id") @db.Uuid
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([callSessionId])
+  @@index([orgId, key])
+  @@map("call_summaries")
 }
