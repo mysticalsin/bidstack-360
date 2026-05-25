@@ -97,6 +97,8 @@ import {
   teamsCallWebhookRoutes,
   twilioVoiceWebhookRoutes,
 } from './routes/integrations/calls-webhooks.js';
+// Wave 8 — Customer Success
+import { csRoutes } from './routes/cs.js';
 
 const CONNECT_SRC = [
   "'self'",
@@ -373,6 +375,9 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(zoomCallWebhookRoutes, { prefix: '/api/v1/integrations' });
   await server.register(teamsCallWebhookRoutes, { prefix: '/api/v1/integrations' });
   await server.register(twilioVoiceWebhookRoutes, { prefix: '/api/v1/integrations' });
+
+  // Wave 8 — Customer Success (authenticated + NPS public respond endpoint)
+  await server.register(csRoutes, { prefix: '/api/v1' });
 
   return server;
 }

@@ -20,6 +20,8 @@ import { startNativePushWorker } from './queues/notifications.js';
 import { startWebhookDeliveryWorker } from './queues/webhook-delivery.js';
 // Wave 8 — Y.js CRDT compaction
 import { startYjsCompaction } from './queues/yjs-compaction.js';
+// Wave 8 — Customer Success workers
+import { startCsWorkers } from './queues/cs.js';
 
 const log = pino({
   level: process.env.LOG_LEVEL ?? 'info',
@@ -53,10 +55,11 @@ await Promise.all([
   startNativePushWorker(connection, log, workers, queues),
   startWebhookDeliveryWorker(connection, log, workers, queues),
   startYjsCompaction(connection, log, workers, queues),
+  startCsWorkers(connection, log, workers, queues),
 ]);
 
 log.info(
-  'BidStack worker ready (dust-poll + webhook-processor + company-enrich-apollo + document-extract + calendar-sync + email-sync + sms + native-push + webhook-delivery + yjs-compact)',
+  'BidStack worker ready (dust-poll + webhook-processor + company-enrich-apollo + document-extract + calendar-sync + email-sync + sms + native-push + webhook-delivery + yjs-compact + cs)',
 );
 
 const healthPort = Number(process.env.WORKER_HEALTH_PORT || 4002);
