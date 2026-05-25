@@ -32,6 +32,18 @@ export interface ModelArtifact {
   entityType: 'lead' | 'opportunity';
   orgId: string;
   metrics: AccuracyMetrics;
+
+  // ─── Optional XGBoost companion (W9-3, populated by the worker trainer) ──
+  // Inference here still uses the LR weights above — the API never invokes
+  // Python. These fields are surfaced to admin endpoints (e.g. PROC `model
+  // comparison` view) so dashboards can show XGBoost vs LR side-by-side.
+  xgboost?: {
+    modelJson: string;
+    metrics: AccuracyMetrics;
+    featureImportance: Record<string, number>;
+    bestIteration: number;
+    trainDurationMs: number;
+  };
 }
 
 // ─── Math primitives ─────────────────────────────────────────────────────

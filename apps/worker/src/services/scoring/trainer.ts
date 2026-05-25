@@ -26,6 +26,7 @@ import { prisma as defaultPrisma, Prisma, type PrismaClient } from '@bidstack/db
 import pino from 'pino';
 
 import { extractLeadFeatures, extractOpportunityFeatures } from './feature-extraction.js';
+import { trainWithXgboost, type XgboostMetrics } from './trainer-xgboost.js';
 
 const log = pino({ name: 'scorer:trainer', level: process.env.LOG_LEVEL ?? 'info' });
 
@@ -49,6 +50,26 @@ export interface ModelArtifact {
   entityType: 'lead' | 'opportunity';
   orgId: string;
   metrics: AccuracyMetrics;
+
+  // ─── Optional XGBoost companion fields (W9-3) ────────────────────────────
+  // Populated when PREDICTIVE_USE_XGBOOST=true AND the Python sidecar
+  // succeeds. Always present alongside the LR fields above — XGBoost is a
+  // strict enrichment, never a replacement for inference.
+  // The LR fields drive online scoring (fast, pure-JS). The XGBoost fields
+  // exist for batch analysis, admin dashboards, and future tree-based
+  // inference paths.
+  xgboost?: {
+    /** XGBoost booster save_raw('json') — opaque to TS; consumed by Python */
+    modelJson: string;
+    /** Held-out metrics from the XGBoost trainer (compare against `metrics` above) */
+    metrics: XgboostMetrics;
+    /** Gain-based feature importance, normalized to sum=1.0 */
+    featureImportance: Record<string, number>;
+    /** Best boosting round (≤ n_estimators, may be less if early-stopped) */
+    bestIteration: number;
+    /** Milliseconds spent in the Python sidecar */
+    trainDurationMs: number;
+  };
 }
 
 export interface TrainResult {
@@ -408,6 +429,33 @@ export async function trainOrgModel(
 
   log.info({ orgId, entityType, metrics, sampleCount }, 'training complete');
 
+  // ── XGBoost enrichment (W9-3) ────────────────────────────────────────
+  // Runs only when PREDICTIVE_USE_XGBOOST=true and the Python sidecar
+  // can be invoked. Returns null on disabled/missing/error — caller is
+  // unaffected. The LR weights computed above remain the inference path;
+  // XGBoost fields are persisted alongside for batch analysis + future use.
+  // We pass the SAME train/test split inputs (X, y, featureNames) so the
+  // comparison metrics are directly comparable to the LR `metrics` above.
+  const xgbResult = await trainWithXgboost({
+    X,
+    y,
+    featureNames,
+  });
+
+  if (xgbResult) {
+    log.info(
+      {
+        orgId,
+        entityType,
+        lrAuc: metrics.auc,
+        xgbAuc: xgbResult.metrics.auc,
+        delta: Math.round((xgbResult.metrics.auc - metrics.auc) * 1000) / 1000,
+        durationMs: xgbResult.trainDurationMs,
+      },
+      'XGBoost companion training complete',
+    );
+  }
+
   // ── Persist to S3 ─────────────────────────────────────────────────────
   const trainedAt = new Date().toISOString();
   const version = trainedAt.replace(/[^0-9]/g, '').slice(0, 14); // yyyymmddHHMMSS
@@ -422,6 +470,15 @@ export async function trainOrgModel(
     entityType,
     orgId,
     metrics,
+    ...(xgbResult && {
+      xgboost: {
+        modelJson: xgbResult.modelJson,
+        metrics: xgbResult.metrics,
+        featureImportance: xgbResult.featureImportance,
+        bestIteration: xgbResult.bestIteration,
+        trainDurationMs: xgbResult.trainDurationMs,
+      },
+    }),
   };
 
   const s3Key = modelS3Key(orgId, entityType, version);

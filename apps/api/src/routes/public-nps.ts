@@ -18,7 +18,7 @@
  *   - Token is HMAC-signed (see nps.service.ts). Hash lookup means even a stolen
  *     DB row doesn't reveal valid tokens.
  *   - All user-visible interpolation goes through escapeHtml() to block XSS.
- *   - skipAuth at the Fastify config level — explicit, audited bypass.
+ *   - public route config at the Fastify level — explicit, audited bypass.
  */
 
 import type { FastifyPluginAsync } from 'fastify';
@@ -251,7 +251,7 @@ export const publicNpsRoutes: FastifyPluginAsync = async (app) => {
   // ── GET /public/nps/:token ─────────────────────────────────────────────
   app.get<{ Params: { token: string } }>(
     '/public/nps/:token',
-    { config: { skipAuth: true } },
+    { config: { public: true } },
     async (req, reply) => {
       const { token } = req.params;
       if (!token || token.length < 32 || token.length > 128) {
@@ -266,7 +266,7 @@ export const publicNpsRoutes: FastifyPluginAsync = async (app) => {
   // ── POST /public/nps/:token ────────────────────────────────────────────
   app.post<{ Params: { token: string }; Body: Record<string, string> }>(
     '/public/nps/:token',
-    { config: { skipAuth: true } },
+    { config: { public: true } },
     async (req, reply) => {
       const { token } = req.params;
       const body = req.body ?? {};

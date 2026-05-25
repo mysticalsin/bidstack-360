@@ -1,0 +1,11 @@
+# XGBoost sidecar trainer dependencies.
+# Install with: pip install -r apps/worker/python/requirements.txt
+# Python 3.10+ required.
+#
+# These are intentionally pinned to lower bounds, not exact versions, so
+# security patches flow through. Run `pip install --upgrade -r requirements.txt`
+# periodically and re-run the worker test suite.
+
+xgboost>=2.0,<3.0
+scikit-learn>=1.3,<2.0
+numpy>=1.24,<3.0
