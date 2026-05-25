@@ -22,6 +22,8 @@ import { startWebhookDeliveryWorker } from './queues/webhook-delivery.js';
 import { startYjsCompaction } from './queues/yjs-compaction.js';
 // Wave 8 — Customer Success workers
 import { startCsWorkers } from './queues/cs.js';
+// Wave 8 — Predictive ML scoring retrain worker
+import { startPredictiveRetrainWorker } from './queues/predictive-retrain.js';
 
 const log = pino({
   level: process.env.LOG_LEVEL ?? 'info',
@@ -56,10 +58,11 @@ await Promise.all([
   startWebhookDeliveryWorker(connection, log, workers, queues),
   startYjsCompaction(connection, log, workers, queues),
   startCsWorkers(connection, log, workers, queues),
+  startPredictiveRetrainWorker(connection, log, workers, queues),
 ]);
 
 log.info(
-  'BidStack worker ready (dust-poll + webhook-processor + company-enrich-apollo + document-extract + calendar-sync + email-sync + sms + native-push + webhook-delivery + yjs-compact + cs)',
+  'BidStack worker ready (dust-poll + webhook-processor + company-enrich-apollo + document-extract + calendar-sync + email-sync + sms + native-push + webhook-delivery + yjs-compact + cs + predictive-retrain)',
 );
 
 const healthPort = Number(process.env.WORKER_HEALTH_PORT || 4002);
