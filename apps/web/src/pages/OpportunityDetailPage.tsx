@@ -17,6 +17,7 @@ import {
 import { OpportunityTabs } from '@/components/opportunity/OpportunityTabs';
 import { OpportunityAccountIntel } from '@/components/opportunity/OpportunityAccountIntel';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
+import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';
 import { CreateTaskDialog } from '@/components/task/CreateTaskDialog';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Icon } from '@/components/ui/Icon';
@@ -266,6 +267,14 @@ export function OpportunityDetailPage() {
       />
 
       <CustomFieldValuesSection entityType="opportunity" entityId={id!} />
+
+      {/* Wave 8 — Collaborative scratch-pad: real-time CRDT rich-text. */}
+      <CollaborativeNotesSection
+        entityType="opportunity"
+        entityId={id}
+        fieldKey="notes"
+        label="Collaborative Notes"
+      />
 
       {/* Controlled CreateTaskDialog driven by the command palette (A3). */}
       <CreateTaskDialog

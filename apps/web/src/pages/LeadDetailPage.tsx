@@ -11,6 +11,8 @@ import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { toast } from '@/components/ui/Toast';
 import { useConvertLead, useDeleteLead, useLead, useUpdateLead } from '@/hooks/useLeads';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
+import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
+import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';
 import { formatDate } from '@/lib/format';
 import { LeadPriority, LeadStatus, LeadSource, OpportunityStage } from '@bidstack/shared';
 
@@ -398,6 +400,16 @@ export function LeadDetailPage() {
           </div>
         </Card>
       </div>
+
+      <CustomFieldValuesSection entityType="lead" entityId={id!} />
+
+      {/* Wave 8 — Collaborative scratch-pad: real-time CRDT rich-text. */}
+      <CollaborativeNotesSection
+        entityType="lead"
+        entityId={id}
+        fieldKey="notes"
+        label="Collaborative Notes"
+      />
     </div>
   );
 }

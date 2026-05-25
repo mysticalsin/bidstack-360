@@ -10,6 +10,8 @@ import { useContact } from '@/hooks/useContacts';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { useTasks } from '@/hooks/useTasks';
 import { useNotes } from '@/hooks/useNotes';
+import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
+import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';
 import { formatDate } from '@/lib/format';
 
 export function ContactDetailPage() {
@@ -217,6 +219,16 @@ export function ContactDetailPage() {
           )}
         </Card>
       </div>
+
+      <CustomFieldValuesSection entityType="contact" entityId={id!} />
+
+      {/* Wave 8 — Collaborative scratch-pad: real-time CRDT rich-text. */}
+      <CollaborativeNotesSection
+        entityType="contact"
+        entityId={id}
+        fieldKey="notes"
+        label="Collaborative Notes"
+      />
     </div>
   );
 }
