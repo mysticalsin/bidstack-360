@@ -71,6 +71,7 @@ model Org {
   invoiceLines           InvoiceLine[]
   payments               Payment[]
   PredictiveScore        PredictiveScore[]
+  PredictiveModel        PredictiveModel[]
   Workflow               Workflow[]
   WorkflowRun            WorkflowRun[]
   workflowActions        WorkflowAction[]
@@ -2056,6 +2057,36 @@ model PredictiveScore {
   @@index([orgId, expiresAt], map: "predictive_scores_org_expires_idx")
   @@index([deletedAt])
   @@map("predictive_scores")
+}
+
+// ─── Predictive ML Models ────────────────────────────────────────────────
+
+/// Stores trained model metadata and S3 artifact references.
+/// One active model per (orgId, entityType) — isActive flag marks it.
+/// WHY separate from PredictiveScore: scores are ephemeral (TTL 1h), model
+/// metadata is durable and auditable.
+model PredictiveModel {
+  id                 String   @id @default(uuid()) @db.Uuid
+  orgId              String   @map("org_id") @db.Uuid
+  /// "lead" | "opportunity"
+  entityType         String   @map("entity_type")
+  version            Int
+  /// Serialized precision / recall / AUC / F1 from hold-out set evaluation.
+  accuracyMetrics    Json     @map("accuracy_metrics") @default("{}")
+  trainedAt          DateTime @map("trained_at") @db.Timestamptz(6)
+  /// Number of closed deals used in training.
+  sampleCount        Int      @map("sample_count")
+  /// S3 key — BACKUP_S3_BUCKET/models/<orgId>/<entityType>/v<version>.json
+  modelArtifactS3Key String   @map("model_artifact_s3_key")
+  /// true for the model currently used for inference.
+  isActive           Boolean  @default(false) @map("is_active")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, entityType, isActive], map: "predictive_models_org_entity_active_idx")
+  @@index([orgId, entityType, version(sort: Desc)], map: "predictive_models_org_entity_version_idx")
+  @@map("predictive_models")
 }
 
 // ─── Workflow Automation ──────────────────────────────────────────────────
