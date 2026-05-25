@@ -1,0 +1,89 @@
+{
+  "manifest_version": 3,
+  "name": "BidStack 360° CRM",
+  "short_name": "BidStack",
+  "version": "0.1.0",
+  "description": "Add contacts, create leads, and manage your BidStack CRM directly from Gmail, Outlook, LinkedIn, and HubSpot.",
+
+  "icons": {
+    "16":  "src/icons/icon-16.png",
+    "48":  "src/icons/icon-48.png",
+    "128": "src/icons/icon-128.png"
+  },
+
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "BidStack CRM",
+    "default_icon": {
+      "16":  "src/icons/icon-16.png",
+      "48":  "src/icons/icon-48.png"
+    }
+  },
+
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://mail.google.com/*"
+      ],
+      "js": ["src/content-scripts/gmail.js"],
+      "css": ["src/content-scripts/inject.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://outlook.live.com/*",
+        "https://outlook.office.com/*",
+        "https://outlook.office365.com/*"
+      ],
+      "js": ["src/content-scripts/outlook.js"],
+      "css": ["src/content-scripts/inject.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.linkedin.com/in/*",
+        "https://www.linkedin.com/company/*"
+      ],
+      "js": ["src/content-scripts/linkedin.js"],
+      "css": ["src/content-scripts/inject.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://app.hubspot.com/*"
+      ],
+      "js": ["src/content-scripts/hubspot.js"],
+      "css": ["src/content-scripts/inject.css"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "options_page": "src/options/options.html",
+
+  "permissions": [
+    "storage",
+    "identity"
+  ],
+
+  "host_permissions": [
+    "https://mail.google.com/*",
+    "https://outlook.live.com/*",
+    "https://outlook.office.com/*",
+    "https://outlook.office365.com/*",
+    "https://www.linkedin.com/in/*",
+    "https://www.linkedin.com/company/*",
+    "https://app.hubspot.com/*"
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": ["src/icons/*.png"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

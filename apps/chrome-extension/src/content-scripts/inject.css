@@ -1,0 +1,98 @@
+/* BidStack injected styles — scoped tightly to avoid leaking into host pages */
+
+.bidstack-inject-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #fff;
+  background: #4f46e5;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  min-height: 32px;      /* touch target: combined with padding meets 44px recommendation */
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+.bidstack-inject-btn:hover {
+  background: #4338ca;
+}
+
+.bidstack-inject-btn:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.3);
+}
+
+.bidstack-inject-btn:active {
+  background: #3730a3;
+}
+
+/* Toast notification */
+.bidstack-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 2147483647;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  transition: opacity 0.3s ease;
+  max-width: 340px;
+}
+
+.bidstack-toast--success { background: #059669; }
+.bidstack-toast--error   { background: #dc2626; }
+.bidstack-toast--fade    { opacity: 0; }
+
+/* HubSpot migration banner */
+#bidstack-hs-banner {
+  position: sticky;
+  top: 0;
+  z-index: 99999;
+  background: #eff6ff;
+  border-bottom: 1px solid #bfdbfe;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.bidstack-hs-banner-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #1e3a8a;
+}
+
+.bidstack-hs-banner-inner a {
+  color: #1d4ed8;
+  text-decoration: underline;
+  font-weight: 500;
+}
+
+#bidstack-hs-dismiss {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #1e3a8a;
+  padding: 4px 8px;
+  font-size: 16px;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 4px;
+}
+
+#bidstack-hs-dismiss:hover { background: #dbeafe; }

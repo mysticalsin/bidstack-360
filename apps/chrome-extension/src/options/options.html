@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BidStack Extension — Settings</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <main class="options-container">
+    <header class="options-header">
+      <img src="../icons/icon-48.png" alt="" width="32" height="32" />
+      <div>
+        <h1>BidStack 360° Extension Settings</h1>
+        <p class="subtitle">Connect your CRM account to enable in-browser lead capture</p>
+      </div>
+    </header>
+
+    <form id="options-form" novalidate>
+      <section class="settings-card">
+        <h2>API Configuration</h2>
+
+        <div class="form-group">
+          <label for="api-key">
+            API Key
+            <a href="https://app.bidstack.io/settings/api-keys" target="_blank" rel="noopener" class="help-link">
+              Generate key ↗
+            </a>
+          </label>
+          <input
+            id="api-key"
+            name="apiKey"
+            type="password"
+            placeholder="bsk_live_..."
+            autocomplete="off"
+            aria-describedby="api-key-hint"
+          />
+          <span id="api-key-hint" class="form-hint">
+            Found in Settings → API Keys inside the BidStack app.
+            The key is stored locally in your browser and never sent to any server except the BidStack API.
+          </span>
+        </div>
+
+        <div class="form-group">
+          <label for="host-url">
+            BidStack API URL
+            <span class="badge">Advanced</span>
+          </label>
+          <input
+            id="host-url"
+            name="hostUrl"
+            type="url"
+            placeholder="https://api.bidstack.io/v1"
+            aria-describedby="host-url-hint"
+          />
+          <span id="host-url-hint" class="form-hint">
+            Leave blank for cloud. Enter your on-premises URL if self-hosted.
+          </span>
+        </div>
+      </section>
+
+      <div class="form-actions">
+        <button type="submit" class="btn-primary" id="save-btn">Save Settings</button>
+        <button type="button" class="btn-secondary" id="test-btn">Test Connection</button>
+      </div>
+
+      <div id="save-status" role="status" aria-live="polite" class="save-status"></div>
+    </form>
+
+    <section class="settings-card info-card">
+      <h2>Privacy Notice</h2>
+      <p>
+        This extension stores only your API key and API URL in your browser's local storage
+        (<code>chrome.storage.local</code>). No personal data is collected by the extension itself.
+        Data you submit via the extension is sent directly to the BidStack API endpoint you configured.
+        See the <a href="https://bidstack.io/privacy" target="_blank" rel="noopener">Privacy Policy</a>.
+      </p>
+    </section>
+  </main>
+
+  <script src="options.js" type="module"></script>
+</body>
+</html>
