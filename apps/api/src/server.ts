@@ -46,6 +46,7 @@ import { erpRoutes } from './routes/erp-integration.js';
 import { opportunityRoutes } from './routes/opportunities.js';
 import { opportunityTimelineRoutes } from './routes/opportunity-timeline.js';
 import { predictiveRoutes } from './routes/predictive.js';
+import { predictiveScoringRoutes } from './routes/predictive-scoring.js';
 import { searchRoutes } from './routes/search.js';
 import { serviceDeskRoutes } from './routes/service-desk.js';
 import { reportsRoutes } from './routes/reports.js';
@@ -308,6 +309,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(opportunityTimelineRoutes, { prefix: '/api/v1' });
   await server.register(collaborationRoutes, { prefix: '/api/v1' });
   await server.register(predictiveRoutes, { prefix: '/api/v1' });
+  await server.register(predictiveScoringRoutes, { prefix: '/api/v1' });
   await server.register(serviceDeskRoutes, { prefix: '/api/v1' });
   await server.register(workflowRoutes, { prefix: '/api/v1' });
   await server.register(leadRoutes, { prefix: '/api/v1' });
