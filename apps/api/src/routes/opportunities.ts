@@ -236,7 +236,9 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       // is org-scoped and we don't want to break that invariant.
       const created = await prisma.opportunity.findFirstOrThrow({
         where: { id: createdId, orgId: req.auth.orgId },
-        include: { owner: true, territory: { select: { name: true } }, pipelineStage: { select: { id: true, name: true, probability: true, color: true, isWon: true, isLost: true } } },
+        // BS-25: narrow owner select — `owner: true` pulls clerkId, settings,
+        // and every User column. Only id/name/email is consumed downstream.
+        include: { owner: { select: { id: true, name: true, email: true } }, territory: { select: { name: true } }, pipelineStage: { select: { id: true, name: true, probability: true, color: true, isWon: true, isLost: true } } },
       });
       // Fan-out opportunity.created — fire-and-forget (fail-open).
       void fanOutWebhookEvent(req.auth.orgId, 'opportunity.created', {
@@ -263,7 +265,8 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       const opp = await prisma.opportunity.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
         include: {
-          owner: true,
+          // BS-25: narrow owner select — see fix at /opportunities create.
+          owner: { select: { id: true, name: true, email: true } },
           territory: { select: { name: true } },
           pipelineStage: { select: { id: true, name: true, probability: true, color: true, isWon: true, isLost: true } },
           tasks: { orderBy: { createdAt: 'desc' }, take: 50 },
@@ -377,7 +380,8 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
                 ? { ownerId: null }
                 : {}),
           },
-          include: { owner: true, territory: { select: { name: true } }, pipelineStage: { select: { id: true, name: true, probability: true, color: true, isWon: true, isLost: true } } },
+          // BS-25: narrow owner select — see fix at /opportunities create.
+          include: { owner: { select: { id: true, name: true, email: true } }, territory: { select: { name: true } }, pipelineStage: { select: { id: true, name: true, probability: true, color: true, isWon: true, isLost: true } } },
         }),
         prisma.auditLog.create({
           data: {

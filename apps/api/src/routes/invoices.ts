@@ -730,33 +730,19 @@ export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req, reply) => {
       const { state, customerName, salesOrderId, countryCode, search, overdueOnly } = req.query;
 
-      const invoices = await prisma.invoice.findMany({
-        where: {
-          orgId: req.auth.orgId,
-          ...(state ? { state: toPrismaState(state) } : {}),
-          ...(customerName
-            ? { customerName: { contains: customerName, mode: 'insensitive' } }
-            : {}),
-          ...(salesOrderId ? { salesOrderId } : {}),
-          ...(countryCode ? { countryCode } : {}),
-          ...(overdueOnly ? { dueDate: { lt: new Date() } } : {}),
-          ...(search
-            ? {
-                OR: [
-                  { customerName: { contains: search, mode: 'insensitive' } },
-                  { number: { contains: search, mode: 'insensitive' } },
-                ],
-              }
-            : {}),
-        },
-        include: {
-          salesperson: { select: { name: true } },
-          salesOrder: { select: { number: true } },
-          _count: { select: { lines: true } },
-        },
-        orderBy: [{ invoiceDate: 'desc' }, { createdAt: 'desc' }],
-        take: 1000,
-      });
+      // BS-24: stream the CSV cursor-paginated rather than buffering all rows.
+      // Prior behavior loaded 1,000 rows (with 2 eager relations) into memory
+      // before any byte was written \u2014 large orgs saw GC pressure and a
+      // multi-second TTFB. Cursor pagination + reply.raw.write keeps memory
+      // flat at one batch worth of rows (200) and lets the browser show the
+      // download progress dialog immediately.
+      //
+      // EXPORT_HARD_CAP is a defensive ceiling: even with cursor pagination
+      // we won't stream more than this in a single request. Anything more
+      // belongs in a background job that ships an S3-presigned URL to the
+      // user. 10,000 is comfortably above any sensible interactive export.
+      const EXPORT_HARD_CAP = 10_000;
+      const BATCH_SIZE = 200;
 
       function csvEscape(value: unknown): string {
         const str = value == null ? '' : String(value);
@@ -765,7 +751,7 @@ export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
         return `"${sanitized.replace(/"/g, '""')}"`;
       }
 
-      const headers = [
+      const HEADERS = [
         'Number',
         'State',
         'Customer',
@@ -779,29 +765,25 @@ export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
         'Lines',
       ];
 
-      const rows = invoices.map((inv) => {
-        const totalMicros = inv.totalMicros;
-        const paidMicros = inv.paidMicros;
-        const balanceMicros = totalMicros - paidMicros;
-        return [
-          inv.number,
-          inv.state,
-          inv.customerName,
-          inv.currency,
-          (Number(totalMicros) / 1_000_000).toFixed(2),
-          (Number(paidMicros) / 1_000_000).toFixed(2),
-          (Number(balanceMicros) / 1_000_000).toFixed(2),
-          inv.invoiceDate.toISOString().slice(0, 10),
-          inv.dueDate.toISOString().slice(0, 10),
-          inv.salesperson?.name ?? '',
-          inv._count.lines,
-        ];
-      });
+      const where = {
+        orgId: req.auth.orgId,
+        ...(state ? { state: toPrismaState(state) } : {}),
+        ...(customerName
+          ? { customerName: { contains: customerName, mode: 'insensitive' as const } }
+          : {}),
+        ...(salesOrderId ? { salesOrderId } : {}),
+        ...(countryCode ? { countryCode } : {}),
+        ...(overdueOnly ? { dueDate: { lt: new Date() } } : {}),
+        ...(search
+          ? {
+              OR: [
+                { customerName: { contains: search, mode: 'insensitive' as const } },
+                { number: { contains: search, mode: 'insensitive' as const } },
+              ],
+            }
+          : {}),
+      };
 
-      const csv = [
-        headers.map(csvEscape).join(','),
-        ...rows.map((r) => r.map(csvEscape).join(',')),
-      ].join('\r\n');
       const stamp = new Date().toISOString().slice(0, 10);
       const tag = state ? `-${state}` : '';
       const filename = `invoices${tag}-${stamp}.csv`;
@@ -813,10 +795,68 @@ export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
         .join('');
       const encodedFilename = `attachment; filename*=UTF-8''${encodeURIComponent(sanitized)}`;
 
-      return reply
+      reply
         .header('Content-Type', 'text/csv; charset=utf-8')
         .header('Content-Disposition', encodedFilename)
-        .send('\uFEFF' + csv);
+        // WHY hijack: takes the reply out of Fastify's send pipeline so we
+        // can write to res.raw directly. Without this, Fastify expects a
+        // single .send() and any raw writes leak past the JSON serializer.
+        .hijack();
+
+      // BOM + header row.
+      reply.raw.writeHead(200, {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': encodedFilename,
+        'Transfer-Encoding': 'chunked',
+      });
+      reply.raw.write('\uFEFF' + HEADERS.map(csvEscape).join(',') + '\r\n');
+
+      let cursor: string | undefined;
+      let total = 0;
+      while (total < EXPORT_HARD_CAP) {
+        const batch = await prisma.invoice.findMany({
+          where,
+          include: {
+            salesperson: { select: { name: true } },
+            salesOrder: { select: { number: true } },
+            _count: { select: { lines: true } },
+          },
+          orderBy: [{ invoiceDate: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
+          take: BATCH_SIZE,
+          ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        });
+        if (batch.length === 0) break;
+        for (const inv of batch) {
+          const totalMicros = inv.totalMicros;
+          const paidMicros = inv.paidMicros;
+          const balanceMicros = totalMicros - paidMicros;
+          const row = [
+            inv.number,
+            inv.state,
+            inv.customerName,
+            inv.currency,
+            (Number(totalMicros) / 1_000_000).toFixed(2),
+            (Number(paidMicros) / 1_000_000).toFixed(2),
+            (Number(balanceMicros) / 1_000_000).toFixed(2),
+            inv.invoiceDate.toISOString().slice(0, 10),
+            inv.dueDate.toISOString().slice(0, 10),
+            inv.salesperson?.name ?? '',
+            inv._count.lines,
+          ];
+          reply.raw.write(row.map(csvEscape).join(',') + '\r\n');
+        }
+        cursor = batch[batch.length - 1]?.id;
+        if (!cursor) break;
+        total += batch.length;
+      }
+
+      if (total >= EXPORT_HARD_CAP) {
+        req.log.warn(
+          { orgId: req.auth.orgId, exported: total, cap: EXPORT_HARD_CAP },
+          'invoice CSV export hit hard cap \u2014 consider a background-job export for this org',
+        );
+      }
+      reply.raw.end();
     },
   );
 

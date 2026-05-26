@@ -234,8 +234,14 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
         }
       }
 
-      const updated = await prisma.task.update({
-        where: { id: existing.id },
+      // BS-4: org-scope the update where clause. Even though `existing` was
+      // found via an org-scoped findFirst, code-quality rule 7 mandates that
+      // EVERY Prisma where on a tenant table includes orgId — no exceptions
+      // for "we already checked." Two-step updateMany + findFirstOrThrow
+      // gives us back the row plus the relation `include` (updateMany
+      // doesn't support include).
+      const updateResult = await prisma.task.updateMany({
+        where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
         data: {
           ...(req.body.title !== undefined ? { title: req.body.title } : {}),
           ...(req.body.dueDate !== undefined
@@ -244,6 +250,10 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
           ...(req.body.status !== undefined ? { status: req.body.status } : {}),
           ...(assigneeId !== undefined ? { assigneeId } : {}),
         },
+      });
+      if (updateResult.count === 0) throw server.httpErrors.notFound('Task not found');
+      const updated = await prisma.task.findFirstOrThrow({
+        where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
         include: { assignee: true },
       });
       clearTaskSummaryCache(req.auth.orgId);
@@ -325,9 +335,13 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
         throw server.httpErrors.forbidden('You are not authorized to delete this task');
       }
 
+      // BS-4: org-scope the soft-delete update. updateMany is the only
+      // way to constrain on `{ id, orgId }` together (Prisma's `update`
+      // requires a unique field). count===0 falls through silently since
+      // the prior findFirst proved the row exists in this org.
       await prisma.$transaction([
-        prisma.task.update({
-          where: { id: existing.id },
+        prisma.task.updateMany({
+          where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
           data: { deletedAt: new Date() },
         }),
         prisma.auditLog.create({
