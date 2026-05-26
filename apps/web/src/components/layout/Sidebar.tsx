@@ -96,8 +96,13 @@ export function Sidebar() {
           className="sb-toggle"
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-expanded={!collapsed}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          <Icon name="arrow" size={12} ariaHidden />
+          {/* Hamburger when collapsed (the rail's first affordance), left-
+              pointing chevron when expanded (telegraphing "click to close
+              toward the left"). The chevron flip happens in CSS so motion
+              is smooth if the user toggles rapidly. */}
+          <Icon name={collapsed ? 'menu' : 'chevron-right'} size={collapsed ? 18 : 14} ariaHidden />
         </button>
 
         <div className="sb-brand">
