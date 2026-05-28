@@ -144,6 +144,29 @@ export default defineConfig(({ command, mode }) => {
             ) {
               return 'react';
             }
+            // WHY separate chunks: recharts, tiptap, yjs, and dnd-kit are only
+            // used by lazy-loaded route pages. Pulling them out of the vendor
+            // catch-all means they are never downloaded on initial page load —
+            // only when the user first navigates to analytics / RFP / collab /
+            // kanban. Together they represent ~500 kB of the vendor chunk.
+            //
+            // recharts — only WidgetRenderer (→ AnalyticsDashboardPage, lazy)
+            if (normalized.includes('/recharts/')) return 'charts';
+            // @tiptap + prosemirror — only RFP draft/compliance editors (lazy)
+            if (normalized.includes('/@tiptap/') || normalized.includes('/prosemirror-')) {
+              return 'editor';
+            }
+            // yjs collaboration stack — only CollaborativeRichTextEditor (lazy)
+            if (
+              normalized.includes('/node_modules/yjs/') ||
+              normalized.includes('/node_modules/y-indexeddb/') ||
+              normalized.includes('/node_modules/lib0/') ||
+              normalized.includes('/node_modules/y-protocols/')
+            ) {
+              return 'collab';
+            }
+            // @dnd-kit — only LeadKanbanView (lazy via LeadsPage)
+            if (normalized.includes('/@dnd-kit/')) return 'dnd';
             return 'vendor';
           },
         },
