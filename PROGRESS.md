@@ -1135,3 +1135,58 @@ Sprint 21 shipped the read-only Sales Dashboard. Sprint 22 makes it _act_: every
 **Next:** W10-P2 — load test (50 concurrent RFP uploads), monitoring dashboards
 (queue-depth alerts, embedding failure rate), BM training session, production launch
 with 3 pilot bids.
+
+---
+
+## 2026-05-28 — Wave 10 Sprint 2: Load Test, Monitoring & BM Documentation (W10-P2)
+
+**Branch:** `feat/wave9-rfp-engine`
+
+**Done:**
+
+### W10-P2-1 — RFP upload pipeline load test (`scripts/load-test-rfp.ts`)
+
+- 6-phase CLI load test: Setup → HTTP-10 → HTTP-50 → Queue-50 → Snapshot → Report + Cleanup.
+- **Phase 2 (HTTP-10):** 10 concurrent uploads, all must return 202; p95 < 2s gate.
+- **Phase 3 (HTTP-50):** 50 concurrent uploads; validates rate limiter (~10×202, ~40×429, ±2 tolerance for Redis INCR concurrency).
+- **Phase 4 (Queue-50):** Directly enqueues 50 `rfp.orchestrate` BullMQ jobs; gates on enqueue time < 5s. Jobs carry `removeOnComplete/Fail: { count: 0, age: 60 }` so load-test artifacts auto-purge.
+- Cleanup phase: deletes test `FileAttachment` rows via Prisma, removes BullMQ jobs best-effort.
+- `pnpm load-test:rfp` script added to root `package.json`.
+- Commit: `c14879ea`
+
+### W10-P2-2 — Operational monitoring endpoints (`apps/api/src/routes/monitoring.ts`)
+
+- Three admin endpoints, all live from Redis/BullMQ (no cache):
+  - `GET /api/v1/admin/monitoring/queues` — depth snapshot (waiting/active/delayed/failed/completed/paused) for all 16 known queues.
+  - `GET /api/v1/admin/monitoring/alerts` — computed ok/warning/critical across all queues + embedding failure rate; single `overallSeverity` field for PagerDuty webhook.
+  - `GET /api/v1/admin/monitoring/embeddings` — fail rate % for `rfp.embed-reference` + `rfp.embed-requirement` specifically.
+- Alert thresholds configurable via env: `MONITOR_QUEUE_DEPTH_WARN` (100), `MONITOR_QUEUE_DEPTH_CRIT` (500), `MONITOR_EMBED_FAIL_RATE` (10 %).
+- Lazy IORedis singleton; BullMQ `Queue` instances created and closed per-call to avoid connection leaks.
+- Routes registered in `server.ts` under `/api/v1` prefix.
+- Commit: `ef3391da`
+
+### W10-P2-3 — BM operator guide (`docs/rfp-bm-operator-guide.md`)
+
+- 12-section reference document for non-technical Bid Managers (~575 lines).
+- Sections: What the engine does/doesn't do, Prerequisites, Quick-Start Checklist, 7-Step Workflow, AI Guardrails, NDA Classification (tiers A–E), Rate Limits, Common Issues & Recovery, Monitoring Dashboard (Ops Leads), Post-Submission Debriefs, Definition of Done, FAQ.
+- Draws from `rfp-automation-plan.md` (technical spec) and `RFP_RESPONSE_OPERATING_MODEL.md` (enterprise bid process) without duplicating raw technical detail — translated into operational language for BMs.
+- Commit: `9a25c2e8`
+
+**Verified:**
+
+- `pnpm --filter @bidstack/api typecheck` ✅ (monitoring.ts + server.ts)
+- `pnpm --filter @bidstack/api lint --quiet` ✅
+- Prettier auto-formatted the markdown guide via lint-staged hook.
+
+**Not implemented (human/external process):**
+
+- W10-P2-4 (3 pilot bids): Requires Bid VP coordination + resolution of W10-P1-1/P1-2 legal blockers. Cannot implement technically.
+- W10-P1-1 (DPIA Art. 35): Pending DPO sign-off.
+- W10-P1-2 (Dust DPA): Pending Legal sign-off.
+
+**Ready to start (next sprint candidates):**
+
+- W10-P1-3 (LLM-as-judge eval suite): 10 golden test cases + CI gate — scaffolding in `rfp-automation-plan.md §13.5`.
+- W10-P1-4 (TipTap wire-up): Replace textarea fallback in `HumanEditPane.tsx`.
+
+**Score delta:** 98/100 held (Wave 9 final audit). W10 production hardening brings the ops story up to spec; score re-audit pending after pilot bids complete.
