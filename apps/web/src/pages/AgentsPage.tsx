@@ -449,6 +449,13 @@ export function AgentsPage() {
           </div>
         </div>
 
+        {/* sr-only live region — announces filtered template count to AT */}
+        <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {!templates.isLoading && !templates.isError
+            ? `${filteredTemplates.length} template${filteredTemplates.length === 1 ? '' : 's'}${templateQuery ? ` matching "${templateQuery}"` : ''}${selectedPhase !== ALL_PHASES ? ` in ${selectedPhaseLabel}` : ''}`
+            : ''}
+        </p>
+
         {templates.isLoading ? (
           <LoadingSkeleton rows={3} />
         ) : templates.isError ? (
@@ -560,6 +567,11 @@ export function AgentsPage() {
               />
             </div>
           </div>
+
+          {/* sr-only live region — announces filtered agent count to AT */}
+          <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+            {`${visibleAgents.length} of ${allAgents.length} agent${allAgents.length === 1 ? '' : 's'}${selectedPhase !== ALL_PHASES ? ` in ${selectedPhaseLabel}` : ''}${agentQuery ? ` matching "${agentQuery}"` : ''}`}
+          </p>
 
           {visibleAgents.length === 0 ? (
             <EmptyState title="No matching agents" message="Adjust the search or phase filter." />

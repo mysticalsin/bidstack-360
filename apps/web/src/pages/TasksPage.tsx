@@ -1,7 +1,9 @@
-import { AnimatePresence, motion, Reorder } from 'framer-motion';
+import { AnimatePresence, motion, Reorder, useReducedMotion } from 'framer-motion';
 import {
   memo,
   useCallback,
+  useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -25,6 +27,8 @@ import { daysUntil, formatDate } from '@/lib/format';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { useSavedViews } from '@/stores/savedViews';
 import { useTaskOrder } from '@/stores/taskOrder';
+import { Select } from '@/components/ui/Select';
+import { Icon } from '@/components/ui/Icon';
 
 import type { Task, TaskStatus } from '@bidstack/shared';
 
@@ -263,19 +267,20 @@ export function TasksPage() {
             </button>
           </div>
           {view === 'list' && (
-            <label className="flex items-center gap-1.5 text-[var(--fg-tertiary)]">
+            <div className="flex items-center gap-1.5 text-[var(--fg-tertiary)]">
               <span>Sort by</span>
-              <select
+              <Select
                 aria-label="Sort tasks"
                 value={sort}
                 onChange={(e) => setSort(e.target.value as Sort)}
-                className="rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-1 text-xs text-[var(--fg-primary)]"
+                size="sm"
+                className="w-28"
               >
                 <option value="natural">Recent</option>
                 <option value="due">Due date</option>
                 <option value="status">Status</option>
-              </select>
-            </label>
+              </Select>
+            </div>
           )}
         </div>
       </div>
@@ -476,6 +481,33 @@ const TaskRow = memo(function TaskRow({
   const d = daysUntil(task.dueDate);
   const overdue = d !== null && d < 0;
 
+  const [snoozeOpen, setSnoozeOpen] = useState(false);
+  const snoozeRef = useRef<HTMLDivElement>(null);
+  const snoozeTriggerRef = useRef<HTMLButtonElement>(null);
+  const [highlightedSnoozeIndex, setHighlightedSnoozeIndex] = useState(-1);
+  const reduced = useReducedMotion();
+
+  useEffect(() => {
+    if (!snoozeOpen) return;
+    function onClick(e: MouseEvent) {
+      if (snoozeRef.current && !snoozeRef.current.contains(e.target as Node)) {
+        setSnoozeOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [snoozeOpen]);
+
+  // WHY useLayoutEffect: clears snooze-menu highlight before paint so the
+  // next open cycle starts clean. setState-in-effect is intentional — pure
+  // React UI state, no external system.
+  useLayoutEffect(() => {
+    if (!snoozeOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setHighlightedSnoozeIndex(-1);
+    }
+  }, [snoozeOpen]);
+
   const cycle = () => {
     const next = STATUS_CYCLE[task.status];
     update.mutate(
@@ -521,6 +553,54 @@ const TaskRow = memo(function TaskRow({
       { label: 'In 3 days', value: iso(new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)) },
       { label: 'Next week', value: iso(nextWeek) },
     ];
+  };
+
+  const handleSnoozeKeyDown = (e: React.KeyboardEvent) => {
+    const snoozeOpts = snoozeOptions();
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        if (!snoozeOpen) {
+          setSnoozeOpen(true);
+          setHighlightedSnoozeIndex(0);
+        } else {
+          setHighlightedSnoozeIndex((prev) => (prev + 1) % snoozeOpts.length);
+        }
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        if (!snoozeOpen) {
+          setSnoozeOpen(true);
+          setHighlightedSnoozeIndex(snoozeOpts.length - 1);
+        } else {
+          setHighlightedSnoozeIndex((prev) => (prev - 1 + snoozeOpts.length) % snoozeOpts.length);
+        }
+        break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        if (!snoozeOpen) {
+          setSnoozeOpen(true);
+        } else if (highlightedSnoozeIndex >= 0 && highlightedSnoozeIndex < snoozeOpts.length) {
+          const opt = snoozeOpts[highlightedSnoozeIndex];
+          if (opt) {
+            snoozeTo(opt.label, opt.value);
+          }
+          setSnoozeOpen(false);
+          snoozeTriggerRef.current?.focus();
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setSnoozeOpen(false);
+        snoozeTriggerRef.current?.focus();
+        break;
+      case 'Tab':
+        setSnoozeOpen(false);
+        break;
+      default:
+        break;
+    }
   };
 
   return (
@@ -605,28 +685,68 @@ const TaskRow = memo(function TaskRow({
       </div>
       <div className="flex items-center gap-1.5">
         {task.status !== 'done' ? (
-          <select
-            aria-label={`Snooze ${task.title}`}
-            // Native select dropdown — minimal weight, matches platform
-            // affordances on mobile. The first option is a label that
-            // never fires (we reset value to "" after a pick).
-            value=""
-            onChange={(e) => {
-              const v = e.target.value;
-              if (!v) return;
-              const opt = snoozeOptions().find((o) => o.value === v);
-              if (opt) snoozeTo(opt.label, opt.value);
-              e.target.value = '';
-            }}
-            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-1.5 py-0.5 text-[10px] text-[var(--fg-secondary)] opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100 focus:opacity-100"
-          >
-            <option value="">Snooze…</option>
-            {snoozeOptions().map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+          <div ref={snoozeRef} className="relative">
+            <button
+              ref={snoozeTriggerRef}
+              type="button"
+              onClick={() => setSnoozeOpen((v) => !v)}
+              onKeyDown={handleSnoozeKeyDown}
+              aria-label={`Snooze ${task.title}`}
+              aria-haspopup="listbox"
+              aria-expanded={snoozeOpen}
+              className={cn(
+                'rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-0.5 text-[10px] text-[var(--fg-secondary)] flex items-center gap-1 hover:bg-[var(--surface-hover)] focus-visible:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:outline-none transition-all duration-150',
+                snoozeOpen
+                  ? 'opacity-100 ring-2 ring-[var(--brand-primary)]'
+                  : 'opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100 focus:opacity-100 focus-visible:opacity-100',
+              )}
+            >
+              <Icon name="clock" size={10} ariaHidden />
+              <span>Snooze…</span>
+            </button>
+
+            <AnimatePresence>
+              {snoozeOpen && (
+                <motion.div
+                  initial={reduced ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={reduced ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.98 }}
+                  transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                  className="absolute right-0 top-[calc(100%+6px)] z-30 w-36 rounded-lg glass-menu p-1.5 focus:outline-none"
+                  role="listbox"
+                  aria-label="Snooze presets"
+                >
+                  <div className="flex flex-col gap-0.5">
+                    {snoozeOptions().map((o, index) => {
+                      const isHighlighted = index === highlightedSnoozeIndex;
+                      return (
+                        <button
+                          key={o.value}
+                          role="option"
+                          aria-selected={false}
+                          onClick={() => {
+                            snoozeTo(o.label, o.value);
+                            setSnoozeOpen(false);
+                          }}
+                          onMouseEnter={() => setHighlightedSnoozeIndex(index)}
+                          className="relative flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs rounded-md transition-colors text-[var(--fg-primary)] bg-transparent focus:outline-none cursor-pointer"
+                        >
+                          {isHighlighted && (
+                            <motion.div
+                              layoutId={`snooze-highlight-${task.id}`}
+                              className="absolute inset-0 bg-[var(--surface-hover)] rounded-md -z-10"
+                              transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                            />
+                          )}
+                          <span className="truncate">{o.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         ) : null}
         <motion.button
           type="button"

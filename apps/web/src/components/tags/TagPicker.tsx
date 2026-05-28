@@ -42,7 +42,10 @@ export function TagPicker({ entityType, entityId, suggestionContext }: TagPicker
   const createTag = useCreateTag();
   const suggest = useTagSuggestions();
 
-  const applied = entityTagsData?.tags ?? [];
+  // WHY useMemo: ??[] creates a new array reference every render when data is
+  // undefined; wrapping stabilises the reference so appliedIds only reruns
+  // when the entity's tags actually change.
+  const applied = useMemo(() => entityTagsData?.tags ?? [], [entityTagsData?.tags]);
   const appliedIds = useMemo(() => new Set(applied.map((t) => t.id)), [applied]);
   const candidates = useMemo(() => {
     const all = allTagsData?.items ?? [];

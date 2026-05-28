@@ -58,8 +58,8 @@ export function MobileSection() {
         </div>
       ) : (
         <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] px-4 py-3 text-sm text-[var(--fg-secondary)]">
-          You are using the web version. Install the mobile app below for native push
-          notifications, biometric unlock, and camera access.
+          You are using the web version. Install the mobile app below for native push notifications,
+          biometric unlock, and camera access.
         </div>
       )}
 
@@ -106,11 +106,7 @@ export function MobileSection() {
           Available to design partners via Apple TestFlight. Requires an invite code.
         </p>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <AppStoreButton
-            href={TESTFLIGHT_URL}
-            label="Join TestFlight Beta"
-            icon="apple"
-          />
+          <AppStoreButton href={TESTFLIGHT_URL} label="Join TestFlight Beta" icon="apple" />
           <QRCode value={TESTFLIGHT_URL} label="Scan to open TestFlight" size={96} />
         </div>
       </section>
@@ -125,11 +121,7 @@ export function MobileSection() {
           Available on the Google Play internal testing track. Tap or scan below.
         </p>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <AppStoreButton
-            href={PLAY_STORE_URL}
-            label="Get on Google Play"
-            icon="play"
-          />
+          <AppStoreButton href={PLAY_STORE_URL} label="Get on Google Play" icon="play" />
           <QRCode value={PLAY_STORE_URL} label="Scan for Android" size={96} />
         </div>
       </section>
@@ -138,9 +130,7 @@ export function MobileSection() {
 
       {/* Docs link */}
       <section>
-        <h3 className="mb-1 text-sm font-semibold text-[var(--fg-primary)]">
-          Developer Setup
-        </h3>
+        <h3 className="mb-1 text-sm font-semibold text-[var(--fg-primary)]">Developer Setup</h3>
         <p className="text-xs text-[var(--fg-secondary)]">
           For EAS build setup, code signing, and submission instructions see{' '}
           <a
@@ -210,6 +200,7 @@ function QRCode({ value, label, size }: QRCodeProps) {
         width={size}
         height={size}
         loading="lazy"
+        decoding="async"
         className="rounded border border-[var(--border)]"
       />
       <span className="text-xs text-[var(--fg-tertiary)]">{label}</span>

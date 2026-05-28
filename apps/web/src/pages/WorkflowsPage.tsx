@@ -30,6 +30,13 @@ export function WorkflowsPage() {
         </div>
       </div>
 
+      {/* sr-only live region — announces filter result count to AT */}
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {!isLoading && data
+          ? `${items.length} workflow${items.length === 1 ? '' : 's'}${showActiveOnly ? ' · active only' : ''}`
+          : ''}
+      </p>
+
       {isError ? (
         <ErrorState
           title="Failed to load workflows"
