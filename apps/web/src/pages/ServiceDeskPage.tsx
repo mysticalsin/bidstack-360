@@ -82,7 +82,7 @@ export function ServiceDeskPage() {
             aria-label="Filter by status"
             value={status}
             onChange={(e) => setStatus(e.target.value as CaseStatus | '')}
-            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none"
+            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
           >
             {STATUS_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -94,7 +94,7 @@ export function ServiceDeskPage() {
             aria-label="Filter by priority"
             value={priority}
             onChange={(e) => setPriority(e.target.value as CasePriority | '')}
-            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none"
+            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
           >
             {PRIORITY_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
