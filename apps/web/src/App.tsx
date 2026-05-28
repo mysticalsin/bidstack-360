@@ -149,6 +149,44 @@ const ForecastsPage = lazy(() =>
   import('@/pages/ForecastsPage').then((m) => ({ default: m.ForecastsPage })),
 );
 
+// Wave 2 — previously-unrouted pages
+const CalendarPage = lazy(() =>
+  import('@/pages/CalendarPage').then((m) => ({ default: m.CalendarPage })),
+);
+const CallsPage = lazy(() => import('@/pages/CallsPage'));
+const AnalyticsDashboardPage = lazy(() =>
+  import('@/pages/AnalyticsDashboardPage').then((m) => ({ default: m.AnalyticsDashboardPage })),
+);
+const DashboardsListPage = lazy(() =>
+  import('@/pages/DashboardsListPage').then((m) => ({ default: m.DashboardsListPage })),
+);
+const CustomObjectListPage = lazy(() =>
+  import('@/pages/CustomObjectListPage').then((m) => ({ default: m.CustomObjectListPage })),
+);
+const CustomObjectEditorPage = lazy(() =>
+  import('@/pages/CustomObjectEditorPage').then((m) => ({ default: m.CustomObjectEditorPage })),
+);
+const CustomObjectDetailPage = lazy(() =>
+  import('@/pages/CustomObjectDetailPage').then((m) => ({ default: m.CustomObjectDetailPage })),
+);
+const CustomObjectsAdminPage = lazy(() =>
+  import('@/pages/CustomObjectsAdminPage').then((m) => ({ default: m.CustomObjectsAdminPage })),
+);
+const KeyAccountsPage = lazy(() =>
+  import('@/pages/KeyAccountsPage').then((m) => ({ default: m.KeyAccountsPage })),
+);
+const PredictiveAdminPage = lazy(() => import('@/pages/PredictiveAdminPage'));
+const ReferencesPage = lazy(() =>
+  import('@/pages/ReferencesPage').then((m) => ({ default: m.ReferencesPage })),
+);
+const ReportsListPage = lazy(() =>
+  import('@/pages/ReportsListPage').then((m) => ({ default: m.ReportsListPage })),
+);
+const RolesPage = lazy(() => import('@/pages/RolesPage').then((m) => ({ default: m.RolesPage })));
+const TopAccountsPage = lazy(() =>
+  import('@/pages/TopAccountsPage').then((m) => ({ default: m.TopAccountsPage })),
+);
+
 const LoginPage = lazy(() => import('@/pages/LoginPage').then((m) => ({ default: m.LoginPage })));
 const QuickStartPage = lazy(() =>
   import('@/pages/QuickStartPage').then((m) => ({ default: m.QuickStartPage })),
@@ -557,6 +595,119 @@ function AnimatedRoutes() {
             element={
               <RequireAuth>
                 <QuickStartPage />
+              </RequireAuth>
+            }
+          />
+          {/* Wave 2 — previously-unrouted pages */}
+          <Route
+            path="/calendar"
+            element={
+              <RequireAuth>
+                <CalendarPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/calls"
+            element={
+              <RequireAuth>
+                <CallsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              <RequireAuth>
+                <AnalyticsDashboardPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/dashboards"
+            element={
+              <RequireAuth>
+                <DashboardsListPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/custom-objects"
+            element={
+              <RequireAuth>
+                <CustomObjectListPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/custom-objects/new"
+            element={
+              <RequireAuth>
+                <CustomObjectEditorPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/custom-objects/:id"
+            element={
+              <RequireAuth>
+                <CustomObjectDetailPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/custom-objects"
+            element={
+              <RequireAdmin>
+                <CustomObjectsAdminPage />
+              </RequireAdmin>
+            }
+          />
+          <Route
+            path="/key-accounts"
+            element={
+              <RequireAuth>
+                <KeyAccountsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/predictive"
+            element={
+              <RequireAdmin>
+                <PredictiveAdminPage />
+              </RequireAdmin>
+            }
+          />
+          <Route
+            path="/references"
+            element={
+              <RequireAuth>
+                <ReferencesPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/reports/list"
+            element={
+              <RequireAuth>
+                <ReportsListPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/roles"
+            element={
+              <RequireAdmin>
+                <RolesPage />
+              </RequireAdmin>
+            }
+          />
+          <Route
+            path="/top-accounts"
+            element={
+              <RequireAuth>
+                <TopAccountsPage />
               </RequireAuth>
             }
           />
