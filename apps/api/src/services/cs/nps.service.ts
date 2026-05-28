@@ -12,6 +12,7 @@ import type { Logger as PinoLogger } from 'pino';
 import { prisma } from '@bidstack/db';
 
 import { fanOutWebhookEvent } from '../../queues/webhook-delivery.js';
+import { sendEmail } from '../email-integration.service.js';
 
 const NPS_TOKEN_SECRET = process.env['NPS_TOKEN_SECRET'] ?? 'change-me-in-production';
 const SURVEY_TTL_DAYS = 30;
@@ -94,6 +95,12 @@ export async function sendNpsSurvey(
     expiresAt: exp.toISOString(),
   });
 
+  // Also attempt a direct transactional email when the org has a connected
+  // email integration. WHY: webhook fan-out covers Zapier/downstream, but
+  // direct send provides immediate delivery without requiring setup.
+  // Fail-open — never blocks survey creation.
+  void sendNpsEmailDirect({ orgId, contactId, surveyId: survey.id, publicUrl, exp }, log);
+
   return { surveyId: survey.id, token, expiresAt: exp };
 }
 
@@ -145,6 +152,128 @@ export async function recordNpsResponse(
   log.info({ surveyId: survey.id, category, score11 }, 'cs: NPS response recorded');
   return { surveyId: survey.id, category };
 }
+
+// ─── Direct email dispatch ─────────────────────────────────────────────────
+
+/**
+ * Attempt to send the NPS survey link via the org's active email integration.
+ * WHY: Provides immediate delivery without requiring Zapier/downstream setup.
+ * Silently skips when no contact email or no active integration is available.
+ */
+async function sendNpsEmailDirect(
+  params: {
+    orgId: string;
+    contactId: string | undefined;
+    surveyId: string;
+    publicUrl: string;
+    exp: Date;
+  },
+  log: PinoLogger,
+): Promise<void> {
+  if (!params.contactId) return;
+
+  const contact = await prisma.contact.findFirst({
+    where: { id: params.contactId, orgId: params.orgId, deletedAt: null },
+    select: { email: true, name: true },
+  });
+  if (!contact?.email) return;
+
+  // Pick the most-recently-used active email integration for this org.
+  const token = await prisma.integrationToken.findFirst({
+    where: {
+      orgId: params.orgId,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      provider: { in: ['gmail', 'microsoft_graph'] as any[] },
+      status: 'active',
+      deletedAt: null,
+    },
+    orderBy: { updatedAt: 'desc' },
+    select: { userId: true },
+  });
+  if (!token) return; // no integration — webhook-only path is fine
+
+  // Use first word of full name as a personal greeting.
+  const firstName = contact.name?.split(' ')[0] ?? '';
+  const greeting = firstName ? `Hi ${firstName},` : 'Hi,';
+
+  try {
+    await sendEmail(
+      {
+        orgId: params.orgId,
+        userId: token.userId,
+        to: [{ email: contact.email }],
+        subject: 'How are we doing? (2-second survey)',
+        html: buildNpsEmailHtml(greeting, params.publicUrl, params.exp),
+        text: buildNpsEmailText(greeting, params.publicUrl, params.exp),
+        entityType: 'nps_survey',
+        entityId: params.surveyId,
+      },
+      log,
+    );
+    log.info({ surveyId: params.surveyId, contactId: params.contactId }, 'cs: NPS email sent');
+  } catch (err) {
+    // WHY fail-open: email failure must never block survey creation.
+    log.warn(
+      { err, surveyId: params.surveyId },
+      'cs: NPS direct email failed (webhook path active)',
+    );
+  }
+}
+
+function buildNpsEmailHtml(greeting: string, publicUrl: string, exp: Date): string {
+  const expStr = exp.toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /></head>
+<body style="margin:0;padding:0;font-family:system-ui,-apple-system,sans-serif;background:#f5f5f7">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f7;padding:40px 0">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;padding:48px 40px;max-width:560px">
+        <tr><td>
+          <p style="margin:0 0 8px;font-size:15px;color:#1d1d1f">${greeting}</p>
+          <p style="margin:0 0 24px;font-size:15px;color:#1d1d1f;line-height:1.6">
+            We'd love to hear how we're doing. It only takes a second — just click below to share your score.
+          </p>
+          <table cellpadding="0" cellspacing="0"><tr><td style="border-radius:10px;background:#0071e3">
+            <a href="${publicUrl}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:600;color:#fff;text-decoration:none;letter-spacing:-0.01em">
+              Share your feedback →
+            </a>
+          </td></tr></table>
+          <p style="margin:24px 0 0;font-size:13px;color:#6e6e73">
+            This survey link expires on ${expStr}.
+            If the button doesn't work, copy this URL into your browser:<br />
+            <span style="color:#0071e3">${publicUrl}</span>
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+function buildNpsEmailText(greeting: string, publicUrl: string, exp: Date): string {
+  const expStr = exp.toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  return [
+    greeting,
+    '',
+    "We'd love to hear how we're doing. It only takes a second.",
+    '',
+    `Share your feedback: ${publicUrl}`,
+    '',
+    `This survey link expires on ${expStr}.`,
+  ].join('\n');
+}
+
+// ─── Quarterly batch ───────────────────────────────────────────────────────
 
 /** Send NPS surveys to all contacts for qualifying accounts (quarterly trigger). */
 export async function sendQuarterlyNpsSurveys(orgId: string, log: PinoLogger): Promise<number> {

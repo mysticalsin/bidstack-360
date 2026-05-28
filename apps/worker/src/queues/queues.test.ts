@@ -31,7 +31,7 @@ describe('Worker queues', () => {
 
     if (!(await canReachRedis(redisUrl))) {
       throw new Error(
-        `Redis at ${redisUrl} not reachable — aborting worker queue tests. (Rule 12: Fail loud)`,
+        `Redis at ${safeRedisUrl(redisUrl)} not reachable — aborting worker queue tests. (Rule 12: Fail loud)`,
       );
     }
 
@@ -102,6 +102,18 @@ function isRedisTeardownNoise(err: unknown): boolean {
 function swallowRedisTeardownNoise(err: Error): void {
   if (isRedisTeardownNoise(err)) return;
   throw err;
+}
+
+/** Strip credentials from a Redis URL before using it in error messages or logs. */
+function safeRedisUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    u.username = '';
+    u.password = '';
+    return u.toString();
+  } catch {
+    return '[invalid-redis-url]';
+  }
 }
 
 function canReachRedis(url: string): Promise<boolean> {
