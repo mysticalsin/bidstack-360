@@ -1,0 +1,147 @@
+/**
+ * ReviewStep — human-in-the-loop approval of extracted solutions and products.
+ * Step 3: user reviews and optionally removes items before publishing.
+ */
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Icon } from '@/components/ui/Icon';
+import { toast } from '@/components/ui/Toast';
+import { useAccountIntel, useDeleteSolution, useDeleteProduct } from '@/hooks/useAccountIntel';
+
+import type { ExtractedItem } from './intakeConfig';
+
+interface ReviewStepProps {
+  accountId: string;
+  onNext: () => void;
+  onBack: () => void;
+}
+
+export function ReviewStep({ accountId, onNext, onBack }: ReviewStepProps) {
+  const intel = useAccountIntel(accountId || undefined);
+  const solutions = (intel.data?.solutions ?? []) as ExtractedItem[];
+  const products = (intel.data?.products ?? []) as ExtractedItem[];
+  const deleteSolution = useDeleteSolution(accountId || undefined);
+  const deleteProduct = useDeleteProduct(accountId || undefined);
+
+  const handleDeleteSolution = (id: string, name: string) => {
+    deleteSolution.mutate(id, {
+      onSuccess: () => toast.success(`Removed "${name}"`),
+      onError: () => toast.error(`Failed to remove "${name}"`),
+    });
+  };
+
+  const handleDeleteProduct = (id: string, name: string) => {
+    deleteProduct.mutate(id, {
+      onSuccess: () => toast.success(`Removed "${name}"`),
+      onError: () => toast.error(`Failed to remove "${name}"`),
+    });
+  };
+
+  return (
+    <Card className="p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-[var(--fg-primary)]">Review extracted data</h2>
+        <Button variant="ghost" size="sm" onClick={() => intel.refetch()}>
+          <Icon name="refresh" size={14} />
+          Refresh
+        </Button>
+      </div>
+
+      {intel.isLoading ? (
+        <div className="h-32 flex items-center justify-center text-xs text-[var(--fg-tertiary)]">
+          Loading…
+        </div>
+      ) : (
+        <>
+          <ExtractedGroup
+            title="Solutions"
+            items={solutions}
+            onDelete={handleDeleteSolution}
+            isDeleting={deleteSolution.isPending}
+          />
+          <ExtractedGroup
+            title="Products"
+            items={products}
+            onDelete={handleDeleteProduct}
+            isDeleting={deleteProduct.isPending}
+          />
+        </>
+      )}
+
+      <div className="flex items-center gap-2">
+        <Button variant="secondary" onClick={onBack}>
+          ← Back
+        </Button>
+        <Button onClick={onNext}>Publish →</Button>
+      </div>
+    </Card>
+  );
+}
+
+// ── ExtractedGroup — renders one category (solutions or products) ──────────────
+
+function ExtractedGroup({
+  title,
+  items,
+  onDelete,
+  isDeleting,
+}: {
+  title: string;
+  items: ExtractedItem[];
+  onDelete: (id: string, name: string) => void;
+  isDeleting: boolean;
+}) {
+  return (
+    <div>
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+        {title} ({items.length})
+      </h3>
+      {items.length === 0 ? (
+        <p className="text-xs text-[var(--fg-tertiary)]">No {title.toLowerCase()} extracted.</p>
+      ) : (
+        <div className="space-y-2">
+          {items.map((item) => (
+            <div
+              key={item.id}
+              className="group flex items-start justify-between gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-medium text-[var(--fg-primary)]">{item.name}</div>
+                  <ConfidenceBadge bps={item.confidenceBps} />
+                </div>
+                <div className="text-xs text-[var(--fg-secondary)]">{item.description}</div>
+              </div>
+              <button
+                type="button"
+                aria-label={`Remove ${item.name}`}
+                onClick={() => onDelete(item.id, item.name)}
+                disabled={isDeleting}
+                className="opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100 focus:opacity-100 shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-red-50 hover:text-red-600 focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
+              >
+                <Icon name="trash" size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── ConfidenceBadge — only used within this file ──────────────────────────────
+
+function ConfidenceBadge({ bps }: { bps: number }) {
+  const pct = Math.round(bps / 100);
+  let color = 'text-gray-500 bg-gray-100';
+  if (bps >= 8000) color = 'text-emerald-700 bg-emerald-100';
+  else if (bps >= 6000) color = 'text-blue-700 bg-blue-100';
+  else if (bps >= 4000) color = 'text-amber-700 bg-amber-100';
+  return (
+    <span
+      className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${color}`}
+    >
+      {pct}%
+    </span>
+  );
+}
