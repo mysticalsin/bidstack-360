@@ -4,7 +4,7 @@ import { forwardRef } from 'react';
 import { cn } from '@/lib/cn';
 import { springSnap } from '@/lib/motion';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'destructive';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'destructive' | 'success';
 type Size = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> {
@@ -26,6 +26,15 @@ const VARIANT: Record<Variant, string> = {
   destructive:
     'bg-[var(--danger)] text-white hover:opacity-95 active:opacity-90 active:scale-[0.98] shadow-[var(--shadow-xs)] ' +
     'dark:bg-[rgba(251,113,133,0.18)] dark:text-[#fda4af] dark:border dark:border-[rgba(251,113,133,0.25)] dark:hover:bg-[rgba(251,113,133,0.25)] dark:hover:shadow-[0_0_16px_rgba(251,113,133,0.2)]',
+  // WHY: Apple "tinted button" pattern — green tint at rest, floods to solid on hover.
+  // Overrides the base focus-visible ring so the keyboard outline matches the
+  // success palette rather than brand-primary purple.
+  success:
+    'bg-[var(--success-tint)] text-[var(--success)] border border-[rgba(31,138,91,0.35)] ' +
+    'hover:bg-[var(--success)] hover:text-white hover:border-transparent active:opacity-90 active:scale-[0.98] shadow-[var(--shadow-xs)] ' +
+    'focus-visible:ring-[var(--success)] ' +
+    'dark:bg-[rgba(52,211,153,0.12)] dark:text-[#86efac] dark:border dark:border-[rgba(52,211,153,0.28)] ' +
+    'dark:hover:bg-[rgba(52,211,153,0.22)] dark:hover:shadow-[0_0_16px_rgba(52,211,153,0.22)]',
 };
 
 const SIZE: Record<Size, string> = {
