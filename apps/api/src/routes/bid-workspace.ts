@@ -11,11 +11,7 @@ import {
   Requirement,
   RequirementCreateRequest,
 } from '@bidstack/shared';
-import type {
-  ApprovalGate,
-  ReviewIssue,
-  SubmissionPackage,
-} from '@bidstack/shared';
+import type { ApprovalGate, ReviewIssue, SubmissionPackage } from '@bidstack/shared';
 
 import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 import { enqueueDocumentExtract } from '../queues/document-extract.js';
@@ -320,6 +316,88 @@ export const bidWorkspaceRoutes: FastifyPluginAsyncZod = async (server) => {
     },
   );
 
+  /**
+   * GET /bid-workspaces/:opportunityId/compliance
+   *
+   * Dedicated compliance matrix read endpoint consumed by useRfpCompliance().
+   * Returns rows joined with their requirement text, plus aggregated counts for
+   * the summary banner. Kept separate from the full BidWorkspaceSnapshot so the
+   * compliance panel can refresh cheaply without re-fetching all documents.
+   *
+   * responseStatus mapping (AI worker writes 'YES'|'NO'|'PARTIAL'|'NOT_APPLICABLE'):
+   *   'YES'            → compliant
+   *   'NO'             → non_compliant
+   *   'PARTIAL'        → partial
+   *   'not_started'/other → pending
+   */
+  server.get(
+    '/bid-workspaces/:opportunityId/compliance',
+    {
+      preHandler: server.requirePermission('documents:read'),
+      schema: {
+        params: WorkspaceParams,
+        response: {
+          200: z.object({
+            items: z.array(
+              z.object({
+                id: z.string().uuid(),
+                requirement: z.string(),
+                response: z.string().nullable(),
+                status: z.enum(['pending', 'compliant', 'partial', 'non_compliant']),
+                autoFilled: z.boolean(),
+                aiConfidenceBps: z.number().int().min(0).max(10000),
+              }),
+            ),
+            total: z.number().int(),
+            compliantCount: z.number().int(),
+            pendingCount: z.number().int(),
+          }),
+        },
+      },
+    },
+    async (req, reply) => {
+      const opportunity = await ensureOpportunity(req.auth.orgId, req.params.opportunityId);
+      if (!opportunity) return reply.notFound('Opportunity not found');
+
+      const matrixRows = await prisma.complianceMatrixRow.findMany({
+        where: { orgId: req.auth.orgId, opportunityId: opportunity.id, deletedAt: null },
+        orderBy: { createdAt: 'asc' },
+        take: 500,
+        select: {
+          id: true,
+          responseStatus: true,
+          answerDraft: true,
+          requirement: { select: { text: true, confidenceBps: true } },
+        },
+      });
+
+      function toFrontendStatus(rs: string): 'pending' | 'compliant' | 'partial' | 'non_compliant' {
+        if (rs === 'YES') return 'compliant';
+        if (rs === 'NO') return 'non_compliant';
+        if (rs === 'PARTIAL') return 'partial';
+        return 'pending';
+      }
+
+      const items = matrixRows.map((row) => ({
+        id: row.id,
+        requirement: row.requirement.text,
+        response: row.answerDraft,
+        status: toFrontendStatus(row.responseStatus),
+        // autoFilled = compliance-fill worker has assessed this row;
+        // 'not_started' is the DB default before any AI processing.
+        autoFilled: row.responseStatus !== 'not_started',
+        aiConfidenceBps: row.requirement.confidenceBps,
+      }));
+
+      return {
+        items,
+        total: items.length,
+        compliantCount: items.filter((i) => i.status === 'compliant').length,
+        pendingCount: items.filter((i) => i.status === 'pending').length,
+      };
+    },
+  );
+
   server.post(
     '/bid-workspaces/:opportunityId/documents',
     {
@@ -340,7 +418,9 @@ export const bidWorkspaceRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!file) return reply.notFound('File attachment not found');
       if (opportunity.companyId && file.companyId && opportunity.companyId !== file.companyId) {
-        throw server.httpErrors.badRequest('File belongs to a different company than the opportunity');
+        throw server.httpErrors.badRequest(
+          'File belongs to a different company than the opportunity',
+        );
       }
 
       const result = await prisma.$transaction(async (tx) => {
@@ -412,7 +492,11 @@ export const bidWorkspaceRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!jobId) {
         await prisma.documentVersion.updateMany({
-          where: { id: result.version.id, orgId: req.auth.orgId, bidDocumentId: result.bidDocument.id },
+          where: {
+            id: result.version.id,
+            orgId: req.auth.orgId,
+            bidDocumentId: result.bidDocument.id,
+          },
           data: { extractionStatus: 'pending' },
         });
       }
@@ -560,7 +644,9 @@ export const bidWorkspaceRoutes: FastifyPluginAsyncZod = async (server) => {
       const nextStatus = req.body.status ?? existing.status;
       const nextCitations = req.body.citations ?? jsonArray(existing.citations);
       if (nextStatus === 'approved' && nextCitations.length === 0) {
-        throw server.httpErrors.conflict('Cannot approve a compliance row without source citations');
+        throw server.httpErrors.conflict(
+          'Cannot approve a compliance row without source citations',
+        );
       }
 
       const updated = await prisma.$transaction(async (tx) => {

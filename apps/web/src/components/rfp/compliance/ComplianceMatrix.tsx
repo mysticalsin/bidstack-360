@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/Card';
 import { LoadingSkeleton, EmptyState } from '@/components/ui/StateMessages';
-import { useRfpCompliance } from '@/hooks/rfp/useRfpCompliance';
+import { useRfpCompliance, useSaveComplianceRow } from '@/hooks/rfp/useRfpCompliance';
 import { useRfpPipelineStore } from '@/stores/rfpPipeline';
 import { ComplianceRow } from './ComplianceRow';
 
@@ -12,6 +12,11 @@ export function ComplianceMatrix() {
   const { t } = useTranslation('rfp');
   const bidWorkspaceId = useRfpPipelineStore((s) => s.bidWorkspaceId);
   const { data, isLoading, isError, error } = useRfpCompliance(bidWorkspaceId);
+  const saveRow = useSaveComplianceRow(bidWorkspaceId);
+
+  function handleSave(rowId: string, answerDraft: string) {
+    saveRow.mutate({ rowId, answerDraft });
+  }
 
   return (
     <Card>
@@ -73,7 +78,12 @@ export function ComplianceMatrix() {
           </div>
           <div role="list" aria-label={t('compliance.matrixLabel')}>
             {data.items.map((row) => (
-              <ComplianceRow key={row.id} row={row} />
+              <ComplianceRow
+                key={row.id}
+                row={row}
+                onSave={handleSave}
+                isSaving={saveRow.isPending}
+              />
             ))}
           </div>
         </div>
