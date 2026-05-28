@@ -1,7 +1,7 @@
 # BS-R1 — File Size Debt Design Doc
 
 **Date:** 2026-05-28  
-**Status:** In progress  
+**Status:** ✅ Complete (Wave 10)  
 **Ticket:** BS-R1  
 **Rule violated:** CLAUDE.md §Quality — max file: 400 lines
 
@@ -20,20 +20,20 @@ preserve the existing API surface and pass typecheck + lint + tests.
 
 ## File inventory (descending size)
 
-| #   | File                                                          | Lines | Priority | Strategy                                                                                                                                                                                                                                           |
-| --- | ------------------------------------------------------------- | ----- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `apps/api/src/services/crm/dashboard.service.ts`              | 1,752 | P1 ✅    | ~~Split into 5 modules: dashboard.utils.ts / dashboard.defaults.ts / company-enrichment.service.ts / dashboard.cockpit.ts / dashboard.queries.ts~~ **Done Wave 10**                                                                                |
-| 2   | `apps/web/src/pages/IntegrationsPage.tsx`                     | 1,423 | P2 ✅    | ~~Split into 9 modules: types.ts / integration-helpers.ts / IntegrationAtoms.tsx / IntegrationHero.tsx / ConnectionRunway.tsx / WebhookEventsCard.tsx / ConnectionCommandCenter.tsx / ConnectionTester.tsx / DustAgentsCard.tsx~~ **Done Wave 10** |
-| 3   | `apps/web/src/components/dashboard/OrgDashboard.tsx`          | 1,403 | P2 ✅    | ~~Extract: widget components → `dashboard/widgets/` (one file per widget type); layout shell stays in `OrgDashboard.tsx`~~ **Done Wave 10**                                                                                                        |
-| 4   | `apps/web/src/pages/AuditLogPage.tsx`                         | 1,203 | P3 ✅    | ~~Extract: `audit-log/audit-log-types.ts`, `audit-log/audit-log-helpers.ts`, `audit-log/AuditLogHero.tsx`, `audit-log/AuditLogInsights.tsx`, `audit-log/AuditLogFilters.tsx`, `audit-log/AuditLogTable.tsx`~~ **Done Wave 10**                     |
-| 5   | `apps/web/src/pages/OpportunitiesPage.tsx`                    | 956   | P3 ✅    | ~~Extract: `OppInlineEditCells.tsx` (cells), `OpportunityRow.tsx` (row), `OppToolbar.tsx` (KPI bar + header + stage chips + bulk bar)~~ **Done Wave 10**                                                                                           |
-| 6   | `apps/api/src/routes/invoices.ts`                             | 933   | P3 ✅    | ~~Extract: helpers + DB util → `invoices.helpers.ts`; streaming CSV + AR aging → `invoices.export.ts`; state transitions + payments → `invoices.payments.ts`; create + from-order → `invoices.mutations.ts`~~ **Done Wave 10**                     |
-| 7   | `apps/api/src/services/ai-assistant.service.ts`               | 916   | P3 ✅    | ~~Extract: constants/types/Redis/Prisma utilities → `ai-assistant.helpers.ts`; Prisma context builders → `ai-assistant.context.ts`; main orchestration stays~~ **Done Wave 10**                                                                    |
-| 8   | `apps/web/src/pages/ContactsPage.tsx`                         | 872   | P3 ✅    | ~~Extract: `ContactTable.tsx`, `ContactContextMenu.tsx`, `useContactsKeyboard.ts`~~ **Done Wave 10**                                                                                                                                               |
-| 9   | `apps/api/src/routes/rfp-nocobase.ts`                         | 834   | P4       | Extract: RFP template logic → `rfp-templates.ts`; scoring → `rfp-scoring.ts`                                                                                                                                                                       |
-| 10  | `apps/api/src/routes/opportunities.ts`                        | 834   | P4       | Extract: stage-transition helpers → `opportunities.transitions.ts`                                                                                                                                                                                 |
-| 11  | `apps/api/src/services/reports/sales-intelligence.service.ts` | 831   | P4       | Extract: chart data builders → `sales-intelligence.charts.ts`; summary builders → `sales-intelligence.summary.ts`                                                                                                                                  |
-| 12  | `apps/api/src/routes/territories.ts`                          | 816   | P1 ✅    | ~~Extract `A2_TO_A3` → `lib/geo/iso-country-codes.ts`~~ **Done Wave 10**                                                                                                                                                                           |
+| #   | File                                                          | Lines | Priority | Strategy                                                                                                                                                                                                                                                          |
+| --- | ------------------------------------------------------------- | ----- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `apps/api/src/services/crm/dashboard.service.ts`              | 1,752 | P1 ✅    | ~~Split into 5 modules: dashboard.utils.ts / dashboard.defaults.ts / company-enrichment.service.ts / dashboard.cockpit.ts / dashboard.queries.ts~~ **Done Wave 10**                                                                                               |
+| 2   | `apps/web/src/pages/IntegrationsPage.tsx`                     | 1,423 | P2 ✅    | ~~Split into 9 modules: types.ts / integration-helpers.ts / IntegrationAtoms.tsx / IntegrationHero.tsx / ConnectionRunway.tsx / WebhookEventsCard.tsx / ConnectionCommandCenter.tsx / ConnectionTester.tsx / DustAgentsCard.tsx~~ **Done Wave 10**                |
+| 3   | `apps/web/src/components/dashboard/OrgDashboard.tsx`          | 1,403 | P2 ✅    | ~~Extract: widget components → `dashboard/widgets/` (one file per widget type); layout shell stays in `OrgDashboard.tsx`~~ **Done Wave 10**                                                                                                                       |
+| 4   | `apps/web/src/pages/AuditLogPage.tsx`                         | 1,203 | P3 ✅    | ~~Extract: `audit-log/audit-log-types.ts`, `audit-log/audit-log-helpers.ts`, `audit-log/AuditLogHero.tsx`, `audit-log/AuditLogInsights.tsx`, `audit-log/AuditLogFilters.tsx`, `audit-log/AuditLogTable.tsx`~~ **Done Wave 10**                                    |
+| 5   | `apps/web/src/pages/OpportunitiesPage.tsx`                    | 956   | P3 ✅    | ~~Extract: `OppInlineEditCells.tsx` (cells), `OpportunityRow.tsx` (row), `OppToolbar.tsx` (KPI bar + header + stage chips + bulk bar)~~ **Done Wave 10**                                                                                                          |
+| 6   | `apps/api/src/routes/invoices.ts`                             | 933   | P3 ✅    | ~~Extract: helpers + DB util → `invoices.helpers.ts`; streaming CSV + AR aging → `invoices.export.ts`; state transitions + payments → `invoices.payments.ts`; create + from-order → `invoices.mutations.ts`~~ **Done Wave 10**                                    |
+| 7   | `apps/api/src/services/ai-assistant.service.ts`               | 916   | P3 ✅    | ~~Extract: constants/types/Redis/Prisma utilities → `ai-assistant.helpers.ts`; Prisma context builders → `ai-assistant.context.ts`; main orchestration stays~~ **Done Wave 10**                                                                                   |
+| 8   | `apps/web/src/pages/ContactsPage.tsx`                         | 872   | P3 ✅    | ~~Extract: `ContactTable.tsx`, `ContactContextMenu.tsx`, `useContactsKeyboard.ts`~~ **Done Wave 10**                                                                                                                                                              |
+| 9   | `apps/api/src/routes/rfp-nocobase.ts`                         | 834   | P4 ✅    | ~~Extract: helpers (Zod schemas + mock agents + orchestrator) → `rfp-nocobase.helpers.ts`; AI/assignment/output routes → `rfp-nocobase.agent-routes.ts`; CRUD only stays in main file~~ **Done Wave 10**                                                          |
+| 10  | `apps/api/src/routes/opportunities.ts`                        | 834   | P4 ✅    | ~~Extract: create/import → `opportunities.mutations.ts`; stage/brief → `opportunities.transitions.ts`; shared utils → `opportunities.helpers.ts`; CRUD only stays in main file~~ **Done Wave 10**                                                                 |
+| 11  | `apps/api/src/services/reports/sales-intelligence.service.ts` | 831   | P4 ✅    | ~~Extract: constants/interfaces/helpers → `sales-intelligence.helpers.ts`; chart builders → `sales-intelligence.charts.ts`; KPI/team/territory/pipeline/win-loss → `sales-intelligence.summary.ts`; DB + orchestrators only stay in service.ts~~ **Done Wave 10** |
+| 12  | `apps/api/src/routes/territories.ts`                          | 816   | P1 ✅    | ~~Extract `A2_TO_A3` → `lib/geo/iso-country-codes.ts`~~ **Done Wave 10**                                                                                                                                                                                          |
 
 ---
 
@@ -145,9 +145,44 @@ preserve the existing API surface and pass typecheck + lint + tests.
 - Import DAG is acyclic; ContactContextMenu + useContactsKeyboard are leaf nodes
 - Typecheck ✅ Lint ✅ (0 errors, 0 warnings)
 
+### `rfp-nocobase.ts` — Wave 10 (2026-05-28)
+
+- Split 834-line monolith into 3 focused modules:
+  - `rfp-nocobase.helpers.ts` (~370 lines) — Zod schemas (`RfpStatus`, `RfpPriority`, `RfpRecommendation`, `RfpRequest`, `RfpDocument`, `RfpSection`), shared interfaces (`IntakeResult`, `SectionResult`), private keyword classifiers (`detectSectionType`, `detectImportance`), mock agents (`mockIntakeAgent`, `mockStructuringAgent`), background orchestrator (`runIntakeAndStructuring`); leaf node, zero local sibling imports
+  - `rfp-nocobase.agent-routes.ts` (~250 lines) — named export `rfpAgentRoutes: FastifyPluginAsyncZod` covering `POST /rfp/:id/intake`, `POST /rfp/:id/agents/:agentType/run`, `GET/POST/DELETE /rfp/:id/assignments`, `GET/POST /rfp/:id/outputs/:outputId/(approve|reject)`
+  - `rfp-nocobase.ts` (~220 lines) — CRUD only: `GET/POST/PATCH/DELETE /rfp`, `POST /rfp/:id/documents`, `GET /rfp/:id/sections`, `GET /rfp/:id/documents`; registers `rfpAgentRoutes` sub-plugin at end; preserves `export default plugin`
+- Import DAG is acyclic: helpers (leaf) ← agent-routes ← main plugin
+- Typecheck ✅ Lint ✅ (0 errors, 0 warnings)
+
+### `opportunities.ts` — Wave 10 (2026-05-28)
+
+- Split 834-line monolith into 4 focused modules:
+  - `opportunities.helpers.ts` (~35 lines) — `mintNextCode` (reads highest OP-NNNN code inside active tx, returns next) + `isUniqueViolation` (Prisma P2002 guard); leaf node, zero local sibling imports
+  - `opportunities.mutations.ts` (~290 lines) — named export `opportunityMutationsRoutes: FastifyPluginAsyncZod` covering `POST /opportunities` (parallel owner/territory lookups, pipelineStage resolve, 5-attempt mintNextCode retry, fanOutWebhookEvent) + `POST /opportunities/import` (N+1-free reference map pre-load, per-row retry)
+  - `opportunities.transitions.ts` (~145 lines) — named export `opportunityTransitionRoutes: FastifyPluginAsyncZod` covering `POST /opportunities/:id/stage` (kanban move with audit log, pushOpportunityToDust, fanOutWebhookEvent) + `POST /opportunities/:id/brief` (stub; prod path calls Dust agent)
+  - `opportunities.ts` reduced from 834 → ~376 lines — `GET /opportunities` (list + batch comment counts), `GET /opportunities/count`, `GET /opportunities/:id` (360° payload + viewCount), `PATCH /opportunities/:id` (parallel lookups, stageUpdate, customFieldValues upsert, pushOpportunityToDust), `DELETE /opportunities/:id` (audit tombstone + soft-delete); registers both sub-plugins at end
+- Import DAG is acyclic: helpers (leaf) ← mutations; transitions is leaf-like (no local sibling imports); opportunities.ts registers both via `server.register()`
+- Typecheck ✅ Lint ✅ (0 errors, 0 warnings)
+
+### `sales-intelligence.service.ts` — Wave 10 (2026-05-28)
+
+- Split 831-line monolith into 4 focused modules under `services/reports/`:
+  - `sales-intelligence.helpers.ts` (143 lines) — leaf node: constants (`SALES_CURRENCY`, `QUOTATION_STATES`, `ORDER_STATES`, `COUNTRY_META`, `CUSTOMER_COUNTRY`), interfaces (`SalesOrderRow`, `ProductRollupRow`), pure helpers (`sumMicros`, `sortByRevenue`, `customerCountry`, `attribution`, `classifyProduct`, `countryMapFromEnrichments`); zero local sibling imports
+  - `sales-intelligence.charts.ts` (236 lines) — monthly, country, and product chart builders: `buildMonthlySales`, `buildCountryRows` (+ private `mergePeople`), `buildOpportunityProductRows`, `buildProductRowsFromSales`, `buildCategoryRowsFromProducts`
+  - `sales-intelligence.summary.ts` (255 lines) — KPI, team, territory, pipeline, and win-loss builders: `buildKpis` (+ private `kpi`, `priorPeriodStats`), `buildTeamPerformanceFromOrders`, `buildTeamPerformanceFromOpportunities`, `buildTerritoryBreakdown`, `buildPipelineByStage`, `buildWinLossFromOrders`, `buildWinLossFromOpportunities`
+  - `sales-intelligence.service.ts` (308 lines, reduced from 831) — DB guards (`tableExists`), raw SQL fetchers (`readSalesOrders`, `readProductRollup`, `readCategoryRollup`), and report orchestrators (`buildSalesOrderReport`, `buildOpportunitySalesReport`); only layer that touches Prisma
+- Import DAG is acyclic: helpers (leaf) ← charts, summary ← service (orchestrator)
+- External API surface unchanged — callers `routes/reports.ts` import the same 5 names from `service.ts`
+- Typecheck ✅ Lint ✅ (0 errors, 0 warnings)
+
 ---
 
-## Next up (P4)
+## Status: COMPLETE
+
+All 12 files from the BS-R1 inventory have been addressed. The file-size-debt
+backlog is fully resolved as of Wave 10 (2026-05-28).
+
+---
 
 ## Guiding principles for all splits
 
