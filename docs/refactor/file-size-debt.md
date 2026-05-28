@@ -28,8 +28,8 @@ preserve the existing API surface and pass typecheck + lint + tests.
 | 4   | `apps/web/src/pages/AuditLogPage.tsx`                         | 1,203 | P3 ✅    | ~~Extract: `audit-log/audit-log-types.ts`, `audit-log/audit-log-helpers.ts`, `audit-log/AuditLogHero.tsx`, `audit-log/AuditLogInsights.tsx`, `audit-log/AuditLogFilters.tsx`, `audit-log/AuditLogTable.tsx`~~ **Done Wave 10**                     |
 | 5   | `apps/web/src/pages/OpportunitiesPage.tsx`                    | 956   | P3 ✅    | ~~Extract: `OppInlineEditCells.tsx` (cells), `OpportunityRow.tsx` (row), `OppToolbar.tsx` (KPI bar + header + stage chips + bulk bar)~~ **Done Wave 10**                                                                                           |
 | 6   | `apps/api/src/routes/invoices.ts`                             | 933   | P3 ✅    | ~~Extract: helpers + DB util → `invoices.helpers.ts`; streaming CSV + AR aging → `invoices.export.ts`; state transitions + payments → `invoices.payments.ts`; create + from-order → `invoices.mutations.ts`~~ **Done Wave 10**                     |
-| 7   | `apps/api/src/services/ai-assistant.service.ts`               | 916   | P3       | Extract: tool-call dispatch → `ai-assistant.tools.ts`; context-building → `ai-assistant.context.ts`; main orchestration stays                                                                                                                      |
-| 8   | `apps/web/src/pages/ContactsPage.tsx`                         | 872   | P3       | Extract: `ContactTable.tsx`, `ContactFilters.tsx`, `ContactImportModal.tsx`                                                                                                                                                                        |
+| 7   | `apps/api/src/services/ai-assistant.service.ts`               | 916   | P3 ✅    | ~~Extract: constants/types/Redis/Prisma utilities → `ai-assistant.helpers.ts`; Prisma context builders → `ai-assistant.context.ts`; main orchestration stays~~ **Done Wave 10**                                                                    |
+| 8   | `apps/web/src/pages/ContactsPage.tsx`                         | 872   | P3 ✅    | ~~Extract: `ContactTable.tsx`, `ContactContextMenu.tsx`, `useContactsKeyboard.ts`~~ **Done Wave 10**                                                                                                                                               |
 | 9   | `apps/api/src/routes/rfp-nocobase.ts`                         | 834   | P4       | Extract: RFP template logic → `rfp-templates.ts`; scoring → `rfp-scoring.ts`                                                                                                                                                                       |
 | 10  | `apps/api/src/routes/opportunities.ts`                        | 834   | P4       | Extract: stage-transition helpers → `opportunities.transitions.ts`                                                                                                                                                                                 |
 | 11  | `apps/api/src/services/reports/sales-intelligence.service.ts` | 831   | P4       | Extract: chart data builders → `sales-intelligence.charts.ts`; summary builders → `sales-intelligence.summary.ts`                                                                                                                                  |
@@ -125,9 +125,29 @@ preserve the existing API surface and pass typecheck + lint + tests.
 - Import DAG is acyclic; `invoices.helpers.ts` is the leaf; all external callers unchanged via same `invoicesRoutes` named export
 - Typecheck ✅ Lint ✅ (0 errors, 0 warnings; fixed `Prisma` namespace as `import type`)
 
+### `ai-assistant.service.ts` — Wave 10 (2026-05-28)
+
+- Split 916-line monolith into 3 focused modules under `services/`:
+  - `ai-assistant.helpers.ts` (~255 lines) — leaf node: constants (`DEFAULT_DAILY_CAP_MICROS`, `AI_MODEL`, token cost rates), 8 shared interfaces, Redis key helpers (`dailyCostKey`, `dailySessionKey`), `checkDailyCap`, `recordCost`, `sanitiseContactForPrompt`, `buildDustClient`, `estimateCost`, `persistSession`; zero local sibling imports
+  - `ai-assistant.context.ts` (~195 lines) — Prisma context builders: `buildEmailDraftContext`, `buildSentimentContext`, `buildMeetingContext`, `buildEnrichContext`, `buildAccountIntelContext`; imports from helpers, Zod (attendee parsing), `@bidstack/db`; throws `{ statusCode: 404 }` on not-found entities
+  - `ai-assistant.service.ts` (~310 lines) — pure orchestrator: cap-check → context → prompt → Dust/stub → parse → persist; zero direct Prisma/Redis/Zod imports
+- Import DAG is acyclic: `helpers` (leaf) ← `context` ← `service`
+- Route file (`ai-assistant.ts`) unchanged — imports same 5 exported function names
+- Typecheck ✅ Lint ✅ (0 errors, 0 warnings)
+
+### `ContactsPage.tsx` — Wave 10 (2026-05-28)
+
+- Split 872-line monolith into 4 focused modules under `pages/contacts/`:
+  - `ContactContextMenu.tsx` (~155 lines) — WAI-ARIA right-click menu (role=menu, arrow nav, Home/End, Tab close, Escape via document listener, viewport clamping); leaf node, zero local sibling imports
+  - `useContactsKeyboard.ts` (~95 lines) — vim-style keyboard nav hook (j/k/arrows, gg/G, Enter/x/Space, ⌘E); pendingG ref for gg chord; deps `[items, cursorIdx, quickLook]` match original exactly; leaf node
+  - `ContactTable.tsx` (~330 lines) — aria-live `<p role="status">` + `<Card>` with loading/error/empty/populated states; exports `ContactSortKey`, `ContactSortState`, `ContactTableProps`; uses `ReadonlyArray<Contact>` for items + raw props
+- `ContactsPage.tsx` reduced from 872 → ~310 lines (URL-persisted sort, bulk selection, data-fetching, handler logic only)
+- Import DAG is acyclic; ContactContextMenu + useContactsKeyboard are leaf nodes
+- Typecheck ✅ Lint ✅ (0 errors, 0 warnings)
+
 ---
 
-## Next up (P3)
+## Next up (P4)
 
 ## Guiding principles for all splits
 
