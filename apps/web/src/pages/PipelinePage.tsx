@@ -10,34 +10,22 @@
 // two systems coexist — framer drives the visual spring/inertia, HTML5
 // drives the data hand-off.
 
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { memo, useMemo, useState, type DragEvent, type KeyboardEvent } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useMemo, useState, type DragEvent, type KeyboardEvent } from 'react';
 
-import { AnimatedNumber } from '@/components/motion/AnimatedNumber';
+import { useReducedMotion } from 'framer-motion';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+
 import { KanbanSkeleton } from '@/components/skeletons/PageSkeletons';
 import { ErrorState } from '@/components/ui/StateMessages';
-import { Badge, stageTone } from '@/components/ui/Badge';
-import { GlassCard } from '@/components/ui/GlassCard';
-import { Icon } from '@/components/ui/Icon';
 import { toast } from '@/components/ui/Toast';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { useStageMutation } from '@/hooks/useStageMutation';
-import { cn } from '@/lib/cn';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
-import { formatDate } from '@/lib/format';
-import { springLayout, springSnap } from '@/lib/motion';
-import { getPipelineStages, resolvePipelineStage } from '@/lib/pipeline-stages';
-
+import { getPipelineStages } from '@/lib/pipeline-stages';
 import type { Opportunity } from '@bidstack/shared';
 
-function getStageId(opp: Opportunity): string {
-  return resolvePipelineStage(opp).id;
-}
-
-function getStageName(opp: Opportunity): string {
-  return resolvePipelineStage(opp).name;
-}
+import { getStageId, getStageName } from './pipelineBoard/pipelineUtils';
+import { StageColumn } from './pipelineBoard/StageColumn';
 
 export function PipelinePage() {
   const reduced = useReducedMotion();
@@ -45,11 +33,11 @@ export function PipelinePage() {
   const { formatMoney } = useFormatMoney();
   const { data, isLoading, isError, error } = useOpportunities({ limit: 50 });
   const move = useStageMutation();
+
   // Stage filter via the URL. `?pipelineStageId=...` collapses the board to a
   // single column so the user can focus that slice and share the link.
   const [searchParams, setSearchParams] = useSearchParams();
-  const stageFilterRaw = searchParams.get('pipelineStageId');
-  const stageFilter = stageFilterRaw ?? null;
+  const stageFilter = searchParams.get('pipelineStageId') ?? null;
   const setStageFilter = (next: string | null) => {
     const params = new URLSearchParams(searchParams);
     if (next) params.set('pipelineStageId', next);
@@ -68,12 +56,10 @@ export function PipelinePage() {
 
   // Derive stage columns from canonical PipelineStage rows, with a legacy
   // fallback for tenants that still only carry the old stage enum.
-  const stages = useMemo(() => {
-    return getPipelineStages(data?.items ?? []);
-  }, [data?.items]);
+  const stages = useMemo(() => getPipelineStages(data?.items ?? []), [data?.items]);
 
-  // Group items by pipelineStageId once per data change so each column doesn't filter
-  // the whole list on every render.
+  // Group items by pipelineStageId once per data change so each column doesn't
+  // filter the whole list on every render.
   const byStage = useMemo(() => {
     const map = new Map<string, Opportunity[]>();
     for (const stage of stages) map.set(stage.id, []);
@@ -181,6 +167,7 @@ export function PipelinePage() {
           : ''}
       </p>
 
+      {/* KPI summary bar */}
       {!isLoading && data && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-tour="pipeline-kanban">
           {(() => {
@@ -206,11 +193,7 @@ export function PipelinePage() {
               },
               { label: 'Open value', value: formatMoney(openValue, 'EUR'), tone: 'jade' as const },
               { label: 'Win rate', value: winRate, tone: 'amber' as const },
-              {
-                label: 'Active deals',
-                value: String(openOpps.length),
-                tone: 'purple' as const,
-              },
+              { label: 'Active deals', value: String(openOpps.length), tone: 'purple' as const },
             ];
           })().map((kpi) => (
             <div
@@ -308,241 +291,3 @@ export function PipelinePage() {
     </div>
   );
 }
-
-// One stage column. Memoized so reordering inside another column doesn't
-// re-render the other 5 columns — only the source/destination columns
-// actually change.
-const StageColumn = memo(function StageColumn({
-  stageId: _stageId,
-  stageName,
-  stageColor: _stageColor,
-  items,
-  total,
-  conversion,
-  isHoverTarget,
-  draggingId,
-  focusedId,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  onCardDragStart,
-  onCardDragEnd,
-  onCardFocus,
-  onCardBlur,
-  onCardKey,
-}: {
-  stageId: string;
-  stageName: string;
-  stageColor: string | null;
-  items: Opportunity[];
-  total: number;
-  /** % of opps that have advanced past this stage (excludes closed_lost). */
-  conversion: number | null;
-  isHoverTarget: boolean;
-  draggingId: string | null;
-  focusedId: string | null;
-  onDragOver: (e: DragEvent<HTMLDivElement>) => void;
-  onDragLeave: () => void;
-  onDrop: (e: DragEvent<HTMLDivElement>) => void;
-  onCardDragStart: (id: string) => void;
-  onCardDragEnd: () => void;
-  onCardFocus: (id: string) => void;
-  onCardBlur: (id: string) => void;
-  onCardKey: (e: KeyboardEvent<HTMLAnchorElement>, opp: Opportunity) => void;
-}) {
-  return (
-    <section
-      aria-label={`${stageName} column with ${items.length} opportunities`}
-      className="min-w-0"
-    >
-      <div className="flex items-center justify-between mb-2 px-1">
-        <div className="flex items-center gap-1.5">
-          <Badge tone={stageTone(stageName)}>{stageName}</Badge>
-          {conversion !== null ? (
-            <span
-              title={`${conversion}% of opps in this stage or later have advanced past it`}
-              aria-label={`Conversion rate: ${conversion}%`}
-              className="inline-flex items-center gap-0.5 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-1.5 py-0.5 text-[9px] font-semibold tabular-nums text-[var(--fg-secondary)]"
-            >
-              <span aria-hidden>→</span>
-              {conversion}%
-            </span>
-          ) : null}
-        </div>
-        <span className="text-[10px] text-[var(--fg-tertiary)] tabular-nums">
-          <AnimatedNumber value={items.length} duration={0.6} />
-          {' · '}
-          <AnimatedNumber
-            value={total}
-            duration={0.7}
-            // Reuse the locale-aware money formatter so EUR / comma-grouping
-            // matches the rest of the page. The cents portion would jitter
-            // during the tween — keep precision at whole units.
-            format={(n) =>
-              new Intl.NumberFormat(undefined, {
-                style: 'currency',
-                currency: 'EUR',
-                maximumFractionDigits: 0,
-              }).format(Math.round(n))
-            }
-          />
-        </span>
-      </div>
-      <GlassCard
-        padding="none"
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onDrop={onDrop}
-        animate={{
-          backgroundColor: isHoverTarget ? 'var(--brand-primary-tint)' : 'rgba(0,0,0,0)',
-          borderColor: isHoverTarget ? 'var(--brand-primary)' : 'var(--border-subtle)',
-        }}
-        transition={springSnap}
-        className={cn(
-          'min-h-[200px] border border-[var(--border-subtle)] bg-[var(--surface-sunken-alpha)]',
-          isHoverTarget &&
-            'ring-2 ring-[var(--brand-primary)] ring-offset-2 ring-offset-[var(--surface-page)]',
-        )}
-      >
-        <ul className="space-y-2 p-1.5">
-          <AnimatePresence initial={false}>
-            {items.map((o) => (
-              <PipelineCard
-                key={o.id}
-                opp={o}
-                isDragging={draggingId === o.id}
-                isFocused={focusedId === o.id}
-                onDragStart={onCardDragStart}
-                onDragEnd={onCardDragEnd}
-                onFocus={onCardFocus}
-                onBlur={onCardBlur}
-                onKey={onCardKey}
-              />
-            ))}
-          </AnimatePresence>
-          {items.length === 0 ? (
-            <li className="flex h-32 items-center justify-center rounded-xl border border-dashed border-[var(--border-subtle)] p-4 text-[10px] font-medium text-[var(--fg-tertiary)] uppercase tracking-widest">
-              Drop here
-            </li>
-          ) : null}
-        </ul>
-      </GlassCard>
-    </section>
-  );
-});
-
-// Card. Memoized so a column re-render (e.g. another card moved out) doesn't
-// re-render every remaining card.
-const PipelineCard = memo(function PipelineCard({
-  opp,
-  isDragging,
-  isFocused,
-  onDragStart,
-  onDragEnd,
-  onFocus,
-  onBlur,
-  onKey,
-}: {
-  opp: Opportunity;
-  isDragging: boolean;
-  isFocused: boolean;
-  onDragStart: (id: string) => void;
-  onDragEnd: () => void;
-  onFocus: (id: string) => void;
-  onBlur: (id: string) => void;
-  onKey: (e: KeyboardEvent<HTMLAnchorElement>, opp: Opportunity) => void;
-}) {
-  const reduced = useReducedMotion();
-  const { formatMoney } = useFormatMoney();
-  const stageName = getStageName(opp);
-  const isStalled =
-    opp.dueDate != null &&
-    new Date(opp.dueDate) < new Date() &&
-    stageName !== 'Closed Won' &&
-    stageName !== 'Closed Lost';
-  return (
-    <motion.li
-      layout
-      initial={{ opacity: 0, y: 6 }}
-      animate={{
-        opacity: isDragging ? 0.5 : 1,
-        y: 0,
-        scale: isDragging ? 1.02 : 1,
-      }}
-      exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.18 } }}
-      whileHover={reduced || isDragging ? undefined : { y: -2 }}
-      transition={springLayout}
-    >
-      <Link
-        to={`/opportunities/${opp.id}`}
-        draggable
-        onDragStart={(e) => {
-          e.dataTransfer.setData('text/plain', opp.id);
-          e.dataTransfer.effectAllowed = 'move';
-          onDragStart(opp.id);
-        }}
-        onDragEnd={onDragEnd}
-        onFocus={() => onFocus(opp.id)}
-        onBlur={() => onBlur(opp.id)}
-        onKeyDown={(e) => onKey(e, opp)}
-        aria-roledescription="draggable opportunity"
-        aria-label={`${opp.code}: ${opp.name}, ${stageName}, ${formatMoney(opp.value, 'EUR')}. Use left or right arrows to move stage.`}
-        className={cn(
-          'block cursor-grab active:cursor-grabbing rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-3 shadow-[var(--shadow-xs)] transition-shadow hover:shadow-[var(--shadow-sm)]',
-          isFocused &&
-            'ring-2 ring-offset-1 ring-[var(--brand-primary)] ring-offset-[var(--surface-page)]',
-          isStalled && 'border-red-300/40 bg-red-50/40 dark:border-red-900/30 dark:bg-red-950/20',
-        )}
-      >
-        {/* Company name + value */}
-        <div className="flex items-start justify-between gap-2">
-          <span className="text-[11px] font-semibold text-[var(--fg-primary)] truncate">
-            {opp.customer}
-          </span>
-          <span className="tabular-nums text-[11px] font-bold text-[var(--fg-primary)] shrink-0">
-            {formatMoney(opp.value, 'EUR')}
-          </span>
-        </div>
-
-        {/* Opportunity title */}
-        <div className="mt-1 text-xs font-medium text-[var(--fg-secondary)] line-clamp-2">
-          {opp.name}
-        </div>
-
-        {/* Territory badge */}
-        {opp.territoryName && (
-          <div className="mt-1.5">
-            <Badge tone="teal" className="text-[9px] px-1.5 py-0">
-              {opp.territoryName}
-            </Badge>
-          </div>
-        )}
-
-        {/* Activity row */}
-        <div className="mt-2 flex items-center gap-3 text-[var(--fg-tertiary)]">
-          <span className="inline-flex items-center gap-0.5 text-[10px]" title="Views">
-            <Icon name="eye" size={12} strokeWidth={2} />
-            <span className="tabular-nums">{opp.viewCount ?? 0}</span>
-          </span>
-          <span className="inline-flex items-center gap-0.5 text-[10px]" title="Comments">
-            <Icon name="messageCircle" size={12} strokeWidth={2} />
-            <span className="tabular-nums">{opp.commentCount ?? 0}</span>
-          </span>
-          <span className="inline-flex items-center gap-0.5 text-[10px]" title="Tasks">
-            <Icon name="checkCircle" size={12} strokeWidth={2} />
-            <span className="tabular-nums">{opp.taskCount ?? 0}</span>
-          </span>
-        </div>
-
-        {/* Date + code */}
-        <div className="mt-2 flex items-center justify-between text-[10px] text-[var(--fg-tertiary)]">
-          <span className="inline-flex items-center gap-1">
-            <Icon name="clock" size={10} strokeWidth={2} />
-            {opp.dueDate ? formatDate(opp.dueDate) : 'No date'}
-          </span>
-          <span className="font-mono">{opp.code}</span>
-        </div>
-      </Link>
-    </motion.li>
-  );
-});
