@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { AiDisclosureBadge } from '@/components/rfp/shared/AiDisclosureBadge';
 import type { ComplianceRow as ComplianceRowData } from '@/hooks/rfp/useRfpCompliance';
 
 interface ComplianceRowProps {
@@ -64,12 +65,19 @@ export function ComplianceRow({ row, style }: ComplianceRowProps) {
           {STATUS_LABELS[row.status]}
         </span>
         {row.autoFilled && (
-          <span
-            className="text-[10px] text-[var(--fg-tertiary)]"
-            aria-label={`AI confidence: ${confidencePct}%`}
-          >
-            AI {confidencePct}%
-          </span>
+          // EU AI Act Art. 50 — unambiguous AI disclosure is mandatory for
+          // auto-filled compliance answers. The AiDisclosureBadge is always
+          // visible when autoFilled=true; it is not behind a toggle.
+          // Confidence percentage is supplementary information shown below.
+          <div className="flex flex-col items-end gap-0.5">
+            <AiDisclosureBadge />
+            <span
+              className="text-[10px] text-[var(--fg-tertiary)]"
+              aria-label={`AI confidence: ${confidencePct}%`}
+            >
+              {confidencePct}% confidence
+            </span>
+          </div>
         )}
         <button
           type="button"
