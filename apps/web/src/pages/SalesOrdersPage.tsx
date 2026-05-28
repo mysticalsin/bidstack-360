@@ -8,7 +8,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { OrderStateBadge } from '@/components/sales/OrderStateBadge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
-import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { SpotlightTable, SpotlightTableRow } from '@/components/ui/SpotlightTable';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { formatDate, formatMoneyMicros } from '@/lib/format';
@@ -181,6 +181,24 @@ export function SalesOrdersPage() {
         {list.isLoading ? (
           <div className="p-5">
             <LoadingSkeleton rows={6} />
+          </div>
+        ) : list.isError ? (
+          <div className="p-5">
+            <ErrorState
+              title="Couldn't load orders"
+              message={
+                list.error instanceof Error ? list.error.message : 'The server did not respond.'
+              }
+              action={
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => void list.refetch()}
+                >
+                  Retry
+                </button>
+              }
+            />
           </div>
         ) : list.data && list.data.items.length === 0 ? (
           <div className="px-5 py-10 text-center text-sm text-[var(--fg-tertiary)]">

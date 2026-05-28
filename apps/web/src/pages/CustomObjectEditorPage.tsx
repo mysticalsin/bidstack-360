@@ -19,22 +19,37 @@ import {
   useAddCustomObjectRelation,
 } from '@/hooks/useCustomObjects';
 import { cn } from '@/lib/cn';
+import { ErrorState } from '@/components/ui/StateMessages';
 
 const FIELD_TYPES = [
-  'text', 'number', 'date', 'boolean',
-  'select', 'multi_select', 'currency', 'url', 'email', 'phone',
+  'text',
+  'number',
+  'date',
+  'boolean',
+  'select',
+  'multi_select',
+  'currency',
+  'url',
+  'email',
+  'phone',
 ] as const;
 
 const CARDINALITIES = ['ONE_TO_ONE', 'ONE_TO_MANY', 'MANY_TO_MANY'] as const;
 
 const PRESET_COLORS = [
-  '#6366f1', '#10b981', '#f59e0b', '#ef4444',
-  '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6',
+  '#6366f1',
+  '#10b981',
+  '#f59e0b',
+  '#ef4444',
+  '#3b82f6',
+  '#8b5cf6',
+  '#ec4899',
+  '#14b8a6',
 ];
 
 export function CustomObjectEditorPage() {
   const { id = '' } = useParams<{ id: string }>();
-  const { data: defsData, isLoading } = useCustomObjectDefs();
+  const { data: defsData, isLoading, isError, error, refetch } = useCustomObjectDefs();
   const relationsQuery = useCustomObjectRelations(id);
   const updateDef = useUpdateCustomObjectDef(id);
   const addField = useAddCustomObjectField(id);
@@ -80,8 +95,11 @@ export function CustomObjectEditorPage() {
   // Field creation state
   const [showFieldForm, setShowFieldForm] = useState(false);
   const [newField, setNewField] = useState({
-    fieldKey: '', label: '', fieldType: 'text' as typeof FIELD_TYPES[number],
-    required: false, orderIndex: 0,
+    fieldKey: '',
+    label: '',
+    fieldType: 'text' as (typeof FIELD_TYPES)[number],
+    required: false,
+    orderIndex: 0,
   });
   const [fieldError, setFieldError] = useState<string | null>(null);
 
@@ -104,8 +122,10 @@ export function CustomObjectEditorPage() {
   // Relation creation state
   const [showRelationForm, setShowRelationForm] = useState(false);
   const [newRelation, setNewRelation] = useState({
-    relationKey: '', label: '', relatedEntityType: 'contact',
-    cardinality: 'ONE_TO_MANY' as typeof CARDINALITIES[number],
+    relationKey: '',
+    label: '',
+    relatedEntityType: 'contact',
+    cardinality: 'ONE_TO_MANY' as (typeof CARDINALITIES)[number],
     required: false,
   });
   const [relationError, setRelationError] = useState<string | null>(null);
@@ -120,7 +140,13 @@ export function CustomObjectEditorPage() {
     try {
       await addRelation.mutateAsync(newRelation);
       setShowRelationForm(false);
-      setNewRelation({ relationKey: '', label: '', relatedEntityType: 'contact', cardinality: 'ONE_TO_MANY', required: false });
+      setNewRelation({
+        relationKey: '',
+        label: '',
+        relatedEntityType: 'contact',
+        cardinality: 'ONE_TO_MANY',
+        required: false,
+      });
     } catch (err) {
       setRelationError(err instanceof Error ? err.message : 'Failed to add relation');
     }
@@ -131,6 +157,22 @@ export function CustomObjectEditorPage() {
       <div className="p-6 space-y-4 max-w-3xl mx-auto animate-pulse">
         <div className="h-8 w-48 bg-[var(--surface-2)] rounded" />
         <div className="h-40 bg-[var(--surface-2)] rounded-xl" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="p-6 max-w-3xl mx-auto">
+        <ErrorState
+          title="Couldn't load object definitions"
+          message={error instanceof Error ? error.message : 'The server did not respond.'}
+          action={
+            <button type="button" className="btn btn-secondary" onClick={() => void refetch()}>
+              Retry
+            </button>
+          }
+        />
       </div>
     );
   }
@@ -168,17 +210,29 @@ export function CustomObjectEditorPage() {
         <h2 id="edit-def-heading" className="text-lg font-semibold text-[var(--text-primary)] mb-4">
           Object Settings
         </h2>
-        <form onSubmit={(e) => { void handleUpdate(e); }} className="space-y-4 bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5">
+        <form
+          onSubmit={(e) => {
+            void handleUpdate(e);
+          }}
+          className="space-y-4 bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5"
+        >
           {updateError && (
-            <p role="alert" className="text-sm text-red-600 dark:text-red-400">{updateError}</p>
+            <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+              {updateError}
+            </p>
           )}
           {updateSuccess && (
-            <p role="status" className="text-sm text-emerald-600 dark:text-emerald-400">Saved.</p>
+            <p role="status" className="text-sm text-emerald-600 dark:text-emerald-400">
+              Saved.
+            </p>
           )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="ed-singular" className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+              <label
+                htmlFor="ed-singular"
+                className="block text-sm font-medium text-[var(--text-primary)] mb-1"
+              >
                 Singular label
               </label>
               <input
@@ -191,7 +245,10 @@ export function CustomObjectEditorPage() {
               />
             </div>
             <div>
-              <label htmlFor="ed-plural" className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+              <label
+                htmlFor="ed-plural"
+                className="block text-sm font-medium text-[var(--text-primary)] mb-1"
+              >
                 Plural label
               </label>
               <input
@@ -206,7 +263,10 @@ export function CustomObjectEditorPage() {
           </div>
 
           <div>
-            <label htmlFor="ed-description" className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+            <label
+              htmlFor="ed-description"
+              className="block text-sm font-medium text-[var(--text-primary)] mb-1"
+            >
               Description
             </label>
             <textarea
@@ -279,29 +339,44 @@ export function CustomObjectEditorPage() {
 
           {showFieldForm && (
             <form
-              onSubmit={(e) => { void handleAddField(e); }}
+              onSubmit={(e) => {
+                void handleAddField(e);
+              }}
               className="p-4 border-b border-[var(--border)] space-y-3 bg-[var(--surface-3)]"
             >
               {fieldError && (
-                <p role="alert" className="text-sm text-red-600 dark:text-red-400">{fieldError}</p>
+                <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                  {fieldError}
+                </p>
               )}
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label htmlFor="nf-key" className="block text-xs font-medium text-[var(--text-primary)] mb-1">
+                  <label
+                    htmlFor="nf-key"
+                    className="block text-xs font-medium text-[var(--text-primary)] mb-1"
+                  >
                     Field key
                   </label>
                   <input
                     id="nf-key"
                     type="text"
                     value={newField.fieldKey}
-                    onChange={(e) => setNewField((p) => ({ ...p, fieldKey: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_') }))}
+                    onChange={(e) =>
+                      setNewField((p) => ({
+                        ...p,
+                        fieldKey: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_'),
+                      }))
+                    }
                     placeholder="e.g. budget"
                     className="input w-full text-sm"
                     required
                   />
                 </div>
                 <div>
-                  <label htmlFor="nf-label" className="block text-xs font-medium text-[var(--text-primary)] mb-1">
+                  <label
+                    htmlFor="nf-label"
+                    className="block text-xs font-medium text-[var(--text-primary)] mb-1"
+                  >
                     Label
                   </label>
                   <input
@@ -315,17 +390,27 @@ export function CustomObjectEditorPage() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="nf-type" className="block text-xs font-medium text-[var(--text-primary)] mb-1">
+                  <label
+                    htmlFor="nf-type"
+                    className="block text-xs font-medium text-[var(--text-primary)] mb-1"
+                  >
                     Type
                   </label>
                   <select
                     id="nf-type"
                     value={newField.fieldType}
-                    onChange={(e) => setNewField((p) => ({ ...p, fieldType: e.target.value as typeof FIELD_TYPES[number] }))}
+                    onChange={(e) =>
+                      setNewField((p) => ({
+                        ...p,
+                        fieldType: e.target.value as (typeof FIELD_TYPES)[number],
+                      }))
+                    }
                     className="input w-full text-sm"
                   >
                     {FIELD_TYPES.map((t) => (
-                      <option key={t} value={t}>{t}</option>
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -361,8 +446,8 @@ export function CustomObjectEditorPage() {
           )}
 
           <p className="p-4 text-sm text-[var(--text-secondary)]">
-            Fields are managed via the Custom Fields API. Use the &quot;Add field&quot; button above to add
-            new fields to this object.
+            Fields are managed via the Custom Fields API. Use the &quot;Add field&quot; button above
+            to add new fields to this object.
           </p>
         </div>
       </section>
@@ -385,29 +470,44 @@ export function CustomObjectEditorPage() {
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl overflow-hidden">
           {showRelationForm && (
             <form
-              onSubmit={(e) => { void handleAddRelation(e); }}
+              onSubmit={(e) => {
+                void handleAddRelation(e);
+              }}
               className="p-4 border-b border-[var(--border)] space-y-3 bg-[var(--surface-3)]"
             >
               {relationError && (
-                <p role="alert" className="text-sm text-red-600 dark:text-red-400">{relationError}</p>
+                <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                  {relationError}
+                </p>
               )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="nr-key" className="block text-xs font-medium text-[var(--text-primary)] mb-1">
+                  <label
+                    htmlFor="nr-key"
+                    className="block text-xs font-medium text-[var(--text-primary)] mb-1"
+                  >
                     Relation key
                   </label>
                   <input
                     id="nr-key"
                     type="text"
                     value={newRelation.relationKey}
-                    onChange={(e) => setNewRelation((p) => ({ ...p, relationKey: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '_') }))}
+                    onChange={(e) =>
+                      setNewRelation((p) => ({
+                        ...p,
+                        relationKey: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '_'),
+                      }))
+                    }
                     placeholder="e.g. primary_contact"
                     className="input w-full text-sm"
                     required
                   />
                 </div>
                 <div>
-                  <label htmlFor="nr-label" className="block text-xs font-medium text-[var(--text-primary)] mb-1">
+                  <label
+                    htmlFor="nr-label"
+                    className="block text-xs font-medium text-[var(--text-primary)] mb-1"
+                  >
                     Label
                   </label>
                   <input
@@ -421,30 +521,45 @@ export function CustomObjectEditorPage() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="nr-entity" className="block text-xs font-medium text-[var(--text-primary)] mb-1">
+                  <label
+                    htmlFor="nr-entity"
+                    className="block text-xs font-medium text-[var(--text-primary)] mb-1"
+                  >
                     Related entity
                   </label>
                   <input
                     id="nr-entity"
                     type="text"
                     value={newRelation.relatedEntityType}
-                    onChange={(e) => setNewRelation((p) => ({ ...p, relatedEntityType: e.target.value }))}
+                    onChange={(e) =>
+                      setNewRelation((p) => ({ ...p, relatedEntityType: e.target.value }))
+                    }
                     placeholder="e.g. contact, opportunity"
                     className="input w-full text-sm"
                   />
                 </div>
                 <div>
-                  <label htmlFor="nr-cardinality" className="block text-xs font-medium text-[var(--text-primary)] mb-1">
+                  <label
+                    htmlFor="nr-cardinality"
+                    className="block text-xs font-medium text-[var(--text-primary)] mb-1"
+                  >
                     Cardinality
                   </label>
                   <select
                     id="nr-cardinality"
                     value={newRelation.cardinality}
-                    onChange={(e) => setNewRelation((p) => ({ ...p, cardinality: e.target.value as typeof CARDINALITIES[number] }))}
+                    onChange={(e) =>
+                      setNewRelation((p) => ({
+                        ...p,
+                        cardinality: e.target.value as (typeof CARDINALITIES)[number],
+                      }))
+                    }
                     className="input w-full text-sm"
                   >
                     {CARDINALITIES.map((c) => (
-                      <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>
+                      <option key={c} value={c}>
+                        {c.replace(/_/g, ' ')}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -469,9 +584,7 @@ export function CustomObjectEditorPage() {
           )}
 
           {relationsQuery.data?.items.length === 0 && (
-            <p className="p-4 text-sm text-[var(--text-secondary)]">
-              No relations defined yet.
-            </p>
+            <p className="p-4 text-sm text-[var(--text-secondary)]">No relations defined yet.</p>
           )}
 
           {relationsQuery.data?.items.map((rel) => (
