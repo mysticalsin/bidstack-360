@@ -1,0 +1,51 @@
+{
+  "agents": {
+    "title": "Dust 智能代理",
+    "ask": "向代理提问",
+    "placeholder": "您想了解或准备什么？",
+    "submit": "发送",
+    "thinking": "思考中…",
+    "noAgents": "未配置 Dust 代理",
+    "configureFirst": "请在集成设置中配置您的 Dust 连接。",
+    "error": "代理无法响应，请重试。",
+    "copyResponse": "复制回答",
+    "newConversation": "新对话",
+    "selectAgent": "选择代理",
+    "sources": "来源",
+    "confidence": "置信度",
+    "regenerate": "重新生成"
+  },
+  "meetingPrep": {
+    "title": "会议准备",
+    "generate": "生成准备简报",
+    "generating": "生成中…",
+    "attendees": "与会者",
+    "agenda": "议程",
+    "context": "客户背景",
+    "keyTopics": "需涵盖的关键议题",
+    "recentActivity": "近期活动",
+    "risks": "已识别风险",
+    "opportunities": "商机",
+    "noMeetingSelected": "请选择一个会议以生成准备简报。"
+  },
+  "feedback": {
+    "helpful": "有用",
+    "notHelpful": "没用",
+    "reportIssue": "报告问题",
+    "thanks": "感谢您的反馈"
+  },
+  "intel": {
+    "title": "客户情报",
+    "loading": "分析中…",
+    "lastUpdated": "更新于 {{when}}",
+    "refresh": "刷新",
+    "noData": "暂无情报数据",
+    "signals": {
+      "hiring": "近期招聘",
+      "funding": "融资轮次",
+      "news": "新闻资讯",
+      "technographics": "在用技术",
+      "executives": "高管信息"
+    }
+  }
+}

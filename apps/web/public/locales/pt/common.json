@@ -1,0 +1,263 @@
+{
+  "app": {
+    "name": "BidStack",
+    "tagline": "Mantu · Pré-venda e propostas",
+    "guest": "Visitante",
+    "notSignedIn": "Não autenticado"
+  },
+  "nav": {
+    "primary": "Navegação principal",
+    "breadcrumb": "Trilha de navegação",
+    "workspace": "Espaço de trabalho",
+    "settings": "Configurações",
+    "starred": "Favoritos",
+    "recent": "Recentes",
+    "openNavigation": "Abrir navegação",
+    "closeNavigation": "Fechar navegação",
+    "expandSidebar": "Expandir barra lateral",
+    "collapseSidebar": "Recolher barra lateral",
+    "dashboard": "Painel",
+    "sales": "Vendas",
+    "salesOrders": "Cotações e pedidos",
+    "products": "Produtos",
+    "invoices": "Faturas",
+    "accounts": "Contas",
+    "companies": "Empresas",
+    "opportunities": "Oportunidades",
+    "pipeline": "Pipeline",
+    "forecasts": "Previsões",
+    "bidMatrix": "Matriz Bid/No-Bid",
+    "rfpResponse": "Resposta a RFP / Licitação",
+    "rfpSection": "RFP · Resposta",
+    "rfpHub": "Central de resposta a RFP",
+    "proposals": "Propostas",
+    "leads": "Leads",
+    "contacts": "Contatos",
+    "tasks": "Tarefas",
+    "territories": "Territórios",
+    "serviceDesk": "Central de serviços",
+    "workflows": "Fluxos de trabalho",
+    "intake": "Recepção",
+    "reports": "Relatórios",
+    "integrations": "Integrações",
+    "auditLog": "Registro de auditoria",
+    "agents": "Agentes Dust",
+    "search": "Pesquisar",
+    "references": "Biblioteca de referências",
+    "settingsPage": "Configurações"
+  },
+  "crumbs": {
+    "portfolio": "Carteira",
+    "detail": "Detalhe"
+  },
+  "actions": {
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "close": "Fechar",
+    "edit": "Editar",
+    "delete": "Excluir",
+    "create": "Criar",
+    "update": "Atualizar",
+    "submit": "Enviar",
+    "search": "Pesquisar",
+    "filter": "Filtrar",
+    "sort": "Ordenar",
+    "clear": "Limpar",
+    "loading": "Carregando…",
+    "retry": "Tentar novamente",
+    "back": "Voltar",
+    "next": "Próximo",
+    "previous": "Anterior",
+    "viewAll": "Ver tudo",
+    "markRead": "Marcar como lido",
+    "signOut": "Sair",
+    "skipToContent": "Pular para o conteúdo"
+  },
+  "search": {
+    "placeholder": "Pesquisar ou ir para…",
+    "label": "Pesquisar oportunidades, contatos, tarefas",
+    "recent": "Recentes",
+    "clear": "Limpar",
+    "shortcut": "Ctrl+/"
+  },
+  "theme": {
+    "switchToLight": "Mudar para o modo claro",
+    "switchToDark": "Mudar para o modo escuro"
+  },
+  "notifications": {
+    "title": "Menções",
+    "unread_one": "{{count}} menção não lida",
+    "unread_other": "{{count}} menções não lidas",
+    "noUnread": "Sem menções não lidas",
+    "loading": "Carregando…",
+    "couldNotLoad": "Não foi possível carregar as menções",
+    "ariaLabel": "Notificações",
+    "ariaLabelWithCount": "Notificações, {{count}} não lidas",
+    "mentionTooltip": "Notificações",
+    "youWereMentioned": "Alguém mencionou você em um comentário"
+  },
+  "help": {
+    "tooltip": "Ajuda e atalhos (?)",
+    "ariaLabel": "Ajuda e atalhos do teclado"
+  },
+  "states": {
+    "loading": "Carregando…",
+    "empty": "Nada para mostrar",
+    "error": "Algo deu errado",
+    "noResults": "Nenhum resultado"
+  },
+  "toast": {
+    "saved": "Salvo",
+    "updated": "Atualizado",
+    "created": "Criado",
+    "deleted": "Excluído",
+    "copied": "Copiado para a área de transferência",
+    "genericError": "Algo deu errado. Por favor, tente novamente.",
+    "networkError": "Erro de rede. Verifique sua conexão."
+  },
+  "validation": {
+    "required": "Este campo é obrigatório",
+    "invalidEmail": "Insira um e-mail válido",
+    "tooShort": "Deve ter pelo menos {{min}} caracteres",
+    "tooLong": "Deve ter no máximo {{max}} caracteres",
+    "invalidUrl": "Insira uma URL válida",
+    "invalidNumber": "Insira um número válido",
+    "invalidDate": "Insira uma data válida"
+  },
+  "offline": {
+    "title": "Você está offline",
+    "message": "As alterações serão sincronizadas quando você voltar a ficar online."
+  },
+  "page": {
+    "titleSuffix": "BidStack 360°"
+  },
+  "routeAnnouncer": {
+    "nowOn": "Agora em {{title}}"
+  },
+  "footer": {
+    "createdBy": "Criado por Tony Walteur",
+    "dustConnected": "Dust conectado",
+    "dustSynced": "sincronizado {{when}}"
+  },
+  "pages": {
+    "dashboard": { "title": "Painel de controlo" },
+    "opportunities": { "title": "Oportunidades" },
+    "contacts": { "title": "Contactos" },
+    "rfpHub": {
+      "title": "Hub de resposta a concursos",
+      "subtitle": "Qualifique, redija, pontue e submeta — todo o fluxo de concurso num só lugar.",
+      "kpi": {
+        "proposalsInFlight": "Propostas em curso",
+        "proposalsDetail": "rascunho · revisão · aprovado · submetido",
+        "openOpps": "Oportunidades de licitação abertas",
+        "openOppsDetail": "sem ganho/perda encerrado",
+        "avgScore": "Pontuação média de proposta",
+        "winRate": "Taxa de sucesso"
+      },
+      "proposals": {
+        "heading": "Propostas em curso",
+        "caption": "Rascunhos ativos e envios em todo o pipeline de resposta.",
+        "viewAll": "Ver tudo →",
+        "emptyTitle": "Sem propostas em curso",
+        "emptyMessage": "Execute uma pontuação Bid/No-Bid numa oportunidade qualificada e redija a resposta aqui.",
+        "openMatrix": "Abrir matriz Bid/No-Bid"
+      },
+      "bidScores": {
+        "heading": "Pontuações recentes",
+        "matrixLink": "Matriz →",
+        "emptyTitle": "Sem pontuações ainda",
+        "emptyMessage": "Execute a sua primeira análise Bid/No-Bid para preencher esta lista."
+      },
+      "agents": {
+        "heading": "Co-pilotos de IA para este fluxo",
+        "caption": "Os agentes Dust ajudam na qualificação, redação, conformidade e revisão.",
+        "qualifier": {
+          "title": "Qualificador de proposta",
+          "description": "Avalia ajuste, temas vencedores e esforço vs. valor a partir da informação do concurso.",
+          "cta": "Executar numa oportunidade"
+        },
+        "drafter": {
+          "title": "Redator de secções",
+          "description": "Redige secções de proposta a partir de vitórias anteriores e do conjunto de requisitos.",
+          "cta": "Abrir propostas"
+        },
+        "compliance": {
+          "title": "Revisor de conformidade",
+          "description": "Verifica cada secção em relação à matriz de requisitos do concurso.",
+          "cta": "Abrir agentes Dust"
+        },
+        "winLoss": {
+          "title": "Analisador de vitórias e perdas",
+          "description": "Destaca as razões por trás das vitórias e perdas recentes para alimentar a próxima proposta.",
+          "cta": "Ver relatórios"
+        }
+      },
+      "actions": {
+        "bidNoBid": "Bid/No-Bid",
+        "newProposal": "Nova proposta"
+      }
+    },
+    "leads": {
+      "title": "Leads",
+      "search": "Pesquisar leads...",
+      "filterStatus": "Filtrar por estado",
+      "filterPriority": "Filtrar por prioridade",
+      "allStatuses": "Todos os estados",
+      "allPriorities": "Todas as prioridades",
+      "stats": {
+        "filtered": "Leads filtrados",
+        "filteredDetail": "vista atual",
+        "highPriority": "Alta prioridade",
+        "highPriorityDetail": "alta ou crítica",
+        "pipelineReady": "Prontos para pipeline",
+        "pipelineReadyDetail": "qualificados ou convertidos",
+        "avgScore": "Pontuação média",
+        "avgScoreDetail": "pontuação de ajuste"
+      },
+      "table": {
+        "name": "Nome",
+        "company": "Empresa",
+        "status": "Estado",
+        "priority": "Prioridade",
+        "score": "Pontuação",
+        "source": "Fonte",
+        "owner": "Responsável",
+        "actions": "Ações",
+        "selectAll": "Selecionar tudo",
+        "deselectAll": "Desmarcar tudo"
+      },
+      "empty": {
+        "title": "Sem leads ainda",
+        "message": "Crie o seu primeiro lead para começar a acompanhar os prospectos."
+      },
+      "error": { "title": "Falha ao carregar leads" },
+      "view": {
+        "list": "Lista",
+        "kanban": "Kanban",
+        "ariaLabel": "Vista de leads"
+      },
+      "actions": {
+        "exportCsv": "Exportar CSV",
+        "newLead": "Novo lead"
+      }
+    },
+    "settings": {
+      "title": "Definições",
+      "subtitle": "Gira a sua conta, preferências e integrações do espaço de trabalho.",
+      "sections": {
+        "profile": "Perfil",
+        "appearance": "Aparência",
+        "language": "Idioma",
+        "notifications": "Notificações",
+        "security": "Segurança",
+        "microsoft": "Microsoft 365",
+        "mobile": "Aplicação móvel",
+        "workspace": "Espaço de trabalho",
+        "advanced": "Avançado",
+        "emailTemplates": "Modelos de email",
+        "tags": "Etiquetas",
+        "leadRot": "Regras de envelhecimento"
+      }
+    }
+  }
+}

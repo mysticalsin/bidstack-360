@@ -27,6 +27,10 @@
     "pipeline": "Pipeline",
     "forecasts": "Previsiones",
     "bidMatrix": "Matriz Oferta/No oferta",
+    "rfpResponse": "Respuesta a RFP / Licitación",
+    "rfpSection": "RFP · Respuesta",
+    "rfpHub": "Centro de respuesta a RFP",
+    "proposals": "Propuestas",
     "leads": "Prospectos",
     "contacts": "Contactos",
     "tasks": "Tareas",
@@ -134,5 +138,126 @@
     "createdBy": "Creado por Tony Walteur",
     "dustConnected": "Dust conectado",
     "dustSynced": "sincronizado {{when}}"
+  },
+  "pages": {
+    "dashboard": { "title": "Panel de control" },
+    "opportunities": { "title": "Oportunidades" },
+    "contacts": { "title": "Contactos" },
+    "rfpHub": {
+      "title": "Centro de respuesta a licitaciones",
+      "subtitle": "Califica, redacta, evalúa y presenta — todo el proceso de licitación en un solo lugar.",
+      "kpi": {
+        "proposalsInFlight": "Propuestas en curso",
+        "proposalsDetail": "borrador · revisión · aprobado · enviado",
+        "openOpps": "Oportunidades de licitación abiertas",
+        "openOppsDetail": "sin cerrar-ganado/cerrar-perdido",
+        "avgScore": "Puntuación media de oferta",
+        "winRate": "Tasa de éxito"
+      },
+      "proposals": {
+        "heading": "Propuestas en curso",
+        "caption": "Borradores activos y envíos en el pipeline de respuesta.",
+        "viewAll": "Ver todo →",
+        "emptyTitle": "No hay propuestas en curso",
+        "emptyMessage": "Realiza una puntuación Bid/No-Bid en una oportunidad calificada y redacta la respuesta aquí.",
+        "openMatrix": "Abrir matriz Bid/No-Bid"
+      },
+      "bidScores": {
+        "heading": "Puntuaciones recientes",
+        "matrixLink": "Matriz →",
+        "emptyTitle": "Sin puntuaciones aún",
+        "emptyMessage": "Realiza tu primer análisis Bid/No-Bid para rellenar esta lista."
+      },
+      "agents": {
+        "heading": "Co-pilotos de IA para este flujo",
+        "caption": "Los agentes Dust ayudan con la calificación, redacción, cumplimiento y revisión.",
+        "qualifier": {
+          "title": "Calificador de oferta",
+          "description": "Evalúa el ajuste, los temas ganadores y el esfuerzo vs. el valor desde la información del pliego.",
+          "cta": "Ejecutar en una oportunidad"
+        },
+        "drafter": {
+          "title": "Redactor de secciones",
+          "description": "Redacta secciones de propuesta a partir de victorias pasadas y el conjunto de requisitos.",
+          "cta": "Abrir propuestas"
+        },
+        "compliance": {
+          "title": "Revisor de cumplimiento",
+          "description": "Comprueba cada sección frente a la matriz de requisitos del pliego.",
+          "cta": "Abrir agentes Dust"
+        },
+        "winLoss": {
+          "title": "Analizador de victorias y derrotas",
+          "description": "Muestra las razones de las victorias y derrotas recientes para mejorar la próxima oferta.",
+          "cta": "Ver informes"
+        }
+      },
+      "actions": {
+        "bidNoBid": "Bid/No-Bid",
+        "newProposal": "Nueva propuesta"
+      }
+    },
+    "leads": {
+      "title": "Prospectos",
+      "search": "Buscar prospectos...",
+      "filterStatus": "Filtrar por estado",
+      "filterPriority": "Filtrar por prioridad",
+      "allStatuses": "Todos los estados",
+      "allPriorities": "Todas las prioridades",
+      "stats": {
+        "filtered": "Prospectos filtrados",
+        "filteredDetail": "vista actual",
+        "highPriority": "Alta prioridad",
+        "highPriorityDetail": "alta o crítica",
+        "pipelineReady": "Listos para pipeline",
+        "pipelineReadyDetail": "calificados o convertidos",
+        "avgScore": "Puntuación media",
+        "avgScoreDetail": "puntuación de ajuste"
+      },
+      "table": {
+        "name": "Nombre",
+        "company": "Empresa",
+        "status": "Estado",
+        "priority": "Prioridad",
+        "score": "Puntuación",
+        "source": "Fuente",
+        "owner": "Propietario",
+        "actions": "Acciones",
+        "selectAll": "Seleccionar todo",
+        "deselectAll": "Deseleccionar todo"
+      },
+      "empty": {
+        "title": "Sin prospectos aún",
+        "message": "Crea tu primer prospecto para comenzar a rastrear posibles clientes."
+      },
+      "error": { "title": "No se pudieron cargar los prospectos" },
+      "view": {
+        "list": "Lista",
+        "kanban": "Kanban",
+        "ariaLabel": "Vista de prospectos"
+      },
+      "actions": {
+        "exportCsv": "Exportar CSV",
+        "newLead": "Nuevo prospecto"
+      }
+    },
+    "settings": {
+      "title": "Configuración",
+      "subtitle": "Gestiona tu cuenta, preferencias e integraciones del espacio de trabajo.",
+      "sections": {
+        "profile": "Perfil",
+        "appearance": "Apariencia",
+        "language": "Idioma",
+        "notifications": "Notificaciones",
+        "security": "Seguridad",
+        "microsoft": "Microsoft 365",
+        "mobile": "Aplicación móvil",
+        "workspace": "Espacio de trabajo",
+        "advanced": "Avanzado",
+        "emailTemplates": "Plantillas de email",
+        "tags": "Etiquetas",
+        "leadRot": "Reglas de caducidad"
+      }
+    }
   }
 }

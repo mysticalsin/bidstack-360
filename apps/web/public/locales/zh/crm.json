@@ -1,0 +1,73 @@
+{
+  "entities": {
+    "account": "客户",
+    "accounts": "客户",
+    "company": "公司",
+    "companies": "公司",
+    "contact": "联系人",
+    "contacts": "联系人",
+    "opportunity": "商机",
+    "opportunities": "商机",
+    "lead": "潜在客户",
+    "leads": "潜在客户",
+    "task": "任务",
+    "tasks": "任务",
+    "invoice": "发票",
+    "invoices": "发票",
+    "quote": "报价",
+    "quotes": "报价",
+    "product": "产品",
+    "products": "产品",
+    "territory": "区域",
+    "territories": "区域"
+  },
+  "stages": {
+    "qualifying": "资质评估",
+    "discovery": "需求挖掘",
+    "proposal": "方案提交",
+    "negotiation": "商务谈判",
+    "closedWon": "成交",
+    "closedLost": "丢单"
+  },
+  "kpi": {
+    "openBids": "进行中的投标",
+    "overdueTasks": "逾期任务",
+    "weightedPipeline": "加权管道",
+    "winRate": "赢单率",
+    "averageDealSize": "平均成交金额",
+    "newThisWeek": "本周新增"
+  },
+  "fields": {
+    "name": "名称",
+    "subject": "主题",
+    "stage": "阶段",
+    "amount": "金额",
+    "currency": "货币",
+    "closeDate": "预计关闭日期",
+    "owner": "负责人",
+    "createdAt": "创建时间",
+    "updatedAt": "更新时间",
+    "dueDate": "截止日期",
+    "status": "状态",
+    "priority": "优先级"
+  },
+  "detail": {
+    "opportunity": "商机详情",
+    "contact": "联系人详情",
+    "lead": "潜在客户详情",
+    "company": "公司详情",
+    "task": "任务详情",
+    "invoice": "发票详情",
+    "quote": "报价或订单详情",
+    "serviceCase": "服务工单详情",
+    "account": "客户：{{name}}"
+  },
+  "empty": {
+    "opportunities": "暂无商机",
+    "contacts": "暂无联系人",
+    "tasks": "暂无任务",
+    "leads": "暂无潜在客户",
+    "companies": "暂无公司",
+    "ctaCreate": "创建第一个{{entity}}"
+  }
+}

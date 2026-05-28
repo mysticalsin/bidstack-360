@@ -42,13 +42,26 @@
     "webhooks": {
       "title": "Webhooks",
       "caption": "Receive event payloads at your endpoints."
+    },
+    "language": {
+      "title": "Language",
+      "caption": "Choose the language for your interface — applies immediately."
     }
   },
   "languages": {
     "en": "English",
     "fr": "Français",
     "es": "Español",
+    "pt": "Português",
+    "it": "Italiano",
+    "zh": "中文",
     "ar": "العربية"
+  },
+  "languageSwitcher": {
+    "ariaLabel": "Choose interface language",
+    "label": "Switch to",
+    "currentLanguage": "Current language: {{lang}}",
+    "changeSuccess": "Language changed to {{lang}}"
   },
   "currencies": {
     "CAD": "CAD — Canadian Dollar",

@@ -1,0 +1,57 @@
+{
+  "title": "电子签名",
+  "send": {
+    "title": "发送签名请求",
+    "recipients": "收件人",
+    "addRecipient": "添加收件人",
+    "recipientName": "姓名",
+    "recipientEmail": "电子邮件地址",
+    "recipientRole": "角色",
+    "message": "自定义消息",
+    "messagePlaceholder": "为签署人添加消息（可选）",
+    "send": "发送签名请求",
+    "sending": "发送中…",
+    "cancel": "取消",
+    "document": "文档",
+    "selectDocument": "选择文档"
+  },
+  "status": {
+    "pending": "待处理",
+    "sent": "已发送",
+    "viewed": "已查看",
+    "signed": "已签署",
+    "declined": "已拒绝",
+    "expired": "已过期",
+    "completed": "已完成",
+    "cancelled": "已取消"
+  },
+  "pad": {
+    "title": "签署文档",
+    "instruction": "请在下方区域签名",
+    "clear": "清除",
+    "sign": "应用签名",
+    "signing": "签署中…",
+    "decline": "拒绝",
+    "declineReason": "拒绝原因（可选）",
+    "typedSignature": "键入签名",
+    "drawnSignature": "手绘签名",
+    "typeNamePlaceholder": "输入您的全名",
+    "agreed": "我同意此电子签名在法律上等同于我的手写签名。"
+  },
+  "timeline": {
+    "title": "签名历史",
+    "sent": "已发送给 {{name}}",
+    "viewed": "{{name}} 已查看",
+    "signed": "{{name}} 已签署",
+    "declined": "{{name}} 已拒绝",
+    "completed": "所有签署人均已完成签署",
+    "reminder": "已向 {{name}} 发送提醒"
+  },
+  "actions": {
+    "remind": "发送提醒",
+    "download": "下载",
+    "cancel": "取消请求",
+    "viewCertificate": "查看证书",
+    "confirmCancel": "取消此签名请求？签署人将收到通知。"
+  }
+}

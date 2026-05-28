@@ -1,0 +1,77 @@
+{
+  "tour": {
+    "start": "开始引导游览",
+    "skip": "跳过游览",
+    "next": "下一步",
+    "previous": "上一步",
+    "finish": "完成",
+    "stepOf": "第 {{current}} / {{total}} 步",
+    "welcome": {
+      "title": "欢迎使用 BidStack 360°",
+      "body": "Mantu 的投标与售前管理平台。2 分钟内快速上手。"
+    },
+    "pipeline": {
+      "title": "您的销售管道",
+      "body": "从首次接触到签单，可视化并推进您的商机流转。"
+    },
+    "bidMatrix": {
+      "title": "投标决策矩阵",
+      "body": "在决定是否响应之前，使用 Mantu 的加权评估标准客观评估每个投标机会。"
+    },
+    "dustAgents": {
+      "title": "Dust AI 代理",
+      "body": "让您的 AI 代理准备方案、总结会议或丰富客户资料。"
+    },
+    "integrations": {
+      "title": "连接您的工具",
+      "body": "同步 Gmail、Microsoft 365、Slack 及您的业务工具，集中管理信息。"
+    },
+    "quickStart": {
+      "title": "立即开始",
+      "body": "创建您的第一个商机，邀请团队成员，探索个性化仪表盘。"
+    }
+  },
+  "quickStart": {
+    "title": "快速开始",
+    "subtitle": "完成以下步骤，充分利用 BidStack 360°",
+    "progress": "已完成 {{done}} / {{total}} 步",
+    "steps": {
+      "createOpportunity": {
+        "label": "创建商机",
+        "description": "将您的第一个投标添加到管道"
+      },
+      "inviteTeam": {
+        "label": "邀请团队",
+        "description": "将同事添加到工作空间"
+      },
+      "connectIntegration": {
+        "label": "连接集成",
+        "description": "同步您的邮件或日历"
+      },
+      "runBidMatrix": {
+        "label": "运行投标决策矩阵",
+        "description": "评估您的第一个商机"
+      },
+      "configureStages": {
+        "label": "配置阶段",
+        "description": "根据您的销售流程定制管道"
+      }
+    },
+    "completed": "快速开始完成！",
+    "completedBody": "您已掌握 BidStack 360° 的基础知识，祝您投标顺利。",
+    "dismiss": "关闭"
+  },
+  "templates": {
+    "title": "模板",
+    "subtitle": "选择模板快速开始",
+    "use": "使用此模板",
+    "preview": "预览",
+    "blank": "空白",
+    "blankDesc": "从头开始"
+  },
+  "sampleData": {
+    "banner": "您正在查看演示数据。",
+    "clear": "清除演示数据",
+    "confirmClear": "删除所有演示数据？此操作无法撤销。"
+  }
+}

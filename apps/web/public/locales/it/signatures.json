@@ -1,0 +1,57 @@
+{
+  "title": "Firme elettroniche",
+  "send": {
+    "title": "Invia per la firma",
+    "recipients": "Destinatari",
+    "addRecipient": "Aggiungi destinatario",
+    "recipientName": "Nome",
+    "recipientEmail": "Indirizzo email",
+    "recipientRole": "Ruolo",
+    "message": "Messaggio personalizzato",
+    "messagePlaceholder": "Aggiungi un messaggio per i firmatari (opzionale)",
+    "send": "Invia per la firma",
+    "sending": "Invio in corso…",
+    "cancel": "Annulla",
+    "document": "Documento",
+    "selectDocument": "Seleziona un documento"
+  },
+  "status": {
+    "pending": "In attesa",
+    "sent": "Inviato",
+    "viewed": "Visualizzato",
+    "signed": "Firmato",
+    "declined": "Rifiutato",
+    "expired": "Scaduto",
+    "completed": "Completato",
+    "cancelled": "Annullato"
+  },
+  "pad": {
+    "title": "Firma il documento",
+    "instruction": "Firma nell'area sottostante",
+    "clear": "Cancella",
+    "sign": "Applica firma",
+    "signing": "Firma in corso…",
+    "decline": "Rifiuta",
+    "declineReason": "Motivo del rifiuto (opzionale)",
+    "typedSignature": "Firma digitata",
+    "drawnSignature": "Firma disegnata",
+    "typeNamePlaceholder": "Digita il tuo nome completo",
+    "agreed": "Accetto che questa firma elettronica sia legalmente equivalente alla mia firma autografa."
+  },
+  "timeline": {
+    "title": "Cronologia firme",
+    "sent": "Inviato a {{name}}",
+    "viewed": "Visualizzato da {{name}}",
+    "signed": "Firmato da {{name}}",
+    "declined": "Rifiutato da {{name}}",
+    "completed": "Tutti i firmatari hanno firmato",
+    "reminder": "Promemoria inviato a {{name}}"
+  },
+  "actions": {
+    "remind": "Invia promemoria",
+    "download": "Scarica",
+    "cancel": "Annulla richiesta",
+    "viewCertificate": "Visualizza certificato",
+    "confirmCancel": "Annullare questa richiesta di firma? I firmatari verranno notificati."
+  }
+}

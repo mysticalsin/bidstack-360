@@ -1,0 +1,55 @@
+{
+  "title": "Integrações",
+  "subtitle": "Ligue o BidStack às suas ferramentas e serviços",
+  "connected": "Ligado",
+  "disconnected": "Desligado",
+  "connect": "Ligar",
+  "disconnect": "Desligar",
+  "configure": "Configurar",
+  "reconnect": "Religar",
+  "lastSync": "Última sincronização {{when}}",
+  "syncNow": "Sincronizar agora",
+  "syncing": "A sincronizar…",
+  "status": {
+    "active": "Ativo",
+    "inactive": "Inativo",
+    "error": "Erro",
+    "pending": "Pendente"
+  },
+  "gmail": {
+    "name": "Gmail",
+    "description": "Sincronize os seus e-mails e atividades do Gmail com o BidStack.",
+    "permissionsRequired": "É necessário acesso de leitura aos e-mails",
+    "connectViaGoogle": "Ligar via Google"
+  },
+  "microsoft": {
+    "name": "Microsoft 365",
+    "description": "Sincronize o Outlook, Calendário e Teams com o BidStack.",
+    "connectViaMicrosoft": "Ligar via Microsoft"
+  },
+  "slack": {
+    "name": "Slack",
+    "description": "Receba notificações e partilhe atualizações no Slack.",
+    "workspace": "Espaço de trabalho Slack",
+    "connectViaSlack": "Ligar via Slack",
+    "notifyChannel": "Canal de notificações"
+  },
+  "zapier": {
+    "name": "Zapier",
+    "description": "Automatize o BidStack com milhares de aplicações via Zapier.",
+    "apiKey": "Chave API do Zapier",
+    "viewZaps": "Ver os meus Zaps"
+  },
+  "dust": {
+    "name": "Dust",
+    "description": "Ligue o seu espaço de trabalho Dust para ativar agentes de IA.",
+    "workspace": "Espaço de trabalho Dust",
+    "apiKey": "Chave API do Dust",
+    "status": "Estado da ligação Dust"
+  },
+  "errors": {
+    "connectFailed": "Ligação falhada. Verifique as suas credenciais.",
+    "syncFailed": "Sincronização falhada.",
+    "disconnectFailed": "Desligamento falhado."
+  }
+}

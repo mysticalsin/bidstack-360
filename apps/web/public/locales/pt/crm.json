@@ -1,0 +1,73 @@
+{
+  "entities": {
+    "account": "Conta",
+    "accounts": "Contas",
+    "company": "Empresa",
+    "companies": "Empresas",
+    "contact": "Contacto",
+    "contacts": "Contactos",
+    "opportunity": "Oportunidade",
+    "opportunities": "Oportunidades",
+    "lead": "Potencial cliente",
+    "leads": "Potenciais clientes",
+    "task": "Tarefa",
+    "tasks": "Tarefas",
+    "invoice": "Fatura",
+    "invoices": "Faturas",
+    "quote": "Proposta",
+    "quotes": "Propostas",
+    "product": "Produto",
+    "products": "Produtos",
+    "territory": "Território",
+    "territories": "Territórios"
+  },
+  "stages": {
+    "qualifying": "Qualificação",
+    "discovery": "Descoberta",
+    "proposal": "Proposta",
+    "negotiation": "Negociação",
+    "closedWon": "Ganho",
+    "closedLost": "Perdido"
+  },
+  "kpi": {
+    "openBids": "Propostas abertas",
+    "overdueTasks": "Tarefas em atraso",
+    "weightedPipeline": "Pipeline ponderado",
+    "winRate": "Taxa de sucesso",
+    "averageDealSize": "Valor médio dos negócios",
+    "newThisWeek": "Novos esta semana"
+  },
+  "fields": {
+    "name": "Nome",
+    "subject": "Assunto",
+    "stage": "Etapa",
+    "amount": "Valor",
+    "currency": "Moeda",
+    "closeDate": "Data de fecho",
+    "owner": "Responsável",
+    "createdAt": "Criado em",
+    "updatedAt": "Atualizado em",
+    "dueDate": "Data limite",
+    "status": "Estado",
+    "priority": "Prioridade"
+  },
+  "detail": {
+    "opportunity": "Detalhe da oportunidade",
+    "contact": "Detalhe do contacto",
+    "lead": "Detalhe do potencial cliente",
+    "company": "Detalhe da empresa",
+    "task": "Detalhe da tarefa",
+    "invoice": "Detalhe da fatura",
+    "quote": "Detalhe da proposta ou encomenda",
+    "serviceCase": "Detalhe do caso de suporte",
+    "account": "Conta: {{name}}"
+  },
+  "empty": {
+    "opportunities": "Sem oportunidades",
+    "contacts": "Sem contactos",
+    "tasks": "Sem tarefas",
+    "leads": "Sem potenciais clientes",
+    "companies": "Sem empresas",
+    "ctaCreate": "Criar o primeiro {{entity}}"
+  }
+}

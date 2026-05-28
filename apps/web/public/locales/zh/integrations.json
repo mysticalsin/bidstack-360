@@ -1,0 +1,55 @@
+{
+  "title": "集成",
+  "subtitle": "将 BidStack 连接到您的工具和服务",
+  "connected": "已连接",
+  "disconnected": "已断开",
+  "connect": "连接",
+  "disconnect": "断开",
+  "configure": "配置",
+  "reconnect": "重新连接",
+  "lastSync": "上次同步 {{when}}",
+  "syncNow": "立即同步",
+  "syncing": "同步中…",
+  "status": {
+    "active": "活跃",
+    "inactive": "未激活",
+    "error": "错误",
+    "pending": "待处理"
+  },
+  "gmail": {
+    "name": "Gmail",
+    "description": "将您的 Gmail 邮件和活动与 BidStack 同步。",
+    "permissionsRequired": "需要邮件读取权限",
+    "connectViaGoogle": "通过 Google 连接"
+  },
+  "microsoft": {
+    "name": "Microsoft 365",
+    "description": "将 Outlook、日历和 Teams 与 BidStack 同步。",
+    "connectViaMicrosoft": "通过 Microsoft 连接"
+  },
+  "slack": {
+    "name": "Slack",
+    "description": "在 Slack 中接收通知并分享更新。",
+    "workspace": "Slack 工作空间",
+    "connectViaSlack": "通过 Slack 连接",
+    "notifyChannel": "通知频道"
+  },
+  "zapier": {
+    "name": "Zapier",
+    "description": "通过 Zapier 将 BidStack 与数千个应用程序自动化连接。",
+    "apiKey": "Zapier API 密钥",
+    "viewZaps": "查看我的 Zap"
+  },
+  "dust": {
+    "name": "Dust",
+    "description": "连接您的 Dust 工作空间以启用 AI 代理。",
+    "workspace": "Dust 工作空间",
+    "apiKey": "Dust API 密钥",
+    "status": "Dust 连接状态"
+  },
+  "errors": {
+    "connectFailed": "连接失败，请检查您的凭据。",
+    "syncFailed": "同步失败。",
+    "disconnectFailed": "断开连接失败。"
+  }
+}

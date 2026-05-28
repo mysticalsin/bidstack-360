@@ -1,0 +1,57 @@
+{
+  "title": "Assinaturas eletrónicas",
+  "send": {
+    "title": "Enviar para assinar",
+    "recipients": "Destinatários",
+    "addRecipient": "Adicionar destinatário",
+    "recipientName": "Nome",
+    "recipientEmail": "Endereço de e-mail",
+    "recipientRole": "Função",
+    "message": "Mensagem personalizada",
+    "messagePlaceholder": "Adicione uma mensagem para os signatários (opcional)",
+    "send": "Enviar para assinar",
+    "sending": "A enviar…",
+    "cancel": "Cancelar",
+    "document": "Documento",
+    "selectDocument": "Selecionar um documento"
+  },
+  "status": {
+    "pending": "Pendente",
+    "sent": "Enviado",
+    "viewed": "Visualizado",
+    "signed": "Assinado",
+    "declined": "Recusado",
+    "expired": "Expirado",
+    "completed": "Concluído",
+    "cancelled": "Cancelado"
+  },
+  "pad": {
+    "title": "Assinar o documento",
+    "instruction": "Assine na área abaixo",
+    "clear": "Limpar",
+    "sign": "Aplicar assinatura",
+    "signing": "A assinar…",
+    "decline": "Recusar",
+    "declineReason": "Motivo da recusa (opcional)",
+    "typedSignature": "Assinatura digitada",
+    "drawnSignature": "Assinatura desenhada",
+    "typeNamePlaceholder": "Escreva o seu nome completo",
+    "agreed": "Concordo que esta assinatura eletrónica é juridicamente equivalente à minha assinatura manuscrita."
+  },
+  "timeline": {
+    "title": "Histórico de assinaturas",
+    "sent": "Enviado para {{name}}",
+    "viewed": "Visualizado por {{name}}",
+    "signed": "Assinado por {{name}}",
+    "declined": "Recusado por {{name}}",
+    "completed": "Todos os signatários assinaram",
+    "reminder": "Lembrete enviado para {{name}}"
+  },
+  "actions": {
+    "remind": "Enviar lembrete",
+    "download": "Transferir",
+    "cancel": "Cancelar pedido",
+    "viewCertificate": "Ver certificado",
+    "confirmCancel": "Cancelar este pedido de assinatura? Os signatários serão notificados."
+  }
+}

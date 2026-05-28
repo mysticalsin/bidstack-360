@@ -1,0 +1,73 @@
+{
+  "entities": {
+    "account": "Account",
+    "accounts": "Account",
+    "company": "Azienda",
+    "companies": "Aziende",
+    "contact": "Contatto",
+    "contacts": "Contatti",
+    "opportunity": "Opportunità",
+    "opportunities": "Opportunità",
+    "lead": "Lead",
+    "leads": "Lead",
+    "task": "Attività",
+    "tasks": "Attività",
+    "invoice": "Fattura",
+    "invoices": "Fatture",
+    "quote": "Offerta",
+    "quotes": "Offerte",
+    "product": "Prodotto",
+    "products": "Prodotti",
+    "territory": "Territorio",
+    "territories": "Territori"
+  },
+  "stages": {
+    "qualifying": "Qualifica",
+    "discovery": "Analisi",
+    "proposal": "Proposta",
+    "negotiation": "Negoziazione",
+    "closedWon": "Vinto",
+    "closedLost": "Perso"
+  },
+  "kpi": {
+    "openBids": "Offerte aperte",
+    "overdueTasks": "Attività scadute",
+    "weightedPipeline": "Pipeline ponderata",
+    "winRate": "Tasso di successo",
+    "averageDealSize": "Valore medio dei deal",
+    "newThisWeek": "Nuovi questa settimana"
+  },
+  "fields": {
+    "name": "Nome",
+    "subject": "Oggetto",
+    "stage": "Fase",
+    "amount": "Importo",
+    "currency": "Valuta",
+    "closeDate": "Data chiusura",
+    "owner": "Responsabile",
+    "createdAt": "Creato",
+    "updatedAt": "Aggiornato",
+    "dueDate": "Scadenza",
+    "status": "Stato",
+    "priority": "Priorità"
+  },
+  "detail": {
+    "opportunity": "Dettaglio opportunità",
+    "contact": "Dettaglio contatto",
+    "lead": "Dettaglio lead",
+    "company": "Dettaglio azienda",
+    "task": "Dettaglio attività",
+    "invoice": "Dettaglio fattura",
+    "quote": "Dettaglio offerta o ordine",
+    "serviceCase": "Dettaglio caso di assistenza",
+    "account": "Account: {{name}}"
+  },
+  "empty": {
+    "opportunities": "Nessuna opportunità",
+    "contacts": "Nessun contatto",
+    "tasks": "Nessuna attività",
+    "leads": "Nessun lead",
+    "companies": "Nessuna azienda",
+    "ctaCreate": "Crea il primo {{entity}}"
+  }
+}

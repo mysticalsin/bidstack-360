@@ -1,0 +1,99 @@
+{
+  "page": {
+    "title": "Impostazioni"
+  },
+  "sections": {
+    "workspace": {
+      "title": "Area di lavoro",
+      "caption": "Nome, logo e identità visiva dell'area di lavoro."
+    },
+    "team": {
+      "title": "Team",
+      "caption": "Invita e gestisci i membri dell'area di lavoro."
+    },
+    "roles": {
+      "title": "Ruoli e permessi",
+      "caption": "Definisci cosa può fare ogni ruolo."
+    },
+    "pipelineStages": {
+      "title": "Fasi della pipeline",
+      "caption": "Personalizza le fasi attraverso cui scorrono le opportunità."
+    },
+    "customFields": {
+      "title": "Campi personalizzati",
+      "caption": "Aggiungi campi specifici dell'organizzazione ai record."
+    },
+    "currencyLocale": {
+      "title": "Valuta e localizzazione",
+      "caption": "Valuta predefinita, lingua, formato data e fuso orario dell'area di lavoro.",
+      "currencyLabel": "Valuta predefinita",
+      "languageLabel": "Lingua",
+      "dateFormatLabel": "Formato data",
+      "timezoneLabel": "Fuso orario"
+    },
+    "notifications": {
+      "title": "Notifiche",
+      "caption": "Scegli di cosa vuoi essere notificato."
+    },
+    "apiKeys": {
+      "title": "Chiavi API",
+      "caption": "Emetti e revoca chiavi API per le integrazioni."
+    },
+    "webhooks": {
+      "title": "Webhook",
+      "caption": "Ricevi payload di eventi ai tuoi endpoint."
+    },
+    "language": {
+      "title": "Lingua dell'interfaccia",
+      "caption": "Scegli la lingua dell'interfaccia — si applica immediatamente."
+    }
+  },
+  "languages": {
+    "en": "English",
+    "fr": "Français",
+    "es": "Español",
+    "pt": "Português",
+    "it": "Italiano",
+    "zh": "中文",
+    "ar": "العربية"
+  },
+  "languageSwitcher": {
+    "ariaLabel": "Scegli la lingua dell'interfaccia",
+    "label": "Passa a",
+    "currentLanguage": "Lingua attuale: {{lang}}",
+    "changeSuccess": "Lingua cambiata in {{lang}}"
+  },
+  "currencies": {
+    "CAD": "CAD — Dollaro canadese",
+    "USD": "USD — Dollaro statunitense",
+    "EUR": "EUR — Euro",
+    "GBP": "GBP — Sterlina britannica",
+    "AUD": "AUD — Dollaro australiano",
+    "JPY": "JPY — Yen giapponese"
+  },
+  "apiKeys": {
+    "create": "Crea chiave",
+    "revoke": "Revoca",
+    "name": "Nome chiave",
+    "created": "Creata il",
+    "lastUsed": "Ultimo utilizzo",
+    "never": "Mai utilizzata",
+    "copyKey": "Copia chiave",
+    "confirmRevoke": "Sei sicuro di voler revocare questa chiave? L'azione è irreversibile.",
+    "noKeys": "Nessuna chiave API al momento.",
+    "keyCreated": "Chiave API creata. Copiala ora, non sarà mostrata di nuovo.",
+    "scopes": "Ambiti"
+  },
+  "webhooks": {
+    "create": "Aggiungi webhook",
+    "endpoint": "URL endpoint",
+    "events": "Eventi",
+    "secret": "Segreto di firma",
+    "active": "Attivo",
+    "inactive": "Inattivo",
+    "testWebhook": "Testa",
+    "delete": "Elimina",
+    "noWebhooks": "Nessun webhook configurato.",
+    "confirmDelete": "Eliminare questo webhook?"
+  }
+}

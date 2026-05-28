@@ -1,0 +1,77 @@
+{
+  "tour": {
+    "start": "Inizia la visita guidata",
+    "skip": "Salta la visita",
+    "next": "Avanti",
+    "previous": "Indietro",
+    "finish": "Fine",
+    "stepOf": "Passo {{current}} di {{total}}",
+    "welcome": {
+      "title": "Benvenuto in BidStack 360°",
+      "body": "La piattaforma Mantu per la gestione di offerte e prevendita. Scopri tutto in meno di 2 minuti."
+    },
+    "pipeline": {
+      "title": "La tua pipeline di vendita",
+      "body": "Visualizza e fai avanzare le tue opportunità attraverso le fasi, dal primo contatto alla firma del contratto."
+    },
+    "bidMatrix": {
+      "title": "Matrice Offerta/Non offerta",
+      "body": "Valuta oggettivamente ogni offerta utilizzando i criteri ponderati di Mantu prima di decidere se rispondere."
+    },
+    "dustAgents": {
+      "title": "Agenti IA Dust",
+      "body": "Chiedi ai tuoi agenti IA di preparare proposte, riassumere riunioni o arricchire gli account."
+    },
+    "integrations": {
+      "title": "Collega i tuoi strumenti",
+      "body": "Sincronizza Gmail, Microsoft 365, Slack e i tuoi strumenti aziendali per centralizzare le informazioni."
+    },
+    "quickStart": {
+      "title": "Inizia ora",
+      "body": "Crea la tua prima opportunità, invita il team e scopri le tue dashboard personalizzate."
+    }
+  },
+  "quickStart": {
+    "title": "Avvio rapido",
+    "subtitle": "Completa questi passaggi per sfruttare al massimo BidStack 360°",
+    "progress": "{{done}} di {{total}} passaggi completati",
+    "steps": {
+      "createOpportunity": {
+        "label": "Crea un'opportunità",
+        "description": "Aggiungi la tua prima offerta alla pipeline"
+      },
+      "inviteTeam": {
+        "label": "Invita il team",
+        "description": "Aggiungi colleghi al workspace"
+      },
+      "connectIntegration": {
+        "label": "Collega un'integrazione",
+        "description": "Sincronizza la tua email o il calendario"
+      },
+      "runBidMatrix": {
+        "label": "Esegui una Matrice Offerta/Non offerta",
+        "description": "Valuta la tua prima opportunità"
+      },
+      "configureStages": {
+        "label": "Configura le fasi",
+        "description": "Adatta la pipeline al tuo processo di vendita"
+      }
+    },
+    "completed": "Avvio rapido completato!",
+    "completedBody": "Ora conosci le basi di BidStack 360°. Buona fortuna con le tue offerte.",
+    "dismiss": "Ignora"
+  },
+  "templates": {
+    "title": "Modelli",
+    "subtitle": "Scegli un modello per iniziare rapidamente",
+    "use": "Usa questo modello",
+    "preview": "Anteprima",
+    "blank": "Vuoto",
+    "blankDesc": "Inizia da zero"
+  },
+  "sampleData": {
+    "banner": "Stai visualizzando dati dimostrativi.",
+    "clear": "Cancella dati dimostrativi",
+    "confirmClear": "Eliminare tutti i dati dimostrativi? Questa azione non può essere annullata."
+  }
+}

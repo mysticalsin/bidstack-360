@@ -52,7 +52,16 @@
     "en": "English",
     "fr": "Français",
     "es": "Español",
+    "pt": "Português",
+    "it": "Italiano",
+    "zh": "中文",
     "ar": "العربية"
+  },
+  "languageSwitcher": {
+    "ariaLabel": "Elegir idioma de la interfaz",
+    "label": "Cambiar a",
+    "currentLanguage": "Idioma actual: {{lang}}",
+    "changeSuccess": "Idioma cambiado a {{lang}}"
   },
   "currencies": {
     "CAD": "CAD — Dólar canadiense",

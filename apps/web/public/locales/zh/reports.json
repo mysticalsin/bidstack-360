@@ -1,0 +1,67 @@
+{
+  "title": "报表",
+  "list": {
+    "title": "报表库",
+    "create": "新建报表",
+    "noReports": "尚未创建报表",
+    "recent": "近期报表",
+    "starred": "收藏报表"
+  },
+  "builder": {
+    "title": "报表构建器",
+    "metric": "指标",
+    "dimension": "维度",
+    "filter": "筛选器",
+    "groupBy": "分组",
+    "orderBy": "排序",
+    "limit": "限制",
+    "addFilter": "添加筛选器",
+    "addMetric": "添加指标",
+    "run": "运行报表",
+    "running": "运行中…",
+    "save": "保存报表",
+    "export": "导出",
+    "exportCsv": "导出为 CSV",
+    "exportXlsx": "导出为 Excel",
+    "schedule": "定时任务",
+    "noData": "所选条件下无数据",
+    "error": "运行报表时出错"
+  },
+  "charts": {
+    "bar": "柱状图",
+    "line": "折线图",
+    "pie": "饼图",
+    "donut": "环形图",
+    "area": "面积图",
+    "scatter": "散点图",
+    "funnel": "漏斗图",
+    "heatmap": "热力图",
+    "table": "表格"
+  },
+  "periods": {
+    "today": "今天",
+    "yesterday": "昨天",
+    "last7Days": "最近 7 天",
+    "last30Days": "最近 30 天",
+    "thisMonth": "本月",
+    "lastMonth": "上月",
+    "thisQuarter": "本季度",
+    "lastQuarter": "上季度",
+    "thisYear": "今年",
+    "lastYear": "去年",
+    "custom": "自定义"
+  },
+  "metrics": {
+    "revenue": "营收",
+    "deals": "成交",
+    "winRate": "赢单率",
+    "avgDealSize": "平均成交金额",
+    "salesCycle": "销售周期时长",
+    "leads": "潜在客户",
+    "conversionRate": "转化率",
+    "activities": "活动",
+    "calls": "电话",
+    "emails": "邮件",
+    "meetings": "会议"
+  }
+}

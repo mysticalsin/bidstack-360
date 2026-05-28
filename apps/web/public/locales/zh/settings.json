@@ -1,0 +1,99 @@
+{
+  "page": {
+    "title": "设置"
+  },
+  "sections": {
+    "workspace": {
+      "title": "工作空间",
+      "caption": "工作空间名称、徽标和品牌标识。"
+    },
+    "team": {
+      "title": "团队",
+      "caption": "邀请和管理工作空间成员。"
+    },
+    "roles": {
+      "title": "角色与权限",
+      "caption": "定义每个角色的操作权限。"
+    },
+    "pipelineStages": {
+      "title": "销售漏斗阶段",
+      "caption": "自定义商机流转的各个阶段。"
+    },
+    "customFields": {
+      "title": "自定义字段",
+      "caption": "向记录添加特定于组织的字段。"
+    },
+    "currencyLocale": {
+      "title": "货币与本地化",
+      "caption": "工作空间的默认货币、语言、日期格式和时区。",
+      "currencyLabel": "默认货币",
+      "languageLabel": "语言",
+      "dateFormatLabel": "日期格式",
+      "timezoneLabel": "时区"
+    },
+    "notifications": {
+      "title": "通知",
+      "caption": "选择您希望收到通知的事项。"
+    },
+    "apiKeys": {
+      "title": "API 密钥",
+      "caption": "为集成发放和撤销 API 密钥。"
+    },
+    "webhooks": {
+      "title": "Webhook",
+      "caption": "在您的端点接收事件有效负载。"
+    },
+    "language": {
+      "title": "界面语言",
+      "caption": "选择界面语言 — 立即生效。"
+    }
+  },
+  "languages": {
+    "en": "English",
+    "fr": "Français",
+    "es": "Español",
+    "pt": "Português",
+    "it": "Italiano",
+    "zh": "中文",
+    "ar": "العربية"
+  },
+  "languageSwitcher": {
+    "ariaLabel": "选择界面语言",
+    "label": "切换至",
+    "currentLanguage": "当前语言：{{lang}}",
+    "changeSuccess": "语言已切换至 {{lang}}"
+  },
+  "currencies": {
+    "CAD": "CAD — 加拿大元",
+    "USD": "USD — 美元",
+    "EUR": "EUR — 欧元",
+    "GBP": "GBP — 英镑",
+    "AUD": "AUD — 澳大利亚元",
+    "JPY": "JPY — 日元"
+  },
+  "apiKeys": {
+    "create": "创建密钥",
+    "revoke": "撤销",
+    "name": "密钥名称",
+    "created": "创建时间",
+    "lastUsed": "上次使用",
+    "never": "从未使用",
+    "copyKey": "复制密钥",
+    "confirmRevoke": "确定要撤销此密钥吗？此操作不可逆。",
+    "noKeys": "暂无 API 密钥。",
+    "keyCreated": "API 密钥已创建，请立即复制，此后将不再显示。",
+    "scopes": "权限范围"
+  },
+  "webhooks": {
+    "create": "添加 Webhook",
+    "endpoint": "端点 URL",
+    "events": "事件",
+    "secret": "签名密钥",
+    "active": "已启用",
+    "inactive": "已禁用",
+    "testWebhook": "测试",
+    "delete": "删除",
+    "noWebhooks": "暂无已配置的 Webhook。",
+    "confirmDelete": "删除此 Webhook？"
+  }
+}

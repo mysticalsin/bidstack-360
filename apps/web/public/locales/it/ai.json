@@ -1,0 +1,51 @@
+{
+  "agents": {
+    "title": "Agenti Dust",
+    "ask": "Chiedi a un agente",
+    "placeholder": "Cosa vorresti sapere o preparare?",
+    "submit": "Invia",
+    "thinking": "Elaborazione…",
+    "noAgents": "Nessun agente Dust configurato",
+    "configureFirst": "Configura la tua connessione Dust nelle impostazioni di integrazione.",
+    "error": "L'agente non ha potuto rispondere. Riprova.",
+    "copyResponse": "Copia risposta",
+    "newConversation": "Nuova conversazione",
+    "selectAgent": "Seleziona agente",
+    "sources": "Fonti",
+    "confidence": "Affidabilità",
+    "regenerate": "Rigenera"
+  },
+  "meetingPrep": {
+    "title": "Preparazione riunione",
+    "generate": "Genera briefing di preparazione",
+    "generating": "Generazione in corso…",
+    "attendees": "Partecipanti",
+    "agenda": "Ordine del giorno",
+    "context": "Contesto account",
+    "keyTopics": "Argomenti principali da trattare",
+    "recentActivity": "Attività recente",
+    "risks": "Rischi identificati",
+    "opportunities": "Opportunità",
+    "noMeetingSelected": "Seleziona una riunione per generare il briefing di preparazione."
+  },
+  "feedback": {
+    "helpful": "Utile",
+    "notHelpful": "Non utile",
+    "reportIssue": "Segnala un problema",
+    "thanks": "Grazie per il tuo feedback"
+  },
+  "intel": {
+    "title": "Intelligence account",
+    "loading": "Analisi in corso…",
+    "lastUpdated": "Aggiornato {{when}}",
+    "refresh": "Aggiorna",
+    "noData": "Nessun dato di intelligence disponibile",
+    "signals": {
+      "hiring": "Assunzioni recenti",
+      "funding": "Round di finanziamento",
+      "news": "Notizie",
+      "technographics": "Tecnologie in uso",
+      "executives": "Dirigenti"
+    }
+  }
+}

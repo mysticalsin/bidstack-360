@@ -1,0 +1,263 @@
+{
+  "app": {
+    "name": "BidStack",
+    "tagline": "Mantu · 售前与投标",
+    "guest": "访客",
+    "notSignedIn": "未登录"
+  },
+  "nav": {
+    "primary": "主导航",
+    "breadcrumb": "面包屑",
+    "workspace": "工作区",
+    "settings": "设置",
+    "starred": "已收藏",
+    "recent": "最近",
+    "openNavigation": "打开导航",
+    "closeNavigation": "关闭导航",
+    "expandSidebar": "展开侧边栏",
+    "collapseSidebar": "折叠侧边栏",
+    "dashboard": "仪表盘",
+    "sales": "销售",
+    "salesOrders": "报价与订单",
+    "products": "产品",
+    "invoices": "发票",
+    "accounts": "客户",
+    "companies": "公司",
+    "opportunities": "商机",
+    "pipeline": "销售管道",
+    "forecasts": "预测",
+    "bidMatrix": "投标决策矩阵",
+    "rfpResponse": "RFP / 投标响应",
+    "rfpSection": "RFP · 投标响应",
+    "rfpHub": "投标响应中心",
+    "proposals": "提案",
+    "leads": "潜在客户",
+    "contacts": "联系人",
+    "tasks": "任务",
+    "territories": "区域",
+    "serviceDesk": "服务台",
+    "workflows": "工作流",
+    "intake": "接收",
+    "reports": "报告",
+    "integrations": "集成",
+    "auditLog": "审计日志",
+    "agents": "Dust 智能体",
+    "search": "搜索",
+    "references": "参考资料库",
+    "settingsPage": "设置"
+  },
+  "crumbs": {
+    "portfolio": "投资组合",
+    "detail": "详情"
+  },
+  "actions": {
+    "save": "保存",
+    "cancel": "取消",
+    "close": "关闭",
+    "edit": "编辑",
+    "delete": "删除",
+    "create": "创建",
+    "update": "更新",
+    "submit": "提交",
+    "search": "搜索",
+    "filter": "筛选",
+    "sort": "排序",
+    "clear": "清除",
+    "loading": "加载中…",
+    "retry": "重试",
+    "back": "返回",
+    "next": "下一步",
+    "previous": "上一步",
+    "viewAll": "查看全部",
+    "markRead": "标记为已读",
+    "signOut": "退出登录",
+    "skipToContent": "跳到内容"
+  },
+  "search": {
+    "placeholder": "搜索或跳转到…",
+    "label": "搜索商机、联系人、任务",
+    "recent": "最近",
+    "clear": "清除",
+    "shortcut": "Ctrl+/"
+  },
+  "theme": {
+    "switchToLight": "切换到浅色模式",
+    "switchToDark": "切换到深色模式"
+  },
+  "notifications": {
+    "title": "提及",
+    "unread_one": "{{count}} 条未读提及",
+    "unread_other": "{{count}} 条未读提及",
+    "noUnread": "没有未读提及",
+    "loading": "加载中…",
+    "couldNotLoad": "无法加载提及",
+    "ariaLabel": "通知",
+    "ariaLabelWithCount": "通知，{{count}} 条未读",
+    "mentionTooltip": "通知",
+    "youWereMentioned": "有人在评论中提到了你"
+  },
+  "help": {
+    "tooltip": "帮助和快捷键 (?)",
+    "ariaLabel": "帮助和键盘快捷键"
+  },
+  "states": {
+    "loading": "加载中…",
+    "empty": "暂无内容",
+    "error": "出现了问题",
+    "noResults": "没有结果"
+  },
+  "toast": {
+    "saved": "已保存",
+    "updated": "已更新",
+    "created": "已创建",
+    "deleted": "已删除",
+    "copied": "已复制到剪贴板",
+    "genericError": "出现了问题。请重试。",
+    "networkError": "网络错误。请检查您的连接。"
+  },
+  "validation": {
+    "required": "此字段为必填项",
+    "invalidEmail": "请输入有效的电子邮件地址",
+    "tooShort": "至少需要 {{min}} 个字符",
+    "tooLong": "最多 {{max}} 个字符",
+    "invalidUrl": "请输入有效的 URL",
+    "invalidNumber": "请输入有效的数字",
+    "invalidDate": "请输入有效的日期"
+  },
+  "offline": {
+    "title": "您处于离线状态",
+    "message": "重新联网后将同步更改。"
+  },
+  "page": {
+    "titleSuffix": "BidStack 360°"
+  },
+  "routeAnnouncer": {
+    "nowOn": "当前页面：{{title}}"
+  },
+  "footer": {
+    "createdBy": "由 Tony Walteur 创建",
+    "dustConnected": "Dust 已连接",
+    "dustSynced": "已同步 {{when}}"
+  },
+  "pages": {
+    "dashboard": { "title": "仪表盘" },
+    "opportunities": { "title": "商机" },
+    "contacts": { "title": "联系人" },
+    "rfpHub": {
+      "title": "投标响应中心",
+      "subtitle": "资格审查、起草、评分、提交 — 整个 RFP 流程一站完成。",
+      "kpi": {
+        "proposalsInFlight": "进行中的提案",
+        "proposalsDetail": "草稿 · 审核 · 已批准 · 已提交",
+        "openOpps": "开放投标机会",
+        "openOppsDetail": "未成交/未失败",
+        "avgScore": "平均投标评分",
+        "winRate": "胜率"
+      },
+      "proposals": {
+        "heading": "进行中的提案",
+        "caption": "响应流程中的活跃草稿和提交内容。",
+        "viewAll": "查看全部 →",
+        "emptyTitle": "暂无进行中的提案",
+        "emptyMessage": "对合格机会进行 Bid/No-Bid 评分，然后在此起草响应。",
+        "openMatrix": "打开 Bid/No-Bid 矩阵"
+      },
+      "bidScores": {
+        "heading": "最近投标评分",
+        "matrixLink": "矩阵 →",
+        "emptyTitle": "暂无评分",
+        "emptyMessage": "运行第一次 Bid/No-Bid 分析以填充此列表。"
+      },
+      "agents": {
+        "heading": "本流程的 AI 协作助手",
+        "caption": "Dust 代理协助资格审查、起草、合规和审核。",
+        "qualifier": {
+          "title": "投标资格审查",
+          "description": "根据 RFP 信息评估匹配度、制胜主题及投入产出比。",
+          "cta": "在机会上运行"
+        },
+        "drafter": {
+          "title": "章节起草助手",
+          "description": "根据过往成功案例和需求集起草提案章节。",
+          "cta": "打开提案"
+        },
+        "compliance": {
+          "title": "合规审核员",
+          "description": "对照 RFP 需求矩阵逐一检查每个章节。",
+          "cta": "打开 Dust 代理"
+        },
+        "winLoss": {
+          "title": "胜负分析器",
+          "description": "揭示近期胜负背后的原因，为下次投标提供依据。",
+          "cta": "查看报告"
+        }
+      },
+      "actions": {
+        "bidNoBid": "Bid/No-Bid",
+        "newProposal": "新建提案"
+      }
+    },
+    "leads": {
+      "title": "潜在客户",
+      "search": "搜索潜在客户...",
+      "filterStatus": "按状态筛选",
+      "filterPriority": "按优先级筛选",
+      "allStatuses": "所有状态",
+      "allPriorities": "所有优先级",
+      "stats": {
+        "filtered": "筛选后的潜在客户",
+        "filteredDetail": "当前视图",
+        "highPriority": "高优先级",
+        "highPriorityDetail": "高或关键",
+        "pipelineReady": "已就绪进入管道",
+        "pipelineReadyDetail": "已合格或已转化",
+        "avgScore": "平均评分",
+        "avgScoreDetail": "匹配评分"
+      },
+      "table": {
+        "name": "姓名",
+        "company": "公司",
+        "status": "状态",
+        "priority": "优先级",
+        "score": "评分",
+        "source": "来源",
+        "owner": "负责人",
+        "actions": "操作",
+        "selectAll": "全选",
+        "deselectAll": "取消全选"
+      },
+      "empty": {
+        "title": "暂无潜在客户",
+        "message": "创建您的第一个潜在客户以开始跟踪商机。"
+      },
+      "error": { "title": "加载潜在客户失败" },
+      "view": {
+        "list": "列表",
+        "kanban": "看板",
+        "ariaLabel": "潜在客户视图"
+      },
+      "actions": {
+        "exportCsv": "导出 CSV",
+        "newLead": "新建潜在客户"
+      }
+    },
+    "settings": {
+      "title": "设置",
+      "subtitle": "管理您的账户、偏好设置和工作区集成。",
+      "sections": {
+        "profile": "个人资料",
+        "appearance": "外观",
+        "language": "语言",
+        "notifications": "通知",
+        "security": "安全",
+        "microsoft": "Microsoft 365",
+        "mobile": "移动应用",
+        "workspace": "工作区",
+        "advanced": "高级",
+        "emailTemplates": "邮件模板",
+        "tags": "标签",
+        "leadRot": "线索过期规则"
+      }
+    }
+  }
+}

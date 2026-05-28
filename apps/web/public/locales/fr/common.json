@@ -27,6 +27,10 @@
     "pipeline": "Pipeline",
     "forecasts": "Prévisions",
     "bidMatrix": "Matrice Bid/No-Bid",
+    "rfpResponse": "Réponse AO / Bid",
+    "rfpSection": "AO · Réponse Bid",
+    "rfpHub": "Centre de réponse aux AO",
+    "proposals": "Propositions",
     "leads": "Prospects",
     "contacts": "Contacts",
     "tasks": "Tâches",
@@ -134,5 +138,126 @@
     "createdBy": "Créé par Tony Walteur",
     "dustConnected": "Dust connecté",
     "dustSynced": "synchronisé {{when}}"
+  },
+  "pages": {
+    "dashboard": { "title": "Tableau de bord" },
+    "opportunities": { "title": "Opportunités" },
+    "contacts": { "title": "Contacts" },
+    "rfpHub": {
+      "title": "Centre de réponse aux AO",
+      "subtitle": "Qualifier, rédiger, évaluer et soumettre — tout le processus AO en un seul endroit.",
+      "kpi": {
+        "proposalsInFlight": "Propositions en cours",
+        "proposalsDetail": "brouillon · révision · approuvé · soumis",
+        "openOpps": "Opportunités d'appel d'offres",
+        "openOppsDetail": "hors closed-won/closed-lost",
+        "avgScore": "Score bid moyen",
+        "winRate": "Taux de victoire"
+      },
+      "proposals": {
+        "heading": "Propositions en cours",
+        "caption": "Brouillons actifs et soumissions dans le pipeline de réponse.",
+        "viewAll": "Tout afficher →",
+        "emptyTitle": "Aucune proposition en cours",
+        "emptyMessage": "Effectuez un score Bid/No-Bid sur une opportunité qualifiée, puis rédigez la réponse ici.",
+        "openMatrix": "Ouvrir la matrice Bid/No-Bid"
+      },
+      "bidScores": {
+        "heading": "Scores bid récents",
+        "matrixLink": "Matrice →",
+        "emptyTitle": "Aucun score bid pour l'instant",
+        "emptyMessage": "Effectuez votre première analyse Bid/No-Bid pour alimenter cette liste."
+      },
+      "agents": {
+        "heading": "Co-pilotes IA pour ce processus",
+        "caption": "Les agents Dust aident à la qualification, la rédaction, la conformité et la révision.",
+        "qualifier": {
+          "title": "Qualificateur de bid",
+          "description": "Évalue la pertinence, les thèmes gagnants et l'effort vs la valeur depuis les informations de l'AO.",
+          "cta": "Lancer sur une opportunité"
+        },
+        "drafter": {
+          "title": "Rédacteur de sections",
+          "description": "Rédige les sections de proposition à partir des victoires passées et du cahier des charges.",
+          "cta": "Ouvrir les propositions"
+        },
+        "compliance": {
+          "title": "Vérificateur de conformité",
+          "description": "Vérifie chaque section par rapport à la matrice des exigences de l'AO.",
+          "cta": "Ouvrir les agents Dust"
+        },
+        "winLoss": {
+          "title": "Analyseur gains/pertes",
+          "description": "Met en lumière les raisons des victoires et défaites récentes pour alimenter le prochain bid.",
+          "cta": "Voir les rapports"
+        }
+      },
+      "actions": {
+        "bidNoBid": "Bid/No-Bid",
+        "newProposal": "Nouvelle proposition"
+      }
+    },
+    "leads": {
+      "title": "Prospects",
+      "search": "Rechercher des prospects...",
+      "filterStatus": "Filtrer par statut",
+      "filterPriority": "Filtrer par priorité",
+      "allStatuses": "Tous les statuts",
+      "allPriorities": "Toutes les priorités",
+      "stats": {
+        "filtered": "Prospects filtrés",
+        "filteredDetail": "vue actuelle",
+        "highPriority": "Haute priorité",
+        "highPriorityDetail": "haute ou critique",
+        "pipelineReady": "Prêts pour le pipeline",
+        "pipelineReadyDetail": "qualifiés ou convertis",
+        "avgScore": "Score moyen",
+        "avgScoreDetail": "score de correspondance"
+      },
+      "table": {
+        "name": "Nom",
+        "company": "Entreprise",
+        "status": "Statut",
+        "priority": "Priorité",
+        "score": "Score",
+        "source": "Source",
+        "owner": "Responsable",
+        "actions": "Actions",
+        "selectAll": "Tout sélectionner",
+        "deselectAll": "Tout désélectionner"
+      },
+      "empty": {
+        "title": "Aucun prospect pour l'instant",
+        "message": "Créez votre premier prospect pour commencer à suivre les opportunités."
+      },
+      "error": { "title": "Échec du chargement des prospects" },
+      "view": {
+        "list": "Liste",
+        "kanban": "Kanban",
+        "ariaLabel": "Vue des prospects"
+      },
+      "actions": {
+        "exportCsv": "Exporter CSV",
+        "newLead": "Nouveau prospect"
+      }
+    },
+    "settings": {
+      "title": "Paramètres",
+      "subtitle": "Gérez votre compte, vos préférences et vos intégrations d'espace de travail.",
+      "sections": {
+        "profile": "Profil",
+        "appearance": "Apparence",
+        "language": "Langue",
+        "notifications": "Notifications",
+        "security": "Sécurité",
+        "microsoft": "Microsoft 365",
+        "mobile": "Application mobile",
+        "workspace": "Espace de travail",
+        "advanced": "Avancé",
+        "emailTemplates": "Modèles d'e-mails",
+        "tags": "Étiquettes",
+        "leadRot": "Règles de vieillissement"
+      }
+    }
   }
 }

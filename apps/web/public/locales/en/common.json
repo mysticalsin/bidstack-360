@@ -27,6 +27,10 @@
     "pipeline": "Pipeline",
     "forecasts": "Forecasts",
     "bidMatrix": "Bid/No-Bid Matrix",
+    "rfpResponse": "RFP / Bid Response",
+    "rfpSection": "RFP · Bid Response",
+    "rfpHub": "Bid response hub",
+    "proposals": "Proposals",
     "leads": "Leads",
     "contacts": "Contacts",
     "tasks": "Tasks",
@@ -134,5 +138,126 @@
     "createdBy": "Created by Tony Walteur",
     "dustConnected": "Dust connected",
     "dustSynced": "synced {{when}}"
+  },
+  "pages": {
+    "dashboard": { "title": "Dashboard" },
+    "opportunities": { "title": "Opportunities" },
+    "contacts": { "title": "Contacts" },
+    "rfpHub": {
+      "title": "Bid response hub",
+      "subtitle": "Qualify, draft, score, and submit — the whole RFP workflow in one place.",
+      "kpi": {
+        "proposalsInFlight": "Proposals in flight",
+        "proposalsDetail": "draft · review · approved · submitted",
+        "openOpps": "Open bid opportunities",
+        "openOppsDetail": "not closed-won/closed-lost",
+        "avgScore": "Avg bid score",
+        "winRate": "Win rate"
+      },
+      "proposals": {
+        "heading": "Proposals in flight",
+        "caption": "Active drafts and submissions across the response pipeline.",
+        "viewAll": "View all →",
+        "emptyTitle": "No proposals in flight",
+        "emptyMessage": "Run a Bid/No-Bid score on a qualified opportunity, then draft the response here.",
+        "openMatrix": "Open Bid/No-Bid matrix"
+      },
+      "bidScores": {
+        "heading": "Recent bid scores",
+        "matrixLink": "Matrix →",
+        "emptyTitle": "No bid scores yet",
+        "emptyMessage": "Run your first Bid/No-Bid analysis to populate this list."
+      },
+      "agents": {
+        "heading": "AI co-pilots for this workflow",
+        "caption": "Dust agents help with qualification, drafting, compliance, and review.",
+        "qualifier": {
+          "title": "Bid qualifier",
+          "description": "Scores fit, win-themes, and effort vs. value from the RFP intel.",
+          "cta": "Run on an opportunity"
+        },
+        "drafter": {
+          "title": "Section drafter",
+          "description": "Drafts proposal sections from past wins and the requirement set.",
+          "cta": "Open proposals"
+        },
+        "compliance": {
+          "title": "Compliance reviewer",
+          "description": "Cross-checks each section against the RFP requirement matrix.",
+          "cta": "Open Dust agents"
+        },
+        "winLoss": {
+          "title": "Win-loss analyser",
+          "description": "Surfaces the why behind recent wins and losses to feed the next bid.",
+          "cta": "View reports"
+        }
+      },
+      "actions": {
+        "bidNoBid": "Bid/No-Bid",
+        "newProposal": "New proposal"
+      }
+    },
+    "leads": {
+      "title": "Leads",
+      "search": "Search leads...",
+      "filterStatus": "Filter by status",
+      "filterPriority": "Filter by priority",
+      "allStatuses": "All statuses",
+      "allPriorities": "All priorities",
+      "stats": {
+        "filtered": "Filtered leads",
+        "filteredDetail": "current view",
+        "highPriority": "High priority",
+        "highPriorityDetail": "high or critical",
+        "pipelineReady": "Pipeline-ready",
+        "pipelineReadyDetail": "qualified or converted",
+        "avgScore": "Avg score",
+        "avgScoreDetail": "fit score"
+      },
+      "table": {
+        "name": "Name",
+        "company": "Company",
+        "status": "Status",
+        "priority": "Priority",
+        "score": "Score",
+        "source": "Source",
+        "owner": "Owner",
+        "actions": "Actions",
+        "selectAll": "Select all",
+        "deselectAll": "Deselect all"
+      },
+      "empty": {
+        "title": "No leads yet",
+        "message": "Create your first lead to start tracking prospects."
+      },
+      "error": { "title": "Failed to load leads" },
+      "view": {
+        "list": "List",
+        "kanban": "Kanban",
+        "ariaLabel": "Leads view"
+      },
+      "actions": {
+        "exportCsv": "Export CSV",
+        "newLead": "New lead"
+      }
+    },
+    "settings": {
+      "title": "Settings",
+      "subtitle": "Manage your account, preferences, and workspace integrations.",
+      "sections": {
+        "profile": "Profile",
+        "appearance": "Appearance",
+        "language": "Language",
+        "notifications": "Notifications",
+        "security": "Security",
+        "microsoft": "Microsoft 365",
+        "mobile": "Mobile App",
+        "workspace": "Workspace",
+        "advanced": "Advanced",
+        "emailTemplates": "Email templates",
+        "tags": "Tags",
+        "leadRot": "Lead rot rules"
+      }
+    }
   }
 }

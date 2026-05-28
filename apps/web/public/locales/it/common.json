@@ -1,0 +1,263 @@
+{
+  "app": {
+    "name": "BidStack",
+    "tagline": "Mantu · Prevendita e gare d'appalto",
+    "guest": "Ospite",
+    "notSignedIn": "Non connesso"
+  },
+  "nav": {
+    "primary": "Navigazione principale",
+    "breadcrumb": "Briciole di pane",
+    "workspace": "Spazio di lavoro",
+    "settings": "Impostazioni",
+    "starred": "Preferiti",
+    "recent": "Recenti",
+    "openNavigation": "Apri navigazione",
+    "closeNavigation": "Chiudi navigazione",
+    "expandSidebar": "Espandi barra laterale",
+    "collapseSidebar": "Comprimi barra laterale",
+    "dashboard": "Dashboard",
+    "sales": "Vendite",
+    "salesOrders": "Preventivi e ordini",
+    "products": "Prodotti",
+    "invoices": "Fatture",
+    "accounts": "Account",
+    "companies": "Aziende",
+    "opportunities": "Opportunità",
+    "pipeline": "Pipeline",
+    "forecasts": "Previsioni",
+    "bidMatrix": "Matrice Bid/No-Bid",
+    "rfpResponse": "Risposta a RFP / Gara",
+    "rfpSection": "RFP · Risposta",
+    "rfpHub": "Hub di risposta alle RFP",
+    "proposals": "Proposte",
+    "leads": "Lead",
+    "contacts": "Contatti",
+    "tasks": "Attività",
+    "territories": "Territori",
+    "serviceDesk": "Service desk",
+    "workflows": "Workflow",
+    "intake": "Ricezione",
+    "reports": "Report",
+    "integrations": "Integrazioni",
+    "auditLog": "Registro di audit",
+    "agents": "Agenti Dust",
+    "search": "Cerca",
+    "references": "Libreria di riferimenti",
+    "settingsPage": "Impostazioni"
+  },
+  "crumbs": {
+    "portfolio": "Portfolio",
+    "detail": "Dettaglio"
+  },
+  "actions": {
+    "save": "Salva",
+    "cancel": "Annulla",
+    "close": "Chiudi",
+    "edit": "Modifica",
+    "delete": "Elimina",
+    "create": "Crea",
+    "update": "Aggiorna",
+    "submit": "Invia",
+    "search": "Cerca",
+    "filter": "Filtra",
+    "sort": "Ordina",
+    "clear": "Cancella",
+    "loading": "Caricamento…",
+    "retry": "Riprova",
+    "back": "Indietro",
+    "next": "Avanti",
+    "previous": "Precedente",
+    "viewAll": "Vedi tutto",
+    "markRead": "Segna come letto",
+    "signOut": "Esci",
+    "skipToContent": "Vai al contenuto"
+  },
+  "search": {
+    "placeholder": "Cerca o vai a…",
+    "label": "Cerca opportunità, contatti, attività",
+    "recent": "Recenti",
+    "clear": "Cancella",
+    "shortcut": "Ctrl+/"
+  },
+  "theme": {
+    "switchToLight": "Passa alla modalità chiara",
+    "switchToDark": "Passa alla modalità scura"
+  },
+  "notifications": {
+    "title": "Menzioni",
+    "unread_one": "{{count}} menzione non letta",
+    "unread_other": "{{count}} menzioni non lette",
+    "noUnread": "Nessuna menzione non letta",
+    "loading": "Caricamento…",
+    "couldNotLoad": "Impossibile caricare le menzioni",
+    "ariaLabel": "Notifiche",
+    "ariaLabelWithCount": "Notifiche, {{count}} non lette",
+    "mentionTooltip": "Notifiche",
+    "youWereMentioned": "Qualcuno ti ha menzionato in un commento"
+  },
+  "help": {
+    "tooltip": "Aiuto e scorciatoie (?)",
+    "ariaLabel": "Aiuto e scorciatoie da tastiera"
+  },
+  "states": {
+    "loading": "Caricamento…",
+    "empty": "Niente da mostrare",
+    "error": "Qualcosa è andato storto",
+    "noResults": "Nessun risultato"
+  },
+  "toast": {
+    "saved": "Salvato",
+    "updated": "Aggiornato",
+    "created": "Creato",
+    "deleted": "Eliminato",
+    "copied": "Copiato negli appunti",
+    "genericError": "Qualcosa è andato storto. Riprova.",
+    "networkError": "Errore di rete. Controlla la connessione."
+  },
+  "validation": {
+    "required": "Questo campo è obbligatorio",
+    "invalidEmail": "Inserisci un indirizzo email valido",
+    "tooShort": "Deve contenere almeno {{min}} caratteri",
+    "tooLong": "Deve contenere al massimo {{max}} caratteri",
+    "invalidUrl": "Inserisci un URL valido",
+    "invalidNumber": "Inserisci un numero valido",
+    "invalidDate": "Inserisci una data valida"
+  },
+  "offline": {
+    "title": "Sei offline",
+    "message": "Le modifiche verranno sincronizzate quando torni online."
+  },
+  "page": {
+    "titleSuffix": "BidStack 360°"
+  },
+  "routeAnnouncer": {
+    "nowOn": "Ora su {{title}}"
+  },
+  "footer": {
+    "createdBy": "Creato da Tony Walteur",
+    "dustConnected": "Dust connesso",
+    "dustSynced": "sincronizzato {{when}}"
+  },
+  "pages": {
+    "dashboard": { "title": "Dashboard" },
+    "opportunities": { "title": "Opportunità" },
+    "contacts": { "title": "Contatti" },
+    "rfpHub": {
+      "title": "Hub risposta alle RFP",
+      "subtitle": "Qualifica, redigi, valuta e invia — l'intero flusso RFP in un unico posto.",
+      "kpi": {
+        "proposalsInFlight": "Proposte in corso",
+        "proposalsDetail": "bozza · revisione · approvato · inviato",
+        "openOpps": "Opportunità di gara aperte",
+        "openOppsDetail": "senza vinto/perso chiuso",
+        "avgScore": "Punteggio medio offerta",
+        "winRate": "Tasso di successo"
+      },
+      "proposals": {
+        "heading": "Proposte in corso",
+        "caption": "Bozze attive e invii lungo il pipeline di risposta.",
+        "viewAll": "Vedi tutto →",
+        "emptyTitle": "Nessuna proposta in corso",
+        "emptyMessage": "Esegui un punteggio Bid/No-Bid su un'opportunità qualificata e redigi la risposta qui.",
+        "openMatrix": "Apri matrice Bid/No-Bid"
+      },
+      "bidScores": {
+        "heading": "Punteggi recenti",
+        "matrixLink": "Matrice →",
+        "emptyTitle": "Nessun punteggio ancora",
+        "emptyMessage": "Esegui la prima analisi Bid/No-Bid per popolare questo elenco."
+      },
+      "agents": {
+        "heading": "Co-piloti AI per questo flusso",
+        "caption": "Gli agenti Dust aiutano con qualificazione, redazione, conformità e revisione.",
+        "qualifier": {
+          "title": "Qualificatore offerta",
+          "description": "Valuta la corrispondenza, i temi vincenti e lo sforzo rispetto al valore dall'intel RFP.",
+          "cta": "Esegui su un'opportunità"
+        },
+        "drafter": {
+          "title": "Redattore sezioni",
+          "description": "Redige sezioni di proposta dalle vittorie passate e dal set di requisiti.",
+          "cta": "Apri proposte"
+        },
+        "compliance": {
+          "title": "Revisore conformità",
+          "description": "Verifica ogni sezione rispetto alla matrice dei requisiti RFP.",
+          "cta": "Apri agenti Dust"
+        },
+        "winLoss": {
+          "title": "Analizzatore vittorie/perdite",
+          "description": "Evidenzia i motivi delle vittorie e perdite recenti per la prossima offerta.",
+          "cta": "Vedi report"
+        }
+      },
+      "actions": {
+        "bidNoBid": "Bid/No-Bid",
+        "newProposal": "Nuova proposta"
+      }
+    },
+    "leads": {
+      "title": "Lead",
+      "search": "Cerca lead...",
+      "filterStatus": "Filtra per stato",
+      "filterPriority": "Filtra per priorità",
+      "allStatuses": "Tutti gli stati",
+      "allPriorities": "Tutte le priorità",
+      "stats": {
+        "filtered": "Lead filtrati",
+        "filteredDetail": "vista corrente",
+        "highPriority": "Alta priorità",
+        "highPriorityDetail": "alta o critica",
+        "pipelineReady": "Pronti per pipeline",
+        "pipelineReadyDetail": "qualificati o convertiti",
+        "avgScore": "Punteggio medio",
+        "avgScoreDetail": "punteggio di corrispondenza"
+      },
+      "table": {
+        "name": "Nome",
+        "company": "Azienda",
+        "status": "Stato",
+        "priority": "Priorità",
+        "score": "Punteggio",
+        "source": "Fonte",
+        "owner": "Proprietario",
+        "actions": "Azioni",
+        "selectAll": "Seleziona tutto",
+        "deselectAll": "Deseleziona tutto"
+      },
+      "empty": {
+        "title": "Nessun lead ancora",
+        "message": "Crea il tuo primo lead per iniziare a tracciare i potenziali clienti."
+      },
+      "error": { "title": "Impossibile caricare i lead" },
+      "view": {
+        "list": "Lista",
+        "kanban": "Kanban",
+        "ariaLabel": "Vista lead"
+      },
+      "actions": {
+        "exportCsv": "Esporta CSV",
+        "newLead": "Nuovo lead"
+      }
+    },
+    "settings": {
+      "title": "Impostazioni",
+      "subtitle": "Gestisci account, preferenze e integrazioni dell'area di lavoro.",
+      "sections": {
+        "profile": "Profilo",
+        "appearance": "Aspetto",
+        "language": "Lingua",
+        "notifications": "Notifiche",
+        "security": "Sicurezza",
+        "microsoft": "Microsoft 365",
+        "mobile": "App mobile",
+        "workspace": "Area di lavoro",
+        "advanced": "Avanzate",
+        "emailTemplates": "Modelli email",
+        "tags": "Etichette",
+        "leadRot": "Regole di obsolescenza"
+      }
+    }
+  }
+}
