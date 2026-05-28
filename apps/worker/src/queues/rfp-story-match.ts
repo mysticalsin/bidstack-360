@@ -58,7 +58,7 @@ interface CandidateRow {
   closedAt?: Date | null;
 }
 
-interface ScoredCandidate extends CandidateRow {
+export interface ScoredCandidate extends CandidateRow {
   keywordBps: number;
   tagBps: number;
   recencyBps: number;
@@ -67,16 +67,21 @@ interface ScoredCandidate extends CandidateRow {
 
 // ─── Keyword overlap scoring ────────────────────────────────────────────────
 
-function tokenize(text: string): Set<string> {
+export function tokenize(text: string): Set<string> {
+  // WHY length > 2 (not > 3): bid language is dense with 3-letter acronyms
+  // (RFP, SLA, SME, ERP, CRM, SAP, API, KPI) that are the primary differentiators
+  // between requirements. Filtering them out degrades keyword signal and causes
+  // MMR to collapse stories that differ only by a short client code.
+  // length > 2 still drops 1- and 2-character noise (a, an, to, of, etc.).
   return new Set(
     text
       .toLowerCase()
       .split(/\W+/)
-      .filter((t) => t.length > 3),
+      .filter((t) => t.length > 2),
   );
 }
 
-function keywordOverlapBps(reqText: string, refTitle: string | null | undefined): number {
+export function keywordOverlapBps(reqText: string, refTitle: string | null | undefined): number {
   if (!refTitle) return 0;
   const reqTokens = tokenize(reqText);
   const refTokens = tokenize(refTitle);
@@ -92,7 +97,7 @@ function keywordOverlapBps(reqText: string, refTitle: string | null | undefined)
 
 // ─── Tag overlap scoring ────────────────────────────────────────────────────
 
-function tagOverlapBps(reqText: string, refTags: string[]): number {
+export function tagOverlapBps(reqText: string, refTags: string[]): number {
   if (refTags.length === 0) return 0;
   const reqLower = reqText.toLowerCase();
   let matches = 0;
@@ -104,18 +109,24 @@ function tagOverlapBps(reqText: string, refTags: string[]): number {
 
 // ─── Recency decay scoring ─────────────────────────────────────────────────
 
-function recencyBps(closedAt: Date | null | undefined): number {
+export function recencyBps(closedAt: Date | null | undefined): number {
   if (!closedAt) return 5000; // unknown → neutral
   const ageMs = Date.now() - closedAt.getTime();
   const ageDays = ageMs / 86_400_000;
   // Exponential decay: score = 10000 * exp(-ln2 * ageDays / halfLife)
-  return Math.round(10000 * Math.exp(-Math.LN2 * (ageDays / RECENCY_HALF_LIFE_DAYS)));
+  // WHY Math.min clamp: a future closedAt (data entry error) produces ageDays < 0
+  // which makes exp() return > 1 and the score exceed 10000 before weighting.
+  // Clamping keeps the output in [0, 10000] regardless of data quality.
+  return Math.min(
+    10000,
+    Math.round(10000 * Math.exp(-Math.LN2 * (ageDays / RECENCY_HALF_LIFE_DAYS))),
+  );
 }
 
 // ─── MMR diversity pruning ─────────────────────────────────────────────────
 // Removes redundant candidates whose titles are too similar to already-selected ones.
 
-function mmrPrune(sorted: ScoredCandidate[], topK: number): ScoredCandidate[] {
+export function mmrPrune(sorted: ScoredCandidate[], topK: number): ScoredCandidate[] {
   const selected: ScoredCandidate[] = [];
   for (const candidate of sorted) {
     if (selected.length >= topK) break;
@@ -208,13 +219,21 @@ async function persistMatches(
   // WHY $executeRaw per row: RequirementReferenceMatch is a Wave 9 model not
   // yet in the generated Prisma client (Windows DLL lock). ON CONFLICT makes
   // re-runs idempotent — same requirementId+referenceId is a no-op.
+  //
+  // WHY agent_run_id = NULL: BullMQ job IDs are not UUIDs (format: "123" or
+  // "rfp-story-match:orgId:reqId"). The schema defines agent_run_id as
+  // @db.Uuid — casting a non-UUID string fails at runtime. NULL is the correct
+  // default; a true UUID run ID can be stored once Dust exposes one.
+  //
+  // WHY no updated_at: RequirementReferenceMatch has only createdAt and
+  // deletedAt — there is no updatedAt column in the schema.
   for (const [idx, m] of topMatches.entries()) {
     const reasoning = `cosine=${m.cosineBps}bps keyword=${m.keywordBps}bps tag=${m.tagBps}bps recency=${m.recencyBps}bps`;
     await prisma.$executeRaw`
       INSERT INTO requirement_reference_matches (
         id, org_id, requirement_id, reference_id,
         score_bps, rank, reasoning, matched_by_agent, agent_run_id,
-        created_at, updated_at
+        created_at
       ) VALUES (
         gen_random_uuid(),
         ${orgId}::uuid,
@@ -224,8 +243,7 @@ async function persistMatches(
         ${idx + 1},
         ${reasoning},
         'rfp-story-match-hybrid',
-        ${jobId},
-        now(),
+        NULL,
         now()
       )
       ON CONFLICT (requirement_id, reference_id)
@@ -233,9 +251,7 @@ async function persistMatches(
         score_bps         = EXCLUDED.score_bps,
         rank              = EXCLUDED.rank,
         reasoning         = EXCLUDED.reasoning,
-        matched_by_agent  = EXCLUDED.matched_by_agent,
-        agent_run_id      = EXCLUDED.agent_run_id,
-        updated_at        = now()
+        matched_by_agent  = EXCLUDED.matched_by_agent
       WHERE requirement_reference_matches.org_id = ${orgId}::uuid
     `;
   }
@@ -293,6 +309,21 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
   const topMatches = mmrPrune(sorted, topK);
 
   await persistMatches(orgId, requirementId, job.id ?? null, topMatches);
+
+  // Warn when MMR collapses more candidates than expected — signals a near-duplicate-heavy
+  // library or a very small story set for this org.
+  if (topMatches.length < topK) {
+    log.warn(
+      {
+        orgId,
+        requirementId,
+        matchCount: topMatches.length,
+        topK,
+        candidateCount: candidates.length,
+      },
+      'rfp-story-match: MMR returned fewer matches than topK — library may be sparse or near-duplicate-heavy',
+    );
+  }
 
   log.info(
     { orgId, orchestrationId, requirementId, matchCount: topMatches.length },
