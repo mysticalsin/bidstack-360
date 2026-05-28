@@ -325,9 +325,9 @@ function RankingCard({
           <table className="sales-rank-table">
             <thead>
               <tr>
-                <th>Customer</th>
-                <th>Salesperson</th>
-                <th>Revenue</th>
+                <th scope="col">Customer</th>
+                <th scope="col">Salesperson</th>
+                <th scope="col">Revenue</th>
               </tr>
             </thead>
             <tbody>

@@ -186,11 +186,13 @@ export function ContactCsvImportDialog({ trigger }: Props) {
                         <thead className="bg-[var(--surface-sunken)] text-[10px] uppercase text-[var(--fg-tertiary)]">
                           <tr>
                             {headers.map((h) => (
-                              <th key={h} className="px-2 py-1 text-left font-semibold">
+                              <th key={h} scope="col" className="px-2 py-1 text-left font-semibold">
                                 {h}
                               </th>
                             ))}
-                            <th className="px-2 py-1 text-left font-semibold">status</th>
+                            <th scope="col" className="px-2 py-1 text-left font-semibold">
+                              status
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--border-subtle)]">

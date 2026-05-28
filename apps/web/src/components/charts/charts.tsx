@@ -79,9 +79,11 @@ function DataTable({ data, xKey, yKeys }: { data: DataPoint[]; xKey: string; yKe
       <table>
         <thead>
           <tr>
-            <th>{xKey}</th>
+            <th scope="col">{xKey}</th>
             {yKeys.map((k) => (
-              <th key={k}>{k}</th>
+              <th key={k} scope="col">
+                {k}
+              </th>
             ))}
           </tr>
         </thead>
@@ -193,13 +195,7 @@ export function BarChart({
 
 // ── AreaChart ─────────────────────────────────────────────────────────────────
 
-export function AreaChart({
-  data,
-  xKey,
-  yKey,
-  'aria-label': ariaLabel,
-  height = 240,
-}: BaseProps) {
+export function AreaChart({ data, xKey, yKey, 'aria-label': ariaLabel, height = 240 }: BaseProps) {
   const yKeys = resolveYKeys(yKey);
   return (
     <div role="img" aria-label={ariaLabel ?? 'Area chart'}>
@@ -261,8 +257,8 @@ export function PieChart({ data, 'aria-label': ariaLabel, height = 240 }: PiePro
         <table>
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Value</th>
+              <th scope="col">Name</th>
+              <th scope="col">Value</th>
             </tr>
           </thead>
           <tbody>
@@ -397,7 +393,13 @@ export function GaugeChart({ value, label, 'aria-label': ariaLabel, height = 200
   const reduced = useReducedMotion();
   const data = [{ name: label, value }];
   return (
-    <div role="meter" aria-valuenow={value} aria-valuemin={0} aria-valuemax={100} aria-label={ariaLabel ?? label}>
+    <div
+      role="meter"
+      aria-valuenow={value}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={ariaLabel ?? label}
+    >
       <ChartEnter height={height}>
         <ResponsiveContainer width="100%" height="100%">
           <RadialBarChart
@@ -451,8 +453,8 @@ export function ScatterChart({
         <table>
           <thead>
             <tr>
-              <th>{xLabel}</th>
-              <th>{yLabel}</th>
+              <th scope="col">{xLabel}</th>
+              <th scope="col">{yLabel}</th>
             </tr>
           </thead>
           <tbody>
@@ -505,10 +507,7 @@ export function RadarChart({
         <ResponsiveContainer width="100%" height="100%">
           <RRadarChart data={data}>
             <PolarGrid stroke={CHART_GRID_COLOR} />
-            <PolarAngleAxis
-              dataKey={nameKey}
-              tick={{ fill: CHART_AXIS_COLOR, fontSize: 11 }}
-            />
+            <PolarAngleAxis dataKey={nameKey} tick={{ fill: CHART_AXIS_COLOR, fontSize: 11 }} />
             {keys.map((k, i) => (
               <RRadar
                 key={k}
@@ -588,8 +587,7 @@ interface TableChartProps {
 }
 
 export function TableChart({ data, columns, 'aria-label': ariaLabel }: TableChartProps) {
-  const cols =
-    columns ?? (data[0] ? Object.keys(data[0]).map((k) => ({ key: k, label: k })) : []);
+  const cols = columns ?? (data[0] ? Object.keys(data[0]).map((k) => ({ key: k, label: k })) : []);
   if (data.length === 0) {
     return (
       <p className="text-xs text-[var(--fg-tertiary)] py-4 text-center">No rows to display.</p>
@@ -607,6 +605,7 @@ export function TableChart({ data, columns, 'aria-label': ariaLabel }: TableChar
             {cols.map((c) => (
               <th
                 key={c.key}
+                scope="col"
                 className="px-3 py-2 text-left font-semibold text-[var(--fg-secondary)] uppercase tracking-wide"
               >
                 {c.label}
@@ -618,11 +617,7 @@ export function TableChart({ data, columns, 'aria-label': ariaLabel }: TableChar
           {data.map((row, i) => (
             <tr
               key={i}
-              className={
-                i % 2 === 0
-                  ? 'bg-[var(--surface-card)]'
-                  : 'bg-[var(--surface-sunken)]'
-              }
+              className={i % 2 === 0 ? 'bg-[var(--surface-card)]' : 'bg-[var(--surface-sunken)]'}
             >
               {cols.map((c) => (
                 <td key={c.key} className="px-3 py-2 text-[var(--fg-primary)]">
