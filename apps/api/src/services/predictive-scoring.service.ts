@@ -30,7 +30,9 @@ import type Redis from 'ioredis';
 import {
   loadModelFromS3,
   inferScore,
+  inferXgboostScore,
   shapAttributions,
+  xgboostShapProxy,
   type ModelArtifact,
 } from './scoring/trainer.js';
 import { extractLeadFeatures, extractOpportunityFeatures } from './scoring/feature-extraction.js';
@@ -177,10 +179,18 @@ export async function scoreLead(
   let modelVersion = 'fallback-v0';
 
   if (model && featureVector) {
-    const prob = inferScore(model, featureVector.values);
+    // Prefer XGBoost when a trained model is present; fall back to LR.
+    const xgbProb = model.xgboost
+      ? inferXgboostScore(model.xgboost.modelJson, featureVector.values)
+      : null;
+    const prob = xgbProb ?? inferScore(model, featureVector.values);
     score = Math.round(prob * 100);
-    factors = shapAttributions(model, featureVector.values).slice(0, 5);
-    modelVersion = model.version;
+    factors = (
+      xgbProb !== null
+        ? xgboostShapProxy(model, featureVector.values)
+        : shapAttributions(model, featureVector.values)
+    ).slice(0, 5);
+    modelVersion = xgbProb !== null ? `${model.version}+xgb` : model.version;
   }
 
   // Persist to DB (upsert on orgId+entityType+entityId)
@@ -188,12 +198,13 @@ export async function scoreLead(
     where: {
       // Prisma requires a unique constraint — use compound index semantics
       // via findFirst + update fallback since schema uses @@index not @@unique
-      id: (
-        await prisma.predictiveScore.findFirst({
-          where: { orgId, targetType: 'lead', targetId: leadId },
-          select: { id: true },
-        })
-      )?.id ?? '00000000-0000-0000-0000-000000000000',
+      id:
+        (
+          await prisma.predictiveScore.findFirst({
+            where: { orgId, targetType: 'lead', targetId: leadId },
+            select: { id: true },
+          })
+        )?.id ?? '00000000-0000-0000-0000-000000000000',
     },
     update: {
       score,
@@ -244,10 +255,18 @@ export async function scoreOpportunity(
   let modelVersion = 'fallback-v0';
 
   if (model && featureVector) {
-    const prob = inferScore(model, featureVector.values);
+    // Prefer XGBoost when a trained model is present; fall back to LR.
+    const xgbProb = model.xgboost
+      ? inferXgboostScore(model.xgboost.modelJson, featureVector.values)
+      : null;
+    const prob = xgbProb ?? inferScore(model, featureVector.values);
     winProbability = Math.round(prob * 100);
-    factors = shapAttributions(model, featureVector.values).slice(0, 5);
-    modelVersion = model.version;
+    factors = (
+      xgbProb !== null
+        ? xgboostShapProxy(model, featureVector.values)
+        : shapAttributions(model, featureVector.values)
+    ).slice(0, 5);
+    modelVersion = xgbProb !== null ? `${model.version}+xgb` : model.version;
   }
 
   // Check for score degradation vs 7d ago for notification trigger
@@ -264,8 +283,7 @@ export async function scoreOpportunity(
     select: { score: true },
   });
 
-  const recentDropPercent =
-    previousScore ? (previousScore.score / 100 - winProbability) : 0;
+  const recentDropPercent = previousScore ? previousScore.score / 100 - winProbability : 0;
 
   // Predict close date using current velocity (linear extrapolation)
   const opp = await prisma.opportunity.findFirst({
