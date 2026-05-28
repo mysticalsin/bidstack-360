@@ -17,6 +17,7 @@ import { idempotencyPlugin } from './plugins/idempotency.js';
 import { openapiPlugin } from './plugins/openapi.js';
 import { queryGuardPlugin } from './plugins/query-guard.js';
 import { redisCachePlugin } from './plugins/redis-cache.js';
+import { securityHeadersPlugin } from './plugins/security-headers.js';
 // Wave 7 — Real-time collaboration
 import { realtimePlugin } from './plugins/realtime.js';
 import { realtimeRoutes } from './routes/realtime.js';
@@ -57,6 +58,10 @@ import { territoryRoutes } from './routes/territories.js';
 import { accountIntelRoutes } from './routes/account-intel.js';
 import { webhooksRoutes } from './routes/webhooks.js';
 import { workflowRoutes } from './routes/workflows.js';
+// Sprint 1 — Krayin import
+import { tagRoutes } from './routes/tags.js';
+import { emailTemplateRoutes } from './routes/email-templates.js';
+import { leadRotRoutes } from './routes/lead-rot.js';
 import { pluginRoutes } from './routes/plugins.js';
 import { productsRoutes } from './routes/products.js';
 import { usersRoutes } from './routes/users.js';
@@ -74,6 +79,8 @@ import { activityRoutes } from './routes/activities.js';
 import { bidWorkspaceRoutes } from './routes/bid-workspace.js';
 import { calendarRoutes } from './routes/calendar.js';
 import { bookingsRoutes } from './routes/bookings.js';
+// NocoBase RFP integration
+import rfpNocobaseRoutes from './routes/rfp-nocobase.js';
 // Wave 4 — AI assistant
 import { aiAssistantRoutes } from './routes/ai-assistant.js';
 // Wave 5 — Outlook / Microsoft Graph Mail
@@ -102,6 +109,8 @@ import {
 import { csRoutes } from './routes/cs.js';
 // Wave 9 — Public NPS response page (server-rendered HTML, no auth, no JS)
 import { publicNpsRoutes } from './routes/public-nps.js';
+// Wave 9 — RFP pipeline HTTP endpoints (upload, SSE stream, autofill, approval gate)
+import { rfpPipelineRoutes } from './routes/rfp-pipeline.js';
 
 const CONNECT_SRC = [
   "'self'",
@@ -251,6 +260,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(errorHandlerPlugin);
   await server.register(authPlugin);
   await server.register(rbacPlugin);
+  await server.register(securityHeadersPlugin);
   await server.register(idempotencyPlugin);
   await server.register(cacheHeadersPlugin);
   await server.register(queryGuardPlugin);
@@ -315,6 +325,10 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(serviceDeskRoutes, { prefix: '/api/v1' });
   await server.register(workflowRoutes, { prefix: '/api/v1' });
   await server.register(leadRoutes, { prefix: '/api/v1' });
+  // Sprint 1 — Krayin import
+  await server.register(tagRoutes, { prefix: '/api/v1' });
+  await server.register(emailTemplateRoutes, { prefix: '/api/v1' });
+  await server.register(leadRotRoutes, { prefix: '/api/v1' });
   await server.register(pluginRoutes, { prefix: '/api/v1' });
   await server.register(usersRoutes, { prefix: '/api/v1' });
   await server.register(webhookSubscriptionsRoutes, { prefix: '/api/v1' });
@@ -335,6 +349,8 @@ export async function buildServer(): Promise<FastifyInstance> {
   // Public booking routes skip auth middleware — register without /api/v1 prefix
   // so /book/:slug resolves cleanly for the public page
   await server.register(bookingsRoutes, { prefix: '/api/v1' });
+  // NocoBase RFP workspace routes
+  await server.register(rfpNocobaseRoutes, { prefix: '/api/v1' });
   // Public booking page route (no auth): /book/:slug — served by the frontend SPA.
   // The API backing it is /api/v1/booking-pages/:slug/availability (above).
 
@@ -387,6 +403,9 @@ export async function buildServer(): Promise<FastifyInstance> {
   // Mounted at /api/v1/public/nps/:token. The /api → /api/v1 rewrite hook
   // means email links can use the shorter /api/public/nps/:token form.
   await server.register(publicNpsRoutes, { prefix: '/api/v1' });
+
+  // Wave 9 — RFP pipeline: upload, SSE progress stream, matrix autofill, approval gate
+  await server.register(rfpPipelineRoutes, { prefix: '/api/v1' });
 
   return server;
 }
