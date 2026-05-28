@@ -136,13 +136,33 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const body = req.body;
-      // Resolve owner email to ownerId if provided
+
+      // WHY: owner and territory lookups are independent — run them in parallel
+      // to halve the round-trips when both fields are provided.
+      const needsOwnerLookup = body.owner !== undefined && body.owner !== null;
+      const needsTerritoryLookup = body.territoryId === undefined && !!body.country;
+      const [ownerUser, territory] = await Promise.all([
+        needsOwnerLookup
+          ? prisma.user.findFirst({
+              where: { email: body.owner as string, orgId: req.auth.orgId },
+              select: { id: true },
+            })
+          : Promise.resolve(null),
+        needsTerritoryLookup
+          ? prisma.territory.findFirst({
+              where: {
+                orgId: req.auth.orgId,
+                active: true,
+                countryCodes: { has: body.country as string },
+              },
+              select: { id: true },
+            })
+          : Promise.resolve(null),
+      ]);
+
+      // Resolve owner
       let ownerId: string | null | undefined = undefined;
-      if (body.owner !== undefined && body.owner !== null) {
-        const ownerUser = await prisma.user.findFirst({
-          where: { email: body.owner, orgId: req.auth.orgId },
-          select: { id: true },
-        });
+      if (needsOwnerLookup) {
         if (!ownerUser) throw server.httpErrors.badRequest('Owner user not found');
         ownerId = ownerUser.id;
       } else if (body.owner === null) {
@@ -151,16 +171,8 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
 
       // Auto-assign territory from country if not explicitly provided
       let territoryId: string | null | undefined = body.territoryId;
-      if (territoryId === undefined && body.country) {
-        const territory = await prisma.territory.findFirst({
-          where: {
-            orgId: req.auth.orgId,
-            active: true,
-            countryCodes: { has: body.country },
-          },
-          select: { id: true },
-        });
-        if (territory) territoryId = territory.id;
+      if (needsTerritoryLookup && territory) {
+        territoryId = territory.id;
       }
 
       // Resolve pipeline stage — validate provided or look up default.
@@ -336,22 +348,45 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
 
       // Update + audit atomic so a crash mid-mutation can't leave an opp
       // changed without a paper trail (Arch-4).
-      // Auto-assign territory if country changed and territoryId not explicitly set
-      let territoryId: string | null | undefined = req.body.territoryId;
-      if (
-        territoryId === undefined &&
+      // WHY: territory and owner lookups are independent — run them in parallel
+      // to halve round-trips when both fields are present in a single PATCH.
+      const needsOwnerLookup = req.body.owner !== undefined && req.body.owner !== null;
+      const needsTerritoryLookup =
+        req.body.territoryId === undefined &&
         req.body.country !== undefined &&
-        req.body.country !== before.country
-      ) {
-        const territory = await prisma.territory.findFirst({
-          where: {
-            orgId: req.auth.orgId,
-            active: true,
-            countryCodes: { has: req.body.country },
-          },
-          select: { id: true },
-        });
-        territoryId = territory?.id ?? null;
+        req.body.country !== before.country;
+      const [patchOwner, patchTerritory] = await Promise.all([
+        needsOwnerLookup
+          ? prisma.user.findFirst({
+              where: { email: req.body.owner as string, orgId: req.auth.orgId },
+              select: { id: true },
+            })
+          : Promise.resolve(null),
+        needsTerritoryLookup
+          ? prisma.territory.findFirst({
+              where: {
+                orgId: req.auth.orgId,
+                active: true,
+                countryCodes: { has: req.body.country as string },
+              },
+              select: { id: true },
+            })
+          : Promise.resolve(null),
+      ]);
+
+      // Resolve territory
+      let territoryId: string | null | undefined = req.body.territoryId;
+      if (needsTerritoryLookup) {
+        territoryId = patchTerritory?.id ?? null;
+      }
+
+      // Resolve owner — eagerly fail if the email doesn't exist in the org
+      let resolvedOwnerId: string | null | undefined = undefined;
+      if (needsOwnerLookup) {
+        if (!patchOwner) throw server.httpErrors.badRequest('Owner user not found');
+        resolvedOwnerId = patchOwner.id;
+      } else if (req.body.owner === null) {
+        resolvedOwnerId = null;
       }
 
       // Resolve pipeline stage change — validate and sync legacy enum.
@@ -396,18 +431,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
             ...(req.body.logo !== undefined ? { logoUrl: req.body.logo } : {}),
             ...(req.body.country !== undefined ? { country: req.body.country } : {}),
             ...(territoryId !== undefined ? { territoryId } : {}),
-            ...(req.body.owner !== undefined && req.body.owner !== null
-              ? {
-                  ownerId: (
-                    await prisma.user.findFirst({
-                      where: { email: req.body.owner, orgId: req.auth.orgId },
-                      select: { id: true },
-                    })
-                  )?.id,
-                }
-              : req.body.owner === null
-                ? { ownerId: null }
-                : {}),
+            ...(resolvedOwnerId !== undefined ? { ownerId: resolvedOwnerId } : {}),
           },
           // BS-25: narrow owner select — see fix at /opportunities create.
           include: {
@@ -619,62 +643,82 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       const errors: Array<{ index: number; message: string }> = [];
       let created = 0;
 
+      // WHY: pre-load all reference data once before the loop to eliminate
+      // N+1 queries (3–4 DB round-trips per row → 3 queries total regardless
+      // of import batch size).
+      const uniqueOwnerEmails = [
+        ...new Set(
+          opportunities
+            .map((r) => r.owner)
+            .filter((o): o is string => o !== undefined && o !== null),
+        ),
+      ];
+      const [importTerritories, importOwnerUsers, importPipelineStages] = await Promise.all([
+        prisma.territory.findMany({
+          where: { orgId: req.auth.orgId, active: true },
+          select: { id: true, countryCodes: true },
+        }),
+        uniqueOwnerEmails.length > 0
+          ? prisma.user.findMany({
+              where: { orgId: req.auth.orgId, email: { in: uniqueOwnerEmails } },
+              select: { id: true, email: true },
+            })
+          : Promise.resolve([]),
+        prisma.pipelineStage.findMany({
+          where: { orgId: req.auth.orgId, deletedAt: null },
+          orderBy: { orderIndex: 'asc' },
+          select: { id: true, key: true },
+        }),
+      ]);
+
+      // Build lookup maps once — O(1) access per row.
+      const countryToTerritoryId = new Map<string, string>();
+      for (const t of importTerritories) {
+        for (const cc of t.countryCodes) {
+          if (!countryToTerritoryId.has(cc)) countryToTerritoryId.set(cc, t.id);
+        }
+      }
+      const emailToUserId = new Map<string, string>(
+        importOwnerUsers.filter((u) => u.email !== null).map((u) => [u.email as string, u.id]),
+      );
+      const stageById = new Map(importPipelineStages.map((s) => [s.id, s]));
+      const defaultImportStage = importPipelineStages[0];
+
       for (let i = 0; i < opportunities.length; i += 1) {
         const row = opportunities[i];
         if (!row) continue;
         try {
           let ownerId: string | null | undefined = undefined;
           if (row.owner !== undefined && row.owner !== null) {
-            const ownerUser = await prisma.user.findFirst({
-              where: { email: row.owner, orgId: req.auth.orgId },
-              select: { id: true },
-            });
-            if (!ownerUser) {
+            const userId = emailToUserId.get(row.owner);
+            if (!userId) {
               errors.push({ index: i, message: `Owner user not found: ${row.owner}` });
               continue;
             }
-            ownerId = ownerUser.id;
+            ownerId = userId;
           } else if (row.owner === null) {
             ownerId = null;
           }
 
-          // Auto-assign territory from country
+          // Auto-assign territory from country (map lookup — no DB query)
           let territoryId: string | null = null;
           if (row.country) {
-            const territory = await prisma.territory.findFirst({
-              where: {
-                orgId: req.auth.orgId,
-                active: true,
-                countryCodes: { has: row.country },
-              },
-              select: { id: true },
-            });
-            if (territory) territoryId = territory.id;
+            territoryId = countryToTerritoryId.get(row.country) ?? null;
           }
 
-          // Resolve pipeline stage — validate provided or look up default.
+          // Resolve pipeline stage (map lookup — no DB query per row)
           let pipelineStageId = row.pipelineStageId;
           let stageKey: PrismaStage = 's1_lead';
           if (pipelineStageId) {
-            const ps = await prisma.pipelineStage.findFirst({
-              where: { id: pipelineStageId, orgId: req.auth.orgId, deletedAt: null },
-              select: { key: true },
-            });
+            const ps = stageById.get(pipelineStageId);
             if (!ps) {
               errors.push({ index: i, message: `Invalid pipeline stage: ${pipelineStageId}` });
               continue;
             }
             stageKey = ps.key as PrismaStage;
-          } else {
-            const defaultStage = await prisma.pipelineStage.findFirst({
-              where: { orgId: req.auth.orgId, deletedAt: null },
-              orderBy: { orderIndex: 'asc' },
-              select: { id: true, key: true },
-            });
-            if (defaultStage) {
-              pipelineStageId = defaultStage.id;
-              stageKey = defaultStage.key as PrismaStage;
-            }
+          } else if (defaultImportStage) {
+            pipelineStageId = defaultImportStage.id;
+            stageKey = defaultImportStage.key as PrismaStage;
           }
 
           let createdId: string | null = null;

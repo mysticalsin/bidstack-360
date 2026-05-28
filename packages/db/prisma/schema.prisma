@@ -228,6 +228,8 @@ model User {
   nativePushTokens  NativePushToken[]
   // Wave 8 — Voice + Video calls
   callSessions      CallSession[]
+  // Wave 8 — real-time presence (one-to-one; userId @unique on UserPresence)
+  presence          UserPresence?
 
   // Sprint 1 — Krayin import
   createdTags       Tag[]              @relation("TagCreatedBy")
@@ -2297,7 +2299,10 @@ model UserPresence {
   currentRecordId   String?  @map("current_record_id") @db.Uuid
   lastSeenAt        DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(6)
 
-  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  // WHY: explicit user relation so we can use include: { user: { select: { name: true } } }
+  // in GET /presence instead of a two-step findMany + separate user lookup.
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 

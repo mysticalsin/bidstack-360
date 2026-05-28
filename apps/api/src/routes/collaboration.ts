@@ -306,27 +306,31 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const upserted = await prisma.userPresence.upsert({
-        where: { userId: req.auth.userId },
-        create: {
-          orgId: req.auth.orgId,
-          userId: req.auth.userId,
-          status: req.body.status ?? 'online',
-          currentRecordType: req.body.currentRecordType ?? null,
-          currentRecordId: req.body.currentRecordId ?? null,
-        },
-        update: {
-          orgId: req.auth.orgId,
-          status: req.body.status ?? 'online',
-          currentRecordType: req.body.currentRecordType ?? null,
-          currentRecordId: req.body.currentRecordId ?? null,
-          lastSeenAt: new Date(),
-        },
-      });
-      const user = await prisma.user.findUnique({
-        where: { id: upserted.userId },
-        select: { name: true },
-      });
+      // WHY: userId is known before the upsert result — run user lookup in
+      // parallel to cut two sequential DB round-trips to one.
+      const [upserted, user] = await Promise.all([
+        prisma.userPresence.upsert({
+          where: { userId: req.auth.userId },
+          create: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            status: req.body.status ?? 'online',
+            currentRecordType: req.body.currentRecordType ?? null,
+            currentRecordId: req.body.currentRecordId ?? null,
+          },
+          update: {
+            orgId: req.auth.orgId,
+            status: req.body.status ?? 'online',
+            currentRecordType: req.body.currentRecordType ?? null,
+            currentRecordId: req.body.currentRecordId ?? null,
+            lastSeenAt: new Date(),
+          },
+        }),
+        prisma.user.findUnique({
+          where: { id: req.auth.userId },
+          select: { name: true },
+        }),
+      ]);
       return {
         id: upserted.id,
         orgId: upserted.orgId,

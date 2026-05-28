@@ -525,7 +525,14 @@ function buildCockpit({
     customer: string;
     name: string;
     stage: string;
-    pipelineStage: { key: string; name: string; probability: number | unknown; color: string | null; isWon: boolean; isLost: boolean } | null;
+    pipelineStage: {
+      key: string;
+      name: string;
+      probability: number | unknown;
+      color: string | null;
+      isWon: boolean;
+      isLost: boolean;
+    } | null;
     valueMicros: bigint | number | unknown;
     probability: number;
     dueDate: Date | null;
@@ -683,7 +690,14 @@ function serializeDeal(opportunity: {
   customer: string;
   name: string;
   stage: string;
-  pipelineStage: { key: string; name: string; probability: number | unknown; color: string | null; isWon: boolean; isLost: boolean } | null;
+  pipelineStage: {
+    key: string;
+    name: string;
+    probability: number | unknown;
+    color: string | null;
+    isWon: boolean;
+    isLost: boolean;
+  } | null;
   valueMicros: bigint | number | unknown;
   probability: number;
   dueDate: Date | null;
@@ -1614,4 +1628,125 @@ export async function getCompaniesOnly(
     }),
   ]);
   return buildCompanies(opportunities, enrichments);
+}
+
+/**
+ * Lean per-company cockpit builder for GET /crm/companies/:id.
+ *
+ * WHY: The original handler called buildDashboardSnapshot (12 parallel queries, ~1 000 rows)
+ * just to look up one company. This builds the same AccountCockpitSnapshot using 7 targeted
+ * queries — it skips widgets, bidOpportunities, insights, providers, queues, and releaseScore
+ * entirely, and scopes opportunities, contacts, and tasks to the requested company.
+ *
+ * Returns null when the company cannot be found (caller should throw 404).
+ */
+export async function buildCompanyCockpit(
+  orgId: string,
+  companyId: string,
+  prismaClient: PrismaClient,
+): Promise<z.infer<typeof AccountCockpitSnapshot> | null> {
+  // Step 1: resolve company from enrichments + opportunities (2 queries via getCompaniesOnly)
+  const companies = await getCompaniesOnly(orgId, prismaClient);
+  const company =
+    companies.find((c) => c.id === companyId) ??
+    companies.find((c) => normalizeName(c.name) === companyId);
+  if (!company) return null;
+
+  // Step 2: load company-specific data in parallel (5 queries, all filtered by company)
+  const [opportunities, contacts, tasks, riskRows, complianceRows] = await Promise.all([
+    prismaClient.opportunity.findMany({
+      where: { orgId, customer: company.name },
+      select: {
+        id: true,
+        customer: true,
+        name: true,
+        stage: true,
+        valueMicros: true,
+        probability: true,
+        dueDate: true,
+        owner: { select: { name: true, email: true } },
+        pipelineStage: {
+          select: {
+            key: true,
+            name: true,
+            probability: true,
+            color: true,
+            isWon: true,
+            isLost: true,
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 100,
+    }),
+    prismaClient.contact.findMany({
+      where: { orgId, customer: company.name },
+      select: {
+        id: true,
+        customer: true,
+        name: true,
+        role: true,
+        email: true,
+        phone: true,
+        influence: true,
+        createdAt: true,
+      },
+      orderBy: { name: 'asc' },
+      take: 20,
+    }),
+    prismaClient.task.findMany({
+      where: { orgId, opportunity: { customer: company.name } },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        createdAt: true,
+        dueDate: true,
+        opportunity: { select: { id: true, customer: true, name: true } },
+        assignee: { select: { name: true, email: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    }),
+    // WHY: risks and compliance can't be cheaply filtered at DB layer — risks may have
+    // casing variations and compliance uses JSON attribution metadata. Load the full org
+    // set (take: 50) and let buildCockpit's in-memory filter select the right rows.
+    prismaClient.riskRegisterItem.findMany({
+      where: { orgId },
+      select: {
+        id: true,
+        title: true,
+        severity: true,
+        owner: true,
+        mitigation: true,
+        dueDate: true,
+        status: true,
+        companyName: true,
+      },
+      orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+      take: 50,
+    }),
+    prismaClient.complianceCheck.findMany({
+      where: { orgId },
+      select: {
+        id: true,
+        label: true,
+        status: true,
+        owner: true,
+        sourceAttribution: true,
+      },
+      orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+      take: 50,
+    }),
+  ]);
+
+  return buildCockpit({
+    company,
+    companies,
+    opportunities,
+    contacts,
+    tasks,
+    risks: riskRows,
+    compliance: complianceRows,
+  });
 }

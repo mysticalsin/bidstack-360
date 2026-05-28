@@ -5,9 +5,7 @@ import { prisma } from '@bidstack/db';
 import { AccountCockpitSnapshot, CompanyAutopopulateResponse, CrmCompany } from '@bidstack/shared';
 
 import {
-  buildDashboardSnapshot,
-  buildCockpitFromCompany,
-  normalizeName,
+  buildCompanyCockpit,
   normalizeDomain,
   normalizeRegistryValue,
   domainFor,
@@ -159,12 +157,12 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const snapshot = await buildDashboardSnapshot(req.auth.orgId, undefined, prisma, req.log);
-      const company =
-        snapshot.companies.find((item) => item.id === req.params.id) ??
-        snapshot.companies.find((item) => normalizeName(item.name) === req.params.id);
-      if (!company) throw server.httpErrors.notFound('Company not found');
-      return buildCockpitFromCompany(snapshot, company);
+      // WHY: buildCompanyCockpit runs 7 targeted queries vs buildDashboardSnapshot's 12
+      // full-table scans. Widgets, bid opportunities, insights, providers, queues, and
+      // release score are irrelevant to a single-company cockpit view.
+      const cockpit = await buildCompanyCockpit(req.auth.orgId, req.params.id, prisma);
+      if (!cockpit) throw server.httpErrors.notFound('Company not found');
+      return cockpit;
     },
   );
 
