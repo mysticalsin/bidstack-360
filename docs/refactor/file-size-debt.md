@@ -24,7 +24,7 @@ preserve the existing API surface and pass typecheck + lint + tests.
 | --- | ------------------------------------------------------------- | ----- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | `apps/api/src/services/crm/dashboard.service.ts`              | 1,752 | P1 ✅    | ~~Split into 5 modules: dashboard.utils.ts / dashboard.defaults.ts / company-enrichment.service.ts / dashboard.cockpit.ts / dashboard.queries.ts~~ **Done Wave 10**                                                                                |
 | 2   | `apps/web/src/pages/IntegrationsPage.tsx`                     | 1,423 | P2 ✅    | ~~Split into 9 modules: types.ts / integration-helpers.ts / IntegrationAtoms.tsx / IntegrationHero.tsx / ConnectionRunway.tsx / WebhookEventsCard.tsx / ConnectionCommandCenter.tsx / ConnectionTester.tsx / DustAgentsCard.tsx~~ **Done Wave 10** |
-| 3   | `apps/web/src/components/dashboard/OrgDashboard.tsx`          | 1,403 | P2       | Extract: widget components → `dashboard/widgets/` (one file per widget type); layout shell stays in `OrgDashboard.tsx`                                                                                                                             |
+| 3   | `apps/web/src/components/dashboard/OrgDashboard.tsx`          | 1,403 | P2 ✅    | ~~Extract: widget components → `dashboard/widgets/` (one file per widget type); layout shell stays in `OrgDashboard.tsx`~~ **Done Wave 10**                                                                                                        |
 | 4   | `apps/web/src/pages/AuditLogPage.tsx`                         | 1,203 | P3       | Extract: `AuditLogTable.tsx`, `AuditLogFilters.tsx`, `AuditLogDetail.tsx`                                                                                                                                                                          |
 | 5   | `apps/web/src/pages/OpportunitiesPage.tsx`                    | 956   | P3       | Extract: `OpportunityKanban.tsx`, `OpportunityFilters.tsx`, `OpportunityRow.tsx`                                                                                                                                                                   |
 | 6   | `apps/api/src/routes/invoices.ts`                             | 933   | P3       | Extract: PDF-generation handler → `invoices.pdf.ts`; payment-link handler → `invoices.payment.ts`; CRUD stays in `invoices.ts`                                                                                                                     |
@@ -72,9 +72,29 @@ preserve the existing API surface and pass typecheck + lint + tests.
 - `IntegrationsPage.tsx` reduced from 1,423 → 220 lines (queries + page layout only)
 - Import DAG is acyclic; typecheck ✅ Lint ✅ (0 errors, 0 new warnings)
 
+### `OrgDashboard.tsx` — Wave 10 (2026-05-28)
+
+- Split 1,403-line monolith into 13 focused modules under `dashboard/widgets/`:
+  - `dashboard-types.ts` (~80 lines) — shared types, tone token maps, stage helpers (leaf)
+  - `KpiRow.tsx` (~130 lines) — 6-card KPI grid with trend indicators + signal bars
+  - `InsightsBar.tsx` (~85 lines) — inline insight callouts (overdue / stalled / leads)
+  - `WorkspaceHealthCard.tsx` (~110 lines) — SVG circular gauge with gradient stroke
+  - `PipelineCard.tsx` (~160 lines) — live-chart sparkline + stage bars
+  - `PipelineByStageMini.tsx` (~65 lines) — compact by-stage breakdown
+  - `AlertCard.tsx` (~65 lines) — single-metric alert with progress arc
+  - `SidebarCards.tsx` (~75 lines) — QuickActionsCard + QuickLinksCard (co-located)
+  - `RecentActivityCard.tsx` (~135 lines) — animated activity feed
+  - `TopAccountsCard.tsx` (~75 lines) — top-5 accounts list with CompanyLogo
+  - `SalesFunnelCard.tsx` (~115 lines) — animated horizontal funnel bars
+  - `WeeklyGoalCard.tsx` (~60 lines) — weekly pipeline goal progress bar
+  - `WinRateCard.tsx` (~85 lines) — animated SVG ring chart
+- `OrgDashboard.tsx` reduced from 1,403 → 357 lines (imports + orchestration + SourceStat)
+- Import DAG is acyclic; dashboard-types.ts is leaf with zero local imports
+- Typecheck ✅ Lint ✅ (0 errors, 0 new warnings from our changes)
+
 ---
 
-## Next up (P2)
+## Next up (P3)
 
 ## Guiding principles for all splits
 
