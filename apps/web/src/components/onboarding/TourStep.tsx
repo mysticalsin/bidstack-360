@@ -92,9 +92,32 @@ export function TourStepCard({
   function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (e.key === 'Escape') {
       onDismiss();
+      return;
     }
-    // Tab cycles within the card — browser default handles this since we're
-    // a self-contained div; no manual interception needed.
+    // Trap focus inside the card (WCAG 2.1.2 — No Keyboard Trap requires
+    // that keyboard users can cycle within a modal and exit via Escape).
+    if (e.key === 'Tab') {
+      const focusable = cardRef.current?.querySelectorAll<HTMLElement>(
+        'button, [href], input, [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable || focusable.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
   }
 
   const vh = typeof window !== 'undefined' ? window.innerHeight : 768;
@@ -108,7 +131,6 @@ export function TourStepCard({
       aria-modal="true"
       aria-label={`Tour step ${stepIndex + 1} of ${TOUR_TOTAL}: ${step.title}`}
       onKeyDown={handleKeyDown}
-       
       style={{ top: pos.top, left: pos.left, width: CARD_WIDTH }}
       className="fixed z-[9999] rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] p-5 shadow-[var(--shadow-xl)] outline-none"
     >

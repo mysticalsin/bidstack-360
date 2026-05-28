@@ -154,10 +154,7 @@ export function LeadScoreBadge({ leadId, prefetched, size = 'md' }: LeadScoreBad
       >
         {/* Aria-hidden span handles visual badge — parent button has full label */}
         <span aria-hidden="true">{score}</span>
-        <span
-          aria-hidden="true"
-          className="hidden sm:inline opacity-70 font-normal"
-        >
+        <span aria-hidden="true" className="hidden sm:inline opacity-70 font-normal">
           {label}
         </span>
       </button>
@@ -165,7 +162,6 @@ export function LeadScoreBadge({ leadId, prefetched, size = 'md' }: LeadScoreBad
       {/* Popover — SHAP factor breakdown */}
       {open && factors.length > 0 && (
         <div
-          role="dialog"
           aria-label="Score factors"
           className={[
             'absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50',

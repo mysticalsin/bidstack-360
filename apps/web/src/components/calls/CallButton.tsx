@@ -68,11 +68,13 @@ function PhoneDial({ defaultPhone, onDial, onCancel, loading }: PhoneDialProps) 
 
   return (
     <div
-      role="dialog"
       aria-label="Enter phone number"
       className="mt-1 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] p-3 shadow-[var(--shadow-md)] dark:bg-[var(--surface-glass)] dark:border-[var(--border-glow-strong)]"
     >
-      <label htmlFor={inputId} className="mb-1.5 block text-xs font-medium text-[var(--fg-primary)]">
+      <label
+        htmlFor={inputId}
+        className="mb-1.5 block text-xs font-medium text-[var(--fg-primary)]"
+      >
         Phone number (E.164)
       </label>
       <input

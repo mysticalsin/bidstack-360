@@ -28,7 +28,8 @@ interface OppWinProbabilityBadgeProps {
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
 function probColorClasses(prob: number): string {
-  if (prob >= 70) return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300';
+  if (prob >= 70)
+    return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300';
   if (prob >= 40) return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
   return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
 }
@@ -76,7 +77,6 @@ function FactorPopover({
   const top3 = factors.slice(0, 3);
   return (
     <div
-      role="dialog"
       aria-label="Win probability factors"
       className={[
         'absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50',
@@ -121,7 +121,8 @@ function FactorPopover({
                       : 'text-red-700 dark:text-red-300',
                   ].join(' ')}
                 >
-                  {f.contribution > 0 ? '+' : ''}{(f.contribution * 100).toFixed(1)}
+                  {f.contribution > 0 ? '+' : ''}
+                  {(f.contribution * 100).toFixed(1)}
                 </span>
               </li>
             ))}
@@ -184,9 +185,7 @@ export function OppWinProbabilityBadge({
         </span>
       </button>
 
-      {open && (
-        <FactorPopover factors={factors} recommendation={recommendation} prob={prob} />
-      )}
+      {open && <FactorPopover factors={factors} recommendation={recommendation} prob={prob} />}
     </span>
   );
 }
