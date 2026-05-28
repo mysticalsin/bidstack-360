@@ -17,6 +17,7 @@ import { Fragment, useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
+import { Modal } from '@/components/ui/Modal';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -119,13 +120,7 @@ function CreateEventModal({ initialDate, onClose, onSave, loading }: CreateEvent
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Create calendar event"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
+    <Modal open onClose={onClose} label="Create calendar event">
       <div className="bg-(--color-surface) rounded-2xl p-6 shadow-xl w-full max-w-md mx-4 focus:outline-none">
         <h2 className="text-lg font-semibold mb-4 text-(--color-text-primary)">New event</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -254,7 +249,7 @@ function CreateEventModal({ initialDate, onClose, onSave, loading }: CreateEvent
           </div>
         </form>
       </div>
-    </div>
+    </Modal>
   );
 }
 

@@ -9,6 +9,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
+import { confirm } from '@/components/ui/ConfirmDialog';
+import { Modal } from '@/components/ui/Modal';
+import { toast } from '@/components/ui/Toast';
 import {
   useCreateCustomObjectDef,
   useCustomObjectDefs,
@@ -53,7 +56,6 @@ export function CustomObjectsAdminPage() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<CreateFormState>(INITIAL_FORM);
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   function handleField(field: keyof CreateFormState, value: string) {
@@ -83,7 +85,9 @@ export function CustomObjectsAdminPage() {
       return;
     }
     if (!/^[a-z][a-z0-9_-]*$/.test(form.key)) {
-      setFormError('Key must start with a letter and contain only lowercase letters, digits, _ or -');
+      setFormError(
+        'Key must start with a letter and contain only lowercase letters, digits, _ or -',
+      );
       return;
     }
     try {
@@ -105,8 +109,21 @@ export function CustomObjectsAdminPage() {
   }
 
   async function handleDelete(id: string) {
-    await deleteDef.mutateAsync(id);
-    setDeleteTarget(null);
+    const ok = await confirm({
+      title: 'Delete Custom Object?',
+      description:
+        'This will permanently delete the object definition and all records belonging to it. This action cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await deleteDef.mutateAsync(id);
+    } catch (err) {
+      toast.error('Delete failed', {
+        description: err instanceof Error ? err.message : 'Delete failed',
+      });
+    }
   }
 
   return (
@@ -144,7 +161,10 @@ export function CustomObjectsAdminPage() {
 
       {/* State: error */}
       {isError && (
-        <div role="alert" className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300">
+        <div
+          role="alert"
+          className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
+        >
           Failed to load custom objects. Please refresh.
         </div>
       )}
@@ -152,9 +172,13 @@ export function CustomObjectsAdminPage() {
       {/* State: empty */}
       {!isLoading && !isError && data?.items.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center text-[var(--text-secondary)]">
-          <span className="text-4xl mb-4" aria-hidden="true">📦</span>
+          <span className="text-4xl mb-4" aria-hidden="true">
+            📦
+          </span>
           <p className="font-medium">No custom objects yet</p>
-          <p className="text-sm mt-1">Click &quot;New Object&quot; to define your first custom entity type.</p>
+          <p className="text-sm mt-1">
+            Click &quot;New Object&quot; to define your first custom entity type.
+          </p>
         </div>
       )}
 
@@ -199,7 +223,7 @@ export function CustomObjectsAdminPage() {
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
-                  setDeleteTarget(def.id);
+                  void handleDelete(def.id);
                 }}
                 className={cn(
                   'absolute top-2 right-2 p-1.5 rounded opacity-0 group-hover:opacity-100',
@@ -217,186 +241,156 @@ export function CustomObjectsAdminPage() {
       )}
 
       {/* Create modal */}
-      {showCreate && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="create-obj-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-        >
-          <div className="bg-[var(--surface)] rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
-            <h2 id="create-obj-title" className="text-lg font-semibold text-[var(--text-primary)]">
-              New Custom Object
-            </h2>
-            <form onSubmit={(e) => { void handleCreate(e); }} className="space-y-3">
-              {formError && (
-                <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-                  {formError}
-                </p>
-              )}
+      <Modal
+        open={showCreate}
+        onClose={() => {
+          setShowCreate(false);
+          setForm(INITIAL_FORM);
+          setFormError(null);
+        }}
+        labelId="create-obj-title"
+      >
+        <div className="bg-[var(--surface)] rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+          <h2 id="create-obj-title" className="text-lg font-semibold text-[var(--text-primary)]">
+            New Custom Object
+          </h2>
+          <form
+            onSubmit={(e) => {
+              void handleCreate(e);
+            }}
+            className="space-y-3"
+          >
+            {formError && (
+              <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                {formError}
+              </p>
+            )}
 
-              <div>
-                <label
-                  htmlFor="co-label-singular"
-                  className="block text-sm font-medium text-[var(--text-primary)] mb-1"
-                >
-                  Singular label <span aria-hidden="true">*</span>
-                </label>
-                <input
-                  id="co-label-singular"
-                  type="text"
-                  value={form.labelSingular}
-                  onChange={(e) => handleField('labelSingular', e.target.value)}
-                  placeholder="e.g. Project"
-                  required
-                  className="input w-full"
-                  aria-required="true"
-                />
+            <div>
+              <label
+                htmlFor="co-label-singular"
+                className="block text-sm font-medium text-[var(--text-primary)] mb-1"
+              >
+                Singular label <span aria-hidden="true">*</span>
+              </label>
+              <input
+                id="co-label-singular"
+                type="text"
+                value={form.labelSingular}
+                onChange={(e) => handleField('labelSingular', e.target.value)}
+                placeholder="e.g. Project"
+                required
+                className="input w-full"
+                aria-required="true"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="co-label-plural"
+                className="block text-sm font-medium text-[var(--text-primary)] mb-1"
+              >
+                Plural label <span aria-hidden="true">*</span>
+              </label>
+              <input
+                id="co-label-plural"
+                type="text"
+                value={form.labelPlural}
+                onChange={(e) => handleField('labelPlural', e.target.value)}
+                placeholder="e.g. Projects"
+                required
+                className="input w-full"
+                aria-required="true"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="co-key"
+                className="block text-sm font-medium text-[var(--text-primary)] mb-1"
+              >
+                API key <span className="text-[var(--text-tertiary)] font-normal">(auto)</span>
+              </label>
+              <input
+                id="co-key"
+                type="text"
+                value={form.key}
+                onChange={(e) => handleField('key', e.target.value)}
+                placeholder="e.g. project"
+                pattern="^[a-z][a-z0-9_-]*$"
+                required
+                className="input w-full font-mono text-sm"
+                aria-required="true"
+                aria-describedby="co-key-hint"
+              />
+              <p id="co-key-hint" className="text-xs text-[var(--text-tertiary)] mt-0.5">
+                Lowercase letters, digits, _ or - only. Immutable after creation.
+              </p>
+            </div>
+
+            <div>
+              <label
+                htmlFor="co-description"
+                className="block text-sm font-medium text-[var(--text-primary)] mb-1"
+              >
+                Description
+              </label>
+              <textarea
+                id="co-description"
+                value={form.description}
+                onChange={(e) => handleField('description', e.target.value)}
+                rows={2}
+                className="input w-full resize-none"
+                maxLength={512}
+              />
+            </div>
+
+            {/* Color picker */}
+            <fieldset>
+              <legend className="text-sm font-medium text-[var(--text-primary)] mb-1">Color</legend>
+              <div className="flex gap-2 flex-wrap">
+                {PRESET_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => handleField('color', c)}
+                    className={cn(
+                      'w-7 h-7 rounded-full border-2 transition-transform hover:scale-110',
+                      form.color === c
+                        ? 'border-white ring-2 ring-[var(--ring)]'
+                        : 'border-transparent',
+                    )}
+                    style={{ backgroundColor: c }}
+                    aria-label={`Select color ${c}`}
+                    aria-pressed={form.color === c}
+                  />
+                ))}
               </div>
+            </fieldset>
 
-              <div>
-                <label
-                  htmlFor="co-label-plural"
-                  className="block text-sm font-medium text-[var(--text-primary)] mb-1"
-                >
-                  Plural label <span aria-hidden="true">*</span>
-                </label>
-                <input
-                  id="co-label-plural"
-                  type="text"
-                  value={form.labelPlural}
-                  onChange={(e) => handleField('labelPlural', e.target.value)}
-                  placeholder="e.g. Projects"
-                  required
-                  className="input w-full"
-                  aria-required="true"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="co-key"
-                  className="block text-sm font-medium text-[var(--text-primary)] mb-1"
-                >
-                  API key <span className="text-[var(--text-tertiary)] font-normal">(auto)</span>
-                </label>
-                <input
-                  id="co-key"
-                  type="text"
-                  value={form.key}
-                  onChange={(e) => handleField('key', e.target.value)}
-                  placeholder="e.g. project"
-                  pattern="^[a-z][a-z0-9_-]*$"
-                  required
-                  className="input w-full font-mono text-sm"
-                  aria-required="true"
-                  aria-describedby="co-key-hint"
-                />
-                <p id="co-key-hint" className="text-xs text-[var(--text-tertiary)] mt-0.5">
-                  Lowercase letters, digits, _ or - only. Immutable after creation.
-                </p>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="co-description"
-                  className="block text-sm font-medium text-[var(--text-primary)] mb-1"
-                >
-                  Description
-                </label>
-                <textarea
-                  id="co-description"
-                  value={form.description}
-                  onChange={(e) => handleField('description', e.target.value)}
-                  rows={2}
-                  className="input w-full resize-none"
-                  maxLength={512}
-                />
-              </div>
-
-              {/* Color picker */}
-              <fieldset>
-                <legend className="text-sm font-medium text-[var(--text-primary)] mb-1">
-                  Color
-                </legend>
-                <div className="flex gap-2 flex-wrap">
-                  {PRESET_COLORS.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => handleField('color', c)}
-                      className={cn(
-                        'w-7 h-7 rounded-full border-2 transition-transform hover:scale-110',
-                        form.color === c
-                          ? 'border-white ring-2 ring-[var(--ring)]'
-                          : 'border-transparent',
-                      )}
-                      style={{ backgroundColor: c }}
-                      aria-label={`Select color ${c}`}
-                      aria-pressed={form.color === c}
-                    />
-                  ))}
-                </div>
-              </fieldset>
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => { setShowCreate(false); setForm(INITIAL_FORM); setFormError(null); }}
-                  className="flex-1 px-4 py-2 rounded-lg border border-[var(--border)] text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors min-h-[44px]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={createDef.isPending}
-                  className="flex-1 px-4 py-2 rounded-lg bg-[var(--accent)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
-                >
-                  {createDef.isPending ? 'Creating…' : 'Create'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Delete confirm modal */}
-      {deleteTarget && (
-        <div
-          role="alertdialog"
-          aria-modal="true"
-          aria-labelledby="delete-obj-title"
-          aria-describedby="delete-obj-desc"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-        >
-          <div className="bg-[var(--surface)] rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
-            <h2 id="delete-obj-title" className="text-lg font-semibold text-[var(--text-primary)]">
-              Delete Custom Object?
-            </h2>
-            <p id="delete-obj-desc" className="text-sm text-[var(--text-secondary)]">
-              This will permanently delete the object definition and <strong>all records</strong>{' '}
-              belonging to it. This action cannot be undone.
-            </p>
-            <div className="flex gap-3">
+            <div className="flex gap-3 pt-2">
               <button
                 type="button"
-                onClick={() => setDeleteTarget(null)}
+                onClick={() => {
+                  setShowCreate(false);
+                  setForm(INITIAL_FORM);
+                  setFormError(null);
+                }}
                 className="flex-1 px-4 py-2 rounded-lg border border-[var(--border)] text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors min-h-[44px]"
               >
                 Cancel
               </button>
               <button
-                type="button"
-                onClick={() => { void handleDelete(deleteTarget); }}
-                disabled={deleteDef.isPending}
-                className="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors min-h-[44px]"
+                type="submit"
+                disabled={createDef.isPending}
+                className="flex-1 px-4 py-2 rounded-lg bg-[var(--accent)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
               >
-                {deleteDef.isPending ? 'Deleting…' : 'Delete'}
+                {createDef.isPending ? 'Creating…' : 'Create'}
               </button>
             </div>
-          </div>
+          </form>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

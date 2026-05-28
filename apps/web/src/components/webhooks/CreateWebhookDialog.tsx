@@ -10,11 +10,24 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
+import { Modal } from '@/components/ui/Modal';
 
 const EVENT_OPTIONS = [
-  { group: 'CRM', events: ['opportunity.created', 'opportunity.updated', 'opportunity.stage_changed', 'contact.created', 'lead.converted'] },
+  {
+    group: 'CRM',
+    events: [
+      'opportunity.created',
+      'opportunity.updated',
+      'opportunity.stage_changed',
+      'contact.created',
+      'lead.converted',
+    ],
+  },
   { group: 'Tasks & Proposals', events: ['task.created', 'task.completed', 'proposal.submitted'] },
-  { group: 'Bids & Documents', events: ['bid.score_updated', 'document.extracted', 'dust.agent.completed'] },
+  {
+    group: 'Bids & Documents',
+    events: ['bid.score_updated', 'document.extracted', 'dust.agent.completed'],
+  },
   { group: 'Finance', events: ['invoice.sent', 'invoice.paid'] },
 ];
 
@@ -46,18 +59,10 @@ export function CreateWebhookDialog({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="create-webhook-title"
-    >
+    <Modal open onClose={onClose} labelId="create-webhook-title">
       <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] shadow-xl">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--surface-card)] px-6 py-4">
-          <h2
-            id="create-webhook-title"
-            className="text-lg font-semibold text-[var(--fg-primary)]"
-          >
+          <h2 id="create-webhook-title" className="text-lg font-semibold text-[var(--fg-primary)]">
             New webhook subscription
           </h2>
           <button
@@ -77,7 +82,10 @@ export function CreateWebhookDialog({
               htmlFor="webhook-url"
               className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
             >
-              Endpoint URL <span aria-hidden="true" className="text-[var(--error-fg)]">*</span>
+              Endpoint URL{' '}
+              <span aria-hidden="true" className="text-[var(--error-fg)]">
+                *
+              </span>
             </label>
             <input
               id="webhook-url"
@@ -98,7 +106,10 @@ export function CreateWebhookDialog({
           <div>
             <div className="mb-2 flex items-center justify-between">
               <label className="text-xs font-medium text-[var(--fg-secondary)]">
-                Events <span aria-hidden="true" className="text-[var(--error-fg)]">*</span>
+                Events{' '}
+                <span aria-hidden="true" className="text-[var(--error-fg)]">
+                  *
+                </span>
               </label>
               <div className="flex gap-2">
                 <button
@@ -157,15 +168,12 @@ export function CreateWebhookDialog({
             <Button type="button" variant="secondary" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={isPending || !url || selected.length === 0}
-            >
+            <Button type="submit" disabled={isPending || !url || selected.length === 0}>
               {isPending ? 'Creating…' : 'Create subscription'}
             </Button>
           </div>
         </form>
       </div>
-    </div>
+    </Modal>
   );
 }

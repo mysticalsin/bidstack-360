@@ -10,6 +10,8 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
+import { confirm } from '@/components/ui/ConfirmDialog';
+import { toast } from '@/components/ui/Toast';
 import {
   useCustomObjectDefs,
   useCustomObjectRecord,
@@ -32,8 +34,6 @@ export function CustomObjectDetailPage() {
   const [editField, setEditField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
   const [editError, setEditError] = useState<string | null>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const record = recordQuery.data;
   const values = (record?.valuesJson ?? {}) as Record<string, unknown>;
@@ -56,13 +56,20 @@ export function CustomObjectDetailPage() {
   }
 
   async function handleDelete() {
-    setDeleteError(null);
+    const ok = await confirm({
+      title: `Delete ${def?.labelSingular ?? 'record'}?`,
+      description: `${record?.recordKey ?? 'This record'} will be soft-deleted. It can be restored via the API.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
     try {
       await deleteRecord.mutateAsync(recordId);
-      // Navigate back to list — use history.back() equivalent
       window.history.back();
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Delete failed');
+      toast.error('Delete failed', {
+        description: err instanceof Error ? err.message : 'Delete failed',
+      });
     }
   }
 
@@ -129,7 +136,9 @@ export function CustomObjectDetailPage() {
         {/* Danger zone */}
         <button
           type="button"
-          onClick={() => setShowDeleteConfirm(true)}
+          onClick={() => {
+            void handleDelete();
+          }}
           className={cn(
             'px-3 py-1.5 rounded-lg border border-red-300 dark:border-red-800',
             'text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20',
@@ -146,7 +155,9 @@ export function CustomObjectDetailPage() {
         aria-labelledby="fields-section"
         className="bg-[var(--surface)] border border-[var(--border)] rounded-xl overflow-hidden"
       >
-        <h2 id="fields-section" className="sr-only">Field values</h2>
+        <h2 id="fields-section" className="sr-only">
+          Field values
+        </h2>
         <dl>
           {fieldKeys.map((key, i) => (
             <div
@@ -177,7 +188,9 @@ export function CustomObjectDetailPage() {
                     />
                     <button
                       type="button"
-                      onClick={() => { void saveEdit(); }}
+                      onClick={() => {
+                        void saveEdit();
+                      }}
                       disabled={updateRecord.isPending}
                       className="px-3 py-1 rounded-lg bg-[var(--accent)] text-white text-sm hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
                     >
@@ -218,7 +231,10 @@ export function CustomObjectDetailPage() {
           {fieldKeys.length === 0 && (
             <div className="px-5 py-8 text-center text-sm text-[var(--text-secondary)]">
               No fields defined yet. Add fields in the{' '}
-              <Link to={`/settings/custom-objects/${def.id}`} className="underline text-[var(--accent)]">
+              <Link
+                to={`/settings/custom-objects/${def.id}`}
+                className="underline text-[var(--accent)]"
+              >
                 object editor
               </Link>
               .
@@ -235,46 +251,6 @@ export function CustomObjectDetailPage() {
           <p className="text-red-500">Deleted {relativeTime(record.deletedAt)}</p>
         )}
       </section>
-
-      {/* Delete confirm dialog */}
-      {showDeleteConfirm && (
-        <div
-          role="alertdialog"
-          aria-modal="true"
-          aria-labelledby="del-record-title"
-          aria-describedby="del-record-desc"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-        >
-          <div className="bg-[var(--surface)] rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
-            <h2 id="del-record-title" className="text-lg font-semibold text-[var(--text-primary)]">
-              Delete {def.labelSingular}?
-            </h2>
-            <p id="del-record-desc" className="text-sm text-[var(--text-secondary)]">
-              {record.recordKey} will be soft-deleted. It can be restored via the API.
-            </p>
-            {deleteError && (
-              <p role="alert" className="text-sm text-red-600 dark:text-red-400">{deleteError}</p>
-            )}
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 px-4 py-2 rounded-lg border border-[var(--border)] text-sm hover:bg-[var(--surface-2)] transition-colors min-h-[44px]"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => { void handleDelete(); }}
-                disabled={deleteRecord.isPending}
-                className="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white text-sm hover:bg-red-700 disabled:opacity-50 transition-colors min-h-[44px]"
-              >
-                {deleteRecord.isPending ? 'Deleting…' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

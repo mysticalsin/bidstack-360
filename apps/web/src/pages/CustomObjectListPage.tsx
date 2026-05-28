@@ -19,6 +19,7 @@ import {
 } from '@/hooks/useCustomObjects';
 import { cn } from '@/lib/cn';
 import { relativeTime } from '@/lib/format';
+import { Modal } from '@/components/ui/Modal';
 
 export function CustomObjectListPage() {
   const { objectKey = '' } = useParams<{ objectKey: string }>();
@@ -65,7 +66,10 @@ export function CustomObjectListPage() {
       <div className="p-6 text-center text-[var(--text-secondary)]">
         <p className="text-2xl mb-2">404</p>
         <p>Custom object &quot;{objectKey}&quot; not found.</p>
-        <Link to="/settings/custom-objects" className="mt-4 inline-block text-[var(--accent)] underline">
+        <Link
+          to="/settings/custom-objects"
+          className="mt-4 inline-block text-[var(--accent)] underline"
+        >
           Manage custom objects
         </Link>
       </div>
@@ -78,9 +82,7 @@ export function CustomObjectListPage() {
 
   // Derive displayable field keys from first record (fallback to "name")
   const displayKeys =
-    records.length > 0
-      ? Object.keys(records[0]?.valuesJson ?? {}).slice(0, 4)
-      : ['name'];
+    records.length > 0 ? Object.keys(records[0]?.valuesJson ?? {}).slice(0, 4) : ['name'];
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -121,7 +123,10 @@ export function CustomObjectListPage() {
       )}
 
       {recordsQuery.isError && (
-        <div role="alert" className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300">
+        <div
+          role="alert"
+          className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
+        >
           Failed to load records.
         </div>
       )}
@@ -129,7 +134,9 @@ export function CustomObjectListPage() {
       {!recordsQuery.isLoading && records.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center text-[var(--text-secondary)]">
           <p className="font-medium">No {def.labelPlural.toLowerCase()} yet</p>
-          <p className="text-sm mt-1">Click &quot;New {def.labelSingular}&quot; to create your first record.</p>
+          <p className="text-sm mt-1">
+            Click &quot;New {def.labelSingular}&quot; to create your first record.
+          </p>
         </div>
       )}
 
@@ -202,56 +209,71 @@ export function CustomObjectListPage() {
       )}
 
       {/* Create record modal */}
-      {showCreate && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="create-record-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-        >
-          <div className="bg-[var(--surface)] rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
-            <h2 id="create-record-title" className="text-lg font-semibold text-[var(--text-primary)]">
-              New {def.labelSingular}
-            </h2>
-            <form onSubmit={(e) => { void handleCreate(e); }} className="space-y-3">
-              {createError && (
-                <p role="alert" className="text-sm text-red-600 dark:text-red-400">{createError}</p>
-              )}
-              <div>
-                <label htmlFor="cr-name" className="block text-sm font-medium text-[var(--text-primary)] mb-1">
-                  Name <span aria-hidden="true">*</span>
-                </label>
-                <input
-                  id="cr-name"
-                  type="text"
-                  value={createValues.name ?? ''}
-                  onChange={(e) => setCreateValues((v) => ({ ...v, name: e.target.value }))}
-                  className="input w-full"
-                  required
-                  aria-required="true"
-                  autoFocus
-                />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => { setShowCreate(false); setCreateValues({ name: '' }); setCreateError(null); }}
-                  className="flex-1 px-4 py-2 rounded-lg border border-[var(--border)] text-sm hover:bg-[var(--surface-2)] transition-colors min-h-[44px]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={createRecord.isPending}
-                  className="flex-1 px-4 py-2 rounded-lg bg-[var(--accent)] text-white text-sm hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
-                >
-                  {createRecord.isPending ? 'Creating…' : 'Create'}
-                </button>
-              </div>
-            </form>
-          </div>
+      <Modal
+        open={showCreate}
+        onClose={() => {
+          setShowCreate(false);
+          setCreateValues({ name: '' });
+          setCreateError(null);
+        }}
+        labelId="create-record-title"
+      >
+        <div className="bg-[var(--surface)] rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+          <h2 id="create-record-title" className="text-lg font-semibold text-[var(--text-primary)]">
+            New {def.labelSingular}
+          </h2>
+          <form
+            onSubmit={(e) => {
+              void handleCreate(e);
+            }}
+            className="space-y-3"
+          >
+            {createError && (
+              <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                {createError}
+              </p>
+            )}
+            <div>
+              <label
+                htmlFor="cr-name"
+                className="block text-sm font-medium text-[var(--text-primary)] mb-1"
+              >
+                Name <span aria-hidden="true">*</span>
+              </label>
+              <input
+                id="cr-name"
+                type="text"
+                value={createValues.name ?? ''}
+                onChange={(e) => setCreateValues((v) => ({ ...v, name: e.target.value }))}
+                className="input w-full"
+                required
+                aria-required="true"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCreate(false);
+                  setCreateValues({ name: '' });
+                  setCreateError(null);
+                }}
+                className="flex-1 px-4 py-2 rounded-lg border border-[var(--border)] text-sm hover:bg-[var(--surface-2)] transition-colors min-h-[44px]"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={createRecord.isPending}
+                className="flex-1 px-4 py-2 rounded-lg bg-[var(--accent)] text-white text-sm hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
+              >
+                {createRecord.isPending ? 'Creating…' : 'Create'}
+              </button>
+            </div>
+          </form>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }
