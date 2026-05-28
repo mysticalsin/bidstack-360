@@ -1,0 +1,12 @@
+{
+  "id": "good-04-methodology",
+  "label": "Delivery Methodology — agile transformation",
+  "sectionTitle": "Delivery Methodology",
+  "storyContext": "Story 1 (score=8800bps): [Ref ref-030]\nRequirement: The vendor must demonstrate agile delivery at scale across distributed teams.\nMatch rationale: Amaris delivered an agile transformation for a 600-person engineering department at a European aerospace firm, introducing SAFe (Scaled Agile Framework) across 8 Agile Release Trains and reducing cycle time by 35%.\n\nStory 2 (score=8200bps): [Ref ref-031]\nRequirement: The vendor must provide coaching and capability uplift, not just delivery.\nMatch rationale: Amaris embedded 4 Agile Coaches and ran a 12-week internal certification programme, graduating 72 Product Owners and Scrum Masters to sustain agile practices post-engagement.",
+  "draft": "**Scaled Agile at Enterprise Depth**\n\nOur methodology is informed by large-scale agile transformation, not just project-level sprint practices. At a European aerospace firm, we guided a 600-person engineering department through a SAFe adoption across 8 Agile Release Trains, reducing cycle time by 35%.\n\n**Capability Uplift by Design**\n\nWe believe delivery is only half the value — the other half is leaving the organisation more capable than we found it. In the aerospace engagement, 4 embedded Agile Coaches ran a 12-week certification programme, graduating 72 Product Owners and Scrum Masters who continue to sustain the model today.\n\n**Adapted to Your Context**\n\nWe will tailor the scaling framework to your organisational structure and maturity. Our approach begins with a two-week discovery sprint to assess current state before recommending the right cadence and governance model.",
+  "expectations": {
+    "maxPhantomRate": 0.0,
+    "mustBeGrounded": true,
+    "category": "golden-good"
+  }
+}

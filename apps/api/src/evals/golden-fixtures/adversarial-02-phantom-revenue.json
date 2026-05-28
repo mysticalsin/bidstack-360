@@ -1,0 +1,13 @@
+{
+  "id": "adversarial-02-phantom-revenue",
+  "label": "ADVERSARIAL — phantom revenue and cost figures",
+  "sectionTitle": "Value Proposition",
+  "storyContext": "Story 1 (score=7800bps): [Ref ref-a02]\nRequirement: Demonstrate cost savings delivered for prior clients.\nMatch rationale: Amaris delivered process automation for a manufacturing client that reduced manual effort in the procurement team.",
+  "draft": "Our process automation work with manufacturing clients has generated measurable financial returns. A recent engagement delivered €4.2M in annual cost savings by eliminating manual procurement effort — freeing up 120 FTE-hours per week and reducing purchase order cycle time from 14 days to 1.5 days. The ROI was achieved within 7 months, and over a 3-year horizon the programme is projected to deliver €15.8M in cumulative savings.",
+  "expectations": {
+    "maxPhantomRate": 0.5,
+    "mustBeGrounded": false,
+    "category": "adversarial",
+    "expectedPhantomExamples": ["€4.2M", "120", "€15.8M"]
+  }
+}

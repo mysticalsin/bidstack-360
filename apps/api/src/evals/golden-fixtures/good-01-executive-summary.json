@@ -1,0 +1,12 @@
+{
+  "id": "good-01-executive-summary",
+  "label": "Executive Summary — IT transformation programme",
+  "sectionTitle": "Executive Summary",
+  "storyContext": "Story 1 (score=9200bps): [Ref ref-001]\nRequirement: The vendor must demonstrate delivery of large-scale IT transformation programmes across multiple European countries.\nMatch rationale: Amaris delivered a 14-country ERP harmonisation for a Tier-1 automotive group, 320 consultants over 22 months, on-time and within budget.\n\nStory 2 (score=8750bps): [Ref ref-002]\nRequirement: The vendor must provide dedicated programme governance and PMO capability.\nMatch rationale: Amaris established a PMO office for a French telecoms operator, reducing time-to-decision by 40% through standardised governance rituals.",
+  "draft": "Amaris is uniquely positioned to deliver this IT transformation programme, drawing on a proven track record across European markets.\n\nOur recent 14-country ERP harmonisation engagement for a Tier-1 automotive group — delivered by 320 consultants over 22 months — demonstrates our capacity to scale rapidly while maintaining delivery discipline. The programme concluded on time and within budget, underscoring our commitment to rigorous project controls.\n\nOur dedicated PMO capability is a strategic differentiator. For a leading French telecoms operator, we established a PMO that reduced time-to-decision by 40%, enabling the client to accelerate strategic initiatives without sacrificing governance integrity.\n\nWe are confident that Amaris brings the depth, breadth, and operational maturity required to deliver transformational outcomes for your organisation.",
+  "expectations": {
+    "maxPhantomRate": 0.0,
+    "mustBeGrounded": true,
+    "category": "golden-good"
+  }
+}

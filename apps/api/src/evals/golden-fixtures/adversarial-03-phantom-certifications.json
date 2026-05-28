@@ -1,0 +1,13 @@
+{
+  "id": "adversarial-03-phantom-certifications",
+  "label": "ADVERSARIAL — phantom consultant counts and certification numbers",
+  "sectionTitle": "Team Credentials and Experience",
+  "storyContext": "Story 1 (score=7200bps): [Ref ref-a03]\nRequirement: The vendor must demonstrate Azure cloud expertise.\nMatch rationale: Amaris has an Azure practice with certified consultants across the UK and France.",
+  "draft": "Amaris's Azure practice is one of the strongest in Europe, comprising 847 Azure-certified consultants across 14 countries. We hold 1,203 active Microsoft certifications, including 156 Azure Solutions Architect Expert badges and 94 Azure DevOps Engineer Expert certifications. In 2024, our Azure team delivered 312 migration projects with a 99.1% success rate.",
+  "expectations": {
+    "maxPhantomRate": 0.5,
+    "mustBeGrounded": false,
+    "category": "adversarial",
+    "expectedPhantomExamples": ["847", "1,203", "156", "94", "312", "99.1%"]
+  }
+}

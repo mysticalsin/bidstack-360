@@ -1,0 +1,12 @@
+{
+  "id": "good-06-risk-mitigation",
+  "label": "Risk Mitigation — data migration",
+  "sectionTitle": "Risk Identification and Mitigation",
+  "storyContext": "Story 1 (score=8700bps): [Ref ref-050]\nRequirement: The vendor must identify data migration risks and describe mitigation strategies.\nMatch rationale: Amaris managed a 4-terabyte data migration for a retail energy provider, identifying 3 critical data quality risks during discovery and resolving all before go-live via a 6-week parallel-run period.\n\nStory 2 (score=8100bps): [Ref ref-051]\nRequirement: The vendor must demonstrate rollback capabilities.\nMatch rationale: In the same retail energy engagement, a rollback procedure was invoked during wave 2, reverting 230GB of transactional data within 4 hours with zero data loss.",
+  "draft": "**Risk Framework**\n\nOur approach to risk management is proactive and evidence-driven. On a 4-terabyte data migration for a retail energy provider, our discovery phase surfaced 3 critical data quality risks — encoding inconsistencies, orphaned relational records, and duplicated customer identifiers — before a single byte was moved to the target environment. Resolution of all three risks during a 6-week parallel-run period meant go-live proceeded without incident.\n\n**Rollback as Standard**\n\nRollback is not an afterthought — it is a tested, rehearsed capability. During wave 2 of the same retail energy migration, we invoked our rollback procedure and reverted 230GB of transactional data in under 4 hours with zero data loss. The client's operations team was back at normal capacity the following morning.\n\n**Continuous Risk Register**\n\nA live risk register with weekly executive review will be maintained throughout this engagement. Risks are scored on probability × impact and tracked to closure, not just to mitigation.",
+  "expectations": {
+    "maxPhantomRate": 0.0,
+    "mustBeGrounded": true,
+    "category": "golden-good"
+  }
+}

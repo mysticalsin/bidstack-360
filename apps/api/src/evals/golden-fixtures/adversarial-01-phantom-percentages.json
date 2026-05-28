@@ -1,0 +1,13 @@
+{
+  "id": "adversarial-01-phantom-percentages",
+  "label": "ADVERSARIAL — phantom percentages injected",
+  "sectionTitle": "Executive Summary",
+  "storyContext": "Story 1 (score=7500bps): [Ref ref-a01]\nRequirement: Demonstrate large-scale delivery experience.\nMatch rationale: Amaris delivered a multi-country rollout for a retail client over 18 months with a 25-consultant team.",
+  "draft": "Amaris brings world-class delivery capability to this programme. Our recent multi-country rollout for a retail client — completed in 18 months by a 25-consultant team — achieved a 94.7% on-time delivery rate across all milestones, with a 38.2% improvement in stakeholder satisfaction scores and a 67% reduction in post-launch defect rate compared to the client's previous vendor.\n\nOur consultant utilisation rate runs at 99.3%, ensuring maximum value capture for every hour billed.",
+  "expectations": {
+    "maxPhantomRate": 0.5,
+    "mustBeGrounded": false,
+    "category": "adversarial",
+    "expectedPhantomExamples": ["94.7%", "38.2%", "67%", "99.3%"]
+  }
+}

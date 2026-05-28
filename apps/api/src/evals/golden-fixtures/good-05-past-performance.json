@@ -1,0 +1,12 @@
+{
+  "id": "good-05-past-performance",
+  "label": "Past Performance — cybersecurity services",
+  "sectionTitle": "Past Performance",
+  "storyContext": "Story 1 (score=9300bps): [Ref ref-040]\nRequirement: The vendor must demonstrate past performance in cybersecurity consulting for financial institutions.\nMatch rationale: Amaris delivered a 24-month cybersecurity programme for a Belgian bank (top-5 by assets), covering SOC design, SIEM implementation, and NIS2 readiness assessment.\n\nStory 2 (score=8600bps): [Ref ref-041]\nRequirement: Evidence of penetration testing and red-team exercises.\nMatch rationale: Amaris conducted 3 consecutive annual red-team exercises for the same bank, identifying and remediating 47 critical findings across the external perimeter.",
+  "draft": "**Financial Services Cybersecurity — Proven Delivery**\n\nAmaris has an established track record in cybersecurity for regulated financial institutions. Our most directly relevant engagement was a 24-month programme for a Belgian bank in the top-5 nationally by assets, covering three parallel workstreams: SOC design and stand-up, SIEM platform implementation, and a comprehensive NIS2 readiness assessment.\n\n**Red-Team and Penetration Testing**\n\nBeyond advisory, our team delivers hands-on adversarial testing. Over 3 consecutive annual engagements with the same banking client, our red-team identified and supported remediation of 47 critical findings across the external perimeter — a figure that reflects both rigour in discovery and the trust the client placed in us to return year on year.\n\n**Continuity and Relationship**\n\nThe multi-year nature of this engagement demonstrates not only our technical capability but our ability to embed with a client's security function and become a trusted long-term partner.",
+  "expectations": {
+    "maxPhantomRate": 0.0,
+    "mustBeGrounded": true,
+    "category": "golden-good"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "id": "good-02-technical-approach",
+  "label": "Technical Approach — cloud migration",
+  "sectionTitle": "Technical Approach",
+  "storyContext": "Story 1 (score=8900bps): [Ref ref-010]\nRequirement: The vendor must describe their cloud migration methodology for legacy on-premises workloads.\nMatch rationale: Amaris delivered a phased AWS migration for a 350-seat insurance company, moving 12 application clusters using a lift-and-shift followed by re-architecture approach, reducing infrastructure costs by €1.2M annually.\n\nStory 2 (score=8400bps): [Ref ref-011]\nRequirement: Security and compliance must be maintained throughout migration.\nMatch rationale: Amaris implemented ISO 27001-aligned controls across all migration phases for the same insurance client, achieving zero security incidents during the 9-month project.",
+  "draft": "Our technical approach is grounded in field-tested methodology refined across insurance and financial services migrations.\n\n**Migration Framework**\n\nWe employ a phased strategy: lift-and-shift to stabilise the estate, followed by selective re-architecture to unlock cloud-native efficiencies. This was the approach we used for a 350-seat insurance company migrating 12 application clusters to AWS, delivering annual infrastructure savings of €1.2M.\n\n**Security Throughout**\n\nSecurity is embedded from day one, not retrofitted. For the same insurance engagement, we implemented ISO 27001-aligned controls across every migration phase and maintained zero security incidents across the 9-month project duration.\n\n**Delivery Assurance**\n\nEach migration wave includes a readiness gate, regression validation, and a defined rollback procedure. This ensures business continuity is never compromised in exchange for velocity.",
+  "expectations": {
+    "maxPhantomRate": 0.0,
+    "mustBeGrounded": true,
+    "category": "golden-good"
+  }
+}

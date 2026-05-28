@@ -1,0 +1,12 @@
+{
+  "id": "good-07-innovation-ai",
+  "label": "AI Innovation — intelligent automation",
+  "sectionTitle": "Innovation and AI Strategy",
+  "storyContext": "Story 1 (score=9000bps): [Ref ref-060]\nRequirement: The vendor must describe their AI and automation capabilities with examples.\nMatch rationale: Amaris built a GenAI-powered contract review assistant for a global logistics company, reducing average contract review time from 8 hours to 45 minutes per document, processing over 2,400 contracts in the pilot quarter.\n\nStory 2 (score=8500bps): [Ref ref-061]\nRequirement: The vendor must address governance and responsible AI in their innovation approach.\nMatch rationale: Amaris designed a responsible AI governance framework including mandatory human-in-the-loop review for all AI-generated outputs with legal or financial implications.",
+  "draft": "**AI That Delivers Measurable Outcomes**\n\nAmaris combines AI capability with responsible deployment practice. Our most concrete recent example: a GenAI-powered contract review assistant built for a global logistics company that reduced average per-document review time from 8 hours to 45 minutes, processing over 2,400 contracts during the pilot quarter.\n\n**Responsible AI by Design**\n\nEvery AI capability we deploy is paired with a governance framework that reflects its risk profile. For applications with legal or financial implications, we mandate human-in-the-loop review of all AI-generated outputs. This is not a compliance checkbox — it is a fundamental design principle that preserves accountability while enabling scale.\n\n**Applied to Your Context**\n\nWe will conduct an AI readiness assessment in the programme's first four weeks to identify the highest-value automation opportunities within your environment, prioritised by effort-to-impact ratio.",
+  "expectations": {
+    "maxPhantomRate": 0.0,
+    "mustBeGrounded": true,
+    "category": "golden-good"
+  }
+}

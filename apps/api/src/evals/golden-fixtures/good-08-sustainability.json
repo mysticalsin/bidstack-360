@@ -1,0 +1,12 @@
+{
+  "id": "good-08-sustainability",
+  "label": "Sustainability — ESG commitments",
+  "sectionTitle": "Sustainability and ESG Commitments",
+  "storyContext": "Story 1 (score=8400bps): [Ref ref-070]\nRequirement: The vendor must describe their ESG programme and carbon reduction targets.\nMatch rationale: Amaris achieved a 28% reduction in Scope 1 and 2 emissions between 2022 and 2024 through office energy efficiency measures and a business travel policy capping non-essential flights to 2 per consultant per year.\n\nStory 2 (score=7900bps): [Ref ref-071]\nRequirement: Evidence of social impact commitments.\nMatch rationale: Amaris ran a 6-month apprenticeship programme in 2024, placing 180 junior consultants from underrepresented backgrounds into client-facing roles.",
+  "draft": "**Environmental Commitments**\n\nAmaris takes a measurable approach to sustainability. Between 2022 and 2024, we achieved a 28% reduction in combined Scope 1 and 2 emissions — driven by office energy efficiency upgrades and a revised business travel policy that caps non-essential flights to 2 per consultant per year. These are not aspirational targets; they are verified outcomes from our annual carbon accounting process.\n\n**Social Impact**\n\nIn 2024, we ran a structured 6-month apprenticeship programme that placed 180 junior consultants from underrepresented backgrounds into client-facing roles. We view talent diversity as both an ethical obligation and a business advantage that brings broader perspective to client engagements.\n\n**Alignment with Your Programme**\n\nWe will work with your sustainability team to ensure this programme's carbon footprint is tracked from initiation, and that any digital waste generated (storage, compute) is offset through our carbon-neutral cloud provisioning commitments.",
+  "expectations": {
+    "maxPhantomRate": 0.0,
+    "mustBeGrounded": true,
+    "category": "golden-good"
+  }
+}

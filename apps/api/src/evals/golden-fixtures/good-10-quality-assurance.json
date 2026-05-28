@@ -1,0 +1,12 @@
+{
+  "id": "good-10-quality-assurance",
+  "label": "Quality Assurance — software testing",
+  "sectionTitle": "Quality Assurance Approach",
+  "storyContext": "Story 1 (score=9000bps): [Ref ref-090]\nRequirement: The vendor must describe their QA methodology and testing coverage standards.\nMatch rationale: Amaris built and operated a QA practice for a Scandinavian media group, achieving 87% automated test coverage across the core digital platform within 6 months, reducing production incidents by 62% year-on-year.\n\nStory 2 (score=8300bps): [Ref ref-091]\nRequirement: The vendor must provide performance testing and load testing capabilities.\nMatch rationale: Amaris conducted k6 load tests simulating 25,000 concurrent users for the same Scandinavian media group's streaming platform, identifying a 340ms bottleneck in the CDN routing layer that was eliminated before peak season.",
+  "draft": "**Test Automation at Scale**\n\nQuality is built in, not inspected in. For a Scandinavian media group, our QA practice achieved 87% automated test coverage across the core digital platform within 6 months of engagement — a level that enabled the client to cut production incidents by 62% year-on-year.\n\n**Performance and Load Testing**\n\nWe test for realistic peak loads, not laboratory conditions. For the same media group's streaming platform, we executed k6 load tests simulating 25,000 concurrent users. The test surfaced a 340ms routing bottleneck in the CDN layer that, had it reached peak season, would have degraded the experience for millions of viewers. The issue was eliminated pre-launch.\n\n**Quality Gates in Every Sprint**\n\nOur delivery model embeds quality gates at every sprint boundary: automated regression, exploratory testing, and performance benchmarking against baseline. Release to production requires all gates to be green — no exceptions.",
+  "expectations": {
+    "maxPhantomRate": 0.0,
+    "mustBeGrounded": true,
+    "category": "golden-good"
+  }
+}

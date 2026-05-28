@@ -1,0 +1,12 @@
+{
+  "id": "good-09-pricing",
+  "label": "Pricing Strategy — managed services",
+  "sectionTitle": "Pricing Strategy and Commercial Model",
+  "storyContext": "Story 1 (score=8600bps): [Ref ref-080]\nRequirement: The vendor must offer flexible commercial models including time-and-materials and fixed-price options.\nMatch rationale: Amaris structured a hybrid commercial model for a Dutch utilities company: fixed-price for well-scoped deliverables (Phase 1 discovery, Phase 3 go-live), time-and-materials for the iterative design phase, reducing client budget risk by €340K versus a fully fixed-price approach.\n\nStory 2 (score=7800bps): [Ref ref-081]\nRequirement: The vendor must demonstrate transparent cost management.\nMatch rationale: Amaris introduced a monthly cost dashboard visible to the client's CFO office throughout the Dutch utilities engagement, with weekly burn-rate alerts at 80% of any budget milestone.",
+  "draft": "**Commercial Flexibility**\n\nWe offer the full spectrum of commercial models and have the experience to recommend the right structure for each phase of your programme. For a Dutch utilities company, we designed a hybrid model that applied fixed-price discipline to well-scoped deliverables — Phase 1 discovery and Phase 3 go-live — while preserving time-and-materials flexibility during the iterative design phase. The result was a reduction of €340K in client budget risk compared to a fully fixed-price contract.\n\n**Radical Cost Transparency**\n\nCost surprises damage trust. Our approach is to eliminate them. Throughout the Dutch utilities engagement, we operated a monthly cost dashboard directly accessible to the client's CFO office, complemented by weekly burn-rate alerts triggered at 80% of any budget milestone. Finance had full visibility at all times.\n\n**For This Engagement**\n\nWe will propose a phase-appropriate commercial structure during contract negotiation, calibrated to your budget certainty requirements and the inherent scope variability of each workstream.",
+  "expectations": {
+    "maxPhantomRate": 0.0,
+    "mustBeGrounded": true,
+    "category": "golden-good"
+  }
+}
