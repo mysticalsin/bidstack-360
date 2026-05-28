@@ -27,7 +27,7 @@ preserve the existing API surface and pass typecheck + lint + tests.
 | 3   | `apps/web/src/components/dashboard/OrgDashboard.tsx`          | 1,403 | P2 ✅    | ~~Extract: widget components → `dashboard/widgets/` (one file per widget type); layout shell stays in `OrgDashboard.tsx`~~ **Done Wave 10**                                                                                                        |
 | 4   | `apps/web/src/pages/AuditLogPage.tsx`                         | 1,203 | P3 ✅    | ~~Extract: `audit-log/audit-log-types.ts`, `audit-log/audit-log-helpers.ts`, `audit-log/AuditLogHero.tsx`, `audit-log/AuditLogInsights.tsx`, `audit-log/AuditLogFilters.tsx`, `audit-log/AuditLogTable.tsx`~~ **Done Wave 10**                     |
 | 5   | `apps/web/src/pages/OpportunitiesPage.tsx`                    | 956   | P3 ✅    | ~~Extract: `OppInlineEditCells.tsx` (cells), `OpportunityRow.tsx` (row), `OppToolbar.tsx` (KPI bar + header + stage chips + bulk bar)~~ **Done Wave 10**                                                                                           |
-| 6   | `apps/api/src/routes/invoices.ts`                             | 933   | P3       | Extract: PDF-generation handler → `invoices.pdf.ts`; payment-link handler → `invoices.payment.ts`; CRUD stays in `invoices.ts`                                                                                                                     |
+| 6   | `apps/api/src/routes/invoices.ts`                             | 933   | P3 ✅    | ~~Extract: helpers + DB util → `invoices.helpers.ts`; streaming CSV + AR aging → `invoices.export.ts`; state transitions + payments → `invoices.payments.ts`; create + from-order → `invoices.mutations.ts`~~ **Done Wave 10**                     |
 | 7   | `apps/api/src/services/ai-assistant.service.ts`               | 916   | P3       | Extract: tool-call dispatch → `ai-assistant.tools.ts`; context-building → `ai-assistant.context.ts`; main orchestration stays                                                                                                                      |
 | 8   | `apps/web/src/pages/ContactsPage.tsx`                         | 872   | P3       | Extract: `ContactTable.tsx`, `ContactFilters.tsx`, `ContactImportModal.tsx`                                                                                                                                                                        |
 | 9   | `apps/api/src/routes/rfp-nocobase.ts`                         | 834   | P4       | Extract: RFP template logic → `rfp-templates.ts`; scoring → `rfp-scoring.ts`                                                                                                                                                                       |
@@ -113,6 +113,17 @@ preserve the existing API surface and pass typecheck + lint + tests.
 - `OpportunitiesPage.tsx` reduced from 956 → 338 lines (URL state, sort, bulk-selection, data-fetching, thead/tbody shell)
 - Import DAG is acyclic; OppInlineEditCells is the leaf, OpportunityRow imports from it, OppToolbar is independent, OpportunitiesPage imports all three
 - Typecheck ✅ Lint ✅ (0 errors, 0 new warnings)
+
+### `invoices.ts` — Wave 10 (2026-05-28)
+
+- Split 933-line monolith into 5 focused modules:
+  - `invoices.helpers.ts` (~185 lines) — Zod schemas (`ArAgingQuery`, `OptionalInvoiceTransitionBody`, `InvoiceUpdate`), pure utilities (`toPrismaState`, `isUniqueViolation`, `mintNextInvoiceNumber`, `resolveLineSubtotal`, `invoiceLineProductIds`, `loadInvoiceDetail`); leaf node, zero local imports
+  - `invoices.export.ts` (~180 lines) — streaming cursor-paginated CSV (`reply.hijack()`, 200-row batches, 10K hard cap) + 4-bucket AR-aging report sub-plugin
+  - `invoices.payments.ts` (~185 lines) — state transitions (`send`→`sent`, `cancel`→`cancelled` via shared for-loop), `/pay` (sets `paidAt` + mirrors `paidMicros`), `/payments` (partial payment with auto-pay) sub-plugin; fires `invoice.sent` / `invoice.paid` webhooks
+  - `invoices.mutations.ts` (~170 lines) — `POST /invoices` (5-attempt retry loop guarded by `isUniqueViolation`) + `POST /invoices/from-order/:orderId` (copy lines from confirmed/done sales order) sub-plugin
+- `invoices.ts` reduced from 933 → ~205 lines (`GET /invoices` list, `GET /invoices/:id` detail, `PATCH /invoices/:id`, and three sub-plugin registrations)
+- Import DAG is acyclic; `invoices.helpers.ts` is the leaf; all external callers unchanged via same `invoicesRoutes` named export
+- Typecheck ✅ Lint ✅ (0 errors, 0 warnings; fixed `Prisma` namespace as `import type`)
 
 ---
 
