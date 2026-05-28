@@ -35,8 +35,8 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
   app.get('/accounts/key', {
     schema: {
       querystring: z.object({
-        search: z.string().optional(),
-        industry: z.string().optional(),
+        search: z.string().max(200).optional(),
+        industry: z.string().max(100).optional(),
         ownerId: z.string().uuid().optional(),
       }),
       response: { 200: z.object({ items: z.array(KeyAccountResponse) }) },
@@ -122,8 +122,8 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
     schema: {
       querystring: z.object({
         limit: z.coerce.number().int().min(1).max(100).default(20),
-        search: z.string().optional(),
-        industry: z.string().optional(),
+        search: z.string().max(200).optional(),
+        industry: z.string().max(100).optional(),
       }),
       response: { 200: z.object({ items: z.array(TopAccountResponse) }) },
     },
@@ -164,11 +164,19 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
       ]);
 
       const contactMap = new Map(contacts.map((c) => [c.companyId, c._count.id]));
-      const oppMap = new Map<string, { totalValue: number; wonValue: number; openDeals: number; count: number }>();
+      const oppMap = new Map<
+        string,
+        { totalValue: number; wonValue: number; openDeals: number; count: number }
+      >();
 
       for (const o of opps) {
         if (!o.companyId) continue;
-        const existing = oppMap.get(o.companyId) ?? { totalValue: 0, wonValue: 0, openDeals: 0, count: 0 };
+        const existing = oppMap.get(o.companyId) ?? {
+          totalValue: 0,
+          wonValue: 0,
+          openDeals: 0,
+          count: 0,
+        };
         existing.totalValue += Number(o.valueMicros) / 1_000_000;
         existing.count += 1;
         if (o.stage === 'closed_won') {

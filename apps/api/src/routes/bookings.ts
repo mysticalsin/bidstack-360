@@ -252,7 +252,7 @@ export const bookingsRoutes: FastifyPluginAsyncZod = async (server) => {
         rateLimit: { max: 60, timeWindow: '1 minute' },
       },
       schema: {
-        params: z.object({ slug: z.string() }),
+        params: z.object({ slug: z.string().min(1).max(60) }),
         querystring: z.object({
           date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD'),
           tz: z.string().max(50).default('UTC'),
@@ -373,7 +373,7 @@ export const bookingsRoutes: FastifyPluginAsyncZod = async (server) => {
         rateLimit: { max: 5, timeWindow: '1 hour', keyGenerator: (req) => req.ip },
       },
       schema: {
-        params: z.object({ slug: z.string() }),
+        params: z.object({ slug: z.string().min(1).max(60) }),
         body: PublicBookingCreate,
         response: {
           201: z.object({

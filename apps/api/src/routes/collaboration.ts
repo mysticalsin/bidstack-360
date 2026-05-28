@@ -128,6 +128,8 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
           const users = await tx.user.findMany({
             where: { orgId: req.auth.orgId, name: { in: mentions } },
             select: { id: true },
+            // Cap so a 10k-char body with many @names can't cause a huge IN list
+            take: 50,
           });
           await tx.mention.createMany({
             data: users.map((u) => ({

@@ -60,7 +60,7 @@ export const ProposalSectionPatch = z.object({
 export const ProposalFilter = z.object({
   status: ProposalStatus.optional(),
   opportunityId: z.string().uuid().optional(),
-  search: z.string().optional(),
+  search: z.string().max(200).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
   offset: z.coerce.number().int().min(0).optional().default(0),
 });
