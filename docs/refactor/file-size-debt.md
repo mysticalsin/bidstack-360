@@ -20,20 +20,20 @@ preserve the existing API surface and pass typecheck + lint + tests.
 
 ## File inventory (descending size)
 
-| #   | File                                                          | Lines | Priority | Strategy                                                                                                                                                            |
-| --- | ------------------------------------------------------------- | ----- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `apps/api/src/services/crm/dashboard.service.ts`              | 1,752 | P1       | Extract: static widget defaults → `dashboard.defaults.ts`; company-enrichment logic → `company-enrichment.service.ts`; dashboard query fns → `dashboard.queries.ts` |
-| 2   | `apps/web/src/pages/IntegrationsPage.tsx`                     | 1,423 | P2       | Extract: per-integration panels → `integrations/` subfolder (one file per provider); shared `IntegrationCard` component                                             |
-| 3   | `apps/web/src/components/dashboard/OrgDashboard.tsx`          | 1,403 | P2       | Extract: widget components → `dashboard/widgets/` (one file per widget type); layout shell stays in `OrgDashboard.tsx`                                              |
-| 4   | `apps/web/src/pages/AuditLogPage.tsx`                         | 1,203 | P3       | Extract: `AuditLogTable.tsx`, `AuditLogFilters.tsx`, `AuditLogDetail.tsx`                                                                                           |
-| 5   | `apps/web/src/pages/OpportunitiesPage.tsx`                    | 956   | P3       | Extract: `OpportunityKanban.tsx`, `OpportunityFilters.tsx`, `OpportunityRow.tsx`                                                                                    |
-| 6   | `apps/api/src/routes/invoices.ts`                             | 933   | P3       | Extract: PDF-generation handler → `invoices.pdf.ts`; payment-link handler → `invoices.payment.ts`; CRUD stays in `invoices.ts`                                      |
-| 7   | `apps/api/src/services/ai-assistant.service.ts`               | 916   | P3       | Extract: tool-call dispatch → `ai-assistant.tools.ts`; context-building → `ai-assistant.context.ts`; main orchestration stays                                       |
-| 8   | `apps/web/src/pages/ContactsPage.tsx`                         | 872   | P3       | Extract: `ContactTable.tsx`, `ContactFilters.tsx`, `ContactImportModal.tsx`                                                                                         |
-| 9   | `apps/api/src/routes/rfp-nocobase.ts`                         | 834   | P4       | Extract: RFP template logic → `rfp-templates.ts`; scoring → `rfp-scoring.ts`                                                                                        |
-| 10  | `apps/api/src/routes/opportunities.ts`                        | 834   | P4       | Extract: stage-transition helpers → `opportunities.transitions.ts`                                                                                                  |
-| 11  | `apps/api/src/services/reports/sales-intelligence.service.ts` | 831   | P4       | Extract: chart data builders → `sales-intelligence.charts.ts`; summary builders → `sales-intelligence.summary.ts`                                                   |
-| 12  | `apps/api/src/routes/territories.ts`                          | 816   | P1 ✅    | ~~Extract `A2_TO_A3` → `lib/geo/iso-country-codes.ts`~~ **Done Wave 10**                                                                                            |
+| #   | File                                                          | Lines | Priority | Strategy                                                                                                                                                                                                                                           |
+| --- | ------------------------------------------------------------- | ----- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `apps/api/src/services/crm/dashboard.service.ts`              | 1,752 | P1 ✅    | ~~Split into 5 modules: dashboard.utils.ts / dashboard.defaults.ts / company-enrichment.service.ts / dashboard.cockpit.ts / dashboard.queries.ts~~ **Done Wave 10**                                                                                |
+| 2   | `apps/web/src/pages/IntegrationsPage.tsx`                     | 1,423 | P2 ✅    | ~~Split into 9 modules: types.ts / integration-helpers.ts / IntegrationAtoms.tsx / IntegrationHero.tsx / ConnectionRunway.tsx / WebhookEventsCard.tsx / ConnectionCommandCenter.tsx / ConnectionTester.tsx / DustAgentsCard.tsx~~ **Done Wave 10** |
+| 3   | `apps/web/src/components/dashboard/OrgDashboard.tsx`          | 1,403 | P2       | Extract: widget components → `dashboard/widgets/` (one file per widget type); layout shell stays in `OrgDashboard.tsx`                                                                                                                             |
+| 4   | `apps/web/src/pages/AuditLogPage.tsx`                         | 1,203 | P3       | Extract: `AuditLogTable.tsx`, `AuditLogFilters.tsx`, `AuditLogDetail.tsx`                                                                                                                                                                          |
+| 5   | `apps/web/src/pages/OpportunitiesPage.tsx`                    | 956   | P3       | Extract: `OpportunityKanban.tsx`, `OpportunityFilters.tsx`, `OpportunityRow.tsx`                                                                                                                                                                   |
+| 6   | `apps/api/src/routes/invoices.ts`                             | 933   | P3       | Extract: PDF-generation handler → `invoices.pdf.ts`; payment-link handler → `invoices.payment.ts`; CRUD stays in `invoices.ts`                                                                                                                     |
+| 7   | `apps/api/src/services/ai-assistant.service.ts`               | 916   | P3       | Extract: tool-call dispatch → `ai-assistant.tools.ts`; context-building → `ai-assistant.context.ts`; main orchestration stays                                                                                                                      |
+| 8   | `apps/web/src/pages/ContactsPage.tsx`                         | 872   | P3       | Extract: `ContactTable.tsx`, `ContactFilters.tsx`, `ContactImportModal.tsx`                                                                                                                                                                        |
+| 9   | `apps/api/src/routes/rfp-nocobase.ts`                         | 834   | P4       | Extract: RFP template logic → `rfp-templates.ts`; scoring → `rfp-scoring.ts`                                                                                                                                                                       |
+| 10  | `apps/api/src/routes/opportunities.ts`                        | 834   | P4       | Extract: stage-transition helpers → `opportunities.transitions.ts`                                                                                                                                                                                 |
+| 11  | `apps/api/src/services/reports/sales-intelligence.service.ts` | 831   | P4       | Extract: chart data builders → `sales-intelligence.charts.ts`; summary builders → `sales-intelligence.summary.ts`                                                                                                                                  |
+| 12  | `apps/api/src/routes/territories.ts`                          | 816   | P1 ✅    | ~~Extract `A2_TO_A3` → `lib/geo/iso-country-codes.ts`~~ **Done Wave 10**                                                                                                                                                                           |
 
 ---
 
@@ -45,27 +45,36 @@ preserve the existing API surface and pass typecheck + lint + tests.
 - `territories.ts` reduced from 816 → ~638 lines
 - No behaviour change; import updated to named export
 
+### `dashboard.service.ts` — Wave 10 (2026-05-28)
+
+- Split 1,752-line monolith into 5 focused modules:
+  - `dashboard.utils.ts` (~280 lines) — pure stateless helpers; leaf node
+  - `dashboard.defaults.ts` (~260 lines) — static constants + fallback factories
+  - `company-enrichment.service.ts` (~210 lines) — CrmCompany entity builders
+  - `dashboard.cockpit.ts` (~310 lines) — AccountCockpitSnapshot builder
+  - `dashboard.queries.ts` (~270 lines) — Prisma wrappers + buildCompanyCockpit
+- `dashboard.service.ts` reduced to ~370 lines (orchestration + backward-compat re-exports)
+- Import DAG is acyclic; all external callers unchanged via re-export block
+- Typecheck ✅ Lint ✅ (0 errors after auto-fix of type-import style)
+
+### `IntegrationsPage.tsx` — Wave 10 (2026-05-28)
+
+- Split 1,423-line monolith into 9 focused modules under `pages/integrations/`:
+  - `types.ts` (144 lines) — all shared TS interfaces + `MCP_TOOLS` constant
+  - `integration-helpers.ts` (211 lines) — pure functions: buildIntegrationSummary, webhookStatusTone, getPathDetail, defaultProbeUrl, readinessBadgeLabel, safeUrlPreview
+  - `IntegrationAtoms.tsx` (160 lines) — stateless UI atoms: Stat, ProbeHint, EndpointBox, SnippetBox, CopyButton, ProbeResultCard
+  - `IntegrationHero.tsx` (169 lines) — hero banner + metric cards
+  - `ConnectionRunway.tsx` (65 lines) — 4-step workflow cards
+  - `WebhookEventsCard.tsx` (114 lines) — webhook events table
+  - `ConnectionCommandCenter.tsx` (279 lines) — connection path navigator + detail panel
+  - `ConnectionTester.tsx` (190 lines) — endpoint probe UI
+  - `DustAgentsCard.tsx` (67 lines) — Dust agents list
+- `IntegrationsPage.tsx` reduced from 1,423 → 220 lines (queries + page layout only)
+- Import DAG is acyclic; typecheck ✅ Lint ✅ (0 errors, 0 new warnings)
+
 ---
 
-## Next up (P1)
-
-### `dashboard.service.ts` split plan
-
-```
-apps/api/src/services/crm/
-├── dashboard.service.ts          # orchestration only (~200 lines)
-├── dashboard.defaults.ts         # DEFAULT_WIDGETS + static company data
-├── dashboard.queries.ts          # all Prisma query functions
-└── company-enrichment.service.ts # company enrichment pipeline
-```
-
-**Pre-conditions:**
-
-1. Confirm no circular imports between the new modules.
-2. Read full file (all 1,752 lines) before splitting.
-3. Typecheck passes after extraction.
-
----
+## Next up (P2)
 
 ## Guiding principles for all splits
 
