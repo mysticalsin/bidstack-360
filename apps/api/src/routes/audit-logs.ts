@@ -40,7 +40,7 @@ export const auditLogsRoutes: FastifyPluginAsyncZod = async (server) => {
       const take = (accountId ? limit * SCAN_MULTIPLIER : limit) + 1;
       const rows = await prisma.auditLog.findMany({
         where,
-        include: { user: true },
+        include: { user: { select: { name: true, email: true } } },
         orderBy: { id: 'desc' },
         take,
         ...(cursor ? { cursor: { id: BigInt(cursor) }, skip: 1 } : {}),

@@ -9,12 +9,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import {
-  prisma,
-  type Prisma,
-  type Note as PrismaNote,
-  type User as PrismaUser,
-} from '@bidstack/db';
+import { prisma, type Prisma, type Note as PrismaNote } from '@bidstack/db';
 import {
   MeetingNotesImportRequest,
   MeetingNotesImportResponse,
@@ -35,7 +30,9 @@ import {
   asJsonObject,
 } from '../services/crm/notes.service';
 
-type NoteWithAuthor = PrismaNote & { author: PrismaUser | null };
+// WHY: only email is needed for the wire shape; fetching the whole User row
+// would include clerkId, settings, and other fields irrelevant to note display.
+type NoteWithAuthor = PrismaNote & { author: { email: string | null } | null };
 
 // accountId is a free-text tag, not a UUID FK. "Aritzia" and "aritzia"
 // should resolve to the same account so notes follow the user even if a
@@ -89,7 +86,7 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
       }
       const items = await prisma.note.findMany({
         where,
-        include: { author: true },
+        include: { author: { select: { email: true } } },
         // Pinned-first, then newest-first within each pinned group. The
         // composite index covers the (orgId, accountId) prefix; the in-memory
         // sort on `pinned` is cheap because limit ≤ 200.
@@ -120,7 +117,7 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
           bodyMd: req.body.bodyMd,
           pinned: req.body.pinned ?? false,
         },
-        include: { author: true },
+        include: { author: { select: { email: true } } },
       });
       return reply.code(201).send(serializeNote(created));
     },
@@ -175,7 +172,7 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
             bodyMd: req.body.bodyMd,
             pinned: true,
           },
-          include: { author: true },
+          include: { author: { select: { email: true } } },
         });
 
         const created = {
@@ -293,7 +290,7 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
         });
         return tx.note.findFirstOrThrow({
           where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
-          include: { author: true },
+          include: { author: { select: { email: true } } },
         });
       });
       return serializeNote(updated);

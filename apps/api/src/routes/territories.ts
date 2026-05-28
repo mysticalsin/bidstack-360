@@ -768,7 +768,19 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
         }
       }
 
-      const items = [...byCountry.values()].map((c) => ({
+      // WHY: sort on BigInt before converting to Number so aggregate values
+      // above ~$9B (9_000_000_000_000_000 micros) aren't silently reordered
+      // by IEEE-754 precision loss. Safe to do before the map because
+      // byCountry.values() is a plain JS iterator over our own Map.
+      const sorted = [...byCountry.values()].sort((a, b) =>
+        a.totalValueMicros > b.totalValueMicros
+          ? -1
+          : a.totalValueMicros < b.totalValueMicros
+            ? 1
+            : 0,
+      );
+
+      const items = sorted.map((c) => ({
         countryCode: c.countryCode,
         countryCodeA3: c.countryCodeA3,
         opportunityCount: c.opportunityCount,
@@ -782,8 +794,6 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
         territories: [...c.territories],
         ownerNames: [...c.ownerNames],
       }));
-
-      items.sort((a, b) => b.totalValueMicros - a.totalValueMicros);
 
       const totalOpportunities = items.reduce((s, i) => s + i.opportunityCount, 0);
       const totalValueMicros = items.reduce((s, i) => s + i.totalValueMicros, 0);
