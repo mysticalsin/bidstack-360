@@ -164,6 +164,13 @@ export function SalesOrdersPage() {
         </div>
       </div>
 
+      {/* sr-only live region — announces filter/search result count to AT */}
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {list.data
+          ? `${list.data.items.length} result${list.data.items.length === 1 ? '' : 's'}${list.data.nextCursor ? ' or more' : ''}`
+          : ''}
+      </p>
+
       {/* Result table */}
       <Card>
         <SectionHeader

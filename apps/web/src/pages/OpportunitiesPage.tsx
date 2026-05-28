@@ -235,6 +235,17 @@ export function OpportunitiesPage() {
     <div className="space-y-6">
       {!isLoading && data && data.items.length > 0 && <OppKpiBar opps={data.items} />}
 
+      {/* sr-only live region — announces filter/search result count to AT */}
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {!isLoading && data
+          ? search
+            ? `${data.items.length} opportunit${data.items.length === 1 ? 'y' : 'ies'} matching "${search}"`
+            : stageFilter
+              ? `${data.items.length} opportunit${data.items.length === 1 ? 'y' : 'ies'} in selected stage`
+              : `${data.items.length} opportunit${data.items.length === 1 ? 'y' : 'ies'}`
+          : ''}
+      </p>
+
       <OppPageHeader
         search={search}
         stageFilter={stageFilter}

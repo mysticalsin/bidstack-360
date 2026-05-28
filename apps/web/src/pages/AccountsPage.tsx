@@ -267,6 +267,11 @@ export function AccountsPage() {
         </div>
       </motion.section>
 
+      {/* sr-only live region — announces filter/search result count to AT */}
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {`${rows.length} account${rows.length === 1 ? '' : 's'}${search ? ` matching "${search}"` : ''}`}
+      </p>
+
       {rows.length === 0 ? (
         <EmptyState title="No accounts match your filters" />
       ) : (

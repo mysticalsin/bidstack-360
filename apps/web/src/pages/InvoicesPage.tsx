@@ -183,6 +183,11 @@ export function InvoicesPage() {
         />
       </div>
 
+      {/* sr-only live region — announces filter/search result count to AT */}
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {list.data ? `${items.length} invoice${items.length === 1 ? '' : 's'} found` : ''}
+      </p>
+
       {/* Table */}
       <Card>
         <SectionHeader title="Invoices" />

@@ -254,6 +254,13 @@ export function LeadsPage() {
         </section>
       ) : null}
 
+      {/* sr-only live region — announces filter/search result count to AT */}
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {!isLoading && !isError
+          ? `${items.length} lead${items.length === 1 ? '' : 's'}${deferredSearch ? ` matching "${deferredSearch}"` : ''}`
+          : ''}
+      </p>
+
       <BulkActionBar
         count={bulk.count}
         onExport={exportSelected}
