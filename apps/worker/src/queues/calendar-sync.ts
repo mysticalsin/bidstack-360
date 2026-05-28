@@ -21,11 +21,7 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 
 import { prisma } from '@bidstack/db';
-import {
-  CALENDAR_PUSH,
-  CALENDAR_PULL_INCREMENTAL,
-  CALENDAR_WATCH_RENEW,
-} from '@bidstack/shared';
+import { CALENDAR_PUSH, CALENDAR_PULL_INCREMENTAL, CALENDAR_WATCH_RENEW } from '@bidstack/shared';
 import { decryptToken } from '@bidstack/shared/token-crypto';
 
 // ─── Job data schemas ──────────────────────────────────────────────────────
@@ -203,7 +199,13 @@ export async function startCalendarSync(
             ? { id: raw['integrationTokenId'] as string }
             : {}),
         },
-        select: { id: true, orgId: true, userId: true, accessTokenEncrypted: true, deltaState: true },
+        select: {
+          id: true,
+          orgId: true,
+          userId: true,
+          accessTokenEncrypted: true,
+          deltaState: true,
+        },
       });
 
       for (const t of tokens) {
@@ -214,8 +216,7 @@ export async function startCalendarSync(
 
           // Renew if expiry is within 24h
           const shouldRenew =
-            !channelExpiry ||
-            new Date(channelExpiry).getTime() - Date.now() < 24 * 60 * 60 * 1000;
+            !channelExpiry || new Date(channelExpiry).getTime() - Date.now() < 24 * 60 * 60 * 1000;
 
           if (!shouldRenew) {
             childLog.debug({ tokenId: t.id }, 'Watch channel still valid; skipping renewal');
@@ -302,7 +303,10 @@ async function handleGooglePush({ event, operation, accessToken, log }: PushPara
     log.info({ eventId: event.id, googleId: json.id }, 'Created event in Google Calendar');
   } else if (operation === 'update') {
     if (!event.externalId) {
-      log.warn({ eventId: event.id }, 'Update requested but externalId is null; re-queuing as push');
+      log.warn(
+        { eventId: event.id },
+        'Update requested but externalId is null; re-queuing as push',
+      );
       await prisma.calendarEvent.update({
         where: { id: event.id },
         data: { syncState: 'PENDING_PUSH' },
@@ -345,7 +349,12 @@ async function handleGooglePush({ event, operation, accessToken, log }: PushPara
 
 // ─── Microsoft push ────────────────────────────────────────────────────────
 
-async function handleMicrosoftPush({ event, operation, accessToken, log }: PushParams): Promise<void> {
+async function handleMicrosoftPush({
+  event,
+  operation,
+  accessToken,
+  log,
+}: PushParams): Promise<void> {
   const baseUrl = 'https://graph.microsoft.com/v1.0/me/events';
   const headers = {
     Authorization: `Bearer ${accessToken}`,
@@ -687,9 +696,7 @@ async function upsertMicrosoftEvents(
           isCancelled: item.isCancelled ?? false,
           attendees,
           organizerEmail: item.organizer?.emailAddress?.address ?? null,
-          externalUpdatedAt: item.lastModifiedDateTime
-            ? new Date(item.lastModifiedDateTime)
-            : null,
+          externalUpdatedAt: item.lastModifiedDateTime ? new Date(item.lastModifiedDateTime) : null,
           etag: item['@odata.etag'] ?? null,
           syncState: 'SYNCED',
           lastSyncedAt: new Date(),
@@ -703,9 +710,7 @@ async function upsertMicrosoftEvents(
           isAllDay: item.isAllDay ?? false,
           isCancelled: item.isCancelled ?? false,
           attendees,
-          externalUpdatedAt: item.lastModifiedDateTime
-            ? new Date(item.lastModifiedDateTime)
-            : null,
+          externalUpdatedAt: item.lastModifiedDateTime ? new Date(item.lastModifiedDateTime) : null,
           etag: item['@odata.etag'] ?? null,
           syncState: 'SYNCED',
           lastSyncedAt: new Date(),
@@ -725,7 +730,6 @@ async function renewGoogleWatchChannel(
   log: pino.Logger,
 ): Promise<void> {
   const channelId = randomUUID();
-  // TODO: replace GOOGLE_WEBHOOK_URL with your actual push-notification endpoint
   const webhookUrl = process.env.GOOGLE_CALENDAR_WEBHOOK_URL ?? '';
 
   if (!webhookUrl) {
@@ -733,22 +737,19 @@ async function renewGoogleWatchChannel(
     return;
   }
 
-  const res = await fetch(
-    'https://www.googleapis.com/calendar/v3/calendars/primary/events/watch',
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        id: channelId,
-        type: 'web_hook',
-        address: webhookUrl,
-        expiration: String(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days in ms
-      }),
+  const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events/watch', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
     },
-  );
+    body: JSON.stringify({
+      id: channelId,
+      type: 'web_hook',
+      address: webhookUrl,
+      expiration: String(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days in ms
+    }),
+  });
 
   if (!res.ok) {
     const text = await res.text();

@@ -12,12 +12,14 @@
  */
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
+import type pino from 'pino';
 import { z } from 'zod';
 import { prisma, type Prisma } from '@bidstack/db';
 import { computeSlots, type AvailabilityRule, type BlockingEvent } from '@bidstack/shared';
 import { CALENDAR_PUSH } from '@bidstack/shared';
 import { Queue } from 'bullmq';
 import { redis } from '../redis.js';
+import { sendEmail } from '../services/email-integration.service.js';
 
 // ─── Zod schemas ──────────────────────────────────────────────────────────
 
@@ -98,7 +100,9 @@ export const bookingsRoutes: FastifyPluginAsyncZod = async (server) => {
         select: { id: true },
       });
       if (existing) {
-        throw server.httpErrors.conflict('A booking page with this slug already exists in your org');
+        throw server.httpErrors.conflict(
+          'A booking page with this slug already exists in your org',
+        );
       }
 
       const page = await prisma.bookingPage.create({
@@ -165,14 +169,28 @@ export const bookingsRoutes: FastifyPluginAsyncZod = async (server) => {
           ...(req.body.slug !== undefined ? { slug: req.body.slug } : {}),
           ...(req.body.name !== undefined ? { name: req.body.name } : {}),
           ...(req.body.description !== undefined ? { description: req.body.description } : {}),
-          ...(req.body.durationMinutes !== undefined ? { durationMinutes: req.body.durationMinutes } : {}),
-          ...(req.body.bufferBeforeMinutes !== undefined ? { bufferBeforeMinutes: req.body.bufferBeforeMinutes } : {}),
-          ...(req.body.bufferAfterMinutes !== undefined ? { bufferAfterMinutes: req.body.bufferAfterMinutes } : {}),
-          ...(req.body.minNoticeHours !== undefined ? { minNoticeHours: req.body.minNoticeHours } : {}),
-          ...(req.body.maxAdvanceDays !== undefined ? { maxAdvanceDays: req.body.maxAdvanceDays } : {}),
-          ...(req.body.availabilityRules !== undefined ? { availabilityRules: req.body.availabilityRules as Prisma.InputJsonValue } : {}),
+          ...(req.body.durationMinutes !== undefined
+            ? { durationMinutes: req.body.durationMinutes }
+            : {}),
+          ...(req.body.bufferBeforeMinutes !== undefined
+            ? { bufferBeforeMinutes: req.body.bufferBeforeMinutes }
+            : {}),
+          ...(req.body.bufferAfterMinutes !== undefined
+            ? { bufferAfterMinutes: req.body.bufferAfterMinutes }
+            : {}),
+          ...(req.body.minNoticeHours !== undefined
+            ? { minNoticeHours: req.body.minNoticeHours }
+            : {}),
+          ...(req.body.maxAdvanceDays !== undefined
+            ? { maxAdvanceDays: req.body.maxAdvanceDays }
+            : {}),
+          ...(req.body.availabilityRules !== undefined
+            ? { availabilityRules: req.body.availabilityRules as Prisma.InputJsonValue }
+            : {}),
           ...(req.body.isActive !== undefined ? { isActive: req.body.isActive } : {}),
-          ...(req.body.customQuestions !== undefined ? { customQuestions: req.body.customQuestions as Prisma.InputJsonValue } : {}),
+          ...(req.body.customQuestions !== undefined
+            ? { customQuestions: req.body.customQuestions as Prisma.InputJsonValue }
+            : {}),
           ...(req.body.redirectUrl !== undefined ? { redirectUrl: req.body.redirectUrl } : {}),
         },
         select: { id: true },
@@ -207,7 +225,14 @@ export const bookingsRoutes: FastifyPluginAsyncZod = async (server) => {
       const pages = await prisma.bookingPage.findMany({
         where: { orgId: req.auth.orgId, userId: req.auth.userId, deletedAt: null },
         orderBy: { createdAt: 'desc' },
-        select: { id: true, slug: true, name: true, isActive: true, durationMinutes: true, createdAt: true },
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          isActive: true,
+          durationMinutes: true,
+          createdAt: true,
+        },
       });
       return {
         items: pages.map((p) => ({
@@ -274,8 +299,7 @@ export const bookingsRoutes: FastifyPluginAsyncZod = async (server) => {
       }
 
       // Fetch existing events for the owner on that day (plus buffer time on each side)
-      const bufferMs =
-        Math.max(page.bufferBeforeMinutes, page.bufferAfterMinutes) * 60 * 1000;
+      const bufferMs = Math.max(page.bufferBeforeMinutes, page.bufferAfterMinutes) * 60 * 1000;
       const fetchStart = new Date(rangeStart.getTime() - bufferMs);
       const fetchEnd = new Date(rangeEnd.getTime() + bufferMs);
 
@@ -406,7 +430,11 @@ export const bookingsRoutes: FastifyPluginAsyncZod = async (server) => {
       });
 
       const allBlocking: BlockingEvent[] = [
-        ...blockingEvents.map((e) => ({ startAt: e.startAt, endAt: e.endAt, isAllDay: e.isAllDay })),
+        ...blockingEvents.map((e) => ({
+          startAt: e.startAt,
+          endAt: e.endAt,
+          isAllDay: e.isAllDay,
+        })),
         ...existingBookings.map((b) => ({ startAt: b.startAt, endAt: b.endAt, isAllDay: false })),
       ];
 
@@ -482,8 +510,25 @@ export const bookingsRoutes: FastifyPluginAsyncZod = async (server) => {
         server.log.warn({ err, bookingId: booking.id }, 'Failed to enqueue calendar push');
       }
 
-      // TODO: Send confirmation email to attendee + notification to owner
-      // (email service not yet wired — see Wire-up TODOs)
+      // Send confirmation email to attendee — fire-and-forget, fail-open.
+      // WHY: cancelToken must reach the attendee so they can cancel via the
+      // public link without needing an account. The token is never returned by
+      // authenticated list endpoints — the email is the only delivery channel.
+      void sendBookingConfirmationEmail(
+        {
+          orgId: page.user.orgId,
+          userId: page.userId,
+          attendeeName,
+          attendeeEmail,
+          ownerName: page.user.name ?? null,
+          pageName: page.name,
+          startAt: booking.startAt,
+          endAt: booking.endAt,
+          bookingId: booking.id,
+          cancelToken: booking.cancelToken,
+        },
+        server.log,
+      );
 
       return reply.code(201).send({
         bookingId: booking.id,
@@ -517,7 +562,12 @@ export const bookingsRoutes: FastifyPluginAsyncZod = async (server) => {
       // Validate by both id AND cancelToken — prevents enumeration attacks
       const booking = await prisma.booking.findFirst({
         where: { id, cancelToken: token, deletedAt: null },
-        select: { id: true, status: true, calendarEventId: true, bookingPage: { select: { userId: true, user: { select: { orgId: true } } } } },
+        select: {
+          id: true,
+          status: true,
+          calendarEventId: true,
+          bookingPage: { select: { userId: true, user: { select: { orgId: true } } } },
+        },
       });
 
       if (!booking) throw server.httpErrors.notFound('Booking not found or token invalid');
@@ -541,7 +591,10 @@ export const bookingsRoutes: FastifyPluginAsyncZod = async (server) => {
             operation: 'delete',
           });
         } catch (err) {
-          server.log.warn({ err, bookingId: booking.id }, 'Failed to enqueue calendar delete on cancel');
+          server.log.warn(
+            { err, bookingId: booking.id },
+            'Failed to enqueue calendar delete on cancel',
+          );
         }
       }
 
@@ -549,3 +602,155 @@ export const bookingsRoutes: FastifyPluginAsyncZod = async (server) => {
     },
   );
 };
+
+// ─── Booking confirmation email ────────────────────────────────────────────
+
+interface BookingEmailParams {
+  orgId: string;
+  userId: string;
+  attendeeName: string;
+  attendeeEmail: string;
+  ownerName: string | null;
+  pageName: string;
+  startAt: Date;
+  endAt: Date;
+  bookingId: string;
+  cancelToken: string;
+}
+
+/**
+ * Fire-and-forget confirmation email to the attendee.
+ * WHY fail-open: email failure must never block booking creation.
+ * WHY send via owner's integration: attendee has no account; owner's
+ * Gmail/Outlook connection is the only outbound email path available.
+ */
+// Minimum log surface needed — compatible with both pino.Logger and FastifyBaseLogger.
+type BookingLogger = Pick<pino.Logger, 'debug' | 'error' | 'info' | 'warn'>;
+
+async function sendBookingConfirmationEmail(
+  params: BookingEmailParams,
+  log: BookingLogger,
+): Promise<void> {
+  const appBaseUrl = process.env['APP_BASE_URL'] ?? 'https://app.bidstack.com';
+  const cancelUrl = `${appBaseUrl}/api/v1/public/bookings/${params.bookingId}/cancel?token=${params.cancelToken}`;
+  const firstName = params.attendeeName.split(' ')[0] ?? params.attendeeName;
+  const greeting = `Hi ${firstName},`;
+  const organizer = params.ownerName ?? 'your host';
+
+  try {
+    await sendEmail(
+      {
+        orgId: params.orgId,
+        userId: params.userId,
+        to: [{ email: params.attendeeEmail, name: params.attendeeName }],
+        subject: `Booking confirmed: ${params.pageName}`,
+        html: buildBookingConfirmationHtml({ greeting, organizer, cancelUrl, ...params }),
+        text: buildBookingConfirmationText({ greeting, organizer, cancelUrl, ...params }),
+        entityType: 'booking',
+        entityId: params.bookingId,
+      },
+      log,
+    );
+    log.info({ bookingId: params.bookingId }, 'bookings: confirmation email sent to attendee');
+  } catch (err) {
+    // WHY fail-open: email failure must never block booking creation.
+    log.warn(
+      { err, bookingId: params.bookingId },
+      'bookings: confirmation email failed (non-fatal)',
+    );
+  }
+}
+
+function buildBookingConfirmationHtml(
+  p: BookingEmailParams & { greeting: string; organizer: string; cancelUrl: string },
+): string {
+  const dateStr = p.startAt.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+  const startTime = p.startAt.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'UTC',
+    timeZoneName: 'short',
+  });
+  const endTime = p.endAt.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'UTC',
+    timeZoneName: 'short',
+  });
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /></head>
+<body style="margin:0;padding:0;font-family:system-ui,-apple-system,sans-serif;background:#f5f5f7">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f7;padding:40px 0">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;padding:48px 40px;max-width:560px">
+        <tr><td>
+          <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#0071e3;text-transform:uppercase;letter-spacing:0.06em">Confirmed</p>
+          <h1 style="margin:0 0 24px;font-size:24px;font-weight:700;color:#1d1d1f;letter-spacing:-0.02em">${p.pageName}</h1>
+          <p style="margin:0 0 8px;font-size:15px;color:#1d1d1f">${p.greeting}</p>
+          <p style="margin:0 0 28px;font-size:15px;color:#1d1d1f;line-height:1.6">
+            Your booking with <strong>${p.organizer}</strong> is confirmed.
+          </p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f7;border-radius:12px;padding:20px 24px;margin-bottom:28px">
+            <tr>
+              <td style="font-size:13px;color:#6e6e73;padding-bottom:8px">Date</td>
+              <td style="font-size:15px;font-weight:600;color:#1d1d1f;text-align:right;padding-bottom:8px">${dateStr}</td>
+            </tr>
+            <tr>
+              <td style="font-size:13px;color:#6e6e73">Time</td>
+              <td style="font-size:15px;font-weight:600;color:#1d1d1f;text-align:right">${startTime} – ${endTime}</td>
+            </tr>
+          </table>
+          <p style="margin:0 0 8px;font-size:13px;color:#6e6e73">
+            Need to cancel? Use the link below — no account required.
+          </p>
+          <a href="${p.cancelUrl}" style="font-size:13px;color:#6e6e73">${p.cancelUrl}</a>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+function buildBookingConfirmationText(
+  p: BookingEmailParams & { greeting: string; organizer: string; cancelUrl: string },
+): string {
+  const dateStr = p.startAt.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+  const startTime = p.startAt.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'UTC',
+    timeZoneName: 'short',
+  });
+  const endTime = p.endAt.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'UTC',
+    timeZoneName: 'short',
+  });
+  return [
+    p.greeting,
+    '',
+    `Your booking "${p.pageName}" with ${p.organizer} is confirmed.`,
+    '',
+    `Date: ${dateStr}`,
+    `Time: ${startTime} – ${endTime}`,
+    '',
+    'To cancel your booking, visit:',
+    p.cancelUrl,
+  ].join('\n');
+}
