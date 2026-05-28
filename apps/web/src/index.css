@@ -391,7 +391,22 @@ a {
    Dark-mode aesthetic utilities — MDM ROI Navigator glassmorphism
    ============================================================ */
 
-/* Violet → pink gradient text for headlines — animated flow */
+/* Violet → pink gradient text for headlines.
+   Light-mode: static gradient (contrast checked: violet on white passes 4.5:1).
+   Dark-mode rule below adds the infinite animation via higher specificity. */
+.gradient-text {
+  background: linear-gradient(
+    135deg,
+    var(--brand-gradient-start) 0%,
+    var(--brand-gradient-end) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* Animated flow variant — dark mode only */
 [data-theme='dark'] .gradient-text {
   background: linear-gradient(
     135deg,
@@ -1479,9 +1494,11 @@ a {
     color 0.12s,
     filter 0.12s,
     transform 0.12s;
-  height: 34px;
+  /* WHY: 44px minimum satisfies WCAG 2.5.5 (target size) + Apple HIG touch target rule.
+     Removing explicit height so padding drives the size on desktop while ensuring
+     the element never shrinks below the accessible floor on touch devices. */
+  min-height: 44px;
   white-space: nowrap;
-  min-height: 0;
 }
 .btn-primary {
   background: var(--brand-primary);
@@ -1739,8 +1756,6 @@ a {
   background: transparent;
   border: 0;
   padding: 0;
-  min-height: 0;
-  min-width: 0;
 }
 .link-arrow:hover {
   text-decoration: underline;
