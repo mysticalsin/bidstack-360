@@ -25,7 +25,7 @@ preserve the existing API surface and pass typecheck + lint + tests.
 | 1   | `apps/api/src/services/crm/dashboard.service.ts`              | 1,752 | P1 ✅    | ~~Split into 5 modules: dashboard.utils.ts / dashboard.defaults.ts / company-enrichment.service.ts / dashboard.cockpit.ts / dashboard.queries.ts~~ **Done Wave 10**                                                                                |
 | 2   | `apps/web/src/pages/IntegrationsPage.tsx`                     | 1,423 | P2 ✅    | ~~Split into 9 modules: types.ts / integration-helpers.ts / IntegrationAtoms.tsx / IntegrationHero.tsx / ConnectionRunway.tsx / WebhookEventsCard.tsx / ConnectionCommandCenter.tsx / ConnectionTester.tsx / DustAgentsCard.tsx~~ **Done Wave 10** |
 | 3   | `apps/web/src/components/dashboard/OrgDashboard.tsx`          | 1,403 | P2 ✅    | ~~Extract: widget components → `dashboard/widgets/` (one file per widget type); layout shell stays in `OrgDashboard.tsx`~~ **Done Wave 10**                                                                                                        |
-| 4   | `apps/web/src/pages/AuditLogPage.tsx`                         | 1,203 | P3       | Extract: `AuditLogTable.tsx`, `AuditLogFilters.tsx`, `AuditLogDetail.tsx`                                                                                                                                                                          |
+| 4   | `apps/web/src/pages/AuditLogPage.tsx`                         | 1,203 | P3 ✅    | ~~Extract: `audit-log/audit-log-types.ts`, `audit-log/audit-log-helpers.ts`, `audit-log/AuditLogHero.tsx`, `audit-log/AuditLogInsights.tsx`, `audit-log/AuditLogFilters.tsx`, `audit-log/AuditLogTable.tsx`~~ **Done Wave 10**                     |
 | 5   | `apps/web/src/pages/OpportunitiesPage.tsx`                    | 956   | P3       | Extract: `OpportunityKanban.tsx`, `OpportunityFilters.tsx`, `OpportunityRow.tsx`                                                                                                                                                                   |
 | 6   | `apps/api/src/routes/invoices.ts`                             | 933   | P3       | Extract: PDF-generation handler → `invoices.pdf.ts`; payment-link handler → `invoices.payment.ts`; CRUD stays in `invoices.ts`                                                                                                                     |
 | 7   | `apps/api/src/services/ai-assistant.service.ts`               | 916   | P3       | Extract: tool-call dispatch → `ai-assistant.tools.ts`; context-building → `ai-assistant.context.ts`; main orchestration stays                                                                                                                      |
@@ -91,6 +91,18 @@ preserve the existing API surface and pass typecheck + lint + tests.
 - `OrgDashboard.tsx` reduced from 1,403 → 357 lines (imports + orchestration + SourceStat)
 - Import DAG is acyclic; dashboard-types.ts is leaf with zero local imports
 - Typecheck ✅ Lint ✅ (0 errors, 0 new warnings from our changes)
+
+### `AuditLogPage.tsx` — Wave 10 (2026-05-28)
+
+- Split 1,203-line monolith into 6 focused modules under `pages/audit-log/`:
+  - `audit-log-types.ts` (131 lines) — shared TS types + constants; leaf node, zero local imports
+  - `audit-log-helpers.ts` (354 lines) — 28 pure functions + 3 explicit exported interfaces (AuditStats, EvidenceHealth, ActivityBucket)
+  - `AuditLogHero.tsx` (114 lines) — hero banner + 5 metric cards (AnimatedMetric)
+  - `AuditLogInsights.tsx` (152 lines) — activity cadence chart, forensic watchlist, evidence quality card
+  - `AuditLogFilters.tsx` (192 lines) — search bar, date range, target type, quick-filter buttons, export/refresh controls
+  - `AuditLogTable.tsx` (279 lines) — evidence stream table + co-located AuditRow with expand/collapse diff panel
+- `AuditLogPage.tsx` reduced from 1,203 → 144 lines (URL state + React Query + cursor pagination only)
+- Import DAG is acyclic; audit-log-types.ts is leaf; typecheck ✅ Lint ✅ (0 errors, 0 new warnings)
 
 ---
 
