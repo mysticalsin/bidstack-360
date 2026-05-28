@@ -105,10 +105,13 @@ export function validateTwilioVoiceSignature(
     .reduce((acc, key) => acc + key + (params[key] ?? ''), '');
   const message = callbackUrl + sortedParams;
 
-  const expected = createHmac('sha256', authToken).update(message).digest('base64');
+  const expected = createHmac('sha1', authToken).update(message).digest('base64');
 
   try {
-    return timingSafeEqual(Buffer.from(signature, 'base64'), Buffer.from(expected, 'base64'));
+    const expectedBuf = Buffer.from(expected, 'base64');
+    const signatureBuf = Buffer.from(signature, 'base64');
+    if (expectedBuf.length !== signatureBuf.length) return false;
+    return timingSafeEqual(expectedBuf, signatureBuf);
   } catch {
     return false;
   }
@@ -120,7 +123,9 @@ export function validateTwilioVoiceSignature(
  * Initiates an outbound voice call via Twilio REST.
  * Twilio dials `toNumber` and fetches TwiML from `twimlUrl` to drive the call.
  */
-export async function initiateVoiceCall(params: TwilioVoiceCallParams): Promise<TwilioCallResponse> {
+export async function initiateVoiceCall(
+  params: TwilioVoiceCallParams,
+): Promise<TwilioCallResponse> {
   const accountSid = requireEnv('TWILIO_ACCOUNT_SID');
   const fromNumber = params.fromNumber ?? requireEnv('TWILIO_VOICE_PHONE_NUMBER');
 
@@ -138,17 +143,14 @@ export async function initiateVoiceCall(params: TwilioVoiceCallParams): Promise<
     RecordingChannels: 'dual',
   });
 
-  const resp = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: twilioAuthHeader(),
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: formData.toString(),
+  const resp = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`, {
+    method: 'POST',
+    headers: {
+      Authorization: twilioAuthHeader(),
+      'Content-Type': 'application/x-www-form-urlencoded',
     },
-  );
+    body: formData.toString(),
+  });
 
   if (!resp.ok) {
     const text = await resp.text();
