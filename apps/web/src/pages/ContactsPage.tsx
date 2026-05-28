@@ -1,26 +1,14 @@
-import { motion } from 'framer-motion';
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useDeferredValue, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { ContactCsvImportDialog } from '@/components/contact/ContactCsvImportDialog';
 import { ContactDialog } from '@/components/contact/ContactDialog';
 import { ContactQuickLook } from '@/components/contact/ContactQuickLook';
-import {
-  InlineEditNumber,
-  InlineEditSelect,
-  InlineEditText,
-} from '@/components/opportunity/InlineEdit';
-import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { BulkActionBar } from '@/components/ui/BulkActionBar';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { Icon } from '@/components/ui/Icon';
 import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
-import { SortableHeader, getSortableHeaderAriaSort } from '@/components/ui/SortableHeader';
-import { SpotlightTable, SpotlightTableRow } from '@/components/ui/SpotlightTable';
-import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import {
   useContacts,
@@ -31,22 +19,12 @@ import {
 import { useTableSort } from '@/hooks/useTableSort';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { pushUndo } from '@/stores/undoStack';
-import type { Contact, Sentiment } from '@bidstack/shared';
+import type { Contact } from '@bidstack/shared';
 
-const SENTIMENT_TONE: Record<Sentiment, BadgeTone> = {
-  hot: 'tomato',
-  warm: 'amber',
-  neutral: 'gray',
-  cold: 'blue',
-};
-
-// Module-level constants avoid creating new arrays inside render (stable identity for memoization).
-const SENTIMENT_OPTS = [
-  { value: 'hot' as Sentiment, label: 'Hot' },
-  { value: 'warm' as Sentiment, label: 'Warm' },
-  { value: 'neutral' as Sentiment, label: 'Neutral' },
-  { value: 'cold' as Sentiment, label: 'Cold' },
-];
+import { ContactContextMenu } from './contacts/ContactContextMenu';
+import { ContactTable } from './contacts/ContactTable';
+import type { ContactSortKey, ContactSortState } from './contacts/ContactTable';
+import { useContactsKeyboard } from './contacts/useContactsKeyboard';
 
 export function ContactsPage() {
   const [search, setSearch] = useState('');
@@ -62,8 +40,7 @@ export function ContactsPage() {
   // the whole table; onMutate fans across every cached contacts list.
   const updateContact = useUpdateContact();
   // Undo path: re-creates the contact from the snapshot we still have in
-  // memory after a successful delete. Server treats it as a fresh insert
-  // and the audit log captures both events — that's the truth.
+  // memory after a successful delete.
   const createContact = useCreateContact();
 
   // Memoize so its array identity is stable across renders — the
@@ -87,11 +64,8 @@ export function ContactsPage() {
   // Persist sort in the URL so a sorted view is back/forward-navigable and
   // shareable. "?sort=name.asc" → key=name, dir=asc. Default (unsorted)
   // omits the param so plain "/contacts" stays clean.
-  type ContactSortKey = keyof typeof accessors;
   const [searchParams, setSearchParams] = useSearchParams();
-  const parseSortParam = (
-    raw: string | null,
-  ): { key: ContactSortKey | null; dir: 'asc' | 'desc' | null } => {
+  const parseSortParam = (raw: string | null): ContactSortState => {
     if (!raw) return { key: null, dir: null };
     const [k, d] = raw.split('.');
     if (!k || !d) return { key: null, dir: null };
@@ -100,7 +74,7 @@ export function ContactsPage() {
     return { key: k as ContactSortKey, dir: d };
   };
   const sortState = parseSortParam(searchParams.get('sort'));
-  const setSortState = (next: { key: ContactSortKey | null; dir: 'asc' | 'desc' | null }) => {
+  const setSortState = (next: ContactSortState) => {
     const params = new URLSearchParams(searchParams);
     if (!next.key || !next.dir) params.delete('sort');
     else params.set('sort', `${next.key}.${next.dir}`);
@@ -141,8 +115,8 @@ export function ContactsPage() {
     [items, selectedIds],
   );
 
-  // Right-click context menu. Coordinates are viewport-relative; the
-  // menu closes on click-away, Escape, or pick.
+  // Right-click context menu. Coordinates are viewport-relative; the menu
+  // closes on click-away, Escape, or pick.
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -152,14 +126,8 @@ export function ContactsPage() {
   // macOS-style Quick Look — Space on a focused row peeks the record.
   const [quickLook, setQuickLook] = useState<Contact | null>(null);
 
-  // Vim-style keyboard cursor. `cursorIdx` points at the row that's
-  // visually highlighted; j/k (or arrows) move it, Enter opens the edit
-  // dialog, x toggles selection. None of this fires when the user is
-  // typing in a field. -1 means "no row focused" (initial state).
-  //
-  // We reset the cursor when the visible list changes (search/sort)
-  // using the "compare-prev-during-render" pattern instead of a
-  // setState-in-effect — React documents this as the canonical way to
+  // Vim-style keyboard cursor. Reset when the visible list changes (search/sort)
+  // using the "compare-prev-during-render" pattern — React's canonical way to
   // derive resettable state without cascading renders.
   const [cursorIdx, setCursorIdx] = useState(-1);
   const [prevItems, setPrevItems] = useState(items);
@@ -168,71 +136,16 @@ export function ContactsPage() {
     setCursorIdx(-1);
   }
 
-  // Tracks a pending `g` press for the `gg` chord (jump to top). The global
-  // chord nav (gd/go/gp/…) also starts on `g`, but those second keys never
-  // collide with `g` itself, so coexistence is safe.
-  const pendingG = useRef<number | null>(null);
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      // ⌘E / Ctrl+E opens the edit dialog for the cursor row. Allowed
-      // even when modifier keys are otherwise reserved — this is the
-      // explicit "edit" shortcut.
-      if ((e.metaKey || e.ctrlKey) && e.key === 'e' && cursorIdx >= 0) {
-        e.preventDefault();
-        const row = items[cursorIdx];
-        if (row) setEditTarget(row);
-        return;
-      }
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const targetEl = e.target as HTMLElement | null;
-      const tag = targetEl?.tagName;
-      const inField =
-        tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || targetEl?.isContentEditable;
-      if (inField) return;
-      if (items.length === 0) return;
-      if (e.key === 'j' || e.key === 'ArrowDown') {
-        e.preventDefault();
-        setCursorIdx((i) => Math.min(items.length - 1, i < 0 ? 0 : i + 1));
-      } else if (e.key === 'k' || e.key === 'ArrowUp') {
-        e.preventDefault();
-        setCursorIdx((i) => Math.max(0, i < 0 ? 0 : i - 1));
-      } else if (e.key === 'Enter' && cursorIdx >= 0) {
-        e.preventDefault();
-        const row = items[cursorIdx];
-        if (row) setEditTarget(row);
-      } else if (e.key === 'x' && cursorIdx >= 0) {
-        e.preventDefault();
-        const row = items[cursorIdx];
-        if (row) toggleOne(row.id);
-      } else if (e.key === ' ' && cursorIdx >= 0) {
-        // Space = Quick Look toggle. If a peek is already open, close it.
-        e.preventDefault();
-        if (quickLook) {
-          setQuickLook(null);
-        } else {
-          const row = items[cursorIdx];
-          if (row) setQuickLook(row);
-        }
-      } else if (e.key === 'g') {
-        // First or second half of `gg`. ~900ms window matches the global
-        // chord-nav window for consistency.
-        const now = Date.now();
-        if (pendingG.current && now - pendingG.current < 900) {
-          e.preventDefault();
-          pendingG.current = null;
-          setCursorIdx(0);
-        } else {
-          pendingG.current = now;
-        }
-      } else if (e.key === 'G') {
-        // Shift+g — jump to the bottom of the visible list.
-        e.preventDefault();
-        setCursorIdx(items.length - 1);
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [items, cursorIdx, quickLook]);
+  // j/k navigation, gg/G chords, Enter/x/Space shortcuts — see useContactsKeyboard.
+  useContactsKeyboard({
+    items,
+    cursorIdx,
+    setCursorIdx,
+    setEditTarget,
+    toggleOne,
+    quickLook,
+    setQuickLook,
+  });
 
   const bulkDelete = async () => {
     if (selectedContacts.length === 0) return;
@@ -255,9 +168,7 @@ export function ContactsPage() {
       ),
     );
     if (failed === 0) {
-      // Same undo body used by both the toast button and the global ⌘Z
-      // shortcut. Kept inline rather than extracted so the snapshot
-      // closure stays a normal binding.
+      // Same undo body used by both the toast button and the global ⌘Z shortcut.
       const undoBulk = () => {
         for (const c of snapshot) {
           createContact.mutate({
@@ -314,11 +225,9 @@ export function ContactsPage() {
     if (!ok) return;
     try {
       await del.mutateAsync(c.id);
-      // Apple-style "Undo" path: recreating the contact through useCreateContact
-      // is the safest restore — we already have the full record in memory and
-      // the server treats it as a fresh insert (audit log captures both the
-      // delete and the recreate, which is the truth).
-      // Same body used by both the toast button and the global ⌘Z hotkey.
+      // Apple-style "Undo": recreating through useCreateContact is the safest
+      // restore — we have the full record in memory and the audit log captures
+      // both the delete and the recreate.
       const undoSingle = () => {
         createContact.mutate(
           {
@@ -425,269 +334,31 @@ export function ContactsPage() {
         </div>
       </div>
 
-      {/* aria-live region — announces filter / sort result counts to
-          screen readers. Visually hidden; updates only when the count
-          actually changes so SR doesn't fire on every keystroke. */}
-      <p className="sr-only" role="status" aria-live="polite">
-        {search ? (
-          <>
-            Showing {items.length} of {raw.length} contacts matching {search}.
-          </>
-        ) : (
-          <>Showing {items.length} contacts.</>
-        )}
-      </p>
-
-      <Card className="overflow-hidden">
-        {isLoading ? (
-          <TableSkeleton rows={8} columns={8} headless />
-        ) : isError ? (
-          <ErrorState
-            title="Could not load contacts"
-            message={error instanceof Error ? error.message : undefined}
-            action={
-              <Button size="sm" variant="secondary" onClick={() => refetch()}>
-                Try again
-              </Button>
-            }
-          />
-        ) : items.length === 0 ? (
-          <EmptyState
-            title={search ? 'No matches' : 'No contacts yet'}
-            message={
-              search
-                ? `Nothing matched "${search}".`
-                : 'Add the first decision-maker to start mapping the buying group.'
-            }
-            action={
-              search ? (
-                <Button size="sm" variant="secondary" onClick={() => setSearch('')}>
-                  Clear search
-                </Button>
-              ) : (
-                <ContactDialog
-                  trigger={
-                    <Button size="sm" variant="primary">
-                      Add first contact
-                    </Button>
-                  }
-                />
-              )
-            }
-          />
-        ) : (
-          <SpotlightTable
-            query={deferredSearch}
-            minWidth={980}
-            className="[&_tr[data-selected=true]]:bg-[var(--brand-primary-tint)]/60"
-          >
-            <thead>
-              <tr>
-                <th scope="col" className="w-10 px-5 py-3">
-                  <label className="table-checkbox-hit">
-                    <span className="sr-only">
-                      {allSelected ? 'Deselect all contacts' : 'Select all contacts'}
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      ref={(el) => {
-                        // `indeterminate` is a DOM property, not an HTML attribute,
-                        // so React can't set it declaratively. Ref callback fires
-                        // on every commit, which is exactly when we want to sync.
-                        if (el) el.indeterminate = someSelected;
-                      }}
-                      onChange={toggleAll}
-                      className="cursor-pointer accent-[var(--brand-primary)]"
-                    />
-                  </label>
-                </th>
-                <th
-                  scope="col"
-                  aria-sort={getSortableHeaderAriaSort('name', sortState)}
-                  className="px-5 py-3 font-semibold"
-                >
-                  <SortableHeader columnKey="name" state={sortState} onChange={setSortState}>
-                    Name
-                  </SortableHeader>
-                </th>
-                <th
-                  scope="col"
-                  aria-sort={getSortableHeaderAriaSort('role', sortState)}
-                  className="px-5 py-3 font-semibold"
-                >
-                  <SortableHeader columnKey="role" state={sortState} onChange={setSortState}>
-                    Role
-                  </SortableHeader>
-                </th>
-                <th
-                  scope="col"
-                  aria-sort={getSortableHeaderAriaSort('customer', sortState)}
-                  className="px-5 py-3 font-semibold"
-                >
-                  <SortableHeader columnKey="customer" state={sortState} onChange={setSortState}>
-                    Customer
-                  </SortableHeader>
-                </th>
-                <th scope="col" className="px-5 py-3 font-semibold">
-                  Contact
-                </th>
-                <th
-                  scope="col"
-                  aria-sort={getSortableHeaderAriaSort('influence', sortState)}
-                  className="px-5 py-3 font-semibold"
-                >
-                  <SortableHeader columnKey="influence" state={sortState} onChange={setSortState}>
-                    Influence
-                  </SortableHeader>
-                </th>
-                <th
-                  scope="col"
-                  aria-sort={getSortableHeaderAriaSort('sentiment', sortState)}
-                  className="px-5 py-3 font-semibold"
-                >
-                  <SortableHeader columnKey="sentiment" state={sortState} onChange={setSortState}>
-                    Sentiment
-                  </SortableHeader>
-                </th>
-                <th scope="col" className="px-5 py-3 text-right font-semibold">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border-subtle)]">
-              {items.map((c, i) => (
-                <SpotlightTableRow
-                  key={c.id}
-                  query={deferredSearch}
-                  searchableText={`${c.name} ${c.role ?? ''} ${c.customer} ${c.email ?? ''} ${c.phone ?? ''} ${c.sentiment ?? ''}`}
-                  className="group relative data-[cursor=true]:bg-[var(--surface-sunken)] data-[cursor=true]:shadow-[inset_3px_0_0_var(--brand-primary)]"
-                  data-selected={selectedIds.has(c.id) ? 'true' : undefined}
-                  data-cursor={i === cursorIdx ? 'true' : undefined}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    setContextMenu({ x: e.clientX, y: e.clientY, contact: c });
-                  }}
-                >
-                  <td className="w-10 px-5 py-3">
-                    <label className="table-checkbox-hit">
-                      <span className="sr-only">
-                        {selectedIds.has(c.id) ? `Deselect ${c.name}` : `Select ${c.name}`}
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(c.id)}
-                        onChange={() => toggleOne(c.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="cursor-pointer accent-[var(--brand-primary)]"
-                      />
-                    </label>
-                  </td>
-                  <td className="px-5 py-3">
-                    <Link
-                      to={`/contacts/${c.id}`}
-                      className="rounded font-medium text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
-                    >
-                      {c.name}
-                    </Link>
-                  </td>
-                  {/* A2 — role is inline-editable: click cell to enter text, blur/Enter commits. */}
-                  <td className="px-5 py-3 text-[var(--fg-secondary)]">
-                    <InlineEditText
-                      value={c.role ?? ''}
-                      onSave={(next) =>
-                        updateContact.mutate({ id: c.id, patch: { role: next || null } })
-                      }
-                      label={`Edit role for ${c.name}`}
-                      placeholder="Add role…"
-                      display={(v) => v || <span className="text-[var(--fg-tertiary)]">—</span>}
-                    />
-                  </td>
-                  <td className="px-5 py-3 text-[var(--fg-secondary)]">{c.customer}</td>
-                  <td className="px-5 py-3 text-[var(--fg-secondary)]">
-                    <div className="flex flex-col">
-                      {c.email ? (
-                        <a
-                          href={`mailto:${c.email}`}
-                          className="rounded text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
-                        >
-                          {c.email}
-                        </a>
-                      ) : null}
-                      {c.phone ? (
-                        <span className="text-xs text-[var(--fg-tertiary)]">{c.phone}</span>
-                      ) : null}
-                      {!c.email && !c.phone ? '—' : null}
-                    </div>
-                  </td>
-                  {/* A2 — influence (1–5) is inline-editable. */}
-                  <td className="px-5 py-3 tabular-nums text-[var(--fg-primary)]">
-                    <InlineEditNumber
-                      value={c.influence ?? 0}
-                      min={0}
-                      max={5}
-                      step={1}
-                      onSave={(next) =>
-                        updateContact.mutate({
-                          id: c.id,
-                          patch: { influence: next === 0 ? null : next },
-                        })
-                      }
-                      label={`Edit influence for ${c.name}`}
-                      display={(v) =>
-                        v ? `${v}/5` : <span className="text-[var(--fg-tertiary)]">—</span>
-                      }
-                    />
-                  </td>
-                  {/* A2 — sentiment is inline-editable via select. Read mode shows the badge. */}
-                  <td className="px-5 py-3">
-                    <InlineEditSelect
-                      value={c.sentiment ?? ''}
-                      options={[{ value: '' as Sentiment, label: '—' }, ...SENTIMENT_OPTS]}
-                      onSave={(next) =>
-                        updateContact.mutate({
-                          id: c.id,
-                          patch: { sentiment: (next as Sentiment) || null },
-                        })
-                      }
-                      label={`Edit sentiment for ${c.name}`}
-                      display={(v) =>
-                        v ? (
-                          <Badge tone={SENTIMENT_TONE[v as Sentiment]}>{v}</Badge>
-                        ) : (
-                          <span className="text-[var(--fg-tertiary)]">—</span>
-                        )
-                      }
-                    />
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    <div className="inline-flex items-center gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setEditTarget(c)}
-                        aria-label={`Edit ${c.name}`}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => onDelete(c)}
-                        disabled={del.isPending}
-                        aria-label={`Delete ${c.name}`}
-                        className="text-[var(--danger)] hover:text-[var(--danger)]"
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </td>
-                </SpotlightTableRow>
-              ))}
-            </tbody>
-          </SpotlightTable>
-        )}
-      </Card>
+      {/* aria-live region + data table — extracted to ContactTable for size. */}
+      <ContactTable
+        items={items}
+        raw={raw}
+        search={search}
+        setSearch={setSearch}
+        deferredSearch={deferredSearch}
+        isLoading={isLoading}
+        isError={isError}
+        error={error}
+        refetch={refetch}
+        cursorIdx={cursorIdx}
+        selectedIds={selectedIds}
+        allSelected={allSelected}
+        someSelected={someSelected}
+        toggleOne={toggleOne}
+        toggleAll={toggleAll}
+        sortState={sortState}
+        setSortState={setSortState}
+        updateContact={updateContact}
+        del={del}
+        setEditTarget={setEditTarget}
+        onDelete={onDelete}
+        setContextMenu={setContextMenu}
+      />
 
       {/* Controlled edit dialog — single instance, re-seeded by the
           ContactDialog's open effect when editTarget changes. */}
@@ -720,153 +391,5 @@ export function ContactsPage() {
         />
       ) : null}
     </div>
-  );
-}
-
-// Apple-style right-click menu. Positioned at the click coordinates and
-// clamped to the viewport so it never overflows. Closes on click-away,
-// Escape, or scroll — the latter prevents the menu from drifting away
-// from its anchor.
-//
-// WAI-ARIA Menu pattern (ARIA 1.2 §menu):
-//   - role="menu" on the <ul>, role="menuitem" on each <button>.
-//   - First item receives focus automatically on mount.
-//   - ArrowDown / ArrowUp moves focus between items (wraps around).
-//   - Home / End jumps to first / last item.
-//   - Tab / Shift+Tab closes the menu (WAI-ARIA menu-button pattern).
-//   - Escape closes via the document-level listener below.
-function ContactContextMenu({
-  x,
-  y,
-  contact,
-  onClose,
-  onEdit,
-  onDelete,
-}: {
-  x: number;
-  y: number;
-  contact: Contact;
-  onClose: () => void;
-  onEdit: (c: Contact) => void;
-  onDelete: (c: Contact) => void;
-}) {
-  const menuRef = useRef<HTMLUListElement>(null);
-
-  // Move focus to the first menu item when the menu mounts so keyboard
-  // users don't have to Tab into the menu manually.
-  useEffect(() => {
-    const first = menuRef.current?.querySelector<HTMLElement>('[role=menuitem]');
-    first?.focus();
-  }, []);
-
-  useEffect(() => {
-    const close = (e: MouseEvent | KeyboardEvent) => {
-      if (e instanceof KeyboardEvent && e.key !== 'Escape') return;
-      onClose();
-    };
-    document.addEventListener('mousedown', close);
-    document.addEventListener('keydown', close);
-    window.addEventListener('scroll', onClose, true);
-    return () => {
-      document.removeEventListener('mousedown', close);
-      document.removeEventListener('keydown', close);
-      window.removeEventListener('scroll', onClose, true);
-    };
-  }, [onClose]);
-
-  // Clamp to viewport — assume a 200×200 menu, never let the click open
-  // a menu that immediately falls off-screen.
-  const MENU_W = 220;
-  const MENU_H = 200;
-  const left = Math.min(x, window.innerWidth - MENU_W - 8);
-  const top = Math.min(y, window.innerHeight - MENU_H - 8);
-
-  const copy = (text: string, label: string) => {
-    void navigator.clipboard.writeText(text).then(
-      () => toast.success(`Copied ${label}`, { duration: 1500 }),
-      () => toast.error('Copy failed'),
-    );
-    onClose();
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLUListElement>) => {
-    const menuitems = Array.from(
-      menuRef.current?.querySelectorAll<HTMLElement>('[role=menuitem]') ?? [],
-    );
-    if (menuitems.length === 0) return;
-    const idx = menuitems.indexOf(document.activeElement as HTMLElement);
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      menuitems[(idx + 1) % menuitems.length]?.focus();
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      menuitems[(idx - 1 + menuitems.length) % menuitems.length]?.focus();
-    } else if (e.key === 'Home') {
-      e.preventDefault();
-      menuitems[0]?.focus();
-    } else if (e.key === 'End') {
-      e.preventDefault();
-      menuitems[menuitems.length - 1]?.focus();
-    } else if (e.key === 'Tab') {
-      // Tab and Shift+Tab both close the menu per the WAI-ARIA menu-button
-      // pattern — focus falls through to the next naturally focusable element.
-      e.preventDefault();
-      onClose();
-    }
-    // Escape is handled by the document-level keydown listener above.
-  };
-
-  return (
-    <motion.ul
-      ref={menuRef}
-      role="menu"
-      aria-label={`Actions for ${contact.name}`}
-      onKeyDown={handleKeyDown}
-      initial={{ opacity: 0, scale: 0.96 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ type: 'spring', stiffness: 280, damping: 26 }}
-      style={{ left, top }}
-      className="fixed z-[200] w-[220px] overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] py-1 text-sm shadow-[var(--shadow-lg)]"
-      // Catch clicks inside so the document-level mousedown doesn't close
-      // the menu before the item's onClick fires.
-      onMouseDown={(e) => e.stopPropagation()}
-    >
-      <ContextItem onClick={() => onEdit(contact)}>Edit contact</ContextItem>
-      {contact.email ? (
-        <ContextItem onClick={() => copy(contact.email!, 'email')}>Copy email</ContextItem>
-      ) : null}
-      {contact.phone ? (
-        <ContextItem onClick={() => copy(contact.phone!, 'phone')}>Copy phone</ContextItem>
-      ) : null}
-      <ContextItem onClick={() => onDelete(contact)} tone="danger">
-        Delete contact
-      </ContextItem>
-    </motion.ul>
-  );
-}
-
-function ContextItem({
-  onClick,
-  tone,
-  children,
-}: {
-  onClick: () => void;
-  tone?: 'danger';
-  children: React.ReactNode;
-}) {
-  return (
-    <li role="none">
-      <button
-        type="button"
-        role="menuitem"
-        onClick={onClick}
-        className={`flex w-full items-center px-3 py-1.5 text-left hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)] ${
-          tone === 'danger' ? 'text-[var(--danger)]' : 'text-[var(--fg-primary)]'
-        }`}
-      >
-        {children}
-      </button>
-    </li>
   );
 }
