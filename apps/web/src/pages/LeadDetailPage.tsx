@@ -380,8 +380,11 @@ export function LeadDetailPage() {
         {/* Notes */}
         <Card className="lg:col-span-2">
           <div className="p-5">
-            <h3 className="text-sm font-semibold text-[var(--fg-primary)]">Notes</h3>
+            <label className="text-sm font-semibold text-[var(--fg-primary)]" htmlFor="lead-notes">
+              Notes
+            </label>
             <textarea
+              id="lead-notes"
               value={l.notes ?? ''}
               onChange={(e) => debouncedUpdate({ notes: e.target.value || null })}
               placeholder="Add notes about this lead…"

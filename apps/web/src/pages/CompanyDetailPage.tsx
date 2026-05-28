@@ -98,6 +98,7 @@ export function CompanyDetailPage() {
                   className="input text-xl font-bold"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
+                  aria-label="Company name"
                   autoFocus
                 />
               ) : (
@@ -142,12 +143,14 @@ export function CompanyDetailPage() {
             <div className="mt-2 flex gap-3">
               <input
                 className="input text-sm"
+                aria-label="Industry"
                 placeholder="Industry"
                 value={editIndustry}
                 onChange={(e) => setEditIndustry(e.target.value)}
               />
               <input
                 className="input text-sm"
+                aria-label="Domain"
                 placeholder="Domain"
                 value={editDomain}
                 onChange={(e) => setEditDomain(e.target.value)}
@@ -244,11 +247,7 @@ export function CompanyDetailPage() {
       )}
       {tab === 'hierarchy' && (
         <div role="tabpanel" id={panelId('hierarchy')} aria-labelledby={tabId('hierarchy')}>
-          <HierarchyTab
-            hierarchy={hierarchy}
-            childrenList={c.children}
-            companyId={c.id}
-          />
+          <HierarchyTab hierarchy={hierarchy} childrenList={c.children} companyId={c.id} />
         </div>
       )}
 

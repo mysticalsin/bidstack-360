@@ -112,7 +112,10 @@ export function AgentsPage() {
 
   const allAgents = useMemo(() => agents.data?.items ?? [], [agents.data?.items]);
   const phaseDefinitions = templates.data?.phases ?? [];
-  const templateCatalog = useMemo(() => templates.data?.templates ?? [], [templates.data?.templates]);
+  const templateCatalog = useMemo(
+    () => templates.data?.templates ?? [],
+    [templates.data?.templates],
+  );
   const agentRuns = useAgentRuns(selectedAgentId ?? undefined);
 
   const phaseCoverage = useMemo(() => {
@@ -137,7 +140,7 @@ export function AgentsPage() {
   const selectedPhaseLabel =
     selectedPhase === ALL_PHASES
       ? 'All phases'
-      : selectedPhaseDefinition?.label ?? formatPhase(selectedPhase);
+      : (selectedPhaseDefinition?.label ?? formatPhase(selectedPhase));
   const totalPhaseCount = phaseDefinitions.length || 13;
   const claudeAgentCount = allAgents.filter((agent) => agent.config.provider === 'claude').length;
   const runningAgentCount = allAgents.filter((agent) => agent.status === 'running').length;
@@ -250,7 +253,8 @@ export function AgentsPage() {
           </div>
           <h1 className="text-2xl font-bold text-[var(--fg-primary)]">Agents</h1>
           <p className="mt-1 max-w-2xl text-sm text-[var(--fg-secondary)]">
-            Phase agents for intake, red flags, compliance, legal, security, drafting, and submission.
+            Phase agents for intake, red flags, compliance, legal, security, drafting, and
+            submission.
           </p>
         </div>
         <LiquidGlassButton
@@ -283,7 +287,9 @@ export function AgentsPage() {
                     'Coverage, readiness, risk ownership, and agent run control in one workspace.'}
                 </p>
               </div>
-              <Badge tone={selectedPhase === ALL_PHASES ? 'gray' : PHASE_TONE[selectedPhase] ?? 'gray'}>
+              <Badge
+                tone={selectedPhase === ALL_PHASES ? 'gray' : (PHASE_TONE[selectedPhase] ?? 'gray')}
+              >
                 {selectedPhaseLabel}
               </Badge>
             </div>
@@ -396,11 +402,13 @@ export function AgentsPage() {
                   Red-flag checks
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  {(selectedPhaseDefinition?.redFlagChecks ?? [
-                    'Missing owner',
-                    'No source citation',
-                    'Approval gap',
-                  ]).map((check) => (
+                  {(
+                    selectedPhaseDefinition?.redFlagChecks ?? [
+                      'Missing owner',
+                      'No source citation',
+                      'Approval gap',
+                    ]
+                  ).map((check) => (
                     <Badge key={check} tone="tomato">
                       {check}
                     </Badge>
@@ -444,7 +452,10 @@ export function AgentsPage() {
         {templates.isLoading ? (
           <LoadingSkeleton rows={3} />
         ) : templates.isError ? (
-          <EmptyState title="Template catalog is unavailable" message="Try again after the API recovers." />
+          <EmptyState
+            title="Template catalog is unavailable"
+            message="Try again after the API recovers."
+          />
         ) : filteredTemplates.length === 0 ? (
           <EmptyState title="No starter agents match" message="Adjust the phase or search query." />
         ) : (
@@ -466,7 +477,9 @@ export function AgentsPage() {
                         <Badge tone={PHASE_TONE[template.phase] ?? 'gray'}>
                           {phase?.label ?? formatPhase(template.phase)}
                         </Badge>
-                        <Badge tone={template.defaultConfig.provider === 'claude' ? 'purple' : 'blue'}>
+                        <Badge
+                          tone={template.defaultConfig.provider === 'claude' ? 'purple' : 'blue'}
+                        >
                           {template.defaultConfig.provider === 'claude' ? 'Claude' : 'Dust'}
                         </Badge>
                       </div>
@@ -688,6 +701,7 @@ export function AgentsPage() {
                                       [agent.id]: event.currentTarget.value,
                                     }))
                                   }
+                                  aria-label={`Message for ${agent.name}`}
                                   placeholder="Ask for cited risks, blockers, requirements, or next actions..."
                                   className="min-h-11 flex-1 rounded-xl border border-[var(--border-default)] bg-[var(--surface-sunken)] px-3 text-sm text-[var(--fg-primary)] outline-none placeholder:text-[var(--fg-tertiary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
                                 />
@@ -729,7 +743,7 @@ export function AgentsPage() {
                                           <td className="px-3 py-2">
                                             {formatLatency(run.latencyMs)}
                                           </td>
-                                          <td className="max-w-[220px] truncate px-3 py-2 text-[var(--fg-danger)]">
+                                          <td className="max-w-[220px] truncate px-3 py-2 text-[var(--danger)]">
                                             {run.error || '-'}
                                           </td>
                                           <td className="max-w-[360px] truncate px-3 py-2 text-[var(--fg-secondary)]">
@@ -757,7 +771,7 @@ export function AgentsPage() {
       )}
 
       <AgentDialog
-        key={dialogOpen ? editingAgent?.id ?? 'new-agent' : 'closed-agent'}
+        key={dialogOpen ? (editingAgent?.id ?? 'new-agent') : 'closed-agent'}
         agent={editingAgent}
         open={dialogOpen}
         onClose={() => {
@@ -774,7 +788,10 @@ export function AgentsPage() {
         isPending={createAgent.isPending || updateAgent.isPending}
       />
 
-      <Dialog open={Boolean(deletingAgent)} onOpenChange={(open) => !open && setDeletingAgent(null)}>
+      <Dialog
+        open={Boolean(deletingAgent)}
+        onOpenChange={(open) => !open && setDeletingAgent(null)}
+      >
         <DialogContent
           title="Delete agent"
           description={
