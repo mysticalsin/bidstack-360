@@ -111,6 +111,8 @@ import { csRoutes } from './routes/cs.js';
 import { publicNpsRoutes } from './routes/public-nps.js';
 // Wave 9 — RFP pipeline HTTP endpoints (upload, SSE stream, autofill, approval gate)
 import { rfpPipelineRoutes } from './routes/rfp-pipeline.js';
+// Wave 10 — Operational monitoring (queue depths, embedding failure rate, alerts)
+import { monitoringRoutes } from './routes/monitoring.js';
 
 const CONNECT_SRC = [
   "'self'",
@@ -406,6 +408,9 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   // Wave 9 — RFP pipeline: upload, SSE progress stream, matrix autofill, approval gate
   await server.register(rfpPipelineRoutes, { prefix: '/api/v1' });
+
+  // Wave 10 — Operational monitoring: live queue depths, embedding failure rate, alert conditions
+  await server.register(monitoringRoutes, { prefix: '/api/v1' });
 
   return server;
 }
