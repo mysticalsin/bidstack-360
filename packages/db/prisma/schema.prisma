@@ -4389,25 +4389,29 @@ model LeadStageRotConfig {
 
 // ─── Wave 9: RFP Automation Engine ────────────────────────────────────────
 
+// WHY values: spec contract requires {running, completed, failed, paused, approved}.
+// `queued` added for pre-start state before the worker picks up the job.
+// `rejected` kept for human-rejection paths. `paused_for_review` renamed to `paused`
+// to match the spec and the orchestrator's state machine writes.
 enum RfpOrchestrationState {
   queued
   running
-  paused_for_review
+  paused
   approved
   rejected
   completed
   failed
 }
 
+// WHY values match what rfp-orchestrator.ts writes as current_phase/failed_phase and the spec contract.
+// Broader pipeline phases (legal_scan, qa_review, human_approval) are tracked outside
+// RfpOrchestration for now and will be added when those workers ship.
 enum RfpResponsePhase {
-  intake
-  extraction
-  story_matching
-  section_drafting
+  requirement_extract
+  story_match
+  section_draft
   compliance_fill
-  legal_scan
-  qa_review
-  human_approval
+  completed
 }
 
 /// State machine for a single RFP pipeline run.
@@ -4458,6 +4462,8 @@ model RequirementReferenceMatch {
   matchedByAgent String    @db.VarChar(100) @map("matched_by_agent")
   agentRunId     String?   @db.Uuid @map("agent_run_id")
   createdAt      DateTime  @default(now()) @db.Timestamptz(6) @map("created_at")
+  /// WHY: rfp-story-match ON CONFLICT sets updated_at = now(). Column required by worker upsert.
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(6) @map("updated_at")
   deletedAt      DateTime? @db.Timestamptz(6) @map("deleted_at")
 
   org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
