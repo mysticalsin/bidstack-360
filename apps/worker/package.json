@@ -18,6 +18,7 @@
     "@aws-sdk/s3-request-presigner": "^3.947.0",
     "@bidstack/db": "workspace:*",
     "@bidstack/dust-client": "workspace:*",
+    "@bidstack/memos": "workspace:*",
     "@bidstack/shared": "workspace:*",
     "@e965/xlsx": "^0.20.3",
     "@sentry/node": "^9.0.0",

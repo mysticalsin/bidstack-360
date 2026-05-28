@@ -18,6 +18,7 @@ import { Worker as BullWorker, Queue as BullQueue } from 'bullmq';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { DustClient } from '@bidstack/dust-client';
+import { MemOSService } from '@bidstack/memos';
 
 import { RFP_REQUIREMENT_EXTRACT, RFP_EMBED_REQUIREMENT, RFP_STORY_MATCH } from '@bidstack/shared';
 import { buildAgentUserMessage } from '../lib/prompt-safety.js';
@@ -155,6 +156,7 @@ async function processJob(
   log: pino.Logger,
   embedQueue: BullQueue,
   storyMatchQueue: BullQueue,
+  memos: MemOSService,
 ): Promise<void> {
   const parsed = JobData.safeParse(job.data);
   if (!parsed.success) {
@@ -258,6 +260,20 @@ async function processJob(
     log.info({ orgId, orchestrationId }, 'rfp-requirement-extract: no requirements found');
     // RfpResponsePhase enum: 'extraction' = this phase, 'story_matching' = next
     await updateOrchestrationPhase(orchestrationId, orgId, 'story_matching', 'extraction');
+    try {
+      await memos.logTrace({
+        orgId,
+        tier: 'l1',
+        module: 'rfp',
+        entityType: 'document_version',
+        entityId: documentVersionId,
+        action: 'requirements_extracted',
+        userId: 'system',
+        payload: { orchestrationId, requirementCount: 0, dustRunId },
+      });
+    } catch (traceErr) {
+      log.warn({ err: traceErr }, 'rfp-requirement-extract: MemOS L1 trace failed — non-critical');
+    }
     return;
   }
 
@@ -331,6 +347,27 @@ async function processJob(
   // RfpResponsePhase enum: 'extraction' = this phase, 'story_matching' = next
   await updateOrchestrationPhase(orchestrationId, orgId, 'story_matching', 'extraction');
 
+  // L1 MemOS trace — records extraction run for downstream quality analysis.
+  // Non-critical: failure must not fail the extraction job.
+  try {
+    await memos.logTrace({
+      orgId,
+      tier: 'l1',
+      module: 'rfp',
+      entityType: 'document_version',
+      entityId: documentVersionId,
+      action: 'requirements_extracted',
+      userId: 'system',
+      payload: {
+        orchestrationId,
+        requirementCount: savedRequirements.length,
+        dustRunId,
+      },
+    });
+  } catch (traceErr) {
+    log.warn({ err: traceErr }, 'rfp-requirement-extract: MemOS L1 trace failed — non-critical');
+  }
+
   log.info(
     { orgId, orchestrationId, count: savedRequirements.length },
     'rfp-requirement-extract: complete',
@@ -360,9 +397,12 @@ export async function startRfpRequirementExtract(
   });
   queues.push(storyMatchQueue);
 
+  const memos = new MemOSService();
+
   const worker = new BullWorker<JobData>(
     QUEUE_NAME,
-    async (job) => processJob(job, log.child({ jobId: job.id }), embedQueue, storyMatchQueue),
+    async (job) =>
+      processJob(job, log.child({ jobId: job.id }), embedQueue, storyMatchQueue, memos),
     {
       connection,
       concurrency: 2,

@@ -75,14 +75,17 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
         ...(opportunityId ? { opportunityId } : {}),
         ...(search
           ? {
-              OR: [
-                { name: { contains: search, mode: 'insensitive' as const } },
-              ],
+              OR: [{ name: { contains: search, mode: 'insensitive' as const } }],
             }
           : {}),
       };
       const [items, total] = await Promise.all([
-        prisma.proposal.findMany({ where, orderBy: { updatedAt: 'desc' }, take: limit, skip: offset }),
+        prisma.proposal.findMany({
+          where,
+          orderBy: { updatedAt: 'desc' },
+          take: limit,
+          skip: offset,
+        }),
         prisma.proposal.count({ where }),
       ]);
       return { items: items.map(serializeProposal), total };
@@ -215,6 +218,40 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
           opportunityId: updated.opportunityId,
         });
       }
+
+      // L2 MemOS win/loss crystallization — fires only on a genuine status
+      // transition to won/lost (idempotent: row.status !== req.body.status).
+      // Fire-and-forget: a MemOS failure must not block the PATCH response.
+      // WHY L2 (not L1): win/loss outcomes are policy-level insights that
+      // influence future proposal drafts via getPoliciesForScope(); L1 is for
+      // raw run traces, L2 is for derived strategic signals.
+      if (
+        (req.body.status === 'won' || req.body.status === 'lost') &&
+        row.status !== req.body.status
+      ) {
+        void memos
+          .crystallizePolicy({
+            orgId: req.auth.orgId,
+            key: `proposal:${req.params.id}:outcome`,
+            category: 'win_loss',
+            scopeType: 'opportunity',
+            scopeId: updated.opportunityId ?? undefined,
+            insight: `Proposal "${updated.name}" was marked ${req.body.status}.`,
+            confidence: 0.9,
+            evidence: {
+              proposalId: req.params.id,
+              outcome: req.body.status,
+              previousStatus: row.status,
+            },
+          })
+          .catch((err: unknown) => {
+            server.log.warn(
+              { err, proposalId: req.params.id },
+              'MemOS L2 win/loss crystallization failed — non-critical',
+            );
+          });
+      }
+
       return serializeProposal(updated);
     },
   );
@@ -236,7 +273,12 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
       if (!proposal) return reply.notFound('Proposal not found');
 
       const section = await prisma.proposalSection.findFirst({
-        where: { orgId: req.auth.orgId, id: req.params.sectionId, proposalId: req.params.id, deletedAt: null },
+        where: {
+          orgId: req.auth.orgId,
+          id: req.params.sectionId,
+          proposalId: req.params.id,
+          deletedAt: null,
+        },
       });
       if (!section) return reply.notFound('Section not found');
 
@@ -285,10 +327,18 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
         opp?.valueMicros ? `Value: €${(Number(opp.valueMicros) / 1e6).toLocaleString()}` : '',
         opp?.territory?.name ? `Territory: ${opp.territory.name}` : '',
         req.body.context ? `User context: ${req.body.context}` : '',
-      ].filter(Boolean).join('\n');
+      ]
+        .filter(Boolean)
+        .join('\n');
 
       // Build MemOS context
-      const policies = await memos.getPoliciesForScope(req.auth.orgId, 'opportunity', proposal.opportunityId ?? undefined, undefined, 10);
+      const policies = await memos.getPoliciesForScope(
+        req.auth.orgId,
+        'opportunity',
+        proposal.opportunityId ?? undefined,
+        undefined,
+        10,
+      );
       const worldModels = await memos.retrieveContext('', {
         orgId: req.auth.orgId,
         tier: 'l3',
@@ -320,7 +370,12 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
         data: { content: draft.content, wordCount, aiDrafted: true },
       });
 
-      return { sectionKey: req.body.sectionKey, content: draft.content, wordCount, sources: draft.sources };
+      return {
+        sectionKey: req.body.sectionKey,
+        content: draft.content,
+        wordCount,
+        sources: draft.sources,
+      };
     },
   );
 
@@ -338,7 +393,10 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { orgId: req.auth.orgId, id: req.params.id, deletedAt: null },
       });
       if (!row) return reply.notFound('Proposal not found');
-      await prisma.proposal.update({ where: { id: req.params.id }, data: { deletedAt: new Date() } });
+      await prisma.proposal.update({
+        where: { id: req.params.id },
+        data: { deletedAt: new Date() },
+      });
       reply.status(204);
       return null;
     },

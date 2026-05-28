@@ -27,6 +27,7 @@ import type pino from 'pino';
 import { Worker as BullWorker } from 'bullmq';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
+import { MemOSService } from '@bidstack/memos';
 
 import { RFP_STORY_MATCH } from '@bidstack/shared';
 
@@ -263,7 +264,7 @@ async function persistMatches(
 
 // ─── Core processor ────────────────────────────────────────────────────────
 
-async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
+async function processJob(job: Job<JobData>, log: pino.Logger, memos: MemOSService): Promise<void> {
   const parsed = JobData.safeParse(job.data);
   if (!parsed.success) {
     throw new Error(`Invalid job data: ${parsed.error.message}`);
@@ -329,6 +330,31 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
     );
   }
 
+  // L1 MemOS trace — records match results for retrieval quality analysis
+  // and win/loss correlation. Non-critical: failure must not fail the match job.
+  try {
+    await memos.logTrace({
+      orgId,
+      tier: 'l1',
+      module: 'rfp',
+      entityType: 'requirement',
+      entityId: requirementId,
+      action: 'story_match_complete',
+      userId: 'system',
+      payload: {
+        orchestrationId,
+        matchCount: topMatches.length,
+        topMatchScore: topMatches[0]?.finalBps ?? 0,
+        candidateCount: candidates.length,
+      },
+    });
+  } catch (traceErr) {
+    log.warn(
+      { err: traceErr, requirementId },
+      'rfp-story-match: MemOS L1 trace failed — non-critical',
+    );
+  }
+
   log.info(
     { orgId, orchestrationId, requirementId, matchCount: topMatches.length },
     'rfp-story-match: complete',
@@ -343,9 +369,11 @@ export async function startRfpStoryMatch(
   workers: Worker[],
   _queues: Queue[],
 ): Promise<void> {
+  const memos = new MemOSService();
+
   const worker = new BullWorker<JobData>(
     QUEUE_NAME,
-    async (job) => processJob(job, log.child({ jobId: job.id })),
+    async (job) => processJob(job, log.child({ jobId: job.id }), memos),
     {
       connection,
       // WHY concurrency 16: story-match is CPU-bound hybrid scoring; high

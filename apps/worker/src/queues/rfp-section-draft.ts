@@ -19,6 +19,7 @@ import { Worker as BullWorker } from 'bullmq';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { DustClient } from '@bidstack/dust-client';
+import { MemOSService } from '@bidstack/memos';
 
 import { RFP_SECTION_DRAFT } from '@bidstack/shared';
 import { buildAgentUserMessage } from '../lib/prompt-safety.js';
@@ -110,7 +111,7 @@ function formatStoryContext(contexts: StoryContext[]): string {
 
 // ─── Core processor ────────────────────────────────────────────────────────
 
-async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
+async function processJob(job: Job<JobData>, log: pino.Logger, memos: MemOSService): Promise<void> {
   const parsed = JobData.safeParse(job.data);
   if (!parsed.success) {
     throw new Error(`Invalid job data: ${parsed.error.message}`);
@@ -200,6 +201,32 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
     },
   });
 
+  // L1 MemOS trace — records every agent run for memory retrieval and quality
+  // analysis. Non-critical: a MemOS write failure must not fail the draft job.
+  try {
+    await memos.logTrace({
+      orgId,
+      tier: 'l1',
+      module: 'rfp',
+      entityType: 'proposal_section',
+      entityId: sectionId,
+      action: 'draft_complete',
+      userId: 'system',
+      payload: {
+        orchestrationId,
+        proposalId,
+        sectionTitle,
+        storyCount: storyContexts.length,
+        draftLength: draftContent.length,
+      },
+    });
+  } catch (traceErr) {
+    log.warn(
+      { err: traceErr, sectionId },
+      'rfp-section-draft: MemOS L1 trace failed — non-critical',
+    );
+  }
+
   log.info({ orgId, orchestrationId, sectionId }, 'rfp-section-draft: complete');
 }
 
@@ -211,9 +238,14 @@ export async function startRfpSectionDraft(
   workers: Worker[],
   _queues: Queue[],
 ): Promise<void> {
+  // WHY module-scoped singleton: MemOSService is stateless (uses the shared
+  // Prisma client internally); creating one instance per worker bootstrap avoids
+  // per-job allocation while keeping the reference out of the global scope.
+  const memos = new MemOSService();
+
   const worker = new BullWorker<JobData>(
     QUEUE_NAME,
-    async (job) => processJob(job, log.child({ jobId: job.id })),
+    async (job) => processJob(job, log.child({ jobId: job.id }), memos),
     {
       connection,
       // WHY concurrency 4: section drafts are long Dust calls (tokens-heavy);
