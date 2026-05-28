@@ -152,6 +152,13 @@ export function ProposalsPage() {
         </div>
       </GlassCard>
 
+      {/* sr-only live region — announces filter result count to AT */}
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {!isLoading && data
+          ? `${data.items.length} proposal${data.items.length === 1 ? '' : 's'}${statusFilter ? ` · ${statusFilter}` : ''}`
+          : ''}
+      </p>
+
       {isLoading ? (
         <div className="grid grid-cols-1 gap-3" aria-busy="true" aria-label="Loading proposals">
           {[1, 2, 3].map((i) => (

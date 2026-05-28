@@ -64,34 +64,44 @@ export function NewLeadPage() {
 
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">
+              <label
+                htmlFor="lead-first-name"
+                className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
+              >
                 First name <span className="text-[var(--danger)]">*</span>
               </label>
               <input
+                id="lead-first-name"
                 required
-                aria-label="First name"
                 value={form.firstName}
                 onChange={field('firstName')}
                 className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">
+              <label
+                htmlFor="lead-last-name"
+                className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
+              >
                 Last name <span className="text-[var(--danger)]">*</span>
               </label>
               <input
+                id="lead-last-name"
                 required
-                aria-label="Last name"
                 value={form.lastName}
                 onChange={field('lastName')}
                 className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">
+              <label
+                htmlFor="lead-email"
+                className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
+              >
                 Email
               </label>
               <input
+                id="lead-email"
                 type="email"
                 value={form.email}
                 onChange={field('email')}
@@ -99,10 +109,14 @@ export function NewLeadPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">
+              <label
+                htmlFor="lead-phone"
+                className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
+              >
                 Phone
               </label>
               <input
+                id="lead-phone"
                 type="tel"
                 value={form.phone}
                 onChange={field('phone')}
@@ -110,30 +124,42 @@ export function NewLeadPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">
+              <label
+                htmlFor="lead-company"
+                className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
+              >
                 Company
               </label>
               <input
+                id="lead-company"
                 value={form.companyName}
                 onChange={field('companyName')}
                 className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">
+              <label
+                htmlFor="lead-title"
+                className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
+              >
                 Title
               </label>
               <input
+                id="lead-title"
                 value={form.title}
                 onChange={field('title')}
                 className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">
+              <label
+                htmlFor="lead-source"
+                className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
+              >
                 Source
               </label>
               <select
+                id="lead-source"
                 value={form.source}
                 onChange={field('source')}
                 className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
@@ -148,10 +174,14 @@ export function NewLeadPage() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">
+              <label
+                htmlFor="lead-priority"
+                className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
+              >
                 Priority
               </label>
               <select
+                id="lead-priority"
                 value={form.priority}
                 onChange={field('priority')}
                 className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
@@ -163,10 +193,14 @@ export function NewLeadPage() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">
+              <label
+                htmlFor="lead-score"
+                className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
+              >
                 Score
               </label>
               <input
+                id="lead-score"
                 type="number"
                 min={0}
                 max={100}

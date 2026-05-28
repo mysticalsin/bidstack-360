@@ -76,7 +76,10 @@ export function ReportsListPage() {
     return (
       <div className="p-8 space-y-3">
         {[...Array(6)].map((_, i) => (
-          <div key={i} className="h-14 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] animate-pulse" />
+          <div
+            key={i}
+            className="h-14 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] animate-pulse"
+          />
         ))}
       </div>
     );
@@ -127,7 +130,10 @@ export function ReportsListPage() {
 
       {/* Search */}
       <div className="relative max-w-xs">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--fg-tertiary)]" />
+        <Search
+          size={14}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--fg-tertiary)]"
+        />
         <input
           type="search"
           value={search}
@@ -142,6 +148,12 @@ export function ReportsListPage() {
           )}
         />
       </div>
+
+      {/* sr-only live region — announces search result count to AT */}
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {!isLoading &&
+          `${filtered.length} report${filtered.length === 1 ? '' : 's'}${search ? ` matching "${search}"` : ''}`}
+      </p>
 
       {filtered.length === 0 ? (
         <EmptyState
@@ -167,11 +179,27 @@ export function ReportsListPage() {
           <table className="w-full" role="grid" aria-label="Reports">
             <thead className="bg-[var(--surface-sunken)]">
               <tr>
-                <th className={thCls} onClick={() => handleSort('name')}>
+                <th
+                  className={thCls}
+                  onClick={() => handleSort('name')}
+                  aria-sort={
+                    sortKey === 'name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'
+                  }
+                >
                   Name {renderSortIcon('name')}
                 </th>
                 <th className={thCls}>Entity</th>
-                <th className={thCls} onClick={() => handleSort('lastRunAt')}>
+                <th
+                  className={thCls}
+                  onClick={() => handleSort('lastRunAt')}
+                  aria-sort={
+                    sortKey === 'lastRunAt'
+                      ? sortDir === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
+                >
                   Last run {renderSortIcon('lastRunAt')}
                 </th>
                 <th className={thCls}>Schedule</th>

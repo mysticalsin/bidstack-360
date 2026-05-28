@@ -65,10 +65,16 @@ export function ReferencesPage() {
             placeholder="Search references..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search references"
             className="input w-full pl-9"
           />
         </div>
-        <select value={industry} onChange={(e) => setIndustry(e.target.value)} className="input">
+        <select
+          value={industry}
+          onChange={(e) => setIndustry(e.target.value)}
+          aria-label="Filter by industry"
+          className="input"
+        >
           <option value="">All industries</option>
           {(industries.data?.items ?? []).map((i: string) => (
             <option key={i} value={i}>
@@ -76,7 +82,12 @@ export function ReferencesPage() {
             </option>
           ))}
         </select>
-        <select value={tag} onChange={(e) => setTag(e.target.value)} className="input">
+        <select
+          value={tag}
+          onChange={(e) => setTag(e.target.value)}
+          aria-label="Filter by tag"
+          className="input"
+        >
           <option value="">All tags</option>
           {allTags.map((t) => (
             <option key={t} value={t}>
@@ -85,6 +96,13 @@ export function ReferencesPage() {
           ))}
         </select>
       </motion.div>
+
+      {/* sr-only live region — announces filter/search result count to AT */}
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {!references.isLoading && references.data
+          ? `${items.length} reference${items.length === 1 ? '' : 's'}`
+          : ''}
+      </p>
 
       {/* Reference grid */}
       {references.isLoading ? (

@@ -57,7 +57,12 @@ export function TopAccountsPage() {
           <label htmlFor="top-accounts-search" className="sr-only">
             Search top accounts
           </label>
-          <Icon name="search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--fg-tertiary)]" ariaHidden />
+          <Icon
+            name="search"
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--fg-tertiary)]"
+            ariaHidden
+          />
           <input
             id="top-accounts-search"
             type="search"
@@ -82,7 +87,9 @@ export function TopAccountsPage() {
             {industries.isError ? 'Industries unavailable' : 'All industries'}
           </option>
           {(industries.data?.items ?? []).map((i: string) => (
-            <option key={i} value={i}>{i}</option>
+            <option key={i} value={i}>
+              {i}
+            </option>
           ))}
         </select>
         {industries.isError ? (
@@ -103,6 +110,13 @@ export function TopAccountsPage() {
         ) : null}
       </motion.div>
 
+      {/* sr-only live region — announces filter result count to AT */}
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {!accounts.isLoading && accounts.data
+          ? `${items.length} account${items.length === 1 ? '' : 's'}${industry ? ` · ${industry}` : ''}`
+          : ''}
+      </p>
+
       {/* Leaderboard */}
       {accounts.isLoading ? (
         <LoadingSkeleton rows={5} />
@@ -111,7 +125,11 @@ export function TopAccountsPage() {
           title="Couldn't load top accounts"
           message={accountError ?? 'The top accounts endpoint did not respond.'}
           action={
-            <button type="button" className="btn btn-secondary" onClick={() => void accounts.refetch()}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => void accounts.refetch()}
+            >
               Retry
             </button>
           }
@@ -148,11 +166,7 @@ export function TopAccountsPage() {
                     {index + 1}
                   </div>
 
-                  <CompanyLogo
-                    domain={account.domain}
-                    name={account.name}
-                    size={40}
-                  />
+                  <CompanyLogo domain={account.domain} name={account.name} size={40} />
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">

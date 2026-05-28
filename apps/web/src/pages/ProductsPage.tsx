@@ -96,6 +96,13 @@ export function ProductsPage() {
         </div>
       </Card>
 
+      {/* sr-only live region — announces filter/search result count to AT */}
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {!products.isLoading && products.data
+          ? `${products.data.items.length} product${products.data.items.length === 1 ? '' : 's'}`
+          : ''}
+      </p>
+
       {showNew && (
         <NewProductDialog
           categories={categories.data ?? []}
@@ -263,10 +270,14 @@ function NewProductDialog({
         <form onSubmit={submit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1">
+              <label
+                htmlFor="np-sku"
+                className="block text-xs font-medium text-[var(--fg-secondary)] mb-1"
+              >
                 SKU
               </label>
               <input
+                id="np-sku"
                 className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
                 value={sku}
                 onChange={(e) => setSku(e.target.value)}
@@ -275,10 +286,14 @@ function NewProductDialog({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1">
+              <label
+                htmlFor="np-currency"
+                className="block text-xs font-medium text-[var(--fg-secondary)] mb-1"
+              >
                 Currency
               </label>
               <select
+                id="np-currency"
                 className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
@@ -291,10 +306,14 @@ function NewProductDialog({
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1">
+            <label
+              htmlFor="np-name"
+              className="block text-xs font-medium text-[var(--fg-secondary)] mb-1"
+            >
               Name
             </label>
             <input
+              id="np-name"
               className="input w-full"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -304,10 +323,14 @@ function NewProductDialog({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1">
+              <label
+                htmlFor="np-category"
+                className="block text-xs font-medium text-[var(--fg-secondary)] mb-1"
+              >
                 Category
               </label>
               <select
+                id="np-category"
                 className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
@@ -321,10 +344,14 @@ function NewProductDialog({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1">
+              <label
+                htmlFor="np-price"
+                className="block text-xs font-medium text-[var(--fg-secondary)] mb-1"
+              >
                 List price
               </label>
               <input
+                id="np-price"
                 className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
                 type="number"
                 step="0.01"
