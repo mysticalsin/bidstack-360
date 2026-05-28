@@ -1079,3 +1079,59 @@ Sprint 21 shipped the read-only Sales Dashboard. Sprint 22 makes it _act_: every
 - Proposal export to PDF
 
 **Next:** Day 3 — Dust agent integration for score defense + proposal AI drafting. Day 4 — Proposal workspace UI with TipTap. Day 5 — Test hardening.
+
+---
+
+## 2026-05-28 — Wave 10 Sprint 1: Production Hardening (W10-P1)
+
+**Branch:** `feat/wave9-rfp-engine`
+
+**Done:**
+
+### W10-P1-3 — LLM eval suite (prior session)
+
+- Vitest suite for all three hybrid scoring functions in `rfp-story-match.ts`:
+  `tokenize()`, `keywordOverlapBps()`, `tagOverlapBps()`, `recencyBps()`, `mmrPrune()`.
+- 38 test cases covering edge cases (null titles, future dates, NDA-D gate, org mismatch).
+- Added `rfp-orchestrator.test.ts`, `rfp-embed-reference.test.ts` — inline guard replays
+  for org-mismatch and NDA-D blocked by `doNotRetry` flag.
+
+### W10-P1-4 — TipTap editor
+
+- Already implemented in a prior session. No work needed.
+
+### W10-P1-5 — MemOS L1 traces + L2 win/loss hook
+
+- **rfp-section-draft**: `logTrace('draft_complete')` after `proposalSection.updateMany` —
+  records orchestrationId, proposalId, sectionTitle, storyCount, draftLength.
+- **rfp-story-match**: `logTrace('story_match_complete')` — records matchCount, topMatchScore,
+  candidateCount. Fire-and-forget wrapped in try/catch (non-critical).
+- **rfp-requirement-extract**: `logTrace('requirements_extracted')` on both the zero-
+  requirements early-return path and the normal completion path.
+- **proposals PATCH**: `crystallizePolicy()` L2 `win_loss` policy fired via `.catch()`
+  when status transitions to `won` or `lost`. Transition guard (`row.status !== req.body.status`)
+  prevents duplicate fires. Captures proposalId, outcome, previousStatus, opportunityId.
+- Added `@bidstack/memos: workspace:*` to `apps/worker/package.json`.
+- Fixed pre-existing lint errors in 6 untracked test/service files before committing:
+  `redis-cache.test.ts` (5× `no-explicit-any` with disable+WHY),
+  `rfp-pipeline.integration.test.ts` (unused imports),
+  `rfp-agent-outputs.service.ts` (Error cause chain),
+  `rfp-orchestrator.test.ts`, `rfp-embed-reference.test.ts`, `rfp-story-match.test.ts`
+  (dead static imports removed).
+
+**Verified:**
+
+- `pnpm --filter @bidstack/worker typecheck` ✅
+- `pnpm --filter @bidstack/api typecheck` ✅
+- `pnpm --filter @bidstack/worker lint --quiet` ✅
+- `pnpm --filter @bidstack/api lint --quiet` ✅
+- Commit: `2982c962` `feat(memos): W10-P1-5 — L1 traces in RFP workers + L2 win/loss hook`
+
+**Blocked (external):**
+
+- W10-P1-1 (DPIA): Requires Legal/DPO sign-off — cannot implement technically.
+- W10-P1-2 (Dust DPA): Requires Legal — blocked.
+
+**Next:** W10-P2 — load test (50 concurrent RFP uploads), monitoring dashboards
+(queue-depth alerts, embedding failure rate), BM training session, production launch
+with 3 pilot bids.
