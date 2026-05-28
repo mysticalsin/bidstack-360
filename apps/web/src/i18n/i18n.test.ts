@@ -5,7 +5,7 @@
 // stay in sync, that missing keys fall back to English (never expose raw keys),
 // and that pluralization rules work for EN, FR, and ES.
 
-import { describe, expect, it, beforeAll } from 'vitest';
+import { describe, expect, it, beforeAll, afterAll, vi } from 'vitest';
 
 import {
   DEFAULT_LOCALE,
@@ -18,6 +18,16 @@ import {
 } from './index';
 
 beforeAll(async () => {
+  // Mock fetch to prevent http-backend from attempting real connections
+  vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+    Promise.resolve(
+      new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    ),
+  );
+
   // Wait for the async init backend to settle; happy-dom + http-backend
   // returns immediately when the loadPath isn't reachable, but we still
   // need the singleton to flag itself initialized.
@@ -27,29 +37,47 @@ beforeAll(async () => {
   // Seed the in-memory resource store with the minimum keys required by the
   // tests below. The http-backend won't load files in the test environment
   // (no server), so we add them programmatically.
-  i18n.addResourceBundle('en', 'common', {
-    notifications: {
-      unread_one: '{{count}} unread mention',
-      unread_other: '{{count}} unread mentions',
+  i18n.addResourceBundle(
+    'en',
+    'common',
+    {
+      notifications: {
+        unread_one: '{{count}} unread mention',
+        unread_other: '{{count}} unread mentions',
+      },
+      states: { error: 'Something went wrong' },
     },
-    states: { error: 'Something went wrong' },
-  }, /* deep */ true, /* overwrite */ true);
+    /* deep */ true,
+    /* overwrite */ true,
+  );
 
-  i18n.addResourceBundle('fr', 'common', {
-    notifications: {
-      unread_one: '{{count}} mention non lue',
-      unread_other: '{{count}} mentions non lues',
+  i18n.addResourceBundle(
+    'fr',
+    'common',
+    {
+      notifications: {
+        unread_one: '{{count}} mention non lue',
+        unread_other: '{{count}} mentions non lues',
+      },
+      states: { error: 'Une erreur est survenue' },
     },
-    states: { error: 'Une erreur est survenue' },
-  }, true, true);
+    true,
+    true,
+  );
 
-  i18n.addResourceBundle('es', 'common', {
-    notifications: {
-      unread_one: '{{count}} mención sin leer',
-      unread_other: '{{count}} menciones sin leer',
+  i18n.addResourceBundle(
+    'es',
+    'common',
+    {
+      notifications: {
+        unread_one: '{{count}} mención sin leer',
+        unread_other: '{{count}} menciones sin leer',
+      },
+      states: { error: 'Algo salió mal' },
     },
-    states: { error: 'Algo salió mal' },
-  }, true, true);
+    true,
+    true,
+  );
 });
 
 describe('isSupportedLocale', () => {
@@ -211,4 +239,8 @@ describe('pluralization rules', () => {
       expect(result).toBe('5 menciones sin leer');
     });
   });
+});
+
+afterAll(() => {
+  vi.restoreAllMocks();
 });

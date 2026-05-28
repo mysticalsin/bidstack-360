@@ -56,7 +56,7 @@ export function useRfpUpload(): UseRfpUploadReturn {
             setOrchestrationId(result.orchestrationId);
             setBidWorkspaceId(result.bidWorkspaceId);
             applyEvent({
-              stage: 'extraction',
+              stage: 'extracting',
               message: 'Upload complete — extracting requirements',
               timestamp: new Date().toISOString(),
               progress: 0,
@@ -110,7 +110,7 @@ export function useRfpUpload(): UseRfpUploadReturn {
       xhr.send(form);
 
       applyEvent({
-        stage: 'uploading',
+        stage: 'queued',
         message: 'Uploading document…',
         timestamp: new Date().toISOString(),
         progress: 0,
