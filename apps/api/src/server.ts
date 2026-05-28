@@ -113,6 +113,8 @@ import { publicNpsRoutes } from './routes/public-nps.js';
 import { rfpPipelineRoutes } from './routes/rfp-pipeline.js';
 // Wave 10 — Operational monitoring (queue depths, embedding failure rate, alerts)
 import { monitoringRoutes } from './routes/monitoring.js';
+// Data migration: CSV import, HubSpot sync, cancel/undo destructive operations
+import { migrationRoutes } from './routes/migrations.js';
 
 const CONNECT_SRC = [
   "'self'",
@@ -411,6 +413,9 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   // Wave 10 — Operational monitoring: live queue depths, embedding failure rate, alert conditions
   await server.register(monitoringRoutes, { prefix: '/api/v1' });
+
+  // Data migration: CSV import, HubSpot sync, cancel/undo — was never registered (bug fix)
+  await server.register(migrationRoutes, { prefix: '/api/v1' });
 
   return server;
 }
