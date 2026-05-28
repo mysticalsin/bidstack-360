@@ -38,10 +38,10 @@ export const referencesRoutes: FastifyPluginAsync = async (server) => {
   app.get('/references', {
     schema: {
       querystring: z.object({
-        industry: z.string().optional(),
+        industry: z.string().max(100).optional(),
         companyId: z.string().uuid().optional(),
-        tag: z.string().optional(),
-        search: z.string().optional(),
+        tag: z.string().max(100).optional(),
+        search: z.string().max(200).optional(),
         limit: z.coerce.number().int().min(1).max(100).default(50),
       }),
     },

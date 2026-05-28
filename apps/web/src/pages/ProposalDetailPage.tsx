@@ -45,7 +45,12 @@ export function ProposalDetailPage() {
   const qc = useQueryClient();
   useDocumentTitle();
 
-  const { data: proposal, isLoading } = useQuery({
+  const {
+    data: proposal,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
     queryKey: ['proposal', id],
     queryFn: async () => {
       if (!id) return null;
@@ -73,10 +78,13 @@ export function ProposalDetailPage() {
   const updateSection = useMutation({
     mutationFn: async ({ sectionId, content }: { sectionId: string; content: string }) => {
       if (!id) throw new Error('No proposal ID');
-      return api<{ id: string; wordCount: number }>(`/api/v1/proposals/${id}/sections/${sectionId}`, {
-        method: 'PATCH',
-        body: { content },
-      });
+      return api<{ id: string; wordCount: number }>(
+        `/api/v1/proposals/${id}/sections/${sectionId}`,
+        {
+          method: 'PATCH',
+          body: { content },
+        },
+      );
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['proposal', id] });
@@ -87,14 +95,50 @@ export function ProposalDetailPage() {
   const [editContent, setEditContent] = useState('');
 
   if (isLoading) {
-    return <p className="text-fg-tertiary text-sm">Loading proposal…</p>;
+    return (
+      <div aria-busy="true" aria-label="Loading proposal" className="space-y-4">
+        <div className="animate-pulse h-8 bg-surface-sunken rounded w-1/2" />
+        {[1, 2, 3].map((i) => (
+          <GlassCard key={i} padding="md" className="animate-pulse space-y-2">
+            <div className="h-4 bg-surface-sunken rounded w-1/3" />
+            <div className="h-20 bg-surface-sunken rounded" />
+          </GlassCard>
+        ))}
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <GlassCard className="py-12 text-center" role="alert">
+        <p className="text-sm font-medium text-red-600 dark:text-red-400">
+          Failed to load proposal
+        </p>
+        <p className="text-xs text-fg-tertiary mt-1">
+          {error instanceof Error ? error.message : 'Please try again in a moment.'}
+        </p>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="mt-4"
+          onClick={() => navigate('/proposals')}
+        >
+          Back to Proposals
+        </Button>
+      </GlassCard>
+    );
   }
 
   if (!proposal) {
     return (
       <GlassCard className="py-12 text-center">
         <p className="text-fg-tertiary text-sm">Proposal not found.</p>
-        <Button variant="secondary" size="sm" className="mt-4" onClick={() => navigate('/proposals')}>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="mt-4"
+          onClick={() => navigate('/proposals')}
+        >
           Back to Proposals
         </Button>
       </GlassCard>
@@ -164,7 +208,12 @@ export function ProposalDetailPage() {
                         ? 'Drafting…'
                         : 'AI Draft'}
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => startEdit(section)} aria-label="Edit section">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => startEdit(section)}
+                      aria-label="Edit section"
+                    >
                       <Icon name="pencil" size={14} />
                     </Button>
                   </>
@@ -196,7 +245,9 @@ export function ProposalDetailPage() {
             ) : (
               <div className="prose prose-sm max-w-none text-fg-secondary whitespace-pre-wrap">
                 {section.content || (
-                  <p className="text-fg-muted italic">No content yet. Use AI Draft to generate a first version.</p>
+                  <p className="text-fg-muted italic">
+                    No content yet. Use AI Draft to generate a first version.
+                  </p>
                 )}
               </div>
             )}

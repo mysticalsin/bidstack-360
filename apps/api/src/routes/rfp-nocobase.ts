@@ -79,14 +79,14 @@ const plugin: FastifyPluginAsyncZod = async (server) => {
       config: { permission: 'opportunities:write' },
       schema: {
         body: z.object({
-          name: z.string().min(1),
+          name: z.string().min(1).max(255),
           opportunityId: z.string().uuid().optional(),
           companyId: z.string().uuid().optional(),
           status: RfpStatus.optional(),
           submissionDeadline: z.string().datetime().optional(),
           questionDeadline: z.string().datetime().optional(),
-          industry: z.string().optional(),
-          region: z.string().optional(),
+          industry: z.string().max(100).optional(),
+          region: z.string().max(100).optional(),
           priority: RfpPriority.optional(),
         }),
         response: { 201: RfpRequest },
@@ -109,7 +109,7 @@ const plugin: FastifyPluginAsyncZod = async (server) => {
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: z.object({
-          name: z.string().min(1).optional(),
+          name: z.string().min(1).max(255).optional(),
           status: RfpStatus.optional(),
           submissionDeadline: z.string().datetime().optional(),
           questionDeadline: z.string().datetime().optional(),
@@ -118,7 +118,7 @@ const plugin: FastifyPluginAsyncZod = async (server) => {
           winProbabilityBps: z.number().int().min(0).max(10000).optional(),
           riskScore: z.number().int().min(0).max(100).optional(),
           complianceScore: z.number().int().min(0).max(100).optional(),
-          aiSummary: z.string().optional(),
+          aiSummary: z.string().max(10_000).optional(),
           metadata: z.record(z.unknown()).optional(),
         }),
         response: { 200: RfpRequest },

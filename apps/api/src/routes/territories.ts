@@ -396,7 +396,7 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       schema: {
         querystring: z.object({
-          period: z.string().optional(),
+          period: z.string().max(10).optional(),
           ownerId: z.string().uuid().optional(),
         }),
         response: { 200: z.object({ items: z.array(Forecast) }) },
