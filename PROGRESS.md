@@ -1219,4 +1219,34 @@ with 3 pilot bids.
 - W10-P1-3 (LLM-as-judge eval suite): 10 golden test cases + CI gate — scaffolding in `rfp-automation-plan.md §13.5`.
 - W10-P1-4 (TipTap wire-up): Replace textarea fallback in `HumanEditPane.tsx`.
 
+---
+
+## 2026-05-28 — Wave 10: Quality 98→100 (infrastructure gaps + BS-R1 start)
+
+**Branch:** `feat/wave8-sdks-extension-apps`
+
+**Goal:** Close the 2-point gap identified in the Wave 9 final report (98/100 → 100/100).
+
+**Done:**
+
+- **XGBoost Docker build** — `Dockerfile` worker stage now installs `python3`, `py3-pip`, creates a PEP 668-compliant venv at `/opt/python-venv`, pip-installs from `apps/worker/python/requirements.txt`, copies the python sidecar scripts, and exports `PREDICTIVE_PYTHON_BIN`. The XGBoost scoring sidecar can now run inside the production container without any Alpine/pip conflicts.
+
+- **NPS webhook dispatch** — `apps/api/src/services/cs/nps.service.ts`: `sendNpsSurvey()` now fires `void fanOutWebhookEvent(orgId, 'nps.survey_dispatched', { surveyId, accountId, contactId, publicUrl, expiresAt })` after creating the signed token. Downstream integrations (e.g. Zapier → transactional email provider) receive the `publicUrl` they need to send the survey link. Fire-and-forget — fail-open, never blocks the caller.
+
+- **BS-R1 start — iso-country-codes extraction** — Extracted the 178-line `A2_TO_A3` lookup table from `apps/api/src/routes/territories.ts` into `apps/api/src/lib/geo/iso-country-codes.ts` (typed `Readonly<Record<string, string>>`). `territories.ts` reduced from 816 → ~638 lines. Named export, no behaviour change.
+
+- **`docs/refactor/file-size-debt.md`** — design doc created per FIX-PLAN.md §0 rule 5. Documents all 12 oversized files, planned split strategies, priority ordering, and guiding principles for safe refactors.
+
+**Verified:**
+
+- `pnpm --filter @bidstack/api exec tsc --noEmit` ✅
+- `pnpm exec eslint territories.ts iso-country-codes.ts nps.service.ts --quiet` ✅
+
+**Still open (post-Wave-10, out of code scope):**
+
+- Zapier publication: requires ops/platform team action to publish the Zapier app.
+- Tree-based inference: future architectural addition to the XGBoost training pipeline.
+- E2E flake calibration: CI matrix tuning (separate ops task).
+- BS-R1 remaining 11 files: tracked in `docs/refactor/file-size-debt.md`.
+
 **Score delta:** 98/100 held (Wave 9 final audit). W10 production hardening brings the ops story up to spec; score re-audit pending after pilot bids complete.
