@@ -1,34 +1,18 @@
 import { motion, useReducedMotion } from 'framer-motion';
-import { memo, useMemo, useState, type CSSProperties } from 'react';
-import { Link } from 'react-router-dom';
+import { useMemo, useState } from 'react';
 
-import { CompanyLogo } from '@/components/company/CompanyLogo';
 import { SmartCompanyDialog } from '@/components/company/SmartCompanyDialog';
-import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
-
-import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useAutopopulateSalesCompanies } from '@/hooks/useAutopopulateSalesCompanies';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
-import { springLayout, springSnap, springSoft } from '@/lib/motion';
+import { springSoft } from '@/lib/motion';
 
-import type { CrmCompany, CrmDeal } from '@bidstack/shared';
-
-type SortKey = 'name' | 'pipeline' | 'health' | 'industry';
-
-interface AccountRow {
-  company: CrmCompany;
-  openDeals: number;
-  pipelineMicros: number;
-  totalDeals: number;
-  // Coarse health proxy until real data enhancement lands: weighted-pipeline / open-deals
-  // banded into 4 buckets. Real CompanyHealth lives in cockpit; per-account here
-  // is derived because we only have aggregate signal at the list level.
-  health: 'strong' | 'good' | 'needs_attention' | 'critical';
-}
+import { AccountCard } from './accountsPage/AccountCard';
+import { IntegrationMotionRail, SourceStat } from './accountsPage/AccountDashboardWidgets';
+import { deriveAccount, sortRows, titleCase, type SortKey } from './accountsPage/accountUtils';
 
 export function AccountsPage() {
   const { formatMoneyMicros } = useFormatMoney();
@@ -40,7 +24,7 @@ export function AccountsPage() {
   const [sort, setSort] = useState<SortKey>('pipeline');
   const syncError = autopopulate.error instanceof Error ? autopopulate.error.message : null;
 
-  const rows = useMemo<AccountRow[]>(() => {
+  const rows = useMemo(() => {
     if (!dashboard.data) return [];
     return dashboard.data.companies
       .map((company) => deriveAccount(company, dashboard.data!.deals))
@@ -103,6 +87,7 @@ export function AccountsPage() {
     (p) => p.status === 'healthy',
   ).length;
   const providerCount = dashboard.data.providerHealth.length;
+
   const syncErpAccounts = () => {
     autopopulate.mutate(
       { limit: 20 },
@@ -290,248 +275,4 @@ export function AccountsPage() {
       )}
     </>
   );
-}
-
-const AccountCard = memo(function AccountCard({ row, index }: { row: AccountRow; index: number }) {
-  const { formatMoneyMicros } = useFormatMoney();
-  const { company, openDeals, pipelineMicros, totalDeals, health } = row;
-  const sources = sourcePillsFor(company);
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 8 }}
-      animate={{
-        opacity: 1,
-        y: 0,
-        transition: { ...springLayout, delay: Math.min(index, 16) * 0.028 },
-      }}
-      exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.16 } }}
-      /* hover/tap animations removed per UX request */
-    >
-      <div className="account-card-shell">
-        <Link
-          to={`/accounts/${encodeURIComponent(company.id)}`}
-          className="account-card"
-          aria-label={`Open ${company.name} customer cockpit`}
-        >
-          {company.imageUrl ? (
-            <img
-              src={company.imageUrl}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              className="account-card-cover"
-            />
-          ) : null}
-          <div className="account-card-head">
-            <CompanyLogo
-              name={company.name}
-              logo={company.logo}
-              domain={company.domain}
-              size={52}
-            />
-            <div className="account-card-title">
-              <div className="account-card-name">{company.name}</div>
-              <div className="account-card-meta">
-                {titleCase(company.industry ?? 'Unknown industry')}
-                {company.domain ? ` · ${company.domain}` : ''}
-              </div>
-            </div>
-            <Badge tone={healthTone(health)}>{healthLabel(health)}</Badge>
-          </div>
-
-          <div className="account-card-sources" aria-label={`${company.name} data sources`}>
-            {sources.map((source, sourceIndex) => (
-              <motion.span
-                key={source}
-                initial={{ opacity: 0, x: -4 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ ...springSnap, delay: Math.min(sourceIndex, 4) * 0.035 }}
-              >
-                {source}
-              </motion.span>
-            ))}
-          </div>
-
-          <dl className="account-card-stats">
-            <div>
-              <dt>Open deals</dt>
-              <dd>
-                <AnimatedMetric value={openDeals.toLocaleString()} />
-              </dd>
-            </div>
-            <div>
-              <dt>Pipeline</dt>
-              <dd>
-                <AnimatedMetric value={formatMoneyMicros(pipelineMicros, 'EUR')} />
-              </dd>
-            </div>
-            <div>
-              <dt>Total deals</dt>
-              <dd>
-                <AnimatedMetric value={totalDeals.toLocaleString()} />
-              </dd>
-            </div>
-            <div>
-              <dt>Employees</dt>
-              <dd>{company.employeeCount ? company.employeeCount.toLocaleString() : '—'}</dd>
-            </div>
-          </dl>
-
-          <div className="account-card-confidence">
-            <span>Confidence</span>
-            <strong>
-              <AnimatedMetric value={`${Math.round(company.confidence * 100)}%`} />
-            </strong>
-          </div>
-
-          <div className="account-card-foot">
-            Open account cockpit <Icon name="arrow" size={11} />
-          </div>
-        </Link>
-      </div>
-    </motion.div>
-  );
-});
-
-function SourceStat({ label, value, detail }: { label: string; value: string; detail: string }) {
-  return (
-    <div className="account-source-stat">
-      <span>{label}</span>
-      <strong>
-        <AnimatedMetric value={value} />
-      </strong>
-      <small>{detail}</small>
-    </div>
-  );
-}
-
-function IntegrationMotionRail({
-  providers,
-}: {
-  providers: Array<{ name: string; status: string }>;
-}) {
-  const visible = providers.length
-    ? providers.slice(0, 8)
-    : [
-        { name: 'ERP', status: 'healthy' },
-        { name: 'External CRM', status: 'healthy' },
-        { name: 'Apollo', status: 'disabled' },
-        { name: 'TradingView', status: 'healthy' },
-      ];
-  return (
-    <div className="integration-motion-rail" aria-label="CRM integration status">
-      <span className="rail-label">Integration activity</span>
-      <div className="rail-track" aria-hidden>
-        {visible.map((provider, index) => (
-          <span
-            key={`${provider.name}-${index}`}
-            className={`rail-node rail-node-${provider.status}`}
-            style={{ '--rail-delay': `${index * 0.12}s` } as CSSProperties}
-          >
-            {sourceLabel(provider.name)}
-          </span>
-        ))}
-      </div>
-      <span className="rail-caption">ERP, External CRM, verified data connectors</span>
-    </div>
-  );
-}
-
-function deriveAccount(company: CrmCompany, deals: CrmDeal[]): AccountRow {
-  const matched = deals.filter(
-    (d) =>
-      d.companyId === company.id || d.companyName?.toLowerCase() === company.name.toLowerCase(),
-  );
-  const open = matched.filter((d) => d.stage !== 'closed_won' && d.stage !== 'closed_lost');
-  const pipelineMicros = open.reduce(
-    (acc, d) => acc + Math.round(d.amountMicros * ((d.probability ?? 50) / 100)),
-    0,
-  );
-  // Health proxy: 0 → critical, <250k → needs_attention, <2M → good, ≥2M → strong.
-  const health: AccountRow['health'] =
-    pipelineMicros === 0
-      ? 'critical'
-      : pipelineMicros < 250_000_000_000
-        ? 'needs_attention'
-        : pipelineMicros < 2_000_000_000_000
-          ? 'good'
-          : 'strong';
-  return {
-    company,
-    openDeals: open.length,
-    pipelineMicros,
-    totalDeals: matched.length,
-    health,
-  };
-}
-
-function sortRows(a: AccountRow, b: AccountRow, key: SortKey): number {
-  switch (key) {
-    case 'name':
-      return a.company.name.localeCompare(b.company.name);
-    case 'pipeline':
-      return b.pipelineMicros - a.pipelineMicros;
-    case 'health': {
-      const order = { strong: 0, good: 1, needs_attention: 2, critical: 3 };
-      return order[a.health] - order[b.health];
-    }
-    case 'industry':
-      return (a.company.industry ?? '').localeCompare(b.company.industry ?? '');
-  }
-}
-
-function healthTone(h: AccountRow['health']) {
-  return h === 'strong'
-    ? 'jade'
-    : h === 'good'
-      ? 'blue'
-      : h === 'needs_attention'
-        ? 'amber'
-        : 'tomato';
-}
-
-function healthLabel(h: AccountRow['health']) {
-  return h === 'strong'
-    ? 'Strong'
-    : h === 'good'
-      ? 'Good'
-      : h === 'needs_attention'
-        ? 'Watch'
-        : 'At risk';
-}
-
-function titleCase(s: string): string {
-  return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function sourcePillsFor(company: CrmCompany): string[] {
-  const pills = new Set<string>();
-  pills.add(company.source === 'verified_data' ? 'Verified' : sourceLabel(company.source));
-  if (company.logo?.source) pills.add(`Logo: ${logoSourceLabel(company.logo.source)}`);
-  for (const source of company.sourceAttribution.slice(0, 2)) {
-    pills.add(sourceLabel(source.source));
-  }
-  if (company.sourceAttribution.length === 0) pills.add('External CRM');
-  return [...pills].slice(0, 4);
-}
-
-function sourceLabel(source: string): string {
-  const normalized = source.toLowerCase();
-  if (normalized.includes('external_erp')) return 'ERP';
-  if (normalized.includes('external_crm')) return 'External CRM';
-  if (normalized.includes('apollo')) return 'Apollo';
-  if (normalized.includes('brandfetch')) return 'Brandfetch';
-  if (normalized.includes('logo_dev')) return 'Logo.dev';
-  if (normalized.includes('official')) return 'Official';
-  if (normalized.includes('favicon')) return 'Favicon';
-  if (normalized.includes('bidstack')) return 'BidStack';
-  if (normalized.includes('verified_data')) return 'Verified';
-  return titleCase(source.replace(/[-.]/g, ' '));
-}
-
-function logoSourceLabel(source: NonNullable<CrmCompany['logo']>['source']): string {
-  if (source === 'logo_dev') return 'Logo.dev';
-  if (source === 'official_website') return 'Official';
-  return sourceLabel(source);
 }
