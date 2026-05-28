@@ -19,12 +19,13 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { DustClient } from '@bidstack/dust-client';
 
-import { RFP_REQUIREMENT_EXTRACT, RFP_EMBED_REQUIREMENT } from '@bidstack/shared';
+import { RFP_REQUIREMENT_EXTRACT, RFP_EMBED_REQUIREMENT, RFP_STORY_MATCH } from '@bidstack/shared';
 import { buildAgentUserMessage } from '../lib/prompt-safety.js';
 import { logAiInvocation } from '../lib/ai-audit-worker.js';
 
 const QUEUE_NAME = RFP_REQUIREMENT_EXTRACT.name;
 const EMBED_QUEUE_NAME = RFP_EMBED_REQUIREMENT.name;
+const STORY_MATCH_QUEUE_NAME = RFP_STORY_MATCH.name;
 
 const DUST_AGENT_ID = process.env.DUST_RFP_EXTRACTOR_AGENT_ID ?? 'rfp-extractor-agent';
 
@@ -89,6 +90,9 @@ function fallbackExtract(rawText: string): Array<z.infer<typeof ExtractedRequire
 
 // ─── Orchestration state helpers (raw SQL) ─────────────────────────────────
 
+// WHY RfpResponsePhase enum strings: Prisma schema defines enum values as
+// 'extraction' and 'story_matching' (not 'requirement_extract'/'story_match').
+// These must match the DB enum exactly to avoid PostgreSQL constraint violations.
 async function updateOrchestrationPhase(
   orchestrationId: string,
   orgId: string,
@@ -98,8 +102,8 @@ async function updateOrchestrationPhase(
   await prisma.$executeRaw`
     UPDATE rfp_orchestrations
     SET
-      current_phase    = ${phase},
-      completed_phases = array_append(completed_phases, ${completedPhase}::text),
+      current_phase    = ${phase}::"RfpResponsePhase",
+      completed_phases = array_append(completed_phases, ${completedPhase}::"RfpResponsePhase"),
       updated_at       = now()
     WHERE id = ${orchestrationId}::uuid AND org_id = ${orgId}::uuid
   `;
@@ -118,12 +122,39 @@ async function markOrchestrationFailed(
   `;
 }
 
+// ─── NDA-D gate ────────────────────────────────────────────────────────────
+// §NDA-D — GDPR Art. 5(1)(f) / contractual confidentiality obligation.
+// Documents whose parent BidDocument has metadata.ndaTier='D' must NEVER be
+// sent to any AI processor. This gate is checked before any Dust call.
+//
+// WHY inline (not imported from api/lib): workers cannot import from apps/api.
+// WHY no documentVersionId in the false-path log: existence of a Tier-D
+// document must not leak to log aggregators (information-disclosure risk).
+async function isDocumentAiSafe(documentVersionId: string, orgId: string): Promise<boolean> {
+  const docVersion = await prisma.documentVersion.findUnique({
+    where: { id: documentVersionId, orgId },
+    select: { bidDocumentId: true },
+  });
+  if (!docVersion?.bidDocumentId) return true; // no parent BidDocument — safe
+
+  const bidDoc = await prisma.bidDocument.findFirst({
+    where: { id: docVersion.bidDocumentId, orgId },
+    select: { metadata: true },
+  });
+  if (!bidDoc) return true; // parent not found — safe
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- metadata is untyped Json
+  const meta = bidDoc.metadata as any;
+  return !(meta && meta.ndaTier === 'D');
+}
+
 // ─── Core processor ────────────────────────────────────────────────────────
 
 async function processJob(
   job: Job<JobData>,
   log: pino.Logger,
   embedQueue: BullQueue,
+  storyMatchQueue: BullQueue,
 ): Promise<void> {
   const parsed = JobData.safeParse(job.data);
   if (!parsed.success) {
@@ -142,6 +173,22 @@ async function processJob(
   }
 
   const rawText = docVersion.extractedText;
+
+  // §NDA-D gate — must pass before any AI call.
+  // WHY orchestrationId in log (not documentVersionId): orchestrationId is already
+  // public context for monitoring; documentVersionId must not appear on a blocked-D record.
+  const aiSafe = await isDocumentAiSafe(documentVersionId, orgId);
+  if (!aiSafe) {
+    const ndaErr = new Error('rfp-requirement-extract: document blocked by NDA-D gate');
+    (ndaErr as Error & { doNotRetry?: boolean }).doNotRetry = true;
+    log.warn(
+      { orchestrationId },
+      'rfp-requirement-extract: NDA-D gate blocked AI call — document ID omitted',
+    );
+    await markOrchestrationFailed(orchestrationId, orgId, 'extraction', 'NDA-D gate');
+    return; // graceful exit — no AI call, no requirement extraction
+  }
+
   const dust = getDustClient(log);
 
   let requirements: Array<z.infer<typeof ExtractedRequirement>>;
@@ -209,7 +256,8 @@ async function processJob(
 
   if (requirements.length === 0) {
     log.info({ orgId, orchestrationId }, 'rfp-requirement-extract: no requirements found');
-    await updateOrchestrationPhase(orchestrationId, orgId, 'story_match', 'requirement_extract');
+    // RfpResponsePhase enum: 'extraction' = this phase, 'story_matching' = next
+    await updateOrchestrationPhase(orchestrationId, orgId, 'story_matching', 'extraction');
     return;
   }
 
@@ -233,13 +281,24 @@ async function processJob(
     skipDuplicates: true,
   });
 
-  // ─── Fan-out: one embed-requirement job per extracted requirement ──────
+  // ─── Fan-out: 3 jobs per extracted requirement ────────────────────────
+  // WHY 3 jobs: (1) embed-requirement generates the pgvector embedding for
+  // cosine search; (2) story-match runs hybrid retrieval against reference
+  // embeddings; (3) embed-reference is not triggered here — it fires on
+  // SuccessStory create/update events — but story-match IS triggered here
+  // because it depends on requirement embeddings being present (the embed
+  // job runs first and is idempotent on re-runs).
+  //
+  // WHY story-match jobId includes requirementId: deduplication ensures
+  // a re-run of the extraction phase does not double-schedule matches for
+  // requirements that already have embeddings.
   const savedRequirements = await prisma.requirement.findMany({
     where: { documentVersionId, orgId, deletedAt: null },
     select: { id: true, text: true },
   });
 
   for (const req of savedRequirements) {
+    // 1. Embed this requirement's text into requirement_embeddings
     await embedQueue.add(
       'rfp.embed-requirement',
       {
@@ -250,9 +309,27 @@ async function processJob(
       },
       { jobId: `rfp-embed-req:${orgId}:${req.id}` },
     );
+
+    // 2. Run hybrid story-match for this requirement
+    // WHY no waitChildren: story-match has its own retry/backoff; it will
+    // fail with a missing embedding and retry after embed completes.
+    await storyMatchQueue.add(
+      'rfp.story-match',
+      {
+        orgId,
+        orchestrationId,
+        requirementId: req.id,
+      },
+      {
+        jobId: `rfp-story-match:${orgId}:${req.id}`,
+        attempts: RFP_STORY_MATCH.defaultJobOptions.attempts,
+        backoff: RFP_STORY_MATCH.defaultJobOptions.backoff,
+      },
+    );
   }
 
-  await updateOrchestrationPhase(orchestrationId, orgId, 'story_match', 'requirement_extract');
+  // RfpResponsePhase enum: 'extraction' = this phase, 'story_matching' = next
+  await updateOrchestrationPhase(orchestrationId, orgId, 'story_matching', 'extraction');
 
   log.info(
     { orgId, orchestrationId, count: savedRequirements.length },
@@ -274,9 +351,18 @@ export async function startRfpRequirementExtract(
   });
   queues.push(embedQueue);
 
+  // WHY storyMatchQueue created here: requirement-extract is the fan-out
+  // producer for story-match; creating the queue handle here (not in the
+  // story-match worker's bootstrap) avoids a shared-queue reference cycle.
+  const storyMatchQueue = new BullQueue(STORY_MATCH_QUEUE_NAME, {
+    connection,
+    defaultJobOptions: RFP_STORY_MATCH.defaultJobOptions,
+  });
+  queues.push(storyMatchQueue);
+
   const worker = new BullWorker<JobData>(
     QUEUE_NAME,
-    async (job) => processJob(job, log.child({ jobId: job.id }), embedQueue),
+    async (job) => processJob(job, log.child({ jobId: job.id }), embedQueue, storyMatchQueue),
     {
       connection,
       concurrency: 2,
@@ -296,7 +382,7 @@ export async function startRfpRequirementExtract(
     markOrchestrationFailed(
       p.data.orchestrationId,
       p.data.orgId,
-      'requirement_extract',
+      'extraction',
       err.message.slice(0, 2000),
     ).catch(() => undefined);
   });

@@ -52,6 +52,21 @@ const RFP_UPLOAD_RATE_LIMIT_TTL_SECONDS = 3600;
 /** SSE poll interval in milliseconds — low enough to feel real-time. */
 const SSE_POLL_INTERVAL_MS = 2000;
 
+/**
+ * Heartbeat interval — send a SSE comment every 30 s to prevent proxy timeout.
+ * Most load balancers (Nginx, AWS ALB) drop idle connections after 60 s;
+ * 30 s keeps the stream alive with comfortable headroom.
+ */
+const SSE_HEARTBEAT_INTERVAL_MS = 30_000;
+
+/**
+ * Maximum streaming duration — 30 minutes. If the orchestration is still
+ * in-progress after this window the stream closes and the client must
+ * reconnect. WHY: a stuck BullMQ job or DB deadlock must not hold an open
+ * HTTP response handle indefinitely, exhausting Fastify's connection pool.
+ */
+const SSE_MAX_POLL_MS = 30 * 60 * 1000;
+
 /** Terminal states — stop streaming once reached. */
 const SSE_TERMINAL_STATES = new Set(['completed', 'failed', 'rejected']);
 
@@ -327,22 +342,37 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
       if (!initial) throw server.httpErrors.notFound('RFP orchestration not found');
 
       // Switch to SSE mode.
+      // §SSE-CORS — must never fall back to wildcard ('*').
+      // Wildcard + credentials (cookies / Authorization header) is rejected by browsers
+      // AND exposes the SSE stream to any origin. Fail-closed: if PUBLIC_BASE_URL is
+      // not set in production, return 500 rather than silently open the stream to all.
+      const allowedOrigin =
+        process.env.PUBLIC_BASE_URL ??
+        (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : null);
+      if (!allowedOrigin) {
+        throw server.httpErrors.internalServerError(
+          'SSE stream misconfigured: PUBLIC_BASE_URL env var is required in production',
+        );
+      }
       reply.raw.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         Connection: 'keep-alive',
-        // Allow cross-origin SSE — the frontend is on a different origin in dev.
-        'Access-Control-Allow-Origin': process.env.PUBLIC_BASE_URL ?? '*',
+        'Access-Control-Allow-Origin': allowedOrigin,
         'X-Accel-Buffering': 'no', // disable Nginx buffering for SSE
       });
 
       // Send initial state immediately so the client doesn't wait for the first poll.
+      // WHY field names match PipelineEvent in apps/web/src/stores/rfpPipeline.ts:
+      // stage/message/timestamp/progress/error — the frontend store's applyEvent()
+      // reads these exact keys. Mismatched keys silently produce undefined values.
       writeSseEvent(reply, {
-        phase: initial.currentPhase,
+        stage: initial.currentPhase,
         state: initial.state,
+        message: initial.currentPhase ?? 'Pipeline started',
+        timestamp: initial.updatedAt.toISOString(),
         progress: initial.completedPhases.length,
-        message: initial.failureReason ?? null,
-        updatedAt: initial.updatedAt.toISOString(),
+        ...(initial.failureReason ? { error: initial.failureReason } : {}),
       });
 
       if (SSE_TERMINAL_STATES.has(initial.state)) {
@@ -361,8 +391,39 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
       });
 
       await new Promise<void>((resolve) => {
+        const deadline = Date.now() + SSE_MAX_POLL_MS;
+
+        // Heartbeat: SSE comment every 30 s prevents proxy/LB idle-connection timeout.
+        // WHY comment not data event: a comment (': ping\n\n') is ignored by
+        // EventSource's onmessage handler — no spurious dispatches to the client.
+        const heartbeatTimer = setInterval(() => {
+          if (!closed) reply.raw.write(': ping\n\n');
+        }, SSE_HEARTBEAT_INTERVAL_MS);
+
+        const cleanup = (endStream: boolean) => {
+          clearInterval(heartbeatTimer);
+          if (endStream) reply.raw.end();
+          resolve();
+        };
+
         const tick = async () => {
-          if (closed) return resolve();
+          if (closed) return cleanup(false);
+
+          // MAX_POLL_TIME guard: hard deadline prevents eternal connection on stuck jobs.
+          if (Date.now() >= deadline) {
+            log.warn(
+              { orchestrationId: req.params.orchestrationId, orgId },
+              'SSE stream closed — max poll duration (30 min) reached',
+            );
+            writeSseEvent(reply, {
+              stage: 'failed',
+              state: 'timeout',
+              message: 'Stream closed after maximum duration. Reconnect to continue monitoring.',
+              timestamp: new Date().toISOString(),
+              error: 'SSE stream timed out after 30 minutes',
+            });
+            return cleanup(true);
+          }
 
           const row = await prisma.rfpOrchestration
             .findFirst({
@@ -381,19 +442,19 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
             })
             .catch(() => null); // DB errors must not crash the SSE response
 
-          if (!row || closed) return resolve();
+          if (!row || closed) return cleanup(false);
 
           writeSseEvent(reply, {
-            phase: row.currentPhase,
+            stage: row.currentPhase,
             state: row.state,
+            message: row.currentPhase ?? 'Processing',
+            timestamp: row.updatedAt.toISOString(),
             progress: row.completedPhases.length,
-            message: row.failureReason ?? null,
-            updatedAt: row.updatedAt.toISOString(),
+            ...(row.failureReason ? { error: row.failureReason } : {}),
           });
 
           if (SSE_TERMINAL_STATES.has(row.state)) {
-            reply.raw.end();
-            return resolve();
+            return cleanup(true);
           }
 
           setTimeout(() => {

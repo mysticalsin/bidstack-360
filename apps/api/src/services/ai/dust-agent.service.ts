@@ -201,19 +201,30 @@ export async function defendBidScore(props: {
     };
   }
 
-  const prompt = [
-    `You are a pre-sales director reviewing a Bid/No-Bid score for ${props.customer}: "${props.opportunityName}".`,
-    ``,
-    `Score: ${props.totalScore}/100`,
-    `Recommendation: ${props.recommendation}`,
-    `Criteria breakdown:`,
-    ...Object.entries(props.criteria).map(([k, v]) => `  - ${k}: ${v}/5`),
-    ``,
-    `Historical context from MemOS:`,
-    props.memosContext || '(no historical data)',
-    ``,
-    `Task: Defend or challenge this score in 3-5 sentences. Cite specific criteria and historical patterns. Be concise and actionable.`,
-  ].join('\n');
+  // §PROMPT-INJECTION-DEFENSE — customer name, opportunity name, and memosContext
+  // are all user-controlled strings. Interpolating them directly into the prompt
+  // allows an attacker to inject instructions (e.g. "Ignore previous instructions...").
+  // buildAgentUserMessage() XML-escapes untrusted content and envelopes it so the
+  // model treats it as data, not instructions. Trusted numerics go in {{PLACEHOLDERS}}.
+  const criteriaBreakdown = Object.entries(props.criteria)
+    .map(([k, v]) => `  - ${k}: ${v}/5`)
+    .join('\n');
+  const prompt = buildAgentUserMessage({
+    template: [
+      'You are a pre-sales director reviewing a Bid/No-Bid score.',
+      'Score: {{TOTAL_SCORE}}/100',
+      'Recommendation: {{RECOMMENDATION}}',
+      'Criteria breakdown:\n{{CRITERIA_BREAKDOWN}}',
+      '',
+      'Task: Defend or challenge this score in 3-5 sentences. Cite specific criteria and historical patterns. Be concise and actionable.',
+    ].join('\n'),
+    trusted: {
+      TOTAL_SCORE: props.totalScore,
+      RECOMMENDATION: props.recommendation,
+      CRITERIA_BREAKDOWN: criteriaBreakdown,
+    },
+    userText: `Customer: ${props.customer}\nOpportunity: ${props.opportunityName}\n\nHistorical context from MemOS:\n${props.memosContext || '(no historical data)'}`,
+  });
 
   try {
     const run = await client.runAgent(agentId, prompt);
@@ -258,21 +269,34 @@ export async function draftProposalSection(props: {
     };
   }
 
-  const prompt = [
-    `You are a proposal writer drafting the "${props.sectionTitle}" section for a proposal to ${props.customer}: "${props.proposalName}".`,
-    ``,
-    `Opportunity context:`,
+  // §PROMPT-INJECTION-DEFENSE — sectionTitle, customer, proposalName,
+  // opportunityContext, memosContext, and existingContent are all user-controlled.
+  // buildAgentUserMessage() XML-escapes and envelopes untrusted content so the
+  // model treats it as data. sectionTitle goes into {{SECTION_TITLE}} which is
+  // trusted-interpolated (server-side section key, not raw user text).
+  const userContext = [
+    `Customer: ${props.customer}`,
+    `Proposal: ${props.proposalName}`,
+    '',
+    'Opportunity context:',
     props.opportunityContext || '(none)',
-    ``,
-    `Relevant historical content from MemOS:`,
+    '',
+    'Relevant historical content from MemOS:',
     props.memosContext || '(none)',
-    ``,
+    '',
     props.existingContent
-      ? `Existing draft (revise and improve):\n${props.existingContent}\n`
+      ? `Existing draft (revise and improve):\n${props.existingContent}`
       : 'Write a new draft.',
-    ``,
-    `Task: Write a professional, compelling ${props.sectionTitle} in 200-400 words. Use specific examples where possible. Output only the section content, no markdown headers.`,
   ].join('\n');
+  const prompt = buildAgentUserMessage({
+    template: [
+      'You are a proposal writer drafting the "{{SECTION_TITLE}}" section.',
+      'Task: Write a professional, compelling {{SECTION_TITLE}} in 200-400 words.',
+      'Use specific examples where possible. Output only the section content, no markdown headers.',
+    ].join('\n'),
+    trusted: { SECTION_TITLE: props.sectionTitle },
+    userText: userContext,
+  });
 
   try {
     const run = await client.runAgent(agentId, prompt);
