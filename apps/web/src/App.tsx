@@ -1,8 +1,8 @@
 import { AnimatePresence, MotionConfig } from 'framer-motion';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
-import { useAuth, useIsAdmin } from '@/lib/auth';
+import { useAuth, useIsAdmin, useUser } from '@/lib/auth';
 import { CommandPalette } from '@/components/command/CommandPalette';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { LiveAnnouncer } from '@/components/a11y/LiveAnnouncer';
@@ -21,6 +21,7 @@ import { useCmdDotClose } from '@/hooks/useCmdDotClose';
 import { useCommandPalette } from '@/hooks/useCommandPalette';
 import { useGlobalShortcuts } from '@/hooks/useGlobalShortcuts';
 import { usePreferences } from '@/stores/preferences';
+import { useCockpitLayout } from '@/stores/cockpitLayout';
 import { useGlobalUndoHotkey } from '@/stores/undoStack';
 import { ProductTour } from '@/components/onboarding/ProductTour';
 import { SampleDataBanner } from '@/components/onboarding/SampleDataBanner';
@@ -59,6 +60,13 @@ const IntegrationsPage = lazy(() =>
 const AgentsPage = lazy(() =>
   import('@/pages/AgentsPage').then((m) => ({ default: m.AgentsPage })),
 );
+const RfpAgentsPage = lazy(() =>
+  import('@/pages/RfpAgentsPage').then((m) => ({ default: m.RfpAgentsPage })),
+);
+// Wave 9 — RFP Pipeline
+const RfpPipelinePage = lazy(() =>
+  import('@/pages/RfpPipelinePage').then((m) => ({ default: m.RfpPipelinePage })),
+);
 const SettingsPage = lazy(() =>
   import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 );
@@ -87,6 +95,9 @@ const SalesOrdersPage = lazy(() =>
 const SalesOrderDetailPage = lazy(() =>
   import('@/pages/SalesOrderDetailPage').then((m) => ({ default: m.SalesOrderDetailPage })),
 );
+const NewSalesOrderPage = lazy(() =>
+  import('@/pages/NewSalesOrderPage').then((m) => ({ default: m.NewSalesOrderPage })),
+);
 const InvoicesPage = lazy(() =>
   import('@/pages/InvoicesPage').then((m) => ({ default: m.InvoicesPage })),
 );
@@ -101,6 +112,16 @@ const NewInvoicePage = lazy(() =>
 );
 const BidNoBidPage = lazy(() =>
   import('@/pages/BidNoBidPage').then((m) => ({ default: m.BidNoBidPage })),
+);
+// Sprint 1 — RFP / Bid Response section
+const RfpResponseHubPage = lazy(() =>
+  import('@/pages/RfpResponseHubPage').then((m) => ({ default: m.RfpResponseHubPage })),
+);
+const ProposalsPage = lazy(() =>
+  import('@/pages/ProposalsPage').then((m) => ({ default: m.ProposalsPage })),
+);
+const ProposalDetailPage = lazy(() =>
+  import('@/pages/ProposalDetailPage').then((m) => ({ default: m.ProposalDetailPage })),
 );
 const SearchPage = lazy(() =>
   import('@/pages/SearchPage').then((m) => ({ default: m.SearchPage })),
@@ -311,6 +332,14 @@ function AnimatedRoutes() {
             }
           />
           <Route
+            path="/sales/orders/new"
+            element={
+              <RequireAuth>
+                <NewSalesOrderPage />
+              </RequireAuth>
+            }
+          />
+          <Route
             path="/sales/orders/:id"
             element={
               <RequireAuth>
@@ -367,6 +396,25 @@ function AnimatedRoutes() {
             }
           />
           <Route
+            path="/rfp/:id/agents"
+            element={
+              <RequireAuth>
+                <RfpAgentsPage />
+              </RequireAuth>
+            }
+          />
+          {/* Wave 9 — RFP Pipeline */}
+          <Route
+            path="/rfp/:id/pipeline"
+            element={
+              <RequireAuth>
+                <PageTransition>
+                  <RfpPipelinePage />
+                </PageTransition>
+              </RequireAuth>
+            }
+          />
+          <Route
             path="/settings"
             element={
               <RequireAuth>
@@ -395,6 +443,31 @@ function AnimatedRoutes() {
             element={
               <RequireAuth>
                 <BidNoBidPage />
+              </RequireAuth>
+            }
+          />
+          {/* Sprint 1 — RFP / Bid Response */}
+          <Route
+            path="/rfp-response"
+            element={
+              <RequireAuth>
+                <RfpResponseHubPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/proposals"
+            element={
+              <RequireAuth>
+                <ProposalsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/proposals/:id"
+            element={
+              <RequireAuth>
+                <ProposalDetailPage />
               </RequireAuth>
             }
           />
@@ -521,6 +594,16 @@ export function App() {
   useGlobalUndoHotkey();
   const location = useLocation();
   const isLogin = location.pathname === '/login';
+
+  const { user } = useUser();
+  const scopePreferences = usePreferences((s) => s.scopeToUser);
+  const scopeCockpitLayout = useCockpitLayout((s) => s.scopeToUser);
+
+  useEffect(() => {
+    const userId = user?.id ?? null;
+    scopePreferences(userId);
+    scopeCockpitLayout(userId);
+  }, [user?.id, scopePreferences, scopeCockpitLayout]);
   // Map our 3-way motion pref onto framer-motion's MotionConfig contract.
   // `system` is framer's `user` (read prefers-reduced-motion). `reduced`
   // forces `always`, overriding the OS. `full` forces `never`. This makes

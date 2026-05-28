@@ -4,11 +4,12 @@
 
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
-import pino from 'pino';
+import { prisma } from '@bidstack/db';
+import { createLogger } from '../lib/logger.js';
 
 import { DOCUMENT_EXTRACT } from '@bidstack/shared';
 
-const log = pino({ name: 'queue:document-extract', level: process.env.LOG_LEVEL ?? 'info' });
+const log = createLogger({ name: 'queue:document-extract' });
 
 export const DOCUMENT_EXTRACT_QUEUE = DOCUMENT_EXTRACT.name;
 
@@ -49,6 +50,38 @@ function getQueue(): Queue {
     defaultJobOptions: DOCUMENT_EXTRACT.defaultJobOptions,
   });
   return queueSingleton;
+}
+
+/**
+ * NDA-D gate: silently skip documents marked NDA tier D (never-in-AI).
+ *
+ * WHY: NDA-D content is contractually forbidden from any AI processing.
+ * Silent skip (not error) to avoid revealing existence of the document to logs.
+ * Returns true if safe to proceed, false if the document must be skipped.
+ *
+ * Schema note: the legacy `Document` model has no ndaTier column. NDA tier is
+ * stored in `BidDocument.metadata.ndaTier` (Json field) introduced in Wave 9.
+ * The documentId param corresponds to the BidDocument id when present.
+ * If no BidDocument is found (legacy document flow), we treat as safe.
+ */
+export async function isDocumentAiSafe(documentId: string, orgId: string): Promise<boolean> {
+  const doc = await prisma.bidDocument.findFirst({
+    where: { id: documentId, orgId },
+    select: { metadata: true },
+  });
+
+  // Missing document: treated as safe — will fail later on actual access attempt
+  if (!doc) return true;
+
+  // WHY type assertion: metadata is Json (unknown shape); we read a single known key
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- metadata is untyped Json from Prisma
+  const meta = doc.metadata as any;
+  if (meta && meta.ndaTier === 'D') {
+    // Do NOT log document ID or name — NDA-D existence must not be leaked to log aggregators
+    return false;
+  }
+
+  return true;
 }
 
 /**
