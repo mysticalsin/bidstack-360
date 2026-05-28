@@ -12,7 +12,6 @@ import { CreateOpportunityDialog } from '@/components/opportunity/CreateOpportun
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
 import { Card } from '@/components/ui/Card';
 import { confirm } from '@/components/ui/ConfirmDialog';
-import { SortableHeader, getSortableHeaderAriaSort } from '@/components/ui/SortableHeader';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
@@ -31,6 +30,7 @@ import {
 import type { Opportunity } from '@bidstack/shared';
 
 import { Row } from './opportunities/OpportunityRow';
+import { OpportunitiesTableHead } from './opportunities/OpportunitiesTableHead';
 import { OppBulkBar, OppKpiBar, OppPageHeader, OppStageChips } from './opportunities/OppToolbar';
 
 export function OpportunitiesPage() {
@@ -296,91 +296,13 @@ export function OpportunitiesPage() {
                   ? `Opportunities matching "${search}"`
                   : 'All opportunities, sorted by most recent activity. Cells are inline-editable.'}
               </caption>
-              <thead className="sticky top-0 z-10 bg-[var(--surface-sunken)] text-xs uppercase tracking-wider text-[var(--fg-tertiary)]">
-                <tr>
-                  <th scope="col" className="w-10 px-5 py-3">
-                    <label className="table-checkbox-hit">
-                      <span className="sr-only">{allSelected ? 'Deselect all' : 'Select all'}</span>
-                      <input
-                        type="checkbox"
-                        checked={allSelected}
-                        ref={(el) => {
-                          if (el) el.indeterminate = someSelected;
-                        }}
-                        onChange={toggleAll}
-                        className="cursor-pointer accent-[var(--brand-primary)]"
-                      />
-                    </label>
-                  </th>
-                  <th
-                    scope="col"
-                    aria-sort={getSortableHeaderAriaSort('code', sortState)}
-                    className="px-5 py-3 font-semibold"
-                  >
-                    <SortableHeader columnKey="code" state={sortState} onChange={setSortState}>
-                      Code
-                    </SortableHeader>
-                  </th>
-                  <th
-                    scope="col"
-                    aria-sort={getSortableHeaderAriaSort('name', sortState)}
-                    className="px-5 py-3 font-semibold"
-                  >
-                    <SortableHeader columnKey="name" state={sortState} onChange={setSortState}>
-                      Opportunity
-                    </SortableHeader>
-                  </th>
-                  <th scope="col" className="px-5 py-3 font-semibold">
-                    Territory
-                  </th>
-                  <th
-                    scope="col"
-                    aria-sort={getSortableHeaderAriaSort('stage', sortState)}
-                    className="px-5 py-3 font-semibold"
-                  >
-                    <SortableHeader columnKey="stage" state={sortState} onChange={setSortState}>
-                      Stage
-                    </SortableHeader>
-                  </th>
-                  <th
-                    scope="col"
-                    aria-sort={getSortableHeaderAriaSort('value', sortState)}
-                    className="px-5 py-3 font-semibold"
-                  >
-                    <SortableHeader
-                      columnKey="value"
-                      state={sortState}
-                      onChange={setSortState}
-                      align="right"
-                    >
-                      Value
-                    </SortableHeader>
-                  </th>
-                  <th
-                    scope="col"
-                    aria-sort={getSortableHeaderAriaSort('probability', sortState)}
-                    className="px-5 py-3 font-semibold"
-                  >
-                    <SortableHeader
-                      columnKey="probability"
-                      state={sortState}
-                      onChange={setSortState}
-                      align="right"
-                    >
-                      Probability
-                    </SortableHeader>
-                  </th>
-                  <th
-                    scope="col"
-                    aria-sort={getSortableHeaderAriaSort('dueDate', sortState)}
-                    className="px-5 py-3 font-semibold"
-                  >
-                    <SortableHeader columnKey="dueDate" state={sortState} onChange={setSortState}>
-                      Due
-                    </SortableHeader>
-                  </th>
-                </tr>
-              </thead>
+              <OpportunitiesTableHead
+                sortState={sortState}
+                setSortState={setSortState}
+                allSelected={allSelected}
+                someSelected={someSelected}
+                toggleAll={toggleAll}
+              />
               <tbody className="divide-y divide-[var(--border-subtle)]">
                 {items.map((opp) => (
                   <Row
