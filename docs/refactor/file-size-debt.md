@@ -26,7 +26,7 @@ preserve the existing API surface and pass typecheck + lint + tests.
 | 2   | `apps/web/src/pages/IntegrationsPage.tsx`                     | 1,423 | P2 ✅    | ~~Split into 9 modules: types.ts / integration-helpers.ts / IntegrationAtoms.tsx / IntegrationHero.tsx / ConnectionRunway.tsx / WebhookEventsCard.tsx / ConnectionCommandCenter.tsx / ConnectionTester.tsx / DustAgentsCard.tsx~~ **Done Wave 10** |
 | 3   | `apps/web/src/components/dashboard/OrgDashboard.tsx`          | 1,403 | P2 ✅    | ~~Extract: widget components → `dashboard/widgets/` (one file per widget type); layout shell stays in `OrgDashboard.tsx`~~ **Done Wave 10**                                                                                                        |
 | 4   | `apps/web/src/pages/AuditLogPage.tsx`                         | 1,203 | P3 ✅    | ~~Extract: `audit-log/audit-log-types.ts`, `audit-log/audit-log-helpers.ts`, `audit-log/AuditLogHero.tsx`, `audit-log/AuditLogInsights.tsx`, `audit-log/AuditLogFilters.tsx`, `audit-log/AuditLogTable.tsx`~~ **Done Wave 10**                     |
-| 5   | `apps/web/src/pages/OpportunitiesPage.tsx`                    | 956   | P3       | Extract: `OpportunityKanban.tsx`, `OpportunityFilters.tsx`, `OpportunityRow.tsx`                                                                                                                                                                   |
+| 5   | `apps/web/src/pages/OpportunitiesPage.tsx`                    | 956   | P3 ✅    | ~~Extract: `OppInlineEditCells.tsx` (cells), `OpportunityRow.tsx` (row), `OppToolbar.tsx` (KPI bar + header + stage chips + bulk bar)~~ **Done Wave 10**                                                                                           |
 | 6   | `apps/api/src/routes/invoices.ts`                             | 933   | P3       | Extract: PDF-generation handler → `invoices.pdf.ts`; payment-link handler → `invoices.payment.ts`; CRUD stays in `invoices.ts`                                                                                                                     |
 | 7   | `apps/api/src/services/ai-assistant.service.ts`               | 916   | P3       | Extract: tool-call dispatch → `ai-assistant.tools.ts`; context-building → `ai-assistant.context.ts`; main orchestration stays                                                                                                                      |
 | 8   | `apps/web/src/pages/ContactsPage.tsx`                         | 872   | P3       | Extract: `ContactTable.tsx`, `ContactFilters.tsx`, `ContactImportModal.tsx`                                                                                                                                                                        |
@@ -103,6 +103,16 @@ preserve the existing API surface and pass typecheck + lint + tests.
   - `AuditLogTable.tsx` (279 lines) — evidence stream table + co-located AuditRow with expand/collapse diff panel
 - `AuditLogPage.tsx` reduced from 1,203 → 144 lines (URL state + React Query + cursor pagination only)
 - Import DAG is acyclic; audit-log-types.ts is leaf; typecheck ✅ Lint ✅ (0 errors, 0 new warnings)
+
+### `OpportunitiesPage.tsx` — Wave 10 (2026-05-28)
+
+- Split 956-line monolith into 4 focused modules under `pages/opportunities/`:
+  - `OppInlineEditCells.tsx` (184 lines) — StageCell (click-to-select with spring animation), NumberCell (number input with clamp), DateCell (date picker); leaf node, zero local sibling imports
+  - `OpportunityRow.tsx` (244 lines) — private `UpdatedAgo` span (self-ticking, isolates timer re-render), memoised `Row` with per-field SavedFlash + confetti on Closed Won + SR announcements
+  - `OppToolbar.tsx` (240 lines) — four co-located above-table sections: `OppKpiBar`, `OppPageHeader`, `OppStageChips`, `OppBulkBar`
+- `OpportunitiesPage.tsx` reduced from 956 → 338 lines (URL state, sort, bulk-selection, data-fetching, thead/tbody shell)
+- Import DAG is acyclic; OppInlineEditCells is the leaf, OpportunityRow imports from it, OppToolbar is independent, OpportunitiesPage imports all three
+- Typecheck ✅ Lint ✅ (0 errors, 0 new warnings)
 
 ---
 
