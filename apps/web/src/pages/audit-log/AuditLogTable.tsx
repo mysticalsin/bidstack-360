@@ -27,8 +27,8 @@ import {
   riskScore,
   summarizeDiff,
   truncateId,
-  writeClipboard,
 } from './audit-log-helpers';
+import { writeClipboard } from './audit-log-export';
 
 // ─── AuditTable ───────────────────────────────────────────────────────────────
 

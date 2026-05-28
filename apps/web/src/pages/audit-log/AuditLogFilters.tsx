@@ -14,7 +14,7 @@ import { cn } from '@/lib/cn';
 
 import type { ActiveFilterChip, DateRange, QuickFilter, TargetTypeFilter } from './audit-log-types';
 import { DATE_RANGES, QUICK_FILTERS, TARGET_TYPES } from './audit-log-types';
-import { exportCsv, writeClipboard } from './audit-log-helpers';
+import { exportCsv, writeClipboard } from './audit-log-export';
 
 // ─── AuditFilterBar ───────────────────────────────────────────────────────────
 
