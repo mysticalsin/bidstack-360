@@ -24,7 +24,10 @@ export function Navbar() {
   const isStub = !clerkKey;
 
   return (
-    <nav className="flex items-center justify-between py-6 px-6 md:px-10 w-full relative z-10">
+    <nav
+      aria-label="Site navigation"
+      className="flex items-center justify-between py-6 px-6 md:px-10 w-full relative z-10"
+    >
       {/* Left Side (hidden spacer for centering) */}
       <div className="flex-1 hidden md:block" />
 
@@ -56,12 +59,15 @@ export function Navbar() {
       <div className="flex-1 flex justify-end items-center gap-2 md:gap-3">
         {isStub ? (
           <>
-            {/* Dev preview — disabled buttons */}
+            {/* Dev preview — disabled buttons; tabIndex={-1} ensures they're excluded
+                from tab order in all browsers even with the disabled attribute */}
             <button
               type="button"
               disabled
+              tabIndex={-1}
+              aria-disabled="true"
+              aria-label="Sign in with Microsoft (requires Clerk configuration)"
               className="flex items-center bg-[rgba(30,50,90,0.4)] text-white/70 rounded-full px-3 md:px-5 py-1.5 md:py-2 gap-2 text-xs md:text-sm font-normal cursor-not-allowed"
-              title="Requires VITE_CLERK_PUBLISHABLE_KEY"
             >
               <MicrosoftLogo />
               <span className="hidden sm:inline">{microsoftLabel}</span>
@@ -69,8 +75,10 @@ export function Navbar() {
             <button
               type="button"
               disabled
+              tabIndex={-1}
+              aria-disabled="true"
+              aria-label="Sign in with Google (requires Clerk configuration)"
               className="flex items-center bg-white/40 text-[rgba(30,50,90,0.6)] rounded-full px-3 md:px-5 py-1.5 md:py-2 gap-2 text-xs md:text-sm font-normal cursor-not-allowed"
-              title="Requires VITE_CLERK_PUBLISHABLE_KEY"
             >
               <GoogleLogo />
               <span className="hidden sm:inline">{googleLabel}</span>
@@ -100,13 +108,15 @@ export function Navbar() {
         <motion.button
           type="button"
           onClick={() => navigate('/dashboard', { replace: true })}
+          aria-label="Dev bypass — enter dashboard without auth"
           className="ml-2 md:ml-3 flex items-center gap-1 text-[11px] font-normal text-amber-600/80 hover:text-amber-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/50 rounded-sm"
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          title="Dev bypass — enter dashboard without auth"
         >
-          <Info className="w-3 h-3" />
-          <span className="hidden sm:inline">Dashboard</span>
+          <Info className="w-3 h-3" aria-hidden="true" />
+          <span className="hidden sm:inline" aria-hidden="true">
+            Dashboard
+          </span>
         </motion.button>
       )}
 

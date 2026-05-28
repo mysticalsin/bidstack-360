@@ -25,15 +25,21 @@ export function BottomLeftCard() {
       {isStub && (
         <motion.button
           type="button"
-          className="flex items-center bg-white rounded-full pl-1.5 pr-5 py-1.5 gap-2 hover:bg-white/90 transition-colors self-start group"
+          aria-label="Go to dashboard (dev bypass)"
+          className="flex items-center bg-white rounded-full pl-1.5 pr-5 py-1.5 gap-2 hover:bg-white/90 transition-colors self-start group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(30,50,90,0.3)] rounded-full"
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => navigate('/dashboard', { replace: true })}
         >
-          <div className="bg-[rgba(30,50,90,0.1)] p-1 rounded-full flex items-center justify-center">
+          <div
+            className="bg-[rgba(30,50,90,0.1)] p-1 rounded-full flex items-center justify-center"
+            aria-hidden="true"
+          >
             <ArrowUpRight className="w-3.5 h-3.5 text-[rgba(30,50,90,0.9)]" />
           </div>
-          <span className="text-[14px] font-normal text-[rgba(30,50,90,0.9)]">Dashboard</span>
+          <span className="text-[14px] font-normal text-[rgba(30,50,90,0.9)]" aria-hidden="true">
+            Dashboard
+          </span>
         </motion.button>
       )}
     </motion.div>
