@@ -1,65 +1,73 @@
 @layer components {
-  /* Liquid Glass — light (scoped to login page to avoid conflicts with existing .liquid-glass) */
-  .login-page .liquid-glass {
-    background: rgba(255, 255, 255, 0.01);
-    background-blend-mode: luminosity;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    border: none;
-    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+  /* ───────────────────────────────────────────────
+     Weblex Dark Hero — Login Page Scoped Styles
+     ─────────────────────────────────────────────── */
+
+  /* ── SSO Button — Primary (lime) ── */
+  .login-page .sso-btn-primary {
     position: relative;
-    overflow: hidden;
-  }
-  .login-page .liquid-glass::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    padding: 1.4px;
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.45) 0%,
-      rgba(255, 255, 255, 0.15) 20%,
-      rgba(255, 255, 255, 0) 40%,
-      rgba(255, 255, 255, 0) 60%,
-      rgba(255, 255, 255, 0.15) 80%,
-      rgba(255, 255, 255, 0.45) 100%
-    );
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
+    display: inline-flex;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    border-radius: 9999px;
+    padding: 0.75rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: var(--font-body), 'Barlow', system-ui, sans-serif;
+    color: hsl(240, 67%, 1%);
+    background-color: hsl(73, 98%, 57%);
+    border: none;
+    transition: all 0.2s ease;
+    cursor: pointer;
   }
 
-  /* Liquid Glass — strong (for CTAs) */
-  .login-page .liquid-glass-strong {
-    background: rgba(255, 255, 255, 0.01);
-    background-blend-mode: luminosity;
-    backdrop-filter: blur(50px);
-    -webkit-backdrop-filter: blur(50px);
-    border: none;
-    box-shadow: 4px 4px 4px rgba(0, 0, 0, 0.05), inset 0 1px 1px rgba(255, 255, 255, 0.15);
-    position: relative;
-    overflow: hidden;
+  .login-page .sso-btn-primary:hover:not(:disabled) {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
   }
-  .login-page .liquid-glass-strong::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    padding: 1.4px;
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.5) 0%,
-      rgba(255, 255, 255, 0.2) 20%,
-      rgba(255, 255, 255, 0) 40%,
-      rgba(255, 255, 255, 0) 60%,
-      rgba(255, 255, 255, 0.2) 80%,
-      rgba(255, 255, 255, 0.5) 100%
-    );
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
+
+  .login-page .sso-btn-primary:active:not(:disabled) {
+    transform: scale(0.98) translateY(0);
+  }
+
+  .login-page .sso-btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* ── SSO Button — Secondary (white) ── */
+  .login-page .sso-btn-secondary {
+    position: relative;
+    display: inline-flex;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    border-radius: 9999px;
+    padding: 0.75rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: var(--font-body), 'Barlow', system-ui, sans-serif;
+    color: hsl(240, 67%, 1%);
+    background-color: hsl(0, 0%, 100%);
+    border: none;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+
+  .login-page .sso-btn-secondary:hover:not(:disabled) {
+    filter: brightness(0.95);
+    transform: translateY(-1px);
+  }
+
+  .login-page .sso-btn-secondary:active:not(:disabled) {
+    transform: scale(0.98) translateY(0);
+  }
+
+  .login-page .sso-btn-secondary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 }
