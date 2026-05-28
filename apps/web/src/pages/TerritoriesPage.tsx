@@ -12,7 +12,6 @@ import { TerritoryDialog } from '@/components/territories/TerritoryDialog';
 import { RoutingRuleDialog } from '@/components/territories/RoutingRuleDialog';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
 import { Icon } from '@/components/ui/Icon';
@@ -34,6 +33,13 @@ import {
 } from '@/hooks/useTerritories';
 
 import type { Territory, LeadRoutingRule } from '@bidstack/shared';
+
+import {
+  CountryDetailPanel,
+  KpiTile,
+  RoutingRuleListPanel,
+  TerritoryListPanel,
+} from './territoriesPage/TerritoryPanels';
 
 export function TerritoriesPage() {
   const { formatMoneyMicros } = useFormatMoney();
@@ -243,243 +249,32 @@ export function TerritoriesPage() {
         variants={reducedMotion ? undefined : staggerChild}
         className="grid grid-cols-1 gap-6 lg:grid-cols-3"
       >
-        {/* Selected country detail */}
-        <Card className={selected ? '' : 'opacity-60'}>
-          <SectionHeader
-            title={selected ? `${selected.countryCode} Detail` : 'Country Detail'}
-            caption={selected ? undefined : 'Click a country on the map'}
-          />
-          {selected ? (
-            <div className="space-y-3 p-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-                    Opportunities
-                  </div>
-                  <div className="mt-1 text-lg font-bold text-[var(--fg-primary)] tabular-nums">
-                    {selected.opportunityCount}
-                  </div>
-                </div>
-                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-                    Pipeline
-                  </div>
-                  <div className="mt-1 text-lg font-bold text-[var(--fg-primary)] tabular-nums">
-                    {formatMoneyMicros(selected.totalValueMicros, 'EUR')}
-                  </div>
-                </div>
-              </div>
-              <div>
-                <div className="text-xs font-medium text-[var(--fg-secondary)] mb-1">
-                  Territories
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {selected.territories.length > 0 ? (
-                    selected.territories.map((t) => (
-                      <span
-                        key={t}
-                        className="inline-flex items-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-card)] px-2 py-0.5 text-[10px] font-medium text-[var(--fg-secondary)]"
-                      >
-                        {t}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-xs text-[var(--fg-tertiary)]">—</span>
-                  )}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs font-medium text-[var(--fg-secondary)] mb-1">Owners</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {selected.ownerNames.length > 0 ? (
-                    selected.ownerNames.map((o) => (
-                      <span
-                        key={o}
-                        className="inline-flex items-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-card)] px-2 py-0.5 text-[10px] font-medium text-[var(--fg-secondary)]"
-                      >
-                        {o}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-xs text-[var(--fg-tertiary)]">—</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="flex h-40 items-center justify-center text-xs text-[var(--fg-tertiary)]">
-              Select a country on the map to see details
-            </div>
-          )}
-        </Card>
-
-        {/* Territories list */}
-        <div>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-[var(--fg-primary)]">Territories</h2>
-            <span className="text-xs text-[var(--fg-tertiary)]">{tItems.length} total</span>
-          </div>
-          {territories.isError ? (
-            <ErrorState
-              title="Failed to load"
-              message={territories.error?.message}
-              action={<Button onClick={() => territories.refetch()}>Retry</Button>}
-            />
-          ) : territories.isLoading ? (
-            <TableSkeleton rows={4} />
-          ) : tItems.length === 0 ? (
-            <EmptyState
-              title="No territories"
-              message="Create your first territory to get started."
-            />
-          ) : (
-            <div className="space-y-2">
-              {tItems.map((t) => (
-                <Card key={t.id} className="p-3 group">
-                  <div className="flex items-center justify-between">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <div className="text-sm font-medium text-[var(--fg-primary)]">{t.name}</div>
-                        {!t.active && <Badge tone="gray">Inactive</Badge>}
-                      </div>
-                      <div className="text-xs text-[var(--fg-secondary)]">
-                        {t.region ?? 'No region'} · {t.countryCodes.join(', ') || 'Global'}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="text-xs text-[var(--fg-tertiary)]">{t.ownerName ?? '—'}</div>
-                      <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100 focus-within:opacity-100">
-                        <button
-                          onClick={() => {
-                            setEditingTerritory(t);
-                            setTerritoryDialogOpen(true);
-                          }}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)]"
-                          title="Edit"
-                        >
-                          <Icon name="pencil" size={13} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteTerritory(t)}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)]"
-                          title="Delete"
-                        >
-                          <Icon name="trash" size={13} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Lead Routing Rules */}
-        <div>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-[var(--fg-primary)]">Lead Routing Rules</h2>
-            <span className="text-xs text-[var(--fg-tertiary)]">{rItems.length} total</span>
-          </div>
-          {rules.isError ? (
-            <ErrorState
-              title="Failed to load"
-              message={rules.error?.message}
-              action={<Button onClick={() => rules.refetch()}>Retry</Button>}
-            />
-          ) : rules.isLoading ? (
-            <TableSkeleton rows={4} />
-          ) : rItems.length === 0 ? (
-            <EmptyState
-              title="No routing rules"
-              message="Create your first rule to auto-assign leads."
-            />
-          ) : (
-            <div className="space-y-2">
-              {rItems.map((r) => {
-                const criteria = r.criteria as Record<string, unknown>;
-                return (
-                  <Card key={r.id} className="p-3 group">
-                    <div className="flex items-center justify-between">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <div className="text-sm font-medium text-[var(--fg-primary)]">
-                            {r.name}
-                          </div>
-                          {!r.active && <Badge tone="gray">Inactive</Badge>}
-                          {criteria.countryCode ? (
-                            <Badge tone="blue">{String(criteria.countryCode)}</Badge>
-                          ) : null}
-                        </div>
-                        <div className="text-xs text-[var(--fg-secondary)]">
-                          Priority {r.priority} ·{' '}
-                          {r.assignToUserId
-                            ? 'Assign to user'
-                            : r.assignToTerritoryId
-                              ? 'Assign to territory'
-                              : r.roundRobinTeam.length > 0
-                                ? `Round robin (${r.roundRobinTeam.length})`
-                                : 'No assignment'}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100 focus-within:opacity-100">
-                        <button
-                          onClick={() => {
-                            setEditingRule(r);
-                            setRuleDialogOpen(true);
-                          }}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)]"
-                          title="Edit"
-                        >
-                          <Icon name="pencil" size={13} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteRule(r)}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)]"
-                          title="Delete"
-                        >
-                          <Icon name="trash" size={13} />
-                        </button>
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        <CountryDetailPanel selected={selected} formatMoneyMicros={formatMoneyMicros} />
+        <TerritoryListPanel
+          items={tItems}
+          isLoading={territories.isLoading}
+          isError={territories.isError}
+          errorMessage={territories.error?.message}
+          onRetry={() => territories.refetch()}
+          onEdit={(t) => {
+            setEditingTerritory(t);
+            setTerritoryDialogOpen(true);
+          }}
+          onDelete={handleDeleteTerritory}
+        />
+        <RoutingRuleListPanel
+          items={rItems}
+          isLoading={rules.isLoading}
+          isError={rules.isError}
+          errorMessage={rules.error?.message}
+          onRetry={() => rules.refetch()}
+          onEdit={(r) => {
+            setEditingRule(r);
+            setRuleDialogOpen(true);
+          }}
+          onDelete={handleDeleteRule}
+        />
       </motion.div>
     </motion.div>
-  );
-}
-
-function KpiTile({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone: 'blue' | 'jade' | 'amber' | 'purple';
-}) {
-  const dotColor =
-    tone === 'blue'
-      ? '#2c4bff'
-      : tone === 'jade'
-        ? '#059669'
-        : tone === 'amber'
-          ? '#d97706'
-          : '#7c3aed';
-
-  return (
-    <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3">
-      <div className="flex items-center gap-2">
-        <span className="inline-flex h-2 w-2 rounded-full" style={{ backgroundColor: dotColor }} />
-        <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-          {label}
-        </div>
-      </div>
-      <div className="mt-1 text-lg font-bold text-[var(--fg-primary)] tabular-nums">{value}</div>
-    </div>
   );
 }
