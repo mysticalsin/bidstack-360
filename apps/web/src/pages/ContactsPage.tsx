@@ -22,7 +22,12 @@ import { SortableHeader, getSortableHeaderAriaSort } from '@/components/ui/Sorta
 import { SpotlightTable, SpotlightTableRow } from '@/components/ui/SpotlightTable';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
-import { useContacts, useCreateContact, useDeleteContact, useUpdateContact } from '@/hooks/useContacts';
+import {
+  useContacts,
+  useCreateContact,
+  useDeleteContact,
+  useUpdateContact,
+} from '@/hooks/useContacts';
 import { useTableSort } from '@/hooks/useTableSort';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { pushUndo } from '@/stores/undoStack';
@@ -722,6 +727,14 @@ export function ContactsPage() {
 // clamped to the viewport so it never overflows. Closes on click-away,
 // Escape, or scroll — the latter prevents the menu from drifting away
 // from its anchor.
+//
+// WAI-ARIA Menu pattern (ARIA 1.2 §menu):
+//   - role="menu" on the <ul>, role="menuitem" on each <button>.
+//   - First item receives focus automatically on mount.
+//   - ArrowDown / ArrowUp moves focus between items (wraps around).
+//   - Home / End jumps to first / last item.
+//   - Tab / Shift+Tab closes the menu (WAI-ARIA menu-button pattern).
+//   - Escape closes via the document-level listener below.
 function ContactContextMenu({
   x,
   y,
@@ -737,6 +750,15 @@ function ContactContextMenu({
   onEdit: (c: Contact) => void;
   onDelete: (c: Contact) => void;
 }) {
+  const menuRef = useRef<HTMLUListElement>(null);
+
+  // Move focus to the first menu item when the menu mounts so keyboard
+  // users don't have to Tab into the menu manually.
+  useEffect(() => {
+    const first = menuRef.current?.querySelector<HTMLElement>('[role=menuitem]');
+    first?.focus();
+  }, []);
+
   useEffect(() => {
     const close = (e: MouseEvent | KeyboardEvent) => {
       if (e instanceof KeyboardEvent && e.key !== 'Escape') return;
@@ -767,9 +789,40 @@ function ContactContextMenu({
     onClose();
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLUListElement>) => {
+    const menuitems = Array.from(
+      menuRef.current?.querySelectorAll<HTMLElement>('[role=menuitem]') ?? [],
+    );
+    if (menuitems.length === 0) return;
+    const idx = menuitems.indexOf(document.activeElement as HTMLElement);
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      menuitems[(idx + 1) % menuitems.length]?.focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      menuitems[(idx - 1 + menuitems.length) % menuitems.length]?.focus();
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      menuitems[0]?.focus();
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      menuitems[menuitems.length - 1]?.focus();
+    } else if (e.key === 'Tab') {
+      // Tab and Shift+Tab both close the menu per the WAI-ARIA menu-button
+      // pattern — focus falls through to the next naturally focusable element.
+      e.preventDefault();
+      onClose();
+    }
+    // Escape is handled by the document-level keydown listener above.
+  };
+
   return (
     <motion.ul
+      ref={menuRef}
       role="menu"
+      aria-label={`Actions for ${contact.name}`}
+      onKeyDown={handleKeyDown}
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ type: 'spring', stiffness: 280, damping: 26 }}
