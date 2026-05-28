@@ -264,6 +264,8 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
+      // BS-39: single query via explicit user relation in UserPresence schema —
+      // avoids a second findMany + manual Map join.
       const rows = await prisma.userPresence.findMany({
         where: {
           orgId: req.auth.orgId,
@@ -273,20 +275,15 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
             ? { currentRecordType: req.query.recordType, currentRecordId: req.query.recordId }
             : {}),
         },
+        include: { user: { select: { name: true } } },
         take: 50,
       });
-      const userIds = rows.map((r) => r.userId);
-      const users = await prisma.user.findMany({
-        where: { id: { in: userIds } },
-        select: { id: true, name: true },
-      });
-      const userMap = new Map(users.map((u) => [u.id, u.name]));
       return {
         items: rows.map((r) => ({
           id: r.id,
           orgId: r.orgId,
           userId: r.userId,
-          userName: userMap.get(r.userId) ?? null,
+          userName: r.user?.name ?? null,
           status: r.status as z.infer<typeof UserPresence>['status'],
           currentRecordType: r.currentRecordType,
           currentRecordId: r.currentRecordId,

@@ -169,6 +169,20 @@ export const roleRoutes: FastifyPluginAsyncZod = async (server) => {
       }
 
       if (req.body.permissionIds !== undefined) {
+        // BS-33: validate that every supplied permissionId actually exists
+        // before wiring them to the role. Unknown IDs are silently skipped by
+        // skipDuplicates; validating here surfaces bad input with a clear 400.
+        if (req.body.permissionIds.length > 0) {
+          const found = await prisma.permission.findMany({
+            where: { id: { in: req.body.permissionIds } },
+            select: { id: true },
+          });
+          if (found.length !== req.body.permissionIds.length) {
+            const foundIds = new Set(found.map((p) => p.id));
+            const bad = req.body.permissionIds.filter((pid) => !foundIds.has(pid));
+            throw server.httpErrors.badRequest(`Unknown permissionId(s): ${bad.join(', ')}`);
+          }
+        }
         await prisma.rolePermission.deleteMany({
           where: { roleId: req.params.id },
         });

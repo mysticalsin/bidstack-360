@@ -142,6 +142,10 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/tasks',
     {
+      // WHY: any org member with tasks:write can create a task; the
+      // admin-vs-assignee ownership check only applies to mutations on
+      // existing tasks (PATCH/DELETE below).
+      preHandler: [server.requirePermission('tasks:write')],
       schema: {
         body: TaskCreate,
         response: { 201: Task },
@@ -197,6 +201,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
   server.patch(
     '/tasks/:id',
     {
+      preHandler: [server.requirePermission('tasks:write')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: TaskPatch,
@@ -316,6 +321,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/tasks/:id',
     {
+      preHandler: [server.requirePermission('tasks:write')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 204: z.null() },
