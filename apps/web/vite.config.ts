@@ -115,21 +115,12 @@ export default defineConfig(({ command, mode }) => {
             // stub mode. Audit B2 (2026-05-10) regression guard.
             if (normalized.includes('/@clerk/')) return 'clerk';
             if (normalized.includes('/@sentry/')) return 'sentry';
-            // Heavy geo/map deps only used by TerritoriesPage — keep them in the
-            // route chunk so the rest of the app never pays the download cost.
-            if (
-              normalized.includes('/react-simple-maps/') ||
-              normalized.includes('/d3-geo/') ||
-              normalized.includes('/d3-scale/') ||
-              normalized.includes('/topojson-client/')
-            ) {
-              return undefined;
-            }
             // framer-motion ships ~50KB gzipped — isolate so the rest of
             // vendor stays lean and motion can be cached separately across
             // deploys where only app code changes.
             if (
               normalized.includes('/node_modules/framer-motion/') ||
+              normalized.includes('/node_modules/motion/') ||
               normalized.includes('/node_modules/motion-utils/') ||
               normalized.includes('/node_modules/motion-dom/')
             ) {
@@ -148,12 +139,64 @@ export default defineConfig(({ command, mode }) => {
             // used by lazy-loaded route pages. Pulling them out of the vendor
             // catch-all means they are never downloaded on initial page load —
             // only when the user first navigates to analytics / RFP / collab /
-            // kanban. Together they represent ~500 kB of the vendor chunk.
+            // kanban. Bundle-analyzer (2026-05-28) confirmed these transitive
+            // deps were silently inflating the vendor catch-all.
             //
-            // recharts — only WidgetRenderer (→ AnalyticsDashboardPage, lazy)
+            // recharts + its entire d3 family, animation helpers, and
+            // comparison utilities — only WidgetRenderer (→ AnalyticsDashboardPage,
+            // lazy). Bundle-analyzer (2026-05-28) revealed the full transitive
+            // closure leaking into vendor. Capturing them here eliminates a
+            // charts→vendor→charts circular chunk warning from Rollup.
             if (normalized.includes('/recharts/')) return 'charts';
-            // @tiptap + prosemirror — only RFP draft/compliance editors (lazy)
-            if (normalized.includes('/@tiptap/') || normalized.includes('/prosemirror-')) {
+            if (normalized.includes('/decimal.js')) return 'charts';
+            // recharts smooth animation lib — MUST be co-located with recharts;
+            // react-smooth imports d3-interpolate (charts), creating the cycle if
+            // react-smooth itself went to vendor.
+            if (normalized.includes('/react-smooth/')) return 'charts';
+            if (normalized.includes('/react-resize-detector/')) return 'charts';
+            if (normalized.includes('/eventemitter3/')) return 'charts';
+            if (normalized.includes('/fast-equals/')) return 'charts';
+            if (
+              normalized.includes('/d3-color/') ||
+              normalized.includes('/d3-scale/') ||
+              normalized.includes('/d3-shape/') ||
+              normalized.includes('/d3-time/') ||
+              normalized.includes('/d3-time-format/') ||
+              normalized.includes('/d3-format/') ||
+              normalized.includes('/d3-interpolate/') ||
+              normalized.includes('/d3-array/') ||
+              normalized.includes('/d3-path/') ||
+              normalized.includes('/d3-selection/') ||
+              normalized.includes('/d3-transition/') ||
+              normalized.includes('/d3-dispatch/') ||
+              normalized.includes('/d3-timer/') ||
+              normalized.includes('/d3-drag/') ||
+              normalized.includes('/d3-zoom/') ||
+              normalized.includes('/internmap/') ||
+              normalized.includes('/robust-predicates/')
+            ) {
+              return 'charts';
+            }
+            // react-simple-maps + d3-geo + topojson — only TerritoriesPage (lazy)
+            if (
+              normalized.includes('/react-simple-maps/') ||
+              normalized.includes('/d3-geo/') ||
+              normalized.includes('/topojson-client/') ||
+              normalized.includes('/topojson-specification/')
+            ) {
+              return 'maps';
+            }
+            // @tiptap + prosemirror + their transitive deps — only RFP/compliance editors (lazy)
+            if (
+              normalized.includes('/@tiptap/') ||
+              normalized.includes('/prosemirror-') ||
+              normalized.includes('/node_modules/linkifyjs/') ||
+              normalized.includes('/node_modules/linkify-') ||
+              normalized.includes('/node_modules/y-prosemirror/') ||
+              normalized.includes('/rope-sequence/') ||
+              normalized.includes('/w3c-keyname/') ||
+              normalized.includes('/orderedmap/')
+            ) {
               return 'editor';
             }
             // yjs collaboration stack — only CollaborativeRichTextEditor (lazy)
