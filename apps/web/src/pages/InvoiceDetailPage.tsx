@@ -7,6 +7,7 @@ import { useParams, Link } from 'react-router-dom';
 import { InvoiceStateBadge } from '@/components/sales/InvoiceStateBadge';
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
+import { confirm } from '@/components/ui/ConfirmDialog';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { formatDate, formatMoneyMicros } from '@/lib/format';
@@ -112,8 +113,15 @@ export function InvoiceDetailPage() {
           {(d?.state === 'draft' || d?.state === 'sent' || d?.state === 'overdue') && (
             <button
               type="button"
-              onClick={() => {
-                if (window.confirm('Cancel this invoice?')) {
+              onClick={async () => {
+                if (
+                  await confirm({
+                    title: 'Cancel invoice?',
+                    description: 'This cannot be undone.',
+                    confirmLabel: 'Cancel Invoice',
+                    destructive: true,
+                  })
+                ) {
                   cancelInvoice.mutate(
                     { id: d.id },
                     {

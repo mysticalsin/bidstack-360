@@ -38,8 +38,9 @@ export function ReportsPage() {
           <button
             key={t.key}
             type="button"
+            aria-pressed={tab === t.key}
             onClick={() => setTab(t.key)}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px] ${
               tab === t.key
                 ? 'bg-[var(--fg-primary)] text-[var(--surface-page)]'
                 : 'bg-[var(--surface-sunken)] text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)]'
