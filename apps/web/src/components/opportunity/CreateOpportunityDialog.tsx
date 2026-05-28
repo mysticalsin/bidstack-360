@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from '@/components/ui/Dialog';
 import { LookupFieldPicker, type LookupOption } from '@/components/ui/LookupFieldPicker';
+import { Select } from '@/components/ui/Select';
 import { api } from '@/lib/api';
 import {
   INDUSTRIES,
@@ -242,15 +243,6 @@ function Field({
 function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      {...props}
-      className="w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-3 py-1.5 text-sm text-[var(--fg-primary)] hover:border-[var(--border-strong)] focus-visible:border-[var(--border-focus)] transition-colors"
-    />
-  );
-}
-
-function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return (
-    <select
       {...props}
       className="w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-3 py-1.5 text-sm text-[var(--fg-primary)] hover:border-[var(--border-strong)] focus-visible:border-[var(--border-focus)] transition-colors"
     />

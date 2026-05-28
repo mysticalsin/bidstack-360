@@ -99,7 +99,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                 animate={reduced ? { opacity: 1 } : { opacity: 1, scale: 1, y: 0 }}
                 exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.98, y: -4 }}
                 transition={springModal}
-                className="fixed left-1/2 top-[15vh] z-50 w-[min(560px,92vw)] -translate-x-1/2 rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] shadow-[var(--shadow-lg)] outline-none"
+                className="fixed left-1/2 top-[15vh] z-50 w-[min(560px,92vw)] -translate-x-1/2 rounded-xl outline-none glass-menu"
               >
                 <Dialog.Title className="sr-only">Command palette</Dialog.Title>
                 <PaletteBody onClose={() => onOpenChange(false)} />
@@ -193,7 +193,11 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
     // Shown at the very top — before recents — so they are immediately reachable.
     // Filtered by query when one is typed.
     for (const cmd of contextualCommands) {
-      if (!q || cmd.label.toLowerCase().includes(q) || (cmd.hint?.toLowerCase().includes(q) ?? false)) {
+      if (
+        !q ||
+        cmd.label.toLowerCase().includes(q) ||
+        (cmd.hint?.toLowerCase().includes(q) ?? false)
+      ) {
         out.push({
           id: `ctx:${cmd.id}`,
           group: 'action',
@@ -531,13 +535,16 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
               onMouseEnter={() => setActiveIdx(i)}
               onClick={item.onSelect}
               onKeyDown={(e) => handleItemKeyDown(e, item)}
-              // min-h-11 keeps touch targets ≥ 44px (WCAG 2.5.5 AA);
-              // the active row also gets a tinted background.
-              className={cn(
-                'flex min-h-11 cursor-pointer items-center justify-between gap-3 px-4 py-2.5 text-sm',
-                active && 'bg-[var(--brand-primary-tint)]',
-              )}
+              // min-h-11 keeps touch targets ≥ 44px (WCAG 2.5.5 AA)
+              className="relative flex min-h-11 cursor-pointer items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors rounded-lg mx-2 my-0.5 bg-transparent z-10"
             >
+              {active && (
+                <motion.div
+                  layoutId="command-palette-highlight"
+                  className="absolute inset-0 bg-[var(--surface-hover)] rounded-lg -z-10"
+                  transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                />
+              )}
               <div className="flex items-center gap-2 min-w-0">
                 {item.leading ? (
                   <span className="shrink-0" aria-hidden>
@@ -546,8 +553,10 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
                 ) : (
                   <span
                     className={cn(
-                      'text-[10px] font-mono uppercase tracking-wider',
-                      active ? 'text-[var(--brand-primary)]' : 'text-[var(--fg-tertiary)]',
+                      'text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md font-mono border transition-all',
+                      active
+                        ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] text-[var(--brand-primary)]'
+                        : 'border-[var(--border-default)] bg-[var(--surface-sunken)] text-[var(--fg-tertiary)]',
                     )}
                   >
                     {groupTag(item.group)}
@@ -555,11 +564,11 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
                 )}
                 <span
                   className={cn(
-                    'truncate',
+                    'truncate transition-colors',
                     active ? 'text-[var(--brand-primary)] font-medium' : 'text-[var(--fg-primary)]',
                   )}
                 >
-                  {item.label}
+                  {highlightText(item.label, query, active)}
                 </span>
               </div>
               {item.hint ? (
@@ -647,4 +656,32 @@ function groupTag(group: Item['group']): string {
   if (group === 'task') return 'todo';
   if (group === 'agent') return 'agent';
   return group;
+}
+
+function highlightText(text: string, query: string, active: boolean) {
+  if (!query) return <span>{text}</span>;
+  const parts = text.split(new RegExp(`(${escapeRegExp(query)})`, 'gi'));
+  return (
+    <span>
+      {parts.map((part, i) =>
+        part.toLowerCase() === query.toLowerCase() ? (
+          <mark
+            key={i}
+            className={cn(
+              'bg-yellow-500/20 text-yellow-900 dark:bg-yellow-500/30 dark:text-yellow-100 rounded-sm px-0.5 font-semibold',
+              active && 'bg-yellow-500/30 font-bold',
+            )}
+          >
+            {part}
+          </mark>
+        ) : (
+          part
+        ),
+      )}
+    </span>
+  );
+}
+
+function escapeRegExp(string: string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

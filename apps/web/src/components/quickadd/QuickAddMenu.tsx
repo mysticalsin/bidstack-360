@@ -101,7 +101,7 @@ export function QuickAddMenu() {
                   animate={reduced ? { opacity: 1 } : { opacity: 1, scale: 1, y: 0 }}
                   exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.98, y: -4 }}
                   transition={springModal}
-                  className="fixed left-1/2 top-[20vh] z-50 w-[min(440px,92vw)] -translate-x-1/2 overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] shadow-[var(--shadow-lg)] outline-none"
+                  className="fixed left-1/2 top-[20vh] z-50 w-[min(440px,92vw)] -translate-x-1/2 overflow-hidden rounded-xl outline-none glass-menu"
                   onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
                     if (e.key === 'ArrowDown') {
                       e.preventDefault();
@@ -126,7 +126,7 @@ export function QuickAddMenu() {
                   <RadixDialog.Title className="border-b border-[var(--border-subtle)] px-4 py-3 text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
                     Create
                   </RadixDialog.Title>
-                  <ul role="listbox" className="py-1">
+                  <ul role="listbox" className="p-1">
                     {OPTIONS.map((opt, i) => {
                       const active = i === activeIdx;
                       return (
@@ -136,15 +136,19 @@ export function QuickAddMenu() {
                           aria-selected={active}
                           onMouseEnter={() => setActiveIdx(i)}
                           onClick={() => choose(opt.key)}
-                          className={cn(
-                            'flex cursor-pointer items-center justify-between gap-3 px-4 py-2.5 text-sm',
-                            active && 'bg-[var(--brand-primary-tint)]',
-                          )}
+                          className="relative flex cursor-pointer items-center justify-between gap-3 px-4 py-3 text-sm transition-colors rounded-lg mx-1.5 my-1 bg-transparent z-10"
                         >
+                          {active && (
+                            <motion.div
+                              layoutId="quick-add-highlight"
+                              className="absolute inset-0 bg-[var(--surface-hover)] rounded-lg -z-10"
+                              transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                            />
+                          )}
                           <div className="min-w-0">
                             <div
                               className={cn(
-                                'font-medium',
+                                'font-medium transition-colors',
                                 active ? 'text-[var(--brand-primary)]' : 'text-[var(--fg-primary)]',
                               )}
                             >
@@ -154,7 +158,7 @@ export function QuickAddMenu() {
                               {opt.description}
                             </div>
                           </div>
-                          <kbd className="rounded border border-[var(--border-default)] bg-[var(--surface-sunken)] px-1.5 py-0.5 text-[10px] font-mono text-[var(--fg-tertiary)]">
+                          <kbd className="rounded border border-[var(--border-default)] bg-[var(--surface-sunken)] px-2 py-1 text-[10px] font-mono text-[var(--fg-tertiary)] shadow-sm font-semibold">
                             {opt.hint}
                           </kbd>
                         </li>

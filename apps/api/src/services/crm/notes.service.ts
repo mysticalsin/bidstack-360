@@ -25,26 +25,46 @@ export const STACK_DICTIONARY: Array<{
   name: string;
   aliases: string[];
 }> = [
-  { category: 'IT Infrastructure', name: 'Microsoft 365', aliases: ['microsoft 365', 'office 365', 'm365'] },
+  {
+    category: 'IT Infrastructure',
+    name: 'Microsoft 365',
+    aliases: ['microsoft 365', 'office 365', 'm365'],
+  },
   { category: 'IT Infrastructure', name: 'Azure', aliases: ['azure', 'microsoft azure'] },
   { category: 'IT Infrastructure', name: 'AWS', aliases: ['aws', 'amazon web services'] },
   { category: 'IT Infrastructure', name: 'Google Cloud', aliases: ['google cloud', 'gcp'] },
   { category: 'IT Infrastructure', name: 'VMware', aliases: ['vmware', 'vsphere'] },
   { category: 'IT Infrastructure', name: 'Snowflake', aliases: ['snowflake'] },
   { category: 'IT Infrastructure', name: 'Databricks', aliases: ['databricks'] },
-  { category: 'Identity & Access', name: 'Microsoft Entra ID', aliases: ['entra id', 'azure ad', 'microsoft entra'] },
+  {
+    category: 'Identity & Access',
+    name: 'Microsoft Entra ID',
+    aliases: ['entra id', 'azure ad', 'microsoft entra'],
+  },
   { category: 'Identity & Access', name: 'Okta', aliases: ['okta'] },
   { category: 'Identity & Access', name: 'Duo', aliases: ['duo', 'duo security'] },
-  { category: 'Identity & Access', name: 'Active Directory', aliases: ['active directory', 'ad ds'] },
+  {
+    category: 'Identity & Access',
+    name: 'Active Directory',
+    aliases: ['active directory', 'ad ds'],
+  },
   { category: 'Security', name: 'CrowdStrike', aliases: ['crowdstrike', 'crowd strike'] },
-  { category: 'Security', name: 'Microsoft Defender', aliases: ['microsoft defender', 'defender for endpoint'] },
+  {
+    category: 'Security',
+    name: 'Microsoft Defender',
+    aliases: ['microsoft defender', 'defender for endpoint'],
+  },
   { category: 'Security', name: 'Proofpoint', aliases: ['proofpoint'] },
   { category: 'Security', name: 'SentinelOne', aliases: ['sentinelone', 'sentinel one'] },
   { category: 'Security', name: 'Wiz', aliases: ['wiz'] },
   { category: 'Security', name: 'Snyk', aliases: ['snyk'] },
   { category: 'Endpoints', name: 'Microsoft Intune', aliases: ['intune', 'microsoft intune'] },
   { category: 'Endpoints', name: 'Jamf Pro', aliases: ['jamf pro', 'jamf'] },
-  { category: 'Endpoints', name: 'Windows', aliases: ['windows 11', 'windows 10', 'windows endpoints'] },
+  {
+    category: 'Endpoints',
+    name: 'Windows',
+    aliases: ['windows 11', 'windows 10', 'windows endpoints'],
+  },
   { category: 'Endpoints', name: 'macOS', aliases: ['macos', 'mac os', 'mac endpoints'] },
   { category: 'Endpoints', name: 'iOS', aliases: ['ios', 'ipad', 'iphone'] },
   { category: 'Network', name: 'Cisco Meraki', aliases: ['cisco meraki', 'meraki'] },
@@ -266,7 +286,6 @@ export async function persistContacts(
   const existing = await tx.contact.findMany({
     where: {
       orgId,
-      customer: companyName,
       OR: [
         ...(emails.length > 0 ? [{ email: { in: emails } }] : []),
         { name: { in: names, mode: 'insensitive' } },

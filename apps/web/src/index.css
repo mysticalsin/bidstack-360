@@ -146,6 +146,11 @@
   --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.09), 0 4px 12px rgba(0, 0, 0, 0.04);
   --focus-ring: 0 0 0 3px rgba(44, 75, 255, 0.14);
   --focus-ring-color: rgba(44, 75, 255, 0.35);
+
+  /* Glassmorphism tokens */
+  --surface-glass: rgba(255, 255, 255, 0.72);
+  --border-glow: rgba(44, 75, 255, 0.08);
+  --border-glow-strong: rgba(44, 75, 255, 0.16);
 }
 
 /* ---------- Dark theme — MDM ROI Navigator purple-black aesthetic ---------- */
@@ -512,6 +517,18 @@ a {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border-default);
+}
+
+.glass-menu {
+  background: var(--surface-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-glow-strong);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme='dark'] .glass-menu {
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
 }
 
 /* Card with elevated violet glow on hover */

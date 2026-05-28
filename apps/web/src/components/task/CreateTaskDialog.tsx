@@ -6,6 +6,7 @@ import { useState, type FormEvent } from 'react';
 
 import { Button } from '@/components/ui/Button';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/Dialog';
+import { Select } from '@/components/ui/Select';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { useCreateTask } from '@/hooks/useTasks';
 import type { TaskStatus } from '@bidstack/shared';
@@ -104,11 +105,10 @@ export function CreateTaskDialog({ oppId, trigger, open: controlledOpen, onOpenC
 
             <div className="grid grid-cols-2 gap-3">
               <Field label="Opportunity" htmlFor="task-opp">
-                <select
+                <Select
                   id="task-opp"
                   value={linkedOppId}
                   onChange={(e) => setLinkedOppId(e.target.value)}
-                  className="dialog-input"
                 >
                   <option value="">— None —</option>
                   {opps.data?.items.map((o) => (
@@ -116,20 +116,19 @@ export function CreateTaskDialog({ oppId, trigger, open: controlledOpen, onOpenC
                       {o.code} · {o.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </Field>
               <Field label="Status" htmlFor="task-status">
-                <select
+                <Select
                   id="task-status"
                   value={status}
                   onChange={(e) => setStatus(e.target.value as TaskStatus)}
-                  className="dialog-input"
                 >
                   <option value="open">Open</option>
                   <option value="in_progress">In progress</option>
                   <option value="blocked">Blocked</option>
                   <option value="done">Done</option>
-                </select>
+                </Select>
               </Field>
             </div>
 

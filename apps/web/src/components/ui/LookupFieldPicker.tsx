@@ -22,6 +22,7 @@ import {
   useState,
   type KeyboardEvent,
 } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 
 import { cn } from '@/lib/cn';
 
@@ -99,11 +100,11 @@ export function LookupFieldPicker({
     if (query.trim().length < MIN_QUERY_LEN) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- short queries clear stale async search results.
       setResults([]);
-       
+
       setLoading(false);
       return;
     }
-     
+
     setLoading(true);
     timerRef.current = setTimeout(() => {
       void onSearch(query.trim()).then((r) => {
@@ -179,7 +180,7 @@ export function LookupFieldPicker({
           aria-label={label ?? placeholder}
           type="search"
           value={displayValue}
-          placeholder={open ? placeholder : (value ? undefined : placeholder)}
+          placeholder={open ? placeholder : value ? undefined : placeholder}
           disabled={disabled}
           autoComplete="off"
           onFocus={() => setOpen(true)}
@@ -217,74 +218,98 @@ export function LookupFieldPicker({
             ×
           </button>
         ) : (
-          <span className="pointer-events-none absolute right-2 text-[var(--fg-tertiary)]" aria-hidden>
+          <span
+            className="pointer-events-none absolute right-2 text-[var(--fg-tertiary)]"
+            aria-hidden
+          >
             ▾
           </span>
         )}
       </div>
 
       {/* Dropdown */}
-      {open ? (
-        <ul
-          id={listboxId}
-          role="listbox"
-          aria-label={label ?? placeholder}
-          className={cn(
-            'absolute z-50 mt-1 w-full rounded-lg border border-[var(--border-default)]',
-            'bg-[var(--surface-card)] shadow-[var(--shadow-lg)]',
-            'max-h-60 overflow-y-auto py-1',
-          )}
-        >
-          {loading ? (
-            <li className="px-3 py-2 text-xs text-[var(--fg-tertiary)]" aria-live="polite">
-              Searching…
-            </li>
-          ) : options.length === 0 ? (
-            <li className="px-3 py-2 text-xs text-[var(--fg-tertiary)]">
-              {query.length >= MIN_QUERY_LEN ? 'No results.' : 'Type to search…'}
-            </li>
-          ) : (
-            options.map((opt, i) => {
-              const active = i === safeIdx;
-              return (
-                <li
-                  key={opt.id}
-                  id={`${uid}-opt-${i}`}
-                  role="option"
-                  aria-selected={opt.id === value?.id}
-                  tabIndex={active ? 0 : -1}
-                  onMouseEnter={() => setActiveIdx(i)}
-                  onClick={() => select(opt)}
-                  onKeyDown={(e) => handleItemKeyDown(e, opt)}
-                  // min-h-11 = 44px touch target (WCAG 2.5.5 AA)
-                  className={cn(
-                    'flex min-h-11 cursor-pointer items-center gap-2 px-3 py-2 text-sm',
-                    active
-                      ? 'bg-[var(--brand-primary-tint)] text-[var(--brand-primary)]'
-                      : 'text-[var(--fg-primary)] hover:bg-[var(--surface-sunken)]',
-                    opt.id === value?.id && 'font-medium',
-                  )}
-                >
-                  {opt.leading ? (
-                    <span className="shrink-0" aria-hidden>
-                      {opt.leading}
-                    </span>
-                  ) : null}
-                  <span className="flex-1 truncate">{opt.label}</span>
-                  {opt.hint ? (
-                    <span className="shrink-0 text-xs text-[var(--fg-tertiary)]">{opt.hint}</span>
-                  ) : null}
-                  {opt.id === value?.id ? (
-                    <span className="shrink-0 text-xs" aria-hidden>
-                      ✓
-                    </span>
-                  ) : null}
-                </li>
-              );
-            })
-          )}
-        </ul>
-      ) : null}
+      <AnimatePresence>
+        {open && (
+          <motion.ul
+            id={listboxId}
+            role="listbox"
+            aria-label={label ?? placeholder}
+            initial={{ opacity: 0, y: -4, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute z-50 mt-1.5 w-full rounded-lg glass-menu max-h-60 overflow-y-auto p-1.5 focus:outline-none"
+          >
+            {loading ? (
+              <li className="px-3 py-2 text-xs text-[var(--fg-tertiary)]" aria-live="polite">
+                Searching…
+              </li>
+            ) : options.length === 0 ? (
+              <li className="px-3 py-2 text-xs text-[var(--fg-tertiary)]">
+                {query.length >= MIN_QUERY_LEN ? 'No results.' : 'Type to search…'}
+              </li>
+            ) : (
+              options.map((opt, i) => {
+                const active = i === safeIdx;
+                const isSelected = opt.id === value?.id;
+                return (
+                  <li
+                    key={opt.id}
+                    id={`${uid}-opt-${i}`}
+                    role="option"
+                    aria-selected={isSelected}
+                    tabIndex={active ? 0 : -1}
+                    onMouseEnter={() => setActiveIdx(i)}
+                    onClick={() => select(opt)}
+                    onKeyDown={(e) => handleItemKeyDown(e, opt)}
+                    // min-h-11 = 44px touch target (WCAG 2.5.5 AA)
+                    className={cn(
+                      'relative flex min-h-11 cursor-pointer items-center gap-2 px-3 py-2 text-sm rounded-md transition-all duration-150 bg-transparent z-10 select-none mx-0.5 my-0.5',
+                      isSelected && 'font-medium',
+                    )}
+                  >
+                    {active && (
+                      <motion.div
+                        layoutId={`${uid}-highlight`}
+                        className="absolute inset-0 bg-[var(--surface-hover)] rounded-md -z-10"
+                        transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                      />
+                    )}
+                    {opt.leading ? (
+                      <span className="shrink-0" aria-hidden>
+                        {opt.leading}
+                      </span>
+                    ) : null}
+                    <span className="flex-1 truncate">{opt.label}</span>
+                    {opt.hint ? (
+                      <span className="shrink-0 text-xs text-[var(--fg-tertiary)]">{opt.hint}</span>
+                    ) : null}
+                    {isSelected ? (
+                      <span
+                        className="shrink-0 text-[var(--brand-primary)] flex items-center justify-center ml-2"
+                        aria-hidden
+                      >
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      </span>
+                    ) : null}
+                  </li>
+                );
+              })
+            )}
+          </motion.ul>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
