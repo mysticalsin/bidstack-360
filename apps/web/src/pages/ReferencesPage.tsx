@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
-import { EmptyState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useReferences, useUseReference } from '@/hooks/useReferences';
 import { useAccountIndustries } from '@/hooks/useKeyAccounts';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
@@ -30,9 +30,7 @@ export function ReferencesPage() {
   const items = references.data?.items ?? [];
 
   // Collect all unique tags for the filter
-  const allTags = Array.from(
-    new Set(items.flatMap((r) => r.tags)),
-  ).sort();
+  const allTags = Array.from(new Set(items.flatMap((r) => r.tags))).sort();
 
   return (
     <motion.div
@@ -56,7 +54,12 @@ export function ReferencesPage() {
         className="flex flex-wrap items-center gap-3"
       >
         <div className="relative flex-1 min-w-[200px]">
-          <Icon name="search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--fg-tertiary)]" ariaHidden />
+          <Icon
+            name="search"
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--fg-tertiary)]"
+            ariaHidden
+          />
           <input
             type="search"
             placeholder="Search references..."
@@ -65,24 +68,20 @@ export function ReferencesPage() {
             className="input w-full pl-9"
           />
         </div>
-        <select
-          value={industry}
-          onChange={(e) => setIndustry(e.target.value)}
-          className="input"
-        >
+        <select value={industry} onChange={(e) => setIndustry(e.target.value)} className="input">
           <option value="">All industries</option>
           {(industries.data?.items ?? []).map((i: string) => (
-            <option key={i} value={i}>{i}</option>
+            <option key={i} value={i}>
+              {i}
+            </option>
           ))}
         </select>
-        <select
-          value={tag}
-          onChange={(e) => setTag(e.target.value)}
-          className="input"
-        >
+        <select value={tag} onChange={(e) => setTag(e.target.value)} className="input">
           <option value="">All tags</option>
           {allTags.map((t) => (
-            <option key={t} value={t}>{t}</option>
+            <option key={t} value={t}>
+              {t}
+            </option>
           ))}
         </select>
       </motion.div>
@@ -90,6 +89,15 @@ export function ReferencesPage() {
       {/* Reference grid */}
       {references.isLoading ? (
         <LoadingSkeleton rows={4} />
+      ) : references.isError ? (
+        <ErrorState
+          title="Could not load references"
+          message={
+            references.error instanceof Error
+              ? references.error.message
+              : 'Please try again in a moment.'
+          }
+        />
       ) : items.length === 0 ? (
         <EmptyState
           title="No references yet"
@@ -113,9 +121,7 @@ export function ReferencesPage() {
                         <span className="text-sm font-semibold text-[var(--fg-primary)]">
                           {ref.title}
                         </span>
-                        {ref.industry && (
-                          <Badge tone="blue">{ref.industry}</Badge>
-                        )}
+                        {ref.industry && <Badge tone="blue">{ref.industry}</Badge>}
                       </div>
                       {ref.company && (
                         <div className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
@@ -150,9 +156,7 @@ export function ReferencesPage() {
 
                   <div className="mt-4 flex items-center justify-between">
                     <div className="text-xs text-[var(--fg-tertiary)]">
-                      {ref.contactName && (
-                        <span className="mr-3">{ref.contactName}</span>
-                      )}
+                      {ref.contactName && <span className="mr-3">{ref.contactName}</span>}
                       {ref.lastUsedAt && (
                         <span>Last used: {new Date(ref.lastUsedAt).toLocaleDateString()}</span>
                       )}
