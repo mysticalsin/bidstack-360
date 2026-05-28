@@ -165,10 +165,20 @@ function NewWebhookDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] p-6 shadow-lg">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="wh-title"
+        className="w-full max-w-lg rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] p-6 shadow-lg"
+      >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[var(--fg-primary)]">
+          <h2 id="wh-title" className="text-lg font-semibold text-[var(--fg-primary)]">
             New webhook subscription
           </h2>
           <button
@@ -182,10 +192,14 @@ function NewWebhookDialog({
         </div>
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1">
+            <label
+              htmlFor="wh-url"
+              className="block text-xs font-medium text-[var(--fg-secondary)] mb-1"
+            >
               Endpoint URL
             </label>
             <input
+              id="wh-url"
               className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
               type="url"
               value={url}
@@ -195,10 +209,17 @@ function NewWebhookDialog({
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1">
+            <p
+              id="wh-events-label"
+              className="block text-xs font-medium text-[var(--fg-secondary)] mb-1"
+            >
               Events
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            </p>
+            <div
+              role="group"
+              aria-labelledby="wh-events-label"
+              className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+            >
               {EVENT_OPTIONS.map((e) => (
                 <label
                   key={e}
