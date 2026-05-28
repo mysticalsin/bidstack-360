@@ -22,8 +22,18 @@ import { startWebhookDeliveryWorker } from './queues/webhook-delivery.js';
 import { startYjsCompaction } from './queues/yjs-compaction.js';
 // Wave 8 — Customer Success workers
 import { startCsWorkers } from './queues/cs.js';
+// Wave 8 — Call-processing pipeline (fetch-recording → transcribe → analyze → update-deal)
+import { startCallWorkers } from './queues/calls.js';
 // Wave 8 — Predictive ML scoring retrain worker
 import { startPredictiveRetrainWorker } from './queues/predictive-retrain.js';
+// Wave 9 — RFP Automation Engine workers
+import { startRfpOrchestrator } from './queues/rfp-orchestrator.js';
+import { startRfpRequirementExtract } from './queues/rfp-requirement-extract.js';
+import { startRfpStoryMatch } from './queues/rfp-story-match.js';
+import { startRfpSectionDraft } from './queues/rfp-section-draft.js';
+import { startRfpComplianceFill } from './queues/rfp-compliance-fill.js';
+import { startRfpEmbedReference } from './queues/rfp-embed-reference.js';
+import { startRfpEmbedRequirement } from './queues/rfp-embed-requirement.js';
 
 const log = pino({
   level: process.env.LOG_LEVEL ?? 'info',
@@ -66,11 +76,20 @@ await Promise.all([
   startWebhookDeliveryWorker(connection, log, workers, queues),
   startYjsCompaction(connection, log, workers, queues),
   startCsWorkers(connection, log, workers, queues),
+  startCallWorkers(connection, log, workers, queues),
   startPredictiveRetrainWorker(connection, log, workers, queues),
+  // Wave 9 — RFP Automation Engine
+  startRfpOrchestrator(connection, log, workers, queues),
+  startRfpRequirementExtract(connection, log, workers, queues),
+  startRfpStoryMatch(connection, log, workers, queues),
+  startRfpSectionDraft(connection, log, workers, queues),
+  startRfpComplianceFill(connection, log, workers, queues),
+  startRfpEmbedReference(connection, log, workers, queues),
+  startRfpEmbedRequirement(connection, log, workers, queues),
 ]);
 
 log.info(
-  'BidStack worker ready (dust-poll + webhook-processor + company-enrich-apollo + document-extract + calendar-sync + email-sync + sms + native-push + webhook-delivery + yjs-compact + cs + predictive-retrain)',
+  'BidStack worker ready (dust-poll + webhook-processor + company-enrich-apollo + document-extract + calendar-sync + email-sync + sms + native-push + webhook-delivery + yjs-compact + cs + call-processing + predictive-retrain + rfp-orchestrator + rfp-requirement-extract + rfp-story-match + rfp-section-draft + rfp-compliance-fill + rfp-embed-reference + rfp-embed-requirement)',
 );
 
 const healthPort = Number(process.env.WORKER_HEALTH_PORT || 4002);
