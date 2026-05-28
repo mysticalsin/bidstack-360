@@ -1,81 +1,38 @@
+/**
+ * CommandPalette — global ⌘K search/navigation overlay.
+ *
+ * Shell (this file, ~270 lines):
+ *   CommandPalette    → Radix Dialog + Framer Motion chrome
+ *   PaletteBody       → query state, keyboard nav, list JSX
+ *   highlightText     → inline JSX helper (JSX, only used here)
+ *
+ * Extracted:
+ *   commandPaletteUtils.ts  → pure types, constants, matchers, formatters
+ *   usePaletteItems.ts      → all hooks + item-list memo
+ */
 import * as Dialog from '@radix-ui/react-dialog';
-import { useQuery } from '@tanstack/react-query';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   useCallback,
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
-  type ReactNode,
 } from 'react';
-import { useNavigate } from 'react-router-dom';
 
-import { CompanyLogo } from '@/components/company/CompanyLogo';
-import { useCommandContextStore } from '@/hooks/useCommandContext';
-import { useContacts } from '@/hooks/useContacts';
-import { useCrmDashboard } from '@/hooks/useCrmDashboard';
-import { useGlobalSearch } from '@/hooks/useGlobalSearch';
-import { useTasks } from '@/hooks/useTasks';
-import { useAgents } from '@/hooks/useAgents';
-import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { springModal } from '@/lib/motion';
-import { getRecents, pushRecent, type RecentEntry } from '@/lib/palette-recents';
-import { useAccountHistory } from '@/stores/accountHistory';
-import type { Contact, CrmCompany, OpportunityPage, Task } from '@bidstack/shared';
 
-// Caps per section keep the palette scannable on large tenants. The bigger
-// concern than total length is *section dominance* — one big section
-// drowning the others — so we cap each independently.
-const ACCOUNT_RESULT_LIMIT = 6;
-const CONTACT_RESULT_LIMIT = 6;
-const TASK_RESULT_LIMIT = 6;
+import { findDirectNavTarget, groupTag, type Item } from './commandPaletteUtils';
+import { usePaletteItems } from './usePaletteItems';
+
+// ── Public component ─────────────────────────────────────────────────────────
 
 interface CommandPaletteProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
-interface Item {
-  id: string;
-  group:
-    | 'navigate'
-    | 'opportunity'
-    | 'account'
-    | 'contact'
-    | 'task'
-    | 'action'
-    | 'company'
-    | 'note'
-    | 'sales_order'
-    | 'invoice'
-    | 'agent';
-  label: string;
-  hint?: string;
-  // Optional leading visual (e.g. CompanyLogo for account rows). Group label
-  // is suppressed when this is set so the icon carries the group affordance.
-  leading?: ReactNode;
-  onSelect: () => void;
-}
-
-type NavTarget = { to: string; label: string; hint: string };
-
-const NAV_TARGETS: NavTarget[] = [
-  { to: '/dashboard', label: 'Go to Dashboard', hint: '⌘1' },
-  { to: '/accounts', label: 'Go to Accounts', hint: '⌘A' },
-  { to: '/opportunities', label: 'Go to Opportunities', hint: '⌘2' },
-  { to: '/pipeline', label: 'Go to Pipeline (kanban)', hint: '⌘3' },
-  { to: '/contacts', label: 'Go to Contacts', hint: '⌘4' },
-  { to: '/tasks', label: 'Go to Tasks', hint: '⌘5' },
-  { to: '/reports', label: 'Go to Reports', hint: '⌘6' },
-  { to: '/integrations', label: 'Go to Integrations', hint: '⌘7' },
-  { to: '/audit-log', label: 'Go to Audit log', hint: '⌘L' },
-  { to: '/settings', label: 'Go to Settings', hint: '⌘8' },
-  { to: '/search', label: 'Search across workspace', hint: '⌘9' },
-];
 
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const reduced = useReducedMotion();
@@ -112,309 +69,35 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   );
 }
 
+// ── PaletteBody ──────────────────────────────────────────────────────────────
+
 function PaletteBody({ onClose }: { onClose: () => void }) {
-  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // queryRef is a stable ref to the current query — used in the document
+  // keydown handler (closure captures the ref, not the stale state value).
   const queryRef = useRef('');
-  // Snapshot recents at mount — we don't want them shifting around while
-  // the palette is open (the user might select an item that's now at a
-  // different index than when they started typing).
-  const [recents] = useState<RecentEntry[]>(() => getRecents());
-  // Recently-visited accounts from the cockpit history store. Distinct
-  // from palette-recents (which tracks palette selections) — these come
-  // from actually opening an account view. Show top 3 so we don't crowd
-  // the empty-query state. We subscribe to the *whole* recents array
-  // (stable reference unless the store actually changes) and slice in a
-  // memo — slicing inside the selector would return a fresh array on
-  // every store read and trigger Zustand's "getSnapshot uncached" loop.
-  const allRecents = useAccountHistory((s) => s.recents);
-  const accountRecents = useMemo(() => allRecents.slice(0, 3), [allRecents]);
   const listRef = useRef<HTMLUListElement | null>(null);
 
+  const { items, isFetching, selectNavTarget } = usePaletteItems(query, onClose);
+
+  // Focus the input immediately on mount — both sync (for standard focus) and
+  // deferred one frame (for portals that mount slightly after the effect runs).
   useLayoutEffect(() => {
     inputRef.current?.focus();
     const frame = window.requestAnimationFrame(() => inputRef.current?.focus());
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
+  // Keep queryRef in sync so the document keydown handler always reads the
+  // latest query without needing to be recreated on every keystroke.
   useEffect(() => {
     queryRef.current = query;
   }, [query]);
 
-  const oppSearch = useQuery({
-    enabled: query.trim().length >= 2,
-    queryKey: ['palette:opps', query],
-    queryFn: ({ signal }) =>
-      api<OpportunityPage>(`/api/opportunities?search=${encodeURIComponent(query)}&limit=8`, {
-        signal,
-      }),
-  });
-
-  const globalSearch = useGlobalSearch(query);
-
-  // Dashboard snapshot is already in the React Query cache once the user has
-  // visited the dashboard, so this hook is effectively free here.
-  const dashboard = useCrmDashboard();
-  const companies = useMemo(() => dashboard.data?.companies ?? [], [dashboard.data?.companies]);
-
-  // Contacts + tasks are listed via the same hooks the pages use, so the
-  // palette inherits their cache state without re-fetching when the user
-  // has already opened those pages.
-  const contacts = useContacts();
-  const tasks = useTasks();
-  const agents = useAgents();
-  // Contextual commands registered by the currently mounted page (A3 — Twenty pattern).
-  // These appear at the top of the list (above nav) so page-specific actions are
-  // immediately reachable without scrolling or querying.
-  const contextualCommands = useCommandContextStore((s) => s.commands);
-
-  const selectNavTarget = useCallback(
-    (target: NavTarget) => {
-      pushRecent({
-        id: `nav:${target.to}`,
-        group: 'navigate',
-        label: target.label,
-        hint: target.hint,
-        route: target.to,
-      });
-      navigate(target.to);
-      onClose();
-    },
-    [navigate, onClose],
-  );
-
-  const items: Item[] = useMemo(() => {
-    const out: Item[] = [];
-    const q = query.trim().toLowerCase();
-
-    // Contextual commands from the active page (e.g. "Create task for this opp").
-    // Shown at the very top — before recents — so they are immediately reachable.
-    // Filtered by query when one is typed.
-    for (const cmd of contextualCommands) {
-      if (
-        !q ||
-        cmd.label.toLowerCase().includes(q) ||
-        (cmd.hint?.toLowerCase().includes(q) ?? false)
-      ) {
-        out.push({
-          id: `ctx:${cmd.id}`,
-          group: 'action',
-          label: cmd.label,
-          hint: cmd.hint,
-          onSelect: () => {
-            cmd.onSelect();
-            onClose();
-          },
-        });
-      }
-    }
-
-    // When the query is empty and the user has a history, show recents at
-    // the very top of the list — Spotlight/macOS-style "continue where you
-    // left off" surface.
-    if (!q && recents.length > 0) {
-      for (const r of recents) {
-        out.push({
-          id: `recent:${r.id}`,
-          group: r.group,
-          label: r.label,
-          hint: r.hint ?? 'Recently visited',
-          onSelect: () => {
-            navigate(r.route);
-            onClose();
-          },
-        });
-      }
-    }
-    // Cockpit-visit recents. Distinct from palette-recents — these are
-    // accounts the user actually opened the cockpit for, not just navigated
-    // to via the palette. Joining against `companies` lets us reuse the
-    // CompanyLogo affordance when the company is known.
-    if (!q && accountRecents.length > 0) {
-      for (const acc of accountRecents) {
-        const company = companies.find((c) => c.id === acc.slug);
-        const route = `/accounts/${encodeURIComponent(acc.slug)}`;
-        out.push({
-          id: `recent-account:${acc.slug}`,
-          group: 'account',
-          label: acc.name,
-          hint: 'Recently visited',
-          leading: company ? (
-            <CompanyLogo
-              name={company.name}
-              logo={company.logo}
-              domain={company.domain}
-              size={18}
-            />
-          ) : undefined,
-          onSelect: () => {
-            navigate(route);
-            onClose();
-          },
-        });
-      }
-    }
-    for (const n of NAV_TARGETS) {
-      if (!q || n.label.toLowerCase().includes(q)) {
-        out.push({
-          id: `nav:${n.to}`,
-          group: 'navigate',
-          label: n.label,
-          hint: n.hint,
-          onSelect: () => selectNavTarget(n),
-        });
-      }
-    }
-    for (const c of matchCompanies(companies, q, ACCOUNT_RESULT_LIMIT)) {
-      const route = `/accounts/${encodeURIComponent(c.id)}`;
-      const subtitle = accountSubtitle(c);
-      out.push({
-        id: `account:${c.id}`,
-        group: 'account',
-        label: c.name,
-        hint: subtitle,
-        leading: <CompanyLogo name={c.name} logo={c.logo} domain={c.domain} size={18} />,
-        onSelect: () => {
-          pushRecent({
-            id: `account:${c.id}`,
-            group: 'account',
-            label: c.name,
-            ...(subtitle ? { hint: subtitle } : {}),
-            route,
-          });
-          navigate(route);
-          onClose();
-        },
-      });
-    }
-    for (const p of matchContacts(contacts.data?.items ?? [], q, CONTACT_RESULT_LIMIT)) {
-      const route = `/contacts?search=${encodeURIComponent(p.name)}`;
-      const subtitle = contactSubtitle(p);
-      out.push({
-        id: `contact:${p.id}`,
-        group: 'contact',
-        label: p.name,
-        hint: subtitle,
-        onSelect: () => {
-          pushRecent({
-            id: `contact:${p.id}`,
-            group: 'contact',
-            label: p.name,
-            ...(subtitle ? { hint: subtitle } : {}),
-            route,
-          });
-          navigate(route);
-          onClose();
-        },
-      });
-    }
-    for (const t of matchTasks(tasks.data?.items ?? [], q, TASK_RESULT_LIMIT)) {
-      const route = `/tasks?search=${encodeURIComponent(t.title)}`;
-      const subtitle = taskSubtitle(t);
-      out.push({
-        id: `task:${t.id}`,
-        group: 'task',
-        label: t.title,
-        hint: subtitle,
-        onSelect: () => {
-          pushRecent({
-            id: `task:${t.id}`,
-            group: 'task',
-            label: t.title,
-            ...(subtitle ? { hint: subtitle } : {}),
-            route,
-          });
-          navigate(route);
-          onClose();
-        },
-      });
-    }
-    for (const g of globalSearch.data?.items ?? []) {
-      out.push({
-        id: `search:${g.type}:${g.id}`,
-        group: g.type === 'sales_order' ? 'opportunity' : g.type,
-        label: g.title,
-        hint: g.subtitle,
-        onSelect: () => {
-          pushRecent({
-            id: `search:${g.type}:${g.id}`,
-            group: g.type === 'sales_order' ? 'opportunity' : g.type,
-            label: g.title,
-            hint: g.subtitle,
-            route: g.url,
-          });
-          navigate(g.url);
-          onClose();
-        },
-      });
-    }
-    for (const o of oppSearch.data?.items ?? []) {
-      const route = `/opportunities/${o.id}`;
-      out.push({
-        id: `opp:${o.id}`,
-        group: 'opportunity',
-        label: `${o.code} — ${o.name}`,
-        hint: o.customer,
-        onSelect: () => {
-          pushRecent({
-            id: `opp:${o.id}`,
-            group: 'opportunity',
-            label: `${o.code} — ${o.name}`,
-            hint: o.customer,
-            route,
-          });
-          navigate(route);
-          onClose();
-        },
-      });
-    }
-    for (const a of agents.data?.items ?? []) {
-      if (
-        !q ||
-        a.name.toLowerCase().includes(q) ||
-        (a.description?.toLowerCase().includes(q) ?? false)
-      ) {
-        const route = `/agents`;
-        out.push({
-          id: `agent:${a.id}`,
-          group: 'agent',
-          label: `Run ${a.name}`,
-          hint: a.description ?? 'Agent',
-          onSelect: () => {
-            pushRecent({
-              id: `agent:${a.id}`,
-              group: 'agent',
-              label: `Run ${a.name}`,
-              hint: a.description ?? 'Agent',
-              route,
-            });
-            navigate(route);
-            onClose();
-          },
-        });
-      }
-    }
-    return out;
-  }, [
-    query,
-    companies,
-    oppSearch.data,
-    globalSearch.data,
-    contacts.data?.items,
-    tasks.data?.items,
-    navigate,
-    onClose,
-    recents,
-    accountRecents,
-    agents.data?.items,
-    selectNavTarget,
-    contextualCommands,
-  ]);
-
   // Auto-scroll the active row into view when arrowing through long result
-  // lists. Defer to next frame so the DOM has settled with the new active
+  // lists. Deferred one frame so the DOM has settled with the new active
   // class before we measure.
   useEffect(() => {
     if (!listRef.current) return;
@@ -423,13 +106,11 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
     node?.scrollIntoView({ block: 'nearest' });
   }, [activeIdx, items.length]);
 
-  // Clamp active index when the items shrink (e.g. user typed a more specific
-  // query). Compute the safe index inline rather than via a setState-in-effect.
+  // Clamp activeIdx when the result set shrinks (user typed more specifically).
   const safeIdx = items.length === 0 ? 0 : Math.min(activeIdx, items.length - 1);
 
-  // Activate the focused item with Enter or Space. The parent search input
-  // already handles arrow navigation; this handler is for screen-reader users
-  // who arrow directly into the listbox via voiceover/jaws gestures.
+  // Activate focused list item with Enter / Space for screen-reader users
+  // who arrow directly into the listbox via VoiceOver/JAWS gestures.
   const handleItemKeyDown = (e: KeyboardEvent<HTMLLIElement>, item: Item) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -437,6 +118,8 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
     }
   };
 
+  // If the user presses a printable key while focus is outside the input
+  // (e.g. on a list item), append the character to the query and re-focus.
   const appendQueryCharacter = useCallback((key: string) => {
     inputRef.current?.focus();
     setQuery((prev) => {
@@ -447,6 +130,8 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
     setActiveIdx(0);
   }, []);
 
+  // Capture printable keypresses anywhere in the document so the palette
+  // never "eats" a key without reflecting it in the query.
   useEffect(() => {
     const handleDocumentKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.defaultPrevented || event.target === inputRef.current) return;
@@ -454,7 +139,6 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
       appendQueryCharacter(event.key);
       event.preventDefault();
     };
-
     document.addEventListener('keydown', handleDocumentKeyDown, true);
     return () => document.removeEventListener('keydown', handleDocumentKeyDown, true);
   }, [appendQueryCharacter]);
@@ -483,7 +167,6 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
             const nextQuery = e.currentTarget.value;
             queryRef.current = nextQuery;
             setQuery(nextQuery);
-            // Re-anchor to the top of the new result set.
             setActiveIdx(0);
           }}
           onKeyDown={(e) => {
@@ -519,7 +202,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
       <ul ref={listRef} id="cmdk-list" role="listbox" className="max-h-[60vh] overflow-y-auto py-2">
         {items.length === 0 ? (
           <li className="px-4 py-6 text-center text-xs text-[var(--fg-tertiary)]">
-            {oppSearch.isFetching ? 'Searching…' : 'No matches.'}
+            {isFetching ? 'Searching…' : 'No matches.'}
           </li>
         ) : null}
         {items.map((item, i) => {
@@ -582,81 +265,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   );
 }
 
-// Substring match across name / legalName / domain. Cheap and predictable —
-// no fuzzy lib dependency, which is overkill for the dashboard's company list.
-function matchCompanies(companies: CrmCompany[], q: string, limit: number): CrmCompany[] {
-  if (!q) return companies.slice(0, limit);
-  const out: CrmCompany[] = [];
-  for (const c of companies) {
-    const haystack = [c.name, c.legalName ?? '', c.domain ?? ''].join('\n').toLowerCase();
-    if (haystack.includes(q)) out.push(c);
-    if (out.length >= limit) break;
-  }
-  return out;
-}
-
-function matchContacts(contacts: Contact[], q: string, limit: number): Contact[] {
-  if (!q) return [];
-  const out: Contact[] = [];
-  for (const c of contacts) {
-    const haystack = [c.name, c.email ?? '', c.role ?? '', c.customer].join('\n').toLowerCase();
-    if (haystack.includes(q)) out.push(c);
-    if (out.length >= limit) break;
-  }
-  return out;
-}
-
-function matchTasks(tasks: Task[], q: string, limit: number): Task[] {
-  if (!q) return [];
-  const out: Task[] = [];
-  for (const t of tasks) {
-    if (t.title.toLowerCase().includes(q)) out.push(t);
-    if (out.length >= limit) break;
-  }
-  return out;
-}
-
-function accountSubtitle(c: CrmCompany): string | undefined {
-  const parts = [c.industry, c.domain].filter((p): p is string => Boolean(p));
-  return parts.length ? parts.join(' · ') : undefined;
-}
-
-function contactSubtitle(c: Contact): string | undefined {
-  const parts = [c.role, c.customer].filter((p): p is string => Boolean(p));
-  return parts.length ? parts.join(' · ') : undefined;
-}
-
-function taskSubtitle(t: Task): string | undefined {
-  return t.dueDate ? `Due ${t.dueDate} · ${t.status}` : t.status;
-}
-
-function findDirectNavTarget(query: string): NavTarget | undefined {
-  const normalized = normalizeNavQuery(query);
-  if (!normalized) return undefined;
-  return NAV_TARGETS.find((target) => {
-    const label = normalizeNavQuery(
-      target.label
-        .replace(/^go to\s+/i, '')
-        .replace(/\([^)]*\)/g, '')
-        .trim(),
-    );
-    const route = normalizeNavQuery(target.to.replace(/^\//, ''));
-    return normalized === label || normalized === route;
-  });
-}
-
-function normalizeNavQuery(value: string) {
-  return value.trim().toLowerCase();
-}
-
-function groupTag(group: Item['group']): string {
-  if (group === 'opportunity') return 'opp';
-  if (group === 'account') return 'acct';
-  if (group === 'contact') return 'who';
-  if (group === 'task') return 'todo';
-  if (group === 'agent') return 'agent';
-  return group;
-}
+// ── Inline JSX helpers (only used in this file, not worth a separate .tsx) ───
 
 function highlightText(text: string, query: string, active: boolean) {
   if (!query) return <span>{text}</span>;
