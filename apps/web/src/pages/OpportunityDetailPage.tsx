@@ -1,10 +1,8 @@
 import { useState } from 'react';
-import { useReducedMotion } from 'framer-motion';
 import { useParams, Link } from 'react-router-dom';
 
 import { Badge, stageTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Card, SectionHeader } from '@/components/ui/Card';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { BriefingDialog } from '@/components/opportunity/BriefingDialog';
@@ -24,11 +22,19 @@ import { Icon } from '@/components/ui/Icon';
 import { MagneticButton } from '@/components/ui/MagneticButton';
 import { usePatchOpportunity, useOpportunity } from '@/hooks/useOpportunities';
 import { useOpportunityTimeline } from '@/hooks/useOpportunityTimeline';
-import { useBidScoreLatest } from '@/hooks/useBidScore';
 import { useCommandContext } from '@/hooks/useCommandContext';
 import { formatDate, formatMoney, formatStage } from '@/lib/format';
-
 import type { OpportunityStage, IntelPayload } from '@bidstack/shared';
+
+import {
+  DataFreshnessRibbon,
+  FinancialHealthCard,
+  WinPredictionCard,
+  TriggersCard,
+  CompetitorRadarCard,
+  NewsCard,
+} from './opportunityDetail/IntelCards';
+import { BidScoreCard } from './opportunityDetail/BidScoreCard';
 
 const STAGE_OPTIONS: ReadonlyArray<{ value: OpportunityStage; label: string }> = [
   { value: 's1_lead', label: 'S1 Lead' },
@@ -277,256 +283,7 @@ export function OpportunityDetailPage() {
       />
 
       {/* Controlled CreateTaskDialog driven by the command palette (A3). */}
-      <CreateTaskDialog
-        oppId={data.id}
-        open={taskOpen}
-        onOpenChange={setTaskOpen}
-      />
+      <CreateTaskDialog oppId={data.id} open={taskOpen} onOpenChange={setTaskOpen} />
     </div>
-  );
-}
-
-function DataFreshnessRibbon({ refreshedAt }: { refreshedAt?: string }) {
-  const reduced = useReducedMotion();
-  return (
-    <div className="flex items-center gap-2 text-xs text-[var(--fg-tertiary)]">
-      <span
-        className={`inline-block h-2 w-2 rounded-full bg-[var(--success)] ${reduced ? '' : 'animate-pulse'}`}
-        aria-hidden
-      />
-      <span>
-        Intel refreshed {refreshedAt ? formatDate(refreshedAt) : '—'} · Sources: Crunchbase,
-        LinkedIn, EU register
-      </span>
-    </div>
-  );
-}
-
-function FinancialHealthCard({ intel }: { intel: IntelPayload }) {
-  const f = intel.financial;
-  return (
-    <Card>
-      <SectionHeader title="Financial health" caption={f?.ticker ?? 'Private'} />
-      <div className="p-5 space-y-3 text-sm">
-        <Row label="Market cap" value={f?.marketCap ? formatMoney(f.marketCap, 'USD') : '—'} />
-        <Row
-          label="Revenue (TTM)"
-          value={f?.revenueAnnual ? formatMoney(f.revenueAnnual, 'USD') : '—'}
-        />
-        <Row
-          label="Growth"
-          value={f?.revenueGrowth != null ? `${(f.revenueGrowth * 100).toFixed(1)}%` : '—'}
-        />
-        <Row
-          label="EBITDA margin"
-          value={f?.ebitdaMargin != null ? `${(f.ebitdaMargin * 100).toFixed(1)}%` : '—'}
-        />
-        <Row label="Credit rating" value={f?.creditRating ?? '—'} />
-        <Row label="Headcount" value={f?.headcount?.toLocaleString() ?? '—'} />
-      </div>
-    </Card>
-  );
-}
-
-function WinPredictionCard({ intel }: { intel: IntelPayload }) {
-  const wp = intel.winPrediction;
-  if (!wp)
-    return (
-      <Card>
-        <SectionHeader title="Win prediction" />
-        <div className="p-5 text-xs text-[var(--fg-tertiary)]">No prediction available.</div>
-      </Card>
-    );
-  return (
-    <Card>
-      <SectionHeader title="Win prediction" caption={`Model ${wp.modelVersion}`} />
-      <div className="p-5 space-y-3">
-        <div className="flex items-baseline gap-2">
-          <div className="text-4xl font-bold tabular-nums text-[var(--fg-primary)]">
-            {wp.probability}%
-          </div>
-          <div className="text-xs text-[var(--fg-tertiary)]">probability</div>
-        </div>
-        <ul className="space-y-1.5">
-          {wp.drivers.map((d) => (
-            <li key={d.label} className="flex items-center justify-between text-xs">
-              <span className="text-[var(--fg-secondary)]">{d.label}</span>
-              <span
-                className={`tabular-nums font-medium ${d.contribution >= 0 ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}
-              >
-                {d.contribution > 0 ? '+' : ''}
-                {d.contribution}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </Card>
-  );
-}
-
-function TriggersCard({ intel }: { intel: IntelPayload }) {
-  return (
-    <Card>
-      <SectionHeader title="Buying triggers" caption="Weighted signals" />
-      <ul className="divide-y divide-[var(--border-subtle)]">
-        {(intel.triggers ?? []).map((t) => (
-          <li key={t.id} className="flex items-center justify-between gap-3 px-5 py-3">
-            <div className="min-w-0">
-              <div className="text-sm text-[var(--fg-primary)]">{t.label}</div>
-              <div className="text-xs text-[var(--fg-tertiary)]">
-                {t.kind} · {t.source ?? 'unknown'} · {formatDate(t.observedAt)}
-              </div>
-            </div>
-            <div
-              className="rounded-md bg-[var(--brand-primary-tint)] px-2 py-1 text-xs font-semibold text-[var(--brand-primary)] tabular-nums"
-              aria-label={`Weight ${t.weight}/10`}
-            >
-              {t.weight}/10
-            </div>
-          </li>
-        ))}
-        {!intel.triggers?.length ? (
-          <li className="px-5 py-6 text-xs text-[var(--fg-tertiary)]">No triggers detected yet.</li>
-        ) : null}
-      </ul>
-    </Card>
-  );
-}
-
-function CompetitorRadarCard({ intel }: { intel: IntelPayload }) {
-  return (
-    <Card>
-      <SectionHeader title="Competitor landscape" />
-      <ul className="divide-y divide-[var(--border-subtle)]">
-        {(intel.competitors ?? []).map((c) => (
-          <li key={c.vendor} className="px-5 py-3">
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="text-sm font-medium text-[var(--fg-primary)]">{c.vendor}</div>
-              <div className="text-xs tabular-nums text-[var(--fg-tertiary)]">{c.score}/100</div>
-            </div>
-            <div className="h-1.5 rounded-full bg-[var(--surface-sunken)] overflow-hidden">
-              <div className="h-full bg-[var(--brand-primary)]" style={{ width: `${c.score}%` }} />
-            </div>
-            <div className="mt-1.5 text-xs text-[var(--fg-tertiary)]">
-              + {c.strengths.join(', ') || '—'} · − {c.weaknesses.join(', ') || '—'}
-            </div>
-          </li>
-        ))}
-        {!intel.competitors?.length ? (
-          <li className="px-5 py-6 text-xs text-[var(--fg-tertiary)]">No competitors mapped.</li>
-        ) : null}
-      </ul>
-    </Card>
-  );
-}
-
-function NewsCard({ intel }: { intel: IntelPayload }) {
-  return (
-    <Card>
-      <SectionHeader title="Recent news" />
-      <ul className="divide-y divide-[var(--border-subtle)]">
-        {(intel.news ?? []).map((n) => (
-          <li key={n.id} className="px-5 py-3">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-[var(--fg-primary)]">{n.headline}</div>
-              <Badge
-                tone={
-                  n.sentiment === 'positive'
-                    ? 'jade'
-                    : n.sentiment === 'negative'
-                      ? 'tomato'
-                      : 'gray'
-                }
-              >
-                {n.sentiment}
-              </Badge>
-            </div>
-            <div className="text-xs text-[var(--fg-tertiary)]">
-              {n.source} · {formatDate(n.publishedAt)}
-            </div>
-          </li>
-        ))}
-        {!intel.news?.length ? (
-          <li className="px-5 py-6 text-xs text-[var(--fg-tertiary)]">No news pulled.</li>
-        ) : null}
-      </ul>
-    </Card>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-xs text-[var(--fg-tertiary)]">{label}</span>
-      <span className="font-medium text-[var(--fg-primary)] tabular-nums">{value}</span>
-    </div>
-  );
-}
-
-function BidScoreCard({ opportunityId }: { opportunityId: string }) {
-  const { data, isLoading } = useBidScoreLatest(opportunityId);
-
-  return (
-    <Card>
-      <SectionHeader title="Bid/No-Bid Score" />
-      <div className="p-5 flex flex-col justify-between h-[calc(100%-48px)] min-h-[140px]">
-        {isLoading ? (
-          <div className="space-y-3">
-            <div className="h-8 w-24 bg-[var(--surface-sunken)] animate-pulse rounded" />
-            <div className="h-4 w-32 bg-[var(--surface-sunken)] animate-pulse rounded" />
-          </div>
-        ) : data ? (
-          <div className="space-y-4 flex flex-col justify-between h-full">
-            <div className="space-y-2">
-              <div className="flex items-baseline gap-2">
-                <div className="text-4xl font-bold tabular-nums text-[var(--fg-primary)]">
-                  {data.totalScore.toFixed(0)}%
-                </div>
-                <div className="text-xs text-[var(--fg-tertiary)]">overall score</div>
-              </div>
-              <div>
-                <Badge
-                  tone={
-                    data.recommendation === 'bid'
-                      ? 'jade'
-                      : data.recommendation === 'no_bid'
-                        ? 'tomato'
-                        : 'amber'
-                  }
-                  className="px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider"
-                >
-                  {data.recommendation === 'bid'
-                    ? 'Bid'
-                    : data.recommendation === 'no_bid'
-                      ? 'No-Bid'
-                      : 'Conditional Bid'}
-                </Badge>
-              </div>
-            </div>
-            <div className="pt-2">
-              <Link to={`/bid-matrix?opportunityId=${opportunityId}`} className="block">
-                <Button variant="secondary" size="sm" className="w-full text-xs">
-                  Details
-                </Button>
-              </Link>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4 flex flex-col justify-between h-full">
-            <p className="text-xs text-[var(--fg-tertiary)]">
-              No bid evaluation score has been recorded for this opportunity yet.
-            </p>
-            <div>
-              <Link to={`/bid-matrix?opportunityId=${opportunityId}`} className="block">
-                <Button variant="secondary" size="sm" className="w-full text-xs">
-                  Evaluate Now
-                </Button>
-              </Link>
-            </div>
-          </div>
-        )}
-      </div>
-    </Card>
   );
 }
