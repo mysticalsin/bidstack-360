@@ -55,7 +55,12 @@ export function KeyAccountsPage() {
           <label htmlFor="key-accounts-search" className="sr-only">
             Search key accounts
           </label>
-          <Icon name="search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--fg-tertiary)]" ariaHidden />
+          <Icon
+            name="search"
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--fg-tertiary)]"
+            ariaHidden
+          />
           <input
             id="key-accounts-search"
             type="search"
@@ -80,7 +85,9 @@ export function KeyAccountsPage() {
             {industries.isError ? 'Industries unavailable' : 'All industries'}
           </option>
           {(industries.data?.items ?? []).map((i) => (
-            <option key={i} value={i}>{i}</option>
+            <option key={i} value={i}>
+              {i}
+            </option>
           ))}
         </select>
         {industries.isError ? (
@@ -101,6 +108,13 @@ export function KeyAccountsPage() {
         ) : null}
       </motion.div>
 
+      {/* sr-only live region — announces filter result count to AT */}
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {!accounts.isLoading && accounts.data
+          ? `${items.length} account${items.length === 1 ? '' : 's'}${industry ? ` · ${industry}` : ''}`
+          : ''}
+      </p>
+
       {/* Stats strip */}
       {!accounts.isError ? (
         <motion.div
@@ -110,16 +124,13 @@ export function KeyAccountsPage() {
           <StatCard label="Key accounts" value={items.length} />
           <StatCard
             label="Total pipeline"
-            value={formatMoney(items.reduce((s, a) => s + a.totalValue, 0), 'EUR')}
+            value={formatMoney(
+              items.reduce((s, a) => s + a.totalValue, 0),
+              'EUR',
+            )}
           />
-          <StatCard
-            label="Open deals"
-            value={items.reduce((s, a) => s + a.openDeals, 0)}
-          />
-          <StatCard
-            label="Contacts"
-            value={items.reduce((s, a) => s + a.contactCount, 0)}
-          />
+          <StatCard label="Open deals" value={items.reduce((s, a) => s + a.openDeals, 0)} />
+          <StatCard label="Contacts" value={items.reduce((s, a) => s + a.contactCount, 0)} />
         </motion.div>
       ) : null}
 
@@ -131,7 +142,11 @@ export function KeyAccountsPage() {
           title="Couldn't load key accounts"
           message={accountError ?? 'The key accounts endpoint did not respond.'}
           action={
-            <button type="button" className="btn btn-secondary" onClick={() => void accounts.refetch()}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => void accounts.refetch()}
+            >
               Retry
             </button>
           }
@@ -153,11 +168,7 @@ export function KeyAccountsPage() {
             >
               <Card>
                 <div className="flex items-start gap-4 p-5">
-                  <CompanyLogo
-                    domain={account.domain}
-                    name={account.name}
-                    size={48}
-                  />
+                  <CompanyLogo domain={account.domain} name={account.name} size={48} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Link
@@ -167,9 +178,7 @@ export function KeyAccountsPage() {
                         {account.name}
                       </Link>
                       <Badge tone="purple">Key</Badge>
-                      {account.industry ? (
-                        <Badge tone="gray">{account.industry}</Badge>
-                      ) : null}
+                      {account.industry ? <Badge tone="gray">{account.industry}</Badge> : null}
                     </div>
                     {account.domain ? (
                       <div className="text-xs text-[var(--fg-tertiary)]">{account.domain}</div>

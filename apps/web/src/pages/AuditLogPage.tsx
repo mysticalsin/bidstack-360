@@ -115,6 +115,13 @@ export function AuditLogPage() {
         isRefreshing={query.isFetching}
       />
 
+      {/* sr-only live region — announces filter result count to AT */}
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {!query.isLoading && query.data
+          ? `${visibleRows.length} event${visibleRows.length === 1 ? '' : 's'}${search ? ` matching "${search}"` : ''}${quickFilter !== 'all' ? ` · ${quickFilter}` : ''}`
+          : ''}
+      </p>
+
       <AuditInsightStrip rows={visibleRows} />
 
       {query.isLoading && <LoadingSkeleton rows={8} />}

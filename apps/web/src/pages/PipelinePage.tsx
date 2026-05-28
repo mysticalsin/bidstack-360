@@ -99,7 +99,10 @@ export function PipelinePage() {
       move.mutate(
         { id: opp.id, pipelineStageId: nextStageId },
         {
-          onSuccess: () => toast.success(`Moved to ${stages.find((s) => s.id === nextStageId)?.name ?? nextStageId}`),
+          onSuccess: () =>
+            toast.success(
+              `Moved to ${stages.find((s) => s.id === nextStageId)?.name ?? nextStageId}`,
+            ),
         },
       );
     }
@@ -171,13 +174,21 @@ export function PipelinePage() {
         ) : null}
       </header>
 
+      {/* sr-only live region — announces visible opportunity count to AT */}
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {!isLoading && data
+          ? `${visibleStages.reduce((s, st) => s + (byStage.get(st.id)?.length ?? 0), 0)} opportunit${visibleStages.reduce((s, st) => s + (byStage.get(st.id)?.length ?? 0), 0) === 1 ? 'y' : 'ies'}${stageFilter ? ` · ${stages.find((s) => s.id === stageFilter)?.name ?? ''}` : ''}`
+          : ''}
+      </p>
+
       {!isLoading && data && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-tour="pipeline-kanban">
           {(() => {
             const opps = data.items;
             const totalValue = opps.reduce((acc, o) => acc + o.value, 0);
             const openOpps = opps.filter(
-              (o) => o.pipelineStage?.name !== 'Closed Won' && o.pipelineStage?.name !== 'Closed Lost',
+              (o) =>
+                o.pipelineStage?.name !== 'Closed Won' && o.pipelineStage?.name !== 'Closed Lost',
             );
             const openValue = openOpps.reduce((acc, o) => acc + o.value, 0);
             const closedWon = opps.filter((o) => o.pipelineStage?.name === 'Closed Won').length;
@@ -254,7 +265,10 @@ export function PipelinePage() {
             // it isn't counted as forward progress — losses are terminal.
             // The closed_* stages themselves get no chip (no "next" stage).
             const nextStages = stages.slice(stageIdx + 1).filter((s) => s.name !== 'Closed Lost');
-            const advanced = nextStages.reduce((acc, s) => acc + (byStage.get(s.id)?.length ?? 0), 0);
+            const advanced = nextStages.reduce(
+              (acc, s) => acc + (byStage.get(s.id)?.length ?? 0),
+              0,
+            );
             const totalReached = items.length + advanced;
             const conversion =
               stage.name === 'Closed Won' || stage.name === 'Closed Lost' || totalReached === 0

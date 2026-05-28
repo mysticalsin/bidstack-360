@@ -280,6 +280,13 @@ export function TasksPage() {
         </div>
       </div>
 
+      {/* sr-only live region — announces filter result count to AT */}
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {!isLoading
+          ? `${items.length} task${items.length === 1 ? '' : 's'}${filter !== 'all' ? ` · ${filter.replace('_', ' ')}` : ''}`
+          : ''}
+      </p>
+
       {view === 'calendar' ? (
         <TaskCalendar tasks={data?.items ?? []} />
       ) : (

@@ -55,6 +55,7 @@ export function ServiceDeskPage() {
             placeholder="Search cases…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search cases"
             className="min-w-[200px] flex-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
           />
           <Button
@@ -103,6 +104,13 @@ export function ServiceDeskPage() {
           </select>
         </div>
       </Card>
+
+      {/* sr-only live region — announces filter result count to AT */}
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {!isLoading && data
+          ? `${items.length} case${items.length === 1 ? '' : 's'}${search ? ` matching "${search}"` : ''}${status ? ` · ${status}` : ''}${priority ? ` · ${priority}` : ''}`
+          : ''}
+      </p>
 
       {isError ? (
         <ErrorState
