@@ -22,6 +22,11 @@ services:
 
   redis:
     image: redis:7-alpine
+    # Require password auth — unauthenticated Redis on the internal Docker
+    # network allows any compromised container to read queues and rate-limit data.
+    command: ['redis-server', '--requirepass', '${REDIS_PASSWORD:?REDIS_PASSWORD is required}']
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
     restart: unless-stopped
     deploy:
       resources:

@@ -66,6 +66,10 @@ COPY --from=builder /app/packages/memos/dist ./packages/memos/dist
 COPY --from=builder /app/packages/odoo-mcp-client/dist ./packages/odoo-mcp-client/dist
 COPY --from=builder /app/packages/db/prisma ./packages/db/prisma
 WORKDIR /app/apps/api
+# Run as non-root — reduces container-escape blast radius.
+RUN addgroup -S bidstack && adduser -S -G bidstack bidstack \
+    && chown -R bidstack:bidstack /app
+USER bidstack
 EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "require('http').get('http://localhost:4000/readyz', (r) => r.statusCode===200?process.exit(0):process.exit(1))"
@@ -109,6 +113,10 @@ COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/packages/dust-client/dist ./packages/dust-client/dist
 COPY --from=builder /app/packages/odoo-mcp-client/dist ./packages/odoo-mcp-client/dist
 WORKDIR /app/apps/worker
+# Run as non-root — reduces container-escape blast radius.
+RUN addgroup -S bidstack && adduser -S -G bidstack bidstack \
+    && chown -R bidstack:bidstack /app
+USER bidstack
 EXPOSE 4002
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:4002/health || exit 1
@@ -136,7 +144,12 @@ COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/packages/dust-client/dist ./packages/dust-client/dist
 COPY --from=builder /app/packages/odoo-mcp-client/dist ./packages/odoo-mcp-client/dist
 WORKDIR /app/apps/mcp-server
+# Run as non-root — reduces container-escape blast radius.
+RUN addgroup -S bidstack && adduser -S -G bidstack bidstack \
+    && chown -R bidstack:bidstack /app
+USER bidstack
 EXPOSE 3001
 EXPOSE 4003
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD curl -f http://localhost:4003/health || exit 1
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:4003/health || exit 1
 CMD ["node", "dist/main.js"]

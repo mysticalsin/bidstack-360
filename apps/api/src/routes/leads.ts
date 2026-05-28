@@ -175,7 +175,7 @@ export const leadRoutes: FastifyPluginAsyncZod = async (server) => {
         return lead;
       });
       // Fire-and-forget push to Dust on create.
-      void pushLeadToDust(created.id);
+      void pushLeadToDust(created.id, req.auth.orgId);
       // Fan-out webhook event to all active subscriptions — fire-and-forget.
       void fanOutWebhookEvent(req.auth.orgId, 'lead.created', {
         id: created.id,
@@ -296,7 +296,7 @@ export const leadRoutes: FastifyPluginAsyncZod = async (server) => {
       }
 
       // Fire-and-forget push to Dust on update.
-      void pushLeadToDust(updated.id);
+      void pushLeadToDust(updated.id, req.auth.orgId);
 
       return {
         id: updated.id,

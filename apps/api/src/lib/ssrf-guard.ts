@@ -24,6 +24,10 @@ export function isPublicHostname(hostname: string): boolean {
     h.endsWith('.local') ||
     h === '127.0.0.1' ||
     h === '0.0.0.0' ||
+    // IPv6 loopback (::1 and bracket forms, plus IPv4-mapped loopback)
+    h === '::1' ||
+    h === '[::1]' ||
+    h.startsWith('::ffff:127.') ||
     h.startsWith('10.') ||
     h.startsWith('172.16.') ||
     h.startsWith('172.17.') ||

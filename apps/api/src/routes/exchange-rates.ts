@@ -21,7 +21,11 @@ export const exchangeRatesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/exchange-rates',
     {
-      config: { public: true },
+      // Rate-limit this public endpoint: unauthenticated callers are capped at
+      // 30 req/min per IP. The 1-hour cache already prevents upstream hammering,
+      // but without this a single IP could still saturate the Fastify process.
+      // rateLimit lives inside config — that's where @fastify/rate-limit reads it.
+      config: { public: true, rateLimit: { max: 30, timeWindow: '1 minute' } },
       schema: {
         response: {
           200: ExchangeRatesResponse,
@@ -43,7 +47,12 @@ export const exchangeRatesRoutes: FastifyPluginAsyncZod = async (server) => {
       }
 
       const upstream = (await res.json()) as Record<string, unknown>;
-      if (!upstream || typeof upstream !== 'object' || !upstream.rates || typeof upstream.rates !== 'object') {
+      if (
+        !upstream ||
+        typeof upstream !== 'object' ||
+        !upstream.rates ||
+        typeof upstream.rates !== 'object'
+      ) {
         throw server.httpErrors.badGateway('Invalid response from exchange rate provider');
       }
 

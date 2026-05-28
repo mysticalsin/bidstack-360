@@ -54,13 +54,14 @@ function serializeOpportunityToMarkdown(opp: {
   ].join('\n');
 }
 
-/** Push an opportunity to Dust. Called after create or update. */
-export async function pushOpportunityToDust(oppId: string): Promise<void> {
+/** Push an opportunity to Dust. Called after create or update.
+ *  orgId is required so the lookup stays org-scoped and respects multi-tenancy. */
+export async function pushOpportunityToDust(oppId: string, orgId: string): Promise<void> {
   const cfg = getDustConfig();
   if (!cfg) return;
 
   try {
-    const opp = await prisma.opportunity.findUnique({ where: { id: oppId } });
+    const opp = await prisma.opportunity.findUnique({ where: { id: oppId, orgId } });
     if (!opp) return;
 
     const dust = new DustClient({
@@ -89,13 +90,14 @@ export async function pushOpportunityToDust(oppId: string): Promise<void> {
   }
 }
 
-/** Push a lead to Dust. Called after create or update. */
-export async function pushLeadToDust(leadId: string): Promise<void> {
+/** Push a lead to Dust. Called after create or update.
+ *  orgId is required so the lookup stays org-scoped and respects multi-tenancy. */
+export async function pushLeadToDust(leadId: string, orgId: string): Promise<void> {
   const cfg = getDustConfig();
   if (!cfg) return;
 
   try {
-    const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+    const lead = await prisma.lead.findUnique({ where: { id: leadId, orgId } });
     if (!lead) return;
 
     const dust = new DustClient({

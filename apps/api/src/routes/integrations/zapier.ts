@@ -19,6 +19,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
+import { isPublicHostname } from '../../lib/ssrf-guard.js';
 
 const ALLOWED_EVENTS = [
   'NEW_LEAD',
@@ -95,6 +96,7 @@ export const zapierRoutes: FastifyPluginAsync = async (fastify) => {
         }),
         response: {
           201: z.object({ id: z.string() }),
+          400: z.object({ error: z.string() }),
           401: z.object({ error: z.string() }),
           409: z.object({ error: z.string(), existingId: z.string() }),
         },
@@ -105,6 +107,15 @@ export const zapierRoutes: FastifyPluginAsync = async (fastify) => {
       if (!zapierApp) return reply.code(401).send({ error: 'Invalid API key' });
 
       const { event, targetUrl } = req.body;
+
+      // SSRF guard — reject webhook targets that resolve to internal addresses.
+      // Without this check an attacker could register e.g. http://redis:6379 as
+      // a callback URL and use Zapier webhooks to probe the internal network.
+      if (!isPublicHostname(new URL(targetUrl).hostname)) {
+        return reply
+          .code(400)
+          .send({ error: 'targetUrl must point to a publicly routable address' });
+      }
 
       const existing = await prisma.zapierSubscription.findFirst({
         where: { orgId: zapierApp.orgId, eventType: event },
@@ -245,5 +256,4 @@ export const zapierRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.send(contacts.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() })));
     },
   );
-
 };

@@ -20,8 +20,6 @@ import {
 
 import { serializeOpportunity, serializeOpportunityFull } from '../serializers/opportunity.js';
 
-
-
 export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
   // GET /api/opportunities
   server.get(
@@ -55,7 +53,16 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         include: {
           owner: { select: { id: true, name: true, email: true } },
           territory: { select: { name: true } },
-          pipelineStage: { select: { id: true, name: true, probability: true, color: true, isWon: true, isLost: true } },
+          pipelineStage: {
+            select: {
+              id: true,
+              name: true,
+              probability: true,
+              color: true,
+              isWon: true,
+              isLost: true,
+            },
+          },
           _count: { select: { tasks: true } },
         },
         orderBy: { updatedAt: 'desc' },
@@ -238,7 +245,20 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: createdId, orgId: req.auth.orgId },
         // BS-25: narrow owner select — `owner: true` pulls clerkId, settings,
         // and every User column. Only id/name/email is consumed downstream.
-        include: { owner: { select: { id: true, name: true, email: true } }, territory: { select: { name: true } }, pipelineStage: { select: { id: true, name: true, probability: true, color: true, isWon: true, isLost: true } } },
+        include: {
+          owner: { select: { id: true, name: true, email: true } },
+          territory: { select: { name: true } },
+          pipelineStage: {
+            select: {
+              id: true,
+              name: true,
+              probability: true,
+              color: true,
+              isWon: true,
+              isLost: true,
+            },
+          },
+        },
       });
       // Fan-out opportunity.created — fire-and-forget (fail-open).
       void fanOutWebhookEvent(req.auth.orgId, 'opportunity.created', {
@@ -268,7 +288,16 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
           // BS-25: narrow owner select — see fix at /opportunities create.
           owner: { select: { id: true, name: true, email: true } },
           territory: { select: { name: true } },
-          pipelineStage: { select: { id: true, name: true, probability: true, color: true, isWon: true, isLost: true } },
+          pipelineStage: {
+            select: {
+              id: true,
+              name: true,
+              probability: true,
+              color: true,
+              isWon: true,
+              isLost: true,
+            },
+          },
           tasks: { orderBy: { createdAt: 'desc' }, take: 50 },
           documents: { orderBy: { createdAt: 'desc' }, take: 50 },
         },
@@ -381,7 +410,20 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
                 : {}),
           },
           // BS-25: narrow owner select — see fix at /opportunities create.
-          include: { owner: { select: { id: true, name: true, email: true } }, territory: { select: { name: true } }, pipelineStage: { select: { id: true, name: true, probability: true, color: true, isWon: true, isLost: true } } },
+          include: {
+            owner: { select: { id: true, name: true, email: true } },
+            territory: { select: { name: true } },
+            pipelineStage: {
+              select: {
+                id: true,
+                name: true,
+                probability: true,
+                color: true,
+                isWon: true,
+                isLost: true,
+              },
+            },
+          },
         }),
         prisma.auditLog.create({
           data: {
@@ -419,7 +461,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       }
 
       // Fire-and-forget push to Dust on any field update.
-      void pushOpportunityToDust(updated.id);
+      void pushOpportunityToDust(updated.id, req.auth.orgId);
 
       return serializeOpportunity(updated);
     },
@@ -546,7 +588,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         }),
       ]);
       // Fire-and-forget push to Dust on stage change.
-      void pushOpportunityToDust(updated.id);
+      void pushOpportunityToDust(updated.id, req.auth.orgId);
       // Fan-out webhook event for stage change.
       void fanOutWebhookEvent(req.auth.orgId, 'opportunity.stage_changed', {
         id: updated.id,

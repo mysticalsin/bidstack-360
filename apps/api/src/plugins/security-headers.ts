@@ -6,16 +6,6 @@
  * needs explicit wiring for SPA deployments. This plugin provides a single,
  * auditable place for all custom header overrides.
  *
- * WIRE-UP TODO (post-merge):
- *   In apps/api/src/server.ts, after the helmet registration block, add:
- *
- *     import { securityHeadersPlugin } from './plugins/security-headers.js';
- *     await server.register(securityHeadersPlugin);
- *
- * NOTE: The current server.ts already sets Permissions-Policy inline via an
- * onSend hook. This plugin is the canonical replacement; once wired, remove
- * the inline hook.
- *
  * Header rationale (per OWASP Secure Headers Project):
  *
  *   CSP             — controls which resources the browser can load.
@@ -42,9 +32,7 @@ const CSP_DIRECTIVES = (isDev: boolean): string => {
     "default-src 'self'",
     // WHY 'unsafe-inline' in dev: Vite injects inline scripts for HMR.
     // Production removes it — rely on hash/nonce if inline scripts are needed.
-    isDev
-      ? "script-src 'self' 'unsafe-inline'"
-      : "script-src 'self'",
+    isDev ? "script-src 'self' 'unsafe-inline'" : "script-src 'self'",
     // Google Fonts stylesheet is loaded by the design system.
     "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
     "font-src 'self' fonts.gstatic.com",
@@ -59,7 +47,7 @@ const CSP_DIRECTIVES = (isDev: boolean): string => {
     "form-action 'self'",
     "worker-src 'none'",
     "media-src 'none'",
-    ...(isDev ? [] : ["upgrade-insecure-requests"]),
+    ...(isDev ? [] : ['upgrade-insecure-requests']),
   ];
   return parts.join('; ');
 };
@@ -79,10 +67,7 @@ export const securityHeadersPlugin: FastifyPluginAsync = fp(
 
       // HSTS — production only (dev uses HTTP)
       if (isProd) {
-        reply.header(
-          'Strict-Transport-Security',
-          'max-age=31536000; includeSubDomains; preload',
-        );
+        reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
       }
 
       // Clickjacking prevention
