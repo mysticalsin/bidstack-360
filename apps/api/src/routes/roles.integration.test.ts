@@ -121,4 +121,26 @@ describe('roles routes', () => {
     });
     expect(res.statusCode).toBe(404);
   });
+
+  // BS-33: supplying a non-existent permissionId must return 400, not silently
+  // wire an orphaned rolePermission row.
+  skipIfNoDb('PATCH /api/roles/:id rejects unknown permissionIds (BS-33)', async () => {
+    const createRes = await server.inject({
+      method: 'POST',
+      url: '/api/roles',
+      payload: { name: 'BS33 Test Role', permissionIds: [] },
+    });
+    expect(createRes.statusCode).toBe(201);
+    const id = createRes.json().id as string;
+    createdRoleIds.push(id);
+
+    const res = await server.inject({
+      method: 'PATCH',
+      url: `/api/roles/${id}`,
+      payload: { permissionIds: ['00000000-0000-0000-0000-000000000001'] },
+    });
+    expect(res.statusCode).toBe(400);
+    const body = res.json() as { message: string };
+    expect(body.message).toMatch(/Unknown permissionId/);
+  });
 });
