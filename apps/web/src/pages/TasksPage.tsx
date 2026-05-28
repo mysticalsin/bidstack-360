@@ -16,7 +16,7 @@ import { TaskCalendar } from '@/components/task/TaskCalendar';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { confirm } from '@/components/ui/ConfirmDialog';
+import { confirm, prompt } from '@/components/ui/ConfirmDialog';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useCreateTask, useTasks, useUpdateTask } from '@/hooks/useTasks';
@@ -691,11 +691,15 @@ function SavedViewsBar() {
   const remove = useSavedViews((s) => s.remove);
   const views = all.tasks ?? [];
 
-  const onSave = () => {
-    const name = window.prompt('Name this view (e.g., "My overdue today")');
-    if (!name?.trim()) return;
-    save('tasks', name.trim(), search);
-    toast.success(`Saved view "${name.trim()}"`, { duration: 1800 });
+  const onSave = async () => {
+    const name = await prompt({
+      title: 'Name this view',
+      placeholder: 'e.g. "My overdue today"',
+      confirmLabel: 'Save View',
+    });
+    if (!name) return;
+    save('tasks', name, search);
+    toast.success(`Saved view "${name}"`, { duration: 1800 });
   };
 
   return (

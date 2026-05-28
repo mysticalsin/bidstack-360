@@ -14,7 +14,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { RouteProgress } from '@/components/layout/RouteProgress';
 import { PageTransition } from '@/components/motion/PageTransition';
 import { QuickAddMenu } from '@/components/quickadd/QuickAddMenu';
-import { ConfirmHost } from '@/components/ui/ConfirmDialog';
+import { ConfirmHost, PromptHost } from '@/components/ui/ConfirmDialog';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import { Toaster } from '@/components/ui/Toast';
 import { useCmdDotClose } from '@/hooks/useCmdDotClose';
@@ -788,6 +788,7 @@ export function App() {
               toasts / open a confirm without prop-drilling. */}
           <Toaster />
           <ConfirmHost />
+          <PromptHost />
           <ConfettiHost />
           <LiveAnnouncer />
           <WebVitalsHud />
