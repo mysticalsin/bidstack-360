@@ -93,8 +93,14 @@ export function ServiceCaseDetailPage() {
           </Card>
 
           <Card className="p-5">
-            <h3 className="text-sm font-medium text-[var(--fg-secondary)] mb-2">Add note</h3>
+            <label
+              htmlFor="case-note"
+              className="block text-sm font-medium text-[var(--fg-secondary)] mb-2"
+            >
+              Add note
+            </label>
             <textarea
+              id="case-note"
               className="input w-full min-h-[80px]"
               value={note}
               onChange={(e) => setNote(e.target.value)}

@@ -346,10 +346,14 @@ export function InvoiceDetailPage() {
                   {payOpen ? (
                     <form onSubmit={onRecordPayment} className="space-y-3 p-4">
                       <div>
-                        <label className="block text-xs font-medium text-[var(--fg-secondary)]">
+                        <label
+                          htmlFor="pay-amount"
+                          className="block text-xs font-medium text-[var(--fg-secondary)]"
+                        >
                           Amount ({d.currency})
                         </label>
                         <input
+                          id="pay-amount"
                           type="number"
                           step="0.01"
                           min="0.01"
@@ -360,10 +364,14 @@ export function InvoiceDetailPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-[var(--fg-secondary)]">
+                        <label
+                          htmlFor="pay-method"
+                          className="block text-xs font-medium text-[var(--fg-secondary)]"
+                        >
                           Method
                         </label>
                         <select
+                          id="pay-method"
                           value={payMethod}
                           onChange={(e) => setPayMethod(e.target.value as PaymentMethod)}
                           className="mt-1 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-2 text-sm text-[var(--fg-primary)] focus:border-[var(--border-focus)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] focus-visible:ring-offset-2"
@@ -376,10 +384,14 @@ export function InvoiceDetailPage() {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-[var(--fg-secondary)]">
+                        <label
+                          htmlFor="pay-ref"
+                          className="block text-xs font-medium text-[var(--fg-secondary)]"
+                        >
                           Reference
                         </label>
                         <input
+                          id="pay-ref"
                           type="text"
                           value={payRef}
                           onChange={(e) => setPayRef(e.target.value)}

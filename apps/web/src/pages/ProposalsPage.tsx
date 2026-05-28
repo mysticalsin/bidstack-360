@@ -100,6 +100,7 @@ export function ProposalsPage() {
           <div className="flex gap-2">
             <input
               className="dialog-input flex-1"
+              aria-label="Proposal name"
               placeholder="Proposal name…"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
@@ -128,11 +129,12 @@ export function ProposalsPage() {
       )}
 
       <GlassCard className="mb-4">
-        <div className="flex gap-2 flex-wrap">
+        <div role="group" aria-label="Filter by status" className="flex gap-2 flex-wrap">
           {(['draft', 'review', 'approved', 'submitted', 'won', 'lost'] as ProposalStatus[]).map(
             (s) => (
               <button
                 key={s}
+                aria-pressed={statusFilter === s}
                 className={`px-3 py-1 rounded-full text-xs font-medium border ${
                   statusFilter === s
                     ? 'bg-brand-primary text-white border-brand-primary'
@@ -179,8 +181,17 @@ export function ProposalsPage() {
             <GlassCard
               key={p.id}
               padding="md"
+              role="button"
+              tabIndex={0}
+              aria-label={`View proposal: ${p.name}`}
               className="flex items-center justify-between gap-4 cursor-pointer hover:bg-surface-sunken/50 transition-colors"
               onClick={() => navigate(`/proposals/${p.id}`)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  navigate(`/proposals/${p.id}`);
+                }
+              }}
             >
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-fg-primary truncate">{p.name}</p>
@@ -190,6 +201,7 @@ export function ProposalsPage() {
                 </p>
               </div>
               <span
+                aria-hidden="true"
                 className={`px-2 py-0.5 rounded-full text-[10px] font-medium uppercase ${STATUS_BADGE[p.status]}`}
               >
                 {p.status}

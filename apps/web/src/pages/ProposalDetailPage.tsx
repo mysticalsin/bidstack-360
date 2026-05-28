@@ -201,6 +201,11 @@ export function ProposalDetailPage() {
                     <Button
                       variant="secondary"
                       size="sm"
+                      aria-label={
+                        draftSection.isPending && draftSection.variables === section.key
+                          ? `Drafting ${section.title}…`
+                          : `AI Draft for ${section.title}`
+                      }
                       onClick={() => draftSection.mutate(section.key)}
                       disabled={draftSection.isPending && draftSection.variables === section.key}
                     >
@@ -212,7 +217,7 @@ export function ProposalDetailPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => startEdit(section)}
-                      aria-label="Edit section"
+                      aria-label={`Edit ${section.title} section`}
                     >
                       <Icon name="pencil" size={14} />
                     </Button>
@@ -225,6 +230,7 @@ export function ProposalDetailPage() {
               <div className="space-y-2">
                 <textarea
                   className="dialog-input min-h-[200px] resize-y w-full font-mono text-sm"
+                  aria-label={`Edit content for ${section.title}`}
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
                 />

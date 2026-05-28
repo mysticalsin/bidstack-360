@@ -54,6 +54,7 @@ export function TaskDetailPage() {
           {editing ? (
             <input
               className="input text-xl font-bold w-full"
+              aria-label="Task title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               autoFocus
@@ -103,6 +104,7 @@ export function TaskDetailPage() {
             {editing ? (
               <select
                 className="input text-sm"
+                aria-label="Status"
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
               >
