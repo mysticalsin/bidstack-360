@@ -23,6 +23,7 @@
     "test:watch": "pnpm -r --parallel --stream test:watch",
     "e2e": "pnpm --filter @bidstack/web e2e",
     "load-test": "k6 run scripts/load-test.js",
+    "load-test:rfp": "tsx scripts/load-test-rfp.ts",
     "db:analyze-queries": "tsx packages/db/scripts/analyze-slow-queries.ts",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\" --ignore-path .prettierignore",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\" --ignore-path .prettierignore",
