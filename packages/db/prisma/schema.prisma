@@ -85,6 +85,7 @@ model Org {
   integrationConfigs     IntegrationConfig[]
   agents                 Agent[]
   agentRuns              AgentRun[]
+  rfpAgentAssignments    RfpAgentAssignment[]
   Forecast               Forecast[]
   Plugin                 Plugin[]
   VoiceCommandLog        VoiceCommandLog[]
@@ -161,6 +162,18 @@ model Org {
   churnSignals           ChurnSignal[]
   expansionOpportunities ExpansionOpportunity[]
 
+  // Sprint 1 — Krayin import (Tags, EmailTemplates, LeadStageRot)
+  tags                   Tag[]
+  entityTags             EntityTag[]
+  emailTemplates         EmailTemplate[]
+  leadStageRotConfigs    LeadStageRotConfig[]
+  // Wave 9 — RFP Automation Engine
+  rfpOrchestrations           RfpOrchestration[]
+  requirementReferenceMatches RequirementReferenceMatch[]
+  referenceEmbeddings         ReferenceEmbedding[]
+  requirementEmbeddings       RequirementEmbedding[]
+  aiInvocations               AiInvocation[]
+
   @@index([deletedAt])
   @@map("orgs")
 }
@@ -215,6 +228,11 @@ model User {
   nativePushTokens  NativePushToken[]
   // Wave 8 — Voice + Video calls
   callSessions      CallSession[]
+
+  // Sprint 1 — Krayin import
+  createdTags       Tag[]              @relation("TagCreatedBy")
+  taggedEntities    EntityTag[]        @relation("EntityTagTaggedBy")
+  createdEmailTemplates EmailTemplate[] @relation("EmailTemplateCreatedBy")
 
   @@index([orgId])
   @@index([deletedAt])
@@ -282,8 +300,6 @@ model Company {
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
-  @@unique([orgId, name])
-  @@unique([orgId, domain], map: "companies_org_domain_key")
   @@index([orgId, domain])
   @@index([orgId])
   @@index([deletedAt])
@@ -379,6 +395,8 @@ model Opportunity {
   @@index([orgId, ownerId], map: "opps_org_owner_idx")
   @@index([orgId, customer], map: "opps_org_customer_idx")
   @@index([orgId])
+  @@index([companyId])
+  @@index([territoryId])
   @@index([deletedAt])
   // opps_search_idx is a GIN trigram index on (customer || ' ' || name || ' ' || code)
   // defined in a raw migration (Prisma can't express functional GIN indexes).
@@ -852,6 +870,13 @@ model Proposal {
   dueDate         DateTime?      @map("due_date") @db.Date
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// Set by the human Bid Manager who approved this proposal. Never null on submission.
+  approvedAt          DateTime?  @db.Timestamptz(6) @map("approved_at")
+  /// User ID of the BM who approved. Enforced non-null at submission route level.
+  approvedByUserId    String?    @db.Uuid @map("approved_by_user_id")
+  /// Always true for AI-generated proposals. Prevents bypassing approval gate.
+  humanReviewRequired Boolean    @default(true) @map("human_review_required")
 
   org         Org               @relation(fields: [orgId], references: [id], onDelete: Cascade)
   opportunity Opportunity?      @relation(fields: [opportunityId], references: [id])
@@ -1360,6 +1385,8 @@ model Requirement {
   @@index([orgId, opportunityId, status], map: "requirements_org_opp_status_idx")
   @@index([orgId, bidDocumentId])
   @@index([orgId, ownerId])
+  @@index([documentVersionId])
+  @@index([sourceChunkId])
   @@index([deletedAt])
   @@map("requirements")
 }
@@ -1421,6 +1448,8 @@ model ReviewIssue {
   @@index([orgId, opportunityId, status], map: "review_issues_org_opp_status_idx")
   @@index([orgId, severity, status], map: "review_issues_org_severity_status_idx")
   @@index([orgId, ownerId])
+  @@index([requirementId])
+  @@index([sourceChunkId])
   @@index([deletedAt])
   @@map("review_issues")
 }
@@ -1449,6 +1478,7 @@ model ApprovalGate {
 
   @@index([orgId, opportunityId, status], map: "approval_gates_org_opp_status_idx")
   @@index([orgId, gateKey])
+  @@index([lockedVersionId])
   @@index([deletedAt])
   @@map("approval_gates")
 }
@@ -1756,8 +1786,9 @@ model Agent {
   createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  org  Org        @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  runs AgentRun[]
+  org   Org        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  runs  AgentRun[]
+  rfpAgentAssignments RfpAgentAssignment[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -1789,6 +1820,33 @@ model AgentRun {
   @@index([agentId, createdAt(sort: Desc)], map: "agent_runs_agent_created_idx")
   @@index([deletedAt])
   @@map("agent_runs")
+}
+
+enum RfpAgentAssignmentStatus {
+  active
+  paused
+
+  @@map("rfp_agent_assignment_status")
+}
+
+model RfpAgentAssignment {
+  id            String                   @id @default(uuid()) @db.Uuid
+  orgId         String                   @map("org_id") @db.Uuid
+  agentId       String                   @map("agent_id") @db.Uuid
+  rfpRequestId  String                   @map("rfp_request_id")
+  status        RfpAgentAssignmentStatus @default(active)
+  createdAt     DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org   Org   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([orgId, rfpRequestId, status], map: "rfp_agent_assignments_org_rfp_status_idx")
+  @@index([agentId, rfpRequestId], map: "rfp_agent_assignments_agent_rfp_idx")
+  @@index([deletedAt])
+  @@map("rfp_agent_assignments")
 }
 
 // ─── Sales module (Quotations + Orders + Products) ────────────────────────
@@ -1887,6 +1945,7 @@ model SalesOrder {
   @@index([orgId, customerName], map: "sales_orders_org_customer_idx")
   @@index([orgId, salespersonId], map: "sales_orders_org_salesperson_idx")
   @@index([orgId, companyId])
+  @@index([customerId])
   @@index([deletedAt])
   @@map("sales_orders")
 }
@@ -1984,6 +2043,7 @@ model Invoice {
   @@index([orgId, customerName], map: "invoices_org_customer_idx")
   @@index([orgId, salesOrderId], map: "invoices_org_sales_order_idx")
   @@index([orgId, companyId])
+  @@index([customerId])
   @@index([deletedAt])
   @@map("invoices")
 }
@@ -2111,6 +2171,11 @@ enum WorkflowActionKind {
   assign_owner
   run_dust_agent
   create_notification
+  // Sprint 1 — Krayin import
+  add_tag
+  remove_tag
+  add_note_as_activity
+  send_email_to_owner
 
   @@map("workflow_action_kind")
 }
@@ -2357,6 +2422,10 @@ model Lead {
   // Timestamps
   createdAt                DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt                DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  /// Sprint 1: timestamp of the last `status` mutation. Drives the kanban
+  /// "Rotten Days" badge. Updated by the leads route on PATCH; existing
+  /// rows backfill from `createdAt` via the migration.
+  statusChangedAt          DateTime     @default(now()) @map("status_changed_at") @db.Timestamptz(6)
 
   org     Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
   owner   User?    @relation(fields: [ownerId], references: [id])
@@ -2371,6 +2440,8 @@ model Lead {
   @@index([orgId, createdAt])
   @@index([orgId, priority])
   @@index([orgId, companyId])
+  @@index([convertedToOpportunityId])
+  @@index([orgId, status, statusChangedAt])
   @@index([deletedAt])
   @@map("leads")
 }
@@ -3229,7 +3300,10 @@ model AiAssistantFeedback {
 
   session AiAssistantSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
   @@index([sessionId])
+  @@index([deletedAt])
   @@map("ai_assistant_feedback")
 }
 
@@ -3329,7 +3403,10 @@ model EmailTrackingPixel {
   org          Org          @relation(fields: [orgId], references: [id], onDelete: Cascade)
   emailMessage EmailMessage @relation(fields: [emailMessageId], references: [id], onDelete: Cascade)
 
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
   @@index([emailMessageId])
+  @@index([deletedAt])
   @@map("email_tracking_pixels")
 }
 
@@ -3377,8 +3454,11 @@ model SlackChannel {
   org            Org             @relation(fields: [orgId], references: [id], onDelete: Cascade)
   slackWorkspace SlackWorkspace? @relation(fields: [slackWorkspaceId], references: [id], onDelete: SetNull)
 
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
   @@unique([orgId, channelId], map: "slack_channels_org_channel_key")
   @@index([orgId])
+  @@index([deletedAt])
   @@map("slack_channels")
 }
 
@@ -3395,8 +3475,11 @@ model SlackUserMapping {
   org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
   @@unique([orgId, userId], map: "slack_user_mappings_org_user_key")
   @@index([orgId, slackUserId])
+  @@index([deletedAt])
   @@map("slack_user_mappings")
 }
 
@@ -3418,8 +3501,11 @@ model ZapierApp {
   actions       ZapierAction[]
   subscriptions ZapierSubscription[]
 
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
   @@unique([orgId], map: "zapier_apps_org_key")
   @@index([orgId])
+  @@index([deletedAt])
   @@map("zapier_apps")
 }
 
@@ -3439,7 +3525,10 @@ model ZapierTrigger {
   org       Org       @relation(fields: [orgId], references: [id], onDelete: Cascade)
   zapierApp ZapierApp @relation(fields: [zapierAppId], references: [id], onDelete: Cascade)
 
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
   @@index([orgId, eventType])
+  @@index([deletedAt])
   @@map("zapier_triggers")
 }
 
@@ -3455,8 +3544,11 @@ model ZapierAction {
   org       Org       @relation(fields: [orgId], references: [id], onDelete: Cascade)
   zapierApp ZapierApp @relation(fields: [zapierAppId], references: [id], onDelete: Cascade)
 
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
   @@unique([orgId, actionType], map: "zapier_actions_org_action_key")
   @@index([orgId])
+  @@index([deletedAt])
   @@map("zapier_actions")
 }
 
@@ -3479,7 +3571,10 @@ model ZapierSubscription {
   org       Org       @relation(fields: [orgId], references: [id], onDelete: Cascade)
   zapierApp ZapierApp @relation(fields: [zapierAppId], references: [id], onDelete: Cascade)
 
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
   @@index([orgId, eventType])
+  @@index([deletedAt])
   @@map("zapier_subscriptions")
 }
 
@@ -3510,10 +3605,13 @@ model GraphSubscription {
   org              Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
   integrationToken IntegrationToken @relation(fields: [integrationTokenId], references: [id], onDelete: Cascade)
 
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
   @@index([orgId])
   @@index([integrationTokenId])
   /// Index for renewal worker: find subscriptions expiring within 26 h
   @@index([expiresAt])
+  @@index([deletedAt])
   @@map("graph_subscriptions")
 }
 
@@ -3544,8 +3642,11 @@ model CustomObjectDef {
   records              CustomObjectRecord[]
   relations            CustomObjectRelation[]
 
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
   @@unique([orgId, key])
   @@index([orgId])
+  @@index([deletedAt])
   @@map("custom_object_defs")
 }
 
@@ -3599,8 +3700,11 @@ model CustomObjectRelation {
   org             Org             @relation(fields: [orgId], references: [id], onDelete: Cascade)
   customObjectDef CustomObjectDef @relation(fields: [customObjectDefId], references: [id], onDelete: Cascade)
 
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
   @@unique([orgId, customObjectDefId, relationKey])
   @@index([orgId, customObjectDefId])
+  @@index([deletedAt])
   @@map("custom_object_relations")
 }
 
@@ -3879,8 +3983,11 @@ model CallSummary {
   orgId String @map("org_id") @db.Uuid
   org   Org    @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
   @@index([callSessionId])
   @@index([orgId, key])
+  @@index([deletedAt])
   @@map("call_summaries")
 }
 
@@ -3926,6 +4033,7 @@ model Subscription {
   @@index([orgId, accountId])
   @@index([orgId, status])
   @@index([orgId, renewalDate])
+  @@index([productId])
   @@index([deletedAt])
   @@map("subscriptions")
 }
@@ -3961,6 +4069,7 @@ model RenewalOpportunity {
 
   @@index([orgId, status])
   @@index([orgId, subscriptionId])
+  @@index([opportunityId])
   @@index([deletedAt])
   @@map("renewal_opportunities")
 }
@@ -3989,6 +4098,7 @@ model HealthScore {
 
   @@index([orgId, accountId, capturedAt(sort: Desc)])
   @@index([orgId, capturedAt(sort: Desc)])
+  @@index([accountId])
   @@map("health_scores")
 }
 
@@ -4025,6 +4135,7 @@ model NpsSurvey {
 
   @@index([orgId, accountId, sentAt(sort: Desc)])
   @@index([orgId, category])
+  @@index([contactId])
   @@index([deletedAt])
   @@map("nps_surveys")
 }
@@ -4071,6 +4182,7 @@ model ChurnSignal {
 
   @@index([orgId, accountId, detectedAt(sort: Desc)])
   @@index([orgId, severity, resolvedAt])
+  @@index([accountId])
   @@index([deletedAt])
   @@map("churn_signals")
 }
@@ -4115,6 +4227,7 @@ model ExpansionOpportunity {
 
   @@index([orgId, accountId])
   @@index([orgId, status])
+  @@index([accountId])
   @@index([deletedAt])
   @@map("expansion_opportunities")
 }
@@ -4141,9 +4254,12 @@ model YjsDocument {
   org     Org          @relation(fields: [orgId], references: [id], onDelete: Cascade)
   updates YjsUpdate[]
 
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
   @@unique([orgId, entityType, entityId, fieldKey])
   @@index([orgId])
   @@index([orgId, entityType, entityId])
+  @@index([deletedAt])
   @@map("yjs_documents")
 }
 
@@ -4164,7 +4280,267 @@ model YjsUpdate {
   ydoc YjsDocument @relation(fields: [ydocId], references: [id], onDelete: Cascade)
   org  Org         @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
   @@index([ydocId, createdAt])
   @@index([orgId, createdAt])
+  @@index([deletedAt])
   @@map("yjs_updates")
+}
+
+// ─── Sprint 1 — Krayin import: Tags ──────────────────────────────────────
+// Single Tag entity + EntityTag polymorphic join. Prisma has no native
+// polymorphism, so EntityTag carries (entityType, entityId) and we enforce
+// the type set in the application layer (zod schema in @bidstack/shared).
+// Tag.name is citext so "Hot Lead" and "hot lead" dedup naturally per-org.
+
+model Tag {
+  id          String   @id @default(uuid()) @db.Uuid
+  orgId       String   @map("org_id") @db.Uuid
+  name        String   @db.Citext
+  /// Hex colour from the palette in packages/shared/src/schemas/tag.ts.
+  color       String   @default("#A78BFA")
+  createdById String?  @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  org        Org         @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy  User?       @relation("TagCreatedBy", fields: [createdById], references: [id])
+  entityTags EntityTag[]
+
+  @@unique([orgId, name])
+  @@index([orgId])
+  @@index([deletedAt])
+  @@map("tags")
+}
+
+model EntityTag {
+  id         String   @id @default(uuid()) @db.Uuid
+  orgId      String   @map("org_id") @db.Uuid
+  tagId      String   @map("tag_id") @db.Uuid
+  /// One of: lead | account | contact | opportunity | bid_opportunity |
+  /// activity | task | proposal. Validated by zod TaggableEntityType.
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id") @db.Uuid
+  taggedById String?  @map("tagged_by_id") @db.Uuid
+  taggedAt   DateTime @default(now()) @map("tagged_at") @db.Timestamptz(6)
+
+  org      Org   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tag      Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  taggedBy User? @relation("EntityTagTaggedBy", fields: [taggedById], references: [id])
+
+  @@unique([orgId, tagId, entityType, entityId])
+  @@index([orgId, entityType, entityId])
+  @@index([orgId, tagId])
+  @@map("entity_tags")
+}
+
+// ─── Sprint 1 — Krayin import: EmailTemplate ─────────────────────────────
+// Reusable email templates with mustache-style placeholder substitution.
+// Wired into the workflow `send_email` action and into per-record compose
+// flows. Soft-delete via `archived` so historical workflow runs that
+// reference an archived template still resolve.
+
+model EmailTemplate {
+  id          String    @id @default(uuid()) @db.Uuid
+  orgId       String    @map("org_id") @db.Uuid
+  name        String
+  subject     String
+  bodyHtml    String    @map("body_html")
+  bodyText    String?   @map("body_text")
+  /// Optional grouping label ("Discovery", "Recovery", "Win-themes").
+  category    String?
+  archived    Boolean   @default(false)
+  createdById String?   @map("created_by_id") @db.Uuid
+  useCount    Int       @default(0) @map("use_count")
+  lastUsedAt  DateTime? @map("last_used_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  org       Org   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("EmailTemplateCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([orgId, name])
+  @@index([orgId, archived])
+  @@index([deletedAt])
+  @@map("email_templates")
+}
+
+// ─── Sprint 1 — Krayin import: Lead stage rot config ─────────────────────
+// Per-org override of how many days a Lead may sit in a given status
+// before the kanban shows a "Rotten Days" badge. Missing rows fall back
+// to the static defaults in packages/shared/src/schemas/lead-rot.ts.
+
+model LeadStageRotConfig {
+  id         String     @id @default(uuid()) @db.Uuid
+  orgId      String     @map("org_id") @db.Uuid
+  status     LeadStatus
+  rottenDays Int        @default(14) @map("rotten_days")
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, status])
+  @@map("lead_stage_rot_config")
+}
+
+// ─── Wave 9: RFP Automation Engine ────────────────────────────────────────
+
+enum RfpOrchestrationState {
+  queued
+  running
+  paused_for_review
+  approved
+  rejected
+  completed
+  failed
+}
+
+enum RfpResponsePhase {
+  intake
+  extraction
+  story_matching
+  section_drafting
+  compliance_fill
+  legal_scan
+  qa_review
+  human_approval
+}
+
+/// State machine for a single RFP pipeline run.
+/// One row per (orgId, rfpRequestId) while active; archived after completion.
+model RfpOrchestration {
+  id                String                @id @default(uuid()) @db.Uuid
+  orgId             String                @map("org_id") @db.Uuid
+  rfpRequestId      String                @map("rfp_request_id")
+  opportunityId     String?               @map("opportunity_id") @db.Uuid
+  proposalId        String?               @map("proposal_id") @db.Uuid
+  documentVersionId String                @map("document_version_id") @db.Uuid
+  state             RfpOrchestrationState @default(queued)
+  currentPhase      RfpResponsePhase?     @map("current_phase")
+  completedPhases   RfpResponsePhase[]    @default([]) @map("completed_phases")
+  failedPhase       RfpResponsePhase?     @map("failed_phase")
+  failureReason     String?               @map("failure_reason")
+  rootJobId         String?               @db.VarChar(200) @map("root_job_id")
+  config            Json                  @default("{}")
+  startedByUserId   String?               @db.Uuid @map("started_by_user_id")
+  startedAt         DateTime?             @db.Timestamptz(6) @map("started_at")
+  completedAt       DateTime?             @db.Timestamptz(6) @map("completed_at")
+  createdAt         DateTime              @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt         DateTime              @updatedAt @db.Timestamptz(6) @map("updated_at")
+  deletedAt         DateTime?             @db.Timestamptz(6) @map("deleted_at")
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, rfpRequestId], map: "uniq_org_rfp_active")
+  @@index([orgId, state])
+  @@index([rootJobId])
+  @@index([deletedAt])
+  @@map("rfp_orchestrations")
+}
+
+/// Persisted semantic match between an RFP requirement and a success story.
+/// scoreBps is 0–10000 (basis points where 10000 = 100% match).
+model RequirementReferenceMatch {
+  id             String    @id @default(uuid()) @db.Uuid
+  orgId          String    @db.Uuid @map("org_id")
+  requirementId  String    @db.Uuid @map("requirement_id")
+  referenceId    String    @db.Uuid @map("reference_id")
+  /// Match score in basis points (0–10000). 10000 = perfect match.
+  scoreBps       Int       @map("score_bps")
+  rank           Int
+  reasoning      String?
+  /// Which story fields contributed to the match (e.g. ["sector","technology"]).
+  whichFields    String[]  @default([]) @map("which_fields")
+  matchedByAgent String    @db.VarChar(100) @map("matched_by_agent")
+  agentRunId     String?   @db.Uuid @map("agent_run_id")
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6) @map("created_at")
+  deletedAt      DateTime? @db.Timestamptz(6) @map("deleted_at")
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, requirementId, referenceId])
+  @@index([orgId, requirementId])
+  @@index([orgId, referenceId])
+  @@index([deletedAt])
+  @@map("requirement_reference_matches")
+}
+
+/// Vector embedding for a success story (reference). Used for HNSW cosine similarity.
+/// vector column uses pgvector's native type — Prisma cannot express this directly,
+/// so we use Unsupported("vector(1024)"). The HNSW index is created via raw SQL migration.
+model ReferenceEmbedding {
+  id          String   @id @default(uuid()) @db.Uuid
+  orgId       String   @db.Uuid @map("org_id")
+  referenceId String   @unique @db.Uuid @map("reference_id")
+  model       String   @db.VarChar(100)
+  dim         Int
+  /// pgvector 1024-dimensional embedding vector. Not accessible via Prisma — query raw.
+  vector      Unsupported("vector(1024)")
+  /// SHA-256 hash of the embedding input text. Skip re-embedding if unchanged.
+  contentHash String   @db.VarChar(64) @map("content_hash")
+  createdAt   DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("reference_embeddings")
+}
+
+/// Vector embedding for an extracted RFP requirement.
+/// Lifecycle: created by rfp.embed-requirement job; deleted when RfpOrchestration is soft-deleted.
+model RequirementEmbedding {
+  id            String   @id @default(uuid()) @db.Uuid
+  orgId         String   @db.Uuid @map("org_id")
+  requirementId String   @unique @db.Uuid @map("requirement_id")
+  model         String   @db.VarChar(100)
+  dim           Int
+  vector        Unsupported("vector(1024)")
+  contentHash   String   @db.VarChar(64) @map("content_hash")
+  createdAt     DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt     DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("requirement_embeddings")
+}
+
+/// Audit log for every AI agent invocation. Required for EU AI Act (Art. 50)
+/// transparency obligations and GDPR Art. 22 automated decision-making audit trail.
+/// Retention: 90 days (enforced via scheduled cleanup job).
+model AiInvocation {
+  id              String   @id @default(uuid()) @db.Uuid
+  orgId           String   @db.Uuid @map("org_id")
+  userId          String?  @db.Uuid @map("user_id")
+  /// Template ID from RFP_AGENT_TEMPLATES e.g. "rfp-extractor-agent".
+  agentType       String   @db.VarChar(100) @map("agent_type")
+  /// Dust model name or "dust" if not determinable.
+  model           String   @db.VarChar(100)
+  /// SHA-256 of full prompt (for deduplication + tamper detection).
+  promptHash      String   @db.VarChar(64) @map("prompt_hash")
+  /// First 200 chars of prompt only — NEVER include PII or full RFP content.
+  promptSnippet   String?  @db.VarChar(200) @map("prompt_snippet")
+  /// SHA-256 of full response.
+  responseHash    String   @db.VarChar(64) @map("response_hash")
+  /// First 200 chars of response only.
+  responseSnippet String?  @db.VarChar(200) @map("response_snippet")
+  tokenCount      Int      @map("token_count")
+  durationMs      Int      @map("duration_ms")
+  /// "success" | "error" | "timeout" | "rejected"
+  status          String   @db.VarChar(20)
+  errorMsg        String?  @map("error_msg")
+  traceId         String?  @db.VarChar(100) @map("trace_id")
+  createdAt       DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, agentType])
+  @@index([orgId, createdAt])
+  @@index([traceId])
+  @@map("ai_invocations")
 }
