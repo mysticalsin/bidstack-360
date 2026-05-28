@@ -1,22 +1,21 @@
-import { memo, useMemo, useState, type FormEvent } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
-import { Dialog, DialogContent } from '@/components/ui/Dialog';
-import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
-import { CompanyLogo } from '@/components/company/CompanyLogo';
-import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
-import { SpotlightTable, SpotlightTableRow } from '@/components/ui/SpotlightTable';
-
-import { useCompanies, useCreateCompany, useDeleteCompany } from '@/hooks/useCompanies';
-import { useBulkSelection } from '@/hooks/useBulkSelection';
 import { BulkActionBar } from '@/components/ui/BulkActionBar';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
+import { SpotlightTable } from '@/components/ui/SpotlightTable';
 import { confirm as confirmDialog } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/components/ui/Toast';
+import { useCompanies, useCreateCompany, useDeleteCompany } from '@/hooks/useCompanies';
+import { useBulkSelection } from '@/hooks/useBulkSelection';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
-import type { Company } from '@bidstack/shared';
+
+import { CompanyRow } from './companiesPage/CompanyRow';
+import { NewCompanyDialog } from './companiesPage/NewCompanyDialog';
 
 export function CompaniesPage() {
   const [params, setParams] = useSearchParams();
@@ -34,11 +33,11 @@ export function CompaniesPage() {
   const items = useMemo(() => companies.data?.items ?? [], [companies.data?.items]);
   const bulk = useBulkSelection(items);
   const searchTerm = filter.search ?? '';
+
   const stats = useMemo(() => {
     const withDomain = items.filter((company) => Boolean(company.domain)).length;
     const withIndustry = items.filter((company) => Boolean(company.industry)).length;
     const countries = new Set(items.map((company) => company.countryCode).filter(Boolean));
-
     return [
       { label: 'Visible companies', value: items.length.toLocaleString(), detail: 'current view' },
       {
@@ -302,232 +301,5 @@ export function CompaniesPage() {
         </Card>
       )}
     </div>
-  );
-}
-
-const CompanyRow = memo(function CompanyRow({
-  company,
-  selected,
-  onToggle,
-  onDelete,
-  query,
-}: {
-  company: Company;
-  selected: boolean;
-  onToggle: (id: string) => void;
-  onDelete: (id: string) => void;
-  query: string;
-}) {
-  return (
-    <SpotlightTableRow
-      query={query}
-      searchableText={`${company.name} ${company.legalName ?? ''} ${company.domain ?? ''} ${company.industry ?? ''}`}
-      data-selected={selected}
-    >
-      <td>
-        <label className="table-checkbox-hit">
-          <span className="sr-only">
-            {selected ? `Deselect ${company.name}` : `Select ${company.name}`}
-          </span>
-          <input
-            type="checkbox"
-            checked={selected}
-            onChange={() => onToggle(company.id)}
-            className="cursor-pointer accent-[var(--brand-primary)]"
-          />
-        </label>
-      </td>
-      <td>
-        <div className="flex min-w-[220px] items-center gap-3">
-          <CompanyLogo name={company.name} domain={company.domain} size={36} />
-          <div className="min-w-0">
-            <Link
-              to={`/companies/${company.id}`}
-              className="block truncate font-semibold text-[var(--fg-primary)] hover:text-[var(--brand-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
-            >
-              {company.name}
-            </Link>
-            {company.legalName && company.legalName !== company.name && (
-              <div className="truncate text-xs text-[var(--fg-tertiary)]">{company.legalName}</div>
-            )}
-          </div>
-        </div>
-      </td>
-      <td className="text-[var(--fg-secondary)]">
-        {company.domain ? (
-          <a
-            href={`https://${company.domain}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 hover:text-[var(--brand-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
-          >
-            <Icon name="globe" size={13} ariaHidden />
-            {company.domain}
-          </a>
-        ) : (
-          '—'
-        )}
-      </td>
-      <td className="px-4 py-3 text-[var(--fg-secondary)]">{company.industry ?? '—'}</td>
-      <td className="tabular-nums text-[var(--fg-secondary)]">
-        {company.employeeCount?.toLocaleString() ?? '—'}
-      </td>
-      <td className="px-4 py-3 text-[var(--fg-secondary)]">{company.countryCode ?? '—'}</td>
-      <td className="text-right">
-        <div className="inline-flex items-center gap-1">
-          <Link
-            to={`/companies/${company.id}`}
-            className="btn btn-ghost btn-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
-          >
-            View
-          </Link>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-[var(--danger)] hover:text-[var(--danger)]"
-            onClick={async () => {
-              const ok = await confirmDialog({
-                title: `Delete ${company.name}?`,
-                description: 'This action cannot be undone.',
-                confirmLabel: 'Delete',
-                destructive: true,
-              });
-              if (ok) onDelete(company.id);
-            }}
-          >
-            Delete
-          </Button>
-        </div>
-      </td>
-    </SpotlightTableRow>
-  );
-});
-
-function NewCompanyDialog({
-  onClose,
-  onCreate,
-  isPending,
-}: {
-  onClose: () => void;
-  onCreate: (body: {
-    name: string;
-    domain?: string | null;
-    industry?: string | null;
-    countryCode?: string | null;
-  }) => void;
-  isPending: boolean;
-}) {
-  const [name, setName] = useState('');
-  const [domain, setDomain] = useState('');
-  const [industry, setIndustry] = useState('');
-  const [countryCode, setCountryCode] = useState('');
-
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    if (!name) return;
-    onCreate({
-      name,
-      domain: domain || null,
-      industry: industry || null,
-      countryCode: countryCode || null,
-    });
-  };
-
-  return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-    >
-      <DialogContent
-        title="New company"
-        description="Create the account profile first. You can enrich firmographics and contacts after the record exists."
-      >
-        <form onSubmit={submit} className="space-y-4">
-          <div>
-            <label
-              htmlFor="new-company-name"
-              className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
-            >
-              Company name
-            </label>
-            <input
-              id="new-company-name"
-              className="input w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Acme Inc."
-              required
-              aria-required="true"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label
-                htmlFor="new-company-domain"
-                className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
-              >
-                Domain
-              </label>
-              <input
-                id="new-company-domain"
-                className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
-                value={domain}
-                onChange={(e) => setDomain(e.target.value)}
-                placeholder="acme.com"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="new-company-country"
-                className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
-              >
-                Country
-              </label>
-              <input
-                id="new-company-country"
-                className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
-                value={countryCode}
-                onChange={(e) => setCountryCode(e.target.value.slice(0, 2).toUpperCase())}
-                placeholder="CA"
-                maxLength={2}
-              />
-            </div>
-          </div>
-          <div>
-            <label
-              htmlFor="new-company-industry"
-              className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
-            >
-              Industry
-            </label>
-            <input
-              id="new-company-industry"
-              className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
-              value={industry}
-              onChange={(e) => setIndustry(e.target.value)}
-              placeholder="Software"
-            />
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              className="btn btn-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
-              onClick={onClose}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
-              disabled={isPending}
-            >
-              {isPending ? 'Creating…' : 'Create company'}
-            </button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }
