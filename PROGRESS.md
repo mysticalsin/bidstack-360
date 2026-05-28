@@ -1096,9 +1096,34 @@ Sprint 21 shipped the read-only Sales Dashboard. Sprint 22 makes it _act_: every
 - Added `rfp-orchestrator.test.ts`, `rfp-embed-reference.test.ts` — inline guard replays
   for org-mismatch and NDA-D blocked by `doNotRetry` flag.
 
-### W10-P1-4 — TipTap editor
+### W10-P1-4 — TipTap compliance editor wire-up (this session)
 
-- Already implemented in a prior session. No work needed.
+Two compound bugs discovered and fixed end-to-end:
+
+**Bug 1 — missing backend endpoint:**
+
+- `useRfpCompliance` was calling `GET /api/v1/bid-workspaces/:id/compliance` which returned 404 — the route never existed; compliance data was embedded in `BidWorkspaceSnapshot.matrixRows` without the requirement text join the frontend needed.
+- Added `GET /bid-workspaces/:opportunityId/compliance` to `apps/api/src/routes/bid-workspace.ts`: single Prisma `findMany` with `include: { requirement: { select: { text, confidenceBps } } }`, maps `responseStatus` ('YES'/'NO'/'PARTIAL') → frontend `status` ('compliant'/'non_compliant'/'partial'/'pending'), derives `autoFilled` from `responseStatus !== 'not_started'`.
+- Returns `{ items[], total, compliantCount, pendingCount }`. Hard-coded `take: 500` for safety; TODO react-virtual for 200+ row matrices.
+
+**Bug 2 — silently discarded edits:**
+
+- `ComplianceRow.tsx` used an uncontrolled `<textarea defaultValue>` with no `onChange` and a "Done" button that only toggled `isEditing` — every edit was thrown away on click.
+- Replaced with a lazy-mounted TipTap `ComplianceEditorInner` sub-component (only mounts `useEditor` when `isEditing=true`). WHY lazy: 200+ row matrices would create 200+ ProseMirror instances at load without this.
+- Added `onSave: (rowId, answerDraft) => void` + `isSaving: boolean` props; `handleDone` calls `onSave(row.id, editor.getHTML())` then exits edit mode.
+
+**Frontend hook rewrite (`apps/web/src/hooks/rfp/useRfpCompliance.ts`):**
+
+- Added `useSaveComplianceRow(opportunityId)` — `useMutation` calling `PATCH /api/v1/bid-workspaces/:id/matrix/:rowId` with `{ answerDraft }`, invalidates `['rfp', opportunityId, 'compliance']` on success.
+
+**ComplianceMatrix wired (`apps/web/src/components/rfp/compliance/ComplianceMatrix.tsx`):**
+
+- Calls `useSaveComplianceRow`; passes `onSave={handleSave}` and `isSaving={saveRow.isPending}` to each `<ComplianceRow>`.
+
+**Test coverage:**
+
+- `ComplianceMatrix.test.tsx`: extended `vi.mock` factory to include `useSaveComplianceRow: vi.fn(() => ({ mutate: vi.fn(), isPending: false }))` — previously the mock only exported `useRfpCompliance`, causing "not a function" at render time.
+- `bid-workspace.integration.test.ts`: third test exercises the full round-trip — creates opportunity → document → requirement (confidenceBps: 8500) → verifies GET /compliance returns `{ response: null, status: 'pending', autoFilled: false, aiConfidenceBps: 8500 }` → PATCHes answerDraft → verifies GET /compliance returns saved HTML.
 
 ### W10-P1-5 — MemOS L1 traces + L2 win/loss hook
 
@@ -1123,9 +1148,14 @@ Sprint 21 shipped the read-only Sales Dashboard. Sprint 22 makes it _act_: every
 
 - `pnpm --filter @bidstack/worker typecheck` ✅
 - `pnpm --filter @bidstack/api typecheck` ✅
+- `pnpm --filter @bidstack/web typecheck` ✅ (W10-P1-4)
 - `pnpm --filter @bidstack/worker lint --quiet` ✅
 - `pnpm --filter @bidstack/api lint --quiet` ✅
+- `pnpm --filter @bidstack/web lint --quiet` ✅ (W10-P1-4, lint-staged via commit hook)
+- 11/11 web unit tests pass (ComplianceMatrix suite) ✅ (W10-P1-4)
+- 3/3 bid-workspace integration tests pass ✅ (W10-P1-4)
 - Commit: `2982c962` `feat(memos): W10-P1-5 — L1 traces in RFP workers + L2 win/loss hook`
+- Commit: `51432cb9` `feat(compliance): W10-P1-4 — add GET /compliance endpoint + wire TipTap editor`
 
 **Blocked (external):**
 
