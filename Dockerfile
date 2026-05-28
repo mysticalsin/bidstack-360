@@ -96,7 +96,18 @@ FROM node:${NODE_VERSION} AS worker
 ENV NODE_ENV=production
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
-RUN apk add --no-cache curl ghostscript ocrmypdf qpdf tesseract-ocr tesseract-ocr-data-eng
+# System tools: OCR pipeline (ocrmypdf, tesseract, ghostscript) + Python for
+# the XGBoost scoring sidecar (see apps/worker/python/README.md).
+RUN apk add --no-cache curl ghostscript ocrmypdf qpdf tesseract-ocr tesseract-ocr-data-eng \
+      python3 py3-pip
+# WHY a venv: PEP 668 "externally-managed" guard and isolation from system pip.
+# Packages pinned to same bounds as python/requirements.txt for consistency.
+COPY --from=builder /app/apps/worker/python/requirements.txt /tmp/worker-py-reqs.txt
+RUN python3 -m venv /opt/python-venv && \
+    /opt/python-venv/bin/pip install --no-cache-dir -r /tmp/worker-py-reqs.txt && \
+    rm /tmp/worker-py-reqs.txt
+ENV PATH="/opt/python-venv/bin:$PATH"
+ENV PREDICTIVE_PYTHON_BIN=/opt/python-venv/bin/python3
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 WORKDIR /app
 COPY --from=builder /app/pnpm-workspace.yaml /app/package.json /app/pnpm-lock.yaml ./
@@ -112,6 +123,7 @@ COPY --from=builder /app/packages/db/generated ./packages/db/generated
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/packages/dust-client/dist ./packages/dust-client/dist
 COPY --from=builder /app/packages/odoo-mcp-client/dist ./packages/odoo-mcp-client/dist
+COPY --from=builder /app/apps/worker/python ./apps/worker/python
 WORKDIR /app/apps/worker
 # Run as non-root — reduces container-escape blast radius.
 RUN addgroup -S bidstack && adduser -S -G bidstack bidstack \

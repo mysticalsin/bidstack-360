@@ -11,6 +11,8 @@ import type { Logger as PinoLogger } from 'pino';
 
 import { prisma } from '@bidstack/db';
 
+import { fanOutWebhookEvent } from '../../queues/webhook-delivery.js';
+
 const NPS_TOKEN_SECRET = process.env['NPS_TOKEN_SECRET'] ?? 'change-me-in-production';
 const SURVEY_TTL_DAYS = 30;
 
@@ -79,6 +81,19 @@ export async function sendNpsSurvey(
   });
 
   log.info({ orgId, accountId, surveyId: survey.id }, 'cs: NPS survey created');
+
+  // Fan-out webhook so downstream integrations (e.g. Zapier → email) can
+  // send the NPS survey link. Fire-and-forget — fail-open, never blocks the caller.
+  const appBaseUrl = process.env['APP_BASE_URL'] ?? 'https://app.bidstack.com';
+  const publicUrl = `${appBaseUrl}/api/v1/public/nps/${token}`;
+  void fanOutWebhookEvent(orgId, 'nps.survey_dispatched', {
+    surveyId: survey.id,
+    accountId,
+    contactId: contactId ?? null,
+    publicUrl,
+    expiresAt: exp.toISOString(),
+  });
+
   return { surveyId: survey.id, token, expiresAt: exp };
 }
 
@@ -132,10 +147,7 @@ export async function recordNpsResponse(
 }
 
 /** Send NPS surveys to all contacts for qualifying accounts (quarterly trigger). */
-export async function sendQuarterlyNpsSurveys(
-  orgId: string,
-  log: PinoLogger,
-): Promise<number> {
+export async function sendQuarterlyNpsSurveys(orgId: string, log: PinoLogger): Promise<number> {
   const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
 
   // Active accounts that haven't had a survey in 90 days.
@@ -149,7 +161,10 @@ export async function sendQuarterlyNpsSurveys(
         },
       },
     },
-    select: { accountId: true, account: { select: { contacts: { select: { id: true }, take: 1 } } } },
+    select: {
+      accountId: true,
+      account: { select: { contacts: { select: { id: true }, take: 1 } } },
+    },
     distinct: ['accountId'],
   });
 
