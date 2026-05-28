@@ -112,7 +112,9 @@ describe('dust integration routes', () => {
     });
 
     expect(res.statusCode).toBe(400);
-    expect(res.json()).toMatchObject({ message: 'Bad Request' });
+    expect(res.json()).toMatchObject({
+      message: 'Probe URL cannot target localhost, private networks, or internal hostnames.',
+    });
     await expect(
       prisma.auditLog.count({ where: { orgId: orgId!, action: 'integration.probe' } }),
     ).resolves.toBe(0);

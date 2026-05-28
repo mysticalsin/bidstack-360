@@ -57,7 +57,9 @@ describe('tasks routes', () => {
   skipIfNoDb('GET /api/tasks returns seeded tasks', async () => {
     const res = await server.inject({ method: 'GET', url: '/api/tasks?limit=20' });
     expect(res.statusCode).toBe(200);
-    const body = res.json() as { items: Array<{ id: string; status: string; assignee: string | null }> };
+    const body = res.json() as {
+      items: Array<{ id: string; status: string; assignee: string | null }>;
+    };
     expect(Array.isArray(body.items)).toBe(true);
     expect(body.items.length).toBeGreaterThanOrEqual(1);
     for (const row of body.items) {
@@ -92,7 +94,12 @@ describe('tasks routes', () => {
       },
     });
     expect(res.statusCode).toBe(201);
-    const body = res.json() as { id: string; title: string; status: string; assignee: string | null };
+    const body = res.json() as {
+      id: string;
+      title: string;
+      status: string;
+      assignee: string | null;
+    };
     expect(body.title).toBe('Integration test task');
     expect(body.status).toBe('open');
     expect(body.assignee).toBeNull();
@@ -112,7 +119,7 @@ describe('tasks routes', () => {
       },
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json().message).toBe('Bad Request');
+    expect(res.json().message).toBe('Opportunity not found in this org');
   });
 
   skipIfNoDb('PATCH /api/tasks/:id transitions status and updates title', async () => {
@@ -165,7 +172,7 @@ describe('tasks routes', () => {
       payload: { assignee: 'not-a-user@example.com' },
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json().message).toBe('Bad Request');
+    expect(res.json().message).toBe('Assignee not found in this org');
   });
 
   skipIfNoDb('GET /api/tasks filters by status', async () => {
@@ -176,7 +183,10 @@ describe('tasks routes', () => {
       url: `/api/tasks/${createdTaskIds[0]}`,
       payload: { status: 'in_progress' },
     });
-    const res = await server.inject({ method: 'GET', url: '/api/tasks?status=in_progress&limit=10' });
+    const res = await server.inject({
+      method: 'GET',
+      url: '/api/tasks?status=in_progress&limit=10',
+    });
     expect(res.statusCode).toBe(200);
     const body = res.json() as { items: Array<{ status: string }> };
     for (const row of body.items) {

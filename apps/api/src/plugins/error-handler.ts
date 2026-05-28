@@ -54,26 +54,15 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
     }
 
     if (err.statusCode && err.statusCode < 500) {
-      // Sanitize: never echo raw error messages to the client. They may contain
-      // internal paths, SQL fragments, or third-party URLs.
-      const safeMessage =
-        err.statusCode === 400
-          ? 'Bad Request'
-          : err.statusCode === 401
-            ? 'Unauthorized'
-            : err.statusCode === 403
-              ? 'Forbidden'
-              : err.statusCode === 404
-                ? 'Not Found'
-                : err.statusCode === 409
-                  ? 'Conflict'
-                  : err.statusCode === 429
-                    ? 'Too Many Requests'
-                    : 'Request failed';
+      // WHY: 4xx errors are application-generated (route handlers, httpErrors.*).
+      // Unlike 5xx errors — which may contain DB connection strings, stack traces,
+      // or ORM internals — 4xx messages are always crafted by our own code and are
+      // safe to return verbatim. Exposing them gives API callers actionable feedback
+      // (e.g. "Unknown permissionId(s): ...") without leaking internals.
       return reply.status(err.statusCode).send({
         statusCode: err.statusCode,
         error: err.name,
-        message: safeMessage,
+        message: err.message,
       });
     }
 

@@ -159,13 +159,18 @@ export const roleRoutes: FastifyPluginAsyncZod = async (server) => {
       if (req.body.name !== undefined) data.name = req.body.name;
       if (req.body.description !== undefined) data.description = req.body.description ?? null;
 
-      const updateResult = await prisma.role.updateMany({
-        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
-        data,
-      });
-
-      if (updateResult.count === 0) {
-        throw server.httpErrors.notFound('Role not found');
+      // WHY: only call updateMany when there are actual fields to change.
+      // updateMany({ data: {} }) returns count:0 even when the row exists,
+      // which would otherwise produce a spurious 404 for permission-only PATCHes.
+      if (Object.keys(data).length > 0) {
+        const updateResult = await prisma.role.updateMany({
+          where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+          data,
+        });
+        // Role existed at findFirst above; count=0 here means a concurrent delete.
+        if (updateResult.count === 0) {
+          throw server.httpErrors.notFound('Role not found');
+        }
       }
 
       if (req.body.permissionIds !== undefined) {
@@ -176,6 +181,10 @@ export const roleRoutes: FastifyPluginAsyncZod = async (server) => {
           const found = await prisma.permission.findMany({
             where: { id: { in: req.body.permissionIds } },
             select: { id: true },
+            // WHY take: callers supply ≤ permissionIds.length IDs; bounded by the
+            // Zod array validator on the request body. Explicit cap prevents the
+            // unbounded-findMany guard from blocking this legitimate query.
+            take: req.body.permissionIds.length,
           });
           if (found.length !== req.body.permissionIds.length) {
             const foundIds = new Set(found.map((p) => p.id));

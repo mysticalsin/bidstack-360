@@ -19,6 +19,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import { redis } from '../redis.js';
 import type { FastifyInstance } from 'fastify';
 
 // ─── Globals ─────────────────────────────────────────────────────────────────
@@ -70,6 +71,15 @@ beforeAll(async () => {
   const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
   orgId = org?.id ?? null;
   if (!orgId) return;
+
+  // WHY: the per-org upload rate-limit key persists in Redis across test runs
+  // (TTL = 1 hour). Without a flush here the counter accumulates and eventually
+  // causes 429 responses where the tests expect 415, 202, etc.
+  try {
+    await redis.del(`rfp:upload:${orgId}`);
+  } catch {
+    // Redis unavailable — fail-open; rate-limit tests still exercise the mock path.
+  }
 
   // Pick the first seed user for assertions against approvedByUserId.
   const user = await prisma.user.findFirst({
@@ -298,8 +308,8 @@ describe('POST /api/v1/opportunities/:opportunityId/rfp/upload', () => {
 
   skipIfNoDb('413 if file exceeds 50 MiB', async () => {
     const opp = await createOpportunity('upload-too-large');
-    // Create a file with bytes > 50 MiB (52_428_800 = 50 MiB + 1 MiB).
-    const bigFile = await createFile({ bytes: 52_428_800 });
+    // Create a file with bytes > 50 MiB (52_428_801 = 50 MiB + 1 byte).
+    const bigFile = await createFile({ bytes: 52_428_801 });
 
     const res = await server.inject({
       method: 'POST',

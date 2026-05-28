@@ -64,7 +64,7 @@ describe('webhook subscription routes', () => {
 
     expect(patch.statusCode).toBe(400);
     expect(patch.json()).toMatchObject({
-      message: 'Bad Request',
+      message: 'url must not point to a private or internal address',
     });
   });
 });

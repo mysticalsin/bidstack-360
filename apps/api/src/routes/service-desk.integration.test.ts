@@ -81,9 +81,15 @@ describe('service-desk routes', () => {
     expect(Array.isArray(body.items)).toBe(true);
     for (const row of body.items) {
       expect(row.number).toMatch(/^CS-\d{5}$/);
-      expect(['new', 'open', 'waiting_customer', 'waiting_internal', 'resolved', 'closed', 'escalated']).toContain(
-        row.status,
-      );
+      expect([
+        'new',
+        'open',
+        'waiting_customer',
+        'waiting_internal',
+        'resolved',
+        'closed',
+        'escalated',
+      ]).toContain(row.status);
       expect(['low', 'medium', 'high', 'critical']).toContain(row.priority);
     }
   });
@@ -149,48 +155,57 @@ describe('service-desk routes', () => {
     expect(leaked).toBeNull();
   });
 
-  skipIfNoDb('PATCH /api/service-cases/:id updates status to resolved and sets resolvedAt', async () => {
-    if (createdCaseIds.length === 0) return;
-    const id = createdCaseIds[0];
-    const res = await server.inject({
-      method: 'PATCH',
-      url: `/api/service-cases/${id}`,
-      payload: { status: 'resolved' },
-    });
-    expect(res.statusCode).toBe(200);
-    const body = res.json() as { status: string; resolvedAt: string | null };
-    expect(body.status).toBe('resolved');
-    expect(body.resolvedAt).toBeTruthy();
-  });
+  skipIfNoDb(
+    'PATCH /api/service-cases/:id updates status to resolved and sets resolvedAt',
+    async () => {
+      if (createdCaseIds.length === 0) return;
+      const id = createdCaseIds[0];
+      const res = await server.inject({
+        method: 'PATCH',
+        url: `/api/service-cases/${id}`,
+        payload: { status: 'resolved' },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as { status: string; resolvedAt: string | null };
+      expect(body.status).toBe('resolved');
+      expect(body.resolvedAt).toBeTruthy();
+    },
+  );
 
-  skipIfNoDb('PATCH /api/service-cases/:id rejects owner ids outside the tenant scope', async () => {
-    if (createdCaseIds.length === 0) return;
-    const foreignUser = await createForeignUser();
-    const id = createdCaseIds[0];
-    const res = await server.inject({
-      method: 'PATCH',
-      url: `/api/service-cases/${id}`,
-      payload: { ownerId: foreignUser.id },
-    });
+  skipIfNoDb(
+    'PATCH /api/service-cases/:id rejects owner ids outside the tenant scope',
+    async () => {
+      if (createdCaseIds.length === 0) return;
+      const foreignUser = await createForeignUser();
+      const id = createdCaseIds[0];
+      const res = await server.inject({
+        method: 'PATCH',
+        url: `/api/service-cases/${id}`,
+        payload: { ownerId: foreignUser.id },
+      });
 
-    expect(res.statusCode).toBe(400);
-    const row = await prisma.serviceCase.findFirst({ where: { id }, select: { ownerId: true } });
-    expect(row?.ownerId).not.toBe(foreignUser.id);
-  });
+      expect(res.statusCode).toBe(400);
+      const row = await prisma.serviceCase.findFirst({ where: { id }, select: { ownerId: true } });
+      expect(row?.ownerId).not.toBe(foreignUser.id);
+    },
+  );
 
-  skipIfNoDb('PATCH /api/service-cases/:id updates status to closed and sets closedAt', async () => {
-    if (createdCaseIds.length === 0) return;
-    const id = createdCaseIds[0];
-    const res = await server.inject({
-      method: 'PATCH',
-      url: `/api/service-cases/${id}`,
-      payload: { status: 'closed' },
-    });
-    expect(res.statusCode).toBe(200);
-    const body = res.json() as { status: string; closedAt: string | null };
-    expect(body.status).toBe('closed');
-    expect(body.closedAt).toBeTruthy();
-  });
+  skipIfNoDb(
+    'PATCH /api/service-cases/:id updates status to closed and sets closedAt',
+    async () => {
+      if (createdCaseIds.length === 0) return;
+      const id = createdCaseIds[0];
+      const res = await server.inject({
+        method: 'PATCH',
+        url: `/api/service-cases/${id}`,
+        payload: { status: 'closed' },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as { status: string; closedAt: string | null };
+      expect(body.status).toBe('closed');
+      expect(body.closedAt).toBeTruthy();
+    },
+  );
 
   skipIfNoDb('PATCH /api/service-cases/:id records customer satisfaction', async () => {
     if (createdCaseIds.length === 0) return;
@@ -214,7 +229,7 @@ describe('service-desk routes', () => {
       payload: { satisfaction: 6 },
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json().message).toBe('Bad Request');
+    expect(res.json().message).toMatch(/satisfaction.*Number must be less than or equal to 5/);
   });
 
   skipIfNoDb('GET /api/service-cases filters by status', async () => {
@@ -225,7 +240,10 @@ describe('service-desk routes', () => {
       url: `/api/service-cases/${createdCaseIds[0]}`,
       payload: { status: 'closed' },
     });
-    const res = await server.inject({ method: 'GET', url: '/api/service-cases?status=closed&limit=10' });
+    const res = await server.inject({
+      method: 'GET',
+      url: '/api/service-cases?status=closed&limit=10',
+    });
     expect(res.statusCode).toBe(200);
     const body = res.json() as { items: Array<{ status: string }> };
     for (const row of body.items) {
@@ -235,7 +253,10 @@ describe('service-desk routes', () => {
 
   skipIfNoDb('GET /api/service-cases filters by priority', async () => {
     if (createdCaseIds.length === 0) return;
-    const res = await server.inject({ method: 'GET', url: '/api/service-cases?priority=high&limit=10' });
+    const res = await server.inject({
+      method: 'GET',
+      url: '/api/service-cases?priority=high&limit=10',
+    });
     expect(res.statusCode).toBe(200);
     const body = res.json() as { items: Array<{ priority: string }> };
     for (const row of body.items) {
@@ -273,7 +294,10 @@ describe('service-desk routes', () => {
   });
 
   skipIfNoDb('GET /api/service-cases/:id returns 404 for unknown id', async () => {
-    const res = await server.inject({ method: 'GET', url: '/api/service-cases/11111111-2222-3333-4444-555555555555' });
+    const res = await server.inject({
+      method: 'GET',
+      url: '/api/service-cases/11111111-2222-3333-4444-555555555555',
+    });
     expect(res.statusCode).toBe(404);
   });
 });
