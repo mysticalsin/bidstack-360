@@ -162,7 +162,6 @@ export function OppWinProbabilityBadge({
         type="button"
         aria-label={`Win probability: ${prob}% — ${label}`}
         aria-expanded={open}
-        aria-haspopup="dialog"
         onClick={() => setOpen((v) => !v)}
         onFocus={() => setOpen(true)}
         onBlur={(e) => {

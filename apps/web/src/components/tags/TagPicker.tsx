@@ -96,7 +96,6 @@ export function TagPicker({ entityType, entityId, suggestionContext }: TagPicker
           'hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)]',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-1',
         )}
-        aria-haspopup="dialog"
         aria-expanded={open}
       >
         <Icon name="plus" size={10} ariaHidden />

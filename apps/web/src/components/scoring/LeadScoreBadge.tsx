@@ -132,7 +132,6 @@ export function LeadScoreBadge({ leadId, prefetched, size = 'md' }: LeadScoreBad
         type="button"
         aria-label={`Lead score: ${score} out of 100 — ${label}`}
         aria-expanded={open}
-        aria-haspopup="dialog"
         onClick={() => setOpen((v) => !v)}
         onFocus={() => setOpen(true)}
         onBlur={(e) => {
