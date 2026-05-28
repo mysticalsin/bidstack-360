@@ -4,12 +4,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import {
-  prisma,
-  type Prisma,
-  type LeadStatus,
-  type LeadPriority,
-} from '@bidstack/db';
+import { prisma, type Prisma, type LeadStatus, type LeadPriority } from '@bidstack/db';
 import { pushLeadToDust } from '../lib/dust-push.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import {
@@ -76,6 +71,7 @@ export const leadRoutes: FastifyPluginAsyncZod = async (server) => {
           ownerId: l.ownerId,
           ownerName: l.owner?.name ?? null,
           convertedToOpportunityId: l.convertedToOpportunityId,
+          statusChangedAt: l.statusChangedAt.toISOString(),
           createdAt: l.createdAt.toISOString(),
           updatedAt: l.updatedAt.toISOString(),
         })),
@@ -119,6 +115,7 @@ export const leadRoutes: FastifyPluginAsyncZod = async (server) => {
         ownerId: lead.ownerId,
         ownerName: lead.owner?.name ?? null,
         convertedToOpportunityId: lead.convertedToOpportunityId,
+        statusChangedAt: lead.statusChangedAt.toISOString(),
         createdAt: lead.createdAt.toISOString(),
         updatedAt: lead.updatedAt.toISOString(),
         notes: lead.notes,
@@ -202,6 +199,7 @@ export const leadRoutes: FastifyPluginAsyncZod = async (server) => {
         ownerId: created.ownerId,
         ownerName: created.owner?.name ?? null,
         convertedToOpportunityId: created.convertedToOpportunityId,
+        statusChangedAt: created.statusChangedAt.toISOString(),
         createdAt: created.createdAt.toISOString(),
         updatedAt: created.updatedAt.toISOString(),
         notes: created.notes,
@@ -315,6 +313,7 @@ export const leadRoutes: FastifyPluginAsyncZod = async (server) => {
         ownerId: updated.ownerId,
         ownerName: updated.owner?.name ?? null,
         convertedToOpportunityId: updated.convertedToOpportunityId,
+        statusChangedAt: updated.statusChangedAt.toISOString(),
         createdAt: updated.createdAt.toISOString(),
         updatedAt: updated.updatedAt.toISOString(),
         notes: updated.notes,

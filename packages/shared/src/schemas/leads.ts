@@ -53,6 +53,7 @@ export const LeadSummary = z.object({
   ownerId: z.string().uuid().nullable(),
   ownerName: z.string().nullable(),
   convertedToOpportunityId: z.string().uuid().nullable(),
+  statusChangedAt: z.string().datetime(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });

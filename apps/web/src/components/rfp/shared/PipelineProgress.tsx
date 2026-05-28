@@ -2,10 +2,14 @@ import { useTranslation } from 'react-i18next';
 
 import type { PipelineStage } from '@/stores/rfpPipeline';
 
-/** Ordered stages that appear in the progress bar (not idle/failed/approved). */
+/**
+ * Ordered stages that appear in the progress bar (not idle/failed/approved).
+ * WHY queued/extracting: QA-9 renamed 'uploading'→'queued' and
+ * 'extraction'→'extracting' to match server RfpOrchestration.state values.
+ */
 const ORDERED_STAGES: PipelineStage[] = [
-  'uploading',
-  'extraction',
+  'queued',
+  'extracting',
   'story_matching',
   'section_drafting',
   'compliance_fill',

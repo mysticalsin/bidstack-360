@@ -64,6 +64,10 @@ connection.on('connect', () => log.info({ redisEndpoint }, 'redis connected'));
 const workers: Worker[] = [];
 const queues: Queue[] = [];
 
+// WHY separate: startCallWorkers has a different signature — returns Worker[]
+// synchronously (no queue/workers arrays) and does not need to be awaited.
+workers.push(...startCallWorkers(connection, log));
+
 await Promise.all([
   startDustPoller(connection, log, workers, queues),
   startWebhookProcessor(connection, log, workers, queues),
@@ -76,7 +80,6 @@ await Promise.all([
   startWebhookDeliveryWorker(connection, log, workers, queues),
   startYjsCompaction(connection, log, workers, queues),
   startCsWorkers(connection, log, workers, queues),
-  startCallWorkers(connection, log, workers, queues),
   startPredictiveRetrainWorker(connection, log, workers, queues),
   // Wave 9 — RFP Automation Engine
   startRfpOrchestrator(connection, log, workers, queues),

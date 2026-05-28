@@ -27,12 +27,61 @@ interface ExchangeRates {
 
 interface CurrencyStore {
   currency: CurrencyCode;
+  autoDetect: boolean;
   rates: ExchangeRates | null;
   ratesLoading: boolean;
   ratesError: string | null;
   setCurrency: (c: CurrencyCode) => void;
+  enableAutoDetect: () => void;
   fetchRates: () => Promise<void>;
   convert: (amount: number, from: string) => number;
+}
+
+export function detectLocalCurrency(): CurrencyCode {
+  try {
+    const resolvedOptions = new Intl.NumberFormat().resolvedOptions();
+    const locale = resolvedOptions.locale || navigator.language || '';
+
+    if (locale.endsWith('-US') || locale === 'en-US') return 'USD';
+    if (locale.endsWith('-GB') || locale === 'en-GB') return 'GBP';
+    if (locale.endsWith('-CA') || locale === 'en-CA') return 'CAD';
+    if (locale.endsWith('-AU') || locale === 'en-AU') return 'AUD';
+    if (locale.endsWith('-JP') || locale === 'ja-JP') return 'JPY';
+    if (locale.endsWith('-SE') || locale === 'sv-SE') return 'SEK';
+    if (locale.endsWith('-NO') || locale === 'nb-NO' || locale === 'nn-NO') return 'NOK';
+    if (locale.endsWith('-DK') || locale === 'da-DK') return 'DKK';
+    if (locale.endsWith('-CH') || locale === 'de-CH' || locale === 'fr-CH' || locale === 'it-CH')
+      return 'CHF';
+
+    const lang = (locale.split('-')[0] ?? '').toLowerCase();
+    if (lang === 'ja') return 'JPY';
+    if (lang === 'sv') return 'SEK';
+    if (lang === 'no' || lang === 'nb' || lang === 'nn') return 'NOK';
+    if (lang === 'da') return 'DKK';
+
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (tz) {
+      if (
+        tz.includes('New_York') ||
+        tz.includes('Chicago') ||
+        tz.includes('Denver') ||
+        tz.includes('Los_Angeles')
+      ) {
+        return 'USD';
+      }
+      if (tz.includes('London')) return 'GBP';
+      if (tz.includes('Toronto') || tz.includes('Vancouver')) return 'CAD';
+      if (tz.includes('Sydney') || tz.includes('Melbourne')) return 'AUD';
+      if (tz.includes('Tokyo')) return 'JPY';
+      if (tz.includes('Stockholm')) return 'SEK';
+      if (tz.includes('Oslo')) return 'NOK';
+      if (tz.includes('Copenhagen')) return 'DKK';
+      if (tz.includes('Zurich')) return 'CHF';
+    }
+  } catch {
+    // ignore
+  }
+  return 'EUR';
 }
 
 function loadCachedRates(): ExchangeRates | null {
@@ -52,12 +101,14 @@ function loadCachedRates(): ExchangeRates | null {
 export const useCurrencyStore = create<CurrencyStore>()(
   persist(
     (set, get) => ({
-      currency: 'EUR',
+      currency: detectLocalCurrency(),
+      autoDetect: true,
       rates: loadCachedRates(),
       ratesLoading: false,
       ratesError: null,
 
-      setCurrency: (currency) => set({ currency }),
+      setCurrency: (currency) => set({ currency, autoDetect: false }),
+      enableAutoDetect: () => set({ autoDetect: true, currency: detectLocalCurrency() }),
 
       fetchRates: async () => {
         const cached = loadCachedRates();
@@ -69,7 +120,7 @@ export const useCurrencyStore = create<CurrencyStore>()(
         try {
           const res = await fetch('/api/v1/exchange-rates', { credentials: 'include' });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const data = await res.json() as { rates?: unknown; base?: string; date?: string };
+          const data = (await res.json()) as { rates?: unknown; base?: string; date?: string };
           if (!data.rates || typeof data.rates !== 'object') throw new Error('Invalid rate data');
           const rates: ExchangeRates = {
             base: data.base ?? 'EUR',
@@ -95,16 +146,16 @@ export const useCurrencyStore = create<CurrencyStore>()(
         const { currency: to, rates } = get();
         if (!rates || !rates.rates) return amount;
         if (from === to) return amount;
-        const fromRate = rates.rates[from];
-        const toRate = rates.rates[to];
-        if (!fromRate || !toRate) return amount;
+        const fromRate = from === rates.base ? 1.0 : rates.rates[from];
+        const toRate = to === rates.base ? 1.0 : rates.rates[to];
+        if (fromRate === undefined || toRate === undefined) return amount;
         // Convert: amount / fromRate * toRate  (rates are all relative to EUR base)
         return (amount / fromRate) * toRate;
       },
     }),
     {
       name: 'bidstack:currency-locale',
-      partialize: (state) => ({ currency: state.currency }),
-    }
-  )
+      partialize: (state) => ({ currency: state.currency, autoDetect: state.autoDetect }),
+    },
+  ),
 );

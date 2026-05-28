@@ -7,7 +7,16 @@ import { z } from 'zod';
 import { nocobase } from '../lib/nocobase-client.js';
 import { createLogger } from '../lib/logger.js';
 import { runAgent } from '../services/agents/agents.service.js';
-import { listAssignmentsForRfp } from '../services/agents/rfp-agent-assignments.service.js';
+import {
+  listAssignmentsForRfp,
+  assignAgentToRfp,
+  unassignAgentFromRfp,
+} from '../services/agents/rfp-agent-assignments.service.js';
+import {
+  listOutputsForRfp,
+  approveOutput,
+  rejectOutput,
+} from '../services/agents/rfp-agent-outputs.service.js';
 import { runRfpAgent } from '../services/ai/dust-agent.service.js';
 
 const log = createLogger({ name: 'rfp-nocobase' });
@@ -614,6 +623,102 @@ const plugin: FastifyPluginAsyncZod = async (server) => {
     async (req, reply) => {
       await nocobase.destroy('rfp_requests', req.params.id);
       return reply.status(204).send();
+    },
+  );
+
+  // ── RFP Agent Assignments ─────────────────────────────────────────────────
+  server.get(
+    '/rfp/:id/assignments',
+    {
+      config: { permission: 'opportunities:read' },
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+      },
+    },
+    async (req) => {
+      return listAssignmentsForRfp(req.auth.orgId, req.params.id);
+    },
+  );
+
+  server.post(
+    '/rfp/:id/assignments',
+    {
+      config: { permission: 'opportunities:write' },
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        body: z.object({
+          agentId: z.string().uuid(),
+        }),
+      },
+    },
+    async (req) => {
+      return assignAgentToRfp(req.auth.orgId, req.body.agentId, req.params.id);
+    },
+  );
+
+  server.delete(
+    '/rfp/:id/assignments/:assignmentId',
+    {
+      config: { permission: 'opportunities:write' },
+      schema: {
+        params: z.object({
+          id: z.string().uuid(),
+          assignmentId: z.string().uuid(),
+        }),
+      },
+    },
+    async (req) => {
+      return unassignAgentFromRfp(req.auth.orgId, req.params.assignmentId);
+    },
+  );
+
+  // ── RFP Agent Outputs ──────────────────────────────────────────────────────
+  server.get(
+    '/rfp/:id/outputs',
+    {
+      config: { permission: 'opportunities:read' },
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+      },
+    },
+    async (req) => {
+      const items = await listOutputsForRfp(req.params.id);
+      return { items };
+    },
+  );
+
+  server.post(
+    '/rfp/:id/outputs/:outputId/approve',
+    {
+      config: { permission: 'opportunities:write' },
+      schema: {
+        params: z.object({
+          id: z.string().uuid(),
+          outputId: z.string(),
+        }),
+      },
+    },
+    async (req) => {
+      return approveOutput(req.params.outputId, req.auth.userId);
+    },
+  );
+
+  server.post(
+    '/rfp/:id/outputs/:outputId/reject',
+    {
+      config: { permission: 'opportunities:write' },
+      schema: {
+        params: z.object({
+          id: z.string().uuid(),
+          outputId: z.string(),
+        }),
+        body: z.object({
+          reason: z.string().min(1),
+        }),
+      },
+    },
+    async (req) => {
+      return rejectOutput(req.params.outputId, req.auth.userId, req.body.reason);
     },
   );
 };

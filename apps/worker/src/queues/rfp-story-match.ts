@@ -225,15 +225,17 @@ async function persistMatches(
   // @db.Uuid — casting a non-UUID string fails at runtime. NULL is the correct
   // default; a true UUID run ID can be stored once Dust exposes one.
   //
-  // WHY no updated_at: RequirementReferenceMatch has only createdAt and
-  // deletedAt — there is no updatedAt column in the schema.
+  // WHY (org_id, requirement_id, reference_id) in ON CONFLICT: the unique
+  // constraint is defined on all three columns (QA-7: f39f88b4). PostgreSQL
+  // requires an exact match to the constraint column list — a 2-col target
+  // (requirement_id, reference_id) fails to resolve at runtime.
   for (const [idx, m] of topMatches.entries()) {
     const reasoning = `cosine=${m.cosineBps}bps keyword=${m.keywordBps}bps tag=${m.tagBps}bps recency=${m.recencyBps}bps`;
     await prisma.$executeRaw`
       INSERT INTO requirement_reference_matches (
         id, org_id, requirement_id, reference_id,
         score_bps, rank, reasoning, matched_by_agent, agent_run_id,
-        created_at
+        created_at, updated_at
       ) VALUES (
         gen_random_uuid(),
         ${orgId}::uuid,
@@ -244,14 +246,16 @@ async function persistMatches(
         ${reasoning},
         'rfp-story-match-hybrid',
         NULL,
+        now(),
         now()
       )
-      ON CONFLICT (requirement_id, reference_id)
+      ON CONFLICT (org_id, requirement_id, reference_id)
       DO UPDATE SET
         score_bps         = EXCLUDED.score_bps,
         rank              = EXCLUDED.rank,
         reasoning         = EXCLUDED.reasoning,
-        matched_by_agent  = EXCLUDED.matched_by_agent
+        matched_by_agent  = EXCLUDED.matched_by_agent,
+        updated_at        = now()
       WHERE requirement_reference_matches.org_id = ${orgId}::uuid
     `;
   }

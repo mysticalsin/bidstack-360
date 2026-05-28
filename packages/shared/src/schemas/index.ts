@@ -33,3 +33,7 @@ export * from './migration.js';
 export * from './integration-hub.js';
 export * from './esignature.js';
 export * from './custom-objects.js';
+export * from './tag.js';
+export * from './email-template.js';
+export * from './lead-rot.js';
+export * from './rfp-agent-assignment.js';

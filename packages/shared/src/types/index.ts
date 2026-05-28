@@ -26,3 +26,46 @@ export type {
   HiringSignal,
   WinPrediction,
 } from '../schemas/intel.js';
+
+export type {
+  Tag,
+  TagCreate,
+  TagPatch,
+  TagList,
+  TagApply,
+  EntityTagsResponse,
+  TagSuggestion,
+  TagSuggestRequest,
+  TagSuggestResponse,
+  TaggableEntityType,
+} from '../schemas/tag.js';
+
+export type {
+  EmailTemplate,
+  EmailTemplateCreate,
+  EmailTemplatePatch,
+  EmailTemplateList,
+  EmailTemplateRenderRequest,
+  EmailTemplateRenderResponse,
+} from '../schemas/email-template.js';
+
+export type {
+  LeadStageRotConfig,
+  LeadStageRotConfigUpsert,
+  LeadStageRotConfigList,
+  RecoverySuggestResponse,
+} from '../schemas/lead-rot.js';
+
+export type {
+  RfpAgentAssignment,
+  RfpAgentAssignmentStatus,
+  RfpAgentAssignmentWithAgent,
+  RfpAgentAssignmentCreate,
+  RfpAgentAssignmentListResult,
+  RfpAgentOutput,
+  RfpAgentOutputStatus,
+  RfpAgentOutputListResult,
+  RfpAgentTask,
+  RfpAgentTaskStatus,
+  RfpAgentTaskListResult,
+} from '../schemas/rfp-agent-assignment.js';

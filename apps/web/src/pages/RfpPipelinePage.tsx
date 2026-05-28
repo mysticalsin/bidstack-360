@@ -22,7 +22,7 @@ import { ComplianceMatrix } from '@/components/rfp/compliance/ComplianceMatrix';
 import { ApprovalGate } from '@/components/rfp/approval/ApprovalGate';
 
 const ACTIVE_PROCESSING_STAGES = [
-  'extraction',
+  'extracting',
   'story_matching',
   'section_drafting',
   'compliance_fill',
@@ -45,12 +45,13 @@ export function RfpPipelinePage() {
   const events = useRfpPipelineStore((s) => s.events);
   const error = useRfpPipelineStore((s) => s.error);
   const bidWorkspaceId = useRfpPipelineStore((s) => s.bidWorkspaceId);
+  const orchestrationId = useRfpPipelineStore((s) => s.orchestrationId);
   const reset = useRfpPipelineStore((s) => s.reset);
 
   useDocumentTitle();
 
-  // Start SSE stream once bidWorkspaceId is known
-  useRfpPipeline(bidWorkspaceId);
+  // Start SSE stream once bidWorkspaceId and orchestrationId are known
+  useRfpPipeline(bidWorkspaceId, orchestrationId);
 
   // Reset store on unmount to avoid stale state on re-entry
   useEffect(() => {
@@ -107,7 +108,7 @@ export function RfpPipelinePage() {
       {stage === 'idle' && <RfpUploadZone />}
 
       {/* 2. Uploading — show progress bar */}
-      {stage === 'uploading' && <RfpUploadProgress />}
+      {stage === 'queued' && <RfpUploadProgress />}
 
       {/* 3-8. Active processing — stage card with event log */}
       {isActiveProcessing(stage) && (

@@ -15,6 +15,12 @@ declare module 'fastify' {
     requireRole: (...allowed: string[]) => (req: FastifyRequest) => Promise<void>;
     requirePermission: (permission: PermissionKey) => (req: FastifyRequest) => Promise<void>;
   }
+  // WHY: route config: { permission: '...' } is a convenience annotation used
+  // by observability middleware to log which permission gate a route enforces.
+  // Augmenting FastifyContextConfig prevents TS2345 on all routes that set it.
+  interface FastifyContextConfig {
+    permission?: PermissionKey;
+  }
 }
 
 const plugin: FastifyPluginAsync = fp(async (server) => {

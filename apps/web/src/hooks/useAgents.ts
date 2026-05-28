@@ -4,6 +4,9 @@ import type {
   AgentProvider,
   RfpAgentTemplate,
   RfpResponsePhaseDefinition,
+  RfpAgentAssignment,
+  RfpAgentAssignmentWithAgent,
+  RfpAgentOutput,
 } from '@bidstack/shared';
 import { api } from '@/lib/api';
 
@@ -135,5 +138,89 @@ export function useAgentRuns(agentId?: string) {
     queryKey: agentId ? ['agent-runs', agentId] : ['agent-runs'],
     queryFn: async ({ signal }) =>
       api(agentId ? `/api/agents/${agentId}/runs` : '/api/agent-runs', { signal }),
+  });
+}
+
+export function useRfpAgentAssignments(rfpRequestId: string | undefined) {
+  return useQuery<{ items: RfpAgentAssignmentWithAgent[] }>({
+    queryKey: ['rfp-assignments', rfpRequestId],
+    queryFn: async ({ signal }) => api(`/api/v1/rfp/${rfpRequestId}/assignments`, { signal }),
+    enabled: Boolean(rfpRequestId),
+  });
+}
+
+export function useAssignAgentToRfp() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ agentId, rfpRequestId }: { agentId: string; rfpRequestId: string }) =>
+      api<RfpAgentAssignment>(`/api/v1/rfp/${rfpRequestId}/assignments`, {
+        method: 'POST',
+        body: { agentId },
+      }),
+    onSuccess: (_data, variables) => {
+      void qc.invalidateQueries({ queryKey: ['rfp-assignments', variables.rfpRequestId] });
+    },
+  });
+}
+
+export function useUnassignAgentFromRfp() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      assignmentId,
+      rfpRequestId,
+    }: {
+      assignmentId: string;
+      rfpRequestId: string;
+    }) =>
+      api<{ success: boolean }>(`/api/v1/rfp/${rfpRequestId}/assignments/${assignmentId}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: (_data, variables) => {
+      void qc.invalidateQueries({ queryKey: ['rfp-assignments', variables.rfpRequestId] });
+    },
+  });
+}
+
+export function useRfpAgentOutputs(rfpRequestId: string | undefined) {
+  return useQuery<{ items: RfpAgentOutput[] }>({
+    queryKey: ['rfp-outputs', rfpRequestId],
+    queryFn: async ({ signal }) => api(`/api/v1/rfp/${rfpRequestId}/outputs`, { signal }),
+    enabled: Boolean(rfpRequestId),
+  });
+}
+
+export function useApproveOutput() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ rfpRequestId, outputId }: { rfpRequestId: string; outputId: string }) =>
+      api<{ success: boolean }>(`/api/v1/rfp/${rfpRequestId}/outputs/${outputId}/approve`, {
+        method: 'POST',
+      }),
+    onSuccess: (_data, variables) => {
+      void qc.invalidateQueries({ queryKey: ['rfp-outputs', variables.rfpRequestId] });
+    },
+  });
+}
+
+export function useRejectOutput() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      rfpRequestId,
+      outputId,
+      reason,
+    }: {
+      rfpRequestId: string;
+      outputId: string;
+      reason: string;
+    }) =>
+      api<{ success: boolean }>(`/api/v1/rfp/${rfpRequestId}/outputs/${outputId}/reject`, {
+        method: 'POST',
+        body: { reason },
+      }),
+    onSuccess: (_data, variables) => {
+      void qc.invalidateQueries({ queryKey: ['rfp-outputs', variables.rfpRequestId] });
+    },
   });
 }

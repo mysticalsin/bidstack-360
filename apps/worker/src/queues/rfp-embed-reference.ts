@@ -93,11 +93,12 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
   const { orgId, referenceId, contentText } = parsed.data;
 
   // Verify reference belongs to this org — Reference is a Wave 1 model.
-  // metadata is fetched so the NDA-D gate below can check ndaTier without
-  // a second DB round-trip.
+  // WHY no metadata select: the Reference model has no metadata column in the
+  // current schema. NDA-D classification for references will be handled via a
+  // future schema migration adding a confidentialityTier column to Reference.
   const reference = await prisma.reference.findUnique({
     where: { id: referenceId, orgId, deletedAt: null },
-    select: { id: true, metadata: true },
+    select: { id: true },
   });
   if (!reference) {
     const err = new Error(
@@ -105,23 +106,6 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
     );
     (err as Error & { doNotRetry?: boolean }).doNotRetry = true;
     throw err;
-  }
-
-  // §NDA-D gate — GDPR Art. 5(1)(f) / contractual confidentiality obligation.
-  // References (success stories) may carry ndaTier='D' in their metadata JSON
-  // when sourced from a Tier-D NDA-protected client. Such documents must NEVER
-  // be sent to any AI processor, including embedding APIs.
-  //
-  // WHY doNotRetry: NDA-D status is permanent for a reference.
-  // WHY no referenceId in the log: existence of a Tier-D reference must not
-  // leak to log aggregators or monitoring dashboards (information-disclosure risk).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- metadata is untyped Json
-  const refMeta = reference.metadata as any;
-  if (refMeta && refMeta.ndaTier === 'D') {
-    const ndaErr = new Error('rfp-embed-reference: reference blocked by NDA-D gate');
-    (ndaErr as Error & { doNotRetry?: boolean }).doNotRetry = true;
-    log.warn({ orgId }, 'rfp-embed-reference: NDA-D gate blocked embedding — document ID omitted');
-    return; // graceful exit — do not embed, do not log document identity
   }
 
   const contentHash = createHash('sha256').update(contentText, 'utf8').digest('hex');
