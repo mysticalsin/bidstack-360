@@ -69,6 +69,48 @@
   --info: #6e59ff;
   --info-tint: #ece8ff;
 
+  /* Semantic aliases — components use these instead of duplicating semantic names */
+  --fg-error: #b82032; /* = --danger; 6.38:1 on white ✅ */
+  --fg-jade: #1a7a4d; /* = --tag-jade-fg; 6.86:1 on white ✅ */
+  --fg-amber: #8a5a00; /* = --warning; 5.93:1 on white ✅ */
+  --fg-tomato: #b03018; /* = --tag-tomato-fg; 5.5:1 on white ✅ */
+  --fg-disabled: #94a3b8; /* disabled text — WCAG 1.4.3 exempt */
+  --success-fg: #177048; /* = --success */
+  --error-fg: #b82032; /* = --danger */
+  --warning-fg: #8a5a00; /* = --warning */
+  --success-surface: #e4f4ec; /* = --success-tint */
+  --error-surface: #fbe5e8; /* = --danger-tint */
+  --sidebar-fg: #6b7280; /* = --fg-tertiary */
+  --sidebar-fg-active: #1a1f36; /* = --fg-primary */
+  --sidebar-hover: rgba(0, 0, 0, 0.04);
+  --sidebar-active: rgba(44, 75, 255, 0.08);
+
+  /* Component tokens — surfaces, shadows, code, inputs */
+  --surface-subtle: #f4f6fa; /* between card and sunken */
+  --surface-elevated: #ffffff; /* = --surface-raised */
+  --surface-input: #ffffff; /* form input background */
+  --surface-sunken-alpha: rgba(237, 239, 245, 0.7);
+  --shadow-soft: 0 4px 16px rgba(0, 0, 0, 0.06);
+  --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.06);
+  --code-bg: #f0f3f9;
+  --code-fg: #1e2d40; /* 12.3:1 on code-bg ✅ */
+  --ring: rgba(44, 75, 255, 0.35); /* = --focus-ring-color */
+  --sidebar-badge-bg: rgba(44, 75, 255, 0.1);
+  --sidebar-badge-fg: #2c4bff; /* = --brand-primary */
+
+  /* Brand shorthands (alias to primary) */
+  --brand: #2c4bff;
+  --brand-hover: #2540e0;
+  --brand-muted: #eaeefe;
+
+  /* Legacy token aliases — AuditLog & older components */
+  --text-primary: #1a1f36; /* = --fg-primary */
+  --text-secondary: #5a6478; /* = --fg-secondary */
+  --text-muted: #a0a8b8; /* = --fg-muted */
+  --surface-primary: #ffffff; /* = --surface-card */
+  --surface-secondary: #edeff5; /* = --surface-sunken */
+  --accent-primary: #2c4bff; /* = --brand-primary */
+
   /* Tag palette */
   --tag-blue-bg: #e5ecff;
   --tag-blue-fg: #2540e0;
@@ -154,6 +196,48 @@
   --danger-tint: rgba(251, 113, 133, 0.16);
   --info: #818cf8;
   --info-tint: rgba(129, 140, 248, 0.16);
+
+  /* Semantic aliases — dark mode equivalents */
+  --fg-error: #fb7185; /* = --danger dark */
+  --fg-jade: #6ee7b7; /* = --tag-jade-fg dark */
+  --fg-amber: #fcd34d; /* = --tag-amber-fg dark */
+  --fg-tomato: #fda4af; /* = --tag-tomato-fg dark */
+  --fg-disabled: #52525b; /* = --fg-muted dark — WCAG exempt */
+  --success-fg: #34d399; /* = --success dark */
+  --error-fg: #fb7185; /* = --danger dark */
+  --warning-fg: #fbbf24; /* = --warning dark */
+  --success-surface: rgba(52, 211, 153, 0.16); /* = --success-tint dark */
+  --error-surface: rgba(251, 113, 133, 0.16); /* = --danger-tint dark */
+  --sidebar-fg: #a1a1aa; /* = --fg-secondary dark */
+  --sidebar-fg-active: #f8fafc; /* = --fg-primary dark */
+  --sidebar-hover: rgba(255, 255, 255, 0.05);
+  --sidebar-active: rgba(94, 106, 210, 0.18);
+
+  /* Component tokens — surfaces, shadows, code, inputs */
+  --surface-subtle: #121214; /* = --surface-soft dark */
+  --surface-elevated: #1c1c1e; /* = --surface-raised dark */
+  --surface-input: #0c0c0e; /* = --surface-card dark */
+  --surface-sunken-alpha: rgba(7, 7, 8, 0.7);
+  --shadow-soft: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.6), 0 8px 16px rgba(0, 0, 0, 0.4);
+  --code-bg: #111113;
+  --code-fg: #c0caf5; /* muted violet — readable on near-black ✅ */
+  --ring: rgba(94, 106, 210, 0.45); /* = --focus-ring-color dark */
+  --sidebar-badge-bg: rgba(94, 106, 210, 0.18);
+  --sidebar-badge-fg: #7882e7; /* = --brand-deep dark */
+
+  /* Brand shorthands (alias to primary) */
+  --brand: #5e6ad2;
+  --brand-hover: #7882e7;
+  --brand-muted: rgba(94, 106, 210, 0.18);
+
+  /* Legacy token aliases — AuditLog & older components */
+  --text-primary: #f8fafc; /* = --fg-primary dark */
+  --text-secondary: #a1a1aa; /* = --fg-secondary dark */
+  --text-muted: #52525b; /* = --fg-muted dark */
+  --surface-primary: #0c0c0e; /* = --surface-card dark */
+  --surface-secondary: #070708; /* = --surface-sunken dark */
+  --accent-primary: #5e6ad2; /* = --brand-primary dark */
 
   /* Tag palette — vibrant against near-black, contrast verified */
   --tag-blue-bg: rgba(101, 132, 255, 0.18);
