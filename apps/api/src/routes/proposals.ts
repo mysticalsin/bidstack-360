@@ -10,49 +10,15 @@ import {
   ProposalSectionPatch,
   ProposalDraftRequest,
   ProposalDraftResponse,
-  type ProposalStatus,
 } from '@bidstack/shared';
 import { MemOSService } from '@bidstack/memos';
 import { draftProposalSection } from '../services/ai/dust-agent.service.js';
 import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 
-const DEFAULT_SECTIONS = [
-  { key: 'executive_summary', title: 'Executive Summary', sortOrder: 0, required: true },
-  { key: 'technical_approach', title: 'Technical Approach', sortOrder: 1, required: true },
-  { key: 'pricing', title: 'Pricing & Commercial Terms', sortOrder: 2, required: true },
-  { key: 'case_studies', title: 'Case Studies & References', sortOrder: 3, required: false },
-  { key: 'team_bios', title: 'Team Bios', sortOrder: 4, required: false },
-  { key: 'risk_matrix', title: 'Risk Matrix & Mitigation', sortOrder: 5, required: true },
-] as const;
+import { DEFAULT_SECTIONS, serializeProposal } from './proposals.helpers.js';
 
-function serializeProposal(row: {
-  id: string;
-  orgId: string;
-  opportunityId: string | null;
-  name: string;
-  status: string;
-  version: number;
-  ownerId: string | null;
-  complianceScore: number | null;
-  dueDate: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-}): z.infer<typeof Proposal> {
-  return {
-    id: row.id,
-    orgId: row.orgId,
-    opportunityId: row.opportunityId,
-    name: row.name,
-    status: row.status as z.infer<typeof ProposalStatus>,
-    version: row.version,
-    ownerId: row.ownerId,
-    complianceScore: row.complianceScore,
-    dueDate: row.dueDate?.toISOString().split('T')[0] ?? null,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  };
-}
+// DEFAULT_SECTIONS and serializeProposal extracted to ./proposals.helpers.ts (BS-R1)
 
 export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
   const memos = new MemOSService();
