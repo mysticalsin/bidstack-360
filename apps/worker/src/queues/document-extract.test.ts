@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildSourceChunks, extractRequirementCandidates } from './document-extract.js';
+import { buildSourceChunks, extractRequirementCandidates } from './document-extract-analysis.js';
 
 describe('bid document extraction helpers', () => {
   it('turns RFP text into source chunks and cited requirement candidates', () => {

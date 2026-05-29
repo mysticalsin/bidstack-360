@@ -1,52 +1,12 @@
 /**
- * chartShared — shared types, style constants, and private helper components
- * used across all chart variants. Not part of the public charts API.
+ * chartShared — private React components shared across all chart variants.
+ * Types, constants, and utilities live in chartTypes.ts (plain .ts) so this
+ * file stays component-only and satisfies react-refresh/only-export-components.
  */
 import type { ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 
-import {
-  CHART_GRID_COLOR,
-  CHART_AXIS_COLOR,
-  CHART_TOOLTIP_BG,
-  CHART_TOOLTIP_BORDER,
-  CHART_TOOLTIP_FG,
-} from './chartTokens';
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-export type DataPoint = Record<string, unknown>;
-
-export interface BaseProps {
-  data: DataPoint[];
-  xKey: string;
-  yKey: string | string[];
-  'aria-label'?: string;
-  height?: number;
-}
-
-// ── Style constants ───────────────────────────────────────────────────────────
-
-export const tooltipStyle = {
-  backgroundColor: CHART_TOOLTIP_BG,
-  border: `1px solid ${CHART_TOOLTIP_BORDER}`,
-  borderRadius: '8px',
-  color: CHART_TOOLTIP_FG,
-  fontSize: '12px',
-  padding: '8px 12px',
-};
-
-export const axisProps = {
-  tick: { fill: CHART_AXIS_COLOR, fontSize: 11 },
-  axisLine: { stroke: CHART_GRID_COLOR },
-  tickLine: { stroke: CHART_GRID_COLOR },
-};
-
-// ── Utility ───────────────────────────────────────────────────────────────────
-
-export function resolveYKeys(yKey: string | string[]): string[] {
-  return Array.isArray(yKey) ? yKey : [yKey];
-}
+import type { DataPoint } from './chartTypes';
 
 // ── DataTable — sr-only accessible fallback for Recharts visualisations ───────
 
