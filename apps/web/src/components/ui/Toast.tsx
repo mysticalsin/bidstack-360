@@ -158,7 +158,7 @@ function ToastCard({ item }: { item: ToastItem }) {
     >
       <div className="flex items-start gap-3 p-3 pl-4">
         <div
-          className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white text-xs font-bold ${style.bar}`}
+          className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--fg-on-brand)] text-xs font-bold ${style.bar}`}
           aria-hidden
         >
           {style.icon}

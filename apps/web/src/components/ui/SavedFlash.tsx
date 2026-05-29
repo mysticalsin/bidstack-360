@@ -43,7 +43,7 @@ export function SavedFlash({ trigger, duration = 900 }: Props) {
           exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.6 }}
           transition={{ type: 'spring', stiffness: 360, damping: 22 }}
           aria-hidden
-          className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-[var(--success)] text-[10px] font-bold text-white"
+          className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-[var(--success)] text-[10px] font-bold text-[var(--fg-on-brand)]"
         >
           ✓
         </motion.span>
