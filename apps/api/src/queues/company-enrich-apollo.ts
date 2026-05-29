@@ -84,8 +84,12 @@ export async function enqueueApolloEnrich(job: ApolloEnrichJob): Promise<string 
     const payload = secret
       ? { ...job, signature: createApolloEnrichJobSignature(job, secret) }
       : job;
+    // BullMQ forbids colons in job IDs — use underscore separator.
+    // This jobId acts as a deduplication key so parallel enrich requests for
+    // the same org+company collapse into one job.
+    const safeCompanyName = job.companyName.replace(/[^a-zA-Z0-9_-]/g, '_');
     const queued = await getQueue().add('apollo.enrich', payload, {
-      jobId: `${job.orgId}:${job.companyName}`,
+      jobId: `${job.orgId}_${safeCompanyName}`,
     });
     log.info({ jobId: queued.id, orgId: job.orgId }, 'Apollo enrich job enqueued');
     return queued.id ?? null;
