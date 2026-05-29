@@ -48,10 +48,7 @@ export function withQueryContext<T>(fn: () => T): T {
   );
 }
 
-function isUnboundedFindMany(params: {
-  action: string;
-  args?: Record<string, unknown>;
-}): boolean {
+function isUnboundedFindMany(params: { action: string; args?: Record<string, unknown> }): boolean {
   if (params.action !== 'findMany') return false;
   const args = params.args ?? {};
   const take = args.take as number | undefined;
@@ -66,7 +63,7 @@ export function installPrismaMiddleware(): void {
   if (installed) return;
   installed = true;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- WHY: Prisma $use callback signature is untyped in Prisma 5; params/next shapes are internal
   prisma.$use(async (params: any, next: any) => {
     const start = performance.now();
     const result = await next(params);

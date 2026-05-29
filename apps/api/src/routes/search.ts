@@ -60,6 +60,7 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
           SELECT id, code, customer, name
           FROM opportunities
           WHERE org_id = ${req.auth.orgId}::uuid
+            AND deleted_at IS NULL
             AND (customer || ' ' || name || ' ' || code) ILIKE ${like}
           ORDER BY updated_at DESC
           LIMIT ${perTypeLimit}
@@ -80,6 +81,7 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
         const contacts = await prisma.contact.findMany({
           where: {
             orgId: req.auth.orgId,
+            deletedAt: null,
             OR: [
               { name: { contains: q, mode: 'insensitive' } },
               { email: { contains: q, mode: 'insensitive' } },
@@ -104,6 +106,7 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
         const companies = await prisma.companyEnrichment.findMany({
           where: {
             orgId: req.auth.orgId,
+            deletedAt: null,
             OR: [
               { normalizedName: { contains: q, mode: 'insensitive' } },
               { domain: { contains: q, mode: 'insensitive' } },
@@ -128,6 +131,7 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
         const tasks = await prisma.task.findMany({
           where: {
             orgId: req.auth.orgId,
+            deletedAt: null,
             title: { contains: q, mode: 'insensitive' },
           },
           take: perTypeLimit,
@@ -148,6 +152,7 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
         const notes = await prisma.note.findMany({
           where: {
             orgId: req.auth.orgId,
+            deletedAt: null,
             OR: [
               { title: { contains: q, mode: 'insensitive' } },
               { bodyMd: { contains: q, mode: 'insensitive' } },
@@ -171,6 +176,7 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
         const orders = await prisma.salesOrder.findMany({
           where: {
             orgId: req.auth.orgId,
+            deletedAt: null,
             OR: [
               { number: { contains: q, mode: 'insensitive' } },
               { customerName: { contains: q, mode: 'insensitive' } },

@@ -217,7 +217,14 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!existing) throw server.httpErrors.notFound('Task not found');
 
-      const isAdmin = req.auth.role === 'admin';
+      const adminRoleCount = await prisma.userRole.count({
+        where: {
+          userId: req.auth.userId,
+          user: { orgId: req.auth.orgId, deletedAt: null },
+          role: { orgId: req.auth.orgId, name: 'Admin', deletedAt: null },
+        },
+      });
+      const isAdmin = adminRoleCount > 0;
       const isAssignee = existing.assigneeId === req.auth.userId;
       const isUnassigned = existing.assigneeId === null;
       if (!isAdmin && !isAssignee && !isUnassigned) {
@@ -334,7 +341,14 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!existing) throw server.httpErrors.notFound('Task not found');
 
-      const isAdmin = req.auth.role === 'admin';
+      const adminRoleCount = await prisma.userRole.count({
+        where: {
+          userId: req.auth.userId,
+          user: { orgId: req.auth.orgId, deletedAt: null },
+          role: { orgId: req.auth.orgId, name: 'Admin', deletedAt: null },
+        },
+      });
+      const isAdmin = adminRoleCount > 0;
       const isAssignee = existing.assigneeId === req.auth.userId;
       const isUnassigned = existing.assigneeId === null;
       if (!isAdmin && !isAssignee && !isUnassigned) {

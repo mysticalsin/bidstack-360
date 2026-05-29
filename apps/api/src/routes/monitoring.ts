@@ -200,6 +200,7 @@ export const monitoringRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/admin/monitoring/queues',
     {
+      preHandler: server.requireRole('admin'),
       schema: {
         summary: 'Live BullMQ queue depth snapshot',
         tags: ['monitoring'],
@@ -241,6 +242,7 @@ export const monitoringRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/admin/monitoring/alerts',
     {
+      preHandler: server.requireRole('admin'),
       schema: {
         summary: 'Queue alert conditions (for PagerDuty / Grafana alerting)',
         tags: ['monitoring'],
@@ -305,6 +307,7 @@ export const monitoringRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/admin/monitoring/embeddings',
     {
+      preHandler: server.requireRole('admin'),
       schema: {
         summary: 'Embedding queue failure rate stats',
         tags: ['monitoring'],

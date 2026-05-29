@@ -32,7 +32,9 @@ const CSP_DIRECTIVES = (isDev: boolean): string => {
     "default-src 'self'",
     // WHY 'unsafe-inline' in dev: Vite injects inline scripts for HMR.
     // Production removes it — rely on hash/nonce if inline scripts are needed.
-    isDev ? "script-src 'self' 'unsafe-inline'" : "script-src 'self'",
+    isDev
+      ? "script-src 'self' 'unsafe-inline'"
+      : "script-src 'self' 'sha256-zMrO0O5IHYc57MwPohPXPYLWREEfnFUG550rxUn/8RA='",
     // Google Fonts stylesheet is loaded by the design system.
     "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
     "font-src 'self' fonts.gstatic.com",
@@ -45,7 +47,7 @@ const CSP_DIRECTIVES = (isDev: boolean): string => {
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
-    "worker-src 'none'",
+    "worker-src 'self'",
     "media-src 'none'",
     ...(isDev ? [] : ['upgrade-insecure-requests']),
   ];
