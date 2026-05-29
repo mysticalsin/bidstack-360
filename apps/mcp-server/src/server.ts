@@ -32,13 +32,22 @@ type SseSession = {
   transport: SSEServerTransport;
   ctx: McpAuthCtx;
   mcp: McpServer;
+  /** Unix ms — used by the TTL sweep to evict sessions that never closed cleanly. */
+  createdAt: number;
 };
 
 type StreamableSession = {
   transport: StreamableHTTPServerTransport;
   ctx: McpAuthCtx;
   mcp: McpServer;
+  /** Unix ms — used by the TTL sweep to evict sessions that never closed cleanly. */
+  createdAt: number;
 };
+
+/** Reject new session creation when combined Map size reaches this. */
+const MAX_SESSIONS = 500;
+/** Evict sessions still open beyond this age (handles unclean client disconnects). */
+const SESSION_TTL_MS = 2 * 60 * 60 * 1_000; // 2 hours
 
 function createAuthenticatedMcp(ctx: McpAuthCtx): McpServer {
   const mcp = new McpServer({ name: 'BidStack 360', version: '0.1.0' });
@@ -154,11 +163,22 @@ export async function buildMcpServer(): Promise<FastifyInstance> {
         }
         transport = session.transport;
       } else if (req.method === 'POST' && isInitializeRequest(req.body)) {
+        // Cap check: guard against runaway session creation before the sweep can evict.
+        if (sseTransports.size + streamableTransports.size >= MAX_SESSIONS) {
+          sendJsonRpcError(reply, 503, 'Server at session capacity — try again later');
+          return;
+        }
+        const sessionCreatedAt = Date.now();
         const mcp = createAuthenticatedMcp(ctx);
         transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
           onsessioninitialized: (initializedSessionId) => {
-            streamableTransports.set(initializedSessionId, { transport, ctx, mcp });
+            streamableTransports.set(initializedSessionId, {
+              transport,
+              ctx,
+              mcp,
+              createdAt: sessionCreatedAt,
+            });
           },
         });
         transport.onclose = () => {
@@ -191,12 +211,17 @@ export async function buildMcpServer(): Promise<FastifyInstance> {
   // Deprecated HTTP+SSE transport, kept for older clients during migration.
   server.get('/mcp/sse', async (req, reply) => {
     const ctx = await mcpAuth(req, prisma);
-    const mcp = createAuthenticatedMcp(ctx);
 
+    if (sseTransports.size + streamableTransports.size >= MAX_SESSIONS) {
+      sendJsonRpcError(reply, 503, 'Server at session capacity — try again later');
+      return;
+    }
+
+    const mcp = createAuthenticatedMcp(ctx);
     const transport = new SSEServerTransport('/mcp/messages', reply.raw);
     await mcp.connect(transport);
 
-    sseTransports.set(transport.sessionId, { transport, ctx, mcp });
+    sseTransports.set(transport.sessionId, { transport, ctx, mcp, createdAt: Date.now() });
 
     const originalOnClose = transport.onclose;
     transport.onclose = () => {
@@ -231,6 +256,37 @@ export async function buildMcpServer(): Promise<FastifyInstance> {
 
     await session.transport.handlePostMessage(req.raw, reply.raw, req.body);
     reply.hijack();
+  });
+
+  // WHY sweep: transport.onclose handles graceful closes, but a client that
+  // drops the network without sending Close never triggers it — leaving its
+  // Map entry until the process restarts. The sweep evicts sessions idle beyond
+  // SESSION_TTL_MS, bounding memory growth from unclean disconnects.
+  let sweepTimer: ReturnType<typeof setInterval> | null = null;
+  server.addHook('onReady', (done) => {
+    sweepTimer = setInterval(
+      () => {
+        const cutoff = Date.now() - SESSION_TTL_MS;
+        for (const [id, session] of sseTransports) {
+          if (session.createdAt < cutoff) {
+            sseTransports.delete(id);
+            void session.mcp.close().catch(() => undefined);
+          }
+        }
+        for (const [id, session] of streamableTransports) {
+          if (session.createdAt < cutoff) {
+            streamableTransports.delete(id);
+            void session.mcp.close().catch(() => undefined);
+          }
+        }
+      },
+      15 * 60 * 1_000,
+    ); // sweep every 15 minutes
+    sweepTimer.unref(); // don't pin the event loop during shutdown
+    done();
+  });
+  server.addHook('onClose', async () => {
+    if (sweepTimer) clearInterval(sweepTimer);
   });
 
   return server;

@@ -167,45 +167,67 @@ export const invoiceExportPlugin: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const orgId = req.auth.orgId;
       const currency = req.query.currency ?? 'CAD';
-      const now = new Date();
 
-      const invoices = await prisma.invoice.findMany({
-        where: {
-          orgId,
-          currency,
-          state: { in: ['sent', 'overdue'] },
-        },
-        select: { id: true, totalMicros: true, paidMicros: true, dueDate: true },
-        take: 1000,
-      });
+      // WHY raw SQL: the previous implementation loaded up to 1,000 invoice rows
+      // into JS and bucketed them there — silently under-reporting large orgs,
+      // wasting memory on rows whose individual values are never needed (only
+      // their sums are), and missing the `deleted_at IS NULL` guard.
+      // A single GROUP BY pushes all arithmetic to Postgres and returns exactly
+      // 4 rows regardless of org size.
+      type BucketRow = { bucket: string; invoice_count: bigint; outstanding_micros: bigint };
 
-      const BUCKETS = [
-        { label: 'Current (0–30 days)', minDays: 0, maxDays: 30 },
-        { label: '31–60 days', minDays: 31, maxDays: 60 },
-        { label: '61–90 days', minDays: 61, maxDays: 90 },
-        { label: '90+ days', minDays: 91, maxDays: null as number | null },
+      const rows = await prisma.$queryRaw<BucketRow[]>`
+        SELECT
+          CASE
+            WHEN FLOOR(EXTRACT(EPOCH FROM (NOW() - due_date)) / 86400) BETWEEN  0 AND  30 THEN 'current'
+            WHEN FLOOR(EXTRACT(EPOCH FROM (NOW() - due_date)) / 86400) BETWEEN 31 AND  60 THEN '31-60'
+            WHEN FLOOR(EXTRACT(EPOCH FROM (NOW() - due_date)) / 86400) BETWEEN 61 AND  90 THEN '61-90'
+            ELSE '90+'
+          END                                           AS bucket,
+          COUNT(*)                                      AS invoice_count,
+          COALESCE(SUM(total_micros - paid_micros), 0)  AS outstanding_micros
+        FROM invoices
+        WHERE
+              org_id     = ${orgId}
+          AND currency   = ${currency}
+          AND state      IN ('sent', 'overdue')
+          AND deleted_at IS NULL
+          AND due_date   <= NOW()
+        GROUP BY 1
+      `;
+
+      const BUCKETS: Array<{
+        label: string;
+        key: string;
+        minDays: number;
+        maxDays: number | null;
+      }> = [
+        { label: 'Current (0–30 days)', key: 'current', minDays: 0, maxDays: 30 },
+        { label: '31–60 days', key: '31-60', minDays: 31, maxDays: 60 },
+        { label: '61–90 days', key: '61-90', minDays: 61, maxDays: 90 },
+        { label: '90+ days', key: '90+', minDays: 91, maxDays: null },
       ];
 
+      const rowsByKey = Object.fromEntries(rows.map((r) => [r.bucket, r]));
       let totalOutstandingMicros = 0n;
-      const bucketResults = BUCKETS.map((b) => {
-        const rows = invoices.filter((inv) => {
-          const daysPastDue = Math.floor(
-            (now.getTime() - inv.dueDate.getTime()) / (1000 * 60 * 60 * 24),
-          );
-          return daysPastDue >= b.minDays && (b.maxDays === null || daysPastDue <= b.maxDays);
-        });
-        const outstandingMicros = rows.reduce(
-          (sum, inv) => sum + BigInt(inv.totalMicros) - BigInt(inv.paidMicros),
-          0n,
-        );
+
+      const buckets = BUCKETS.map((b) => {
+        const row = rowsByKey[b.key];
+        const outstandingMicros = row ? BigInt(row.outstanding_micros) : 0n;
         totalOutstandingMicros += outstandingMicros;
-        return { ...b, invoiceCount: rows.length, outstandingMicros: String(outstandingMicros) };
+        return {
+          label: b.label,
+          minDays: b.minDays,
+          maxDays: b.maxDays,
+          invoiceCount: row ? Number(row.invoice_count) : 0,
+          outstandingMicros: String(outstandingMicros),
+        };
       });
 
       return {
         currency,
-        generatedAt: now.toISOString(),
-        buckets: bucketResults,
+        generatedAt: new Date().toISOString(),
+        buckets,
         totalOutstandingMicros: String(totalOutstandingMicros),
       };
     },
