@@ -52,10 +52,13 @@ function crmSummaryCacheKey(orgId: string, limit: number): string {
 }
 
 async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummaryPayload> {
-  const closedStages = ['closed_won', 'closed_lost'] as ['closed_won', 'closed_lost'];
-
-  const [countsRow, recentOpportunities, recentLeads, recentTasks, recentCases] = await Promise.all([
-    prisma.$queryRaw<SummaryCounts[]>`
+  // NOTE: 'closed_won' and 'closed_lost' are inlined as SQL text (not interpolated
+  // parameters) because Prisma's $queryRaw tagged-template serializer cannot encode
+  // a JS array as a PostgreSQL enum-array parameter. Static enum literals are safe
+  // to inline since they are not derived from user input.
+  const [countsRow, recentOpportunities, recentLeads, recentTasks, recentCases] = await Promise.all(
+    [
+      prisma.$queryRaw<SummaryCounts[]>`
       SELECT
         (SELECT COUNT(*)::int FROM companies WHERE org_id = ${orgId}::uuid AND deleted_at IS NULL) AS companies,
         (SELECT COUNT(*)::int FROM contacts WHERE org_id = ${orgId}::uuid AND deleted_at IS NULL) AS contacts,
@@ -65,14 +68,14 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
           SELECT COUNT(*)::int
           FROM opportunities
           WHERE org_id = ${orgId}::uuid
-            AND stage <> ALL(${closedStages}::opportunity_stage[])
+            AND stage NOT IN ('closed_won', 'closed_lost')
             AND deleted_at IS NULL
         ) AS "openOpportunities",
         (
           SELECT COALESCE(SUM(value_micros), 0)
           FROM opportunities
           WHERE org_id = ${orgId}::uuid
-            AND stage <> ALL(${closedStages}::opportunity_stage[])
+            AND stage NOT IN ('closed_won', 'closed_lost')
             AND deleted_at IS NULL
         ) AS "pipelineValueMicros",
         (SELECT COUNT(*)::int FROM tasks WHERE org_id = ${orgId}::uuid AND deleted_at IS NULL) AS tasks,
@@ -93,55 +96,56 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
             AND deleted_at IS NULL
         ) AS "openServiceCases"
     `,
-    prisma.opportunity.findMany({
-      take: 5,
-      orderBy: { updatedAt: 'desc' },
-      where: { orgId, deletedAt: null },
-      select: {
-        id: true,
-        name: true,
-        stage: true,
-        updatedAt: true,
-        company: { select: { id: true, name: true } },
-      },
-    }),
-    prisma.lead.findMany({
-      take: 5,
-      orderBy: { updatedAt: 'desc' },
-      where: { orgId, deletedAt: null },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        status: true,
-        updatedAt: true,
-      },
-    }),
-    prisma.task.findMany({
-      take: 5,
-      orderBy: { createdAt: 'desc' },
-      where: { orgId, deletedAt: null },
-      select: {
-        id: true,
-        title: true,
-        status: true,
-        createdAt: true,
-      },
-    }),
-    prisma.serviceCase.findMany({
-      take: 5,
-      orderBy: { updatedAt: 'desc' },
-      where: { orgId, deletedAt: null },
-      select: {
-        id: true,
-        subject: true,
-        priority: true,
-        status: true,
-        updatedAt: true,
-        company: { select: { id: true, name: true } },
-      },
-    }),
-    ]);
+      prisma.opportunity.findMany({
+        take: 5,
+        orderBy: { updatedAt: 'desc' },
+        where: { orgId, deletedAt: null },
+        select: {
+          id: true,
+          name: true,
+          stage: true,
+          updatedAt: true,
+          company: { select: { id: true, name: true } },
+        },
+      }),
+      prisma.lead.findMany({
+        take: 5,
+        orderBy: { updatedAt: 'desc' },
+        where: { orgId, deletedAt: null },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          status: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.task.findMany({
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        where: { orgId, deletedAt: null },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          createdAt: true,
+        },
+      }),
+      prisma.serviceCase.findMany({
+        take: 5,
+        orderBy: { updatedAt: 'desc' },
+        where: { orgId, deletedAt: null },
+        select: {
+          id: true,
+          subject: true,
+          priority: true,
+          status: true,
+          updatedAt: true,
+          company: { select: { id: true, name: true } },
+        },
+      }),
+    ],
+  );
 
   const counts = countsRow[0] ?? {
     companies: 0,
@@ -223,12 +227,17 @@ async function cachedCrmSummary(orgId: string, limit: number): Promise<CrmSummar
 
 export async function crmSummaryRoutes(app: FastifyInstance) {
   app.get('/crm/summary', async (req, reply) => {
-    const orgId = (req as unknown as { auth?: { orgId: string } }).auth?.orgId;
+    // req.auth is decorated globally by the auth plugin (fastify-plugin, so
+    // non-encapsulating). The onRequest hook guarantees it is set on every
+    // non-public route before we reach this handler.
+    const orgId = req.auth?.orgId;
     if (!orgId) return reply.code(401).send({ error: 'Unauthorized' });
 
     const queryResult = QuerySchema.safeParse(req.query);
     if (!queryResult.success) {
-      return reply.code(400).send({ error: 'Invalid query parameters', issues: queryResult.error.issues });
+      return reply
+        .code(400)
+        .send({ error: 'Invalid query parameters', issues: queryResult.error.issues });
     }
 
     return cachedCrmSummary(orgId, queryResult.data.limit);
