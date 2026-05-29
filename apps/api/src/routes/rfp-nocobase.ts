@@ -233,4 +233,4 @@ const plugin: FastifyPluginAsyncZod = async (server) => {
   await server.register(rfpAgentRoutes);
 };
 
-export default plugin;
+export const rfpNocobaseRoutes = plugin;
