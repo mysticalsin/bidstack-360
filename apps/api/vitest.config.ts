@@ -15,5 +15,16 @@ export default defineConfig({
     env: {
       NODE_ENV: 'test',
     },
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      include: ['src/**/*.ts'],
+      exclude: ['src/**/*.test.ts', 'src/**/*.d.ts', 'src/**/index.ts'],
+      thresholds: {
+        lines: 60,
+        functions: 60,
+        branches: 50,
+      },
+    },
   },
 });

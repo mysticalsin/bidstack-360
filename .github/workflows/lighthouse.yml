@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
-      pull-requests: write   # needed for PR comment
+      pull-requests: write # needed for PR comment
       contents: read
 
     steps:
@@ -47,7 +47,9 @@ jobs:
         run: pnpm --filter @bidstack/web build
         env:
           # Stub auth token for preview mode — no real backend needed for LHCI
-          VITE_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_placeholder
+          VITE_CLERK_PUBLISHABLE_KEY: pk_test_placeholder
+          VITE_AUTH_MODE: stub
+          BIDSTACK_ALLOW_STUB_AUTH: 'true'
 
       - name: Install Lighthouse CI
         run: npm install -g @lhci/cli@0.14.x
