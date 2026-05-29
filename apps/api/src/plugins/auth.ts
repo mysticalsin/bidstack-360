@@ -6,6 +6,8 @@
 // Stub mode is guarded by NODE_ENV === 'development' and will refuse to run
 // in production even if CLERK_SECRET_KEY is missing.
 
+import { createHash } from 'node:crypto';
+
 import { verifyToken } from '@clerk/backend';
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
@@ -14,6 +16,7 @@ import * as Sentry from '@sentry/node';
 import { prisma } from '@bidstack/db';
 
 import { writeAuthAudit } from './auth-audit.js';
+import { ensureAdminRoleGrant, mapClerkRole } from './auth-helpers.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -59,55 +62,7 @@ async function resolveStubAuth(req: FastifyRequest): Promise<AuthContext> {
   };
 }
 
-function mapClerkRole(orgRole: string | undefined): string {
-  if (orgRole === undefined || orgRole === null) return 'member';
-  const roleMap: Record<string, string> = {
-    'org:admin': 'admin',
-    'org:member': 'member',
-    'org:manager': 'manager',
-    'org:finance': 'finance',
-  };
-  const mapped = roleMap[orgRole];
-  if (!mapped) {
-    throw new Error(`UNRECOGNIZED_CLERK_ROLE:${orgRole}`);
-  }
-  return mapped;
-}
-
-/**
- * Idempotently assign the seeded `Admin` role to a user. Called on every
- * sign-in for users whose mapped Clerk role is `admin`, so the rbac plugin's
- * UserRole-based permission check always has something to find.
- *
- * If the org has no `Admin` row yet (fresh tenant that hasn't run the seed),
- * we log and skip — the operator will need to seed roles before admins can use
- * permission-gated endpoints. We do NOT auto-create the Role here because the
- * full Role row also requires its RolePermission mappings, which are managed
- * centrally in `packages/db/src/seed.ts`.
- */
-async function ensureAdminRoleGrant(
-  userId: string,
-  orgId: string,
-  req: FastifyRequest,
-): Promise<void> {
-  const adminRole = await prisma.role.findFirst({
-    where: { orgId, name: 'Admin', isSystem: true, deletedAt: null },
-    select: { id: true },
-  });
-  if (!adminRole) {
-    req.log.warn(
-      { orgId, userId },
-      'JIT admin grant skipped: org has no seeded Admin role (run pnpm db:seed)',
-    );
-    return;
-  }
-  // upsert on the composite PK so concurrent sign-ins don't race
-  await prisma.userRole.upsert({
-    where: { userId_roleId: { userId, roleId: adminRole.id } },
-    create: { userId, roleId: adminRole.id, orgId },
-    update: { deletedAt: null },
-  });
-}
+// mapClerkRole and ensureAdminRoleGrant extracted to ./auth-helpers.ts (BS-R1)
 
 async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
   const secretKey = process.env.CLERK_SECRET_KEY;
@@ -319,41 +274,92 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
   }
 }
 
-const plugin: FastifyPluginAsync = fp(async (server) => {
-  const hasClerkKey = !!process.env.CLERK_SECRET_KEY;
-  // Stub auth is allowed in dev and test only — production must provide a key.
-  // Do NOT default to 'development' — if NODE_ENV is unset, allowStub is false.
-  const allowStub = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+async function verifyApiKey(req: FastifyRequest): Promise<AuthContext | null> {
+  const apiKeyHeader = req.headers['x-api-key'];
+  if (!apiKeyHeader || typeof apiKeyHeader !== 'string') return null;
 
-  if (!hasClerkKey && !allowStub) {
-    server.log.error(
-      'AUTH CONFIG ERROR: CLERK_SECRET_KEY is missing and NODE_ENV is not development/test. Refusing to start.',
-    );
-    throw new Error('CLERK_SECRET_KEY required in production');
+  const hashedKey = createHash('sha256').update(apiKeyHeader).digest('hex');
+
+  const apiKey = await prisma.apiKey.findFirst({
+    where: {
+      hashedKey,
+      revokedAt: null,
+      deletedAt: null,
+    },
+    include: { org: { select: { id: true } } },
+  });
+
+  if (!apiKey) return null;
+
+  if (apiKey.expiresAt && apiKey.expiresAt < new Date()) {
+    return null;
   }
 
-  if (!hasClerkKey) {
-    server.log.warn(
-      'AUTH STUB MODE — no CLERK_SECRET_KEY set; minting seed org session (dev only)',
-    );
-  } else {
-    server.log.info('Clerk auth enabled');
-  }
+  // Update lastUsedAt fire-and-forget
+  void prisma.apiKey
+    .update({
+      where: { id: apiKey.id },
+      data: { lastUsedAt: new Date() },
+    })
+    .catch(() => {
+      /* silently ignore */
+    });
 
-  server.addHook('onRequest', async (req) => {
-    // Allow public endpoints to pass through without auth context.
-    if (req.routeOptions?.config?.public) return;
+  return {
+    orgId: apiKey.orgId,
+    userId: `apikey:${apiKey.id}`,
+    scopes: apiKey.scopes,
+    role: 'api',
+  };
+}
 
-    if (!hasClerkKey) {
-      req.auth = await resolveStubAuth(req);
-    } else {
-      req.auth = await verifyClerkAuth(req);
+const plugin: FastifyPluginAsync = fp(
+  async (server) => {
+    const hasClerkKey = !!process.env.CLERK_SECRET_KEY;
+    // Stub auth is allowed in dev and test only — production must provide a key.
+    // Do NOT default to 'development' — if NODE_ENV is unset, allowStub is false.
+    const allowStub = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+
+    if (!hasClerkKey && !allowStub) {
+      server.log.error(
+        'AUTH CONFIG ERROR: CLERK_SECRET_KEY is missing and NODE_ENV is not development/test. Refusing to start.',
+      );
+      throw new Error('CLERK_SECRET_KEY required in production');
     }
 
-    Sentry.setTag('orgId', req.auth.orgId);
-    Sentry.setTag('userId', req.auth.userId);
-    Sentry.setUser({ id: req.auth.userId, email: req.auth.email });
-  });
-}, { name: 'auth' });
+    if (!hasClerkKey) {
+      server.log.warn(
+        'AUTH STUB MODE — no CLERK_SECRET_KEY set; minting seed org session (dev only)',
+      );
+    } else {
+      server.log.info('Clerk auth enabled');
+    }
+
+    server.addHook('onRequest', async (req) => {
+      // Allow public endpoints to pass through without auth context.
+      if (req.routeOptions?.config?.public) return;
+
+      // Try API key auth first (documented in OpenAPI spec)
+      const apiAuth = await verifyApiKey(req);
+      if (apiAuth) {
+        req.auth = apiAuth;
+        Sentry.setTag('orgId', req.auth.orgId);
+        Sentry.setTag('userId', req.auth.userId);
+        return;
+      }
+
+      if (!hasClerkKey) {
+        req.auth = await resolveStubAuth(req);
+      } else {
+        req.auth = await verifyClerkAuth(req);
+      }
+
+      Sentry.setTag('orgId', req.auth.orgId);
+      Sentry.setTag('userId', req.auth.userId);
+      Sentry.setUser({ id: req.auth.userId, email: req.auth.email });
+    });
+  },
+  { name: 'auth' },
+);
 
 export const authPlugin = plugin;
