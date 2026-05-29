@@ -2,7 +2,7 @@
 // Reads ?state, ?country, ?salespersonId, ?search from the URL so the
 // dashboard's Top-N rows can deep-link straight into a pre-filtered list.
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { OrderStateBadge } from '@/components/sales/OrderStateBadge';
@@ -10,7 +10,8 @@ import { Card, SectionHeader } from '@/components/ui/Card';
 import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { SpotlightTable, SpotlightTableRow } from '@/components/ui/SpotlightTable';
-import { downloadCsv, rowsToCsv } from '@/lib/csv';
+import { toast } from '@/components/ui/Toast';
+import { downloadFromApi } from '@/lib/api';
 import { formatDate, formatMoneyMicros } from '@/lib/format';
 import { useSalesOrders, type SalesOrdersListFilter } from '@/hooks/useSalesOrders';
 
@@ -43,6 +44,7 @@ export function SalesOrdersPage() {
   }, [params]);
 
   const list = useSalesOrders(filter);
+  const [isExporting, setIsExporting] = useState(false);
 
   const setQueryParam = (key: string, value: string | null): void => {
     const next = new URLSearchParams(params);
@@ -51,43 +53,29 @@ export function SalesOrdersPage() {
     setParams(next, { replace: true });
   };
 
-  const onExport = (): void => {
-    const items = list.data?.items ?? [];
-    if (items.length === 0) return;
-    // Convert wire-format (string micros, ISO dates) into spreadsheet-
-    // friendly columns. Amount stays raw-decimal so Excel can SUM() it;
-    // formatted display column comes alongside for human reading.
-    const csv = rowsToCsv(
-      items.map((row) => ({
-        number: row.number,
-        state: row.state,
-        customer: row.customerName,
-        salesperson: row.salespersonName ?? '',
-        country: row.countryCode ?? '',
-        date: row.orderDate.slice(0, 10),
-        confirmedAt: row.confirmedAt?.slice(0, 10) ?? '',
-        currency: row.currency,
-        total: Number(row.totalMicros) / 1_000_000,
-        totalFormatted: formatMoneyMicros(row.totalMicros, row.currency),
-        lineCount: row.lineCount,
-      })),
-      [
-        { key: 'number', label: 'Number' },
-        { key: 'state', label: 'State' },
-        { key: 'customer', label: 'Customer' },
-        { key: 'salesperson', label: 'Salesperson' },
-        { key: 'country', label: 'Country' },
-        { key: 'date', label: 'Date' },
-        { key: 'confirmedAt', label: 'Confirmed' },
-        { key: 'currency', label: 'Currency' },
-        { key: 'total', label: 'Total' },
-        { key: 'totalFormatted', label: 'Total (formatted)' },
-        { key: 'lineCount', label: 'Lines' },
-      ],
-    );
+  // WHY backend streaming: client-side export was capped at the in-memory
+  // page (50 rows). The backend streams all matching sales orders cursor-
+  // paginated from Postgres via /sales/orders/export — no row limit, flat heap.
+  const exportCsv = async (): Promise<void> => {
+    if (isExporting) return;
     const stamp = new Date().toISOString().slice(0, 10);
     const tag = filter.state ? `-${filter.state}` : '';
-    downloadCsv(`sales-orders${tag}-${stamp}.csv`, csv);
+    setIsExporting(true);
+    try {
+      await downloadFromApi('/api/sales/orders/export', `sales-orders${tag}-${stamp}.csv`, {
+        querystring: {
+          state: filter.state,
+          salespersonId: filter.salespersonId,
+          countryCode: filter.countryCode,
+          search: filter.search,
+        },
+      });
+      toast.success('Export complete');
+    } catch {
+      toast.error('Export failed', { description: 'Try again in a moment.' });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -103,12 +91,12 @@ export function SalesOrdersPage() {
         </div>
         <LiquidGlassButton
           type="button"
-          onClick={onExport}
-          disabled={!list.data || list.data.items.length === 0}
+          onClick={() => void exportCsv()}
+          disabled={!list.data || list.data.items.length === 0 || isExporting}
           tone="secondary"
           size="sm"
         >
-          Export CSV
+          {isExporting ? 'Exporting…' : 'Export CSV'}
         </LiquidGlassButton>
       </header>
 

@@ -7,9 +7,10 @@ import { InvoiceStateBadge } from '@/components/sales/InvoiceStateBadge';
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
-import { downloadCsv, rowsToCsv } from '@/lib/csv';
+import { downloadFromApi } from '@/lib/api';
 import { formatDate, formatMoneyMicros } from '@/lib/format';
 import { useInvoices, type InvoicesListFilter } from '@/hooks/useInvoices';
+import { toast } from '@/components/ui/Toast';
 
 import type { InvoiceState } from '@bidstack/shared';
 
@@ -40,6 +41,7 @@ export function InvoicesPage() {
   const list = useInvoices(filter);
   const { refetch } = list;
   const [cursorStack, setCursorStack] = useState<string[]>([]);
+  const [isExporting, setIsExporting] = useState(false);
 
   const setQueryParam = (key: string, value: string | null): void => {
     const next = new URLSearchParams(params);
@@ -73,40 +75,28 @@ export function InvoicesPage() {
     setParams(next, { replace: true });
   };
 
-  const onExport = (): void => {
-    const items = list.data?.items ?? [];
-    if (items.length === 0) return;
-    const csv = rowsToCsv(
-      items.map((row) => ({
-        number: row.number,
-        state: row.state,
-        customer: row.customerName,
-        currency: row.currency,
-        total: Number(row.totalMicros) / 1_000_000,
-        totalFormatted: formatMoneyMicros(row.totalMicros, row.currency),
-        paid: Number(row.paidMicros) / 1_000_000,
-        balance: Number(row.balanceMicros) / 1_000_000,
-        invoiceDate: row.invoiceDate.slice(0, 10),
-        dueDate: row.dueDate.slice(0, 10),
-        lineCount: row.lineCount,
-      })),
-      [
-        { key: 'number', label: 'Number' },
-        { key: 'state', label: 'State' },
-        { key: 'customer', label: 'Customer' },
-        { key: 'currency', label: 'Currency' },
-        { key: 'total', label: 'Total' },
-        { key: 'totalFormatted', label: 'Total (formatted)' },
-        { key: 'paid', label: 'Paid' },
-        { key: 'balance', label: 'Balance' },
-        { key: 'invoiceDate', label: 'Invoice Date' },
-        { key: 'dueDate', label: 'Due Date' },
-        { key: 'lineCount', label: 'Lines' },
-      ],
-    );
+  // WHY backend streaming: client-side export was capped at the in-memory
+  // page (50 rows). The backend streams all matching invoices cursor-paginated
+  // from Postgres via /invoices/export — no row limit, flat heap.
+  const exportCsv = async (): Promise<void> => {
+    if (isExporting) return;
     const stamp = new Date().toISOString().slice(0, 10);
     const tag = filter.state ? `-${filter.state}` : '';
-    downloadCsv(`invoices${tag}-${stamp}.csv`, csv);
+    setIsExporting(true);
+    try {
+      await downloadFromApi('/api/invoices/export', `invoices${tag}-${stamp}.csv`, {
+        querystring: {
+          state: filter.state,
+          search: filter.search,
+          overdueOnly: filter.overdueOnly ? 'true' : undefined,
+        },
+      });
+      toast.success('Export complete');
+    } catch {
+      toast.error('Export failed', { description: 'Try again in a moment.' });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const items = list.data?.items ?? [];
@@ -130,11 +120,11 @@ export function InvoicesPage() {
           </Link>
           <button
             type="button"
-            onClick={onExport}
-            disabled={!list.data || items.length === 0}
+            onClick={() => void exportCsv()}
+            disabled={!list.data || items.length === 0 || isExporting}
             className="inline-flex min-h-9 items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-1.5 text-xs font-medium text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-11"
           >
-            Export CSV
+            {isExporting ? 'Exporting…' : 'Export CSV'}
           </button>
         </div>
       </header>

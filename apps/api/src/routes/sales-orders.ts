@@ -11,10 +11,12 @@
  */
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
+import { salesOrdersExportRoutes } from './sales-orders.export.js';
 import { salesOrdersRoutesRead } from './sales-orders.read.routes.js';
 import { salesOrdersRoutesWrite } from './sales-orders.write.routes.js';
 
 export const salesOrdersRoutes: FastifyPluginAsyncZod = async (server) => {
   await server.register(salesOrdersRoutesRead);
   await server.register(salesOrdersRoutesWrite);
+  await server.register(salesOrdersExportRoutes);
 };
