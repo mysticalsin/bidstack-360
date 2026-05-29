@@ -51,8 +51,7 @@ const globalForPrisma2 = globalForPrisma as unknown as { prisma?: PrismaClient }
  * const leads = await prisma.lead.findMany({ where: { orgId, deletedAt: null } });
  * ```
  */
-export const prisma =
-  globalForPrisma2.prisma ?? buildPrismaClient();
+export const prisma = globalForPrisma2.prisma ?? buildPrismaClient();
 
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma2.prisma = prisma;
@@ -110,4 +109,6 @@ export {
   WorkflowActionKind,
   LeadStatus,
   LeadPriority,
+  IntegrationProvider,
+  EmailProvider,
 } from '../generated/client/index.js';
