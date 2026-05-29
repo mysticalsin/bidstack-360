@@ -80,7 +80,7 @@ import { bidWorkspaceRoutes } from './routes/bid-workspace.js';
 import { calendarRoutes } from './routes/calendar.js';
 import { bookingsRoutes } from './routes/bookings.js';
 // NocoBase RFP integration
-import rfpNocobaseRoutes from './routes/rfp-nocobase.js';
+import { rfpNocobaseRoutes } from './routes/rfp-nocobase.js';
 // Wave 4 — AI assistant
 import { aiAssistantRoutes } from './routes/ai-assistant.js';
 // Wave 5 — Outlook / Microsoft Graph Mail
@@ -113,8 +113,10 @@ import { publicNpsRoutes } from './routes/public-nps.js';
 import { rfpPipelineRoutes } from './routes/rfp-pipeline.js';
 // Wave 10 — Operational monitoring (queue depths, embedding failure rate, alerts)
 import { monitoringRoutes } from './routes/monitoring.js';
-// Data migration: CSV import, HubSpot sync, cancel/undo destructive operations
+// Data migration: CSV import, cancel/undo destructive operations
 import { migrationRoutes } from './routes/migrations.js';
+// Data migration: HubSpot OAuth + import
+import { hubspotMigrationRoutes } from './routes/migrations-hubspot.routes.js';
 
 const CONNECT_SRC = [
   "'self'",
@@ -414,8 +416,10 @@ export async function buildServer(): Promise<FastifyInstance> {
   // Wave 10 — Operational monitoring: live queue depths, embedding failure rate, alert conditions
   await server.register(monitoringRoutes, { prefix: '/api/v1' });
 
-  // Data migration: CSV import, HubSpot sync, cancel/undo — was never registered (bug fix)
+  // Data migration: CSV import, cancel/undo destructive operations
   await server.register(migrationRoutes, { prefix: '/api/v1' });
+  // Data migration: HubSpot OAuth + import
+  await server.register(hubspotMigrationRoutes, { prefix: '/api/v1' });
 
   return server;
 }
