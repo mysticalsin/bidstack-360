@@ -1,68 +1,24 @@
-import { z } from 'zod';
-
-import { prisma, type OpportunityStage as PrismaStage, type Prisma } from '@bidstack/db';
+import { type Prisma, type OpportunityStage as PrismaStage, prisma } from '@bidstack/db';
 
 import type { Tool } from './index.js';
-
-const Stage = z.enum([
-  'discovery',
-  'qualified',
-  'proposal',
-  'negotiation',
-  'closed_won',
-  'closed_lost',
-]);
-
-const CompanySearchInput = z.object({
-  query: z.string().min(1).optional(),
-  limit: z.number().int().min(1).max(50).default(10),
-});
-
-const DealCreateInput = z.object({
-  customer: z.string().min(1),
-  name: z.string().min(1),
-  stage: Stage.default('discovery'),
-  value: z.number().nonnegative().default(0),
-  probability: z.number().int().min(0).max(100).default(25),
-  dueDate: z.string().date().nullable().optional(),
-  industry: z.string().nullable().optional(),
-});
-
-const DealUpdateInput = z.object({
-  id: z.string().uuid(),
-  patch: z.object({
-    stage: Stage.optional(),
-    probability: z.number().int().min(0).max(100).optional(),
-    value: z.number().nonnegative().optional(),
-    dueDate: z.string().date().nullable().optional(),
-    customer: z.string().min(1).optional(),
-    name: z.string().min(1).optional(),
-    industry: z.string().nullable().optional(),
-  }),
-});
-
-const EnrichCompanyInput = z.object({
-  name: z.string().min(1),
-  domain: z.string().optional(),
-  website: z.string().url().optional(),
-});
-
-const ActivityListInput = z.object({
-  company: z.string().optional(),
-  dealId: z.string().uuid().optional(),
-  limit: z.number().int().min(1).max(100).default(25),
-});
-
-const ActivityCreateInput = z.object({
-  dealId: z.string().uuid(),
-  subject: z.string().min(1).max(200),
-  dueDate: z.string().date().nullable().optional(),
-});
-
-const GenerateInsightsInput = z.object({
-  company: z.string().optional(),
-  dealId: z.string().uuid().optional(),
-});
+import {
+  ActivityCreateInput,
+  ActivityListInput,
+  CompanySearchInput,
+  DealCreateInput,
+  DealUpdateInput,
+  EnrichCompanyInput,
+  GenerateInsightsInput,
+  Stage,
+} from './crm-tools.schemas.js';
+import {
+  logoUrl,
+  mintNextCode,
+  normalizeDomain,
+  normalizeName,
+  serializeDeal,
+  source,
+} from './crm-tools.helpers.js';
 
 export const crmSearchCompanies: Tool<typeof CompanySearchInput> = {
   description: 'Search CRM companies from Twenty-backed opportunities and BidStack enrichments.',
@@ -376,77 +332,3 @@ export const crmGenerateInsights: Tool<typeof GenerateInsightsInput> = {
     };
   },
 };
-
-async function mintNextCode(orgId: string): Promise<string> {
-  const last = await prisma.opportunity.findFirst({
-    where: { orgId, code: { startsWith: 'OP-' } },
-    orderBy: { code: 'desc' },
-    select: { code: true },
-  });
-  if (!last) return 'OP-2001';
-  const n = Number(last.code.slice(3));
-  return `OP-${(n + 1).toString().padStart(4, '0')}`;
-}
-
-function serializeDeal(deal: {
-  id: string;
-  code: string;
-  customer: string;
-  name: string;
-  stage: string;
-  valueMicros: bigint | number | unknown;
-  probability: number;
-  dueDate: Date | null;
-  industry: string | null;
-  updatedAt: Date;
-}) {
-  return {
-    id: deal.id,
-    code: deal.code,
-    customer: deal.customer,
-    name: deal.name,
-    stage: deal.stage,
-    value: Number(deal.valueMicros) / 1_000_000,
-    probability: deal.probability,
-    dueDate: deal.dueDate?.toISOString().slice(0, 10) ?? null,
-    industry: deal.industry,
-    updatedAt: deal.updatedAt.toISOString(),
-  };
-}
-
-function normalizeName(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-}
-
-function normalizeDomain(value: string | null | undefined) {
-  if (!value) return null;
-  return value
-    .replace(/^https?:\/\//, '')
-    .replace(/^www\./, '')
-    .replace(/\/.*$/, '')
-    .toLowerCase();
-}
-
-function logoUrl(name: string, domain: string | null) {
-  if (domain === 'mantu.com' || name.toLowerCase() === 'mantu')
-    return 'https://mantu.com/favicon.ico';
-  if (!domain) return null;
-  return `https://www.${domain.replace(/^www\./, '')}/favicon.ico`;
-}
-
-function source(name: string, sourceUrl: string | null, confidence: number) {
-  return {
-    source: sourceUrl?.includes('mantu.com') ? 'official_website' : 'mcp_enrichment',
-    label: sourceUrl?.includes('mantu.com')
-      ? 'Mantu official website'
-      : `${name} enrichment profile`,
-    sourceUrl,
-    fetchedAt: new Date().toISOString(),
-    confidence,
-    providerMetadata: {},
-  };
-}
