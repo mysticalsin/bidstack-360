@@ -80,3 +80,33 @@ apps/mobile/google-services.json
 apps/mobile/*.p8
 apps/mobile/*.p12
 apps/mobile/*.mobileprovision
+
+# Claude Code local artifacts (worktrees, scheduler lock, slash-command cache)
+.claude/worktrees/
+.claude/commands/
+.claude/scheduled_tasks.lock
+
+# Tool/agent scratch outputs (screenshots, page snapshots, debug outputs)
+.playwright-mcp/
+.tmp-screens/
+.swarm_state/
+.claire/
+.clone/
+.codex/
+.local/
+scratch/
+scratch_skills/
+apps/web/scratch/
+apps/api/debug-out.txt
+
+# Root-level screenshot dumps (from Playwright QA passes)
+*.png
+*.mjs
+
+# Web app screenshot blobs (committed by QA runs, not source)
+apps/web/*.png
+apps/web/e2e/responsive/*-snapshots/
+
+# Scratch / exploratory scripts at repo root
+screenshot-*.cjs
+scratch-*.js
