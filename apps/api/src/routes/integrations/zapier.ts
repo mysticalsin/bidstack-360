@@ -38,7 +38,7 @@ async function resolveZapierApp(
   const keyHash = createHash('sha256').update(rawKey).digest('hex');
 
   const app = await prisma.zapierApp.findFirst({
-    where: { apiKeyHash: keyHash },
+    where: { apiKeyHash: keyHash, deletedAt: null },
     select: { id: true, orgId: true, name: true, scopes: true },
   });
 

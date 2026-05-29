@@ -51,6 +51,7 @@ export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
       const items = await prisma.invoice.findMany({
         where: {
           orgId: req.auth.orgId,
+          deletedAt: null,
           ...(state ? { state: toPrismaState(state) } : {}),
           ...(customerName
             ? { customerName: { contains: customerName, mode: 'insensitive' } }

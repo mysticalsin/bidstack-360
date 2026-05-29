@@ -87,7 +87,7 @@ export const reportsRoutes: FastifyPluginAsyncZod = async (server) => {
           take: 500,
         }),
         prisma.companyEnrichment.findMany({
-          where: { orgId: req.auth.orgId },
+          where: { orgId: req.auth.orgId, deletedAt: null },
           select: {
             legalName: true,
             tradeName: true,

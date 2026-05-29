@@ -13,7 +13,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { prisma } from '@bidstack/db';
+import { prisma, IntegrationProvider } from '@bidstack/db';
 import { decryptToken } from '@bidstack/shared/token-crypto';
 import type pino from 'pino';
 
@@ -69,8 +69,7 @@ async function getBotToken(orgId: string): Promise<string> {
   const token = await prisma.integrationToken.findFirst({
     where: {
       orgId,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      provider: 'slack' as any,
+      provider: IntegrationProvider.slack,
       status: 'active',
     },
     orderBy: { createdAt: 'desc' },

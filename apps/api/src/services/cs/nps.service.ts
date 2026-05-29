@@ -9,7 +9,7 @@
 import { createHmac, createHash } from 'node:crypto';
 import type { Logger as PinoLogger } from 'pino';
 
-import { prisma } from '@bidstack/db';
+import { prisma, IntegrationProvider } from '@bidstack/db';
 
 import { fanOutWebhookEvent } from '../../queues/webhook-delivery.js';
 import { sendEmail } from '../email-integration.service.js';
@@ -182,8 +182,7 @@ async function sendNpsEmailDirect(
   const token = await prisma.integrationToken.findFirst({
     where: {
       orgId: params.orgId,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      provider: { in: ['gmail', 'microsoft_graph'] as any[] },
+      provider: { in: [IntegrationProvider.gmail, IntegrationProvider.microsoft_graph] },
       status: 'active',
       deletedAt: null,
     },

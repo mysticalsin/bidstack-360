@@ -22,7 +22,7 @@ import { randomBytes, createHash } from 'node:crypto';
 import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { prisma } from '@bidstack/db';
+import { prisma, IntegrationProvider } from '@bidstack/db';
 import { encryptToken } from '@bidstack/shared/token-crypto';
 
 const GMAIL_AUTH_BASE = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -72,14 +72,13 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
       // Store the raw state payload so callback can verify
       await prisma.integrationToken.upsert({
         where: {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          orgId_userId_provider: { orgId, userId, provider: 'gmail' as any },
+          orgId_userId_provider: { orgId, userId, provider: IntegrationProvider.gmail },
         },
         create: {
           orgId,
           userId,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          provider: 'gmail' as any,
+
+          provider: IntegrationProvider.gmail,
           accessTokenEncrypted: encryptToken('pending'),
           status: 'revoked',
           deltaState: { oauthState: statePayload },
@@ -131,8 +130,7 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
       // Verify CSRF state
       const record = await prisma.integrationToken.findUnique({
         where: {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          orgId_userId_provider: { orgId, userId, provider: 'gmail' as any },
+          orgId_userId_provider: { orgId, userId, provider: IntegrationProvider.gmail },
         },
       });
       const storedPayload = (record?.deltaState as Record<string, string> | null)?.oauthState;
@@ -177,10 +175,9 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
       // Fetch the user's Gmail address for display
       let externalEmail: string | undefined;
       try {
-        const profileRes = await fetch(
-          'https://www.googleapis.com/oauth2/v1/userinfo?alt=json',
-          { headers: { Authorization: `Bearer ${tokens.access_token}` } },
-        );
+        const profileRes = await fetch('https://www.googleapis.com/oauth2/v1/userinfo?alt=json', {
+          headers: { Authorization: `Bearer ${tokens.access_token}` },
+        });
         if (profileRes.ok) {
           const profile = (await profileRes.json()) as { email?: string };
           externalEmail = profile.email;
@@ -195,8 +192,7 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
 
       await prisma.integrationToken.update({
         where: {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          orgId_userId_provider: { orgId, userId, provider: 'gmail' as any },
+          orgId_userId_provider: { orgId, userId, provider: IntegrationProvider.gmail },
         },
         data: {
           accessTokenEncrypted: encryptToken(tokens.access_token),
@@ -231,8 +227,8 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
         where: {
           orgId,
           userId,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          provider: 'gmail' as any,
+
+          provider: IntegrationProvider.gmail,
         },
         data: { status: 'revoked', deletedAt: new Date() },
       });

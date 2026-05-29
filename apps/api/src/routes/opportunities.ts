@@ -115,6 +115,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       const count = await prisma.opportunity.count({
         where: {
           orgId: req.auth.orgId,
+          deletedAt: null,
           ...(pipelineStageId ? { pipelineStageId } : {}),
           ...(excludeClosed
             ? { stage: { notIn: ['closed_won', 'closed_lost'] as PrismaStage[] } }

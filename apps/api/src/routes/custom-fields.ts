@@ -41,6 +41,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
           orgId: req.auth.orgId,
           entityType: req.query.entityType,
           active: true,
+          deletedAt: null,
         },
         orderBy: { orderIndex: 'asc' },
         take: 500,
@@ -120,7 +121,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const existing = await prisma.customFieldDefinition.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!existing) throw server.httpErrors.notFound('Definition not found');
 
@@ -173,13 +174,13 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const existing = await prisma.customFieldDefinition.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!existing) throw server.httpErrors.notFound('Definition not found');
 
       const updated = await prisma.customFieldDefinition.update({
         where: { id: existing.id },
-        data: { active: false },
+        data: { active: false, deletedAt: new Date() },
       });
       return {
         id: updated.id,
@@ -219,6 +220,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
           orgId: req.auth.orgId,
           entityType: req.query.entityType,
           entityId: req.query.entityId,
+          deletedAt: null,
         },
         include: { definition: true },
         take: 500,
@@ -262,6 +264,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
           orgId: req.auth.orgId,
           entityType: req.query.entityType,
           entityId: { in: ids },
+          deletedAt: null,
         },
         take: 500,
       });

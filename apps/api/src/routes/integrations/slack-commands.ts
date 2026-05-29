@@ -71,7 +71,13 @@ const slackCommandsPlugin: FastifyPluginAsync = async (fastify) => {
       const [subcommand, action, ...rest] = text.trim().split(/\s+/);
 
       try {
-        const result = await dispatchCommand(subcommand, action, rest.join(' '), slackUserId, teamId);
+        const result = await dispatchCommand(
+          subcommand,
+          action,
+          rest.join(' '),
+          slackUserId,
+          teamId,
+        );
         return reply.send(result);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'An error occurred';
@@ -107,7 +113,7 @@ async function dispatchCommand(
           '*Available commands:*',
           '`/bidstack lead create <name>` - Create a new lead',
           '`/bidstack search <query>` - Search CRM records',
-          '`/bidstack tasks today` - View today\'s tasks',
+          "`/bidstack tasks today` - View today's tasks",
         ].join('\n'),
       };
   }
@@ -216,7 +222,8 @@ async function handleSearchCommand(query: string, teamId: string) {
     return `Lead: ${label} (${l.status}) - <https://app.bidstack.io/leads/${l.id}|View>`;
   });
   const contactResults = contacts.map(
-    (c) => `Contact: ${c.name}${c.email ? ` (${c.email})` : ''} - <https://app.bidstack.io/contacts/${c.id}|View>`,
+    (c) =>
+      `Contact: ${c.name}${c.email ? ` (${c.email})` : ''} - <https://app.bidstack.io/contacts/${c.id}|View>`,
   );
   const results = [...leadResults, ...contactResults];
 
@@ -282,7 +289,8 @@ async function handleTasksCommand(slackUserId: string, teamId: string) {
   }
 
   const taskLines = tasks.map(
-    (t) => `- ${t.status === 'done' ? '~' : ''}${t.title}${t.status === 'done' ? '~' : ''} - <https://app.bidstack.io/tasks/${t.id}|View>`,
+    (t) =>
+      `- ${t.status === 'done' ? '~' : ''}${t.title}${t.status === 'done' ? '~' : ''} - <https://app.bidstack.io/tasks/${t.id}|View>`,
   );
 
   return {
@@ -291,4 +299,4 @@ async function handleTasksCommand(slackUserId: string, teamId: string) {
   };
 }
 
-export default slackCommandsPlugin;
+export { slackCommandsPlugin };
