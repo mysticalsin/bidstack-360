@@ -40,6 +40,56 @@ function normalizeApiPath(path: string): string {
   return path;
 }
 
+/**
+ * Trigger a browser file download from a backend endpoint that returns a
+ * non-JSON response (e.g. text/csv). Fetches with the auth token and creates
+ * a temporary object URL so the browser saves the file natively.
+ *
+ * WHY fetch+blob over a plain <a href>: Bearer token auth requires the header
+ * to be set explicitly — the browser's native navigation won't include it.
+ */
+export async function downloadFromApi(
+  path: string,
+  filename: string,
+  opts: { querystring?: Record<string, string | undefined> } = {},
+): Promise<void> {
+  const resolvedPath = normalizeApiPath(path);
+  const token = apiTokenProvider ? await apiTokenProvider() : null;
+  const headers: Record<string, string> = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
+  const qs = opts.querystring
+    ? Object.entries(opts.querystring)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v!)}`)
+        .join('&')
+    : '';
+  const url = qs ? `${resolvedPath}?${qs}` : resolvedPath;
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: Object.keys(headers).length > 0 ? headers : undefined,
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    throw new ApiError(`Export failed (${res.status})`, res.status, null);
+  }
+
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  anchor.style.display = 'none';
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  // Revoke after a tick so Safari has time to initiate the download.
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 100);
+}
+
 export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   const resolvedPath = normalizeApiPath(path);
   const token = apiTokenProvider ? await apiTokenProvider() : null;

@@ -183,31 +183,32 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
             diff: req.body as object,
           },
         });
-        return contact;
-      });
-
-      if (req.body.customFieldValues !== undefined) {
-        for (const { definitionId, value } of req.body.customFieldValues) {
-          await prisma.customFieldValue.upsert({
-            where: {
-              orgId_entityType_entityId_definitionId: {
+        // CF upserts inside the transaction so a CF failure rolls back the
+        // contact update — prevents partial-update / data corruption (P0 #5).
+        if (req.body.customFieldValues !== undefined) {
+          for (const { definitionId, value } of req.body.customFieldValues) {
+            await tx.customFieldValue.upsert({
+              where: {
+                orgId_entityType_entityId_definitionId: {
+                  orgId: req.auth.orgId,
+                  entityType: 'contact',
+                  entityId: existing.id,
+                  definitionId,
+                },
+              },
+              update: { value: value as Prisma.InputJsonValue },
+              create: {
                 orgId: req.auth.orgId,
+                definitionId,
                 entityType: 'contact',
                 entityId: existing.id,
-                definitionId,
+                value: value as Prisma.InputJsonValue,
               },
-            },
-            update: { value: value as Prisma.InputJsonValue },
-            create: {
-              orgId: req.auth.orgId,
-              definitionId,
-              entityType: 'contact',
-              entityId: existing.id,
-              value: value as Prisma.InputJsonValue,
-            },
-          });
+            });
+          }
         }
-      }
+        return contact;
+      });
 
       return serializeContact(updated);
     },

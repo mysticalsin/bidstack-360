@@ -22,9 +22,11 @@ export const TabsTrigger = forwardRef<HTMLButtonElement, ComponentProps<typeof R
       ref={ref}
       className={cn(
         // Apple HIG segmented-control-ish look. State styles per design-standards.md:
-        // default / hover / focus (3px ring via global) / active (data-state) / disabled.
+        // default / hover / focus-visible (2px ring, WCAG 2.2) / active (data-state) / disabled.
         'relative inline-flex h-9 items-center gap-2 rounded-t-md px-3 text-xs font-medium text-[var(--fg-secondary)] transition-colors',
         'hover:text-[var(--fg-primary)] hover:bg-[var(--surface-sunken)] dark:hover:bg-[rgba(168,85,247,0.06)]',
+        // P1 #20: explicit focus ring so keyboard users always have a visible indicator
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-1',
         'active:scale-[0.97]',
         'data-[state=active]:text-[var(--brand-primary)]',
         'data-[disabled]:opacity-50 data-[disabled]:pointer-events-none',

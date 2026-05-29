@@ -304,6 +304,9 @@ model Company {
 
   @@index([orgId, domain])
   @@index([orgId])
+  // P1 #25: list route orders by createdAt DESC — without this index PG does a
+  // full org-scoped scan on every Companies page load.
+  @@index([orgId, createdAt(sort: Desc)], map: "companies_org_created_idx")
   @@index([deletedAt])
   @@map("companies")
 }
@@ -441,6 +444,9 @@ model Contact {
   @@index([orgId])
   @@index([orgId, companyId])
   @@index([orgId, customer], map: "contacts_org_customer_idx")
+  // P1 #25: contacts list + Zapier NEW_CONTACT trigger both filter by orgId and
+  // order by createdAt DESC — full table scan without this index.
+  @@index([orgId, createdAt(sort: Desc)], map: "contacts_org_created_idx")
   @@index([deletedAt])
   @@map("contacts")
 }
@@ -579,6 +585,9 @@ model WebhookSubscription {
   deliveries WebhookDelivery[]
 
   @@index([orgId])
+  // P1 #25: fanOutWebhookEvent queries WHERE orgId=? AND active=true AND deletedAt IS NULL
+  // on every domain event — full table scan without this compound index.
+  @@index([orgId, active, deletedAt], map: "webhook_subs_org_active_idx")
   @@index([deletedAt])
   @@map("webhook_subscriptions")
 }
@@ -1944,6 +1953,9 @@ model SalesOrder {
 
   @@unique([orgId, number], map: "sales_orders_org_number_key")
   @@index([orgId, state, orderDate(sort: Desc)], map: "sales_orders_org_state_date_idx")
+  // P1 #25: unfiltered list orders by orderDate DESC — the state-prefixed index
+  // above can't satisfy this without a state equality predicate.
+  @@index([orgId, orderDate(sort: Desc)], map: "sales_orders_org_order_date_idx")
   @@index([orgId, countryCode], map: "sales_orders_org_country_idx")
   @@index([orgId, customerName], map: "sales_orders_org_customer_idx")
   @@index([orgId, salespersonId], map: "sales_orders_org_salesperson_idx")
@@ -2043,6 +2055,9 @@ model Invoice {
 
   @@unique([orgId, number], map: "invoices_org_number_key")
   @@index([orgId, state, dueDate(sort: Asc)], map: "invoices_org_state_due_idx")
+  // P1 #25: invoice list orders by invoiceDate DESC (then createdAt) — without
+  // this the unfiltered-by-state list scans the full org invoice set.
+  @@index([orgId, invoiceDate(sort: Desc)], map: "invoices_org_invoice_date_idx")
   @@index([orgId, customerName], map: "invoices_org_customer_idx")
   @@index([orgId, salesOrderId], map: "invoices_org_sales_order_idx")
   @@index([orgId, companyId])

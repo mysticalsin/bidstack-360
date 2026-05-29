@@ -124,6 +124,8 @@ export function useRecordPayment() {
     onSuccess: (updated) => {
       qc.setQueryData(['invoice', updated.id], updated);
       void qc.invalidateQueries({ queryKey: ['invoices'] });
+      // AR aging report must reflect the new payment balance immediately (P1 #8)
+      void qc.invalidateQueries({ queryKey: ['invoices', 'ar-aging'] });
     },
   });
 }

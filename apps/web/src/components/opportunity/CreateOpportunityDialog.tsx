@@ -57,8 +57,13 @@ export function CreateOpportunityDialog({ trigger, defaultCustomer }: Props = {}
     mutationFn: (body: OpportunityCreate) =>
       api<Opportunity>('/api/opportunities', { method: 'POST', body }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['opportunities'] });
-      qc.invalidateQueries({ queryKey: ['report:pipeline'] });
+      void qc.invalidateQueries({ queryKey: ['opportunities'] });
+      void qc.invalidateQueries({ queryKey: ['report:pipeline'] });
+      // P1 #9: keep count badge, dashboard KPIs, forecasts, and goals fresh
+      void qc.invalidateQueries({ queryKey: ['opportunities', 'count'] });
+      void qc.invalidateQueries({ queryKey: ['crm-dashboard'] });
+      void qc.invalidateQueries({ queryKey: ['forecasts'] });
+      void qc.invalidateQueries({ queryKey: ['goals'] });
       setOpen(false);
       setError(null);
       setFieldErrors({});

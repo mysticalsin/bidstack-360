@@ -2,13 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 
 import { api } from '@/lib/api';
-import type {
-  LeadCreate,
-  LeadDetail,
-  LeadFilter,
-  LeadPage,
-  LeadPatch,
-} from '@bidstack/shared';
+import type { LeadCreate, LeadDetail, LeadFilter, LeadPage, LeadPatch } from '@bidstack/shared';
 
 const LEADS_KEY = 'leads';
 
@@ -77,10 +71,14 @@ export function useConvertLead(id: string) {
         },
       ),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [LEADS_KEY, id] });
-      qc.invalidateQueries({ queryKey: [LEADS_KEY] });
-      qc.invalidateQueries({ queryKey: ['opportunities'] });
-      qc.invalidateQueries({ queryKey: ['contacts'] });
+      void qc.invalidateQueries({ queryKey: [LEADS_KEY, id] });
+      void qc.invalidateQueries({ queryKey: [LEADS_KEY] });
+      void qc.invalidateQueries({ queryKey: ['opportunities'] });
+      void qc.invalidateQueries({ queryKey: ['contacts'] });
+      // P1 #10: count badge, dashboard, and pipeline report must reflect the new opportunity
+      void qc.invalidateQueries({ queryKey: ['opportunities', 'count'] });
+      void qc.invalidateQueries({ queryKey: ['crm-dashboard'] });
+      void qc.invalidateQueries({ queryKey: ['pipeline-report'] });
     },
   });
 }

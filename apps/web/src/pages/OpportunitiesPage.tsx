@@ -14,12 +14,10 @@ import { Card } from '@/components/ui/Card';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { useOpportunities, usePatchOpportunity } from '@/hooks/useOpportunities';
 import { useStageMutation } from '@/hooks/useStageMutation';
 import { useTableSort } from '@/hooks/useTableSort';
-import { api } from '@/lib/api';
-import { downloadCsv, rowsToCsv } from '@/lib/csv';
+import { api, downloadFromApi } from '@/lib/api';
 import {
   getPipelineStages,
   isLegacyOpportunityStage,
@@ -34,7 +32,6 @@ import { OpportunitiesTableHead } from './opportunities/OpportunitiesTableHead';
 import { OppBulkBar, OppKpiBar, OppPageHeader, OppStageChips } from './opportunities/OppToolbar';
 
 export function OpportunitiesPage() {
-  const { formatMoney } = useFormatMoney();
   const [searchParams, setSearchParams] = useSearchParams();
   const search = searchParams.get('search') ?? undefined;
   const qc = useQueryClient();
@@ -135,6 +132,8 @@ export function OpportunitiesPage() {
     [items, selectedIds],
   );
 
+  const [isExporting, setIsExporting] = useState(false);
+
   const patch = usePatchOpportunity();
   const stageMove = useStageMutation();
 
@@ -196,39 +195,25 @@ export function OpportunitiesPage() {
     });
   };
 
-  const exportCsv = () => {
-    const rows = data?.items ?? [];
-    if (rows.length === 0) {
-      toast.info('Nothing to export');
-      return;
-    }
-    // Format money/stage at the edge so spreadsheets show "EUR 12,345" and
-    // "Closed won" instead of raw micros and snake_case.
-    const csv = rowsToCsv(
-      rows.map((opp) => ({
-        code: opp.code,
-        name: opp.name,
-        customer: opp.customer,
-        stage: resolvePipelineStage(opp).name,
-        value: formatMoney(opp.value, 'EUR'),
-        probability: `${opp.probability}%`,
-        dueDate: opp.dueDate ?? '',
-        updatedAt: opp.updatedAt,
-      })),
-      [
-        { key: 'code', label: 'Code' },
-        { key: 'name', label: 'Name' },
-        { key: 'customer', label: 'Customer' },
-        { key: 'stage', label: 'Stage' },
-        { key: 'value', label: 'Value' },
-        { key: 'probability', label: 'Probability' },
-        { key: 'dueDate', label: 'Due date' },
-        { key: 'updatedAt', label: 'Updated at' },
-      ],
-    );
+  // WHY backend streaming: the previous client-side export was capped at the
+  // in-memory page (100 rows). The backend streams all matching opportunities
+  // cursor-paginated from Postgres — no row limit, flat heap.
+  const exportCsv = async () => {
+    if (isExporting) return;
     const stamp = new Date().toISOString().slice(0, 10);
-    downloadCsv(`bidstack-opportunities-${stamp}`, csv);
-    toast.success(`Exported ${rows.length} opportunit${rows.length === 1 ? 'y' : 'ies'}`);
+    setIsExporting(true);
+    try {
+      await downloadFromApi('/api/opportunities/export', `bidstack-opportunities-${stamp}.csv`, {
+        querystring: {
+          pipelineStageId: stageFilter ?? undefined,
+        },
+      });
+      toast.success('Export complete');
+    } catch {
+      toast.error('Export failed', { description: 'Try again in a moment.' });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -251,9 +236,10 @@ export function OpportunitiesPage() {
         stageFilter={stageFilter}
         itemCount={data?.items.length ?? 0}
         hasData={Boolean(data && data.items.length > 0)}
+        isExporting={isExporting}
         onClearSearch={clearSearch}
         onClearStageFilter={() => setStageFilter(null)}
-        onExportCsv={exportCsv}
+        onExportCsv={() => void exportCsv()}
       />
 
       {!search && (
@@ -271,6 +257,7 @@ export function OpportunitiesPage() {
           onBulkStageChange={(id) => void bulkStageChange(id)}
           onBulkDelete={() => void bulkDelete()}
           onClearSelection={clearSelection}
+          isPending={stageMove.isPending}
         />
       )}
 

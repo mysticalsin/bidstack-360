@@ -62,11 +62,24 @@ function StubAuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setApiTokenProvider(null);
+    // Mark session active so watchAuthForCacheClear can detect sign-out.
+    localStorage.setItem('bidstack:session', 'stub');
     return () => setApiTokenProvider(null);
   }, []);
 
   const signOut = useCallback((cb?: () => void) => {
     setSignedIn(false);
+    // Remove the key and fire a synthetic storage event — native storage events
+    // don't fire on the originating tab, so the same-tab cache-clear handler
+    // in watchAuthForCacheClear would never trigger otherwise.
+    localStorage.removeItem('bidstack:session');
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: 'bidstack:session',
+        newValue: null,
+        storageArea: localStorage,
+      }),
+    );
     cb?.();
   }, []);
 
@@ -110,6 +123,15 @@ const LazyClerkBranch = lazy(async () => {
 
     useEffect(() => {
       setApiTokenProvider(() => auth.getToken());
+      // Keep bidstack:session in sync with Clerk auth state so
+      // watchAuthForCacheClear can detect sign-out on any tab.
+      if (auth.isLoaded) {
+        if (auth.isSignedIn && auth.userId) {
+          localStorage.setItem('bidstack:session', auth.userId);
+        } else if (!auth.isSignedIn) {
+          localStorage.removeItem('bidstack:session');
+        }
+      }
       return () => setApiTokenProvider(null);
     }, [auth]);
 
@@ -131,7 +153,19 @@ const LazyClerkBranch = lazy(async () => {
             : null,
           role: mapClerkRole(auth.orgRole),
           signOut: (cb) => {
-            void clerk.signOut().then(() => cb?.());
+            void clerk.signOut().then(() => {
+              // Remove session key and fire a synthetic storage event so the
+              // same-tab watchAuthForCacheClear handler fires immediately.
+              localStorage.removeItem('bidstack:session');
+              window.dispatchEvent(
+                new StorageEvent('storage', {
+                  key: 'bidstack:session',
+                  newValue: null,
+                  storageArea: localStorage,
+                }),
+              );
+              cb?.();
+            });
           },
         }}
       >

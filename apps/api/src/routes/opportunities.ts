@@ -18,6 +18,7 @@ import {
 } from '@bidstack/shared';
 
 import { serializeOpportunity, serializeOpportunityFull } from '../serializers/opportunity.js';
+import { opportunityExportRoutes } from './opportunities.export.js';
 import { opportunityMutationsRoutes } from './opportunities.mutations.js';
 import { opportunityTransitionRoutes } from './opportunities.transitions.js';
 
@@ -252,6 +253,29 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         stageUpdate = req.body.stage as PrismaStage;
       }
 
+      // CF upserts included in the same transaction so a CF failure rolls back
+      // the opportunity update — prevents partial-update / data corruption (P0 #5).
+      const cfOps = (req.body.customFieldValues ?? []).map(({ definitionId, value }) =>
+        prisma.customFieldValue.upsert({
+          where: {
+            orgId_entityType_entityId_definitionId: {
+              orgId: req.auth.orgId,
+              entityType: 'opportunity',
+              entityId: before.id,
+              definitionId,
+            },
+          },
+          update: { value: value as Prisma.InputJsonValue },
+          create: {
+            orgId: req.auth.orgId,
+            definitionId,
+            entityType: 'opportunity',
+            entityId: before.id,
+            value: value as Prisma.InputJsonValue,
+          },
+        }),
+      );
+
       const [updated] = await prisma.$transaction([
         prisma.opportunity.update({
           where: { id: before.id },
@@ -301,30 +325,8 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
             diff: req.body as object,
           },
         }),
+        ...cfOps,
       ]);
-
-      if (req.body.customFieldValues !== undefined) {
-        for (const { definitionId, value } of req.body.customFieldValues) {
-          await prisma.customFieldValue.upsert({
-            where: {
-              orgId_entityType_entityId_definitionId: {
-                orgId: req.auth.orgId,
-                entityType: 'opportunity',
-                entityId: before.id,
-                definitionId,
-              },
-            },
-            update: { value: value as Prisma.InputJsonValue },
-            create: {
-              orgId: req.auth.orgId,
-              definitionId,
-              entityType: 'opportunity',
-              entityId: before.id,
-              value: value as Prisma.InputJsonValue,
-            },
-          });
-        }
-      }
 
       // Fire-and-forget push to Dust on any field update.
       void pushOpportunityToDust(updated.id, req.auth.orgId);
@@ -376,7 +378,10 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     },
   );
 
-  // Mutations (POST create + import) and transitions (stage + brief) sub-plugins
+  // Export (streaming CSV), mutations (POST create + import), and transitions sub-plugins.
+  // Export MUST be registered before the /:id generic route to prevent "export"
+  // being captured as a UUID param.
+  await server.register(opportunityExportRoutes);
   await server.register(opportunityMutationsRoutes);
   await server.register(opportunityTransitionRoutes);
 };

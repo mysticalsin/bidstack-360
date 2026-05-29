@@ -187,6 +187,30 @@ export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
         linesPayload = { deleteMany: {}, create: resolvedLines };
       }
 
+      // CF upserts included in the same transaction so a CF failure rolls back
+      // the invoice update — prevents partial-update / data corruption (P0 #5).
+      // Build them as lazy PrismaPromises before opening the transaction.
+      const cfOps = (req.body.customFieldValues ?? []).map(({ definitionId, value }) =>
+        prisma.customFieldValue.upsert({
+          where: {
+            orgId_entityType_entityId_definitionId: {
+              orgId: req.auth.orgId,
+              entityType: 'invoice',
+              entityId: invoice.id,
+              definitionId,
+            },
+          },
+          update: { value: value as Prisma.InputJsonValue },
+          create: {
+            orgId: req.auth.orgId,
+            definitionId,
+            entityType: 'invoice',
+            entityId: invoice.id,
+            value: value as Prisma.InputJsonValue,
+          },
+        }),
+      );
+
       await prisma.$transaction([
         prisma.invoice.update({
           where: { id: invoice.id },
@@ -210,30 +234,8 @@ export const invoicesRoutes: FastifyPluginAsyncZod = async (server) => {
             diff: { fields: Object.keys(req.body) },
           },
         }),
+        ...cfOps,
       ]);
-
-      if (req.body.customFieldValues !== undefined) {
-        for (const { definitionId, value } of req.body.customFieldValues) {
-          await prisma.customFieldValue.upsert({
-            where: {
-              orgId_entityType_entityId_definitionId: {
-                orgId: req.auth.orgId,
-                entityType: 'invoice',
-                entityId: invoice.id,
-                definitionId,
-              },
-            },
-            update: { value: value as Prisma.InputJsonValue },
-            create: {
-              orgId: req.auth.orgId,
-              definitionId,
-              entityType: 'invoice',
-              entityId: invoice.id,
-              value: value as Prisma.InputJsonValue,
-            },
-          });
-        }
-      }
 
       return loadInvoiceDetail(req.auth.orgId, invoice.id);
     },

@@ -2,7 +2,14 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma, type Prisma } from '@bidstack/db';
-import { Company, CompanyCreate, CompanyDetail, CompanyPatch, CompanyHierarchy, type CompanyHierarchyNode } from '@bidstack/shared';
+import {
+  Company,
+  CompanyCreate,
+  CompanyDetail,
+  CompanyPatch,
+  CompanyHierarchy,
+  type CompanyHierarchyNode,
+} from '@bidstack/shared';
 import { serializeCompany, serializeCompanyDetail } from '../serializers/company.js';
 
 export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -175,49 +182,53 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           currentId = row?.parentId ?? null;
         }
       }
-      const updateResult = await prisma.company.updateMany({
-        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
-        data: {
-          ...(patch.name !== undefined && { name: patch.name }),
-          ...(patch.legalName !== undefined && { legalName: patch.legalName }),
-          ...(patch.domain !== undefined && { domain: patch.domain }),
-          ...(patch.industry !== undefined && { industry: patch.industry }),
-          ...(patch.employeeCount !== undefined && { employeeCount: patch.employeeCount }),
-          ...(patch.countryCode !== undefined && { countryCode: patch.countryCode }),
-          ...(patch.address !== undefined && {
-            address: (patch.address ?? undefined) as unknown as Prisma.InputJsonValue | undefined,
-          }),
-          ...(patch.billingEmail !== undefined && { billingEmail: patch.billingEmail }),
-          ...(patch.taxId !== undefined && { taxId: patch.taxId }),
-          ...(patch.logoUrl !== undefined && { logoUrl: patch.logoUrl }),
-          ...(patch.website !== undefined && { website: patch.website }),
-          ...(patch.tier !== undefined && patch.tier !== null && { tier: patch.tier }),
-          ...(patch.parentId !== undefined && { parentId: patch.parentId }),
-        },
-      });
-      if (updateResult.count === 0) throw server.httpErrors.notFound('Company not found');
-      if (patch.customFieldValues !== undefined) {
-        for (const { definitionId, value } of patch.customFieldValues) {
-          await prisma.customFieldValue.upsert({
-            where: {
-              orgId_entityType_entityId_definitionId: {
-                orgId: req.auth.orgId,
-                entityType: 'company',
-                entityId: req.params.id,
-                definitionId,
-              },
-            },
-            update: { value: value as Prisma.InputJsonValue },
-            create: {
+      // CF upserts included in the same transaction so a CF failure rolls back
+      // the company update — prevents partial-update / data corruption (P0 #5).
+      const cfOps = (patch.customFieldValues ?? []).map(({ definitionId, value }) =>
+        prisma.customFieldValue.upsert({
+          where: {
+            orgId_entityType_entityId_definitionId: {
               orgId: req.auth.orgId,
-              definitionId,
               entityType: 'company',
               entityId: req.params.id,
-              value: value as Prisma.InputJsonValue,
+              definitionId,
             },
-          });
-        }
-      }
+          },
+          update: { value: value as Prisma.InputJsonValue },
+          create: {
+            orgId: req.auth.orgId,
+            definitionId,
+            entityType: 'company',
+            entityId: req.params.id,
+            value: value as Prisma.InputJsonValue,
+          },
+        }),
+      );
+
+      const [updateResult] = await prisma.$transaction([
+        prisma.company.updateMany({
+          where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+          data: {
+            ...(patch.name !== undefined && { name: patch.name }),
+            ...(patch.legalName !== undefined && { legalName: patch.legalName }),
+            ...(patch.domain !== undefined && { domain: patch.domain }),
+            ...(patch.industry !== undefined && { industry: patch.industry }),
+            ...(patch.employeeCount !== undefined && { employeeCount: patch.employeeCount }),
+            ...(patch.countryCode !== undefined && { countryCode: patch.countryCode }),
+            ...(patch.address !== undefined && {
+              address: (patch.address ?? undefined) as unknown as Prisma.InputJsonValue | undefined,
+            }),
+            ...(patch.billingEmail !== undefined && { billingEmail: patch.billingEmail }),
+            ...(patch.taxId !== undefined && { taxId: patch.taxId }),
+            ...(patch.logoUrl !== undefined && { logoUrl: patch.logoUrl }),
+            ...(patch.website !== undefined && { website: patch.website }),
+            ...(patch.tier !== undefined && patch.tier !== null && { tier: patch.tier }),
+            ...(patch.parentId !== undefined && { parentId: patch.parentId }),
+          },
+        }),
+        ...cfOps,
+      ]);
+      if (updateResult.count === 0) throw server.httpErrors.notFound('Company not found');
 
       const updated = await prisma.company.findFirstOrThrow({
         where: { id: req.params.id, orgId: req.auth.orgId },

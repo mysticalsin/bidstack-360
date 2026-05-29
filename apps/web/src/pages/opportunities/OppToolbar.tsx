@@ -61,6 +61,7 @@ export function OppPageHeader({
   stageFilter,
   itemCount,
   hasData,
+  isExporting = false,
   onClearSearch,
   onClearStageFilter,
   onExportCsv,
@@ -69,6 +70,8 @@ export function OppPageHeader({
   stageFilter: string | null;
   itemCount: number;
   hasData: boolean;
+  /** True while the CSV download fetch is in flight — disables + relabels the button. */
+  isExporting?: boolean;
   onClearSearch: () => void;
   onClearStageFilter: () => void;
   onExportCsv: () => void;
@@ -122,10 +125,12 @@ export function OppPageHeader({
           size="sm"
           variant="secondary"
           onClick={onExportCsv}
-          disabled={!hasData}
-          aria-label="Export visible opportunities as CSV"
+          disabled={!hasData || isExporting}
+          aria-label={
+            isExporting ? 'Exporting opportunities…' : 'Export visible opportunities as CSV'
+          }
         >
-          Export CSV
+          {isExporting ? 'Exporting…' : 'Export CSV'}
         </Button>
         <CreateOpportunityDialog />
       </div>
@@ -188,12 +193,15 @@ export function OppBulkBar({
   onBulkStageChange,
   onBulkDelete,
   onClearSelection,
+  isPending = false,
 }: {
   selectedCount: number;
   stageOptions: PipelineStage[];
   onBulkStageChange: (stageId: string) => void;
   onBulkDelete: () => void;
   onClearSelection: () => void;
+  /** P1 #24: disable controls while a stage-move or delete is in-flight */
+  isPending?: boolean;
 }) {
   return (
     <div
@@ -206,6 +214,7 @@ export function OppBulkBar({
         <select
           aria-label="Move selection to stage"
           defaultValue=""
+          disabled={isPending}
           onChange={(e) => {
             const next = e.target.value;
             if (next) {
@@ -213,7 +222,7 @@ export function OppBulkBar({
               e.target.value = '';
             }
           }}
-          className="dialog-input"
+          className="dialog-input disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <option value="">Move to stage…</option>
           {stageOptions.map((s) => (
@@ -226,11 +235,12 @@ export function OppBulkBar({
           size="sm"
           variant="ghost"
           onClick={onBulkDelete}
+          disabled={isPending}
           className="text-[var(--danger)] hover:text-[var(--danger)]"
         >
           Delete selected
         </Button>
-        <Button size="sm" variant="ghost" onClick={onClearSelection}>
+        <Button size="sm" variant="ghost" onClick={onClearSelection} disabled={isPending}>
           Clear
         </Button>
       </div>

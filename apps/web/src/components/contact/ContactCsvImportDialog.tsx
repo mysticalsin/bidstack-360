@@ -10,7 +10,7 @@
 
 import * as Dialog from '@radix-ui/react-dialog';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/Button';
 import { toast } from '@/components/ui/Toast';
@@ -77,8 +77,14 @@ export function ContactCsvImportDialog({ trigger }: Props) {
   const errorId = useId();
   const [open, setOpen] = useState(false);
   const [pasted, setPasted] = useState('');
+  // progress: null = idle, { done, total } = import in flight
+  // P1 #7: track progress so the footer can show "Importing 3 / 47…"
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const create = useCreateContact();
   const reduced = useReducedMotion();
+  // Allows the abort path to skip the success toast if the dialog was closed
+  // mid-import (not exposed as a cancel button — just a safety guard).
+  const mountedRef = useRef(true);
 
   const { headers, rows } = useMemo(() => parseCsv(pasted), [pasted]);
   const importable = rows.filter((r) => r.errors.length === 0);
@@ -88,28 +94,45 @@ export function ContactCsvImportDialog({ trigger }: Props) {
     setPasted('');
   };
 
+  // P1 #7: cap at 5 concurrent requests — uncapped Promise.all would fire
+  // hundreds of simultaneous POSTs for large pastes, exhausting the browser's
+  // per-origin connection limit (typically 6) and locking the tab.
+  const CONCURRENCY = 5;
+
   const handleImport = async () => {
     if (importable.length === 0) return;
     let failed = 0;
-    await Promise.all(
-      importable.map((r) => {
-        const v = r.values;
-        const body: ContactCreate = {
-          name: v.name ?? '',
-          customer: v.customer ?? '',
-          role: v.role ?? null,
-          email: v.email ?? null,
-          phone: v.phone ?? null,
-          influence: v.influence ? Math.max(0, Math.min(5, Number(v.influence))) : null,
-          sentiment: v.sentiment ? (v.sentiment.toLowerCase() as Sentiment) : null,
-        };
-        return create.mutateAsync(body).catch(() => {
-          failed += 1;
-        });
-      }),
-    );
+    const total = importable.length;
+    mountedRef.current = true;
+    setProgress({ done: 0, total });
+
+    for (let i = 0; i < total; i += CONCURRENCY) {
+      const chunk = importable.slice(i, i + CONCURRENCY);
+      await Promise.all(
+        chunk.map((r) => {
+          const v = r.values;
+          const body: ContactCreate = {
+            name: v.name ?? '',
+            customer: v.customer ?? '',
+            role: v.role ?? null,
+            email: v.email ?? null,
+            phone: v.phone ?? null,
+            influence: v.influence ? Math.max(0, Math.min(5, Number(v.influence))) : null,
+            sentiment: v.sentiment ? (v.sentiment.toLowerCase() as Sentiment) : null,
+          };
+          return create.mutateAsync(body).catch(() => {
+            failed += 1;
+          });
+        }),
+      );
+      // Clamp to total so the last chunk (which may be < CONCURRENCY) shows 100%
+      if (mountedRef.current) setProgress({ done: Math.min(i + CONCURRENCY, total), total });
+    }
+
+    if (!mountedRef.current) return; // dialog was closed mid-import
+    setProgress(null);
     if (failed === 0) {
-      toast.success(`Imported ${importable.length} contact${importable.length === 1 ? '' : 's'}`);
+      toast.success(`Imported ${total} contact${total === 1 ? '' : 's'}`);
       setOpen(false);
       reset();
     } else {
@@ -119,8 +142,19 @@ export function ContactCsvImportDialog({ trigger }: Props) {
     }
   };
 
+  const isImporting = progress !== null;
+
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        // Block ESC / backdrop click while an import is in flight — closing
+        // mid-batch would leave the user uncertain which rows were committed.
+        if (!next && isImporting) return;
+        if (!next) mountedRef.current = false;
+        setOpen(next);
+      }}
+    >
       <Dialog.Trigger asChild>
         {trigger ?? <Button variant="secondary">Paste CSV</Button>}
       </Dialog.Trigger>
@@ -232,23 +266,35 @@ export function ContactCsvImportDialog({ trigger }: Props) {
                 </div>
                 <footer className="flex items-center justify-between border-t border-[var(--border-subtle)] px-5 py-3 text-xs">
                   <span className="text-[var(--fg-tertiary)]">
-                    {rows.length > 0
-                      ? `${importable.length}/${rows.length} ready to import`
-                      : 'Awaiting paste'}
+                    {isImporting
+                      ? `Importing ${progress?.done ?? 0} of ${progress?.total ?? 0}…`
+                      : rows.length > 0
+                        ? `${importable.length}/${rows.length} ready to import`
+                        : 'Awaiting paste'}
                   </span>
                   <div className="flex gap-2">
-                    <Dialog.Close asChild>
-                      <Button size="sm" variant="ghost">
+                    {/* Disabled (not a Dialog.Close) during import — closing mid-flight
+                        would leave the user uncertain which rows were committed. */}
+                    {isImporting ? (
+                      <Button size="sm" variant="ghost" disabled>
                         Cancel
                       </Button>
-                    </Dialog.Close>
+                    ) : (
+                      <Dialog.Close asChild>
+                        <Button size="sm" variant="ghost">
+                          Cancel
+                        </Button>
+                      </Dialog.Close>
+                    )}
                     <Button
                       size="sm"
                       variant="primary"
                       onClick={handleImport}
-                      disabled={importable.length === 0 || create.isPending}
+                      disabled={importable.length === 0 || isImporting}
                     >
-                      Import {importable.length || ''}
+                      {isImporting
+                        ? `Importing ${progress?.done ?? 0} / ${progress?.total ?? 0}…`
+                        : `Import ${importable.length || ''}`}
                     </Button>
                   </div>
                 </footer>

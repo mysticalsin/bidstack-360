@@ -142,11 +142,14 @@ function renderPage({ title, body }: PageOpts): string {
 
 function renderForm(token: string, error?: string): string {
   const safeToken = escapeHtml(token);
-  const buttons = Array.from({ length: 11 }, (_, i) => `
+  const buttons = Array.from(
+    { length: 11 },
+    (_, i) => `
       <label class="score-btn">
         <input type="radio" name="score11" value="${i}" required>
         ${i}
-      </label>`).join('');
+      </label>`,
+  ).join('');
 
   return renderPage({
     title: 'How likely are you to recommend us?',
@@ -190,15 +193,15 @@ function renderThankYou(category: string): string {
     category === 'PROMOTER'
       ? 'Thank you — that means a lot.'
       : category === 'PASSIVE'
-      ? 'Thank you for the honest feedback.'
-      : 'Thank you — we hear you.';
+        ? 'Thank you for the honest feedback.'
+        : 'Thank you — we hear you.';
 
   const message =
     category === 'PROMOTER'
       ? 'Would you mind sharing a quick review or telling a colleague? Word of mouth keeps us going.'
       : category === 'PASSIVE'
-      ? "We'll review what you shared and reach out if there's anything specific we can improve."
-      : 'Someone from our team will reach out within 2 business days to understand what we got wrong and how we can make it right.';
+        ? "We'll review what you shared and reach out if there's anything specific we can improve."
+        : 'Someone from our team will reach out within 2 business days to understand what we got wrong and how we can make it right.';
 
   return renderPage({
     title: 'Thank you',
@@ -255,9 +258,15 @@ export const publicNpsRoutes: FastifyPluginAsync = async (app) => {
     async (req, reply) => {
       const { token } = req.params;
       if (!token || token.length < 32 || token.length > 128) {
-        return reply.code(400).type('text/html').send(
-          renderError('Invalid survey link', "This link doesn't look right. Check the URL in your email.")
-        );
+        return reply
+          .code(400)
+          .type('text/html')
+          .send(
+            renderError(
+              'Invalid survey link',
+              "This link doesn't look right. Check the URL in your email.",
+            ),
+          );
       }
       return reply.type('text/html').send(renderForm(token));
     },
@@ -271,46 +280,74 @@ export const publicNpsRoutes: FastifyPluginAsync = async (app) => {
       const { token } = req.params;
       const body = req.body ?? {};
 
-      // Validate score11
+      // Validate score11.
+      // P2 #28: parseInt("10abc", 10) returns 10, not NaN — use a strict digit-only
+      // guard so malformed strings (e.g. injected via a raw POST) are rejected.
       const scoreRaw = body['score11'];
-      const score11 = scoreRaw !== undefined ? Number.parseInt(scoreRaw, 10) : NaN;
+      const score11 =
+        typeof scoreRaw === 'string' && /^\d{1,2}$/.test(scoreRaw)
+          ? Number.parseInt(scoreRaw, 10)
+          : NaN;
       if (!Number.isInteger(score11) || score11 < 0 || score11 > 10) {
-        return reply.code(400).type('text/html').send(
-          renderForm(token, 'Please choose a score between 0 and 10.')
-        );
+        return reply
+          .code(400)
+          .type('text/html')
+          .send(renderForm(token, 'Please choose a score between 0 and 10.'));
       }
 
-      const feedback = typeof body['feedback'] === 'string' && body['feedback'].trim()
-        ? body['feedback'].trim().slice(0, 2000)
-        : undefined;
+      const feedback =
+        typeof body['feedback'] === 'string' && body['feedback'].trim()
+          ? body['feedback'].trim().slice(0, 2000)
+          : undefined;
 
       try {
-        const result = await recordNpsResponse(
-          { token, score11, feedback },
-          req.log as never,
-        );
+        const result = await recordNpsResponse({ token, score11, feedback }, req.log as never);
         return reply.type('text/html').send(renderThankYou(result.category));
       } catch (err) {
         const message = err instanceof Error ? err.message : 'An unexpected error occurred';
         if (message.includes('not found') || message.includes('invalid')) {
-          return reply.code(404).type('text/html').send(
-            renderError('Survey not found', "This link may have expired or been used already. If you have feedback to share, please email your account manager.")
-          );
+          return reply
+            .code(404)
+            .type('text/html')
+            .send(
+              renderError(
+                'Survey not found',
+                'This link may have expired or been used already. If you have feedback to share, please email your account manager.',
+              ),
+            );
         }
         if (message.includes('expired')) {
-          return reply.code(410).type('text/html').send(
-            renderError('Survey expired', 'This survey link has expired. Please email your account manager if you still have feedback to share.')
-          );
+          return reply
+            .code(410)
+            .type('text/html')
+            .send(
+              renderError(
+                'Survey expired',
+                'This survey link has expired. Please email your account manager if you still have feedback to share.',
+              ),
+            );
         }
         if (message.includes('already responded')) {
-          return reply.code(409).type('text/html').send(
-            renderError("You've already responded", 'Thanks — your previous response has been recorded.')
-          );
+          return reply
+            .code(409)
+            .type('text/html')
+            .send(
+              renderError(
+                "You've already responded",
+                'Thanks — your previous response has been recorded.',
+              ),
+            );
         }
         req.log.error({ err }, 'public-nps: unexpected error recording response');
-        return reply.code(500).type('text/html').send(
-          renderError('Something went wrong', "We couldn't record your response. Please try again in a moment.")
-        );
+        return reply
+          .code(500)
+          .type('text/html')
+          .send(
+            renderError(
+              'Something went wrong',
+              "We couldn't record your response. Please try again in a moment.",
+            ),
+          );
       }
     },
   );

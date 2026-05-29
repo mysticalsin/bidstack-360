@@ -62,6 +62,8 @@ export function useUpdateTask() {
       void qc.invalidateQueries({ queryKey: ['tasks'] });
       void qc.invalidateQueries({ queryKey: ['tasks', 'summary'] });
       void qc.invalidateQueries({ queryKey: ['opportunity'] });
+      // P2 #30: task completion affects dashboard activity counters
+      void qc.invalidateQueries({ queryKey: ['crm-dashboard'] });
     },
   });
 }

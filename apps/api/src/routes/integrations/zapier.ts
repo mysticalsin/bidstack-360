@@ -206,6 +206,8 @@ export const zapierRoutes: FastifyPluginAsync = async (fastify) => {
       const leads = await prisma.lead.findMany({
         where: {
           orgId: zapierApp.orgId,
+          // P2 #26: never surface soft-deleted leads to Zapier
+          deletedAt: null,
           ...(req.query.since ? { createdAt: { gte: new Date(req.query.since) } } : {}),
         },
         orderBy: { createdAt: 'desc' },
@@ -246,6 +248,8 @@ export const zapierRoutes: FastifyPluginAsync = async (fastify) => {
       const contacts = await prisma.contact.findMany({
         where: {
           orgId: zapierApp.orgId,
+          // P2 #27: never surface soft-deleted contacts to Zapier
+          deletedAt: null,
           ...(req.query.since ? { createdAt: { gte: new Date(req.query.since) } } : {}),
         },
         orderBy: { createdAt: 'desc' },
