@@ -1,20 +1,32 @@
 /**
  * invoices.helpers.ts — leaf node for the invoice module.
  *
- * Pure utilities, Zod schemas, and the loadInvoiceDetail DB helper shared
- * across all invoice sub-plugins. Has zero local sibling imports.
+ * Zod schemas and the loadInvoiceDetail DB helper shared across all invoice
+ * sub-plugins. Pure utility functions (toPrismaState, isUniqueViolation, etc.)
+ * are re-exported from the canonical service layer to avoid duplication.
  */
 import type { FastifyError } from 'fastify';
 import { z } from 'zod';
 
-import { prisma, Prisma } from '@bidstack/db';
-import type { InvoiceState as PrismaInvoiceState } from '@bidstack/db';
+import { prisma } from '@bidstack/db';
 import {
   INVOICE_STATE_TRANSITIONS,
   InvoiceCreateLine,
   InvoiceTransitionBody,
 } from '@bidstack/shared';
 import type { InvoiceDetail, InvoiceState, PaymentMethod } from '@bidstack/shared';
+
+// WHY re-export: toPrismaState, isUniqueViolation, mintNextInvoiceNumber,
+// resolveLineSubtotal, invoiceLineProductIds were duplicated verbatim in the
+// service layer. Routes import from here; service layer owns the canonical
+// copy. Callers on both sides remain unchanged.
+export {
+  toPrismaState,
+  isUniqueViolation,
+  mintNextInvoiceNumber,
+  resolveLineSubtotal,
+  invoiceLineProductIds,
+} from '../services/invoices/invoices.service.helpers.js';
 
 // ── Zod schemas ──────────────────────────────────────────────────────────────
 
@@ -34,48 +46,6 @@ export const InvoiceUpdate = z.object({
     .array(z.object({ definitionId: z.string().uuid(), value: z.unknown() }))
     .optional(),
 });
-
-// ── State helpers ─────────────────────────────────────────────────────────────
-
-/** Cast shared InvoiceState literal → Prisma enum (identical underlying strings). */
-export const toPrismaState = (s: z.infer<typeof InvoiceState>): PrismaInvoiceState =>
-  s as unknown as PrismaInvoiceState;
-
-// ── Pure functions ────────────────────────────────────────────────────────────
-
-export function isUniqueViolation(err: unknown): boolean {
-  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
-}
-
-/** Allocate the next INV-XXXXX number inside a transaction.
- *  Callers must wrap this in a retry loop to handle concurrent allocations. */
-export async function mintNextInvoiceNumber(
-  tx: Prisma.TransactionClient,
-  orgId: string,
-): Promise<string> {
-  const last = await tx.invoice.findFirst({
-    where: { orgId, number: { startsWith: 'INV-' } },
-    orderBy: { number: 'desc' },
-    select: { number: true },
-  });
-  const nextSeq = last ? Number((last.number.split('-')[1] ?? '0').replace(/\D/g, '')) + 1 : 1;
-  return `INV-${String(nextSeq).padStart(5, '0')}`;
-}
-
-/** Compute per-line micros from quantity × unitPrice (fixed-point, 3 decimal places). */
-export function resolveLineSubtotal(line: z.infer<typeof InvoiceCreateLine>) {
-  const unitMicros = BigInt(line.unitPriceMicros);
-  const qThousandths = BigInt(Math.round(Number(line.quantity) * 1_000));
-  const subtotalMicros = (unitMicros * qThousandths) / BigInt(1_000);
-  return { unitMicros, subtotalMicros };
-}
-
-/** Extract non-null productIds from invoice lines for org-ownership checks. */
-export function invoiceLineProductIds(
-  lines: readonly z.infer<typeof InvoiceCreateLine>[],
-): string[] {
-  return lines.map((line) => line.productId).filter((id): id is string => Boolean(id));
-}
 
 // ── DB query helper ───────────────────────────────────────────────────────────
 

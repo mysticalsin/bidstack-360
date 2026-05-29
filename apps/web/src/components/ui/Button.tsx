@@ -13,28 +13,34 @@ interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> {
   children?: React.ReactNode;
 }
 
+// WHY: All hex/rgba literals replaced with theme tokens (P1 #23) so that brand
+// palette changes propagate automatically. Token definitions live in index.css.
 const VARIANT: Record<Variant, string> = {
   primary:
     'bg-[var(--brand-primary)] text-white hover:bg-[var(--brand-primary-hover)] active:bg-[var(--brand-primary-press)] shadow-[var(--shadow-xs)] ' +
-    'dark:bg-gradient-to-r dark:from-[var(--brand-primary)] dark:to-[#c084fc] dark:shadow-[0_0_16px_rgba(168,85,247,0.25)] dark:hover:shadow-[0_0_24px_rgba(168,85,247,0.35)] dark:pulse-glow',
+    'dark:bg-gradient-to-r dark:from-[var(--brand-gradient-start)] dark:to-[var(--brand-gradient-end)] ' +
+    'dark:shadow-[0_0_16px_var(--btn-brand-glow)] dark:hover:shadow-[0_0_24px_var(--btn-brand-glow-strong)] dark:pulse-glow',
   secondary:
     'bg-[var(--surface-card)] text-[var(--fg-primary)] border border-[var(--border-default)] hover:bg-[var(--surface-sunken)] hover:border-[var(--border-strong)] active:bg-[var(--border-subtle)] active:scale-[0.98] ' +
     'dark:bg-[var(--surface-glass)] dark:backdrop-blur-md dark:hover:border-[var(--border-glow-strong)] dark:hover:shadow-[0_0_16px_var(--border-glow)]',
   ghost:
     'bg-transparent text-[var(--fg-secondary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)] active:bg-[var(--border-subtle)] ' +
-    'dark:hover:bg-[rgba(168,85,247,0.08)] dark:hover:text-[var(--brand-primary)] dark:active:bg-[rgba(168,85,247,0.12)]',
+    'dark:hover:bg-[var(--btn-brand-tint-hover)] dark:hover:text-[var(--brand-primary)] dark:active:bg-[var(--btn-brand-tint-active)]',
   destructive:
     'bg-[var(--danger)] text-white hover:opacity-95 active:opacity-90 active:scale-[0.98] shadow-[var(--shadow-xs)] ' +
-    'dark:bg-[rgba(251,113,133,0.18)] dark:text-[#fda4af] dark:border dark:border-[rgba(251,113,133,0.25)] dark:hover:bg-[rgba(251,113,133,0.25)] dark:hover:shadow-[0_0_16px_rgba(251,113,133,0.2)]',
+    'dark:bg-[var(--danger-tint)] dark:text-[var(--danger)] dark:border dark:border-[var(--btn-danger-border)] ' +
+    'dark:hover:bg-[var(--btn-danger-border)] dark:hover:shadow-[0_0_16px_var(--btn-danger-glow)]',
   // WHY: Apple "tinted button" pattern — green tint at rest, floods to solid on hover.
   // Overrides the base focus-visible ring so the keyboard outline matches the
   // success palette rather than brand-primary purple.
+  // --btn-success-border resolves to different opacities in light (35%) vs dark (28%)
+  // so the single base `border` class handles both modes via the CSS variable.
   success:
-    'bg-[var(--success-tint)] text-[var(--success)] border border-[rgba(31,138,91,0.35)] ' +
+    'bg-[var(--success-tint)] text-[var(--success)] border border-[var(--btn-success-border)] ' +
     'hover:bg-[var(--success)] hover:text-white hover:border-transparent active:opacity-90 active:scale-[0.98] shadow-[var(--shadow-xs)] ' +
     'focus-visible:ring-[var(--success)] ' +
-    'dark:bg-[rgba(52,211,153,0.12)] dark:text-[#86efac] dark:border dark:border-[rgba(52,211,153,0.28)] ' +
-    'dark:hover:bg-[rgba(52,211,153,0.22)] dark:hover:shadow-[0_0_16px_rgba(52,211,153,0.22)]',
+    'dark:bg-[var(--success-tint)] dark:text-[var(--success)] ' +
+    'dark:hover:bg-[var(--btn-success-glass-hover)] dark:hover:shadow-[0_0_16px_var(--btn-success-glow)]',
 };
 
 const SIZE: Record<Size, string> = {
@@ -63,7 +69,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         // Spring on tap mirrors UIButton's tactile feel on iOS. Disable when
         // the user has reduced-motion on or the button is disabled.
         whileTap={reduced || disabled ? undefined : { scale: PRESS_SCALE[size] }}
-        whileHover={reduced || disabled ? undefined : { y: -0.5 }}
+        whileHover={reduced || disabled ? undefined : { translateY: -0.5 }}
         transition={springSnap}
         className={cn(
           // Touch-target floor: visually compact on desktop (32–44px) but

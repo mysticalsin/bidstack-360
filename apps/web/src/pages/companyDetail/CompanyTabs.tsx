@@ -1,15 +1,24 @@
 // Tab panel sub-components for CompanyDetailPage.
-// Each tab receives fully resolved data — no hooks, no mutations.
+// Each tab receives fully resolved data — no data-fetching hooks, no mutations.
+// Display hooks (currency, i18n) are fine.
 import { Link } from 'react-router-dom';
 
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/Table';
 import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { AccountHierarchyTree } from '@/components/AccountHierarchyTree';
 import type { useCompanyHierarchy } from '@/hooks/useCompanies';
-import { formatMoneyMicros } from '@/lib/format';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 
 export function ContactTab({
   contacts,
@@ -25,37 +34,31 @@ export function ContactTab({
   if (contacts.length === 0)
     return <EmptyState title="No contacts yet" message="Add contacts from the Contacts page." />;
   return (
-    <div className="card">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-[var(--border-subtle)] text-left text-[var(--fg-tertiary)]">
-            <th className="px-4 py-3 font-medium">Name</th>
-            <th className="px-4 py-3 font-medium">Role</th>
-            <th className="px-4 py-3 font-medium">Email</th>
-            <th className="px-4 py-3 font-medium">Phone</th>
-          </tr>
-        </thead>
-        <tbody>
+    <div className="card overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Role</TableHead>
+            <TableHead>Email</TableHead>
+            <TableHead>Phone</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {contacts.map((c) => (
-            <tr
-              key={c.id}
-              className="border-b border-[var(--border-subtle)] hover:bg-[var(--surface-sunken)] transition-colors"
-            >
-              <td className="px-4 py-3">
-                <Link
-                  to={`/contacts/${c.id}`}
-                  className="font-medium text-[var(--fg-primary)] hover:text-[var(--brand-primary)]"
-                >
+            <TableRow key={c.id}>
+              <TableCell className="font-medium text-[var(--fg-primary)]">
+                <Link to={`/contacts/${c.id}`} className="hover:text-[var(--brand-primary)]">
                   {c.name}
                 </Link>
-              </td>
-              <td className="px-4 py-3 text-[var(--fg-secondary)]">{c.role ?? '—'}</td>
-              <td className="px-4 py-3 text-[var(--fg-secondary)]">{c.email ?? '—'}</td>
-              <td className="px-4 py-3 text-[var(--fg-secondary)]">{c.phone ?? '—'}</td>
-            </tr>
+              </TableCell>
+              <TableCell>{c.role ?? '—'}</TableCell>
+              <TableCell>{c.email ?? '—'}</TableCell>
+              <TableCell>{c.phone ?? '—'}</TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }
@@ -73,6 +76,11 @@ export function OpportunityTab({
     dueDate: string | null;
   }>;
 }) {
+  // WHY useFormatMoney instead of bare formatMoneyMicros('CAD'): the hook
+  // converts from the org base currency (CAD) to the user's selected display
+  // currency and respects the currency store, so the value column stays
+  // consistent with every other money figure in the app.
+  const { formatMoneyMicros } = useFormatMoney();
   if (opportunities.length === 0)
     return (
       <EmptyState
@@ -81,41 +89,37 @@ export function OpportunityTab({
       />
     );
   return (
-    <div className="card">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-[var(--border-subtle)] text-left text-[var(--fg-tertiary)]">
-            <th className="px-4 py-3 font-medium">Code</th>
-            <th className="px-4 py-3 font-medium">Name</th>
-            <th className="px-4 py-3 font-medium">Stage</th>
-            <th className="px-4 py-3 font-medium">Value</th>
-            <th className="px-4 py-3 font-medium">Probability</th>
-          </tr>
-        </thead>
-        <tbody>
+    <div className="card overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Code</TableHead>
+            <TableHead>Name</TableHead>
+            <TableHead>Stage</TableHead>
+            <TableHead>Value</TableHead>
+            <TableHead>Probability</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {opportunities.map((o) => (
-            <tr
-              key={o.id}
-              className="border-b border-[var(--border-subtle)] hover:bg-[var(--surface-sunken)] transition-colors"
-            >
-              <td className="px-4 py-3">
-                <Link
-                  to={`/opportunities/${o.id}`}
-                  className="font-medium text-[var(--fg-primary)] hover:text-[var(--brand-primary)]"
-                >
+            <TableRow key={o.id}>
+              <TableCell className="font-medium text-[var(--fg-primary)]">
+                <Link to={`/opportunities/${o.id}`} className="hover:text-[var(--brand-primary)]">
                   {o.code}
                 </Link>
-              </td>
-              <td className="px-4 py-3 text-[var(--fg-secondary)]">{o.name}</td>
-              <td className="px-4 py-3">
+              </TableCell>
+              <TableCell>{o.name}</TableCell>
+              <TableCell>
                 <Badge tone="gray">{o.stage}</Badge>
-              </td>
-              <td className="px-4 py-3 font-medium">{formatMoneyMicros(o.valueMicros, 'CAD')}</td>
-              <td className="px-4 py-3 text-[var(--fg-secondary)]">{o.probability}%</td>
-            </tr>
+              </TableCell>
+              <TableCell className="font-medium text-[var(--fg-primary)]">
+                {formatMoneyMicros(o.valueMicros)}
+              </TableCell>
+              <TableCell>{o.probability}%</TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }
@@ -128,38 +132,35 @@ export function CasesTab({
   if (cases.length === 0)
     return <EmptyState title="No open cases" message="All clear — no active support cases." />;
   return (
-    <div className="card">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-[var(--border-subtle)] text-left text-[var(--fg-tertiary)]">
-            <th className="px-4 py-3 font-medium">Number</th>
-            <th className="px-4 py-3 font-medium">Subject</th>
-            <th className="px-4 py-3 font-medium">Status</th>
-            <th className="px-4 py-3 font-medium">Priority</th>
-          </tr>
-        </thead>
-        <tbody>
+    <div className="card overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Number</TableHead>
+            <TableHead>Subject</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Priority</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {cases.map((c) => (
-            <tr
-              key={c.id}
-              className="border-b border-[var(--border-subtle)] hover:bg-[var(--surface-sunken)] transition-colors"
-            >
-              <td className="px-4 py-3 font-medium text-[var(--fg-primary)]">{c.number}</td>
-              <td className="px-4 py-3 text-[var(--fg-secondary)]">{c.subject}</td>
-              <td className="px-4 py-3">
+            <TableRow key={c.id}>
+              <TableCell className="font-medium text-[var(--fg-primary)]">{c.number}</TableCell>
+              <TableCell>{c.subject}</TableCell>
+              <TableCell>
                 <Badge tone="gray">{c.status}</Badge>
-              </td>
-              <td className="px-4 py-3">
+              </TableCell>
+              <TableCell>
                 <Badge
                   tone={c.priority === 'high' ? 'rose' : c.priority === 'medium' ? 'amber' : 'gray'}
                 >
                   {c.priority}
                 </Badge>
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }

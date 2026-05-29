@@ -17,6 +17,7 @@ import { CreateOpportunityDialog } from '@/components/opportunity/CreateOpportun
 import { ImportOpportunitiesDialog } from '@/components/opportunity/ImportOpportunitiesDialog';
 import { Button } from '@/components/ui/Button';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { cn } from '@/lib/cn';
 import { formatStage } from '@/lib/format';
 
 import type { Opportunity, PipelineStage } from '@bidstack/shared';
@@ -36,7 +37,11 @@ export function OppKpiBar({ opps }: { opps: Opportunity[] }) {
     { label: 'Open', value: formatMoney(openValue, 'EUR') },
   ];
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div
+      role="region"
+      aria-label="Opportunities KPI summary"
+      className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+    >
       {kpis.map((kpi) => (
         <div
           key={kpi.label}
@@ -149,12 +154,16 @@ export function OppStageChips({
   stageOptions: PipelineStage[];
   onSetStageFilter: (id: string | null) => void;
 }) {
+  // WHY cn() over template literal: cn() handles class merging correctly and
+  // avoids whitespace artifacts from string interpolation.
   const chipClass = (active: boolean) =>
-    `rounded-full px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] ${
+    cn(
+      'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]',
       active
         ? 'bg-[var(--fg-primary)] text-[var(--surface-page)]'
-        : 'bg-[var(--surface-sunken)] text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)]'
-    }`;
+        : 'bg-[var(--surface-sunken)] text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)]',
+    );
 
   return (
     <div

@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { toast } from '@/components/ui/Toast';
 import { api } from '@/lib/api';
 
 import type {
   Opportunity,
+  OpportunityCreate,
   OpportunityFilter,
   OpportunityPage,
   OpportunityPatch,
@@ -58,6 +60,27 @@ export function useOpportunity(id: string | undefined) {
   });
 }
 
+// P2 #31: extracted from CreateOpportunityDialog — create mutation should be a
+// shared hook so Kanban quick-add, import, and future entry points don't each
+// duplicate the invalidation list. Per-call callbacks (setOpen, setError, etc.)
+// remain in the call site via mutate(data, { onSuccess, onError }).
+export function useCreateOpportunity() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: OpportunityCreate) =>
+      api<Opportunity>('/api/opportunities', { method: 'POST', body }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['opportunities'] });
+      void qc.invalidateQueries({ queryKey: ['report:pipeline'] });
+      // P1 #9: keep count badge, dashboard KPIs, forecasts, and goals fresh
+      void qc.invalidateQueries({ queryKey: ['opportunities', 'count'] });
+      void qc.invalidateQueries({ queryKey: ['crm-dashboard'] });
+      void qc.invalidateQueries({ queryKey: ['forecasts'] });
+      void qc.invalidateQueries({ queryKey: ['goals'] });
+    },
+  });
+}
+
 // Inline-edit hook for a single opportunity. The route is PATCH-shaped on
 // the server (partial patches with full audit log) — we expose the same
 // shape here so call sites can save just the field that changed.
@@ -101,6 +124,9 @@ export function usePatchOpportunity() {
     onError: (_err, _vars, ctx) => {
       ctx?.listSnapshots.forEach(([key, value]) => qc.setQueryData(key, value));
       if (ctx?.detailSnap && ctx.id) qc.setQueryData(['opportunity', ctx.id], ctx.detailSnap);
+      // P3 #44: tell the user their change was reverted so the silent snap-back
+      // is not mistaken for a successful save.
+      toast.error('Save failed — changes reverted.');
     },
     onSettled: (_data, _err, vars) => {
       void qc.invalidateQueries({ queryKey: ['opportunity', vars.id] });
