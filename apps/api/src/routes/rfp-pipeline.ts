@@ -1,14 +1,13 @@
 // Wave 9 — RFP pipeline HTTP endpoints.
 //
-// Four endpoints that form the human-touchpoint layer around the async
-// BullMQ pipeline defined in apps/worker/src/queues/rfp-*.ts:
+// Three authenticated routes + SSE stream (registered as sub-plugin):
 //
 //   1. POST /opportunities/:opportunityId/rfp/upload
 //      — Accepts a PDF/DOCX/PPTX, creates an RfpOrchestration row and
 //        enqueues the rfp.orchestrate job to start the pipeline.
 //
 //   2. GET /bid-workspaces/:workspaceId/rfp/:orchestrationId/stream
-//      — SSE long-poll for real-time pipeline phase progress.
+//      — SSE long-poll for real-time pipeline phase progress (→ rfp-pipeline-stream.ts).
 //
 //   3. POST /bid-workspaces/:workspaceId/matrix/:rowId/rfp-autofill
 //      — Triggers compliance-fill agent for a single matrix row once the
@@ -18,137 +17,41 @@
 //      — Non-bypassable human approval gate for AI-generated proposals.
 //        Validates humanReviewRequired=true and records approver identity
 //        for EU AI Act Art. 50 audit trail.
+//
+// Constants + schemas + helpers → rfp-pipeline.helpers.ts
+// SSE stream route              → rfp-pipeline-stream.ts
 
-import type { FastifyReply } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-
 import { prisma } from '@bidstack/db';
-
 import { logAiInvocation } from '../lib/ai-audit.js';
-import { redis } from '../redis.js';
 import { enqueueRfpOrchestrate, type RfpOrchestrateJob } from '../queues/rfp-orchestrator.js';
 import { enqueueRfpComplianceFill } from '../queues/rfp-compliance-fill.js';
 import { createLogger } from '../lib/logger.js';
+import {
+  ALLOWED_MIME_TYPES,
+  RFP_MAX_BYTES,
+  RFP_UPLOAD_RATE_LIMIT_MAX,
+  UploadParams,
+  AutofillParams,
+  AutofillBody,
+  ApproveParams,
+  ApproveBody,
+  UploadResponse,
+  AutofillResponse,
+  ApproveResponse,
+  checkRfpUploadRateLimit,
+} from './rfp-pipeline.helpers.js';
+import { rfpPipelineStreamRoutes } from './rfp-pipeline-stream.js';
 
 const log = createLogger({ name: 'rfp-pipeline' });
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-/** Allowed mime types for RFP source documents. */
-const ALLOWED_MIME_TYPES = [
-  'application/pdf',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-] as const;
-
-/** 50 MiB — enforced at the route boundary to override the global 10 MiB cap. */
-const RFP_MAX_BYTES = 50 * 1024 * 1024;
-
-/** Rate-limit: 10 uploads per org per hour. Key format: rfp:upload:{orgId}. */
-const RFP_UPLOAD_RATE_LIMIT_MAX = 10;
-const RFP_UPLOAD_RATE_LIMIT_TTL_SECONDS = 3600;
-
-/** SSE poll interval in milliseconds — low enough to feel real-time. */
-const SSE_POLL_INTERVAL_MS = 2000;
-
-/**
- * Heartbeat interval — send a SSE comment every 30 s to prevent proxy timeout.
- * Most load balancers (Nginx, AWS ALB) drop idle connections after 60 s;
- * 30 s keeps the stream alive with comfortable headroom.
- */
-const SSE_HEARTBEAT_INTERVAL_MS = 30_000;
-
-/**
- * Maximum streaming duration — 30 minutes. If the orchestration is still
- * in-progress after this window the stream closes and the client must
- * reconnect. WHY: a stuck BullMQ job or DB deadlock must not hold an open
- * HTTP response handle indefinitely, exhausting Fastify's connection pool.
- */
-const SSE_MAX_POLL_MS = 30 * 60 * 1000;
-
-/** Terminal states — stop streaming once reached. */
-const SSE_TERMINAL_STATES = new Set(['completed', 'failed', 'rejected']);
-
-// ─── Schemas ──────────────────────────────────────────────────────────────────
-
-const UploadParams = z.object({ opportunityId: z.string().uuid() });
-
-const StreamParams = z.object({
-  workspaceId: z.string().uuid(),
-  orchestrationId: z.string().uuid(),
-});
-
-const AutofillParams = z.object({
-  workspaceId: z.string().uuid(),
-  rowId: z.string().uuid(),
-});
-const AutofillBody = z.object({
-  orchestrationId: z.string().uuid(),
-  sectionKey: z.string().min(1).max(100),
-});
-
-const ApproveParams = z.object({ proposalId: z.string().uuid() });
-const ApproveBody = z.object({ notes: z.string().max(2000).optional() });
-
-const UploadResponse = z.object({
-  orchestrationId: z.string().uuid(),
-  status: z.literal('queued'),
-});
-
-const AutofillResponse = z.object({
-  jobId: z.string().nullable(),
-  status: z.literal('queued'),
-});
-
-const ApproveResponse = z.object({
-  approvedAt: z.string().datetime(),
-  approvedByUserId: z.string().uuid(),
-});
-
-// ─── Rate-limit helpers ───────────────────────────────────────────────────────
-
-/**
- * Check and increment the per-org upload rate limit in Redis.
- * Returns true if the request is within quota, false if the limit is exceeded.
- *
- * WHY Redis INCR + EXPIRE: atomic check-and-increment with sliding window.
- * INCR on a missing key returns 1 and we set TTL immediately after; the 2-call
- * sequence is safe here because a missed TTL set (crash between calls) just means
- * the key lives forever until its next write, never causes silent over-counting.
- */
-async function checkRfpUploadRateLimit(orgId: string): Promise<boolean> {
-  const key = `rfp:upload:${orgId}`;
-  try {
-    const current = await redis.incr(key);
-    if (current === 1) {
-      // First upload in this window — set TTL so the counter expires.
-      await redis.expire(key, RFP_UPLOAD_RATE_LIMIT_TTL_SECONDS);
-    }
-    return current <= RFP_UPLOAD_RATE_LIMIT_MAX;
-  } catch (err) {
-    // Redis unavailable — fail-open so uploads still work, log the anomaly.
-    // WHY fail-open: rate limiting is best-effort protection; blocking all uploads
-    // when Redis is down is worse than allowing a few extra uploads.
-    log.warn({ err, orgId }, 'rfp upload rate-limit Redis check failed — fail-open');
-    return true;
-  }
-}
-
-// ─── SSE helper ───────────────────────────────────────────────────────────────
-
-/**
- * Write a single SSE event frame. Format per the SSE spec:
- *   data: <JSON>\n\n
- * The double newline is the event boundary.
- */
-function writeSseEvent(reply: FastifyReply, payload: Record<string, unknown>): void {
-  reply.raw.write(`data: ${JSON.stringify(payload)}\n\n`);
-}
 
 // ─── Route plugin ─────────────────────────────────────────────────────────────
 
 export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
+  // SSE stream route registered as a sub-plugin so it shares the same prefix.
+  await server.register(rfpPipelineStreamRoutes);
+
   // ── 1. Upload RFP document and start pipeline ─────────────────────────────
   server.post(
     '/opportunities/:opportunityId/rfp/upload',
@@ -159,6 +62,10 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
       bodyLimit: RFP_MAX_BYTES,
       schema: {
         params: UploadParams,
+        body: z.object({
+          fileAttachmentId: z.string().uuid(),
+          rfpRequestId: z.string().uuid().optional(),
+        }),
         response: { 202: UploadResponse },
       },
     },
@@ -187,10 +94,7 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
       //
       // WHY not stream the file here: avoids streaming 50 MiB through the API
       // process — same rationale as files.ts §1 comment.
-      const data = req.body as {
-        fileAttachmentId?: string;
-        rfpRequestId?: string;
-      };
+      const data = req.body;
 
       // fileAttachmentId is required — caller must finalize storage first.
       if (typeof data?.fileAttachmentId !== 'string') {
@@ -307,167 +211,6 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
 
       reply.status(202);
       return { orchestrationId: orchestration.id, status: 'queued' as const };
-    },
-  );
-
-  // ── 2. SSE stream for pipeline phase progress ─────────────────────────────
-  server.get(
-    '/bid-workspaces/:workspaceId/rfp/:orchestrationId/stream',
-    {
-      // WHY no permission config for GET: the RBAC middleware only gates
-      // mutating methods (POST/PUT/PATCH/DELETE). SSE is read-only; auth plugin
-      // still runs and provides req.auth.orgId for tenant scoping.
-      schema: { params: StreamParams },
-    },
-    async (req, reply) => {
-      const { orgId } = req.auth;
-
-      // Verify the orchestration belongs to this org and workspace.
-      const initial = await prisma.rfpOrchestration.findFirst({
-        where: {
-          id: req.params.orchestrationId,
-          orgId,
-          opportunityId: req.params.workspaceId,
-          deletedAt: null,
-        },
-        select: {
-          id: true,
-          state: true,
-          currentPhase: true,
-          completedPhases: true,
-          failureReason: true,
-          updatedAt: true,
-        },
-      });
-      if (!initial) throw server.httpErrors.notFound('RFP orchestration not found');
-
-      // Switch to SSE mode.
-      // §SSE-CORS — must never fall back to wildcard ('*').
-      // Wildcard + credentials (cookies / Authorization header) is rejected by browsers
-      // AND exposes the SSE stream to any origin. Fail-closed: if PUBLIC_BASE_URL is
-      // not set in production, return 500 rather than silently open the stream to all.
-      const allowedOrigin =
-        process.env.PUBLIC_BASE_URL ??
-        (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : null);
-      if (!allowedOrigin) {
-        throw server.httpErrors.internalServerError(
-          'SSE stream misconfigured: PUBLIC_BASE_URL env var is required in production',
-        );
-      }
-      reply.raw.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
-        'Access-Control-Allow-Origin': allowedOrigin,
-        'X-Accel-Buffering': 'no', // disable Nginx buffering for SSE
-      });
-
-      // Send initial state immediately so the client doesn't wait for the first poll.
-      // WHY field names match PipelineEvent in apps/web/src/stores/rfpPipeline.ts:
-      // stage/message/timestamp/progress/error — the frontend store's applyEvent()
-      // reads these exact keys. Mismatched keys silently produce undefined values.
-      writeSseEvent(reply, {
-        stage: initial.currentPhase,
-        state: initial.state,
-        message: initial.currentPhase ?? 'Pipeline started',
-        timestamp: initial.updatedAt.toISOString(),
-        progress: initial.completedPhases.length,
-        ...(initial.failureReason ? { error: initial.failureReason } : {}),
-      });
-
-      if (SSE_TERMINAL_STATES.has(initial.state)) {
-        reply.raw.end();
-        return reply;
-      }
-
-      // Poll the DB every SSE_POLL_INTERVAL_MS until terminal state.
-      // WHY polling instead of Postgres LISTEN/NOTIFY: the worker already writes
-      // state transitions to the rfp_orchestrations row; polling is simpler and
-      // avoids a long-lived PG connection per SSE client. Revisit with
-      // LISTEN/NOTIFY if > 500 concurrent SSE clients become a concern.
-      let closed = false;
-      req.raw.on('close', () => {
-        closed = true;
-      });
-
-      await new Promise<void>((resolve) => {
-        const deadline = Date.now() + SSE_MAX_POLL_MS;
-
-        // Heartbeat: SSE comment every 30 s prevents proxy/LB idle-connection timeout.
-        // WHY comment not data event: a comment (': ping\n\n') is ignored by
-        // EventSource's onmessage handler — no spurious dispatches to the client.
-        const heartbeatTimer = setInterval(() => {
-          if (!closed) reply.raw.write(': ping\n\n');
-        }, SSE_HEARTBEAT_INTERVAL_MS);
-
-        const cleanup = (endStream: boolean) => {
-          clearInterval(heartbeatTimer);
-          if (endStream) reply.raw.end();
-          resolve();
-        };
-
-        const tick = async () => {
-          if (closed) return cleanup(false);
-
-          // MAX_POLL_TIME guard: hard deadline prevents eternal connection on stuck jobs.
-          if (Date.now() >= deadline) {
-            log.warn(
-              { orchestrationId: req.params.orchestrationId, orgId },
-              'SSE stream closed — max poll duration (30 min) reached',
-            );
-            writeSseEvent(reply, {
-              stage: 'failed',
-              state: 'timeout',
-              message: 'Stream closed after maximum duration. Reconnect to continue monitoring.',
-              timestamp: new Date().toISOString(),
-              error: 'SSE stream timed out after 30 minutes',
-            });
-            return cleanup(true);
-          }
-
-          const row = await prisma.rfpOrchestration
-            .findFirst({
-              where: {
-                id: req.params.orchestrationId,
-                orgId,
-                deletedAt: null,
-              },
-              select: {
-                state: true,
-                currentPhase: true,
-                completedPhases: true,
-                failureReason: true,
-                updatedAt: true,
-              },
-            })
-            .catch(() => null); // DB errors must not crash the SSE response
-
-          if (!row || closed) return cleanup(false);
-
-          writeSseEvent(reply, {
-            stage: row.currentPhase,
-            state: row.state,
-            message: row.currentPhase ?? 'Processing',
-            timestamp: row.updatedAt.toISOString(),
-            progress: row.completedPhases.length,
-            ...(row.failureReason ? { error: row.failureReason } : {}),
-          });
-
-          if (SSE_TERMINAL_STATES.has(row.state)) {
-            return cleanup(true);
-          }
-
-          setTimeout(() => {
-            void tick();
-          }, SSE_POLL_INTERVAL_MS);
-        };
-
-        setTimeout(() => {
-          void tick();
-        }, SSE_POLL_INTERVAL_MS);
-      });
-
-      return reply;
     },
   );
 
