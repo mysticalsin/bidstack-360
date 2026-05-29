@@ -1,5 +1,15 @@
 import type { SourceAttribution } from '@bidstack/shared';
 
+import {
+  asUrl,
+  attribution,
+  commonsFileUrl,
+  fetchJson,
+  isRecord,
+  normalizeDomain,
+  normalizeName,
+} from './company-open-enrichment.utils.js';
+
 type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
 interface OpenCompanyInput {
@@ -328,87 +338,5 @@ function claimValue(entity: WikidataEntity, property: string): unknown {
   return datavalue.value ?? null;
 }
 
-function commonsFileUrl(fileName: string): string {
-  return `https://commons.wikimedia.org/wiki/Special:Redirect/file/${encodeURIComponent(fileName)}`;
-}
-
-async function fetchJson<T>(input: string | URL, fetchImpl: FetchLike, label: string): Promise<T> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 4500);
-  try {
-    const headers = new Headers();
-    headers.set('Accept', 'application/json');
-    headers.set(
-      'User-Agent',
-      process.env.BIDSTACK_USER_AGENT ?? 'BidStack360/0.1 (local development)',
-    );
-    const res = await fetchImpl(input, { headers, signal: controller.signal });
-    if (!res.ok) throw new Error(`${label} returned HTTP ${res.status}`);
-    return (await res.json()) as T;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-function attribution({
-  source,
-  label,
-  sourceUrl,
-  fetchedAt,
-  confidence,
-  providerMetadata,
-}: {
-  source: string;
-  label: string;
-  sourceUrl: string;
-  fetchedAt: Date;
-  confidence: number;
-  providerMetadata: Record<string, unknown>;
-}): SourceAttribution {
-  return {
-    source,
-    label,
-    sourceUrl,
-    fetchedAt: fetchedAt.toISOString(),
-    confidence,
-    providerMetadata,
-  };
-}
-
-function asUrl(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const raw =
-    value.startsWith('http://') || value.startsWith('https://') ? value : `https://${value}`;
-  try {
-    return new URL(raw).toString();
-  } catch {
-    return null;
-  }
-}
-
-function normalizeDomain(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const urlish =
-    value.startsWith('http://') || value.startsWith('https://') ? value : `https://${value}`;
-  try {
-    return new URL(urlish).hostname.replace(/^www\./, '').toLowerCase();
-  } catch {
-    return value
-      .replace(/^https?:\/\//, '')
-      .replace(/^www\./, '')
-      .replace(/\/.*$/, '')
-      .toLowerCase();
-  }
-}
-
-function normalizeName(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
+// commonsFileUrl, fetchJson, attribution, asUrl, normalizeDomain, normalizeName,
+// and isRecord are imported from ./company-open-enrichment.utils.js
