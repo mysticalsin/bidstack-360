@@ -21,10 +21,14 @@ import { randomBytes, createHash } from 'node:crypto';
 import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { prisma } from '@bidstack/db';
+import { prisma, IntegrationProvider } from '@bidstack/db';
 import { encryptToken } from '@bidstack/shared/token-crypto';
 import { outlookHistoricalQueue } from '../../queues/email-outlook.js';
-import { createSubscription, deleteSubscription, getAccessToken } from '../../services/microsoft-graph.service.js';
+import { getAccessToken } from '../../services/microsoft-graph-auth.service.js';
+import {
+  createSubscription,
+  deleteSubscription,
+} from '../../services/microsoft-graph-subscription.service.js';
 
 function tenant(): string {
   return process.env.MICROSOFT_TENANT_ID ?? 'common';
@@ -71,14 +75,13 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
 
       await prisma.integrationToken.upsert({
         where: {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          orgId_userId_provider: { orgId, userId, provider: 'microsoft_graph' as any },
+          orgId_userId_provider: { orgId, userId, provider: IntegrationProvider.microsoft_graph },
         },
         create: {
           orgId,
           userId,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          provider: 'microsoft_graph' as any,
+
+          provider: IntegrationProvider.microsoft_graph,
           accessTokenEncrypted: encryptToken('pending'),
           status: 'revoked',
           deltaState: { mailOAuthState: statePayload },
@@ -129,8 +132,7 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
 
       const record = await prisma.integrationToken.findUnique({
         where: {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          orgId_userId_provider: { orgId, userId, provider: 'microsoft_graph' as any },
+          orgId_userId_provider: { orgId, userId, provider: IntegrationProvider.microsoft_graph },
         },
       });
       const stored = (record?.deltaState as Record<string, string> | null)?.mailOAuthState;
@@ -175,9 +177,12 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
       // Get user's email from Graph /me endpoint
       let externalEmail: string | undefined;
       try {
-        const meRes = await fetch('https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName', {
-          headers: { Authorization: `Bearer ${tokens.access_token}` },
-        });
+        const meRes = await fetch(
+          'https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName',
+          {
+            headers: { Authorization: `Bearer ${tokens.access_token}` },
+          },
+        );
         if (meRes.ok) {
           const me = (await meRes.json()) as { mail?: string; userPrincipalName?: string };
           externalEmail = me.mail ?? me.userPrincipalName;
@@ -192,8 +197,7 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
 
       await prisma.integrationToken.update({
         where: {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          orgId_userId_provider: { orgId, userId, provider: 'microsoft_graph' as any },
+          orgId_userId_provider: { orgId, userId, provider: IntegrationProvider.microsoft_graph },
         },
         data: {
           accessTokenEncrypted: encryptToken(tokens.access_token),
@@ -212,8 +216,7 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
       // Fetch the saved token record to get its id for queue/subscription
       const savedToken = await prisma.integrationToken.findUnique({
         where: {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          orgId_userId_provider: { orgId, userId, provider: 'microsoft_graph' as any },
+          orgId_userId_provider: { orgId, userId, provider: IntegrationProvider.microsoft_graph },
         },
         select: { id: true },
       });
@@ -247,12 +250,10 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
       // Find token record first so we can read the access token for subscription cleanup
       const token = await prisma.integrationToken.findUnique({
         where: {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          orgId_userId_provider: { orgId, userId, provider: 'microsoft_graph' as any },
+          orgId_userId_provider: { orgId, userId, provider: IntegrationProvider.microsoft_graph },
         },
         include: {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          graphSubscriptions: { select: { subscriptionId: true } } as any,
+          graphSubscriptions: { select: { subscriptionId: true } },
         },
       });
 
@@ -260,14 +261,18 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
       if (token && token.status === 'active') {
         try {
           const accessToken = await getAccessToken(token, server.log);
-          const subs = (token as typeof token & { graphSubscriptions?: { subscriptionId: string }[] })
-            .graphSubscriptions ?? [];
+          const subs =
+            (token as typeof token & { graphSubscriptions?: { subscriptionId: string }[] })
+              .graphSubscriptions ?? [];
           await Promise.all(
             subs.map((sub) => deleteSubscription(sub.subscriptionId, accessToken, server.log)),
           );
         } catch (err) {
           // Non-fatal — continue to revoke token even if subscription cleanup fails
-          server.log.warn({ err, orgId, userId }, 'Could not clean up Graph subscriptions on disconnect');
+          server.log.warn(
+            { err, orgId, userId },
+            'Could not clean up Graph subscriptions on disconnect',
+          );
         }
       }
 
@@ -275,8 +280,8 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
         where: {
           orgId,
           userId,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          provider: 'microsoft_graph' as any,
+
+          provider: IntegrationProvider.microsoft_graph,
         },
         data: { status: 'revoked', deletedAt: new Date() },
       });

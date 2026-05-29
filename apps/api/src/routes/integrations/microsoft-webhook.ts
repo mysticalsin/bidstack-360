@@ -25,7 +25,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
-import { verifyClientState } from '../../services/microsoft-graph.service.js';
+import { verifyClientState } from '../../services/microsoft-graph-subscription.service.js';
 import { outlookEmailQueue } from '../../queues/email-outlook.js';
 
 const NotificationValueItem = z.object({
