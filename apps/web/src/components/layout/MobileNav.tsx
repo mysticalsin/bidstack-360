@@ -30,12 +30,16 @@ const WORKSPACE: NavItem[] = [
   { to: '/sales/products', label: 'Products', icon: 'package' },
   { to: '/sales/invoices', label: 'Invoices', icon: 'receipt' },
   { to: '/accounts', label: 'Accounts', icon: 'building' },
-  { to: '/accounts/key', label: 'Key Accounts', icon: 'star' },
-  { to: '/accounts/top', label: 'Top Accounts', icon: 'trophy' },
+  { to: '/key-accounts', label: 'Key Accounts', icon: 'star' },
+  { to: '/top-accounts', label: 'Top Accounts', icon: 'trophy' },
   { to: '/companies', label: 'Companies', icon: 'building' },
   { to: '/references', label: 'Reference Library', icon: 'book' },
   { to: '/opportunities', label: 'Opportunities', icon: 'briefcase', badgeKey: 'openBids' },
-  { to: '/bid-matrix', label: 'Bid Decision Matrix', icon: 'target' },
+  { to: '/pipeline', label: 'Pipeline', icon: 'pipeline' },
+  { to: '/forecasts', label: 'Forecasts', icon: 'growth' },
+  { to: '/bid-matrix', label: 'Bid/No-Bid Matrix', icon: 'target' },
+  { to: '/rfp-response', label: 'RFP Response Hub', icon: 'briefcase' },
+  { to: '/proposals', label: 'Proposals', icon: 'receipt' },
   { to: '/leads', label: 'Leads', icon: 'target' },
   { to: '/contacts', label: 'Contacts', icon: 'contacts' },
   { to: '/tasks', label: 'Tasks', icon: 'tasks', badgeKey: 'overdueTasks' },
@@ -128,15 +132,12 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
       {/* Header with close */}
       <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
         <div className="flex items-center gap-2">
-          <div className="sb-mark" aria-hidden>B</div>
+          <div className="sb-mark" aria-hidden>
+            B
+          </div>
           <span className="font-semibold text-[var(--fg-primary)]">BidStack 360</span>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="iconbtn"
-          aria-label="Close navigation"
-        >
+        <button type="button" onClick={onClose} className="iconbtn" aria-label="Close navigation">
           <Icon name="close" size={18} ariaHidden />
         </button>
       </div>

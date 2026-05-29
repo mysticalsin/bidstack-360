@@ -14,7 +14,7 @@ import {
   isValidElement,
   Fragment,
 } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/cn';
 
 export interface SelectOption {
@@ -83,6 +83,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     const errorId = hasError ? `${selectId}-error` : undefined;
     const helperId = helper ? `${selectId}-helper` : undefined;
     const describedBy = [errorId, helperId].filter(Boolean).join(' ') || undefined;
+    const shouldReduceMotion = useReducedMotion();
 
     const parsedOptions = useMemo(() => {
       if (options) return options;
@@ -308,10 +309,12 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                 id={listboxId}
                 role="listbox"
                 aria-label={label ? String(label) : undefined}
-                initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                initial={shouldReduceMotion ? false : { opacity: 0, y: -4, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.98 }}
+                transition={
+                  shouldReduceMotion ? { duration: 0 } : { duration: 0.15, ease: [0.16, 1, 0.3, 1] }
+                }
                 className="absolute left-0 mt-1.5 w-full z-50 rounded-lg glass-menu max-h-60 overflow-y-auto p-1.5 focus:outline-none"
               >
                 {parsedOptions.length === 0 ? (

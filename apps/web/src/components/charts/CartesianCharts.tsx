@@ -21,14 +21,8 @@ import {
 } from 'recharts';
 
 import { CHART_COLORS, CHART_GRID_COLOR } from './chartTokens';
-import {
-  type BaseProps,
-  axisProps,
-  tooltipStyle,
-  resolveYKeys,
-  DataTable,
-  ChartEnter,
-} from './chartShared';
+import { type BaseProps, axisProps, tooltipStyle, resolveYKeys } from './chartTypes';
+import { DataTable, ChartEnter } from './chartShared';
 
 // ── LineChart ─────────────────────────────────────────────────────────────────
 

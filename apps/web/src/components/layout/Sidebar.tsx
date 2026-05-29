@@ -23,22 +23,28 @@ interface NavItem {
 const WORKSPACE: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
   { to: '/sales', label: 'Sales', icon: 'reports' },
-  { to: '/sales/orders', label: 'Quotations & Orders', icon: 'briefcase' },
+  { to: '/sales/orders', label: 'Quotes & Orders', icon: 'briefcase' },
   { to: '/sales/products', label: 'Products', icon: 'package' },
   { to: '/sales/invoices', label: 'Invoices', icon: 'receipt' },
   { to: '/accounts', label: 'Accounts', icon: 'building' },
+  { to: '/key-accounts', label: 'Key Accounts', icon: 'star' },
+  { to: '/top-accounts', label: 'Top Accounts', icon: 'trophy' },
   { to: '/companies', label: 'Companies', icon: 'building' },
+  { to: '/references', label: 'Reference Library', icon: 'book' },
   { to: '/opportunities', label: 'Opportunities', icon: 'briefcase', badgeKey: 'openBids' },
   { to: '/pipeline', label: 'Pipeline', icon: 'pipeline' },
   { to: '/forecasts', label: 'Forecasts', icon: 'growth' },
   { to: '/bid-matrix', label: 'Bid/No-Bid Matrix', icon: 'target' },
+  { to: '/rfp-response', label: 'RFP Response Hub', icon: 'briefcase' },
+  { to: '/proposals', label: 'Proposals', icon: 'receipt' },
   { to: '/leads', label: 'Leads', icon: 'target' },
   { to: '/contacts', label: 'Contacts', icon: 'contacts' },
   { to: '/tasks', label: 'Tasks', icon: 'tasks', badgeKey: 'overdueTasks' },
   { to: '/territories', label: 'Territories', icon: 'building' },
   { to: '/service-desk', label: 'Service Desk', icon: 'briefcase' },
   { to: '/workflows', label: 'Workflows', icon: 'pipeline' },
-  { to: '/intake', label: 'Intake', icon: 'building' },
+  { to: '/agents', label: 'Dust Agents', icon: 'sparkle' },
+  { to: '/intake', label: 'Document Intake', icon: 'building' },
   { to: '/reports', label: 'Reports', icon: 'reports' },
 ];
 
@@ -53,6 +59,8 @@ const MEMBER_SETTINGS: NavItem[] = [
   { to: '/integrations', label: 'Integrations', icon: 'link' },
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ];
+
+const MAX_STARRED = 6;
 
 export function Sidebar() {
   const oppsCount = useOpportunityCount({ excludeClosed: true });
@@ -126,15 +134,15 @@ export function Sidebar() {
         {/* Favorites first (intentional choice), then recents. Both groups
             self-hide when empty so a brand-new user doesn't see two
             confusing empty headers. */}
-        {favorites.length > 0 ? (
+        {favorites.length > 0 && !collapsed ? (
           <SidebarGroup title="Starred">
-            {favorites.map((acc) => (
+            {favorites.slice(0, MAX_STARRED).map((acc) => (
               <AccountShortcut key={acc.slug} acc={acc} icon="starFilled" collapsed={collapsed} />
             ))}
           </SidebarGroup>
         ) : null}
 
-        {recents.length > 0 ? (
+        {recents.length > 0 && !collapsed ? (
           <SidebarGroup title="Recent">
             {recents.slice(0, 5).map((acc) => (
               <AccountShortcut key={acc.slug} acc={acc} icon="clock" collapsed={collapsed} />

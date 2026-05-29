@@ -19,6 +19,8 @@ const ROUTE_TITLES: Record<string, string> = {
   '/accounts': 'Accounts',
   '/accounts/key': 'Key Accounts',
   '/accounts/top': 'Top Accounts',
+  '/key-accounts': 'Key Accounts',
+  '/top-accounts': 'Top Accounts',
   '/companies': 'Companies',
   '/references': 'Reference Library',
   '/opportunities': 'Opportunities',

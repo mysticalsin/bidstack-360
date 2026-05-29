@@ -13,16 +13,9 @@ import { useUpdateTask } from '@/hooks/useTasks';
 import { cn } from '@/lib/cn';
 import { daysUntil, formatDate } from '@/lib/format';
 
-import type { Task, TaskStatus } from '@bidstack/shared';
+import type { Task } from '@bidstack/shared';
 
-// Click-to-cycle status order. Mirrors Apple Reminders: tap to complete /
-// undo. Click on the row's status badge cycles forwards.
-export const STATUS_CYCLE: Record<TaskStatus, TaskStatus> = {
-  open: 'in_progress',
-  in_progress: 'done',
-  done: 'open',
-  blocked: 'open',
-};
+import { STATUS_CYCLE } from './taskConstants';
 
 // Each row is memoized so toggling one task's status doesn't re-render the
 // other 49 rows — the only deps are the task object itself and optional

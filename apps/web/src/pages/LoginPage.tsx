@@ -8,7 +8,11 @@ import { Hero } from '@/components/login';
  */
 export function LoginPage() {
   return (
-    <main className="login-page relative z-[100] overflow-hidden" aria-label="Sign in">
+    <main
+      className="login-page relative z-[100] overflow-hidden"
+      aria-label="Sign in"
+      data-theme="light"
+    >
       <Hero />
     </main>
   );

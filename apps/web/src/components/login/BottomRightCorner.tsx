@@ -1,13 +1,14 @@
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 import { ArrowUpRight, ChevronRight } from 'lucide-react';
 
 export function BottomRightCorner() {
+  const shouldReduceMotion = useReducedMotion();
   return (
     <motion.div
       className="absolute bottom-0 right-0 p-3 pt-5 pl-8 sm:p-4 sm:pt-6 sm:pl-10 md:p-6 md:pt-8 md:pl-14 bg-[#f0f0f0] rounded-tl-[1.5rem] sm:rounded-tl-[2rem] md:rounded-tl-[3.5rem] flex items-center gap-3 sm:gap-4 md:gap-6"
-      initial={{ y: 20, opacity: 0 }}
+      initial={shouldReduceMotion ? false : { y: 20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.8, delay: 0.4 }}
+      transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.8, delay: 0.4 }}
     >
       {/* Top intersection mask */}
       <div className="absolute -top-[1.5rem] sm:-top-[2rem] md:-top-[3.5rem] right-0 w-[1.5rem] sm:w-[2rem] md:w-[3.5rem] h-[1.5rem] sm:h-[2rem] md:h-[3.5rem] pointer-events-none">

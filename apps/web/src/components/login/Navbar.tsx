@@ -32,21 +32,20 @@ export function Navbar() {
       <div className="flex-1 hidden md:block" />
 
       {/* Center Menu */}
-      <ul className="hidden md:flex items-center gap-8 text-[rgb(45,45,45)] font-normal text-sm">
+      <div className="hidden md:flex items-center gap-8 text-[rgb(45,45,45)] font-normal text-sm">
         {navItems.map((item) => (
-          <li
+          <button
             key={item.label}
-            tabIndex={0}
-            role="button"
-            className="cursor-pointer hover:opacity-70 transition-opacity flex items-center gap-1 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(30,50,90,0.3)] rounded-sm"
+            type="button"
+            className="cursor-pointer hover:opacity-70 transition-opacity flex items-center gap-1 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(30,50,90,0.3)] rounded-sm bg-transparent border-none"
           >
             {item.label}
             {item.hasDropdown && (
               <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
             )}
-          </li>
+          </button>
         ))}
-      </ul>
+      </div>
 
       {/* Mobile Logo */}
       <div className="md:hidden">

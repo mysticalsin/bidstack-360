@@ -23,6 +23,9 @@
 
 @import 'tailwindcss';
 
+/* Tailwind v4 dark mode — map `dark:` variant to data-theme attribute */
+@variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /* ---------- Light theme (default) ---------- */
 :root,
 [data-theme='light'] {
@@ -810,6 +813,9 @@ a {
 .sidebar.is-collapsed {
   padding-left: 8px;
   padding-right: 8px;
+}
+.sidebar.is-collapsed .sb-group {
+  padding: 4px 0 0;
 }
 
 /* Transitions for collapsing elements */

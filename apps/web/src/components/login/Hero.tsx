@@ -19,7 +19,7 @@ export function Hero() {
   const pAnim = reducedMotion ? {} : { initial: { opacity: 0 }, animate: { opacity: 1 } };
 
   return (
-    <div className="w-full h-screen flex items-center justify-center bg-[#f0f0f0]">
+    <div className="w-full h-dvh flex items-center justify-center bg-[#f0f0f0]">
       <section className="relative w-full h-full overflow-hidden shadow-none flex flex-col items-center bg-white/10 group">
         {/* Video Background */}
         <video

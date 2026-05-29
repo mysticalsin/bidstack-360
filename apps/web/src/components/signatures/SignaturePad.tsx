@@ -13,14 +13,7 @@
  *    visible only during drawing.
  */
 
-import {
-  forwardRef,
-  useCallback,
-  useEffect,
-  useImperativeHandle,
-  useRef,
-  useState,
-} from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 
 import { cn } from '@/lib/cn';
 
@@ -52,10 +45,7 @@ const CURSIVE_FONT = '"Caveat", "Dancing Script", cursive';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getPos(
-  canvas: HTMLCanvasElement,
-  e: MouseEvent | TouchEvent,
-): { x: number; y: number } {
+function getPos(canvas: HTMLCanvasElement, e: MouseEvent | TouchEvent): { x: number; y: number } {
   const rect = canvas.getBoundingClientRect();
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
@@ -247,7 +237,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
     useEffect(() => {
       clearCanvas();
       setTypedName('');
-    }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps -- WHY: mode change must reset canvas/name; clearCanvas and setTypedName are stable callbacks from useCallback
 
     // ─── Imperative handle ────────────────────────────────────────────────
 

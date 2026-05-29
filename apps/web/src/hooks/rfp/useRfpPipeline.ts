@@ -62,10 +62,8 @@ export function useRfpPipeline(
 
         applyEvent(event);
       } catch {
-        // Malformed SSE data — discard silently; log in dev only.
-        if (import.meta.env.DEV) {
-          console.warn('[useRfpPipeline] malformed SSE message:', e.data);
-        }
+        // Malformed SSE data — discard silently.
+        // WHY: SSE events are best-effort; a malformed frame should not break the stream.
       }
     };
 

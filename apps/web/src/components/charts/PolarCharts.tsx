@@ -19,7 +19,8 @@ import {
 } from 'recharts';
 
 import { CHART_COLORS, CHART_AXIS_COLOR, CHART_GRID_COLOR } from './chartTokens';
-import { type DataPoint, tooltipStyle, DataTable, ChartEnter } from './chartShared';
+import { type DataPoint, tooltipStyle } from './chartTypes';
+import { DataTable, ChartEnter } from './chartShared';
 
 // ── PieChart ──────────────────────────────────────────────────────────────────
 

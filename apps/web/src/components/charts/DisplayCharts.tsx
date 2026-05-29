@@ -2,7 +2,7 @@
  * DisplayCharts — HeatmapChart (CSS colour cells) and TableChart (HTML table).
  * Neither uses Recharts; both are pure layout-based data displays.
  */
-import type { DataPoint } from './chartShared';
+import type { DataPoint } from './chartTypes';
 
 // ── HeatmapChart ──────────────────────────────────────────────────────────────
 
