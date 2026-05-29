@@ -167,6 +167,7 @@ export default tseslint.config(
       '**/playwright.config.ts',
       'apps/marketing/scripts/**/*.mjs',
       'packages/db/src/seed.ts',
+      'packages/db/src/seed.rbac.ts',
     ],
     rules: {
       'no-console': 'off',
