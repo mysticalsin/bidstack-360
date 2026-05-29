@@ -12,7 +12,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
-import { springSnap, springSoft } from '@/lib/motion';
+import { springSnap, springSoft, staggerChild, staggerParent } from '@/lib/motion';
 
 import type { TopCountries } from '@bidstack/shared';
 
@@ -89,21 +89,16 @@ export function TopCountriesCard({ data, isLoading }: Props) {
         <MiniMap items={items} max={max} currency={data?.currency ?? 'CAD'} />
       ) : (
         <motion.ul
-          initial={reducedMotion ? false : { opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={springSoft}
+          variants={reducedMotion ? undefined : staggerParent}
+          initial="initial"
+          animate="animate"
           className="divide-y divide-[var(--border-subtle)]"
         >
-          {items.map((c, index) => {
+          {items.map((c) => {
             const v = Number(BigInt(c.revenueMicros) / BigInt(1_000_000));
             const pct = max > 0 ? (v / max) * 100 : 0;
             return (
-              <motion.li
-                key={c.code}
-                initial={reducedMotion ? false : { opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.03 }}
-              >
+              <motion.li key={c.code} variants={reducedMotion ? undefined : staggerChild}>
                 <Link
                   to={`/sales/orders?country=${c.code}&state=confirmed`}
                   className="flex items-center gap-3 px-5 py-2.5 transition-colors hover:bg-[var(--surface-subtle)] focus-visible:bg-[var(--surface-subtle)] focus-visible:outline-none"
@@ -126,7 +121,7 @@ export function TopCountriesCard({ data, isLoading }: Props) {
                         className="h-full rounded-full bg-[var(--brand-primary)]"
                         initial={reducedMotion ? false : { width: 0 }}
                         animate={{ width: `${pct.toFixed(1)}%` }}
-                        transition={{ ...springSnap, delay: reducedMotion ? 0 : index * 0.03 }}
+                        transition={springSnap}
                         style={{ opacity: 0.6 + 0.4 * (pct / 100) }}
                       />
                     </div>
@@ -161,21 +156,19 @@ function MiniMap({
   // through as the list view (audit 2026-05-11 #4).
   return (
     <motion.div
-      initial={reducedMotion ? false : { opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={springSoft}
+      variants={reducedMotion ? undefined : staggerParent}
+      initial="initial"
+      animate="animate"
       className="grid grid-cols-3 gap-3 px-5 py-5 sm:grid-cols-4"
     >
-      {items.map((c, index) => {
-        const v = Number(BigInt(c.revenueMicros) / BigInt(1_000_000));
-        const intensity = max > 0 ? Math.min(1, v / max) : 0;
+      {items.map((c) => {
+        const intensity =
+          max > 0 ? Math.min(1, Number(BigInt(c.revenueMicros) / BigInt(1_000_000)) / max) : 0;
         return (
           <motion.div
             key={c.code}
-            initial={reducedMotion ? false : { opacity: 0, scale: 0.96, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            whileHover={reducedMotion ? undefined : { y: -3 }}
-            transition={{ ...springSnap, delay: reducedMotion ? 0 : index * 0.035 }}
+            variants={reducedMotion ? undefined : staggerChild}
+            whileHover={reducedMotion ? undefined : { y: -3, transition: springSnap }}
           >
             <Link
               to={`/sales/orders?country=${c.code}&state=confirmed`}

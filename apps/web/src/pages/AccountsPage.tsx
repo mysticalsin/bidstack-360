@@ -42,6 +42,18 @@ export function AccountsPage() {
       .sort((a, b) => sortRows(a, b, sort));
   }, [dashboard.data, search, industry, sort]);
 
+  // Memoize aggregate stats so they don't recompute on every render
+  // (rows is already memoized — this just avoids four extra O(n) passes).
+  const summaryStats = useMemo(
+    () => ({
+      totalPipeline: rows.reduce((acc, r) => acc + r.pipelineMicros, 0),
+      totalOpen: rows.reduce((acc, r) => acc + r.openDeals, 0),
+      logoCoverage: rows.filter((r) => Boolean(r.company.logo?.url)).length,
+      enrichedAccounts: rows.filter((r) => r.company.source === 'verified_data').length,
+    }),
+    [rows],
+  );
+
   const industries = useMemo(() => {
     if (!dashboard.data) return [];
     return [
@@ -79,10 +91,7 @@ export function AccountsPage() {
     );
   }
 
-  const totalPipeline = rows.reduce((acc, r) => acc + r.pipelineMicros, 0);
-  const totalOpen = rows.reduce((acc, r) => acc + r.openDeals, 0);
-  const logoCoverage = rows.filter((r) => Boolean(r.company.logo?.url)).length;
-  const enrichedAccounts = rows.filter((r) => r.company.source === 'verified_data').length;
+  const { totalPipeline, totalOpen, logoCoverage, enrichedAccounts } = summaryStats;
   const healthyProviders = dashboard.data.providerHealth.filter(
     (p) => p.status === 'healthy',
   ).length;

@@ -274,8 +274,12 @@ export function SalesDashboardPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody>
-                {topProducts.map((product, index) => {
+              <motion.tbody
+                variants={reducedMotion ? undefined : staggerParent}
+                initial="initial"
+                animate="animate"
+              >
+                {topProducts.map((product) => {
                   const pct =
                     topProductMax > 0
                       ? Math.min(100, (product.revenueMicros / topProductMax) * 100)
@@ -283,10 +287,8 @@ export function SalesDashboardPage() {
                   return (
                     <motion.tr
                       key={product.product}
-                      initial={reducedMotion ? false : { opacity: 0, x: -6 }}
-                      animate={{ opacity: 1, x: 0 }}
+                      variants={reducedMotion ? undefined : staggerChild}
                       whileHover={reducedMotion ? undefined : { x: 2 }}
-                      transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.025 }}
                       className="border-t border-[var(--border-subtle)]"
                     >
                       <td className="relative px-4 py-2.5 text-[var(--fg-primary)]">
@@ -295,7 +297,7 @@ export function SalesDashboardPage() {
                           className="absolute inset-y-1 left-1 rounded bg-[#eef4ff]"
                           initial={reducedMotion ? false : { width: 0 }}
                           animate={{ width: `calc(${pct.toFixed(2)}% - 8px)` }}
-                          transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.025 }}
+                          transition={springSoft}
                         />
                         <div className="relative truncate font-medium">{product.product}</div>
                         <div className="relative text-[10px] uppercase tracking-wider text-[var(--fg-tertiary)]">
@@ -314,7 +316,7 @@ export function SalesDashboardPage() {
                     </motion.tr>
                   );
                 })}
-              </tbody>
+              </motion.tbody>
             </table>
           )}
         </Card>

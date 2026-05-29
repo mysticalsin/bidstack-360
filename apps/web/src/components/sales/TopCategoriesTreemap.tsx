@@ -9,7 +9,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
-import { springSnap, springSoft } from '@/lib/motion';
+import { springSnap, springSoft, staggerChild, staggerParent } from '@/lib/motion';
 
 import type { CategoryRow, TopCategories } from '@bidstack/shared';
 
@@ -80,18 +80,16 @@ export function TopCategoriesTreemap({ data, isLoading }: Props) {
         <Treemap items={items} sourceCurrency={sourceCurrency} />
       ) : (
         <motion.ul
-          initial={reducedMotion ? false : { opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={springSoft}
+          variants={reducedMotion ? undefined : staggerParent}
+          initial="initial"
+          animate="animate"
           className="divide-y divide-[var(--border-subtle)]"
         >
           {items.map((c, i) => (
             <motion.li
               key={c.id}
-              initial={reducedMotion ? false : { opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
+              variants={reducedMotion ? undefined : staggerChild}
               whileHover={reducedMotion ? undefined : { x: 2 }}
-              transition={{ ...springSoft, delay: reducedMotion ? 0 : i * 0.03 }}
               className="flex items-center gap-3 px-5 py-2.5"
             >
               <motion.span
@@ -147,7 +145,7 @@ function Treemap({ items, sourceCurrency }: { items: CategoryRow[]; sourceCurren
         role="img"
         aria-label="Top categories treemap by revenue"
       >
-        {tiles.map((t, index) => (
+        {tiles.map((t) => (
           <g key={t.item.id}>
             <motion.rect
               x={t.x + 1}
@@ -158,7 +156,7 @@ function Treemap({ items, sourceCurrency }: { items: CategoryRow[]; sourceCurren
               rx={4}
               initial={reducedMotion ? false : { opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ ...springSnap, delay: reducedMotion ? 0 : index * 0.03 }}
+              transition={springSnap}
               style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
             >
               <title>{`${t.item.name}: ${formatMoneyMicros(t.item.revenueMicros, sourceCurrency)} (${t.item.orders} orders)`}</title>
@@ -172,7 +170,7 @@ function Treemap({ items, sourceCurrency }: { items: CategoryRow[]; sourceCurren
                 fill="white"
                 initial={reducedMotion ? false : { opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.035 + 0.08 }}
+                transition={{ ...springSoft, delay: reducedMotion ? 0 : 0.08 }}
                 style={{ pointerEvents: 'none' }}
               >
                 {t.item.name}
@@ -186,7 +184,7 @@ function Treemap({ items, sourceCurrency }: { items: CategoryRow[]; sourceCurren
                 fill="white"
                 initial={reducedMotion ? false : { opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.035 + 0.12 }}
+                transition={{ ...springSoft, delay: reducedMotion ? 0 : 0.12 }}
                 style={{ pointerEvents: 'none' }}
               >
                 {formatMoneyMicros(t.item.revenueMicros, sourceCurrency)}
