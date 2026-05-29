@@ -78,6 +78,24 @@ export default tseslint.config(
       '.audit-screens/**',
       '.codex/**',
       '.claude/worktrees/**', // ephemeral agent worktrees, not source
+      'BIDCRM-design/**', // nested sibling project — not part of this repo
+      'scratch_skills/**', // exploratory scratch directory
+      '.planning/**',
+      'apps/chrome-extension/**', // vanilla JS Chrome extension — not part of TS monorepo
+      'apps/mobile/**', // React Native — has its own Babel/Metro config
+      'apps/docs/**', // Docusaurus / static docs site
+      'integrations/**', // Zapier app and other CJS/vanilla-JS integrations
+      'load-tests/**', // k6 load-test scripts — not Node.js, use k6 globals
+      'scripts/**', // one-off ops scripts — console is intentional there
+      'scratch/**', // local scratch scripts (gitignored)
+      '.claire/**', // ephemeral agent worktrees
+      '.clone/**', // ephemeral agent worktrees
+      '.swarm_state/**', // agent swarm output directory
+      '.tmp-screens/**', // playwright screenshot dumps
+      '.lighthouserc.js', // Lighthouse CI config
+      'tmp-*.cjs', // root-level temp migration scripts
+      'tmp-*.js', // root-level temp scripts
+      '*.mjs', // root-level scratch/audit scripts (axe-login-audit, etc.)
     ],
   },
 

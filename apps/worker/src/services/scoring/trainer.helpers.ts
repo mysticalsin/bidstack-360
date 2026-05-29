@@ -10,6 +10,8 @@
  *   Synthetic data      — buildSyntheticLeadSamples, buildSyntheticOppSamples
  */
 
+import type { XgboostMetrics } from './trainer-xgboost.js';
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface AccuracyMetrics {
@@ -39,7 +41,7 @@ export interface ModelArtifact {
     /** XGBoost booster save_raw('json') — opaque to TS; consumed by Python */
     modelJson: string;
     /** Held-out metrics from the XGBoost trainer */
-    metrics: import('./trainer-xgboost.js').XgboostMetrics;
+    metrics: XgboostMetrics;
     /** Gain-based feature importance, normalized to sum=1.0 */
     featureImportance: Record<string, number>;
     /** Best boosting round (≤ n_estimators, may be less if early-stopped) */
