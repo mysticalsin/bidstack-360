@@ -18,91 +18,34 @@
 import pino from 'pino';
 import { z } from 'zod';
 
-// ─── Public types ───────────────────────────────────────────────────────
+import {
+  OdooMcpError,
+  type OdooMcpClientOptions,
+  type SearchRecordsArgs,
+  type GetRecordArgs,
+  type CreateRecordArgs,
+  type UpdateRecordArgs,
+  type DeleteRecordArgs,
+  type AggregateRecordsArgs,
+  type PostMessageArgs,
+  type CallModelMethodArgs,
+} from './odoo-mcp-client.types.js';
 
-export interface OdooMcpClientOptions {
-  /** Full URL of the MCP server's streamable-http endpoint (e.g. http://mcp-server-odoo:8000/mcp). */
-  url: string;
-  /** Optional bearer token if a reverse proxy gates the sidecar. */
-  bearerToken?: string;
-  /** Request timeout per call (default 15s — Odoo can be slow on big domains). */
-  timeoutMs?: number;
-  /** Pino logger; falls back to a named child if omitted. */
-  logger?: pino.Logger;
-  /** MCP protocol version the client speaks. Bumped via PR if upstream moves. */
-  protocolVersion?: string;
-  /** Identity reported in initialize. Defaults to BidStack 360°. */
-  clientInfo?: { name: string; version: string };
-}
-
-/** Domain expression — Odoo's polish-notation filter (e.g. [['active','=',true]]). */
-export type OdooDomain = ReadonlyArray<unknown>;
-
-export interface SearchRecordsArgs {
-  model: string;
-  domain?: OdooDomain;
-  fields?: string[];
-  limit?: number;
-  offset?: number;
-  order?: string;
-}
-
-export interface GetRecordArgs {
-  model: string;
-  id: number;
-  fields?: string[];
-}
-
-export interface CreateRecordArgs {
-  model: string;
-  values: Record<string, unknown>;
-}
-
-export interface UpdateRecordArgs {
-  model: string;
-  id: number;
-  values: Record<string, unknown>;
-}
-
-export interface DeleteRecordArgs {
-  model: string;
-  id: number;
-}
-
-export interface AggregateRecordsArgs {
-  model: string;
-  domain?: OdooDomain;
-  groupBy: string[];
-  measures?: string[];
-}
-
-export interface PostMessageArgs {
-  model: string;
-  id: number;
-  body: string;
-  subject?: string;
-}
-
-export interface CallModelMethodArgs {
-  model: string;
-  method: string;
-  args?: unknown[];
-  kwargs?: Record<string, unknown>;
-}
-
-// ─── Errors ─────────────────────────────────────────────────────────────
-
-export class OdooMcpError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-    public readonly body: unknown,
-    public readonly code?: number,
-  ) {
-    super(message);
-    this.name = 'OdooMcpError';
-  }
-}
+// Re-export everything from the types module so callers using
+// @bidstack/odoo-mcp-client see no change in their import paths.
+export {
+  OdooMcpError,
+  type OdooMcpClientOptions,
+  type OdooDomain,
+  type SearchRecordsArgs,
+  type GetRecordArgs,
+  type CreateRecordArgs,
+  type UpdateRecordArgs,
+  type DeleteRecordArgs,
+  type AggregateRecordsArgs,
+  type PostMessageArgs,
+  type CallModelMethodArgs,
+} from './odoo-mcp-client.types.js';
 
 // ─── Wire-format schemas ────────────────────────────────────────────────
 
