@@ -61,21 +61,26 @@ export async function fanOutWebhookEvent(
   event: string,
   payload: Record<string, unknown>,
 ): Promise<void> {
-  const subs = await prisma.webhookSubscription.findMany({
-    where: { orgId, active: true, deletedAt: null, events: { has: event } },
-    select: { id: true },
-    take: 1000,
-  });
-
-  if (subs.length === 0) return;
-
   try {
+    // findMany is inside try/catch — a DB error here must NOT propagate to the
+    // void caller; an unhandled rejection would trigger process.exit(1) in main.ts.
+    const subs = await prisma.webhookSubscription.findMany({
+      where: { orgId, active: true, deletedAt: null, events: { has: event } },
+      select: { id: true },
+      take: 1000,
+    });
+
+    if (subs.length === 0) return;
+
     const queue = getQueue();
+    // BullMQ forbids colons in job IDs (Redis uses `:` as key namespace separator).
+    // Sanitize the event name and use underscores throughout.
+    const safeEvent = event.replace(/[^a-zA-Z0-9_.-]/g, '_');
     const jobs = subs.map((sub) => ({
       name: `${event}:${sub.id}`,
       data: { subscriptionId: sub.id, event, payload } satisfies DeliveryJob,
       opts: {
-        jobId: `${event}:${sub.id}:${Date.now()}`,
+        jobId: `${safeEvent}_${sub.id}_${Date.now()}`,
         ...WEBHOOK_DELIVERY.defaultJobOptions,
       },
     }));
