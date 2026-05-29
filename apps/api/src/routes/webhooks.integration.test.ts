@@ -17,7 +17,11 @@ function sign(body: string, secret: string): string {
   return `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`;
 }
 
-async function postDustWebhook(payload: Record<string, unknown>, secret: string, eventType: string) {
+async function postDustWebhook(
+  payload: Record<string, unknown>,
+  secret: string,
+  eventType: string,
+) {
   const body = JSON.stringify(payload);
   return server.inject({
     method: 'POST',
@@ -114,31 +118,140 @@ describe('Dust webhook receiver', () => {
     expect(syncEvent?.orgId).toBe(orgId);
   });
 
-  skipIfNoDb('rejects signed webhooks whose payload org metadata does not match the subscription', async () => {
-    const secret = `whsec_${randomUUID()}`;
-    process.env.DUST_WEBHOOK_SECRET = secret;
-    const eventType = `test.org-mismatch.${randomUUID()}`;
-    eventTypes.push(eventType);
+  skipIfNoDb(
+    'rejects signed webhooks whose payload org metadata does not match the subscription',
+    async () => {
+      const secret = `whsec_${randomUUID()}`;
+      process.env.DUST_WEBHOOK_SECRET = secret;
+      const eventType = `test.org-mismatch.${randomUUID()}`;
+      eventTypes.push(eventType);
 
-    const active = await prisma.webhookSubscription.create({
-      data: {
-        orgId: orgId!,
-        url: 'https://example.com/webhook',
+      const active = await prisma.webhookSubscription.create({
+        data: {
+          orgId: orgId!,
+          url: 'https://example.com/webhook',
+          secret,
+          events: ['document.created'],
+          active: true,
+        },
+      });
+      createdSubscriptionIds.push(active.id);
+
+      const res = await postDustWebhook(
+        { metadata: { orgId: '00000000-0000-0000-0000-000000000001' } },
         secret,
-        events: ['document.created'],
-        active: true,
-      },
-    });
-    createdSubscriptionIds.push(active.id);
+        eventType,
+      );
+      expect(res.statusCode).toBe(403);
 
-    const res = await postDustWebhook(
-      { metadata: { orgId: '00000000-0000-0000-0000-000000000001' } },
-      secret,
-      eventType,
-    );
-    expect(res.statusCode).toBe(403);
+      const count = await prisma.syncEvent.count({ where: { eventType } });
+      expect(count).toBe(0);
+    },
+  );
 
-    const count = await prisma.syncEvent.count({ where: { eventType } });
-    expect(count).toBe(0);
-  });
+  skipIfNoDb(
+    'rejects a validly-signed webhook whose timestamp is outside the 5-minute replay window',
+    async () => {
+      const secret = `whsec_${randomUUID()}`;
+      process.env.DUST_WEBHOOK_SECRET = secret;
+      const eventType = `test.stale-ts.${randomUUID()}`;
+      // No eventTypes.push — a rejected request creates no syncEvent to clean up.
+
+      const sub = await prisma.webhookSubscription.create({
+        data: {
+          orgId: orgId!,
+          url: 'https://example.com/webhook',
+          secret,
+          events: ['document.created'],
+          active: true,
+        },
+      });
+      createdSubscriptionIds.push(sub.id);
+
+      // 6 minutes in the past — just outside the MAX_TIMESTAMP_SKEW_MS (5 min).
+      const staleTs = Date.now() - 6 * 60 * 1000;
+      const body = JSON.stringify({ metadata: { orgId } });
+      const res = await server.inject({
+        method: 'POST',
+        url: '/webhooks/dust',
+        headers: {
+          'content-type': 'application/json',
+          'x-dust-signature': sign(body, secret),
+          'x-dust-event': eventType,
+          'x-dust-event-id': `evt_${randomUUID()}`,
+          'x-dust-timestamp': String(staleTs),
+        },
+        payload: body,
+      });
+      expect(res.statusCode).toBe(401);
+      expect(res.json().message).toMatch(/replay window/i);
+
+      // A replayed request must never reach the DB.
+      const count = await prisma.syncEvent.count({ where: { eventType } });
+      expect(count).toBe(0);
+    },
+  );
+
+  skipIfNoDb(
+    'deduplicates Dust retries — same x-dust-event-id must not create a second syncEvent',
+    async () => {
+      const secret = `whsec_${randomUUID()}`;
+      process.env.DUST_WEBHOOK_SECRET = secret;
+      const eventType = `test.dedup.${randomUUID()}`;
+      eventTypes.push(eventType);
+
+      const sub = await prisma.webhookSubscription.create({
+        data: {
+          orgId: orgId!,
+          url: 'https://example.com/webhook',
+          secret,
+          events: ['document.created'],
+          active: true,
+        },
+      });
+      createdSubscriptionIds.push(sub.id);
+
+      // Use a fixed event-id across both deliveries — simulates Dust retrying
+      // a webhook that got no ack due to a transient network failure.
+      const sharedEventId = `evt_${randomUUID()}`;
+      const body = JSON.stringify({ metadata: { orgId } });
+
+      // First delivery — must be accepted and persisted.
+      const first = await server.inject({
+        method: 'POST',
+        url: '/webhooks/dust',
+        headers: {
+          'content-type': 'application/json',
+          'x-dust-signature': sign(body, secret),
+          'x-dust-event': eventType,
+          'x-dust-event-id': sharedEventId,
+          'x-dust-timestamp': String(Date.now()),
+        },
+        payload: body,
+      });
+      expect(first.statusCode).toBe(200);
+      expect(first.json()).toEqual({ ok: true });
+
+      // Retry with the identical event-id — must ack (200) without writing a
+      // second syncEvent. Works via Redis NX or the in-process fallback Map.
+      const retry = await server.inject({
+        method: 'POST',
+        url: '/webhooks/dust',
+        headers: {
+          'content-type': 'application/json',
+          'x-dust-signature': sign(body, secret),
+          'x-dust-event': eventType,
+          'x-dust-event-id': sharedEventId,
+          'x-dust-timestamp': String(Date.now()),
+        },
+        payload: body,
+      });
+      expect(retry.statusCode).toBe(200);
+      expect(retry.json()).toEqual({ ok: true });
+
+      // Exactly one row — the duplicate was dropped before the DB write.
+      const count = await prisma.syncEvent.count({ where: { eventType } });
+      expect(count).toBe(1);
+    },
+  );
 });

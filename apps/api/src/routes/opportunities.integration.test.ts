@@ -115,6 +115,59 @@ describe('opportunities routes', () => {
       payload: { stage: 's1_ongoing' },
     });
   });
+
+  skipIfNoDb(
+    'DELETE /api/opportunities/:id soft-deletes the record and writes an audit_log entry',
+    async () => {
+      // Look up the seed org — the dev auth stub runs every request as this org.
+      const org = await prisma.org.findUnique({ where: { clerkOrg: 'org_seed_mantu' } });
+      if (!org) {
+        console.warn('[skip] seed org not found');
+        return;
+      }
+
+      // Create a throwaway fixture — deleting a seeded record would break the
+      // ≥8 count assertion in the GET list test above.
+      const fixture = await prisma.opportunity.create({
+        data: {
+          orgId: org.id,
+          code: `OP-TST-${Date.now()}`,
+          name: 'DELETE integration test fixture',
+          customer: 'Test Corp',
+          stage: 's1_lead',
+          valueMicros: BigInt(0),
+          probability: 0,
+        },
+      });
+
+      const del = await server.inject({
+        method: 'DELETE',
+        url: `/api/opportunities/${fixture.id}`,
+      });
+      expect(del.statusCode).toBe(204);
+
+      // Re-fetch must 404 — the record is now soft-deleted (deletedAt is set).
+      const get = await server.inject({
+        method: 'GET',
+        url: `/api/opportunities/${fixture.id}`,
+      });
+      expect(get.statusCode).toBe(404);
+
+      // Audit log must have been written atomically with the soft-delete.
+      const auditEntry = await prisma.auditLog.findFirst({
+        where: {
+          targetType: 'opportunity',
+          targetId: fixture.id,
+          action: 'opportunity.delete',
+        },
+      });
+      expect(auditEntry).not.toBeNull();
+      expect(auditEntry!.diff).toMatchObject({
+        code: fixture.code,
+        customer: fixture.customer,
+      });
+    },
+  );
 });
 
 describe('contacts + tasks + reports routes', () => {
