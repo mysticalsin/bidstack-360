@@ -55,7 +55,7 @@ export async function enqueueRfpSectionDraft(job: RfpSectionDraftJob): Promise<s
   try {
     const queued = await getQueue().add('rfp.section-draft', job, {
       // WHY: dedup key per section prevents duplicate drafts if orchestrator restarts
-      jobId: `rfp-section-draft:${job.orchestrationId}:${job.sectionId}`,
+      jobId: `rfp-section-draft-${job.orchestrationId}-${job.sectionId}`,
     });
     log.info(
       { jobId: queued.id, orgId: job.orgId, sectionId: job.sectionId },

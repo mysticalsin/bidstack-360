@@ -189,6 +189,18 @@ export async function processJob(
     select: { id: true, text: true },
   });
 
+  // Record the story-match fan-out size so the story-match completion handler
+  // knows when the whole fan-out is done (the section-planning bridge).
+  await prisma.$executeRaw`
+    UPDATE rfp_orchestrations
+    SET config = jsonb_set(
+          jsonb_set(config, '{story_match_total}', ${savedRequirements.length}::text::jsonb),
+          '{story_match_done}', '0'::jsonb
+        ),
+        updated_at = now()
+    WHERE id = ${orchestrationId}::uuid AND org_id = ${orgId}::uuid
+  `;
+
   for (const req of savedRequirements) {
     // 1. Embed this requirement's text into requirement_embeddings
     await embedQueue.add(

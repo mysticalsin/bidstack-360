@@ -24,12 +24,13 @@ import type { Queue, Worker, Job } from 'bullmq';
 import type IORedis from 'ioredis';
 import type pino from 'pino';
 
-import { Worker as BullWorker } from 'bullmq';
+import { Worker as BullWorker, Queue as BullQueue } from 'bullmq';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { MemOSService } from '@bidstack/memos';
 
-import { RFP_STORY_MATCH } from '@bidstack/shared';
+import { RFP_STORY_MATCH, RFP_SECTION_DRAFT } from '@bidstack/shared';
+import { advanceToSectionDraftIfReady } from './rfp-section-planning.js';
 
 const QUEUE_NAME = RFP_STORY_MATCH.name;
 const DEFAULT_TOP_K = 5;
@@ -367,8 +368,16 @@ export async function startRfpStoryMatch(
   connection: IORedis,
   log: pino.Logger,
   workers: Worker[],
-  _queues: Queue[],
+  queues: Queue[],
 ): Promise<void> {
+  // Downstream queue: when the whole story-match fan-out completes, the section-
+  // planning bridge creates the proposal + sections and enqueues these drafts.
+  const sectionDraftQueue = new BullQueue(RFP_SECTION_DRAFT.name, {
+    connection,
+    defaultJobOptions: RFP_SECTION_DRAFT.defaultJobOptions,
+  });
+  queues.push(sectionDraftQueue);
+
   const memos = new MemOSService();
 
   const worker = new BullWorker<JobData>(
@@ -386,6 +395,13 @@ export async function startRfpStoryMatch(
     log.info(
       { jobId: job.id, requirementId: job.data.requirementId },
       'rfp-story-match: completed',
+    );
+    // When the whole fan-out is done, plan sections + dispatch section drafts.
+    void advanceToSectionDraftIfReady(
+      job.data.orgId,
+      job.data.orchestrationId,
+      sectionDraftQueue,
+      log,
     );
   });
 
