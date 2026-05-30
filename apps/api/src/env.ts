@@ -14,7 +14,7 @@ export const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().min(1).default('redis://localhost:6380'),
 
-  PUBLIC_BASE_URL: z.string().url(),
+  PUBLIC_BASE_URL: z.string().url().default('http://localhost:5173'),
   PUBLIC_API_URL: z.string().url().optional(),
 
   CLERK_SECRET_KEY: z.string().min(1).optional().or(z.literal('')),

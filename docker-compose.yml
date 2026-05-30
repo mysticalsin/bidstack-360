@@ -1,6 +1,7 @@
 services:
   postgres:
     image: pgvector/pgvector:pg16
+    restart: unless-stopped
     environment:
       POSTGRES_USER: bidstack
       POSTGRES_PASSWORD: bidstack
@@ -17,8 +18,9 @@ services:
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     ports:
-      - '6379:6379'
+      - '6380:6379'
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
@@ -29,6 +31,7 @@ services:
     build:
       context: .
       target: api
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
@@ -38,6 +41,10 @@ services:
       NODE_ENV: ${NODE_ENV:-development}
       DATABASE_URL: postgres://bidstack:bidstack@postgres:5432/bidstack
       REDIS_URL: redis://redis:6379
+      # Public web origin for the CORS allowlist. Defaults to the local web
+      # container origin; override PUBLIC_BASE_URL for any non-local deployment
+      # (production boot refuses a localhost value — see apps/api/src/config.ts).
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost}
       LOG_LEVEL: info
     ports:
       - '4000:4000'
@@ -48,8 +55,12 @@ services:
     build:
       context: .
       target: web
+    restart: unless-stopped
+    # Wait for the API to be healthy (Dockerfile HEALTHCHECK hits /readyz), not
+    # merely started, so the SPA never loads against a not-yet-ready API.
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     ports:
       - '80:80'
 
@@ -57,6 +68,7 @@ services:
     build:
       context: .
       target: worker
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,6 +84,7 @@ services:
     build:
       context: .
       target: mcp-server
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
@@ -81,6 +94,9 @@ services:
       NODE_ENV: development
       DATABASE_URL: postgres://bidstack:bidstack@postgres:5432/bidstack
       REDIS_URL: redis://redis:6379
+      # The MCP HTTP server listens on PORT_MCP (defaults to 4001); pin it to the
+      # published port so the 3001 mapping actually reaches a listener.
+      PORT_MCP: '3001'
     ports:
       - '3001:3001'
 

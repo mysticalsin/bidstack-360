@@ -144,7 +144,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(cors, {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
-      const allowed = [process.env.PUBLIC_BASE_URL].filter(Boolean);
+      const allowed = [config.PUBLIC_BASE_URL].filter(Boolean);
       if (config.NODE_ENV === 'development') {
         allowed.push('http://localhost:5173', 'http://localhost:4173');
       }

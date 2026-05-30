@@ -5,12 +5,19 @@ const ConfigSchema = z.object({
   PORT: z.coerce.number().default(4000),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
 
+  // Public web origin — drives the CORS allowlist (server.ts). Defaults to the
+  // local web dev origin so local/compose boot never crashes; production MUST
+  // override it (enforced in parseConfig below) or browser requests from the
+  // deployed frontend are rejected.
+  PUBLIC_BASE_URL: z.string().url().default('http://localhost:5173'),
+
   // Database
   DATABASE_URL: z.string().min(1),
   SHADOW_DATABASE_URL: z.string().optional(),
 
-  // Redis
-  REDIS_URL: z.string().default('redis://localhost:6379'),
+  // Redis — local default :6380 matches env.ts and the queue producers
+  // (avoids colliding with a system Redis on the standard :6379).
+  REDIS_URL: z.string().default('redis://localhost:6380'),
 
   // Auth
   CLERK_SECRET_KEY: z.string().optional(),
@@ -58,6 +65,13 @@ function parseConfig(): z.infer<typeof ConfigSchema> {
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
     throw new Error(`Config validation failed: ${issues}`);
+  }
+  // Production must set a real public origin; the localhost default would make
+  // the CORS allowlist reject every browser request from the deployed frontend.
+  if (parsed.data.NODE_ENV === 'production' && parsed.data.PUBLIC_BASE_URL.includes('localhost')) {
+    throw new Error(
+      'Config validation failed: PUBLIC_BASE_URL must be set to the public web origin in production',
+    );
   }
   return parsed.data;
 }
