@@ -36,8 +36,14 @@ import {
   CALL_UPDATE_DEAL,
 } from '@bidstack/shared';
 import { transcribeAudioUrl } from '../../src/services/calls/transcription.service.js';
-import { analyzeCallTranscript, meddicDimensionToKey } from '../../src/services/calls/analysis.service.js';
-import { uploadRecording, getSignedRecordingUrl } from '../../src/services/calls/recording-storage.service.js';
+import {
+  analyzeCallTranscript,
+  meddicDimensionToKey,
+} from '../../src/services/calls/analysis.service.js';
+import {
+  uploadRecording,
+  getSignedRecordingUrl,
+} from '../../src/services/calls/recording-storage.service.js';
 import { downloadTwilioRecording } from '../../src/services/calls/twilio-voice.service.js';
 import { getZoomRecordings } from '../../src/services/calls/zoom.service.js';
 
@@ -140,7 +146,10 @@ async function processFetchRecording(
       dualChannel: false,
     } satisfies z.infer<typeof TranscribeJobData>);
 
-    log.info({ callSessionId }, 'call.fetch-recording: Zoom recording URL stored, transcribe queued');
+    log.info(
+      { callSessionId },
+      'call.fetch-recording: Zoom recording URL stored, transcribe queued',
+    );
     return;
   } else if (provider === 'TEAMS' || provider === 'GOOGLE_MEET') {
     // Teams/Meet recordings are accessed via provider-specific auth.
@@ -182,11 +191,7 @@ async function processFetchRecording(
 
 // ─── Worker 2: transcribe ──────────────────────────────────────────────────
 
-async function processTranscribe(
-  job: Job,
-  analyzeQueue: Queue,
-  log: pino.Logger,
-): Promise<void> {
+async function processTranscribe(job: Job, analyzeQueue: Queue, log: pino.Logger): Promise<void> {
   const data = TranscribeJobData.parse(job.data);
   const { callSessionId, s3Key, dualChannel } = data;
 
@@ -223,11 +228,7 @@ async function processTranscribe(
 
 // ─── Worker 3: analyze ────────────────────────────────────────────────────
 
-async function processAnalyze(
-  job: Job,
-  updateDealQueue: Queue,
-  log: pino.Logger,
-): Promise<void> {
+async function processAnalyze(job: Job, updateDealQueue: Queue, log: pino.Logger): Promise<void> {
   const data = AnalyzeJobData.parse(job.data);
   const { callSessionId } = data;
 
@@ -248,7 +249,12 @@ async function processAnalyze(
   }
 
   const segments = Array.isArray(session.transcriptStructured)
-    ? (session.transcriptStructured as Array<{ speaker: string; startMs: number; endMs: number; text: string }>)
+    ? (session.transcriptStructured as Array<{
+        speaker: string;
+        startMs: number;
+        endMs: number;
+        text: string;
+      }>)
     : [];
 
   const insights = await analyzeCallTranscript(session.transcriptText, segments);
@@ -348,10 +354,13 @@ async function processUpdateDeal(job: Job, log: pino.Logger): Promise<void> {
  * Bootstraps all four call-processing workers.
  * Call from apps/worker/src/index.ts.
  */
-export function startCallWorkers(redis: IORedis, log: pino.Logger): Worker[] {
+export function startCallWorkers(redis: IORedis, log: pino.Logger, queues?: Queue[]): Worker[] {
   const transcribeQueue = makeQueue(CALL_TRANSCRIBE, redis);
   const analyzeQueue = makeQueue(CALL_ANALYZE, redis);
   const updateDealQueue = makeQueue(CALL_UPDATE_DEAL, redis);
+  // Register the internal queues for graceful shutdown so their buffered Redis
+  // writes are flushed on SIGTERM instead of dropped (main.ts closes `queues`).
+  queues?.push(transcribeQueue, analyzeQueue, updateDealQueue);
 
   const fetchWorker = new Worker(
     CALL_FETCH_RECORDING.name,
@@ -373,11 +382,10 @@ export function startCallWorkers(redis: IORedis, log: pino.Logger): Worker[] {
     { connection: redis, concurrency: 1 },
   );
 
-  const updateDealWorker = new Worker(
-    CALL_UPDATE_DEAL.name,
-    (job) => processUpdateDeal(job, log),
-    { connection: redis, concurrency: 10 },
-  );
+  const updateDealWorker = new Worker(CALL_UPDATE_DEAL.name, (job) => processUpdateDeal(job, log), {
+    connection: redis,
+    concurrency: 10,
+  });
 
   for (const worker of [fetchWorker, transcribeWorker, analyzeWorker, updateDealWorker]) {
     worker.on('failed', (job, err) => {

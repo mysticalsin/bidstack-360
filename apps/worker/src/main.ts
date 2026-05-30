@@ -66,7 +66,7 @@ const queues: Queue[] = [];
 
 // WHY separate: startCallWorkers has a different signature — returns Worker[]
 // synchronously (no queue/workers arrays) and does not need to be awaited.
-workers.push(...startCallWorkers(connection, log));
+workers.push(...startCallWorkers(connection, log, queues));
 
 await Promise.all([
   startDustPoller(connection, log, workers, queues),
