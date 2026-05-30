@@ -13,6 +13,10 @@ import { Icon, type IconName } from '@/components/ui/Icon';
 import { EmptyState } from '@/components/ui/StateMessages';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { api } from '@/lib/api';
+import {
+  proposalStatusLabel,
+  proposalStatusTone,
+} from '@/components/rfp/shared/ProposalStatusChip';
 
 interface OwnerRow {
   ownerId: string | null;
@@ -28,16 +32,6 @@ interface RfpAnalytics {
   byStatus: Array<{ status: string; count: number }>;
   byOwner: OwnerRow[];
 }
-
-// Mirror the hub's status palette so chips read correctly in light + dark.
-const STATUS_TONE: Record<string, string> = {
-  draft: 'bg-[var(--surface-sunken)] text-[var(--fg-secondary)]',
-  review: 'bg-[var(--tag-amber-bg)] text-[var(--tag-amber-fg)]',
-  approved: 'bg-[var(--tag-jade-bg)] text-[var(--tag-jade-fg)]',
-  submitted: 'bg-[var(--tag-blue-bg)] text-[var(--tag-blue-fg)]',
-  won: 'bg-[var(--success)] text-[var(--fg-on-brand)]',
-  lost: 'bg-[var(--danger)] text-[var(--fg-on-brand)]',
-};
 
 // Money is stored + transported in micros (CLAUDE.md convention). Format to a
 // whole-euro currency string at the edge for display.
@@ -140,9 +134,9 @@ export function AdminRfpPage() {
                 {q.data.byStatus.map((s) => (
                   <span
                     key={s.status}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${STATUS_TONE[s.status] ?? 'bg-[var(--surface-sunken)] text-[var(--fg-secondary)]'}`}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${proposalStatusTone(s.status)}`}
                   >
-                    {s.status.toUpperCase()}
+                    {proposalStatusLabel(s.status)}
                     <span className="rounded-full bg-black/10 px-1.5 dark:bg-white/15">
                       {s.count}
                     </span>

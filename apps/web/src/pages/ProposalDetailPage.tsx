@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { api } from '@/lib/api';
-
-type ProposalStatus = 'draft' | 'review' | 'approved' | 'submitted' | 'won' | 'lost';
+import {
+  ProposalStatusChip,
+  type ProposalStatus,
+} from '@/components/rfp/shared/ProposalStatusChip';
 
 interface ProposalSection {
   id: string;
@@ -168,10 +170,11 @@ export function ProposalDetailPage() {
               <Icon name="arrow" size={16} className="rotate-180" />
             </button>
             <h1 className="page-title">{proposal.name}</h1>
+            <ProposalStatusChip status={proposal.status} />
           </div>
           <p className="page-sub">
-            {proposal.status} · v{proposal.version}
-            {proposal.dueDate ? ` · Due ${proposal.dueDate}` : ''}
+            v{proposal.version}
+            {proposal.dueDate ? ` · Due ${new Date(proposal.dueDate).toLocaleDateString()}` : ''}
           </p>
         </div>
       </div>

@@ -17,8 +17,10 @@ import { EmptyState } from '@/components/ui/StateMessages';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { api } from '@/lib/api';
 import { useOpportunityCount } from '@/hooks/useOpportunities';
-
-type ProposalStatus = 'draft' | 'review' | 'approved' | 'submitted' | 'won' | 'lost';
+import {
+  ProposalStatusChip,
+  type ProposalStatus,
+} from '@/components/rfp/shared/ProposalStatusChip';
 
 interface Proposal {
   id: string;
@@ -48,18 +50,6 @@ interface BidScore {
 interface BidScoreList {
   items: BidScore[];
 }
-
-// Use the design-token tag palette (each token has a light + dark value) so
-// these chips adapt to dark mode. The previous hardcoded hex tints kept dark
-// brown/green/blue text on light tints, which was unreadable on the dark theme.
-const STATUS_TONE: Record<ProposalStatus, string> = {
-  draft: 'bg-[var(--surface-sunken)] text-[var(--fg-secondary)]',
-  review: 'bg-[var(--tag-amber-bg)] text-[var(--tag-amber-fg)]',
-  approved: 'bg-[var(--tag-jade-bg)] text-[var(--tag-jade-fg)]',
-  submitted: 'bg-[var(--tag-blue-bg)] text-[var(--tag-blue-fg)]',
-  won: 'bg-[var(--success)] text-[var(--fg-on-brand)]',
-  lost: 'bg-[var(--danger)] text-[var(--fg-on-brand)]',
-};
 
 const REC_TONE: Record<BidScore['recommendation'], string> = {
   bid: 'bg-[var(--tag-jade-bg)] text-[var(--tag-jade-fg)]',
@@ -213,11 +203,7 @@ export function RfpResponseHubPage() {
                         {p.name}
                       </div>
                       <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-[var(--fg-tertiary)]">
-                        <span
-                          className={`inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold ${STATUS_TONE[p.status]}`}
-                        >
-                          {p.status.toUpperCase()}
-                        </span>
+                        <ProposalStatusChip status={p.status} />
                         <span>v{p.version}</span>
                         {p.complianceScore !== null ? (
                           <span title="Compliance score">· {p.complianceScore}% compliant</span>

@@ -6,8 +6,11 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { api } from '@/lib/api';
-
-type ProposalStatus = 'draft' | 'review' | 'approved' | 'submitted' | 'won' | 'lost';
+import {
+  ProposalStatusChip,
+  proposalStatusLabel,
+  type ProposalStatus,
+} from '@/components/rfp/shared/ProposalStatusChip';
 
 interface Proposal {
   id: string;
@@ -40,18 +43,6 @@ interface ProposalPage {
   items: Proposal[];
   total: number;
 }
-
-// WHY: status badge colours must work in both light and dark mode. Tailwind
-// colour-100/700 classes rely on light-mode defaults; dark: variants ensure
-// the badge remains legible against dark surface tokens.
-const STATUS_BADGE: Record<ProposalStatus, string> = {
-  won: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-  lost: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
-  submitted: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-  approved: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
-  review: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-  draft: 'bg-surface-sunken text-fg-secondary',
-};
 
 export function ProposalsPage() {
   useDocumentTitle();
@@ -147,7 +138,7 @@ export function ProposalsPage() {
                   else setSearchParams({ status: s });
                 }}
               >
-                {s}
+                {proposalStatusLabel(s)}
               </button>
             ),
           )}
@@ -205,16 +196,11 @@ export function ProposalsPage() {
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-fg-primary truncate">{p.name}</p>
                 <p className="text-xs text-fg-tertiary mt-0.5">
-                  {p.status} · v{p.version}
-                  {p.dueDate ? ` · Due ${p.dueDate}` : ''}
+                  v{p.version}
+                  {p.dueDate ? ` · Due ${new Date(p.dueDate).toLocaleDateString()}` : ''}
                 </p>
               </div>
-              <span
-                aria-hidden="true"
-                className={`px-2 py-0.5 rounded-full text-[10px] font-medium uppercase ${STATUS_BADGE[p.status]}`}
-              >
-                {p.status}
-              </span>
+              <ProposalStatusChip status={p.status} />
             </GlassCard>
           ))}
         </div>
