@@ -365,6 +365,25 @@ export function AppRoutes() {
               </RequireAuth>
             }
           />
+          {/* Custom-object record browsing. The List/Detail pages read
+              :objectKey (and :recordId) from the path; without these routes the
+              "New <record>" button and every record link 404'd. */}
+          <Route
+            path="/o/:objectKey"
+            element={
+              <RequireAuth>
+                <CustomObjectListPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/o/:objectKey/:recordId"
+            element={
+              <RequireAuth>
+                <CustomObjectDetailPage />
+              </RequireAuth>
+            }
+          />
 
           {/* ── Domain route groups ──────────────────────────────────────── */}
           {bidRouteElements()}

@@ -16,7 +16,7 @@ import { useReducedMotion } from 'framer-motion';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { KanbanSkeleton } from '@/components/skeletons/PageSkeletons';
-import { ErrorState } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { useStageMutation } from '@/hooks/useStageMutation';
@@ -227,6 +227,20 @@ export function PipelinePage() {
         />
       ) : isLoading ? (
         <KanbanSkeleton />
+      ) : (data?.items.length ?? 0) === 0 ? (
+        <EmptyState
+          title="No opportunities yet"
+          message="Create an opportunity to start building your pipeline."
+          action={
+            <button
+              type="button"
+              onClick={() => navigate('/opportunities')}
+              className="inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-medium text-fg-on-brand hover:bg-brand-hover"
+            >
+              Go to Opportunities
+            </button>
+          }
+        />
       ) : (
         <div
           className={
