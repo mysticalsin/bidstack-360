@@ -49,19 +49,22 @@ interface BidScoreList {
   items: BidScore[];
 }
 
+// Use the design-token tag palette (each token has a light + dark value) so
+// these chips adapt to dark mode. The previous hardcoded hex tints kept dark
+// brown/green/blue text on light tints, which was unreadable on the dark theme.
 const STATUS_TONE: Record<ProposalStatus, string> = {
   draft: 'bg-[var(--surface-sunken)] text-[var(--fg-secondary)]',
-  review: 'bg-[#FBBF24]/15 text-[#92400E]',
-  approved: 'bg-[#34D399]/15 text-[#065F46]',
-  submitted: 'bg-[#60A5FA]/15 text-[#1E3A8A]',
-  won: 'bg-[#10B981] text-white',
-  lost: 'bg-[#F87171] text-white',
+  review: 'bg-[var(--tag-amber-bg)] text-[var(--tag-amber-fg)]',
+  approved: 'bg-[var(--tag-jade-bg)] text-[var(--tag-jade-fg)]',
+  submitted: 'bg-[var(--tag-blue-bg)] text-[var(--tag-blue-fg)]',
+  won: 'bg-[var(--success)] text-[var(--fg-on-brand)]',
+  lost: 'bg-[var(--danger)] text-[var(--fg-on-brand)]',
 };
 
 const REC_TONE: Record<BidScore['recommendation'], string> = {
-  bid: 'bg-[#34D399]/20 text-[#047857]',
-  no_bid: 'bg-[#F87171]/20 text-[#B91C1C]',
-  review: 'bg-[#FBBF24]/20 text-[#92400E]',
+  bid: 'bg-[var(--tag-jade-bg)] text-[var(--tag-jade-fg)]',
+  no_bid: 'bg-[var(--tag-tomato-bg)] text-[var(--tag-tomato-fg)]',
+  review: 'bg-[var(--tag-amber-bg)] text-[var(--tag-amber-fg)]',
 };
 
 export function RfpResponseHubPage() {
