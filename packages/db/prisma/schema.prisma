@@ -1674,6 +1674,7 @@ enum IntegrationType {
   odoo
   salesforce
   microsoft
+  dust
 
   @@map("integration_type")
 }
