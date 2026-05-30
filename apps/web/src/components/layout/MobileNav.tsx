@@ -12,55 +12,11 @@ import { useAccountHistory } from '@/stores/accountHistory';
 import { useIsAdmin } from '@/lib/auth';
 import { useOpportunityCount } from '@/hooks/useOpportunities';
 import { useTaskSummary } from '@/hooks/useTasks';
-import { Icon, type IconName } from '@/components/ui/Icon';
+import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
 import { prefetchRoute } from '@/lib/prefetch';
 
-interface NavItem {
-  to: string;
-  label: string;
-  icon: IconName;
-  badgeKey?: 'openBids' | 'overdueTasks';
-}
-
-const WORKSPACE: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
-  { to: '/sales', label: 'Sales', icon: 'reports' },
-  { to: '/sales/orders', label: 'Quotes & Orders', icon: 'briefcase' },
-  { to: '/sales/products', label: 'Products', icon: 'package' },
-  { to: '/sales/invoices', label: 'Invoices', icon: 'receipt' },
-  { to: '/accounts', label: 'Accounts', icon: 'building' },
-  { to: '/key-accounts', label: 'Key Accounts', icon: 'star' },
-  { to: '/top-accounts', label: 'Top Accounts', icon: 'trophy' },
-  { to: '/companies', label: 'Companies', icon: 'building' },
-  { to: '/references', label: 'Reference Library', icon: 'book' },
-  { to: '/opportunities', label: 'Opportunities', icon: 'briefcase', badgeKey: 'openBids' },
-  { to: '/pipeline', label: 'Pipeline', icon: 'pipeline' },
-  { to: '/forecasts', label: 'Forecasts', icon: 'growth' },
-  { to: '/bid-matrix', label: 'Bid/No-Bid Matrix', icon: 'target' },
-  { to: '/rfp-response', label: 'RFP Response Hub', icon: 'briefcase' },
-  { to: '/proposals', label: 'Proposals', icon: 'receipt' },
-  { to: '/leads', label: 'Leads', icon: 'target' },
-  { to: '/contacts', label: 'Contacts', icon: 'contacts' },
-  { to: '/tasks', label: 'Tasks', icon: 'tasks', badgeKey: 'overdueTasks' },
-  { to: '/territories', label: 'Territories', icon: 'building' },
-  { to: '/service-desk', label: 'Service Desk', icon: 'briefcase' },
-  { to: '/workflows', label: 'Workflows', icon: 'pipeline' },
-  { to: '/agents', label: 'Dust Agents', icon: 'sparkle' },
-  { to: '/intake', label: 'Document Intake', icon: 'building' },
-  { to: '/reports', label: 'Reports', icon: 'reports' },
-];
-
-const ADMIN_SETTINGS: NavItem[] = [
-  { to: '/integrations', label: 'Integrations', icon: 'link' },
-  { to: '/audit-log', label: 'Audit Log', icon: 'reports' },
-  { to: '/settings', label: 'Settings', icon: 'settings' },
-];
-
-const MEMBER_SETTINGS: NavItem[] = [
-  { to: '/integrations', label: 'Integrations', icon: 'link' },
-  { to: '/settings', label: 'Settings', icon: 'settings' },
-];
+import { ADMIN_SETTINGS, MEMBER_SETTINGS, NAV_SECTIONS, type NavItem } from './navConfig';
 
 export function MobileNav() {
   const open = useUiStore((s) => s.mobileNavOpen);
@@ -144,11 +100,13 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
 
       {/* Scrollable nav */}
       <nav aria-label="Primary navigation" className="flex-1 overflow-y-auto px-2 py-2">
-        <NavGroup title="Workspace">
-          {WORKSPACE.map((item) => (
-            <MobileNavItem key={item.to} item={item} badges={badges} onNavigate={onClose} />
-          ))}
-        </NavGroup>
+        {NAV_SECTIONS.map((section) => (
+          <NavGroup key={section.key} title={section.title}>
+            {section.items.map((item) => (
+              <MobileNavItem key={item.to} item={item} badges={badges} onNavigate={onClose} />
+            ))}
+          </NavGroup>
+        ))}
 
         {favorites.length > 0 && (
           <NavGroup title="Starred">
@@ -208,7 +166,7 @@ function MobileNavItem({
             : 'text-[var(--fg-secondary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)]',
         )
       }
-      end={item.to === '/'}
+      end={item.end ?? item.to === '/'}
       onClick={onNavigate}
       onMouseEnter={() => prefetchRoute(item.to)}
     >

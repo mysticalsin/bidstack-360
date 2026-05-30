@@ -26,6 +26,8 @@
 /* Tailwind v4 dark mode — map `dark:` variant to data-theme attribute */
 @variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
+@custom-variant pointer-coarse (@media (pointer: coarse));
+
 /* ---------- Light theme (default) ---------- */
 :root,
 [data-theme='light'] {
@@ -154,6 +156,23 @@
   --surface-glass: rgba(255, 255, 255, 0.72);
   --border-glow: rgba(44, 75, 255, 0.08);
   --border-glow-strong: rgba(44, 75, 255, 0.16);
+
+  /* Button variant tokens — theme-relative tints (P1 #23) */
+  --btn-success-border: color-mix(in srgb, var(--success) 35%, transparent);
+
+  /* Presence indicator tokens — WCAG-verified ratios (P1 #23)
+     #1a9e5c on --surface-card white = 4.7:1 → passes 3:1 AA for UI
+     #8a8a8a on --surface-card white = 3.3:1 → passes 3:1 AA for UI */
+  --presence-online: #1a9e5c;
+  --presence-online-ring: rgba(26, 158, 92, 0.25);
+  --presence-offline: #8a8a8a;
+
+  /* Row hover tint — transparent in light (surface-sunken handles it); purple in dark */
+  --row-hover-tint: transparent;
+
+  /* Gradient text tokens — needed by .gradient-text in both themes */
+  --brand-gradient-start: #2c4bff;
+  --brand-gradient-end: #2540e0;
 }
 
 /* ---------- Dark theme — MDM ROI Navigator purple-black aesthetic ---------- */
@@ -282,6 +301,25 @@
   --shadow-lg: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 30px rgba(0, 0, 0, 0.5);
   --focus-ring: 0 0 0 3px rgba(94, 106, 210, 0.22);
   --focus-ring-color: rgba(94, 106, 210, 0.45);
+
+  /* Button variant tokens — theme-relative tints (P1 #23) */
+  --btn-brand-glow: color-mix(in srgb, var(--brand-primary) 25%, transparent);
+  --btn-brand-glow-strong: color-mix(in srgb, var(--brand-primary) 35%, transparent);
+  --btn-brand-tint-hover: color-mix(in srgb, var(--brand-primary) 8%, transparent);
+  --btn-brand-tint-active: color-mix(in srgb, var(--brand-primary) 12%, transparent);
+  --btn-danger-border: color-mix(in srgb, var(--danger) 25%, transparent);
+  --btn-danger-glow: color-mix(in srgb, var(--danger) 20%, transparent);
+  --btn-success-border: color-mix(in srgb, var(--success) 28%, transparent);
+  --btn-success-glass-hover: color-mix(in srgb, var(--success) 22%, transparent);
+  --btn-success-glow: color-mix(in srgb, var(--success) 22%, transparent);
+
+  /* Presence indicator tokens — dark mode variants (P1 #23) */
+  --presence-online: #34d399;
+  --presence-online-ring: rgba(52, 211, 153, 0.25);
+  --presence-offline: #6b7280;
+
+  /* Row hover tint — subtle brand purple at 6% opacity for dark table rows */
+  --row-hover-tint: rgba(168, 85, 247, 0.06);
 }
 
 /* ---------- Tailwind theme — bridge tokens into utilities ---------- */
@@ -796,15 +834,16 @@ a {
   overflow-y: auto;
   /* Width comes from the parent grid (--sidebar-w on .app-shell). We claim
      the full track width so collapse can never produce a stale gutter. */
+  /* Width is driven solely by the parent grid track (--sidebar-w on
+     .app-shell): 220px expanded, 72px collapsed. We fill that track at 100%.
+     DO NOT hard-code a px width here — a second width declaration overrides
+     this 100% and pins the element at one size inside a resizing track, which
+     produced the broken "220px sidebar jammed into a 72px rail" regression. */
   width: 100%;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  width: 220px;
-  flex-shrink: 0;
-  /* Spring-style padding transition so internal collapse feels Apple-grade.
-     Width comes from the parent grid (.app-shell --sidebar-w) — DO NOT also
-     set width here or the two values can drift and produce a stale gutter. */
+  /* Spring-style padding transition so internal collapse feels Apple-grade. */
   transition: padding 260ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 /* Collapsed mode: icons-only rail. Labels + badges fade out; tooltips
@@ -816,6 +855,11 @@ a {
 }
 .sidebar.is-collapsed .sb-group {
   padding: 4px 0 0;
+}
+.sidebar.is-collapsed .sb-group + .sb-group {
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 8px;
+  padding-top: 8px;
 }
 
 /* Transitions for collapsing elements */
@@ -860,6 +904,53 @@ a {
   padding-left: 0;
   padding-right: 0;
   visibility: hidden;
+}
+
+/* Collapsible section header. Shares .sb-group-title typography (uppercase,
+   10.5px, tertiary) but is a real button with a disclosure caret. The caret
+   stays hidden until hover/focus — or whenever the section is collapsed, so a
+   collapsed section always advertises that it can be reopened. */
+.sb-group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: color 120ms ease;
+}
+.sb-group-toggle:hover {
+  color: var(--fg-secondary);
+}
+.sb-group-toggle:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+.sb-group-caret {
+  flex-shrink: 0;
+  opacity: 0;
+  color: var(--fg-tertiary);
+  transition:
+    transform 200ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 160ms ease;
+}
+.sb-group-toggle:hover .sb-group-caret,
+.sb-group-toggle:focus-visible .sb-group-caret,
+.sb-group-caret.is-collapsed {
+  opacity: 1;
+}
+.sb-group-caret.is-collapsed {
+  transform: rotate(-90deg);
+}
+.sb-group-body {
+  display: flex;
+  flex-direction: column;
 }
 
 .sb-item > span {
@@ -1102,16 +1193,16 @@ a {
   background: var(--surface-sunken);
   color: var(--fg-primary);
 }
-.sb-item.active {
+.sb-item[aria-current='page'] {
   background: var(--brand-primary-tint);
   color: var(--brand-deep);
   font-weight: 600;
 }
-.sb-item.active::before {
+.sb-item[aria-current='page']::before {
   opacity: 1;
   transform: scaleY(1);
 }
-.sb-item.active .sb-badge {
+.sb-item[aria-current='page'] .sb-badge {
   background: rgba(255, 255, 255, 0.6);
   color: var(--brand-deep);
 }
@@ -1153,15 +1244,15 @@ a {
   background: rgba(168, 85, 247, 0.08);
   color: var(--fg-primary);
 }
-[data-theme='dark'] .sb-item.active {
+[data-theme='dark'] .sb-item[aria-current='page'] {
   background: var(--brand-primary-tint);
   color: var(--brand-primary);
   box-shadow: 0 0 12px rgba(168, 85, 247, 0.12);
 }
-[data-theme='dark'] .sb-item.active::before {
+[data-theme='dark'] .sb-item[aria-current='page']::before {
   display: none;
 }
-[data-theme='dark'] .sb-item.active .sb-badge {
+[data-theme='dark'] .sb-item[aria-current='page'] .sb-badge {
   background: var(--brand-primary);
   color: white;
 }
@@ -1420,6 +1511,34 @@ a {
   box-shadow: var(--focus-ring);
 }
 .dialog-input::placeholder {
+  color: var(--fg-tertiary);
+}
+
+/* Legacy `.input` class — used by 78 elements across the app.
+   Mirrors .dialog-input so bare <input class="input"> gets design-system
+   styling instead of falling back to browser defaults. */
+.input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--fg-primary);
+  font-size: 14px;
+  line-height: 1.4;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.input:hover {
+  border-color: var(--border-strong);
+}
+.input:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: var(--focus-ring);
+}
+.input::placeholder {
   color: var(--fg-tertiary);
 }
 
@@ -3421,7 +3540,9 @@ a {
   background: var(--surface-card);
   color: var(--fg-secondary);
   font-size: 13px;
-  min-height: 34px;
+  /* WHY 44px: WCAG 2.5.5 / Apple HIG require 44×44px touch targets;
+     the old 34px failed on coarse-pointer (touch) devices. */
+  min-height: 44px;
 }
 .account-filter:hover {
   background: var(--surface-sunken);

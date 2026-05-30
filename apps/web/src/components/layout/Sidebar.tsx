@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { NavLink } from 'react-router-dom';
 
-import { Tooltip, TooltipProvider } from '@/components/ui/Tooltip';
+import { TooltipBare, TooltipProvider } from '@/components/ui/Tooltip';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useOpportunityCount } from '@/hooks/useOpportunities';
 import { useTaskSummary } from '@/hooks/useTasks';
@@ -13,54 +13,17 @@ import { useIsAdmin } from '@/lib/auth';
 import { useUiStore } from '@/stores/ui';
 import { api } from '@/lib/api';
 
-interface NavItem {
-  to: string;
-  label: string;
-  icon: IconName;
-  badgeKey?: 'openBids' | 'overdueTasks';
-}
-
-const WORKSPACE: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
-  { to: '/sales', label: 'Sales', icon: 'reports' },
-  { to: '/sales/orders', label: 'Quotes & Orders', icon: 'briefcase' },
-  { to: '/sales/products', label: 'Products', icon: 'package' },
-  { to: '/sales/invoices', label: 'Invoices', icon: 'receipt' },
-  { to: '/accounts', label: 'Accounts', icon: 'building' },
-  { to: '/key-accounts', label: 'Key Accounts', icon: 'star' },
-  { to: '/top-accounts', label: 'Top Accounts', icon: 'trophy' },
-  { to: '/companies', label: 'Companies', icon: 'building' },
-  { to: '/references', label: 'Reference Library', icon: 'book' },
-  { to: '/opportunities', label: 'Opportunities', icon: 'briefcase', badgeKey: 'openBids' },
-  { to: '/pipeline', label: 'Pipeline', icon: 'pipeline' },
-  { to: '/forecasts', label: 'Forecasts', icon: 'growth' },
-  { to: '/bid-matrix', label: 'Bid/No-Bid Matrix', icon: 'target' },
-  { to: '/rfp-response', label: 'RFP Response Hub', icon: 'briefcase' },
-  { to: '/proposals', label: 'Proposals', icon: 'receipt' },
-  { to: '/leads', label: 'Leads', icon: 'target' },
-  { to: '/contacts', label: 'Contacts', icon: 'contacts' },
-  { to: '/tasks', label: 'Tasks', icon: 'tasks', badgeKey: 'overdueTasks' },
-  { to: '/territories', label: 'Territories', icon: 'building' },
-  { to: '/service-desk', label: 'Service Desk', icon: 'briefcase' },
-  { to: '/workflows', label: 'Workflows', icon: 'pipeline' },
-  { to: '/agents', label: 'Dust Agents', icon: 'sparkle' },
-  { to: '/intake', label: 'Document Intake', icon: 'building' },
-  { to: '/reports', label: 'Reports', icon: 'reports' },
-];
-
-const ADMIN_SETTINGS: NavItem[] = [
-  { to: '/integrations', label: 'Integrations', icon: 'link' },
-  { to: '/webhooks', label: 'Webhooks', icon: 'zap' },
-  { to: '/audit-log', label: 'Audit log', icon: 'reports' },
-  { to: '/settings', label: 'Settings', icon: 'settings' },
-];
-
-const MEMBER_SETTINGS: NavItem[] = [
-  { to: '/integrations', label: 'Integrations', icon: 'link' },
-  { to: '/settings', label: 'Settings', icon: 'settings' },
-];
+import {
+  ADMIN_SETTINGS,
+  MEMBER_SETTINGS,
+  NAV_SECTIONS,
+  type NavItem,
+  type NavSection,
+} from './navConfig';
 
 const MAX_STARRED = 6;
+
+type Badges = { openBids: number; overdueTasks: number };
 
 export function Sidebar() {
   const oppsCount = useOpportunityCount({ excludeClosed: true });
@@ -84,11 +47,13 @@ export function Sidebar() {
   const recents = useAccountHistory((s) => s.recents);
   const favorites = useAccountHistory((s) => s.favorites);
 
-  const openBids = oppsCount.data?.count ?? 0;
   // Badge counts only truly overdue tasks so its meaning matches the Dashboard KPI.
-  const overdueTasks = taskSummary.data?.overdue ?? 0;
+  const badges: Badges = {
+    openBids: oppsCount.data?.count ?? 0,
+    overdueTasks: taskSummary.data?.overdue ?? 0,
+  };
 
-  const badges = { openBids, overdueTasks };
+  const settings = isAdmin ? ADMIN_SETTINGS : MEMBER_SETTINGS;
 
   return (
     <TooltipProvider delayDuration={300} disableHoverableContent>
@@ -125,33 +90,36 @@ export function Sidebar() {
           </div>
         </div>
 
-        <SidebarGroup title="Workspace">
-          {WORKSPACE.map((item) => (
-            <SidebarItem key={item.to} item={item} badges={badges} collapsed={collapsed} />
-          ))}
-        </SidebarGroup>
+        {NAV_SECTIONS.map((section) => (
+          <SidebarSection
+            key={section.key}
+            section={section}
+            badges={badges}
+            collapsed={collapsed}
+          />
+        ))}
 
         {/* Favorites first (intentional choice), then recents. Both groups
             self-hide when empty so a brand-new user doesn't see two
             confusing empty headers. */}
-        {favorites.length > 0 && !collapsed ? (
+        {favorites.length > 0 ? (
           <SidebarGroup title="Starred">
-            {favorites.slice(0, MAX_STARRED).map((acc) => (
+            {favorites.slice(0, collapsed ? 3 : MAX_STARRED).map((acc) => (
               <AccountShortcut key={acc.slug} acc={acc} icon="starFilled" collapsed={collapsed} />
             ))}
           </SidebarGroup>
         ) : null}
 
-        {recents.length > 0 && !collapsed ? (
+        {recents.length > 0 ? (
           <SidebarGroup title="Recent">
-            {recents.slice(0, 5).map((acc) => (
+            {recents.slice(0, collapsed ? 3 : 5).map((acc) => (
               <AccountShortcut key={acc.slug} acc={acc} icon="clock" collapsed={collapsed} />
             ))}
           </SidebarGroup>
         ) : null}
 
         <SidebarGroup title="Settings">
-          {(isAdmin ? ADMIN_SETTINGS : MEMBER_SETTINGS).map((item) => (
+          {settings.map((item) => (
             <SidebarItem key={item.to} item={item} badges={badges} collapsed={collapsed} />
           ))}
         </SidebarGroup>
@@ -188,6 +156,74 @@ export function Sidebar() {
   );
 }
 
+// A primary nav sub-section. When the rail is expanded the header is a
+// disclosure button that collapses/expands the section (persisted per user).
+// The "Home" section is pinned (single item, no header). In the icon-only
+// rail there is no header — items render grouped, separated by the divider
+// the CSS draws between adjacent `.sb-group` blocks.
+function SidebarSection({
+  section,
+  badges,
+  collapsed,
+}: {
+  section: NavSection;
+  badges: Badges;
+  collapsed: boolean;
+}) {
+  const sectionCollapsed = useUiStore((s) => Boolean(s.collapsedSections[section.key]));
+  const toggleSection = useUiStore((s) => s.toggleSection);
+
+  if (collapsed) {
+    return (
+      <div className="sb-group">
+        {section.items.map((item) => (
+          <SidebarItem key={item.to} item={item} badges={badges} collapsed />
+        ))}
+      </div>
+    );
+  }
+
+  // Home is a single self-evident entry — render it without a disclosure.
+  if (section.key === 'home') {
+    return (
+      <div className="sb-group">
+        {section.items.map((item) => (
+          <SidebarItem key={item.to} item={item} badges={badges} collapsed={false} />
+        ))}
+      </div>
+    );
+  }
+
+  const bodyId = `sb-section-${section.key}`;
+  return (
+    <div className="sb-group">
+      <button
+        type="button"
+        className="sb-group-title sb-group-toggle"
+        onClick={() => toggleSection(section.key)}
+        aria-expanded={!sectionCollapsed}
+        aria-controls={bodyId}
+      >
+        <span>{section.title}</span>
+        <Icon
+          name="chevron-down"
+          size={12}
+          className={cn('sb-group-caret', sectionCollapsed && 'is-collapsed')}
+          ariaHidden
+        />
+      </button>
+      {!sectionCollapsed ? (
+        <div id={bodyId} className="sb-group-body">
+          {section.items.map((item) => (
+            <SidebarItem key={item.to} item={item} badges={badges} collapsed={false} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// Static (non-collapsible) group for Starred / Recent / Settings.
 function SidebarGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="sb-group">
@@ -203,20 +239,27 @@ function SidebarItem({
   collapsed,
 }: {
   item: NavItem;
-  badges: { openBids: number; overdueTasks: number };
+  badges: Badges;
   collapsed: boolean;
 }) {
   const badge = item.badgeKey ? badges[item.badgeKey] : 0;
   // Hover/focus prefetch — kicks off the route's lazy chunk before the
   // click lands. Apple-style "make the next view feel pre-loaded" trick.
   const prefetch = () => prefetchRoute(item.to);
+  // WHY a static string className (not the NavLink `({ isActive }) => …`
+  // render-prop): in collapsed mode each link is wrapped by a Radix Tooltip
+  // `Trigger asChild` (a Slot). The Slot merges className by joining, which
+  // STRINGIFIES a function className onto the <a> (class="({ isActive }) =>
+  // …") — silently dropping every `.sb-item` style. We instead let NavLink
+  // set `aria-current="page"` natively and style the active state via the
+  // `.sb-item[aria-current="page"]` selector, which survives the Slot merge.
   const link = (
     <NavLink
       to={item.to}
-      className={({ isActive }) => cn('sb-item', isActive && 'active')}
+      end={item.end}
+      className="sb-item"
       aria-label={item.label}
       title={collapsed ? undefined : item.label}
-      end={item.to === '/'}
       onMouseEnter={prefetch}
       onFocus={prefetch}
       onTouchStart={prefetch}
@@ -230,7 +273,7 @@ function SidebarItem({
   // the label itself is the affordance and a tooltip would be redundant.
   if (collapsed) {
     return (
-      <Tooltip
+      <TooltipBare
         side="right"
         content={
           <span className="flex items-center gap-2">
@@ -244,7 +287,7 @@ function SidebarItem({
         }
       >
         {link}
-      </Tooltip>
+      </TooltipBare>
     );
   }
   return link;
@@ -266,7 +309,7 @@ function AccountShortcut({
   const link = (
     <NavLink
       to={`/accounts/${acc.slug}`}
-      className={({ isActive }) => cn('sb-item', isActive && 'active')}
+      className="sb-item"
       title={collapsed ? undefined : acc.name}
       onMouseEnter={prefetch}
       onFocus={prefetch}
@@ -280,9 +323,9 @@ function AccountShortcut({
   );
   if (collapsed) {
     return (
-      <Tooltip side="right" content={acc.name}>
+      <TooltipBare side="right" content={acc.name}>
         {link}
-      </Tooltip>
+      </TooltipBare>
     );
   }
   return link;

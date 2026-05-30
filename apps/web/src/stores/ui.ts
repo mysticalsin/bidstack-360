@@ -8,17 +8,26 @@ const STORAGE_KEY = 'bidstack-ui.v1';
 
 interface PersistedState {
   sidebarCollapsed: boolean;
+  /** Per-section collapsed state in the sidebar, keyed by NavSection.key.
+   *  Absent key = expanded (the default), so a new section ships expanded. */
+  collapsedSections: Record<string, boolean>;
 }
 
 function read(): PersistedState {
-  if (typeof window === 'undefined') return { sidebarCollapsed: false };
+  if (typeof window === 'undefined') return { sidebarCollapsed: false, collapsedSections: {} };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { sidebarCollapsed: false };
+    if (!raw) return { sidebarCollapsed: false, collapsedSections: {} };
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
-    return { sidebarCollapsed: Boolean(parsed.sidebarCollapsed) };
+    return {
+      sidebarCollapsed: Boolean(parsed.sidebarCollapsed),
+      collapsedSections:
+        parsed.collapsedSections && typeof parsed.collapsedSections === 'object'
+          ? parsed.collapsedSections
+          : {},
+    };
   } catch {
-    return { sidebarCollapsed: false };
+    return { sidebarCollapsed: false, collapsedSections: {} };
   }
 }
 
@@ -34,6 +43,7 @@ function write(state: PersistedState): void {
 interface UiStore extends PersistedState {
   toggleSidebar: () => void;
   setSidebarCollapsed: (v: boolean) => void;
+  toggleSection: (key: string) => void;
   mobileNavOpen: boolean;
   setMobileNavOpen: (v: boolean) => void;
   toggleMobileNav: () => void;
@@ -44,12 +54,18 @@ export const useUiStore = create<UiStore>((set, get) => ({
   mobileNavOpen: false,
   toggleSidebar: () => {
     const next = !get().sidebarCollapsed;
-    write({ sidebarCollapsed: next });
+    write({ sidebarCollapsed: next, collapsedSections: get().collapsedSections });
     set({ sidebarCollapsed: next });
   },
   setSidebarCollapsed: (v) => {
-    write({ sidebarCollapsed: v });
+    write({ sidebarCollapsed: v, collapsedSections: get().collapsedSections });
     set({ sidebarCollapsed: v });
+  },
+  toggleSection: (key) => {
+    const current = get().collapsedSections;
+    const next = { ...current, [key]: !current[key] };
+    write({ sidebarCollapsed: get().sidebarCollapsed, collapsedSections: next });
+    set({ collapsedSections: next });
   },
   setMobileNavOpen: (v) => set({ mobileNavOpen: v }),
   toggleMobileNav: () => set({ mobileNavOpen: !get().mobileNavOpen }),
