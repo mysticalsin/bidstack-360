@@ -304,7 +304,11 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
           {mode === 'draw' && !hasDrawing && (
             <p
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-gray-400 select-none"
+              // WHY a fixed gray-600 (not a theme token): the canvas is always
+              // white in both themes, so a theme-aware `--fg-*` token would go
+              // light-on-white in dark mode. gray-600 on white clears WCAG AA
+              // (~6.5:1); gray-400 was ~2.5:1.
+              className="pointer-events-none absolute inset-0 flex select-none items-center justify-center text-sm text-gray-600"
             >
               Sign here
             </p>
