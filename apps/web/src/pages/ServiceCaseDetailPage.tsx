@@ -6,13 +6,22 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useServiceCase, useUpdateServiceCase } from '@/hooks/useServiceCases';
+import { toast } from '@/components/ui/Toast';
 
+// Transition map keyed by the canonical CaseStatus enum (packages/shared
+// service-desk.ts: new | open | waiting_customer | waiting_internal |
+// resolved | closed | escalated). The earlier map referenced a non-existent
+// `pending` status, so cases sitting in waiting_customer / waiting_internal /
+// escalated rendered NO action buttons, and any button that did show emitted
+// an invalid status the API would reject.
 const STATUS_FLOW: Record<string, string[]> = {
-  new: ['open'],
-  open: ['pending', 'resolved'],
-  pending: ['open', 'resolved'],
-  resolved: ['closed'],
-  closed: [],
+  new: ['open', 'escalated'],
+  open: ['waiting_customer', 'waiting_internal', 'escalated', 'resolved'],
+  waiting_customer: ['open', 'resolved'],
+  waiting_internal: ['open', 'resolved'],
+  escalated: ['open', 'resolved'],
+  resolved: ['closed', 'open'],
+  closed: ['open'],
 };
 
 export function ServiceCaseDetailPage() {
@@ -34,6 +43,27 @@ export function ServiceCaseDetailPage() {
   const cs = c.data;
 
   const transitions = STATUS_FLOW[cs.status] ?? [];
+
+  const handleSaveNote = () => {
+    const trimmed = note.trim();
+    if (!trimmed) return;
+    // There is no dedicated case-notes table; notes are appended to the case
+    // description (timestamped) through the existing PATCH endpoint. This keeps
+    // the note durable and visible in the Description card with no schema change.
+    const stamp = new Date().toLocaleString();
+    const entry = `[Note - ${stamp}]\n${trimmed}`;
+    const nextDescription = cs.description ? `${cs.description}\n\n${entry}` : entry;
+    update.mutate(
+      { id: cs.id, body: { description: nextDescription } },
+      {
+        onSuccess: () => {
+          setNote('');
+          toast.success('Note added to case');
+        },
+        onError: () => toast.error('Could not save note'),
+      },
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -77,7 +107,7 @@ export function ServiceCaseDetailPage() {
               onClick={() => update.mutate({ id: cs.id, body: { status: s as never } })}
               disabled={update.isPending}
             >
-              Mark {s}
+              Mark {s.replace(/_/g, ' ')}
             </Button>
           ))}
         </div>
@@ -107,8 +137,12 @@ export function ServiceCaseDetailPage() {
               placeholder="Write an internal note…"
             />
             <div className="mt-2 flex justify-end">
-              <Button size="sm" disabled>
-                Save note
+              <Button
+                size="sm"
+                onClick={handleSaveNote}
+                disabled={!note.trim() || update.isPending}
+              >
+                {update.isPending ? 'Saving…' : 'Save note'}
               </Button>
             </div>
           </Card>

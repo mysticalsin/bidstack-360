@@ -57,7 +57,9 @@ export function ProposalsPage() {
   useDocumentTitle();
   const [searchParams, setSearchParams] = useSearchParams();
   const statusFilter = (searchParams.get('status') as ProposalStatus | undefined) ?? undefined;
-  const [showCreate, setShowCreate] = useState(false);
+  // Honor the ?new=1 deep-link the RFP Response Hub's "New Proposal" shortcut
+  // navigates to — open the create form on arrival instead of silently ignoring it.
+  const [showCreate, setShowCreate] = useState(searchParams.get('new') === '1');
   const [newName, setNewName] = useState('');
   const navigate = useNavigate();
   const qc = useQueryClient();

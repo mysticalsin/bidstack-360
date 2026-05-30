@@ -29,12 +29,13 @@ export function AnalyticsDashboardPage() {
   const [addingWidget, setAddingWidget] = useState(false);
 
   // Resolve the active dashboard (default to first)
-  const activeDash = activeDashId
-    ? dashboards.find((d) => d.id === activeDashId)
-    : dashboards[0];
+  const activeDash = activeDashId ? dashboards.find((d) => d.id === activeDashId) : dashboards[0];
 
-  const { data: rawWidgets = [], isLoading: widgetsLoading, error: widgetsError } =
-    useDashboardWidgets(activeDash?.id ?? '');
+  const {
+    data: rawWidgets = [],
+    isLoading: widgetsLoading,
+    error: widgetsError,
+  } = useDashboardWidgets(activeDash?.id ?? '');
 
   // Local widget order (for drag-reorder; persists on next re-fetch)
   const [localOrder, setLocalOrder] = useState<DashboardWidget[]>([]);
@@ -94,9 +95,7 @@ export function AnalyticsDashboardPage() {
             )}
           >
             <LayoutDashboard size={14} className="text-[var(--fg-tertiary)]" />
-            <span className="max-w-[140px] truncate">
-              {activeDash?.name ?? 'Select dashboard'}
-            </span>
+            <span className="max-w-[140px] truncate">{activeDash?.name ?? 'Select dashboard'}</span>
             <ChevronDown size={12} className="text-[var(--fg-tertiary)]" />
           </button>
           {dropdownOpen && (
@@ -186,10 +185,7 @@ export function AnalyticsDashboardPage() {
             }
           />
         ) : widgetsError ? (
-          <ErrorState
-            title="Failed to load widgets"
-            message={(widgetsError as Error).message}
-          />
+          <ErrorState title="Failed to load widgets" message={(widgetsError as Error).message} />
         ) : !widgetsLoading && widgets.length === 0 ? (
           <EmptyState
             title="Empty dashboard"
@@ -216,14 +212,17 @@ export function AnalyticsDashboardPage() {
             as="div"
           >
             {widgets.map((w) => (
-              <Reorder.Item key={w.id} value={w} as="div" className="cursor-grab active:cursor-grabbing">
-                <WidgetRenderer
-                  widget={w}
-                  onDelete={() => handleDeleteWidget(w.id)}
-                  onConfigure={() => {
-                    // Future: open WidgetConfigModal pre-filled
-                  }}
-                />
+              <Reorder.Item
+                key={w.id}
+                value={w}
+                as="div"
+                className="cursor-grab active:cursor-grabbing"
+              >
+                {/* No per-widget Configure flow exists yet (it would need a
+                    widget-update endpoint + edit modal). Rather than surface a
+                    dead "Configure" menu item, we omit onConfigure so the
+                    action isn't rendered. Re-add when editing is implemented. */}
+                <WidgetRenderer widget={w} onDelete={() => handleDeleteWidget(w.id)} />
               </Reorder.Item>
             ))}
           </Reorder.Group>
