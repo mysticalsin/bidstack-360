@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { prisma, type Prisma } from '@bidstack/db';
 
 import { enqueueCrewRun } from '../queues/crew-run.js';
+import { seedStandardCrew } from '../lib/crew-standard.js';
 
 // ─── Row shapes + serializers ───────────────────────────────────────────────
 
@@ -304,6 +305,14 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
       return null;
     },
   );
+
+  // POST /crews/seed-standard — load the out-of-the-box standard agents + the
+  // default RFP-response crew for this org (admin only). Idempotent.
+  app.post('/crews/seed-standard', { preHandler: admin }, async (req, reply) => {
+    const crewId = await seedStandardCrew(req.auth.orgId, req.auth.userId);
+    reply.status(201);
+    return loadCrew(req.auth.orgId, crewId);
+  });
 
   // POST /crews/:id/run — run a crew (any member). Creates a CrewRun + enqueues.
   app.post(
