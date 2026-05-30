@@ -63,7 +63,7 @@ export async function processJob(
       { orchestrationId },
       'rfp-requirement-extract: NDA-D gate blocked AI call — document ID omitted',
     );
-    await markOrchestrationFailed(orchestrationId, orgId, 'extraction', 'NDA-D gate');
+    await markOrchestrationFailed(orchestrationId, orgId, 'requirement_extract', 'NDA-D gate');
     return; // graceful exit — no AI call, no requirement extraction
   }
 
@@ -134,8 +134,8 @@ export async function processJob(
 
   if (requirements.length === 0) {
     log.info({ orgId, orchestrationId }, 'rfp-requirement-extract: no requirements found');
-    // RfpResponsePhase enum: 'extraction' = this phase, 'story_matching' = next
-    await updateOrchestrationPhase(orchestrationId, orgId, 'story_matching', 'extraction');
+    // RfpResponsePhase enum: 'requirement_extract' = this phase, 'story_match' = next
+    await updateOrchestrationPhase(orchestrationId, orgId, 'story_match', 'requirement_extract');
     try {
       await memos.logTrace({
         orgId,
@@ -220,8 +220,8 @@ export async function processJob(
     );
   }
 
-  // RfpResponsePhase enum: 'extraction' = this phase, 'story_matching' = next
-  await updateOrchestrationPhase(orchestrationId, orgId, 'story_matching', 'extraction');
+  // RfpResponsePhase enum: 'requirement_extract' = this phase, 'story_match' = next
+  await updateOrchestrationPhase(orchestrationId, orgId, 'story_match', 'requirement_extract');
 
   // L1 MemOS trace — records extraction run for downstream quality analysis.
   // Non-critical: failure must not fail the extraction job.

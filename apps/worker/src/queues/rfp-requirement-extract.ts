@@ -80,7 +80,7 @@ export async function startRfpRequirementExtract(
     markOrchestrationFailed(
       p.data.orchestrationId,
       p.data.orgId,
-      'extraction',
+      'requirement_extract',
       err.message.slice(0, 2000),
     ).catch(() => undefined);
   });

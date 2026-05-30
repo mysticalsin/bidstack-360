@@ -79,9 +79,10 @@ export function fallbackExtract(rawText: string): Array<z.infer<typeof Extracted
 
 // ─── Orchestration state helpers (raw SQL) ─────────────────────────────────
 
-// WHY RfpResponsePhase enum strings: Prisma schema defines enum values as
-// 'extraction' and 'story_matching' (not 'requirement_extract'/'story_match').
-// These must match the DB enum exactly to avoid PostgreSQL constraint violations.
+// WHY explicit ::"RfpResponsePhase" casts: the phase / completedPhase strings
+// MUST match the DB enum exactly — requirement_extract, story_match,
+// section_draft, compliance_fill, legal_scan, proposal_compile, qa_review,
+// awaiting_approval, completed — or PostgreSQL raises invalid-enum-input.
 export async function updateOrchestrationPhase(
   orchestrationId: string,
   orgId: string,
@@ -106,7 +107,24 @@ export async function markOrchestrationFailed(
 ): Promise<void> {
   await prisma.$executeRaw`
     UPDATE rfp_orchestrations
-    SET state = 'failed', failed_phase = ${phase}, failure_reason = ${reason}, updated_at = now()
+    SET state = 'failed', failed_phase = ${phase}::"RfpResponsePhase", failure_reason = ${reason}, updated_at = now()
+    WHERE id = ${orchestrationId}::uuid AND org_id = ${orgId}::uuid
+  `;
+}
+
+// Terminal-for-automation state: QA review done, proposal staged for the human
+// approval gate. Appends qa_review to completed_phases and moves state + phase
+// to awaiting_approval. The human approve/reject route advances from here.
+export async function markOrchestrationAwaitingApproval(
+  orchestrationId: string,
+  orgId: string,
+): Promise<void> {
+  await prisma.$executeRaw`
+    UPDATE rfp_orchestrations
+    SET state = 'awaiting_approval',
+        current_phase = 'awaiting_approval'::"RfpResponsePhase",
+        completed_phases = array_append(completed_phases, 'qa_review'::"RfpResponsePhase"),
+        updated_at = now()
     WHERE id = ${orchestrationId}::uuid AND org_id = ${orgId}::uuid
   `;
 }

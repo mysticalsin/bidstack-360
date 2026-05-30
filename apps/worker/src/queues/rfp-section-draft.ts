@@ -15,15 +15,16 @@ import type { Queue, Worker, Job } from 'bullmq';
 import type IORedis from 'ioredis';
 import type pino from 'pino';
 
-import { Worker as BullWorker } from 'bullmq';
+import { Worker as BullWorker, Queue as BullQueue } from 'bullmq';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { DustClient } from '@bidstack/dust-client';
 import { MemOSService } from '@bidstack/memos';
 
-import { RFP_SECTION_DRAFT } from '@bidstack/shared';
+import { RFP_SECTION_DRAFT, RFP_LEGAL_SCAN } from '@bidstack/shared';
 import { buildAgentUserMessage } from '../lib/prompt-safety.js';
 import { logAiInvocation } from '../lib/ai-audit-worker.js';
+import { updateOrchestrationPhase } from './rfp-requirement-extract.helpers.js';
 
 const QUEUE_NAME = RFP_SECTION_DRAFT.name;
 const DUST_AGENT_ID = process.env.DUST_RFP_DRAFT_AGENT_ID ?? 'rfp-draft-agent';
@@ -230,14 +231,67 @@ async function processJob(job: Job<JobData>, log: pino.Logger, memos: MemOSServi
   log.info({ orgId, orchestrationId, sectionId }, 'rfp-section-draft: complete');
 }
 
+// ─── Fan-out completion → legal-scan trigger ────────────────────────────────
+// BullMQ has no native "all children done" signal for this fan-out, so we
+// detect completion statelessly: once every ProposalSection for the proposal is
+// aiDrafted, advance the orchestration to legal_scan and enqueue it. The
+// deterministic legal-scan jobId dedups the race when the final section jobs
+// finish near-simultaneously (only one legal-scan job is ever created).
+async function maybeAdvanceToLegalScan(
+  job: Job<JobData>,
+  log: pino.Logger,
+  legalScanQueue: BullQueue,
+): Promise<void> {
+  const { orgId, orchestrationId, proposalId } = job.data;
+  try {
+    const [total, drafted] = await Promise.all([
+      prisma.proposalSection.count({ where: { proposalId, orgId, deletedAt: null } }),
+      prisma.proposalSection.count({
+        where: { proposalId, orgId, deletedAt: null, aiDrafted: true },
+      }),
+    ]);
+    if (total === 0 || drafted < total) return;
+
+    // documentVersionId lives on the orchestration row (Wave 9 — raw SQL).
+    const rows = await prisma.$queryRaw<{ document_version_id: string }[]>`
+      SELECT document_version_id::text AS document_version_id
+      FROM rfp_orchestrations
+      WHERE id = ${orchestrationId}::uuid AND org_id = ${orgId}::uuid
+    `;
+    const documentVersionId = rows[0]?.document_version_id;
+    if (!documentVersionId) {
+      log.warn({ orchestrationId }, 'rfp-section-draft: orchestration not found — cannot advance');
+      return;
+    }
+
+    await updateOrchestrationPhase(orchestrationId, orgId, 'legal_scan', 'section_draft');
+    await legalScanQueue.add(
+      'rfp.legal-scan',
+      { orgId, orchestrationId, documentVersionId, proposalId },
+      { jobId: `rfp-legal-scan:${orchestrationId}` },
+    );
+    log.info({ orchestrationId }, 'rfp-section-draft: all sections drafted -> legal-scan enqueued');
+  } catch (err) {
+    log.error({ err, orchestrationId }, 'rfp-section-draft: legal-scan trigger failed');
+  }
+}
+
 // ─── BullMQ bootstrap ──────────────────────────────────────────────────────
 
 export async function startRfpSectionDraft(
   connection: IORedis,
   log: pino.Logger,
   workers: Worker[],
-  _queues: Queue[],
+  queues: Queue[],
 ): Promise<void> {
+  // Downstream queue: when all section drafts finish, the completed handler
+  // advances the orchestration to legal_scan and enqueues this.
+  const legalScanQueue = new BullQueue(RFP_LEGAL_SCAN.name, {
+    connection,
+    defaultJobOptions: RFP_LEGAL_SCAN.defaultJobOptions,
+  });
+  queues.push(legalScanQueue);
+
   // WHY module-scoped singleton: MemOSService is stateless (uses the shared
   // Prisma client internally); creating one instance per worker bootstrap avoids
   // per-job allocation while keeping the reference out of the global scope.
@@ -257,6 +311,9 @@ export async function startRfpSectionDraft(
 
   worker.on('completed', (job) => {
     log.info({ jobId: job.id, sectionId: job.data.sectionId }, 'rfp-section-draft: completed');
+    // After each section draft, check whether the whole fan-out is done; if so,
+    // advance the orchestration to legal_scan and kick off the late pipeline.
+    void maybeAdvanceToLegalScan(job, log, legalScanQueue);
   });
 
   worker.on('failed', (job, err) => {

@@ -34,6 +34,9 @@ import { startRfpSectionDraft } from './queues/rfp-section-draft.js';
 import { startRfpComplianceFill } from './queues/rfp-compliance-fill.js';
 import { startRfpEmbedReference } from './queues/rfp-embed-reference.js';
 import { startRfpEmbedRequirement } from './queues/rfp-embed-requirement.js';
+import { startRfpLegalScan } from './queues/rfp-legal-scan.js';
+import { startRfpProposalCompile } from './queues/rfp-proposal-compile.js';
+import { startRfpQaReview } from './queues/rfp-qa-review.js';
 
 const log = pino({
   level: process.env.LOG_LEVEL ?? 'info',
@@ -89,6 +92,11 @@ await Promise.all([
   startRfpComplianceFill(connection, log, workers, queues),
   startRfpEmbedReference(connection, log, workers, queues),
   startRfpEmbedRequirement(connection, log, workers, queues),
+  // Wave 9 — RFP late-pipeline consumers. Chain:
+  // section_draft (all done) -> legal_scan -> proposal_compile -> qa_review -> awaiting_approval
+  startRfpLegalScan(connection, log, workers, queues),
+  startRfpProposalCompile(connection, log, workers, queues),
+  startRfpQaReview(connection, log, workers, queues),
 ]);
 
 log.info(
