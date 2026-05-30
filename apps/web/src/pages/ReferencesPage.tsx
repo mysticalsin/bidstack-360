@@ -9,9 +9,17 @@ import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
-import { useReferences, useUseReference } from '@/hooks/useReferences';
+import {
+  useCreateReference,
+  useDeleteReference,
+  useReferences,
+  useUseReference,
+} from '@/hooks/useReferences';
 import { useAccountIndustries } from '@/hooks/useKeyAccounts';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
+import { toast } from '@/components/ui/Toast';
+import { confirm } from '@/components/ui/ConfirmDialog';
+import { NewReferenceDialog, type NewReferenceBody } from './referencesPage/NewReferenceDialog';
 
 export function ReferencesPage() {
   const reducedMotion = useReducedMotion();
@@ -26,8 +34,35 @@ export function ReferencesPage() {
     tag: tag || undefined,
   });
   const useRef = useUseReference();
+  const createRef = useCreateReference();
+  const deleteRef = useDeleteReference();
+  const [showCreate, setShowCreate] = useState(false);
 
   const items = references.data?.items ?? [];
+
+  const handleCreate = (body: NewReferenceBody) => {
+    createRef.mutate(body, {
+      onSuccess: () => {
+        setShowCreate(false);
+        toast.success('Reference added');
+      },
+      onError: () => toast.error('Could not create reference'),
+    });
+  };
+
+  const handleDelete = async (id: string, title: string) => {
+    const ok = await confirm({
+      title: 'Delete reference?',
+      description: `"${title}" will be removed from your library. This can't be undone.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+    deleteRef.mutate(id, {
+      onSuccess: () => toast.success('Reference deleted'),
+      onError: () => toast.error('Could not delete reference'),
+    });
+  };
 
   // Collect all unique tags for the filter
   const allTags = Array.from(new Set(items.flatMap((r) => r.tags))).sort();
@@ -39,13 +74,19 @@ export function ReferencesPage() {
       initial={reducedMotion ? false : 'initial'}
       animate="animate"
     >
-      <motion.header variants={reducedMotion ? undefined : staggerChild}>
-        <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
-          Reference Library
-        </h1>
-        <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          Customer references, case studies, and testimonials for proposals and bids.
-        </p>
+      <motion.header
+        variants={reducedMotion ? undefined : staggerChild}
+        className="flex items-start justify-between gap-4"
+      >
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
+            Reference Library
+          </h1>
+          <p className="mt-1 text-sm text-[var(--fg-secondary)]">
+            Customer references, case studies, and testimonials for proposals and bids.
+          </p>
+        </div>
+        <Button onClick={() => setShowCreate(true)}>New reference</Button>
       </motion.header>
 
       {/* Filters */}
@@ -120,6 +161,7 @@ export function ReferencesPage() {
         <EmptyState
           title="No references yet"
           message="Add customer references to build your proposal library."
+          action={<Button onClick={() => setShowCreate(true)}>Add reference</Button>}
         />
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -179,20 +221,39 @@ export function ReferencesPage() {
                         <span>Last used: {new Date(ref.lastUsedAt).toLocaleDateString()}</span>
                       )}
                     </div>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => useRef.mutate(ref.id)}
-                      disabled={useRef.isPending}
-                    >
-                      {useRef.isPending ? 'Recording...' : 'Use reference'}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(ref.id, ref.title)}
+                        aria-label={`Delete reference: ${ref.title}`}
+                        disabled={deleteRef.isPending}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--fg-tertiary)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] disabled:opacity-50 pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px]"
+                      >
+                        <Icon name="trash" size={15} ariaHidden />
+                      </button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => useRef.mutate(ref.id)}
+                        disabled={useRef.isPending}
+                      >
+                        {useRef.isPending ? 'Recording...' : 'Use reference'}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </Card>
             </motion.div>
           ))}
         </div>
+      )}
+
+      {showCreate && (
+        <NewReferenceDialog
+          onClose={() => setShowCreate(false)}
+          onCreate={handleCreate}
+          isPending={createRef.isPending}
+        />
       )}
     </motion.div>
   );
