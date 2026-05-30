@@ -38,14 +38,18 @@ export const realtimeRoutes: FastifyPluginAsync = async (server) => {
 
       const expiresAt = new Date(Date.now() + LOCK_TTL_MINUTES * 60 * 1_000);
 
-      // Purge expired locks first so a crash doesn't permanently block editing.
+      // Purge this org's expired locks first so a crash doesn't permanently
+      // block editing. Scope to orgId so one tenant's cleanup can't touch
+      // another's locks (the lock table is shared).
       await prisma.entityEditLock.deleteMany({
-        where: { expiresAt: { lt: new Date() } },
+        where: { orgId, expiresAt: { lt: new Date() } },
       });
 
-      // Check for an existing non-expired lock held by another user.
-      const existing = await prisma.entityEditLock.findUnique({
-        where: { entityType_entityId: { entityType, entityId } },
+      // Check for an existing non-expired lock held by another user. Scoped to
+      // orgId (findFirst, since the unique key is entityType+entityId only) so
+      // a lock can never be read across tenants — defense-in-depth.
+      const existing = await prisma.entityEditLock.findFirst({
+        where: { orgId, entityType, entityId },
       });
 
       if (existing && existing.userId !== userId && existing.expiresAt > new Date()) {
@@ -94,8 +98,8 @@ export const realtimeRoutes: FastifyPluginAsync = async (server) => {
       const { orgId, userId } = req.auth;
       const { type: entityType, id: entityId } = entityParamsSchema.parse(req.params);
 
-      const existing = await prisma.entityEditLock.findUnique({
-        where: { entityType_entityId: { entityType, entityId } },
+      const existing = await prisma.entityEditLock.findFirst({
+        where: { orgId, entityType, entityId },
       });
 
       if (!existing) {
