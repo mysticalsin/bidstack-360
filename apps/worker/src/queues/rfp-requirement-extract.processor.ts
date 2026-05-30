@@ -19,6 +19,7 @@ import {
   DustExtractionResponse,
   getDustClient,
   fallbackExtract,
+  ensureExtractedText,
   updateOrchestrationPhase,
   markOrchestrationFailed,
   isDocumentAiSafe,
@@ -41,16 +42,11 @@ export async function processJob(
 
   const { orgId, documentVersionId, orchestrationId, chunkIndex, totalChunks } = parsed.data;
 
-  // Load document text — DocumentVersion is a Wave 1 model, safe to use Prisma client
-  const docVersion = await prisma.documentVersion.findUnique({
-    where: { id: documentVersionId, orgId },
-    select: { extractedText: true },
-  });
-  if (!docVersion?.extractedText) {
-    throw new Error(`DocumentVersion ${documentVersionId} has no extractedText — cannot extract`);
-  }
-
-  const rawText = docVersion.extractedText;
+  // Ensure the source text exists — parse the uploaded file on first run, then
+  // reuse it on retries. WHY here: requirement-extract is the sole consumer of
+  // extractedText and owns the retry/backoff, so extraction belongs at its
+  // doorstep rather than in the concurrency-1 orchestrator. See ensureExtractedText.
+  const rawText = await ensureExtractedText(documentVersionId, orgId, log);
 
   // §NDA-D gate — must pass before any AI call.
   // WHY orchestrationId in log (not documentVersionId): orchestrationId is already

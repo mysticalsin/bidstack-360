@@ -12,6 +12,9 @@ import { prisma } from '@bidstack/db';
 import { DustClient } from '@bidstack/dust-client';
 import { RFP_REQUIREMENT_EXTRACT, RFP_EMBED_REQUIREMENT, RFP_STORY_MATCH } from '@bidstack/shared';
 
+import { readStoredDocument } from '../lib/storage-read.js';
+import { extractTextFromBufferSandboxed } from '../lib/extract-text-sandbox.js';
+
 export const QUEUE_NAME = RFP_REQUIREMENT_EXTRACT.name;
 export const EMBED_QUEUE_NAME = RFP_EMBED_REQUIREMENT.name;
 export const STORY_MATCH_QUEUE_NAME = RFP_STORY_MATCH.name;
@@ -75,6 +78,88 @@ export function fallbackExtract(rawText: string): Array<z.infer<typeof Extracted
       confidenceBps: 4000,
       sourceChunkIndex: 0,
     }));
+}
+
+// ─── Source-text extraction (bytes → text, idempotent) ─────────────────────
+
+/**
+ * Ensure the DocumentVersion has `extractedText`, parsing the uploaded file on
+ * first run and reusing it thereafter.
+ *
+ * WHY here (not the orchestrator): the orchestrator runs at concurrency 1 as a
+ * pure conductor — a 90s sandboxed parse there would serialise every pipeline
+ * launch. requirement-extract is the sole consumer of `extractedText` and owns
+ * its own retry/backoff, so the parse belongs at its doorstep.
+ *
+ * WHY not the shared `document-extract` worker: that worker only writes
+ * `extractedText` via the bid-workspace path, which requires an opportunityId
+ * and creates ComplianceMatrixRows/SourceChunks — the wrong contract for RFP
+ * intake (which may have no opportunity and wants none of those artifacts).
+ *
+ * Idempotent: when text is already present (seeded data, a prior run, or a
+ * BullMQ retry) it short-circuits before touching storage, so the expensive
+ * sandboxed parse runs at most once per document.
+ */
+export async function ensureExtractedText(
+  documentVersionId: string,
+  orgId: string,
+  log: pino.Logger,
+): Promise<string> {
+  const docVersion = await prisma.documentVersion.findFirst({
+    where: { id: documentVersionId, orgId, deletedAt: null },
+    select: {
+      extractedText: true,
+      storageKey: true,
+      contentType: true,
+      fileAttachment: { select: { name: true } },
+    },
+  });
+  if (!docVersion) {
+    throw new Error(`DocumentVersion ${documentVersionId} not found for org`);
+  }
+
+  // Fast-path: already extracted — skip storage + sandbox entirely.
+  if (docVersion.extractedText && docVersion.extractedText.trim().length > 0) {
+    return docVersion.extractedText;
+  }
+
+  await prisma.documentVersion.updateMany({
+    where: { id: documentVersionId, orgId, deletedAt: null },
+    data: { extractionStatus: 'running', ocrStatus: 'running' },
+  });
+
+  try {
+    const stored = await readStoredDocument({ orgId, storageKey: docVersion.storageKey });
+    const text = await extractTextFromBufferSandboxed({
+      buffer: stored.buffer,
+      contentType: docVersion.contentType,
+      name: docVersion.fileAttachment?.name ?? 'document',
+      sourcePath: stored.sourcePath,
+    });
+    if (!text || text.trim().length === 0) {
+      throw new Error('Extraction produced no text — document may be empty or image-only');
+    }
+
+    await prisma.documentVersion.updateMany({
+      where: { id: documentVersionId, orgId, deletedAt: null },
+      data: { extractedText: text, extractionStatus: 'succeeded', ocrStatus: 'succeeded' },
+    });
+    log.info(
+      { orgId, documentVersionId, chars: text.length },
+      'rfp-requirement-extract: source text extracted',
+    );
+    return text;
+  } catch (err) {
+    // Mark the version failed so the UI surfaces the parse failure, then
+    // rethrow so BullMQ applies its retry/backoff before giving up.
+    await prisma.documentVersion
+      .updateMany({
+        where: { id: documentVersionId, orgId, deletedAt: null },
+        data: { extractionStatus: 'failed', ocrStatus: 'failed' },
+      })
+      .catch(() => undefined);
+    throw err instanceof Error ? err : new Error(String(err));
+  }
 }
 
 // ─── Orchestration state helpers (raw SQL) ─────────────────────────────────

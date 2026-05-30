@@ -17,6 +17,33 @@ import { describe, expect, it } from 'vitest';
 
 import { EXTRACT_TIMEOUT_MS, extractTextFromBufferSandboxed } from './extract-text-sandbox.js';
 
+/**
+ * Build a minimal but structurally valid single-page PDF with selectable text,
+ * computing exact xref byte offsets so pdf.js (pdf-parse@2.x) parses it without
+ * falling back to recovery. Kept inline so the test has no binary fixture.
+ */
+function buildMinimalPdf(text: string): Buffer {
+  const stream = `BT /F1 18 Tf 72 700 Td (${text}) Tj ET`;
+  const objs = [
+    '<</Type/Catalog/Pages 2 0 R>>',
+    '<</Type/Pages/Kids[3 0 R]/Count 1>>',
+    '<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>',
+    `<</Length ${stream.length}>>\nstream\n${stream}\nendstream`,
+    '<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>',
+  ];
+  let body = '%PDF-1.4\n';
+  const offsets: number[] = [];
+  objs.forEach((o, i) => {
+    offsets.push(Buffer.byteLength(body));
+    body += `${i + 1} 0 obj\n${o}\nendobj\n`;
+  });
+  const xrefOffset = Buffer.byteLength(body);
+  let xref = `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
+  for (const off of offsets) xref += `${String(off).padStart(10, '0')} 00000 n \n`;
+  const trailer = `trailer\n<</Size ${objs.length + 1}/Root 1 0 R>>\nstartxref\n${xrefOffset}\n%%EOF`;
+  return Buffer.from(body + xref + trailer, 'latin1');
+}
+
 describe('extractTextFromBufferSandboxed', () => {
   it('returns plain UTF-8 text through the sandbox round-trip', async () => {
     // Sanity check: the happy path must still work end-to-end through
@@ -29,6 +56,21 @@ describe('extractTextFromBufferSandboxed', () => {
     });
     expect(text).toBe(original);
   });
+
+  it('extracts text from a real PDF through the sandbox (pdf-parse@2.x regression guard)', async () => {
+    // WHY this test exists: pdf-parse@2.x replaced its callable default export
+    // with a `PDFParse` class. The old `require('pdf-parse')(buffer)` call threw
+    // "pdfParse is not a function" for EVERY PDF, silently breaking all PDF
+    // extraction (RFP intake, account-intel, bid-workspace). No test covered a
+    // real PDF, so it went unnoticed. This locks the v2 instance API in place.
+    const pdf = buildMinimalPdf('Mandatory: the vendor shall provide a pricing workbook.');
+    const text = await extractTextFromBufferSandboxed({
+      buffer: pdf,
+      contentType: 'application/pdf',
+      name: 'rfp.pdf',
+    });
+    expect(text.replace(/\s+/g, ' ')).toContain('the vendor shall provide a pricing workbook');
+  }, 30_000);
 
   it('isolates parser failures so the parent process keeps running', async () => {
     // An unsupported content-type makes the worker throw a structured error

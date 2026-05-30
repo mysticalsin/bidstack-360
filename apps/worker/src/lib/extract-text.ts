@@ -79,9 +79,24 @@ function isImageContentType(contentType: string, ext: string): boolean {
 }
 
 async function extractPdfText(buffer: Buffer): Promise<string> {
-  const pdfParse = require('pdf-parse') as (buffer: Buffer) => Promise<{ text: string }>;
-  const result = await pdfParse(buffer);
-  return typeof result.text === 'string' ? result.text : '';
+  // WHY this shape: pdf-parse@2.x dropped the callable default export of the 1.x
+  // line and now ships a `PDFParse` class (pdf.js under the hood). The old
+  // `require('pdf-parse')(buffer)` call threw "pdfParse is not a function" for
+  // every PDF — fixed to the v2 instance API. A fresh Uint8Array copy is passed
+  // because pdf.js detaches the backing buffer during parsing.
+  const { PDFParse } = require('pdf-parse') as {
+    PDFParse: new (opts: { data: Uint8Array }) => {
+      getText(): Promise<{ text?: string }>;
+      destroy(): Promise<void>;
+    };
+  };
+  const parser = new PDFParse({ data: new Uint8Array(buffer) });
+  try {
+    const result = await parser.getText();
+    return typeof result.text === 'string' ? result.text : '';
+  } finally {
+    await parser.destroy();
+  }
 }
 
 async function ocrPdf(buffer: Buffer): Promise<string> {
@@ -126,7 +141,10 @@ async function ocrImage(buffer: Buffer, ext: string): Promise<string> {
 
 async function extractXlsx(buffer: Buffer): Promise<string> {
   const xlsx = require('@e965/xlsx') as {
-    read(buffer: Buffer, opts: { type: string }): {
+    read(
+      buffer: Buffer,
+      opts: { type: string },
+    ): {
       SheetNames: string[];
       Sheets: Record<string, unknown>;
     };
@@ -144,14 +162,18 @@ async function extractXlsx(buffer: Buffer): Promise<string> {
 }
 
 async function extractDoc(sourcePath: string): Promise<string> {
-  const WordExtractor = require('word-extractor') as new () => { extract(path: string): Promise<{ getBody(): string }> };
+  const WordExtractor = require('word-extractor') as new () => {
+    extract(path: string): Promise<{ getBody(): string }>;
+  };
   const extractor = new WordExtractor();
   const doc = await extractor.extract(sourcePath);
   return doc.getBody() ?? '';
 }
 
 async function extractPptx(sourcePath: string): Promise<string> {
-  const { default: PptxParser } = require('node-pptx-parser') as { default: new (path: string) => { parse(): Promise<{ slides?: Array<{ text?: string }> }> } };
+  const { default: PptxParser } = require('node-pptx-parser') as {
+    default: new (path: string) => { parse(): Promise<{ slides?: Array<{ text?: string }> }> };
+  };
   const parser = new PptxParser(sourcePath);
   const result = await parser.parse();
   return (result.slides ?? [])
@@ -179,7 +201,9 @@ export async function extractTextFromBuffer(opts: ExtractOptions): Promise<strin
 
   if (ct.startsWith('text/')) return buffer.toString('utf-8');
   if (
-    ['application/json', 'application/csv', 'application/xml', 'application/javascript'].includes(ct) ||
+    ['application/json', 'application/csv', 'application/xml', 'application/javascript'].includes(
+      ct,
+    ) ||
     ['.json', '.csv', '.xml', '.md', '.yaml', '.yml'].includes(ext)
   ) {
     return buffer.toString('utf-8');
@@ -194,7 +218,9 @@ export async function extractTextFromBuffer(opts: ExtractOptions): Promise<strin
   if (isImageContentType(ct, ext) && ext !== '.svg' && ct !== 'image/svg+xml') {
     const text = await ocrImage(buffer, ext);
     if (text) return text;
-    throw new Error('Image OCR requires BIDSTACK_OCR_ENABLED=true plus Tesseract on the worker runtime');
+    throw new Error(
+      'Image OCR requires BIDSTACK_OCR_ENABLED=true plus Tesseract on the worker runtime',
+    );
   }
 
   if (
@@ -202,7 +228,9 @@ export async function extractTextFromBuffer(opts: ExtractOptions): Promise<strin
     ct === 'application/docx' ||
     ext === '.docx'
   ) {
-    const mammoth = require('mammoth') as { extractRawText(opts: { buffer: Buffer }): Promise<{ value: string }> };
+    const mammoth = require('mammoth') as {
+      extractRawText(opts: { buffer: Buffer }): Promise<{ value: string }>;
+    };
     const result = await mammoth.extractRawText({ buffer });
     return result.value;
   }
