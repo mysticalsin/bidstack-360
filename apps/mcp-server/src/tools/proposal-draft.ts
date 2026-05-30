@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 
+import { searchReferences, type RankedReference } from '../lib/reference-search.js';
+
 import type { Tool } from './index.js';
 
 const Section = z.enum(['executive_summary', 'scope', 'pricing', 'timeline', 'risks']);
@@ -38,6 +40,25 @@ export const proposalDraft: Tool<typeof Input> = {
       .map((w) => w[0]?.toUpperCase() + w.slice(1))
       .join(' ');
 
+    // Spotlight Ref: pull the most relevant past references for this customer +
+    // section from the reference library (same ranking as the spotlight_ref
+    // tool). Best-effort — a search failure must never block the draft.
+    let references: RankedReference[];
+    try {
+      const query = [opp.customer, opp.name, opp.industry, sectionTitle]
+        .filter(Boolean)
+        .join(' — ');
+      references = (await searchReferences(ctx.orgId, query, { limit: 3 })).references;
+    } catch {
+      references = [];
+    }
+
+    const referencesBlock = references.length
+      ? `\n\n### Suggested references\n${references
+          .map((r) => `- **${r.title}**${r.industry ? ` (${r.industry})` : ''}`)
+          .join('\n')}\n`
+      : '';
+
     const markdown = `## ${sectionTitle} — ${opp.customer}
 
 > **Tone:** ${args.tone}  ·  **Opportunity:** ${opp.code}  ·  **Stage:** ${opp.stage}
@@ -46,12 +67,11 @@ This is a stub draft. To enable the live agent path, set:
 
 - \`DUST_API_KEY\`
 - \`DUST_AGENT_EXEC_BRIEF\` (or a section-specific agent id)
-- \`ANTHROPIC_API_KEY\` (fallback)
-`;
+- \`ANTHROPIC_API_KEY\` (fallback)${referencesBlock}`;
 
     return {
       markdown,
-      citations: [] as Array<{ docId: string; title: string }>,
+      citations: references.map((r) => ({ docId: r.id, title: r.title })),
     };
   },
 };
