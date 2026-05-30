@@ -12,7 +12,6 @@ import { useAccountHistory, type AccountEntry } from '@/stores/accountHistory';
 import { useIsAdmin } from '@/lib/auth';
 import { useUiStore } from '@/stores/ui';
 import { api } from '@/lib/api';
-
 import {
   ADMIN_SETTINGS,
   MEMBER_SETTINGS,
@@ -174,11 +173,47 @@ function SidebarSection({
   const toggleSection = useUiStore((s) => s.toggleSection);
 
   if (collapsed) {
+    if (section.key === 'home') {
+      return (
+        <div className="sb-group">
+          {section.items.map((item) => (
+            <SidebarItem key={item.to} item={item} badges={badges} collapsed />
+          ))}
+        </div>
+      );
+    }
+
+    const totalBadge = section.items.reduce((acc, item) => {
+      const badge = item.badgeKey ? badges[item.badgeKey] : 0;
+      return acc + badge;
+    }, 0);
+
     return (
-      <div className="sb-group">
-        {section.items.map((item) => (
-          <SidebarItem key={item.to} item={item} badges={badges} collapsed />
-        ))}
+      <div className="sb-group sb-parent-container group/parent">
+        <button
+          type="button"
+          className="sb-item sb-parent-trigger"
+          aria-label={section.title}
+          title={section.title}
+        >
+          <Icon name={section.icon} size={16} />
+          {totalBadge > 0 && <span className="sb-badge-dot" />}
+        </button>
+        {/* Flyout menu */}
+        <div className="sb-flyout">
+          <div className="sb-flyout-header">{section.title}</div>
+          <div className="sb-flyout-content">
+            {section.items.map((item) => {
+              const badge = item.badgeKey ? badges[item.badgeKey] : 0;
+              return (
+                <NavLink key={item.to} to={item.to} end={item.end} className="sb-flyout-item">
+                  <span>{item.label}</span>
+                  {badge > 0 && <span className="sb-badge">{badge}</span>}
+                </NavLink>
+              );
+            })}
+          </div>
+        </div>
       </div>
     );
   }

@@ -831,6 +831,11 @@ a {
   position: sticky;
   top: 0;
   height: 100vh;
+  /* Above .main (which has its own isolate stacking context), so the collapsed
+     section hover-flyouts — which overflow the rail into the content column —
+     paint on top of the page instead of being hidden behind it. Kept below the
+     modal/overlay layer (z-40+) so dialogs still cover the sidebar. */
+  z-index: 20;
   overflow-y: auto;
   /* Width comes from the parent grid (--sidebar-w on .app-shell). We claim
      the full track width so collapse can never produce a stale gutter. */
@@ -852,6 +857,12 @@ a {
 .sidebar.is-collapsed {
   padding-left: 8px;
   padding-right: 8px;
+  /* Let the section hover-flyouts escape the 72px rail as popovers. With
+     overflow-y:auto the browser also computes overflow-x:auto, so the absolute
+     flyouts (left:100%, 180px wide) extended the rail's scroll width to ~251px
+     and produced a stray horizontal scrollbar + a scrollable second column.
+     The icon-only rail is short enough not to need its own vertical scroll. */
+  overflow: visible;
 }
 .sidebar.is-collapsed .sb-group {
   padding: 4px 0 0;
@@ -1205,6 +1216,111 @@ a {
 .sb-item[aria-current='page'] .sb-badge {
   background: rgba(255, 255, 255, 0.6);
   color: var(--brand-deep);
+}
+
+/* ---------- Nested Navigation Flyouts & Accordion ---------- */
+.sb-parent-container {
+  position: relative;
+}
+.sb-parent-trigger {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+}
+.sb-badge-dot {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--brand-primary);
+}
+.sb-flyout {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  margin-left: 8px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md);
+  min-width: 180px;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.12s ease,
+    visibility 0.12s ease;
+  z-index: 50;
+  padding: 6px;
+}
+.sb-parent-container:hover .sb-flyout {
+  opacity: 1;
+  visibility: visible;
+}
+.sb-flyout-header {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-tertiary);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 4px;
+}
+.sb-flyout-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sb-flyout-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--fg-secondary);
+  text-decoration: none;
+  border-radius: 6px;
+  transition:
+    background-color 0.12s,
+    color 0.12s;
+}
+.sb-flyout-item:hover {
+  background: var(--surface-sunken);
+  color: var(--fg-primary);
+}
+.sb-flyout-item[aria-current='page'] {
+  background: var(--brand-primary-tint);
+  color: var(--brand-deep);
+  font-weight: 600;
+}
+.sb-group-toggle {
+  width: 100%;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+.sb-group-caret {
+  transition: transform 0.2s ease;
+  color: var(--fg-muted);
+}
+.sb-group-caret.is-collapsed {
+  transform: rotate(-90deg);
+}
+.sb-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+  padding-left: 8px;
+  border-left: 1px dashed var(--border-subtle);
+  margin-left: 19px;
 }
 .sb-foot {
   padding: 6px 10px 0;
@@ -4566,4 +4682,243 @@ a {
 
 .glass-card[class*='glass-glow-']:hover::before {
   opacity: 1;
+}
+
+/* ---------- Salesforce Path / Chevron Component ---------- */
+.sf-path {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  overflow-x: auto;
+  padding: 4px 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.sf-path::-webkit-scrollbar {
+  display: none;
+}
+.sf-path-step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-shrink: 0;
+  min-width: 140px;
+  height: 34px;
+  background: var(--surface-sunken);
+  color: var(--fg-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0 12px 0 20px;
+  clip-path: polygon(
+    calc(100% - 10px) 0,
+    100% 50%,
+    calc(100% - 10px) 100%,
+    0% 100%,
+    10px 50%,
+    0% 0%
+  );
+  transition: all 150ms ease;
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+.sf-path-step:first-child {
+  padding-left: 12px;
+  clip-path: polygon(calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0% 100%, 0% 50%, 0% 0%);
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+}
+.sf-path-step:last-child {
+  padding-right: 12px;
+  clip-path: polygon(100% 0, 100% 50%, 100% 100%, 0% 100%, 10px 50%, 0% 0%);
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+.sf-path-step:hover {
+  background: var(--surface-hover);
+  color: var(--fg-primary);
+}
+.sf-path-step.active {
+  background: var(--brand-primary);
+  color: var(--fg-on-brand);
+}
+.sf-path-step.covered {
+  background: var(--success-surface);
+  color: var(--success-fg);
+}
+.sf-path-step.covered.active {
+  background: var(--success);
+  color: var(--fg-on-brand);
+}
+.sf-path-step:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 1px;
+  z-index: 10;
+}
+
+/* ---------- Salesforce Timeline Component ---------- */
+.sf-timeline {
+  position: relative;
+  padding-left: 28px;
+}
+.sf-timeline::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 11px;
+  width: 2px;
+  background: var(--border-default);
+}
+.sf-timeline-item {
+  position: relative;
+  margin-bottom: 20px;
+}
+.sf-timeline-item:last-child {
+  margin-bottom: 0;
+}
+.sf-timeline-marker {
+  position: absolute;
+  left: -28px;
+  top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 9999px;
+  border: 2px solid var(--surface-card);
+  box-shadow: 0 0 0 1px var(--border-default);
+  z-index: 1;
+}
+.sf-timeline-marker.queued {
+  background: var(--surface-sunken);
+  color: var(--fg-tertiary);
+}
+.sf-timeline-marker.running {
+  background: var(--surface-card);
+  color: var(--warning);
+  box-shadow: 0 0 0 1px var(--warning);
+  animation: sf-pulse 2s infinite ease-in-out;
+}
+.sf-timeline-marker.completed {
+  background: var(--success);
+  color: var(--fg-on-brand);
+  box-shadow: 0 0 0 1px var(--success);
+}
+.sf-timeline-marker.failed {
+  background: var(--danger);
+  color: var(--fg-on-brand);
+  box-shadow: 0 0 0 1px var(--danger);
+}
+.sf-timeline-marker.cancelled {
+  background: var(--surface-sunken);
+  color: var(--fg-tertiary);
+}
+.sf-timeline-content {
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  padding: 12px 16px;
+  box-shadow: var(--shadow-xs);
+  transition: all 200ms ease;
+}
+.sf-timeline-content:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---------- Salesforce Toggle Switch ---------- */
+.sf-toggle-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.sf-toggle-track {
+  position: relative;
+  width: 38px;
+  height: 20px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-default);
+  border-radius: 9999px;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+.sf-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: var(--fg-secondary);
+  border-radius: 9999px;
+  transition:
+    transform 150ms ease,
+    background 150ms ease;
+}
+input:checked + .sf-toggle-track {
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+}
+input:checked + .sf-toggle-track .sf-toggle-thumb {
+  transform: translateX(18px);
+  background: var(--fg-on-brand);
+}
+.sf-toggle-wrapper:hover .sf-toggle-track {
+  border-color: var(--border-strong);
+}
+
+/* ---------- Salesforce Visual Radio Cards ---------- */
+.sf-radio-group {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+.sf-radio-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 2px solid var(--border-subtle);
+  background: var(--surface-card);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+.sf-radio-card:hover {
+  border-color: var(--border-strong);
+}
+.sf-radio-card.selected {
+  border-color: var(--brand-primary);
+  background: var(--brand-primary-tint);
+}
+.sf-radio-card.selected::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 6px;
+  height: 6px;
+  background: var(--brand-primary);
+  border-radius: 9999px;
+}
+
+@keyframes sf-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(245, 158, 11, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+  }
 }

@@ -6,6 +6,7 @@ import type { RfpResponsePhaseDefinition } from '@bidstack/shared';
 
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
+import { cn } from '@/lib/cn';
 
 import { ALL_PHASES, PHASE_TONE, type CommandMetric } from './agentsConfig';
 
@@ -92,16 +93,16 @@ export function AgentsCommandCenter({
             <div
               role="group"
               aria-label="Filter agents and templates by RFP phase"
-              className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1"
+              className="sf-path"
             >
               <button
                 type="button"
                 aria-pressed={selectedPhase === ALL_PHASES}
                 onClick={() => setSelectedPhase(ALL_PHASES)}
-                className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-[var(--border-default)] bg-[var(--surface-card)] px-3 text-xs font-medium text-[var(--fg-secondary)] shadow-[var(--shadow-xs)] transition hover:border-[var(--border-strong)] hover:text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)] aria-pressed:border-[var(--brand-primary)] aria-pressed:bg-[var(--brand-primary-tint)] aria-pressed:text-[var(--brand-primary)]"
+                className={cn('sf-path-step', selectedPhase === ALL_PHASES && 'active')}
               >
-                All
-                <span className="rounded-full bg-[var(--surface-sunken)] px-1.5 py-0.5 text-[10px] text-[var(--fg-tertiary)]">
+                <span>All</span>
+                <span className="rounded-full bg-[rgba(0,0,0,0.08)] px-1.5 py-0.5 text-[10px]">
                   {totalAgentCount}
                 </span>
               </button>
@@ -117,18 +118,15 @@ export function AgentsCommandCenter({
                     type="button"
                     aria-pressed={isActive}
                     onClick={() => setSelectedPhase(phase.id)}
-                    className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-[var(--border-default)] bg-[var(--surface-card)] px-3 text-xs font-medium text-[var(--fg-secondary)] shadow-[var(--shadow-xs)] transition hover:border-[var(--border-strong)] hover:text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)] aria-pressed:border-[var(--brand-primary)] aria-pressed:bg-[var(--brand-primary-tint)] aria-pressed:text-[var(--brand-primary)]"
+                    className={cn('sf-path-step', hasCoverage && 'covered', isActive && 'active')}
                   >
-                    <span
-                      className={
-                        hasCoverage
-                          ? 'h-2 w-2 rounded-full bg-[var(--success)]'
-                          : 'h-2 w-2 rounded-full bg-[var(--fg-muted)]'
-                      }
-                      aria-hidden
-                    />
-                    {phase.label}
-                    <span className="rounded-full bg-[var(--surface-sunken)] px-1.5 py-0.5 text-[10px] text-[var(--fg-tertiary)]">
+                    {hasCoverage ? (
+                      <Icon name="checkCircle" size={12} ariaHidden />
+                    ) : (
+                      <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
+                    )}
+                    <span>{phase.label}</span>
+                    <span className="rounded-full bg-[rgba(0,0,0,0.08)] px-1.5 py-0.5 text-[10px]">
                       {agentCount}/{templateCount}
                     </span>
                   </button>

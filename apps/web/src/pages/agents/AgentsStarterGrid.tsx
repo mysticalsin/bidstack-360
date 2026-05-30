@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { cn } from '@/lib/cn';
 
 import { ALL_PHASES, PHASE_TONE, formatPhase } from './agentsConfig';
 
@@ -94,7 +95,10 @@ export function AgentsStarterGrid({
             return (
               <article
                 key={template.id}
-                className="group flex min-h-[220px] flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4 shadow-[var(--shadow-xs)] transition hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-md)]"
+                className={cn(
+                  'glass-card group flex min-h-[220px] flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4 shadow-[var(--shadow-xs)] transition hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-md)]',
+                  `glass-glow-${PHASE_TONE[template.phase] ?? 'gray'}`,
+                )}
               >
                 <div className="mb-3 flex items-start justify-between gap-3">
                   <div>

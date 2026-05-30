@@ -30,6 +30,7 @@ export interface NavSection {
   /** Stable key used to persist this section's collapsed state. */
   key: string;
   title: string;
+  icon: IconName;
   items: NavItem[];
 }
 
@@ -37,11 +38,13 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     key: 'home',
     title: 'Home',
+    icon: 'dashboard',
     items: [{ to: '/dashboard', label: 'Dashboard', icon: 'dashboard' }],
   },
   {
     key: 'sales',
     title: 'Sales',
+    icon: 'dollar',
     items: [
       { to: '/sales', label: 'Sales', icon: 'dollar', end: true },
       { to: '/sales/orders', label: 'Quotes & Orders', icon: 'briefcase' },
@@ -53,6 +56,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     key: 'accounts',
     title: 'Accounts',
+    icon: 'building',
     items: [
       { to: '/accounts', label: 'Accounts', icon: 'building' },
       { to: '/key-accounts', label: 'Key Accounts', icon: 'star' },
@@ -65,6 +69,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     key: 'pipeline',
     title: 'Pipeline',
+    icon: 'pipeline',
     items: [
       { to: '/leads', label: 'Leads', icon: 'zap' },
       { to: '/opportunities', label: 'Opportunities', icon: 'target', badgeKey: 'openBids' },
@@ -75,6 +80,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     key: 'bids',
     title: 'Bids & RFP',
+    icon: 'checkCircle',
     items: [
       { to: '/bid-matrix', label: 'Bid/No-Bid Matrix', icon: 'checkCircle' },
       { to: '/rfp-response', label: 'RFP Response Hub', icon: 'note' },
@@ -84,6 +90,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     key: 'workspace',
     title: 'Workspace',
+    icon: 'tasks',
     items: [
       { to: '/tasks', label: 'Tasks', icon: 'tasks', badgeKey: 'overdueTasks' },
       { to: '/service-desk', label: 'Service Desk', icon: 'messageCircle' },

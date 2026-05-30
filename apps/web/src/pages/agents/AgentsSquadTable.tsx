@@ -23,6 +23,13 @@ import {
   lastRunLabel,
 } from './agentsConfig';
 
+const PRESETS = [
+  'Analyze red-flags and missing criteria',
+  'Verify solicitation compliance items',
+  'Draft response outline and main arguments',
+  'Evaluate pricing risks and checklist gaps',
+];
+
 interface AgentsSquadTableProps {
   isLoading: boolean;
   isError: boolean;
@@ -249,8 +256,14 @@ export function AgentsSquadTable({
                   {isExpanded ? (
                     <tr className="border-b border-[var(--border-default)] bg-[var(--surface-sunken)]">
                       <td colSpan={7} className="px-4 py-4">
-                        <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4 shadow-[var(--shadow-xs)]">
-                          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div
+                          className="rounded-2xl border border-[var(--border-strong)] p-4 shadow-[var(--shadow-md)] bg-[var(--surface-card)]"
+                          style={{
+                            background:
+                              'linear-gradient(135deg, var(--surface-card), var(--surface-soft))',
+                          }}
+                        >
+                          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                               <div className="text-sm font-semibold text-[var(--fg-primary)]">
                                 Run workspace
@@ -263,7 +276,31 @@ export function AgentsSquadTable({
                               {agent.config.approvalRequired ? 'Approval required' : 'Auto-run'}
                             </Badge>
                           </div>
-                          <div className="mb-3 flex flex-col gap-2 sm:flex-row">
+
+                          <div className="mb-4">
+                            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)] mb-2">
+                              Quick Prompts Presets
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {PRESETS.map((preset) => (
+                                <button
+                                  key={preset}
+                                  type="button"
+                                  onClick={() =>
+                                    setRunInput((prev) => ({
+                                      ...prev,
+                                      [agent.id]: preset,
+                                    }))
+                                  }
+                                  className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-1.5 text-xs text-[var(--fg-secondary)] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] hover:bg-[var(--brand-primary-tint)] transition"
+                                >
+                                  {preset}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="mb-4 flex flex-col gap-2 sm:flex-row">
                             <input
                               value={runInput[agent.id] ?? ''}
                               onChange={(event) =>
@@ -274,7 +311,7 @@ export function AgentsSquadTable({
                               }
                               aria-label={`Message for ${agent.name}`}
                               placeholder="Ask for cited risks, blockers, requirements, or next actions..."
-                              className="min-h-11 flex-1 rounded-xl border border-[var(--border-default)] bg-[var(--surface-sunken)] px-3 text-sm text-[var(--fg-primary)] outline-none placeholder:text-[var(--fg-tertiary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
+                              className="min-h-11 flex-1 rounded-xl border border-[var(--border-default)] bg-[var(--surface-page)] px-4 text-sm text-[var(--fg-primary)] shadow-inner outline-none placeholder:text-[var(--fg-tertiary)] focus-visible:border-[var(--brand-primary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
                             />
                             <Button
                               size="md"
@@ -284,48 +321,115 @@ export function AgentsSquadTable({
                               Send
                             </Button>
                           </div>
-                          {agentRuns.isLoading ? (
-                            <LoadingSkeleton rows={3} />
-                          ) : agentRuns.data?.items.length ? (
-                            <div className="max-h-56 overflow-y-auto rounded-xl border border-[var(--border-default)]">
-                              <table className="w-full min-w-[760px] text-xs">
-                                <thead>
-                                  <tr className="border-b border-[var(--border-default)] bg-[var(--surface-sunken)] text-left text-[var(--fg-tertiary)]">
-                                    <th className="px-3 py-2">Status</th>
-                                    <th className="px-3 py-2">Latency</th>
-                                    <th className="px-3 py-2">Error</th>
-                                    <th className="px-3 py-2">Output</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {agentRuns.data.items.map((run) => (
-                                    <tr
-                                      key={run.id}
-                                      className="border-b border-[var(--border-default)] last:border-b-0"
-                                    >
-                                      <td className="px-3 py-2">
-                                        <Badge
-                                          tone={RUN_STATUS_MAP[run.status] ?? 'gray'}
-                                          className="text-[10px]"
-                                        >
-                                          {run.status}
-                                        </Badge>
-                                      </td>
-                                      <td className="px-3 py-2">{formatLatency(run.latencyMs)}</td>
-                                      <td className="max-w-[220px] truncate px-3 py-2 text-[var(--danger)]">
-                                        {run.error || '-'}
-                                      </td>
-                                      <td className="max-w-[360px] truncate px-3 py-2 text-[var(--fg-secondary)]">
-                                        {run.output?.text ? String(run.output.text) : '-'}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+
+                          <div className="mt-5 border-t border-[var(--border-subtle)] pt-4">
+                            <div className="text-xs font-semibold uppercase tracking-[0.04em] text-[var(--fg-tertiary)] mb-4">
+                              Execution Timeline
                             </div>
-                          ) : (
-                            <p className="text-xs text-[var(--fg-tertiary)]">No runs yet.</p>
-                          )}
+
+                            {agentRuns.isLoading ? (
+                              <LoadingSkeleton rows={2} />
+                            ) : agentRuns.data?.items.length ? (
+                              <div className="sf-timeline max-h-72 overflow-y-auto pr-1">
+                                {agentRuns.data.items.map((run) => {
+                                  const status = run.status;
+                                  const latencyStr = formatLatency(run.latencyMs);
+                                  const dateStr = run.createdAt
+                                    ? new Date(run.createdAt).toLocaleString(undefined, {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        hour: 'numeric',
+                                        minute: '2-digit',
+                                        second: '2-digit',
+                                      })
+                                    : '-';
+
+                                  let markerClass = 'queued';
+                                  if (status === 'completed') markerClass = 'completed';
+                                  else if (status === 'failed') markerClass = 'failed';
+                                  else if (status === 'running') markerClass = 'running';
+                                  else if (status === 'cancelled') markerClass = 'cancelled';
+
+                                  const runMessage =
+                                    typeof run.input === 'object' && run.input !== null
+                                      ? (run.input as { message?: string }).message
+                                      : '';
+                                  const runOutput =
+                                    typeof run.output === 'object' && run.output !== null
+                                      ? (run.output as { text?: string }).text
+                                      : '';
+
+                                  return (
+                                    <div key={run.id} className="sf-timeline-item">
+                                      <div className={`sf-timeline-marker ${markerClass}`}>
+                                        {status === 'running' ? (
+                                          <Icon name="loader" size={11} className="animate-spin" />
+                                        ) : (
+                                          <Icon
+                                            name={
+                                              status === 'completed'
+                                                ? 'checkCircle'
+                                                : status === 'failed'
+                                                  ? 'warning'
+                                                  : status === 'cancelled'
+                                                    ? 'close'
+                                                    : 'clock'
+                                            }
+                                            size={11}
+                                          />
+                                        )}
+                                      </div>
+                                      <div className="sf-timeline-content">
+                                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs font-semibold text-[var(--fg-primary)] capitalize">
+                                              Run {status}
+                                            </span>
+                                            <Badge
+                                              tone={RUN_STATUS_MAP[status] ?? 'gray'}
+                                              className="text-[9px] scale-90"
+                                            >
+                                              {status}
+                                            </Badge>
+                                            {latencyStr !== '-' && (
+                                              <span className="text-[10px] text-[var(--fg-tertiary)] font-mono">
+                                                {latencyStr}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <span className="text-[10px] text-[var(--fg-tertiary)]">
+                                            {dateStr}
+                                          </span>
+                                        </div>
+
+                                        {runMessage && (
+                                          <p className="mt-1.5 text-xs text-[var(--fg-secondary)] bg-[var(--surface-sunken)] px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] font-serif italic">
+                                            &quot;{runMessage}&quot;
+                                          </p>
+                                        )}
+
+                                        {runOutput && (
+                                          <div className="mt-2 text-xs text-[var(--fg-primary)] bg-[var(--surface-sunken)] p-2.5 rounded-lg border border-[var(--border-subtle)] font-mono max-h-24 overflow-y-auto whitespace-pre-wrap">
+                                            {runOutput}
+                                          </div>
+                                        )}
+
+                                        {run.error && (
+                                          <div className="mt-2 text-xs text-[var(--danger)] bg-[color-mix(in_srgb,var(--danger)_6%,transparent)] p-2.5 rounded-lg border border-[color-mix(in_srgb,var(--danger)_20%,transparent)] font-mono">
+                                            Error: {run.error}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-[var(--fg-tertiary)] pl-1">
+                                No runs recorded for this agent yet.
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </td>
                     </tr>
