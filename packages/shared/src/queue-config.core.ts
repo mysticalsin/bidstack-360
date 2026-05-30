@@ -132,3 +132,18 @@ export const MIGRATION: QueueConfig = {
     removeOnFail: { age: 86_400 * 30, count: 5000 },
   },
 };
+
+/**
+ * Crew run — executes a CrewAI-style multi-agent crew (kickoff) and persists
+ * the result. Few attempts: the agents fail open, so a hard failure is usually
+ * a definition/DB issue not worth hammering.
+ */
+export const CREW_RUN: QueueConfig = {
+  name: 'crew-run',
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'exponential', delay: 10_000 },
+    removeOnComplete: { age: 86_400, count: 200 },
+    removeOnFail: { age: 604_800, count: 5000 },
+  },
+};

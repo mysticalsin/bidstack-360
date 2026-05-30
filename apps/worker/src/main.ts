@@ -37,6 +37,8 @@ import { startRfpEmbedRequirement } from './queues/rfp-embed-requirement.js';
 import { startRfpLegalScan } from './queues/rfp-legal-scan.js';
 import { startRfpProposalCompile } from './queues/rfp-proposal-compile.js';
 import { startRfpQaReview } from './queues/rfp-qa-review.js';
+import { startCrewRun } from './queues/crew-run.js';
+import { startSignatureWorkers } from './queues/signatures.js';
 
 const log = pino({
   level: process.env.LOG_LEVEL ?? 'info',
@@ -97,6 +99,9 @@ await Promise.all([
   startRfpLegalScan(connection, log, workers, queues),
   startRfpProposalCompile(connection, log, workers, queues),
   startRfpQaReview(connection, log, workers, queues),
+  startSignatureWorkers(connection, log, workers, queues),
+  // Wave 10 — Crew (CrewAI-style multi-agent) execution
+  startCrewRun(connection, log, workers, queues),
 ]);
 
 log.info(

@@ -174,6 +174,10 @@ model Org {
   requirementEmbeddings       RequirementEmbedding[]
   aiInvocations               AiInvocation[]
 
+  // Wave 4 — e-signature
+  documentTemplates      DocumentTemplate[]
+  signatureRequests      SignatureRequest[]
+
   @@index([deletedAt])
   @@map("orgs")
 }
@@ -507,6 +511,9 @@ model Document {
 
   org         Org          @relation(fields: [orgId], references: [id], onDelete: Cascade)
   opportunity Opportunity? @relation(fields: [oppId], references: [id], onDelete: Cascade)
+
+  // Wave 4 — e-signature
+  signatureRequests  SignatureRequest[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -889,6 +896,13 @@ model Proposal {
   approvedByUserId    String?    @db.Uuid @map("approved_by_user_id")
   /// Always true for AI-generated proposals. Prevents bypassing approval gate.
   humanReviewRequired Boolean    @default(true) @map("human_review_required")
+
+  // Wave 9b: Proposal compilation + QA review fields
+  compiledContent String?  @map("compiled_content") @db.Text
+  compiledAt      DateTime? @map("compiled_at") @db.Timestamptz(6)
+  qaScoreBps      Int?      @map("qa_score_bps")
+  qaReviewedAt    DateTime? @map("qa_reviewed_at") @db.Timestamptz(6)
+  qaIssues        Json?     @map("qa_issues") // [{severity, description, suggestion}]
 
   org         Org               @relation(fields: [orgId], references: [id], onDelete: Cascade)
   opportunity Opportunity?      @relation(fields: [opportunityId], references: [id])
@@ -4420,6 +4434,7 @@ enum RfpOrchestrationState {
   paused
   approved
   rejected
+  awaiting_approval
   completed
   failed
 }
@@ -4432,6 +4447,10 @@ enum RfpResponsePhase {
   story_match
   section_draft
   compliance_fill
+  legal_scan
+  proposal_compile
+  qa_review
+  awaiting_approval
   completed
 }
 
@@ -4462,6 +4481,10 @@ model RfpOrchestration {
 
   @@unique([orgId, rfpRequestId], map: "uniq_org_rfp_active")
   @@index([orgId, state])
+  // FK-lookup paths: joins rfp_orchestrations -> opportunities / proposals.
+  // map: matches the hand-written migration so `prisma migrate diff` sees no drift.
+  @@index([orgId, opportunityId], map: "rfp_orchestrations_org_opp_idx")
+  @@index([orgId, proposalId], map: "rfp_orchestrations_org_proposal_idx")
   @@index([rootJobId])
   @@index([deletedAt])
   @@map("rfp_orchestrations")
@@ -4571,3 +4594,222 @@ model AiInvocation {
   @@index([traceId])
   @@map("ai_invocations")
 }
+
+// ─── E-Signature Models (Wave 4) ──────────────────────────────────────────
+
+model DocumentTemplate {
+  id               String       @id @default(uuid()) @db.Uuid
+  orgId            String       @map("org_id") @db.Uuid
+  name             String
+  kind             TemplateKind
+  description      String?
+  /// HTML body with {{variableName}} placeholders
+  bodyHtml         String       @map("body_html")
+  /// JSON object of { variableName: defaultValue } - documents required vs optional variables
+  defaultVariables Json         @default("{}") @map("default_variables")
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org      Org                       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  versions DocumentTemplateVersion[]
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([orgId, kind])
+  @@index([orgId])
+  @@index([deletedAt])
+  @@map("document_templates")
+}
+
+/// Append-only version history for DocumentTemplate - never updated or deleted.
+model DocumentTemplateVersion {
+  id         String   @id @default(uuid()) @db.Uuid
+  templateId String   @map("template_id") @db.Uuid
+  /// Monotonically increasing version number, unique per template
+  version    Int
+  bodyHtml   String   @map("body_html")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy  String   @map("created_by") @db.Uuid
+
+  template DocumentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, version])
+  @@index([templateId])
+  @@map("document_template_versions")
+}
+
+enum SignatureProvider {
+  DOCUSIGN
+  INTERNAL
+
+  @@map("signature_provider")
+}
+
+enum SignatureStatus {
+  DRAFT
+  SENT
+  VIEWED
+  SIGNED
+  DECLINED
+  VOIDED
+  EXPIRED
+
+  @@map("signature_status")
+}
+
+/// Tracks an e-signature envelope sent for a document.
+/// recipients JSON shape: [{ email, name, role, signedAt? }]
+model SignatureRequest {
+  id                    String            @id @default(uuid()) @db.Uuid
+  orgId                 String            @map("org_id") @db.Uuid
+  documentId            String            @map("document_id") @db.Uuid
+  provider              SignatureProvider  @default(DOCUSIGN)
+  /// Provider-side envelope / request ID (DocuSign envelopeId or internal token)
+  providerRequestId     String?           @map("provider_request_id")
+  status                SignatureStatus    @default(DRAFT)
+  /// Array of { email, name, role, signedAt? }
+  recipients            Json
+  sentAt                DateTime?         @map("sent_at") @db.Timestamptz(6)
+  completedAt           DateTime?         @map("completed_at") @db.Timestamptz(6)
+  voidedAt              DateTime?         @map("voided_at") @db.Timestamptz(6)
+  voidReason            String?           @map("void_reason")
+  /// S3 key of the completed, signed document PDF
+  completedDocumentS3Key String?          @map("completed_document_s3_key")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt        @map("updated_at") @db.Timestamptz(6)
+
+  org    Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  document Document       @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  events SignatureEvent[]
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([orgId, status])
+  @@index([orgId, documentId])
+  @@index([orgId])
+  @@index([deletedAt])
+  @@map("signature_requests")
+}
+
+enum SignatureEventType {
+  SENT
+  VIEWED
+  SIGNED
+  DECLINED
+  DELIVERED
+  VOIDED
+
+  @@map("signature_event_type")
+}
+
+/// Append-only audit trail for every state change on a SignatureRequest.
+/// Never updated or deleted - immutable log.
+model SignatureEvent {
+  id                 String             @id @default(uuid()) @db.Uuid
+  signatureRequestId String             @map("signature_request_id") @db.Uuid
+  type               SignatureEventType
+  recipientEmail     String?            @map("recipient_email")
+  occurredAt         DateTime           @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  /// Signing IP (captured for INTERNAL provider; DocuSign supplies it in webhook payload)
+  ipAddress          String?            @map("ip_address")
+  userAgent          String?            @map("user_agent")
+  /// Full raw webhook payload or internal event metadata
+  payload            Json               @default("{}")
+
+  signatureRequest SignatureRequest @relation(fields: [signatureRequestId], references: [id], onDelete: Cascade)
+
+  @@index([signatureRequestId, occurredAt])
+  @@index([signatureRequestId])
+  @@map("signature_events")
+}
+
+enum TemplateKind {
+  QUOTE
+  MSA
+  SOW
+  NDA
+  PROPOSAL
+  CUSTOM
+
+  @@map("template_kind")
+}
+
+// ─── Crew (CrewAI-style multi-agent infrastructure) — Wave 10 ───────────────
+// Admin-managed agent personas + crews; regular users only RUN them. Accessed
+// via parameterized raw SQL until the Prisma client is regenerated (Windows
+// DLL lock) — mirrors the Wave 9 RFP models. No Prisma relations are declared
+// (FKs live in the migration) so this stays self-contained and regen-safe.
+
+model CrewAgent {
+  id              String    @id @default(uuid()) @db.Uuid
+  orgId           String    @map("org_id") @db.Uuid
+  agentKey        String    @map("agent_key") @db.VarChar(100)
+  role            String
+  goal            String
+  backstory       String
+  tools           Json      @default("[]")
+  isStandard      Boolean   @default(false) @map("is_standard")
+  createdByUserId String?   @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@unique([orgId, agentKey], map: "crew_agents_org_key_key")
+  @@index([orgId])
+  @@index([deletedAt])
+  @@map("crew_agents")
+}
+
+model Crew {
+  id              String    @id @default(uuid()) @db.Uuid
+  orgId           String    @map("org_id") @db.Uuid
+  name            String    @db.VarChar(200)
+  description     String?
+  process         String    @default("sequential") @db.VarChar(20)
+  managerAgentKey String?   @map("manager_agent_key") @db.VarChar(100)
+  createdByUserId String?   @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([orgId])
+  @@index([deletedAt])
+  @@map("crews")
+}
+
+model CrewTask {
+  id             String   @id @default(uuid()) @db.Uuid
+  orgId          String   @map("org_id") @db.Uuid
+  crewId         String   @map("crew_id") @db.Uuid
+  taskKey        String   @map("task_key") @db.VarChar(100)
+  description    String
+  expectedOutput String   @map("expected_output")
+  agentKey       String   @map("agent_key") @db.VarChar(100)
+  contextKeys    Json     @default("[]") @map("context_keys")
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([crewId, taskKey], map: "crew_tasks_crew_key_key")
+  @@index([orgId])
+  @@index([crewId, sortOrder])
+  @@map("crew_tasks")
+}
+
+model CrewRun {
+  id              String    @id @default(uuid()) @db.Uuid
+  orgId           String    @map("org_id") @db.Uuid
+  crewId          String    @map("crew_id") @db.Uuid
+  startedByUserId String?   @map("started_by_user_id") @db.Uuid
+  status          String    @default("queued") @db.VarChar(20)
+  inputs          Json      @default("{}")
+  finalOutput     String?   @map("final_output")
+  results         Json?
+  error           String?
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt     DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  @@index([orgId, startedByUserId])
+  @@index([crewId])
+  @@map("crew_runs")
+}
+
