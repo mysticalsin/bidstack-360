@@ -17,22 +17,44 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
       schema: {
-        response: { 200: z.array(OrgUser) },
+        querystring: z.object({
+          // WHY cursor pagination: a hard take:1000 silently drops users in
+          // large orgs and loads the full set on every request even when the
+          // caller needs a short dropdown. Cursor + limit fixes both.
+          limit: z.coerce.number().int().min(1).max(200).default(100),
+          cursor: z.string().uuid().optional(),
+        }),
+        response: {
+          200: z.object({
+            items: z.array(OrgUser),
+            nextCursor: z.string().uuid().nullable(),
+          }),
+        },
       },
     },
     async (req) => {
+      const { limit, cursor } = req.query;
       const rows = await prisma.user.findMany({
         where: { orgId: req.auth.orgId },
-        orderBy: { createdAt: 'asc' },
-        take: 1000,
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        take: limit + 1,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       });
-      return rows.map((u) => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        role: u.role,
-        createdAt: u.createdAt.toISOString(),
-      }));
+
+      const hasMore = rows.length > limit;
+      const page = hasMore ? rows.slice(0, limit) : rows;
+      const nextCursor = hasMore ? (page[page.length - 1]?.id ?? null) : null;
+
+      return {
+        items: page.map((u) => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          createdAt: u.createdAt.toISOString(),
+        })),
+        nextCursor,
+      };
     },
   );
 
@@ -40,7 +62,7 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
     '/users/:id/role',
     {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
-      preHandler: server.requirePermission('users:write'),
+      preHandler: [server.requirePermission('users:write'), server.requireRole('admin')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: z.object({ role: z.enum(['member', 'admin']) }),

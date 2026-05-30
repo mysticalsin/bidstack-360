@@ -2,12 +2,50 @@
 // These are designed to be called from route handlers after a successful
 // Prisma write. They never throw — failures are logged and silently dropped
 // so the user's API request is never blocked by a Dust outage.
+// Transient errors (429, 502, 503, network) are retried up to 3 times with
+// exponential backoff before giving up.
 
 import { prisma } from '@bidstack/db';
 import { DustClient } from '@bidstack/dust-client';
 import pino from 'pino';
 
 const log = pino({ name: 'dust-push', level: process.env.LOG_LEVEL ?? 'info' });
+
+/** Retry an async operation with exponential backoff on transient errors.
+ *  Transient = HTTP 429 / 502 / 503 or a network-level failure (no status).
+ *  4xx codes other than 429 are permanent; they are not retried. */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxAttempts = 3,
+  baseDelayMs = 1_000,
+): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      const status =
+        err != null && typeof err === 'object' && 'status' in err
+          ? (err as { status: unknown }).status
+          : err != null && typeof err === 'object' && 'statusCode' in err
+            ? (err as { statusCode: unknown }).statusCode
+            : undefined;
+
+      const isTransient =
+        typeof status !== 'number' || // network error or unknown
+        status === 429 || // rate limited
+        status === 502 || // bad gateway
+        status === 503; // service unavailable
+
+      if (!isTransient || attempt === maxAttempts) throw err;
+
+      const delay = baseDelayMs * 2 ** (attempt - 1);
+      await new Promise<void>((resolve) => setTimeout(resolve, delay));
+    }
+  }
+  throw lastErr;
+}
 
 function getDustConfig() {
   const apiKey = process.env.DUST_API_KEY;
@@ -73,15 +111,22 @@ export async function pushOpportunityToDust(oppId: string, orgId: string): Promi
     const documentId = `bidstack-deal-${opp.code}`;
     const text = serializeOpportunityToMarkdown(opp);
 
-    await dust.upsertDocument(cfg.dataSourceId, documentId, text, {
-      opportunity_code: opp.code,
-      opportunity_name: opp.name,
-      customer_name: opp.customer,
-      org_id: opp.orgId,
-    });
+    // WHY withRetry: Dust API occasionally returns 429/503 under load.
+    // Without retries, transient blips silently break the sync and the
+    // document never reaches the knowledge base. Three attempts with
+    // exponential backoff (1 s, 2 s, 4 s) cover the vast majority of
+    // transient failures while staying well within the 10 s handler timeout.
+    await withRetry(() =>
+      dust.upsertDocument(cfg.dataSourceId, documentId, text, {
+        opportunity_code: opp.code,
+        opportunity_name: opp.name,
+        customer_name: opp.customer,
+        org_id: opp.orgId,
+      }),
+    );
 
     await prisma.opportunity.update({
-      where: { id: opp.id },
+      where: { id: opp.id, orgId: opp.orgId },
       data: { dustDocId: documentId, dustLastPushedAt: new Date() },
     });
   } catch (err) {
@@ -129,16 +174,18 @@ export async function pushLeadToDust(leadId: string, orgId: string): Promise<voi
       lead.notes ?? '',
     ].join('\n');
 
-    await dust.upsertDocument(cfg.dataSourceId, documentId, text, {
-      lead_email: lead.email ?? '',
-      lead_first_name: lead.firstName,
-      lead_last_name: lead.lastName,
-      company_name: lead.companyName,
-      org_id: lead.orgId,
-    });
+    await withRetry(() =>
+      dust.upsertDocument(cfg.dataSourceId, documentId, text, {
+        lead_email: lead.email ?? '',
+        lead_first_name: lead.firstName,
+        lead_last_name: lead.lastName,
+        company_name: lead.companyName,
+        org_id: lead.orgId,
+      }),
+    );
 
     await prisma.lead.update({
-      where: { id: lead.id },
+      where: { id: lead.id, orgId: lead.orgId },
       data: { dustDocId: documentId, dustLastPushedAt: new Date() },
     });
   } catch (err) {

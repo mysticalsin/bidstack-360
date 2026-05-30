@@ -16,7 +16,10 @@ export const invoiceExportPlugin: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/invoices/export',
     {
-      preHandler: server.requireRole('admin', 'finance'),
+      preHandler: [
+        server.requirePermission('invoices:read'),
+        server.requireRole('admin', 'finance'),
+      ],
       schema: { querystring: InvoiceFilter },
     },
     async (req, reply) => {
@@ -188,7 +191,7 @@ export const invoiceExportPlugin: FastifyPluginAsyncZod = async (server) => {
           COALESCE(SUM(total_micros - paid_micros), 0)  AS outstanding_micros
         FROM invoices
         WHERE
-              org_id     = ${orgId}
+              org_id     = ${orgId}::uuid
           AND currency   = ${currency}
           AND state      IN ('sent', 'overdue')
           AND deleted_at IS NULL

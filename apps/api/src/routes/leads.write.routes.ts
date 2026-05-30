@@ -156,34 +156,35 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
             diff: { fields: Object.keys(body) } as Prisma.InputJsonValue,
           },
         });
+        // CF upserts inside the transaction so a CF failure rolls back the
+        // lead update — prevents partial-update / data corruption (P0 #5).
+        if (body.customFieldValues !== undefined) {
+          for (const { definitionId, value } of body.customFieldValues) {
+            await tx.customFieldValue.upsert({
+              where: {
+                orgId_entityType_entityId_definitionId: {
+                  orgId: req.auth.orgId,
+                  entityType: 'lead',
+                  entityId: existing.id,
+                  definitionId,
+                },
+              },
+              update: { value: value as Prisma.InputJsonValue },
+              create: {
+                orgId: req.auth.orgId,
+                definitionId,
+                entityType: 'lead',
+                entityId: existing.id,
+                value: value as Prisma.InputJsonValue,
+              },
+            });
+          }
+        }
         return tx.lead.findFirstOrThrow({
           where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
           include: { owner: { select: { name: true } } },
         });
       });
-
-      if (body.customFieldValues !== undefined) {
-        for (const { definitionId, value } of body.customFieldValues) {
-          await prisma.customFieldValue.upsert({
-            where: {
-              orgId_entityType_entityId_definitionId: {
-                orgId: req.auth.orgId,
-                entityType: 'lead',
-                entityId: existing.id,
-                definitionId,
-              },
-            },
-            update: { value: value as Prisma.InputJsonValue },
-            create: {
-              orgId: req.auth.orgId,
-              definitionId,
-              entityType: 'lead',
-              entityId: existing.id,
-              value: value as Prisma.InputJsonValue,
-            },
-          });
-        }
-      }
 
       // Fire-and-forget push to Dust on update.
       void pushLeadToDust(updated.id, req.auth.orgId);
@@ -229,7 +230,7 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const lead = await prisma.lead.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!lead) throw server.httpErrors.notFound('Lead not found');
       if (lead.status === 'converted') {
@@ -301,7 +302,7 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
           },
         });
         if (updateResult.count === 0) {
-          throw new Error('Lead not found');
+          throw server.httpErrors.notFound('Lead not found');
         }
 
         // 4. Audit log
