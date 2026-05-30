@@ -194,6 +194,45 @@ function extractBinaryPpt(buffer: Buffer): string {
   return cleaned.length > 100 ? cleaned : '[Binary PowerPoint file - text extraction limited]';
 }
 
+// ─── OmniParse (optional, fail-open richer parsing) ─────────────────────────
+//
+// When OMNIPARSE_BASE_URL points at a hosted OmniParse instance, prefer it for
+// rich document parsing — tables, layout, image captions, and model-grade OCR.
+// It is entirely OPTIONAL: if the var is unset, the host is unreachable, the
+// response is malformed, or it returns nothing, we return null and the caller
+// falls through to the built-in CPU parsers. The pipeline therefore NEVER
+// depends on OmniParse or on GPU hosting — OmniParse only upgrades quality when
+// it happens to be available.
+async function extractWithOmniParse(
+  buffer: Buffer,
+  contentType: string,
+  name: string,
+): Promise<string | null> {
+  const base = process.env.OMNIPARSE_BASE_URL?.trim();
+  if (!base) return null;
+
+  const rawTimeout = Number(process.env.OMNIPARSE_TIMEOUT_MS ?? 60_000);
+  const timeoutMs = Number.isFinite(rawTimeout) && rawTimeout > 0 ? rawTimeout : 60_000;
+
+  try {
+    const form = new FormData();
+    form.append('file', new Blob([buffer], { type: contentType }), name || 'document');
+    const res = await fetch(`${base.replace(/\/+$/, '')}/parse_document`, {
+      method: 'POST',
+      body: form,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { text?: string; markdown?: string };
+    const text = (data.markdown ?? data.text ?? '').trim();
+    return text.length > 0 ? text : null;
+  } catch {
+    // Network error, timeout, non-JSON body, or unexpected shape — all
+    // fall back to the built-in parsers. OmniParse is best-effort only.
+    return null;
+  }
+}
+
 export async function extractTextFromBuffer(opts: ExtractOptions): Promise<string> {
   const { buffer, contentType, name, sourcePath } = opts;
   const ct = (contentType.toLowerCase().split(';')[0] ?? '').trim();
@@ -208,6 +247,12 @@ export async function extractTextFromBuffer(opts: ExtractOptions): Promise<strin
   ) {
     return buffer.toString('utf-8');
   }
+
+  // Prefer a hosted OmniParse instance for binary document formats when one is
+  // configured. Fail-open: a null result falls through to the CPU parsers
+  // below, so this never becomes a hard dependency.
+  const omni = await extractWithOmniParse(buffer, ct, name ?? '');
+  if (omni) return omni;
 
   if (ct === 'application/pdf' || ext === '.pdf') {
     const text = await extractPdfText(buffer);
