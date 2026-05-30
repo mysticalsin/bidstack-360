@@ -22,9 +22,15 @@ interface PresenceEntry {
 }
 
 export function useUsers() {
+  // GET /api/users is cursor-paginated and returns { items, nextCursor }.
+  // Unwrap to the OrgUser[] array via `select` so every consumer (which all
+  // use `users.data` as a flat list) keeps working — passing the raw object
+  // to a `.map()` crashed the Forecasts page.
   return useQuery({
     queryKey: ['users'],
-    queryFn: ({ signal }) => api<OrgUser[]>('/api/users', { signal }),
+    queryFn: ({ signal }) =>
+      api<{ items: OrgUser[]; nextCursor: string | null }>('/api/users', { signal }),
+    select: (data) => data.items,
   });
 }
 
@@ -35,8 +41,7 @@ export function useUsers() {
 export function useOrgPresence() {
   return useQuery({
     queryKey: ['presence', 'org'],
-    queryFn: ({ signal }) =>
-      api<{ users: PresenceEntry[] }>('/api/v1/presence/org', { signal }),
+    queryFn: ({ signal }) => api<{ users: PresenceEntry[] }>('/api/v1/presence/org', { signal }),
     refetchInterval: 30_000,
     // Never treat stale presence data as an error — offline is fine.
     retry: false,
