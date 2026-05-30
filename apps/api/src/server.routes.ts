@@ -19,6 +19,7 @@ import { crmConnectorRoutes } from './routes/crm/connectors.js';
 import { crmWidgetRoutes } from './routes/crm/widgets.js';
 import { crmSummaryRoutes } from './routes/crm/summary.js';
 import { dustRoutes } from './routes/dust-integration.js';
+import { dustCredentialsRoutes } from './routes/dust-credentials.routes.js';
 import { exchangeRatesRoutes } from './routes/exchange-rates.js';
 import { filesRoutes } from './routes/files.js';
 import { invoicesRoutes } from './routes/invoices.js';
@@ -129,6 +130,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(opportunityContactsRoutes, { prefix: '/api/v1' });
   await server.register(filesRoutes, { prefix: '/api/v1' });
   await server.register(dustRoutes, { prefix: '/api/v1/integrations' });
+  await server.register(dustCredentialsRoutes, { prefix: '/api/v1/integrations' });
   await server.register(erpRoutes, { prefix: '/api/v1/integrations' });
 
   // Backward-compatible redirects: /api/v1/integrations/odoo/* → /api/v1/integrations/erp/*
