@@ -6,7 +6,7 @@
 export function AiDisclosureBadge() {
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+      className="inline-flex items-center gap-1 rounded-full bg-[var(--tag-amber-bg)] px-2 py-0.5 text-xs font-medium text-[var(--tag-amber-fg)]"
       aria-label="This content was generated with AI assistance"
       title="AI-assisted draft — review before sending"
     >
