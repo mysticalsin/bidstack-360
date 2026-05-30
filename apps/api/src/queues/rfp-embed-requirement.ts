@@ -56,7 +56,7 @@ export async function enqueueRfpEmbedRequirement(
   try {
     const queued = await getQueue().add('rfp.embed-requirement', job, {
       // WHY: dedup key per requirement — one pending embed job at a time
-      jobId: `rfp-embed-req:${job.orgId}:${job.requirementId}`,
+      jobId: `rfp-embed-req-${job.orgId}-${job.requirementId}`,
     });
     log.info(
       { jobId: queued.id, orgId: job.orgId, requirementId: job.requirementId },

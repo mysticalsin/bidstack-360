@@ -53,7 +53,7 @@ export async function enqueueRfpStoryMatch(job: RfpStoryMatchJob): Promise<strin
   try {
     const queued = await getQueue().add('rfp.story-match', job, {
       // WHY: dedup key per requirement so parallel orchestrations don't double-match
-      jobId: `rfp-story-match:${job.orchestrationId}:${job.requirementId}`,
+      jobId: `rfp-story-match-${job.orchestrationId}-${job.requirementId}`,
     });
     log.info(
       { jobId: queued.id, orgId: job.orgId, requirementId: job.requirementId },

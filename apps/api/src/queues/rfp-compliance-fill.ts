@@ -55,7 +55,7 @@ export async function enqueueRfpComplianceFill(job: RfpComplianceFillJob): Promi
   try {
     const queued = await getQueue().add('rfp.compliance-fill', job, {
       // WHY: dedup key per matrix item — idempotent across orchestrator restarts
-      jobId: `rfp-compliance:${job.orchestrationId}:${job.matrixItemId}`,
+      jobId: `rfp-compliance-${job.orchestrationId}-${job.matrixItemId}`,
     });
     log.info(
       { jobId: queued.id, orgId: job.orgId, matrixItemId: job.matrixItemId },

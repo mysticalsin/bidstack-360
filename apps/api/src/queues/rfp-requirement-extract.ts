@@ -59,7 +59,7 @@ export async function enqueueRfpRequirementExtract(
     const chunkSuffix = job.chunkIndex !== undefined ? `:chunk${job.chunkIndex}` : '';
     const queued = await getQueue().add('rfp.requirement-extract', job, {
       // WHY: dedup key per orchestration+chunk so retries don't create duplicates
-      jobId: `rfp-req-extract:${job.orchestrationId}${chunkSuffix}`,
+      jobId: `rfp-req-extract-${job.orchestrationId}${chunkSuffix}`,
     });
     log.info(
       { jobId: queued.id, orgId: job.orgId, orchestrationId: job.orchestrationId },

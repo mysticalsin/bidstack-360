@@ -55,7 +55,7 @@ export async function enqueueRfpEmbedReference(job: RfpEmbedReferenceJob): Promi
     const queued = await getQueue().add('rfp.embed-reference', job, {
       // WHY: content-addressed dedup — re-embedding same reference is idempotent
       // but wasteful; jobId ensures the queue holds at most one pending job per ref
-      jobId: `rfp-embed-ref:${job.orgId}:${job.referenceId}`,
+      jobId: `rfp-embed-ref-${job.orgId}-${job.referenceId}`,
     });
     log.info(
       { jobId: queued.id, orgId: job.orgId, referenceId: job.referenceId },

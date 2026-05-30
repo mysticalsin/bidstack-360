@@ -58,7 +58,7 @@ export async function enqueueRfpOrchestrate(job: RfpOrchestrateJob): Promise<str
   try {
     const queued = await getQueue().add('rfp.orchestrate', job, {
       // WHY: dedup key per org+rfpRequest so duplicate uploads don't double-launch
-      jobId: `rfp-orch:${job.orgId}:${job.rfpRequestId}`,
+      jobId: `rfp-orch-${job.orgId}-${job.rfpRequestId}`,
     });
     log.info(
       { jobId: queued.id, orgId: job.orgId, rfpRequestId: job.rfpRequestId },
