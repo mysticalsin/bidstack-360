@@ -7,6 +7,7 @@ import { AnimatePresence } from 'framer-motion';
 import { AnimatedNumber } from '@/components/motion/AnimatedNumber';
 import { Badge, stageTone } from '@/components/ui/Badge';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { cn } from '@/lib/cn';
 import { springSnap } from '@/lib/motion';
 import type { Opportunity } from '@bidstack/shared';
@@ -54,6 +55,7 @@ export const StageColumn = memo(function StageColumn({
   onCardBlur,
   onCardKey,
 }: StageColumnProps) {
+  const { formatMoney } = useFormatMoney();
   return (
     <section
       aria-label={`${stageName} column with ${items.length} opportunities`}
@@ -79,16 +81,11 @@ export const StageColumn = memo(function StageColumn({
           <AnimatedNumber
             value={total}
             duration={0.7}
-            // Reuse the locale-aware money formatter so EUR / comma-grouping
-            // matches the rest of the page. The cents portion would jitter
-            // during the tween — keep precision at whole units.
-            format={(n) =>
-              new Intl.NumberFormat(undefined, {
-                style: 'currency',
-                currency: 'EUR',
-                maximumFractionDigits: 0,
-              }).format(Math.round(n))
-            }
+            // Use the app's money formatter (source = EUR, like PipelineCard)
+            // so the column total honors the selected display currency instead
+            // of always rendering euros. Round to whole units so the cents
+            // portion doesn't jitter during the tween.
+            format={(n) => formatMoney(Math.round(n), 'EUR')}
           />
         </span>
       </div>
