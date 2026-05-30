@@ -7,6 +7,7 @@
 import { Route } from 'react-router-dom';
 
 import {
+  AdminRfpPage,
   AuditLogPage,
   CustomObjectEditorPage,
   CustomObjectsAdminPage,
@@ -18,6 +19,14 @@ import { RequireAdmin } from './AuthGuards';
 export function adminRouteElements() {
   return (
     <>
+      <Route
+        path="/admin/rfp"
+        element={
+          <RequireAdmin>
+            <AdminRfpPage />
+          </RequireAdmin>
+        }
+      />
       <Route
         path="/audit-log"
         element={

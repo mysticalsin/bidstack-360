@@ -173,6 +173,9 @@ export const ServiceDeskPage = lazy(() =>
 
 // ─── Admin & Settings ─────────────────────────────────────────────────────────
 
+export const AdminRfpPage = lazy(() =>
+  import('@/pages/AdminRfpPage').then((m) => ({ default: m.AdminRfpPage })),
+);
 export const AuditLogPage = lazy(() =>
   import('@/pages/AuditLogPage').then((m) => ({ default: m.AuditLogPage })),
 );
@@ -203,6 +206,11 @@ export const SettingsPage = lazy(() =>
 export const WebhooksPage = lazy(() => import('@/pages/WebhooksPage'));
 export const WorkflowsPage = lazy(() =>
   import('@/pages/WorkflowsPage').then((m) => ({ default: m.WorkflowsPage })),
+);
+
+// ─── E-signature public ───────────────────────────────────────────────────────
+export const PublicSignPage = lazy(() =>
+  import('@/pages/PublicSignPage').then((m) => ({ default: m.PublicSignPage })),
 );
 
 // ─── Auth callbacks ───────────────────────────────────────────────────────────

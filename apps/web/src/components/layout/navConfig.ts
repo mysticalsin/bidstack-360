@@ -47,7 +47,7 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: 'dollar',
     items: [
       { to: '/sales', label: 'Sales', icon: 'dollar', end: true },
-      { to: '/sales/orders', label: 'Quotes & Orders', icon: 'briefcase' },
+      { to: '/sales/orders', label: 'Quotations & Orders', icon: 'briefcase' },
       { to: '/sales/products', label: 'Products', icon: 'package' },
       { to: '/sales/invoices', label: 'Invoices', icon: 'receipt' },
       { to: '/forecasts', label: 'Forecasts', icon: 'growth' },
@@ -103,6 +103,7 @@ export const NAV_SECTIONS: NavSection[] = [
 ];
 
 export const ADMIN_SETTINGS: NavItem[] = [
+  { to: '/admin/rfp', label: 'RFP Analytics', icon: 'trophy' },
   { to: '/integrations', label: 'Integrations', icon: 'link' },
   { to: '/webhooks', label: 'Webhooks', icon: 'webhook' },
   { to: '/audit-log', label: 'Audit log', icon: 'shield' },

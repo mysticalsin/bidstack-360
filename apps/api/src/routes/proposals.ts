@@ -101,6 +101,89 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
     },
   );
 
+  // GET /api/proposals/admin/analytics — admin-only org-wide RFP rollup.
+  // WHY a dedicated admin endpoint: regular users are owner-scoped (see
+  // canViewAllRfps), so they can't roll up the org. Admins get the cross-owner
+  // view the requirement calls for — counts, pipeline value (from each
+  // proposal's linked opportunity), and a per-owner breakdown.
+  // WHY requireRole('admin') (not requirePermission): mirrors the other admin
+  // analytics endpoints (monitoring.ts) and the frontend's useIsAdmin gate.
+  const AdminAnalytics = z.object({
+    totalCount: z.number().int(),
+    wonCount: z.number().int(),
+    lostCount: z.number().int(),
+    // Money stays in micros on the wire (formatted at the edge); BigInt is
+    // serialised as a string so it survives JSON without precision loss.
+    totalValueMicros: z.string(),
+    byStatus: z.array(z.object({ status: z.string(), count: z.number().int() })),
+    byOwner: z.array(
+      z.object({
+        ownerId: z.string().nullable(),
+        ownerName: z.string(),
+        count: z.number().int(),
+        totalValueMicros: z.string(),
+      }),
+    ),
+  });
+
+  server.get(
+    '/proposals/admin/analytics',
+    {
+      preHandler: server.requireRole('admin'),
+      schema: { response: { 200: AdminAnalytics } },
+    },
+    async (req) => {
+      const orgId = req.auth.orgId;
+      const rows = await prisma.proposal.findMany({
+        where: { orgId, deletedAt: null },
+        select: {
+          status: true,
+          ownerId: true,
+          opportunity: { select: { valueMicros: true } },
+        },
+      });
+
+      const statusCounts = new Map<string, number>();
+      const ownerAgg = new Map<string, { count: number; value: bigint }>();
+      let totalValue = BigInt(0);
+      for (const r of rows) {
+        statusCounts.set(r.status, (statusCounts.get(r.status) ?? 0) + 1);
+        const v = r.opportunity?.valueMicros ?? BigInt(0);
+        totalValue += v;
+        const key = r.ownerId ?? '';
+        const cur = ownerAgg.get(key) ?? { count: 0, value: BigInt(0) };
+        cur.count += 1;
+        cur.value += v;
+        ownerAgg.set(key, cur);
+      }
+
+      const ownerIds = [...ownerAgg.keys()].filter((k) => k.length > 0);
+      const users = ownerIds.length
+        ? await prisma.user.findMany({
+            where: { id: { in: ownerIds }, orgId, deletedAt: null },
+            select: { id: true, name: true, email: true },
+          })
+        : [];
+      const nameById = new Map(users.map((u) => [u.id, u.name ?? u.email]));
+
+      return {
+        totalCount: rows.length,
+        wonCount: statusCounts.get('won') ?? 0,
+        lostCount: statusCounts.get('lost') ?? 0,
+        totalValueMicros: totalValue.toString(),
+        byStatus: [...statusCounts.entries()].map(([status, count]) => ({ status, count })),
+        byOwner: [...ownerAgg.entries()]
+          .map(([ownerId, agg]) => ({
+            ownerId: ownerId || null,
+            ownerName: ownerId ? (nameById.get(ownerId) ?? 'Unknown') : 'Unassigned',
+            count: agg.count,
+            totalValueMicros: agg.value.toString(),
+          }))
+          .sort((a, b) => b.count - a.count),
+      };
+    },
+  );
+
   // POST /api/proposals
   server.post(
     '/proposals',
