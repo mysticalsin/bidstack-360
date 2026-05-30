@@ -85,6 +85,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { to: '/bid-matrix', label: 'Bid/No-Bid Matrix', icon: 'checkCircle' },
       { to: '/rfp-response', label: 'RFP Response Hub', icon: 'note' },
       { to: '/proposals', label: 'Proposals', icon: 'receipt' },
+      { to: '/agent-studio', label: 'Agent Studio', icon: 'sparkle' },
     ],
   },
   {

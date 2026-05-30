@@ -103,6 +103,9 @@ export const RfpPipelinePage = lazy(() =>
 export const RfpResponseHubPage = lazy(() =>
   import('@/pages/RfpResponseHubPage').then((m) => ({ default: m.RfpResponseHubPage })),
 );
+export const AgentStudioPage = lazy(() =>
+  import('@/pages/AgentStudioPage').then((m) => ({ default: m.AgentStudioPage })),
+);
 
 // ─── Sales & Finance ──────────────────────────────────────────────────────────
 

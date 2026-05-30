@@ -17,6 +17,7 @@ import { RequireAuth, RequireAdmin } from './AuthGuards';
 import { bidRouteElements } from './BidRoutes';
 import {
   AccountsPage,
+  AgentStudioPage,
   AnalyticsDashboardPage,
   CalendarPage,
   CallsPage,
@@ -49,6 +50,7 @@ import {
   TasksPage,
   TerritoriesPage,
   TopAccountsPage,
+  PublicSignPage,
 } from './lazyPages';
 import { opsRouteElements } from './OpsRoutes';
 import { salesRouteElements } from './SalesRoutes';
@@ -71,6 +73,7 @@ export function AppRoutes() {
         <Routes location={location}>
           {/* ── Public ──────────────────────────────────────────────────── */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/sign/:token" element={<PublicSignPage />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/sso-callback" element={<SsoCallbackPage />} />
 
@@ -96,6 +99,16 @@ export function AppRoutes() {
             element={
               <RequireAuth>
                 <SearchPage />
+              </RequireAuth>
+            }
+          />
+          {/* Agent Studio — open to members (run + view); authoring is admin-gated
+              inside the page via useIsAdmin(). */}
+          <Route
+            path="/agent-studio"
+            element={
+              <RequireAuth>
+                <AgentStudioPage />
               </RequireAuth>
             }
           />
