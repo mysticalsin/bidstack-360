@@ -23,6 +23,7 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/leads',
     {
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
       schema: {
         body: LeadCreate,
         response: { 201: LeadDetail },
@@ -30,6 +31,15 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const body = req.body;
+      // Validate ownerId belongs to the caller's org before writing it — a lead
+      // must never reference a user from another tenant.
+      if (body.ownerId) {
+        const owner = await prisma.user.findFirst({
+          where: { id: body.ownerId, orgId: req.auth.orgId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!owner) throw server.httpErrors.badRequest('Owner must belong to your organization');
+      }
       const created = await prisma.$transaction(async (tx) => {
         const lead = await tx.lead.create({
           data: {
@@ -106,6 +116,7 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
   server.patch(
     '/leads/:id',
     {
+      config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: LeadPatch,
@@ -118,8 +129,17 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
       });
       if (!existing) throw server.httpErrors.notFound('Lead not found');
 
-      const data: Prisma.LeadUpdateInput = {};
       const body = req.body;
+      // A reassigned owner must belong to the caller's org (no cross-tenant connect).
+      if (body.ownerId) {
+        const owner = await prisma.user.findFirst({
+          where: { id: body.ownerId, orgId: req.auth.orgId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!owner) throw server.httpErrors.badRequest('Owner must belong to your organization');
+      }
+
+      const data: Prisma.LeadUpdateInput = {};
       if (body.firstName !== undefined) data.firstName = body.firstName;
       if (body.lastName !== undefined) data.lastName = body.lastName;
       if (body.email !== undefined) data.email = body.email;
@@ -328,6 +348,7 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/leads/:id',
     {
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 204: z.null() },
