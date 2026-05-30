@@ -187,15 +187,24 @@ async function cosineCandidates(
 
   // HNSW cosine similarity search against reference_embeddings scoped to this org.
   // WHY raw SQL: pgvector <=> operator is unsupported by Prisma client.
+  // WHY the JOIN: without the real reference title/tags the keyword + tag +
+  // recency rescoring dimensions always saw NULL/empty and contributed ~0,
+  // collapsing the hybrid score to cosine-only. Joining the reference row makes
+  // all four scoring dimensions live. "references" is double-quoted because it
+  // is a reserved word in PostgreSQL; created_at stands in for recency (a
+  // reference has no closed date — newer references decay less).
   const rows = await prisma.$queryRaw<PgVectorRow[]>`
     SELECT
       re.reference_id::text,
       (re.vector <=> ${queryVec}::vector) AS cosine_distance,
-      NULL::text                          AS title,
-      ARRAY[]::text[]                     AS tags,
-      NULL::timestamptz                   AS closed_at
+      r.title                             AS title,
+      COALESCE(r.tags, ARRAY[]::text[])   AS tags,
+      r.created_at                        AS closed_at
     FROM reference_embeddings re
+    JOIN "references" r
+      ON r.id = re.reference_id AND r.org_id = re.org_id
     WHERE re.org_id = ${orgId}::uuid
+      AND r.deleted_at IS NULL
     ORDER BY re.vector <=> ${queryVec}::vector
     LIMIT ${candidateLimit}
   `;

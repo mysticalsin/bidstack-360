@@ -11,6 +11,7 @@ import { tasksCreate } from './tasks-create.js';
 import { tasksList } from './tasks-list.js';
 import { tasksUpdate } from './tasks-update.js';
 import { proposalDraft } from './proposal-draft.js';
+import { spotlightRef } from './spotlight-ref.js';
 import { leadsList } from './leads-list.js';
 import { leadsGet } from './leads-get.js';
 import { leadsCreate } from './leads-create.js';
@@ -54,6 +55,7 @@ export const tools = {
   'tasks.list': tasksList,
   'tasks.update': tasksUpdate,
   'proposal.draft': proposalDraft,
+  spotlight_ref: spotlightRef,
   'leads.list': leadsList,
   'leads.get': leadsGet,
   'leads.create': leadsCreate,
@@ -86,6 +88,7 @@ export const toolScopes = {
   'tasks.list': 'read',
   'tasks.update': 'write',
   'proposal.draft': 'read',
+  spotlight_ref: 'read',
   'leads.list': 'read',
   'leads.get': 'read',
   'leads.create': 'write',

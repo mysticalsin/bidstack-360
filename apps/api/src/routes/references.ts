@@ -7,6 +7,23 @@ import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 
+import { enqueueRfpEmbedReference } from '../queues/rfp-embed-reference.js';
+
+// Build the text we embed for semantic retrieval: title + description +
+// industry + tags. Mirrors the worker's search_document embedding so Spotlight
+// Ref / story-match query vectors land in the same space.
+function referenceEmbedContent(r: {
+  title: string;
+  description: string | null;
+  industry: string | null;
+  tags: string[];
+}): string {
+  return [r.title, r.description ?? '', r.industry ?? '', r.tags.join(' ')]
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
 function serializeReference(ref: {
   id: string;
   orgId: string;
@@ -108,6 +125,14 @@ export const referencesRoutes: FastifyPluginAsync = async (server) => {
         },
       });
 
+      // Background-embed so Spotlight Ref + story-match can retrieve this
+      // reference semantically. Fire-and-forget (fail-open if Redis is down).
+      void enqueueRfpEmbedReference({
+        orgId,
+        referenceId: ref.id,
+        contentText: referenceEmbedContent(ref),
+      });
+
       return reply.status(201).send(serializeReference(ref));
     },
   });
@@ -159,6 +184,14 @@ export const referencesRoutes: FastifyPluginAsync = async (server) => {
 
       const updated = await prisma.reference.findFirstOrThrow({
         where: { id, orgId, deletedAt: null },
+      });
+
+      // Re-embed on content change (content-hash deduped in the worker, so a
+      // no-op edit is cheap). Fire-and-forget.
+      void enqueueRfpEmbedReference({
+        orgId,
+        referenceId: updated.id,
+        contentText: referenceEmbedContent(updated),
       });
 
       return reply.send(serializeReference(updated));
