@@ -57,6 +57,8 @@ import { referencesRoutes } from './routes/references.js';
 import { agentsRoutes } from './routes/agents.js';
 import { bidScoreRoutes } from './routes/bid-scores.js';
 import { proposalRoutes } from './routes/proposals.js';
+import { crewAgentRoutes } from './routes/crew-agents.js';
+import { crewRoutes } from './routes/crews.js';
 import { activityRoutes } from './routes/activities.js';
 import { bidWorkspaceRoutes } from './routes/bid-workspace.js';
 import { bidWorkspaceRequirementRoutes } from './routes/bid-workspace-requirements.js';
@@ -66,11 +68,16 @@ import { bookingsRoutes } from './routes/bookings.js';
 import { rfpNocobaseRoutes } from './routes/rfp-nocobase.js';
 // Wave 4 — AI assistant
 import { aiAssistantRoutes } from './routes/ai-assistant.js';
-// Wave 5 — Outlook / Microsoft Graph Mail
+import { documentTemplatesRoutes } from './routes/document-templates.js';
+import { signaturesRoutes } from './routes/signatures.js';
+import { publicSignRoutes } from './routes/public-sign.js';
+// Wave 5 — Outlook / Microsoft Graph Mail + Slack
 import { gmailOAuthRoutes } from './routes/integrations/gmail.js';
 import { microsoftMailOAuthRoutes } from './routes/integrations/microsoft-mail.js';
 import { emailRoutes } from './routes/integrations/email.js';
 import { microsoftWebhookRoutes } from './routes/integrations/microsoft-webhook.js';
+import { slackOAuthRoutes } from './routes/integrations/slack.js';
+import { slackCommandsPlugin } from './routes/integrations/slack-commands.js';
 // Wave 5 — Onboarding (templates + sample data)
 import { onboardingRoutes } from './routes/onboarding.js';
 // Wave 5 — Help center feedback
@@ -160,6 +167,8 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(agentsRoutes, { prefix: '/api/v1' });
   await server.register(bidScoreRoutes, { prefix: '/api/v1' });
   await server.register(proposalRoutes, { prefix: '/api/v1' });
+  await server.register(crewAgentRoutes, { prefix: '/api/v1' });
+  await server.register(crewRoutes, { prefix: '/api/v1' });
   await server.register(activityRoutes, { prefix: '/api/v1' });
   await server.register(bidWorkspaceRoutes, { prefix: '/api/v1' });
   await server.register(bidWorkspaceRequirementRoutes, { prefix: '/api/v1' });
@@ -174,11 +183,16 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
 
   // Wave 4 — AI Assistant
   await server.register(aiAssistantRoutes, { prefix: '/api/v1' });
+  await server.register(documentTemplatesRoutes, { prefix: '/api/v1' });
+  await server.register(signaturesRoutes, { prefix: '/api/v1' });
+  await server.register(publicSignRoutes, { prefix: '/api/v1' });
 
   // Wave 5 — Outlook (Microsoft Graph Mail) + Gmail OAuth flows
   // WHY /api/v1/integrations prefix: consistent with other integration routes (dust, erp)
   await server.register(gmailOAuthRoutes, { prefix: '/api/v1/integrations' });
   await server.register(microsoftMailOAuthRoutes, { prefix: '/api/v1/integrations' });
+  await server.register(slackOAuthRoutes, { prefix: '/api/v1/integrations' });
+  await server.register(slackCommandsPlugin, { prefix: '/api/v1' });
   await server.register(emailRoutes, { prefix: '/api/v1' });
   // Webhook endpoint: NO auth prefix — Graph calls this as an unauthenticated third party.
   // clientState secret provides the anti-forgery verification layer.
