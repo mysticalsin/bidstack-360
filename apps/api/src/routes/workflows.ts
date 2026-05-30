@@ -208,9 +208,13 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
         },
       });
 
-      // Simple sequential execution
-      const outputs: Record<string, unknown>[] = [];
+      // Simple sequential execution. Collect per-step results into a keyed
+      // object — the WorkflowRun.output schema is `z.record()` (an object), so
+      // returning a bare array here trips the response serializer and 500s
+      // every run. Keying by step keeps the contract AND preserves order.
+      const outputs: Record<string, unknown> = {};
       let error: string | null = null;
+      let step = 0;
       for (const action of wf.actions) {
         try {
           const out = await executeAction(
@@ -218,11 +222,12 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
             action.config as Record<string, unknown>,
             req.auth.orgId,
           );
-          outputs.push(out);
+          outputs[`step_${step + 1}_${action.kind}`] = out;
         } catch (err) {
           error = err instanceof Error ? err.message : String(err);
           break;
         }
+        step += 1;
       }
 
       const finished = await prisma.$transaction(async (tx) => {
