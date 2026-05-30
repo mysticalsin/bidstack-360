@@ -120,9 +120,14 @@ export async function getObjectDefByKey(orgId: string, key: string) {
 
 /** Lists all object defs for the org including record counts. */
 export async function listObjectDefs(orgId: string) {
+  // `take` is required: the app's query guard rejects unbounded findMany with
+  // a 400, which had been breaking the entire Custom Objects feature (the
+  // admin list + editor both 400'd). 200 is far above any realistic number of
+  // object definitions for one org.
   const defs = await prisma.customObjectDef.findMany({
     where: { orgId },
     orderBy: { createdAt: 'asc' },
+    take: 200,
   });
 
   // Efficient count query — one round-trip via groupBy

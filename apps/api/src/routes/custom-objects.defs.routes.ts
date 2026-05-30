@@ -20,6 +20,7 @@ import {
   CustomObjectDefList,
   CustomObjectDefPatch,
   CustomObjectFieldCreate,
+  CustomObjectFieldList,
   CustomObjectRelationCreate,
   CustomObjectRelationList,
 } from '@bidstack/shared';
@@ -104,6 +105,38 @@ export const customObjectDefRoutes: FastifyPluginAsyncZod = async (server) => {
   );
 
   // ── Fields ───────────────────────────────────────────────────────────────
+
+  // GET /custom-objects/:id/fields — list the object's custom fields
+  server.get(
+    '/custom-objects/:id/fields',
+    {
+      schema: {
+        params: IdParam,
+        response: { 200: CustomObjectFieldList },
+      },
+    },
+    async (req) => {
+      const fields = await svc.listObjectFields(req.auth.orgId, req.params.id);
+      return {
+        items: fields.map((f) => ({
+          id: f.id,
+          orgId: f.orgId,
+          entityType: f.entityType,
+          customObjectDefId: f.customObjectDefId ?? null,
+          fieldKey: f.fieldKey,
+          label: f.label,
+          fieldType: f.fieldType,
+          options: (f.options as string[] | null) ?? [],
+          defaultValue: f.defaultValue ?? null,
+          required: f.required,
+          orderIndex: f.orderIndex,
+          active: f.active,
+          createdAt: f.createdAt.toISOString(),
+          updatedAt: f.updatedAt.toISOString(),
+        })),
+      };
+    },
+  );
 
   // POST /custom-objects/:id/fields
   server.post(

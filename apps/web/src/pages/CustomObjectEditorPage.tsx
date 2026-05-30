@@ -14,6 +14,7 @@ import {
   useCustomObjectDefs,
   useUpdateCustomObjectDef,
   useAddCustomObjectField,
+  useCustomObjectFields,
   useCustomObjectRelations,
   useAddCustomObjectRelation,
 } from '@/hooks/useCustomObjects';
@@ -28,6 +29,7 @@ export function CustomObjectEditorPage() {
   const relationsQuery = useCustomObjectRelations(id);
   const updateDef = useUpdateCustomObjectDef(id);
   const addField = useAddCustomObjectField(id);
+  const fieldsQuery = useCustomObjectFields(id);
   const addRelation = useAddCustomObjectRelation(id);
 
   const def = defsData?.items.find((d) => d.id === id);
@@ -86,7 +88,7 @@ export function CustomObjectEditorPage() {
       </nav>
 
       <ObjectSettingsForm def={def} updateDef={updateDef} />
-      <FieldsSection addField={addField} />
+      <FieldsSection addField={addField} fieldsQuery={fieldsQuery} />
       <RelationsSection addRelation={addRelation} relationsQuery={relationsQuery} />
 
       {/* Navigate to records */}

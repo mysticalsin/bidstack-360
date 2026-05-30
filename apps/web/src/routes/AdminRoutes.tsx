@@ -6,7 +6,13 @@
  */
 import { Route } from 'react-router-dom';
 
-import { AuditLogPage, CustomObjectsAdminPage, PredictiveAdminPage, RolesPage } from './lazyPages';
+import {
+  AuditLogPage,
+  CustomObjectEditorPage,
+  CustomObjectsAdminPage,
+  PredictiveAdminPage,
+  RolesPage,
+} from './lazyPages';
 import { RequireAdmin } from './AuthGuards';
 
 export function adminRouteElements() {
@@ -25,6 +31,25 @@ export function adminRouteElements() {
         element={
           <RequireAdmin>
             <CustomObjectsAdminPage />
+          </RequireAdmin>
+        }
+      />
+      {/* The admin page + editor breadcrumb both navigate to
+          /settings/custom-objects[/:id]; without these the editor (and its
+          field/relation management) was unreachable and 404'd. */}
+      <Route
+        path="/settings/custom-objects"
+        element={
+          <RequireAdmin>
+            <CustomObjectsAdminPage />
+          </RequireAdmin>
+        }
+      />
+      <Route
+        path="/settings/custom-objects/:id"
+        element={
+          <RequireAdmin>
+            <CustomObjectEditorPage />
           </RequireAdmin>
         }
       />

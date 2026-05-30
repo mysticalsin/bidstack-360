@@ -127,6 +127,30 @@ export const CustomObjectFieldCreate = z.object({
 });
 export type CustomObjectFieldCreate = z.infer<typeof CustomObjectFieldCreate>;
 
+// Read shape for a persisted custom-object field (mirrors the POST response).
+export const CustomObjectField = z.object({
+  id: z.string().uuid(),
+  orgId: z.string().uuid(),
+  entityType: z.string(),
+  customObjectDefId: z.string().uuid().nullable(),
+  fieldKey: z.string(),
+  label: z.string(),
+  fieldType: z.string(),
+  options: z.array(z.string()).nullable(),
+  defaultValue: z.unknown().nullable(),
+  required: z.boolean(),
+  orderIndex: z.number().int(),
+  active: z.boolean(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type CustomObjectField = z.infer<typeof CustomObjectField>;
+
+export const CustomObjectFieldList = z.object({
+  items: z.array(CustomObjectField),
+});
+export type CustomObjectFieldList = z.infer<typeof CustomObjectFieldList>;
+
 // ─── CustomObjectRecord ────────────────────────────────────────────────────
 
 export const CustomObjectRecord = z.object({

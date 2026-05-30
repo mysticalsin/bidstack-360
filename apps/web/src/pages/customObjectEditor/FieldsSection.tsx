@@ -4,14 +4,15 @@
  */
 import { useState, type FormEvent } from 'react';
 
-import { type useAddCustomObjectField } from '@/hooks/useCustomObjects';
+import { type useAddCustomObjectField, type useCustomObjectFields } from '@/hooks/useCustomObjects';
 import { FIELD_TYPES } from './customObjectEditorConfig';
 
 interface Props {
   addField: ReturnType<typeof useAddCustomObjectField>;
+  fieldsQuery: ReturnType<typeof useCustomObjectFields>;
 }
 
-export function FieldsSection({ addField }: Props) {
+export function FieldsSection({ addField, fieldsQuery }: Props) {
   const [showFieldForm, setShowFieldForm] = useState(false);
   const [newField, setNewField] = useState({
     fieldKey: '',
@@ -168,10 +169,42 @@ export function FieldsSection({ addField }: Props) {
           </form>
         )}
 
-        <p className="p-4 text-sm text-[var(--text-secondary)]">
-          Fields are managed via the Custom Fields API. Use the &quot;Add field&quot; button above
-          to add new fields to this object.
-        </p>
+        {fieldsQuery.isLoading ? (
+          <p className="p-4 text-sm text-[var(--text-secondary)]">Loading fields…</p>
+        ) : fieldsQuery.isError ? (
+          <p className="p-4 text-sm text-red-600 dark:text-red-400" role="alert">
+            Could not load fields. Please retry.
+          </p>
+        ) : (fieldsQuery.data?.items.length ?? 0) === 0 ? (
+          <p className="p-4 text-sm text-[var(--text-secondary)]">
+            No custom fields yet. Use &quot;Add field&quot; above to create your first one.
+          </p>
+        ) : (
+          <ul className="divide-y divide-[var(--border)]">
+            {fieldsQuery.data?.items.map((f) => (
+              <li key={f.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-[var(--text-primary)]">
+                      {f.label}
+                    </span>
+                    {f.required && (
+                      <span className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+                        Required
+                      </span>
+                    )}
+                  </div>
+                  <code className="font-mono text-xs text-[var(--text-tertiary)]">
+                    {f.fieldKey}
+                  </code>
+                </div>
+                <span className="shrink-0 rounded-md bg-[var(--surface-2)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
+                  {f.fieldType}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </section>
   );

@@ -13,6 +13,7 @@ import type {
   CustomObjectDefList,
   CustomObjectDefPatch,
   CustomObjectFieldCreate,
+  CustomObjectFieldList,
   CustomObjectRecord,
   CustomObjectRecordCreate,
   CustomObjectRecordPage,
@@ -45,7 +46,7 @@ export function useCreateCustomObjectDef() {
     mutationFn: (body: CustomObjectDefCreate) =>
       api<CustomObjectDef>('/api/custom-objects', {
         method: 'POST',
-        body: JSON.stringify(body),
+        body,
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['custom-objects'] });
@@ -59,7 +60,7 @@ export function useUpdateCustomObjectDef(id: string) {
     mutationFn: (body: CustomObjectDefPatch) =>
       api<CustomObjectDef>(`/api/custom-objects/${id}`, {
         method: 'PUT',
-        body: JSON.stringify(body),
+        body,
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['custom-objects'] });
@@ -80,13 +81,22 @@ export function useDeleteCustomObjectDef() {
 
 // ─── Fields ────────────────────────────────────────────────────────────────
 
+export function useCustomObjectFields(objectId: string) {
+  return useQuery({
+    queryKey: ['custom-objects', objectId, 'fields'],
+    queryFn: ({ signal }) =>
+      api<CustomObjectFieldList>(`/api/custom-objects/${objectId}/fields`, { signal }),
+    enabled: !!objectId,
+  });
+}
+
 export function useAddCustomObjectField(objectId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: CustomObjectFieldCreate) =>
       api(`/api/custom-objects/${objectId}/fields`, {
         method: 'POST',
-        body: JSON.stringify(body),
+        body,
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['custom-objects', objectId, 'fields'] });
@@ -111,7 +121,7 @@ export function useAddCustomObjectRelation(objectId: string) {
     mutationFn: (body: CustomObjectRelationCreate) =>
       api<CustomObjectRelationList>(`/api/custom-objects/${objectId}/relations`, {
         method: 'POST',
-        body: JSON.stringify(body),
+        body,
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['custom-objects', objectId, 'relations'] });
@@ -163,7 +173,7 @@ export function useCreateCustomObjectRecord(objectId: string) {
     mutationFn: (body: CustomObjectRecordCreate) =>
       api<CustomObjectRecord>(`/api/custom-objects/${objectId}/records`, {
         method: 'POST',
-        body: JSON.stringify(body),
+        body,
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['custom-objects', objectId, 'records'] });
@@ -177,7 +187,7 @@ export function useUpdateCustomObjectRecord(objectId: string, recordId: string) 
     mutationFn: (body: CustomObjectRecordPatch) =>
       api<CustomObjectRecord>(`/api/custom-objects/${objectId}/records/${recordId}`, {
         method: 'PUT',
-        body: JSON.stringify(body),
+        body,
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['custom-objects', objectId, 'records'] });
