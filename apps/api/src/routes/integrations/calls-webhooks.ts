@@ -29,9 +29,7 @@ import {
   zoomUrlValidationResponse,
 } from '../../services/calls/zoom.service.js';
 import { validateTwilioVoiceSignature } from '../../services/calls/twilio-voice.service.js';
-import {
-  CALL_FETCH_RECORDING,
-} from '@bidstack/shared';
+import { CALL_FETCH_RECORDING } from '@bidstack/shared';
 import { redis } from '../../redis.js';
 
 // ─── Zoom webhook routes ─────────────────────────────────────────────────────
@@ -76,10 +74,12 @@ export const zoomCallWebhookRoutes: FastifyPluginAsync = async (fastify) => {
       // URL validation handshake (no signature required for initial setup)
       if (req.body.event === 'endpoint.url_validation') {
         const plainToken = (req.body.payload as { plainToken?: string })?.plainToken ?? '';
-        return reply.send(zoomUrlValidationResponse(plainToken) as {
-          plainToken: string;
-          encryptedToken: string;
-        });
+        return reply.send(
+          zoomUrlValidationResponse(plainToken) as {
+            plainToken: string;
+            encryptedToken: string;
+          },
+        );
       }
 
       // Validate signature for all other events
@@ -95,13 +95,27 @@ export const zoomCallWebhookRoutes: FastifyPluginAsync = async (fastify) => {
       if (req.body.event === 'meeting.ended') {
         const meetingId = String((payload.object as Record<string, unknown>)?.id ?? '');
         if (meetingId) {
-          await prisma.callSession.updateMany({
+          // Derive the owning org from the session FIRST, then scope the write
+          // to that org. A blind updateMany keyed only on externalMeetingId is
+          // not tenant-bounded — every tenant-table write must include orgId
+          // (mirrors the recording.completed + Teams handlers below/above).
+          const session = await prisma.callSession.findFirst({
             where: { externalMeetingId: meetingId, status: { not: 'COMPLETED' } },
-            data: {
-              status: 'COMPLETED',
-              endedAt: new Date(),
-            },
+            select: { orgId: true },
           });
+          if (session) {
+            await prisma.callSession.updateMany({
+              where: {
+                orgId: session.orgId,
+                externalMeetingId: meetingId,
+                status: { not: 'COMPLETED' },
+              },
+              data: {
+                status: 'COMPLETED',
+                endedAt: new Date(),
+              },
+            });
+          }
         }
       } else if (req.body.event === 'recording.completed') {
         const meetingId = String((payload.object as Record<string, unknown>)?.id ?? '');
@@ -152,15 +166,17 @@ export const teamsCallWebhookRoutes: FastifyPluginAsync = async (fastify) => {
         }),
         body: z
           .object({
-            value: z.array(
-              z.object({
-                subscriptionId: z.string().optional(),
-                clientState: z.string().optional(),
-                changeType: z.string().optional(),
-                resource: z.string().optional(),
-                resourceData: z.record(z.unknown()).optional(),
-              }),
-            ).optional(),
+            value: z
+              .array(
+                z.object({
+                  subscriptionId: z.string().optional(),
+                  clientState: z.string().optional(),
+                  changeType: z.string().optional(),
+                  resource: z.string().optional(),
+                  resourceData: z.record(z.unknown()).optional(),
+                }),
+              )
+              .optional(),
           })
           .passthrough()
           .optional(),
@@ -172,9 +188,7 @@ export const teamsCallWebhookRoutes: FastifyPluginAsync = async (fastify) => {
     async (req, reply) => {
       // Graph subscription validation handshake
       if (req.query.validationToken) {
-        return reply
-          .header('Content-Type', 'text/plain')
-          .send(req.query.validationToken as string);
+        return reply.header('Content-Type', 'text/plain').send(req.query.validationToken as string);
       }
 
       const notifications = req.body?.value ?? [];
@@ -257,8 +271,8 @@ export const twilioVoiceWebhookRoutes: FastifyPluginAsync = async (fastify) => {
         const durationSec = req.body.CallDuration
           ? parseInt(req.body.CallDuration, 10)
           : req.body.Duration
-          ? parseInt(req.body.Duration, 10)
-          : undefined;
+            ? parseInt(req.body.Duration, 10)
+            : undefined;
 
         const statusMap: Record<string, string> = {
           completed: 'COMPLETED',
@@ -327,7 +341,11 @@ export const twilioVoiceWebhookRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (
         signature &&
-        !validateTwilioVoiceSignature(signature, twimlUrl, (req.body as Record<string, string>) ?? {})
+        !validateTwilioVoiceSignature(
+          signature,
+          twimlUrl,
+          (req.body as Record<string, string>) ?? {},
+        )
       ) {
         return reply.code(403).send('Forbidden' as never);
       }
