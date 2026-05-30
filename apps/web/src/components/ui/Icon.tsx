@@ -287,6 +287,34 @@ const PATHS: Record<string, JSX.Element> = {
       <path d="M12 8h.01M12 11v5" />
     </>
   ),
+  // Document-intake + AI glyphs — previously passed by RFP screens but absent,
+  // so they rendered as invisible blanks. Added in the same Lucide stroke style.
+  upload: (
+    <>
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+      <path d="M7 9l5-5 5 5M12 4v12" />
+    </>
+  ),
+  file: (
+    <>
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+      <path d="M14 2v6h6" />
+    </>
+  ),
+  wand: (
+    <>
+      <path d="M4 20L13 11" />
+      <path d="M14 7l3-3 3 3-3 3-3-3z" />
+    </>
+  ),
+  refresh: (
+    <>
+      <path d="M21 12a9 9 0 00-9-9 9.75 9.75 0 00-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M3 12a9 9 0 009 9 9.75 9.75 0 006.74-2.74L21 16" />
+      <path d="M21 21v-5h-5" />
+    </>
+  ),
 };
 
 export type IconName = keyof typeof PATHS;

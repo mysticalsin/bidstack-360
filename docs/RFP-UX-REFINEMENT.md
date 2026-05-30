@@ -30,7 +30,7 @@ unified design spec. This is the durable backlog; apply incrementally, verifying
 
 - [x] **`components/rfp/shared/ProposalStatusChip.tsx` (NEW)** — single source of truth for proposal-status tone + labels; adopted in Hub, Proposals (deleted raw-palette `STATUS_BADGE`), ProposalDetail (chip by title), AdminRfp (replaced local `STATUS_TONE`). Also humanized the Proposals status filter + formatted ISO Due dates. **DONE.**
 - [ ] **`public/locales/en/rfp.json`** — fix `pipeline.stages` key mismatch (`uploading`→`queued`, `extraction`→`extracting`; add `awaiting_approval`/`approved`/`completed`/`rejected`/`timeout`); add missing namespaced strings (KPI details, row meta, SectionEditor, RequirementRow `confidence`, upload hints, `intake.*`). Mirror into es/fr/it/pt/zh.
-- [ ] **`components/ui/Icon.tsx`** — add missing glyphs (`upload`/`file`/`wand`/`refresh`); harden `PATHS` to `as const satisfies …` so `IconName` is a literal union (bad names become compile errors).
+- [~] **`components/ui/Icon.tsx`** — glyphs `upload`/`file`/`wand`/`refresh` added (fixed 7 invisible icons across intake ReceiveStep/ExtractStep/ReviewStep + account-intel IntelTabs). Type-hardening (`as const satisfies` so `IconName` is a literal union) **DEFERRED** — needs an app-wide Icon-name audit first or it reds the whole typecheck.
 - [ ] **`components/rfp/shared/RfpStatusChip.tsx`** — replace raw-palette `STAGE_STYLES` with token tag palette; route `STAGE_LABELS` + aria-label through `t()`, reused by the progress bar.
 - [ ] **`components/rfp/compliance/ComplianceRow.tsx`** — map `STATUS_STYLES` onto token tag palette.
 - [ ] **`components/rfp/pipeline/PipelineErrorBanner.tsx`** — use shared `Button` for Retry/Restart; route rejected/timeout copy; keep `role="alert"`.
