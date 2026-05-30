@@ -14,6 +14,7 @@ import {
 import { MemOSService } from '@bidstack/memos';
 import { draftProposalSection } from '../services/ai/dust-agent.service.js';
 import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
+import { canViewAllRfps } from '../lib/rfp-visibility.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 
 import { DEFAULT_SECTIONS, serializeProposal } from './proposals.helpers.js';
@@ -37,6 +38,8 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
       const where = {
         orgId: req.auth.orgId,
         deletedAt: null,
+        // RFP visibility: non-admins see only the proposals they own; admins see all.
+        ...(canViewAllRfps(req) ? {} : { ownerId: req.auth.userId }),
         ...(status ? { status } : {}),
         ...(opportunityId ? { opportunityId } : {}),
         ...(search
@@ -69,7 +72,13 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const row = await prisma.proposal.findFirst({
-        where: { orgId: req.auth.orgId, id: req.params.id, deletedAt: null },
+        where: {
+          orgId: req.auth.orgId,
+          id: req.params.id,
+          deletedAt: null,
+          // RFP visibility: a non-admin may only access proposals they own.
+          ...(canViewAllRfps(req) ? {} : { ownerId: req.auth.userId }),
+        },
         include: { sections: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } } },
       });
       if (!row) return reply.notFound('Proposal not found');
@@ -162,7 +171,13 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const row = await prisma.proposal.findFirst({
-        where: { orgId: req.auth.orgId, id: req.params.id, deletedAt: null },
+        where: {
+          orgId: req.auth.orgId,
+          id: req.params.id,
+          deletedAt: null,
+          // RFP visibility: a non-admin may only access proposals they own.
+          ...(canViewAllRfps(req) ? {} : { ownerId: req.auth.userId }),
+        },
       });
       if (!row) return reply.notFound('Proposal not found');
 
@@ -234,7 +249,13 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const proposal = await prisma.proposal.findFirst({
-        where: { orgId: req.auth.orgId, id: req.params.id, deletedAt: null },
+        where: {
+          orgId: req.auth.orgId,
+          id: req.params.id,
+          deletedAt: null,
+          // RFP visibility: a non-admin may only access proposals they own.
+          ...(canViewAllRfps(req) ? {} : { ownerId: req.auth.userId }),
+        },
       });
       if (!proposal) return reply.notFound('Proposal not found');
 
@@ -275,7 +296,13 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const proposal = await prisma.proposal.findFirst({
-        where: { orgId: req.auth.orgId, id: req.params.id, deletedAt: null },
+        where: {
+          orgId: req.auth.orgId,
+          id: req.params.id,
+          deletedAt: null,
+          // RFP visibility: a non-admin may only access proposals they own.
+          ...(canViewAllRfps(req) ? {} : { ownerId: req.auth.userId }),
+        },
         include: { sections: true, opportunity: { include: { company: true, territory: true } } },
       });
       if (!proposal) return reply.notFound('Proposal not found');
@@ -356,7 +383,13 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const row = await prisma.proposal.findFirst({
-        where: { orgId: req.auth.orgId, id: req.params.id, deletedAt: null },
+        where: {
+          orgId: req.auth.orgId,
+          id: req.params.id,
+          deletedAt: null,
+          // RFP visibility: a non-admin may only access proposals they own.
+          ...(canViewAllRfps(req) ? {} : { ownerId: req.auth.userId }),
+        },
       });
       if (!row) return reply.notFound('Proposal not found');
       await prisma.proposal.update({
