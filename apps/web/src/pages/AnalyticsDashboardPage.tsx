@@ -5,7 +5,7 @@
 // what's already in the bundle: framer-motion handles smooth reordering).
 
 import { useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { motion, Reorder } from 'framer-motion';
 import { Plus, ChevronDown, BarChart2, LayoutDashboard, Settings2 } from 'lucide-react';
 
@@ -23,8 +23,11 @@ import {
 } from '@/hooks/useDashboards';
 
 export function AnalyticsDashboardPage() {
+  const [searchParams] = useSearchParams();
   const { data: dashboards = [], isLoading: dashLoading } = useDashboards();
-  const [activeDashId, setActiveDashId] = useState<string>('');
+  // Initialise from ?id= so deep-links and the Dashboards list (which links
+  // to /analytics?id=<id>) open the chosen dashboard instead of always the first.
+  const [activeDashId, setActiveDashId] = useState<string>(searchParams.get('id') ?? '');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [addingWidget, setAddingWidget] = useState(false);
 

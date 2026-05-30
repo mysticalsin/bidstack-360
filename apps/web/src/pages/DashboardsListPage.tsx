@@ -10,11 +10,7 @@ import { Plus, Layout, Globe, Lock, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { staggerParent, staggerChild } from '@/lib/motion';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
-import {
-  useDashboards,
-  useCreateDashboard,
-  useDeleteDashboard,
-} from '@/hooks/useDashboards';
+import { useDashboards, useCreateDashboard, useDeleteDashboard } from '@/hooks/useDashboards';
 
 export function DashboardsListPage() {
   const { data: dashboards = [], isLoading, error } = useDashboards();
@@ -34,7 +30,10 @@ export function DashboardsListPage() {
     return (
       <div className="p-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {[...Array(6)].map((_, i) => (
-          <div key={i} className="h-28 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] animate-pulse" />
+          <div
+            key={i}
+            className="h-28 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] animate-pulse"
+          />
         ))}
       </div>
     );
@@ -53,9 +52,7 @@ export function DashboardsListPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
-            Dashboards
-          </h1>
+          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">Dashboards</h1>
           <p className="text-sm text-[var(--fg-tertiary)] mt-0.5">
             {dashboards.length} dashboard{dashboards.length !== 1 ? 's' : ''}
           </p>
@@ -142,7 +139,7 @@ export function DashboardsListPage() {
           {dashboards.map((d) => (
             <motion.div key={d.id} variants={staggerChild} className="group relative">
               <Link
-                to={`/dashboard?id=${d.id}`}
+                to={`/analytics?id=${d.id}`}
                 className={cn(
                   'flex flex-col h-28 rounded-xl border border-[var(--border-subtle)]',
                   'bg-[var(--surface-card)] dark:bg-[var(--surface-glass)] p-4',
@@ -159,9 +156,17 @@ export function DashboardsListPage() {
                     </span>
                   </div>
                   {d.isShared ? (
-                    <Globe size={12} className="text-[var(--fg-tertiary)] shrink-0" aria-label="Shared" />
+                    <Globe
+                      size={12}
+                      className="text-[var(--fg-tertiary)] shrink-0"
+                      aria-label="Shared"
+                    />
                   ) : (
-                    <Lock size={12} className="text-[var(--fg-tertiary)] shrink-0" aria-label="Private" />
+                    <Lock
+                      size={12}
+                      className="text-[var(--fg-tertiary)] shrink-0"
+                      aria-label="Private"
+                    />
                   )}
                 </div>
                 {d.description && (

@@ -81,7 +81,7 @@ export function ContactDetailPage() {
                 <>
                   {' · '}
                   <Link
-                    to={`/accounts/${c.customer}`}
+                    to={`/companies?search=${encodeURIComponent(c.customer)}`}
                     className="text-[var(--brand-primary)] hover:underline"
                   >
                     {c.customer}

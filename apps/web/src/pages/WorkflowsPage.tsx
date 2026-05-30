@@ -76,7 +76,7 @@ export function WorkflowsPage() {
 
   return (
     <div className="page">
-      <div className="page-header">
+      <div className="page-head">
         <h1 className="page-title">Workflows</h1>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 text-sm text-[var(--fg-secondary)]">

@@ -285,6 +285,26 @@ export function AppRoutes() {
               </RequireAuth>
             }
           />
+          {/* New/Edit report routes point at the report workspace so the
+              ReportsList "New report"/"Edit" actions and the Analytics
+              "New report" link land on a real page instead of a 404.
+              (A dedicated report editor is future work.) */}
+          <Route
+            path="/reports/new"
+            element={
+              <RequireAuth>
+                <ReportsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/reports/:id/edit"
+            element={
+              <RequireAuth>
+                <ReportsPage />
+              </RequireAuth>
+            }
+          />
           <Route
             path="/analytics"
             element={

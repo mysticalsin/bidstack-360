@@ -44,7 +44,7 @@ export function ServiceDeskPage() {
 
   return (
     <div className="page">
-      <div className="page-header">
+      <div className="page-head">
         <h1 className="page-title">Service Desk</h1>
       </div>
 

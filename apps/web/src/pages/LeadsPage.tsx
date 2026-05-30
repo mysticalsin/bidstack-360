@@ -145,7 +145,7 @@ export function LeadsPage() {
 
   return (
     <div className="page">
-      <div className="page-header">
+      <div className="page-head">
         <h1 className="page-title">Leads</h1>
         <div className="flex items-center gap-2">
           <LiquidGlassButton
@@ -201,7 +201,7 @@ export function LeadsPage() {
               placeholder="Search leads..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
+              className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] min-h-[44px] dark:bg-[var(--surface-glass)] dark:backdrop-blur-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-page)] focus:border-[var(--brand-primary)]"
             />
           </label>
           <select
@@ -210,7 +210,7 @@ export function LeadsPage() {
             onChange={(e) =>
               setStatusFilter(e.target.value === '' ? '' : LeadStatus.parse(e.target.value))
             }
-            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
+            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] min-h-[44px] dark:bg-[var(--surface-glass)] dark:backdrop-blur-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-page)] focus:border-[var(--brand-primary)]"
           >
             {STATUS_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -224,7 +224,7 @@ export function LeadsPage() {
             onChange={(e) =>
               setPriorityFilter(e.target.value === '' ? '' : LeadPriority.parse(e.target.value))
             }
-            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
+            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] min-h-[44px] dark:bg-[var(--surface-glass)] dark:backdrop-blur-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-page)] focus:border-[var(--brand-primary)]"
           >
             {PRIORITY_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
