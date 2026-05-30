@@ -268,7 +268,7 @@ async function maybeAdvanceToLegalScan(
     await legalScanQueue.add(
       'rfp.legal-scan',
       { orgId, orchestrationId, documentVersionId, proposalId },
-      { jobId: `rfp-legal-scan:${orchestrationId}` },
+      { jobId: `rfp-legal-scan-${orchestrationId}` },
     );
     log.info({ orchestrationId }, 'rfp-section-draft: all sections drafted -> legal-scan enqueued');
   } catch (err) {

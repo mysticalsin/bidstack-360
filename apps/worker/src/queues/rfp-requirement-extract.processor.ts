@@ -199,7 +199,7 @@ export async function processJob(
         requirementId: req.id,
         contentText: req.text,
       },
-      { jobId: `rfp-embed-req:${orgId}:${req.id}` },
+      { jobId: `rfp-embed-req-${orgId}-${req.id}` },
     );
 
     // 2. Run hybrid story-match for this requirement
@@ -213,7 +213,7 @@ export async function processJob(
         requirementId: req.id,
       },
       {
-        jobId: `rfp-story-match:${orgId}:${req.id}`,
+        jobId: `rfp-story-match-${orgId}-${req.id}`,
         attempts: RFP_STORY_MATCH.defaultJobOptions.attempts,
         backoff: RFP_STORY_MATCH.defaultJobOptions.backoff,
       },

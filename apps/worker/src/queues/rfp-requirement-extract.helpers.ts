@@ -93,7 +93,7 @@ export async function updateOrchestrationPhase(
     UPDATE rfp_orchestrations
     SET
       current_phase    = ${phase}::"RfpResponsePhase",
-      completed_phases = array_append(completed_phases, ${completedPhase}::"RfpResponsePhase"),
+      completed_phases = array_append(completed_phases, ${completedPhase}),
       updated_at       = now()
     WHERE id = ${orchestrationId}::uuid AND org_id = ${orgId}::uuid
   `;
@@ -123,7 +123,7 @@ export async function markOrchestrationAwaitingApproval(
     UPDATE rfp_orchestrations
     SET state = 'awaiting_approval',
         current_phase = 'awaiting_approval'::"RfpResponsePhase",
-        completed_phases = array_append(completed_phases, 'qa_review'::"RfpResponsePhase"),
+        completed_phases = array_append(completed_phases, 'qa_review'),
         updated_at = now()
     WHERE id = ${orchestrationId}::uuid AND org_id = ${orgId}::uuid
   `;

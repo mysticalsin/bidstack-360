@@ -137,7 +137,7 @@ async function processJob(
       totalChunks: 1,
     },
     {
-      jobId: `rfp-req-extract:${orchestrationId}`,
+      jobId: `rfp-req-extract-${orchestrationId}`,
       attempts: RFP_REQUIREMENT_EXTRACT.defaultJobOptions.attempts,
       backoff: RFP_REQUIREMENT_EXTRACT.defaultJobOptions.backoff,
     },

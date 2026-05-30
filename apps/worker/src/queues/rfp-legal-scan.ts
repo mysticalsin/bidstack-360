@@ -163,7 +163,7 @@ async function processJob(
   await proposalCompileQueue.add(
     'rfp.proposal-compile',
     { orgId, orchestrationId, proposalId },
-    { jobId: `rfp-proposal-compile:${orchestrationId}` },
+    { jobId: `rfp-proposal-compile-${orchestrationId}` },
   );
 
   log.info(

@@ -108,7 +108,7 @@ async function processJob(
   await qaReviewQueue.add(
     'rfp.qa-review',
     { orgId, orchestrationId, proposalId },
-    { jobId: `rfp-qa-review:${orchestrationId}` },
+    { jobId: `rfp-qa-review-${orchestrationId}` },
   );
 
   log.info(
