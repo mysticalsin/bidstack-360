@@ -55,20 +55,20 @@ export function CustomObjectListPage() {
   if (defsLoading) {
     return (
       <div className="p-6 max-w-5xl mx-auto space-y-4 animate-pulse">
-        <div className="h-8 w-48 bg-[var(--surface-2)] rounded" />
-        <div className="h-64 bg-[var(--surface-2)] rounded-xl" />
+        <div className="h-8 w-48 bg-[var(--surface-card)] rounded" />
+        <div className="h-64 bg-[var(--surface-card)] rounded-xl" />
       </div>
     );
   }
 
   if (!def) {
     return (
-      <div className="p-6 text-center text-[var(--text-secondary)]">
+      <div className="p-6 text-center text-[var(--fg-secondary)]">
         <p className="text-2xl mb-2">404</p>
         <p>Custom object &quot;{objectKey}&quot; not found.</p>
         <Link
           to="/settings/custom-objects"
-          className="mt-4 inline-block text-[var(--accent)] underline"
+          className="mt-4 inline-block text-[var(--brand-primary)] underline"
         >
           Manage custom objects
         </Link>
@@ -94,8 +94,8 @@ export function CustomObjectListPage() {
             style={{ backgroundColor: def.color }}
             aria-hidden="true"
           />
-          <h1 className="text-2xl font-semibold text-[var(--text-primary)]">{def.labelPlural}</h1>
-          <span className="text-sm text-[var(--text-tertiary)]">
+          <h1 className="text-2xl font-semibold text-[var(--fg-primary)]">{def.labelPlural}</h1>
+          <span className="text-sm text-[var(--fg-tertiary)]">
             {total > 0 ? `${total} total` : ''}
           </span>
         </div>
@@ -104,8 +104,8 @@ export function CustomObjectListPage() {
           onClick={() => setShowCreate(true)}
           className={cn(
             'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium',
-            'bg-[var(--accent)] text-white hover:opacity-90 active:opacity-80',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]',
+            'bg-[var(--brand-primary)] text-white hover:opacity-90 active:opacity-80',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]',
             'transition-opacity min-h-[44px]',
           )}
         >
@@ -117,7 +117,7 @@ export function CustomObjectListPage() {
       {recordsQuery.isLoading && (
         <div className="space-y-2">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-12 bg-[var(--surface-2)] rounded animate-pulse" />
+            <div key={i} className="h-12 bg-[var(--surface-card)] rounded animate-pulse" />
           ))}
         </div>
       )}
@@ -132,7 +132,7 @@ export function CustomObjectListPage() {
       )}
 
       {!recordsQuery.isLoading && records.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-16 text-center text-[var(--text-secondary)]">
+        <div className="flex flex-col items-center justify-center py-16 text-center text-[var(--fg-secondary)]">
           <p className="font-medium">No {def.labelPlural.toLowerCase()} yet</p>
           <p className="text-sm mt-1">
             Click &quot;New {def.labelSingular}&quot; to create your first record.
@@ -141,10 +141,10 @@ export function CustomObjectListPage() {
       )}
 
       {!recordsQuery.isLoading && records.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
+        <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)]">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-[var(--surface-2)] text-[var(--text-secondary)] text-left">
+              <tr className="bg-[var(--surface-card)] text-[var(--fg-secondary)] text-left">
                 <th className="px-4 py-3 font-medium whitespace-nowrap">Record</th>
                 {displayKeys.map((k) => (
                   <th key={k} className="px-4 py-3 font-medium capitalize whitespace-nowrap">
@@ -158,22 +158,22 @@ export function CustomObjectListPage() {
               {records.map((record) => (
                 <tr
                   key={record.id}
-                  className="border-t border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors"
+                  className="border-t border-[var(--border-subtle)] hover:bg-[var(--surface-card)] transition-colors"
                 >
-                  <td className="px-4 py-3 font-mono text-xs text-[var(--text-tertiary)] whitespace-nowrap">
+                  <td className="px-4 py-3 font-mono text-xs text-[var(--fg-tertiary)] whitespace-nowrap">
                     <Link
                       to={`/o/${objectKey}/${record.id}`}
-                      className="text-[var(--accent)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded"
+                      className="text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)] rounded"
                     >
                       {record.recordKey}
                     </Link>
                   </td>
                   {displayKeys.map((k) => (
-                    <td key={k} className="px-4 py-3 text-[var(--text-primary)] max-w-xs truncate">
+                    <td key={k} className="px-4 py-3 text-[var(--fg-primary)] max-w-xs truncate">
                       {String(record.valuesJson[k] ?? '—')}
                     </td>
                   ))}
-                  <td className="px-4 py-3 text-[var(--text-tertiary)] whitespace-nowrap">
+                  <td className="px-4 py-3 text-[var(--fg-tertiary)] whitespace-nowrap">
                     {relativeTime(record.updatedAt)}
                   </td>
                 </tr>
@@ -190,18 +190,18 @@ export function CustomObjectListPage() {
             type="button"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1}
-            className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-sm disabled:opacity-40 hover:bg-[var(--surface-2)] transition-colors min-h-[44px]"
+            className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-sm disabled:opacity-40 hover:bg-[var(--surface-card)] transition-colors min-h-[44px]"
           >
             ← Previous
           </button>
-          <span className="text-sm text-[var(--text-secondary)]">
+          <span className="text-sm text-[var(--fg-secondary)]">
             Page {page} of {totalPages}
           </span>
           <button
             type="button"
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page >= totalPages}
-            className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-sm disabled:opacity-40 hover:bg-[var(--surface-2)] transition-colors min-h-[44px]"
+            className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-sm disabled:opacity-40 hover:bg-[var(--surface-card)] transition-colors min-h-[44px]"
           >
             Next →
           </button>
@@ -218,8 +218,8 @@ export function CustomObjectListPage() {
         }}
         labelId="create-record-title"
       >
-        <div className="bg-[var(--surface)] rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
-          <h2 id="create-record-title" className="text-lg font-semibold text-[var(--text-primary)]">
+        <div className="bg-[var(--surface-card)] rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+          <h2 id="create-record-title" className="text-lg font-semibold text-[var(--fg-primary)]">
             New {def.labelSingular}
           </h2>
           <form
@@ -236,7 +236,7 @@ export function CustomObjectListPage() {
             <div>
               <label
                 htmlFor="cr-name"
-                className="block text-sm font-medium text-[var(--text-primary)] mb-1"
+                className="block text-sm font-medium text-[var(--fg-primary)] mb-1"
               >
                 Name <span aria-hidden="true">*</span>
               </label>
@@ -259,14 +259,14 @@ export function CustomObjectListPage() {
                   setCreateValues({ name: '' });
                   setCreateError(null);
                 }}
-                className="flex-1 px-4 py-2 rounded-lg border border-[var(--border)] text-sm hover:bg-[var(--surface-2)] transition-colors min-h-[44px]"
+                className="flex-1 px-4 py-2 rounded-lg border border-[var(--border-subtle)] text-sm hover:bg-[var(--surface-card)] transition-colors min-h-[44px]"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={createRecord.isPending}
-                className="flex-1 px-4 py-2 rounded-lg bg-[var(--accent)] text-white text-sm hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
+                className="flex-1 px-4 py-2 rounded-lg bg-[var(--brand-primary)] text-white text-sm hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
               >
                 {createRecord.isPending ? 'Creating…' : 'Create'}
               </button>

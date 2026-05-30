@@ -76,18 +76,18 @@ export function CustomObjectDetailPage() {
   if (recordQuery.isLoading || !defsData) {
     return (
       <div className="p-6 max-w-3xl mx-auto space-y-4 animate-pulse">
-        <div className="h-8 w-40 bg-[var(--surface-2)] rounded" />
-        <div className="h-64 bg-[var(--surface-2)] rounded-xl" />
+        <div className="h-8 w-40 bg-[var(--surface-card)] rounded" />
+        <div className="h-64 bg-[var(--surface-card)] rounded-xl" />
       </div>
     );
   }
 
   if (!record || !def) {
     return (
-      <div className="p-6 text-[var(--text-secondary)]">
+      <div className="p-6 text-[var(--fg-secondary)]">
         Record not found.{' '}
         {def && (
-          <Link to={`/o/${objectKey}`} className="underline text-[var(--accent)]">
+          <Link to={`/o/${objectKey}`} className="underline text-[var(--brand-primary)]">
             Back to {def.labelPlural}
           </Link>
         )}
@@ -101,17 +101,17 @@ export function CustomObjectDetailPage() {
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       {/* Breadcrumb */}
       <nav aria-label="Breadcrumb">
-        <ol className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+        <ol className="flex items-center gap-2 text-sm text-[var(--fg-secondary)]">
           <li>
             <Link
               to={`/o/${objectKey}`}
-              className="hover:text-[var(--accent)] underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded"
+              className="hover:text-[var(--brand-primary)] underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)] rounded"
             >
               {def.labelPlural}
             </Link>
           </li>
           <li aria-hidden="true">/</li>
-          <li className="font-mono text-xs text-[var(--text-primary)]" aria-current="page">
+          <li className="font-mono text-xs text-[var(--fg-primary)]" aria-current="page">
             {record.recordKey}
           </li>
         </ol>
@@ -126,10 +126,10 @@ export function CustomObjectDetailPage() {
             aria-hidden="true"
           />
           <div>
-            <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
+            <h1 className="text-2xl font-semibold text-[var(--fg-primary)]">
               {String(values.name ?? record.recordKey)}
             </h1>
-            <p className="text-sm text-[var(--text-tertiary)] font-mono">{record.recordKey}</p>
+            <p className="text-sm text-[var(--fg-tertiary)] font-mono">{record.recordKey}</p>
           </div>
         </div>
 
@@ -153,7 +153,7 @@ export function CustomObjectDetailPage() {
       {/* Field values */}
       <section
         aria-labelledby="fields-section"
-        className="bg-[var(--surface)] border border-[var(--border)] rounded-xl overflow-hidden"
+        className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-xl overflow-hidden"
       >
         <h2 id="fields-section" className="sr-only">
           Field values
@@ -164,11 +164,11 @@ export function CustomObjectDetailPage() {
               key={key}
               className={cn(
                 'grid grid-cols-3 items-start px-5 py-4',
-                i > 0 && 'border-t border-[var(--border)]',
-                editField === key && 'bg-[var(--surface-2)]',
+                i > 0 && 'border-t border-[var(--border-subtle)]',
+                editField === key && 'bg-[var(--surface-card)]',
               )}
             >
-              <dt className="text-sm font-medium text-[var(--text-secondary)] capitalize">
+              <dt className="text-sm font-medium text-[var(--fg-secondary)] capitalize">
                 {key.replace(/_/g, ' ')}
               </dt>
               <dd className="col-span-2">
@@ -192,14 +192,14 @@ export function CustomObjectDetailPage() {
                         void saveEdit();
                       }}
                       disabled={updateRecord.isPending}
-                      className="px-3 py-1 rounded-lg bg-[var(--accent)] text-white text-sm hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
+                      className="px-3 py-1 rounded-lg bg-[var(--brand-primary)] text-white text-sm hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
                     >
                       {updateRecord.isPending ? '…' : 'Save'}
                     </button>
                     <button
                       type="button"
                       onClick={() => setEditField(null)}
-                      className="px-3 py-1 rounded-lg border border-[var(--border)] text-sm hover:bg-[var(--surface-3)] transition-colors min-h-[44px]"
+                      className="px-3 py-1 rounded-lg border border-[var(--border-subtle)] text-sm hover:bg-[var(--surface-sunken)] transition-colors min-h-[44px]"
                     >
                       Cancel
                     </button>
@@ -210,8 +210,8 @@ export function CustomObjectDetailPage() {
                     onClick={() => startEdit(key)}
                     className={cn(
                       'w-full text-left text-sm px-2 py-1 -ml-2 rounded',
-                      'text-[var(--text-primary)] hover:bg-[var(--surface-2)]',
-                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]',
+                      'text-[var(--fg-primary)] hover:bg-[var(--surface-card)]',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]',
                       'transition-colors min-h-[44px] flex items-center',
                     )}
                     aria-label={`Edit ${key.replace(/_/g, ' ')}: ${String(values[key] ?? '—')}`}
@@ -229,11 +229,11 @@ export function CustomObjectDetailPage() {
           ))}
 
           {fieldKeys.length === 0 && (
-            <div className="px-5 py-8 text-center text-sm text-[var(--text-secondary)]">
+            <div className="px-5 py-8 text-center text-sm text-[var(--fg-secondary)]">
               No fields defined yet. Add fields in the{' '}
               <Link
                 to={`/settings/custom-objects/${def.id}`}
-                className="underline text-[var(--accent)]"
+                className="underline text-[var(--brand-primary)]"
               >
                 object editor
               </Link>
@@ -244,7 +244,7 @@ export function CustomObjectDetailPage() {
       </section>
 
       {/* Metadata */}
-      <section className="text-xs text-[var(--text-tertiary)] space-y-1">
+      <section className="text-xs text-[var(--fg-tertiary)] space-y-1">
         <p>Created {relativeTime(record.createdAt)}</p>
         <p>Updated {relativeTime(record.updatedAt)}</p>
         {record.deletedAt && (
