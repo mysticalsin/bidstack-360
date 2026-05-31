@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { api } from '@/lib/api';
 
 interface ErpStatus {
@@ -70,8 +70,7 @@ export function ErpConnectorCard() {
   });
   const kit = useQuery({
     queryKey: ['erp:presales-kit'],
-    queryFn: ({ signal }) =>
-      api<ErpPresalesKit>('/api/integrations/erp/presales-kit', { signal }),
+    queryFn: ({ signal }) => api<ErpPresalesKit>('/api/integrations/erp/presales-kit', { signal }),
   });
   const autocomplete = useQuery({
     queryKey: ['erp:company-autocomplete', query],
@@ -84,20 +83,24 @@ export function ErpConnectorCard() {
     },
   });
 
-  const tone = !status.data
-    ? 'gray'
-    : !status.data.configured
-      ? 'amber'
-      : status.data.reachable
-        ? 'jade'
-        : 'tomato';
-  const label = !status.data
-    ? 'checking'
-    : !status.data.configured
-      ? 'not configured'
-      : status.data.reachable
-        ? 'live'
-        : 'unreachable';
+  const tone = status.isError
+    ? 'tomato'
+    : !status.data
+      ? 'gray'
+      : !status.data.configured
+        ? 'amber'
+        : status.data.reachable
+          ? 'jade'
+          : 'tomato';
+  const label = status.isError
+    ? 'error'
+    : !status.data
+      ? 'checking'
+      : !status.data.configured
+        ? 'not configured'
+        : status.data.reachable
+          ? 'live'
+          : 'unreachable';
 
   return (
     <Card>
@@ -110,11 +113,23 @@ export function ErpConnectorCard() {
         <div className="p-5">
           <LoadingSkeleton rows={2} />
         </div>
+      ) : status.isError ? (
+        <div className="p-5">
+          <ErrorState
+            title="Couldn't reach the ERP status endpoint"
+            message="This is a connection problem, not a missing configuration. Please retry."
+            action={
+              <Button size="sm" variant="secondary" onClick={() => void status.refetch()}>
+                Retry
+              </Button>
+            }
+          />
+        </div>
       ) : !status.data?.configured ? (
         <div className="px-5 py-6 text-sm text-[var(--fg-secondary)]">
           Set <code className="font-mono text-xs">ERP_MCP_URL</code> and optionally{' '}
-          <code className="font-mono text-xs">ERP_DB</code> to reach the ERP MCP sidecar.
-          Until then, BidStack uses local verified data and verified data connectors.
+          <code className="font-mono text-xs">ERP_DB</code> to reach the ERP MCP sidecar. Until
+          then, BidStack uses local verified data and verified data connectors.
         </div>
       ) : (
         <>

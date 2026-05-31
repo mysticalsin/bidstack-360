@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { EmptyState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { Button } from '@/components/ui/Button';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useTasks } from '@/hooks/useTasks';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
@@ -120,6 +121,20 @@ function DecisionUnitPanel({
   }
 
   if (contacts.isLoading) return <LoadingSkeleton />;
+  // Surface a fetch failure instead of silently showing the "no members" empty
+  // state (which misreads a CRM outage as "nothing here yet").
+  if (contacts.isError)
+    return (
+      <ErrorState
+        title="Couldn't load decision-unit contacts"
+        message="Please try again."
+        action={
+          <Button size="sm" variant="secondary" onClick={() => void contacts.refetch()}>
+            Retry
+          </Button>
+        }
+      />
+    );
   if (rows.length === 0)
     return (
       <EmptyState
