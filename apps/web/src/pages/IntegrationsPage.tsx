@@ -23,6 +23,7 @@ import { ConnectionCommandCenter } from './integrations/ConnectionCommandCenter'
 import { ConnectionRunway } from './integrations/ConnectionRunway';
 import { ConnectionTester } from './integrations/ConnectionTester';
 import { DustAgentsCard } from './integrations/DustAgentsCard';
+import { DustCredentialsCard } from './integrations/DustCredentialsCard';
 import { IntegrationHero } from './integrations/IntegrationHero';
 import { WebhookEventsCard } from './integrations/WebhookEventsCard';
 import { buildIntegrationSummary } from './integrations/integration-helpers';
@@ -131,6 +132,8 @@ export function IntegrationsPage() {
         </TabsContent>
 
         <TabsContent value="agents" className="space-y-6 outline-none">
+          <DustCredentialsCard />
+
           <Card>
             <SectionHeader
               title="Dust workspace"
