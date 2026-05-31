@@ -25,7 +25,7 @@ import { Worker as BullWorker } from 'bullmq';
 import { z } from 'zod';
 import { prisma, type Prisma } from '@bidstack/db';
 
-import { RFP_QA_REVIEW } from '@bidstack/shared';
+import { RFP_QA_REVIEW, rolePreambleForKey } from '@bidstack/shared';
 import { buildAgentUserMessage } from '../lib/prompt-safety.js';
 import { logAiInvocation } from '../lib/ai-audit-worker.js';
 import { getOrgDust, resolveAgentId } from '../lib/dust-credentials.js';
@@ -103,6 +103,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
   if (dust && proposal.compiledContent) {
     const userMessage = buildAgentUserMessage({
       template:
+        `${rolePreambleForKey('qa_reviewer')}\n\n` +
         'Score this compiled proposal for quality, compliance, and completeness. ' +
         'Return ONLY JSON: { "scoreBps": 0-10000, "issues": [{ "severity": string, "description": string }] }.',
       trusted: { PROPOSAL_ID: proposalId },

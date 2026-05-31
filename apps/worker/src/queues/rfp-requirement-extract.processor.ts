@@ -9,7 +9,7 @@ import type { z } from 'zod';
 
 import type { MemOSService } from '@bidstack/memos';
 import { prisma } from '@bidstack/db';
-import { RFP_STORY_MATCH } from '@bidstack/shared';
+import { RFP_STORY_MATCH, rolePreambleForKey } from '@bidstack/shared';
 import { buildAgentUserMessage } from '../lib/prompt-safety.js';
 import { logAiInvocation } from '../lib/ai-audit-worker.js';
 import { getOrgDust, resolveAgentId } from '../lib/dust-credentials.js';
@@ -76,6 +76,7 @@ export async function processJob(
   if (dust) {
     const userMessage = buildAgentUserMessage({
       template:
+        `${rolePreambleForKey('requirements_analyst')}\n\n` +
         'Extract all requirements from the following RFP document chunk ' +
         '(chunk {{CHUNK_INDEX}} of {{TOTAL_CHUNKS}}). ' +
         'Return ONLY a JSON object with a "requirements" array. Each item must have: ' +

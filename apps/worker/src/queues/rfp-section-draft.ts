@@ -20,7 +20,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { MemOSService } from '@bidstack/memos';
 
-import { RFP_SECTION_DRAFT, RFP_LEGAL_SCAN } from '@bidstack/shared';
+import { RFP_SECTION_DRAFT, RFP_LEGAL_SCAN, rolePreambleForKey } from '@bidstack/shared';
 import { buildAgentUserMessage } from '../lib/prompt-safety.js';
 import { logAiInvocation } from '../lib/ai-audit-worker.js';
 import { getOrgDust, resolveAgentId } from '../lib/dust-credentials.js';
@@ -132,6 +132,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger, memos: MemOSServi
   if (dust) {
     const userMessage = buildAgentUserMessage({
       template:
+        `${rolePreambleForKey('proposal_writer')}\n\n` +
         'Write a professional proposal section titled "{{SECTION_TITLE}}" for proposal {{PROPOSAL_ID}}. ' +
         'Use the matched success story context below to ground claims in real delivery evidence. ' +
         'Output only the section content in Markdown. Do not include a heading — it will be added by the renderer.',

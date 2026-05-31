@@ -16,7 +16,7 @@ import { Worker as BullWorker } from 'bullmq';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 
-import { RFP_COMPLIANCE_FILL } from '@bidstack/shared';
+import { RFP_COMPLIANCE_FILL, rolePreambleForKey } from '@bidstack/shared';
 import { buildAgentUserMessage } from '../lib/prompt-safety.js';
 import { logAiInvocation } from '../lib/ai-audit-worker.js';
 import { getOrgDust, resolveAgentId } from '../lib/dust-credentials.js';
@@ -86,6 +86,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
   if (dust) {
     const userMessage = buildAgentUserMessage({
       template:
+        `${rolePreambleForKey('compliance_officer')}\n\n` +
         'Assess compliance for the following requirement{{CATEGORY_SUFFIX}}. ' +
         'Return ONLY a JSON object with: status (YES|NO|PARTIAL|NOT_APPLICABLE), ' +
         'justification (string, max 200 chars), confidence (0-10000).',
