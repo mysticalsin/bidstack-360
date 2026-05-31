@@ -28,7 +28,7 @@ import {
   persistRisks,
   persistTasks,
   asJsonObject,
-} from '../services/crm/notes.service';
+} from '../services/crm/notes.service.js';
 
 // WHY: only email is needed for the wire shape; fetching the whole User row
 // would include clerkId, settings, and other fields irrelevant to note display.
