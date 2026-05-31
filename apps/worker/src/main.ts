@@ -37,7 +37,7 @@ import { startRfpEmbedRequirement } from './queues/rfp-embed-requirement.js';
 import { startRfpLegalScan } from './queues/rfp-legal-scan.js';
 import { startRfpProposalCompile } from './queues/rfp-proposal-compile.js';
 import { startRfpQaReview } from './queues/rfp-qa-review.js';
-import { startCrewRun } from './queues/crew-run.js';
+import { startCrewRun, startCrewRunReaper } from './queues/crew-run.js';
 import { startSignatureWorkers } from './queues/signatures.js';
 
 const log = pino({
@@ -102,6 +102,7 @@ await Promise.all([
   startSignatureWorkers(connection, log, workers, queues),
   // Wave 10 — Crew (CrewAI-style multi-agent) execution
   startCrewRun(connection, log, workers, queues),
+  startCrewRunReaper(connection, log, workers, queues),
 ]);
 
 log.info(

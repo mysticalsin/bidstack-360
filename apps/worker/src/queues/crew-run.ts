@@ -7,7 +7,7 @@ import type { Queue, Worker, Job } from 'bullmq';
 import type IORedis from 'ioredis';
 import type pino from 'pino';
 
-import { Worker as BullWorker } from 'bullmq';
+import { Worker as BullWorker, Queue as BullQueue } from 'bullmq';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 
@@ -170,4 +170,58 @@ export async function startCrewRun(
   worker.on('failed', (job, err) => log.error({ jobId: job?.id, err }, 'crew-run: failed'));
   workers.push(worker);
   log.info({ queue: QUEUE_NAME }, 'crew-run worker started');
+}
+
+// ─── Stuck-run reaper ────────────────────────────────────────────────────────
+
+const REAPER_QUEUE = 'crew-run-reaper';
+const REAPER_EVERY_MS = 5 * 60 * 1000;
+
+/**
+ * Sweep crew runs stuck in queued/running past a 15-minute SLA and mark them
+ * failed, so a run whose worker died mid-flight (or whose job was lost) stops
+ * sitting "running" forever in the UI and the caller can retry. System-wide +
+ * idempotent: the WHERE clause never touches already-terminal runs, so it's
+ * safe even if multiple worker instances run it. `interval '15 minutes'` is a
+ * SQL literal (no interpolation).
+ */
+async function reapStuckRuns(log: pino.Logger): Promise<void> {
+  const reaped = await prisma.$executeRaw`
+    UPDATE crew_runs
+    SET status = 'failed',
+        error = 'Run exceeded the 15-minute limit and was marked failed',
+        completed_at = now()
+    WHERE status IN ('queued', 'running')
+      AND created_at < now() - interval '15 minutes'
+  `;
+  if (reaped > 0) log.warn({ reaped }, 'crew-run reaper: marked stuck runs failed');
+}
+
+export async function startCrewRunReaper(
+  connection: IORedis,
+  log: pino.Logger,
+  workers: Worker[],
+  queues: Queue[],
+): Promise<void> {
+  const queue = new BullQueue(REAPER_QUEUE, { connection });
+  queues.push(queue);
+  await queue.add(
+    'crew-run.reap',
+    {},
+    {
+      repeat: { every: REAPER_EVERY_MS },
+      removeOnComplete: { age: 3600, count: 50 },
+      removeOnFail: { age: 86400 },
+    },
+  );
+  const worker = new BullWorker(
+    REAPER_QUEUE,
+    async () => reapStuckRuns(log.child({ kind: 'crew-reaper' })),
+    {
+      connection,
+    },
+  );
+  worker.on('failed', (job, err) => log.error({ jobId: job?.id, err }, 'crew-run reaper: failed'));
+  workers.push(worker);
+  log.info({ queue: REAPER_QUEUE }, 'crew-run reaper started');
 }
