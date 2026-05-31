@@ -1,5 +1,12 @@
 import { prisma, type Prisma } from '@bidstack/db';
 
+// PostgreSQL's `uuid` type only accepts the canonical 8-4-4-4-12 hex form, so a
+// non-UUID sentinel actor (e.g. 'system' from worker/pipeline jobs) cannot be
+// stored in the user_id column. Because that column has no foreign key, NULL is
+// the correct representation of "no user / system-initiated"; logTrace coerces
+// such actors to NULL and keeps the original string in metadata.actor.
+const ACTOR_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export interface TraceEvent {
   orgId: string;
   tier: 'l1' | 'l2' | 'l3';
@@ -7,6 +14,10 @@ export interface TraceEvent {
   entityType: string;
   entityId: string;
   action: string;
+  /**
+   * Actor UUID. Non-UUID sentinels (e.g. 'system' for pipeline/worker jobs) are
+   * stored as NULL on user_id and preserved in metadata.actor — see logTrace.
+   */
   userId: string;
   payload: Record<string, unknown>;
   metadata?: Record<string, unknown>;
@@ -73,6 +84,17 @@ export class MemOSService {
   }
 
   async logTrace(event: TraceEvent): Promise<void> {
+    // Coerce non-UUID sentinel actors (e.g. 'system') to NULL so the insert
+    // satisfies the user_id UUID column instead of throwing Prisma P2023, and
+    // preserve the original actor in metadata.actor. Centralised here so every
+    // current and future caller is fixed at once.
+    const isUuidActor = ACTOR_UUID_PATTERN.test(event.userId);
+    const userId = isUuidActor ? event.userId : null;
+    const metadata = {
+      ...(event.metadata ?? {}),
+      ...(isUuidActor ? {} : { actor: event.userId }),
+    };
+
     await this.db.memosTrace.create({
       data: {
         orgId: event.orgId,
@@ -81,9 +103,9 @@ export class MemOSService {
         entityType: event.entityType,
         entityId: event.entityId,
         action: event.action,
-        userId: event.userId,
+        userId,
         payload: event.payload as Prisma.InputJsonValue,
-        metadata: (event.metadata ?? {}) as Prisma.InputJsonValue,
+        metadata: metadata as Prisma.InputJsonValue,
       },
     });
   }
@@ -221,9 +243,7 @@ export class MemOSService {
       );
     }
 
-    return items
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-      .slice(0, limit);
+    return items.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, limit);
   }
 
   async getPoliciesForScope(

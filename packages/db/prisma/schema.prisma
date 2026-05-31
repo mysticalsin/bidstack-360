@@ -2809,7 +2809,7 @@ model MemosTrace {
   entityType String   @map("entity_type") // opportunity | contact | task | proposal | etc.
   entityId   String   @map("entity_id") @db.Uuid
   action     String // create | update | delete | view | score | generate | etc.
-  userId     String   @map("user_id") @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid // null = system-initiated (no FK; sentinel actors kept in metadata.actor)
   payload    Json // full context of the action
   metadata   Json     @default("{}")
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
