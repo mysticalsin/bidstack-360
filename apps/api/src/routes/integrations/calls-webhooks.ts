@@ -29,6 +29,7 @@ import {
   zoomUrlValidationResponse,
 } from '../../services/calls/zoom.service.js';
 import { validateTwilioVoiceSignature } from '../../services/calls/twilio-voice.service.js';
+import { verifyClientState } from '../../services/microsoft-graph-subscription.service.js';
 import { CALL_FETCH_RECORDING } from '@bidstack/shared';
 import { redis } from '../../redis.js';
 
@@ -194,9 +195,23 @@ export const teamsCallWebhookRoutes: FastifyPluginAsync = async (fastify) => {
       const notifications = req.body?.value ?? [];
 
       for (const notification of notifications) {
-        // clientState carries orgId (set when subscription was created)
-        const orgId = notification.clientState;
-        if (!orgId) continue;
+        // SECURITY: never trust the request's clientState as the orgId — that
+        // would let anyone POST a victim orgId and mutate their call sessions.
+        // Look the subscription up by its id, constant-time-verify the clientState
+        // secret, and derive orgId from the STORED row.
+        if (!notification.subscriptionId || !notification.clientState) continue;
+        const sub = await prisma.graphSubscription.findUnique({
+          where: { subscriptionId: notification.subscriptionId },
+          select: { orgId: true, clientState: true },
+        });
+        if (!sub || !verifyClientState(notification.clientState, sub.clientState)) {
+          req.log.warn(
+            { subscriptionId: notification.subscriptionId },
+            'teams webhook: unknown subscription or clientState mismatch — ignoring',
+          );
+          continue;
+        }
+        const orgId = sub.orgId;
 
         // For now, mark call as completed when we receive a meeting end notification
         const resource = notification.resource ?? '';

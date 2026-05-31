@@ -63,12 +63,12 @@ export const hubspotMigrationRoutes: FastifyPluginAsyncZod = async (server) => {
         );
       }
 
-      // Encode orgId + userId in state so callback can reconstruct auth context.
-      // State is opaque to HubSpot; we verify it on callback.
+      // Encode orgId + userId in state so the callback can reconstruct auth
+      // context. Authenticated-encrypt it (AES-256-GCM, base64url) so it can't be
+      // forged or tampered — otherwise anyone could craft a state carrying a
+      // victim's orgId and bind their own HubSpot tokens into that org on callback.
       const { orgId, userId } = req.auth;
-      const state = Buffer.from(JSON.stringify({ orgId, userId, ts: Date.now() })).toString(
-        'base64url',
-      );
+      const state = encryptSecret(JSON.stringify({ orgId, userId, ts: Date.now() }));
 
       const authUrl = buildHubSpotAuthUrl(clientId, redirectUri, state);
       return reply.redirect(authUrl, 302);
@@ -101,7 +101,13 @@ export const hubspotMigrationRoutes: FastifyPluginAsyncZod = async (server) => {
       // Verify state param (decode and check ts is < 10 minutes old).
       let stateData: { orgId: string; userId: string; ts: number };
       try {
-        stateData = JSON.parse(Buffer.from(state, 'base64url').toString('utf8'));
+        // decryptSecret throws on a forged/tampered blob (GCM auth-tag failure),
+        // so orgId/userId below are guaranteed to be what WE encrypted at initiate.
+        stateData = JSON.parse(decryptSecret(state)) as {
+          orgId: string;
+          userId: string;
+          ts: number;
+        };
       } catch {
         throw server.httpErrors.badRequest('Invalid OAuth state parameter');
       }
