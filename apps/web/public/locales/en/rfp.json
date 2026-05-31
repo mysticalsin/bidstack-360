@@ -7,7 +7,7 @@
   },
   "upload": {
     "title": "Upload RFP Document",
-    "dropzone": "Drop PDF or DOCX here",
+    "dropzone": "Drop an RFP document, text file, spreadsheet or image here",
     "or": "or",
     "browse": "Browse files",
     "dropzoneLabel": "File upload drop zone",
@@ -15,7 +15,7 @@
     "uploading": "Uploading document…",
     "processingUpload": "Processing upload…",
     "cancel": "Cancel upload",
-    "errorType": "Only PDF and DOCX files are supported.",
+    "errorType": "Upload a supported RFP source: PDF, Office, text, CSV, JSON, HTML, RTF or image.",
     "errorSize": "File exceeds the maximum size of {{max}} MB."
   },
   "pipeline": {
@@ -28,10 +28,13 @@
     "breadcrumbLabel": "Page breadcrumb",
     "breadcrumbOpportunities": "Opportunities",
     "errorTitle": "Pipeline failed",
-    "errorRetry": "Restart pipeline",
+    "errorRetry": "Retry",
+    "errorReset": "Restart pipeline",
     "stages": {
       "uploading": "Upload",
+      "queued": "Queued",
       "extraction": "Extract",
+      "extracting": "Extract",
       "story_matching": "Match Stories",
       "section_drafting": "Draft",
       "compliance_fill": "Compliance",
@@ -94,5 +97,12 @@
       "draftSections": "I have reviewed all draft sections",
       "legalClearance": "Legal scan findings addressed"
     }
+  },
+  "crew": {
+    "title": "Bid Crew",
+    "subtitle": "Your role-based agents working this RFP, stage by stage. Drag an agent to re-assign its stage.",
+    "dropHere": "Drop an agent here",
+    "closeBrief": "Close role brief",
+    "responsibilities": "Responsibilities"
   }
 }

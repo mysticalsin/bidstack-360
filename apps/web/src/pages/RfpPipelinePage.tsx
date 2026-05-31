@@ -20,6 +20,7 @@ import { StoryMatchPanel } from '@/components/rfp/stories/StoryMatchPanel';
 import { DraftReviewPane } from '@/components/rfp/draft/DraftReviewPane';
 import { ComplianceMatrix } from '@/components/rfp/compliance/ComplianceMatrix';
 import { ApprovalGate } from '@/components/rfp/approval/ApprovalGate';
+import { RfpCrewBoard } from '@/components/rfp/crew/RfpCrewBoard';
 
 const ACTIVE_PROCESSING_STAGES = [
   'extracting',
@@ -101,6 +102,12 @@ export function RfpPipelinePage() {
 
       {/* Stage progress bar (only shown once pipeline has started) */}
       {stage !== 'idle' && stage !== 'failed' && <PipelineProgress currentStage={stage} />}
+
+      {/* Live crew board — the role-based agents working this RFP, from the
+          moment it starts running through review and final approval. */}
+      {(isActiveProcessing(stage) || stage === 'awaiting_approval' || stage === 'approved') && (
+        <RfpCrewBoard />
+      )}
 
       {/* Stage-conditional panels */}
 
