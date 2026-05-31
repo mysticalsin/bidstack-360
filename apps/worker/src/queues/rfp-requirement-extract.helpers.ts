@@ -212,13 +212,20 @@ export async function isDocumentAiSafe(documentVersionId: string, orgId: string)
     where: { id: documentVersionId, orgId },
     select: { bidDocumentId: true },
   });
-  if (!docVersion?.bidDocumentId) return true; // no parent BidDocument — safe
+  // Fail CLOSED: a confidentiality gate must not grant AI access when it cannot
+  // even find the record it is meant to classify (race, deletion, org mismatch).
+  if (!docVersion) return false;
+  // A version with no parent BidDocument can carry no ndaTier — genuinely
+  // unclassified, so it is safe to process.
+  if (!docVersion.bidDocumentId) return true;
 
   const bidDoc = await prisma.bidDocument.findFirst({
     where: { id: docVersion.bidDocumentId, orgId },
     select: { metadata: true },
   });
-  if (!bidDoc) return true; // parent not found — safe
+  // Fail CLOSED: we KNOW a parent exists but couldn't load it — never assume
+  // safe and ship potentially Tier-D content to an external model.
+  if (!bidDoc) return false;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- metadata is untyped Json
   const meta = bidDoc.metadata as any;

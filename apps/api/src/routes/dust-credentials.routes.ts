@@ -21,6 +21,8 @@ import type { Logger as PinoLogger } from 'pino';
 import { DustClient } from '@bidstack/dust-client';
 import { encryptSecret } from '@bidstack/shared/server-crypto';
 
+import { isPublicHostname } from '../lib/ssrf-guard.js';
+
 import {
   resolveOrgDustCredentials,
   maskApiKey,
@@ -95,6 +97,21 @@ export const dustCredentialsRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const { apiKey, workspaceId, baseUrl, dataSourceId, agentIds } = req.body;
+
+      // SSRF guard: baseUrl is admin-supplied and the server fetches it now (and
+      // on every later Dust call), so it must be a public https endpoint — never
+      // an internal/metadata address (e.g. 169.254.169.254) or loopback.
+      if (baseUrl) {
+        let parsed: URL;
+        try {
+          parsed = new URL(baseUrl);
+        } catch {
+          throw server.httpErrors.badRequest('Base URL must be a valid URL.');
+        }
+        if (parsed.protocol !== 'https:' || !isPublicHostname(parsed.hostname)) {
+          throw server.httpErrors.badRequest('Base URL must be a public https:// endpoint.');
+        }
+      }
 
       // Validate against Dust BEFORE persisting so the admin gets honest,
       // immediate feedback — the whole point of plug-and-play.

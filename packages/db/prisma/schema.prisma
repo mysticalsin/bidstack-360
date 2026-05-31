@@ -4811,6 +4811,9 @@ model CrewRun {
 
   @@index([orgId, startedByUserId])
   @@index([crewId])
+  // Supports the stuck-run reaper sweep (status IN queued/running AND created_at
+  // < cutoff) so the 5-minute sweep is an index scan, not a seq scan.
+  @@index([status, createdAt], map: "crew_runs_status_created_idx")
   @@map("crew_runs")
 }
 
