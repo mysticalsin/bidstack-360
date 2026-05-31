@@ -111,9 +111,12 @@ export const bidWorkspaceRfpRoutes: FastifyPluginAsyncZod = async (server) => {
       const opportunity = await ensureOpportunity(req.auth.orgId, req.params.opportunityId);
       if (!opportunity) return reply.notFound('Opportunity not found');
 
+      // take: bound the scan — the dev query-guard rejects unbounded findMany,
+      // and an RFP realistically has far fewer than 500 requirements to match.
       const requirements = await prisma.requirement.findMany({
         where: { orgId: req.auth.orgId, opportunityId: opportunity.id, deletedAt: null },
         select: { id: true },
+        take: 500,
       });
       if (requirements.length === 0) return { items: [], total: 0 };
       const requirementIds = requirements.map((r) => r.id);
@@ -167,6 +170,64 @@ export const bidWorkspaceRfpRoutes: FastifyPluginAsyncZod = async (server) => {
         })
         .sort((a, b) => b.hybridScoreBps - a.hybridScoreBps);
 
+      return { items, total: items.length };
+    },
+  );
+
+  // ─── GET extracted requirements for review ───────────────────────────────────
+  // Backs the "Extracted Requirements" panel on the awaiting-approval surface.
+  // Org-scoped + take-bounded, same shape the useRfpRequirements hook expects.
+  server.get(
+    '/bid-workspaces/:opportunityId/requirements',
+    {
+      preHandler: server.requirePermission('documents:read'),
+      schema: {
+        params: WorkspaceParams,
+        response: {
+          200: z.object({
+            items: z.array(
+              z.object({
+                id: z.string().uuid(),
+                text: z.string(),
+                category: z.string(),
+                priority: z.string(),
+                aiConfidenceBps: z.number().int(),
+                pageRef: z.number().int().nullable(),
+              }),
+            ),
+            total: z.number().int(),
+          }),
+        },
+      },
+    },
+    async (req, reply) => {
+      const opportunity = await ensureOpportunity(req.auth.orgId, req.params.opportunityId);
+      if (!opportunity) return reply.notFound('Opportunity not found');
+
+      // take: bound the scan (dev query-guard rejects unbounded findMany); an RFP
+      // realistically has far fewer than 500 requirements.
+      const rows = await prisma.requirement.findMany({
+        where: { orgId: req.auth.orgId, opportunityId: opportunity.id, deletedAt: null },
+        select: {
+          id: true,
+          text: true,
+          requirementType: true,
+          priority: true,
+          confidenceBps: true,
+        },
+        orderBy: { createdAt: 'asc' },
+        take: 500,
+      });
+      const items = rows.map((r) => ({
+        id: r.id,
+        text: r.text,
+        category: r.requirementType,
+        priority: r.priority,
+        aiConfidenceBps: r.confidenceBps,
+        // Requirement has no page-number column yet; surfaced as null until
+        // extraction captures one (RequirementRow renders a null pageRef fine).
+        pageRef: null,
+      }));
       return { items, total: items.length };
     },
   );
@@ -286,6 +347,45 @@ export const bidWorkspaceRfpRoutes: FastifyPluginAsyncZod = async (server) => {
         DO UPDATE SET layout = ${json}::jsonb, updated_at = now()
       `;
       return { layout };
+    },
+  );
+
+  // ─── GET the latest RFP orchestration for this workspace ─────────────────────
+  // Lets the pipeline page resume an in-flight / awaiting-approval run after a
+  // page refresh instead of dropping the user back to the upload zone — the store
+  // resets on mount and the URL only carries the opportunityId, never the
+  // orchestrationId. Returns the most recent non-deleted orchestration or null;
+  // the client re-seeds the SSE stream from it ONLY when the state is still
+  // resumable, so a finished/failed bid still shows the upload zone (no trap).
+  server.get(
+    '/bid-workspaces/:opportunityId/rfp-latest',
+    {
+      preHandler: server.requirePermission('documents:read'),
+      schema: {
+        params: WorkspaceParams,
+        response: {
+          200: z.object({
+            orchestration: z
+              .object({
+                id: z.string().uuid(),
+                state: z.string(),
+                currentPhase: z.string().nullable(),
+              })
+              .nullable(),
+          }),
+        },
+      },
+    },
+    async (req, reply) => {
+      const opportunity = await ensureOpportunity(req.auth.orgId, req.params.opportunityId);
+      if (!opportunity) return reply.notFound('Opportunity not found');
+
+      const row = await prisma.rfpOrchestration.findFirst({
+        where: { orgId: req.auth.orgId, opportunityId: opportunity.id, deletedAt: null },
+        orderBy: { updatedAt: 'desc' },
+        select: { id: true, state: true, currentPhase: true },
+      });
+      return { orchestration: row ?? null };
     },
   );
 };

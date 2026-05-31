@@ -79,14 +79,18 @@ export const rfpPipelineStreamRoutes: FastifyPluginAsyncZod = async (server) => 
       });
 
       // Send initial state immediately so the client doesn't wait for the first poll.
-      // WHY field names match PipelineEvent in apps/web/src/stores/rfpPipeline.ts:
-      // stage/message/timestamp/progress/error — the frontend store's applyEvent()
-      // reads these exact keys. Mismatched keys silently produce undefined values.
+      // WHY these exact keys: the SSE consumer is useRfpPipeline()'s ServerSseFrame
+      // (apps/web/src/hooks/rfp/useRfpPipeline.ts), which reads phase/state/updatedAt/
+      // progress/message/error and DERIVES the UI stage from `phase` — because `state`
+      // stays 'running' for the entire active pipeline. Emitting the store's
+      // PipelineEvent keys (stage/timestamp) here instead leaves frame.phase and
+      // frame.updatedAt undefined, which freezes the UI on "extracting" and renders
+      // "Invalid Date" in the activity feed. Keep this aligned with ServerSseFrame.
       writeSseEvent(reply, {
-        stage: initial.currentPhase,
+        phase: initial.currentPhase,
         state: initial.state,
         message: initial.currentPhase ?? 'Pipeline started',
-        timestamp: initial.updatedAt.toISOString(),
+        updatedAt: initial.updatedAt.toISOString(),
         progress: initial.completedPhases.length,
         ...(initial.failureReason ? { error: initial.failureReason } : {}),
       });
@@ -127,10 +131,10 @@ export const rfpPipelineStreamRoutes: FastifyPluginAsyncZod = async (server) => 
               'SSE stream closed — max poll duration (30 min) reached',
             );
             writeSseEvent(reply, {
-              stage: 'failed',
+              phase: null,
               state: 'timeout',
               message: 'Stream closed after maximum duration. Reconnect to continue monitoring.',
-              timestamp: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
               error: 'SSE stream timed out after 30 minutes',
             });
             return cleanup(true);
@@ -163,11 +167,14 @@ export const rfpPipelineStreamRoutes: FastifyPluginAsyncZod = async (server) => 
               { err: dbErr, orchestrationId: req.params.orchestrationId },
               'SSE poll DB error',
             );
+            // state:'failed' (not 'error') so the client's STATE_TO_STAGE maps it
+            // to the failed UI stage — 'error' is unmapped and would fall back to
+            // 'extracting', masking the failure.
             writeSseEvent(reply, {
-              stage: 'failed',
-              state: 'error',
+              phase: null,
+              state: 'failed',
               message: 'Database error while polling orchestration status',
-              timestamp: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
               error: 'Internal database error',
             });
             return cleanup(true);
@@ -176,10 +183,10 @@ export const rfpPipelineStreamRoutes: FastifyPluginAsyncZod = async (server) => 
           if (!row || closed) return cleanup(false);
 
           writeSseEvent(reply, {
-            stage: row.currentPhase,
+            phase: row.currentPhase,
             state: row.state,
             message: row.currentPhase ?? 'Processing',
-            timestamp: row.updatedAt.toISOString(),
+            updatedAt: row.updatedAt.toISOString(),
             progress: row.completedPhases.length,
             ...(row.failureReason ? { error: row.failureReason } : {}),
           });

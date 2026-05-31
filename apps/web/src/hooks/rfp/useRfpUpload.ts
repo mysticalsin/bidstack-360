@@ -24,11 +24,12 @@ import { useCallback } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useRfpPipelineStore } from '@/stores/rfpPipeline';
 import type { PipelineEvent } from '@/stores/rfpPipeline';
-import type {
-  FileAttachment,
-  FileFinalizeRequest,
-  FileUploadUrlRequest,
-  FileUploadUrlResponse,
+import {
+  inferAllowedFileContentType,
+  type FileAttachment,
+  type FileFinalizeRequest,
+  type FileUploadUrlRequest,
+  type FileUploadUrlResponse,
 } from '@bidstack/shared';
 
 interface UploadResult {
@@ -49,43 +50,14 @@ interface UseRfpUploadReturn {
 // instance (zone vs progress bar) the user's Cancel button is wired to.
 let activeXhr: XMLHttpRequest | null = null;
 
-const CONTENT_TYPE_BY_EXTENSION: Record<string, FileUploadUrlRequest['contentType']> = {
-  pdf: 'application/pdf',
-  doc: 'application/msword',
-  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  ppt: 'application/vnd.ms-powerpoint',
-  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  xls: 'application/vnd.ms-excel',
-  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  txt: 'text/plain',
-  md: 'text/plain',
-  markdown: 'text/plain',
-  csv: 'text/csv',
-  json: 'text/plain',
-  xml: 'text/plain',
-  html: 'text/plain',
-  htm: 'text/plain',
-  rtf: 'text/plain',
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  gif: 'image/gif',
-  webp: 'image/webp',
-  tif: 'image/png',
-  tiff: 'image/png',
-  bmp: 'image/png',
-};
-
 function inferRfpContentType(file: File): FileUploadUrlRequest['contentType'] {
-  if (
-    Object.values(CONTENT_TYPE_BY_EXTENSION).includes(
-      file.type as FileUploadUrlRequest['contentType'],
-    )
-  ) {
-    return file.type as FileUploadUrlRequest['contentType'];
+  const contentType = inferAllowedFileContentType(file.name, file.type);
+  if (!contentType) {
+    throw new Error(
+      `Unsupported RFP source type for "${file.name}". Upload PDF, Office, text/data, image, audio, or video files.`,
+    );
   }
-  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
-  return CONTENT_TYPE_BY_EXTENSION[ext] ?? 'text/plain';
+  return contentType;
 }
 
 /** PUT the raw bytes to storage with byte-level progress. Resolves on 2xx. */
@@ -177,9 +149,16 @@ async function runUpload(file: File, opportunityId: string, actions: UploadActio
     });
 
     // 4. Start the pipeline.
+    // WHY a fresh rfpRequestId per upload: RfpOrchestration has a unique index on
+    // (orgId, rfpRequestId). If we omit it the server falls back to the
+    // opportunityId, so the FIRST upload to an opportunity succeeds but every
+    // re-upload collides — surfacing a raw 409 "record already exists". A unique
+    // id per upload lets a user re-run / upload a revised RFP, and gives each run
+    // a distinct BullMQ orchestrate jobId. The review panes already read the most
+    // recent proposal, so multiple runs per opportunity resolve to the latest.
     const result = await api<UploadResult>(`/api/v1/opportunities/${opportunityId}/rfp/upload`, {
       method: 'POST',
-      body: { fileAttachmentId: finalized.id },
+      body: { fileAttachmentId: finalized.id, rfpRequestId: crypto.randomUUID() },
     });
 
     setUpload({ isUploading: false, uploadProgress: 100 });

@@ -168,9 +168,20 @@ export async function processJob(
   // externalRef+documentVersionId is a natural dedup key.
   // orchestrationId stored in metadata JSON since the Requirement model
   // predates Wave 9 and has no orchestrationId column.
+  //
+  // opportunityId: stamp it from the orchestration so the awaiting-approval
+  // review panels — which query requirements by opportunityId — can actually
+  // find them. The extract job payload carries only documentVersionId, so
+  // without this lookup every requirement persists with a null opportunity and
+  // the "Extracted Requirements" / story-match panels stay empty on a good run.
+  const orch = await prisma.rfpOrchestration.findFirst({
+    where: { id: orchestrationId, orgId },
+    select: { opportunityId: true },
+  });
   await prisma.requirement.createMany({
     data: requirements.map((r) => ({
       orgId,
+      opportunityId: orch?.opportunityId ?? null,
       documentVersionId,
       externalRef: r.externalRef,
       text: r.text,

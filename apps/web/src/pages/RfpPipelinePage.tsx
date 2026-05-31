@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useRfpPipeline } from '@/hooks/rfp/useRfpPipeline';
+import { useRfpLatestOrchestration, RESUMABLE_STATES } from '@/hooks/rfp/useRfpLatestOrchestration';
 import { useRfpPipelineStore } from '@/stores/rfpPipeline';
 
 import { PipelineProgress } from '@/components/rfp/shared/PipelineProgress';
@@ -47,7 +48,13 @@ export function RfpPipelinePage() {
   const error = useRfpPipelineStore((s) => s.error);
   const bidWorkspaceId = useRfpPipelineStore((s) => s.bidWorkspaceId);
   const orchestrationId = useRfpPipelineStore((s) => s.orchestrationId);
+  const isUploading = useRfpPipelineStore((s) => s.isUploading);
+  const setOrchestrationId = useRfpPipelineStore((s) => s.setOrchestrationId);
+  const setBidWorkspaceId = useRfpPipelineStore((s) => s.setBidWorkspaceId);
   const reset = useRfpPipelineStore((s) => s.reset);
+
+  // Latest orchestration for this opportunity — used to resume a run on refresh.
+  const { data: latest } = useRfpLatestOrchestration(opportunityId);
 
   useDocumentTitle();
 
@@ -60,6 +67,19 @@ export function RfpPipelinePage() {
       reset();
     };
   }, [reset]);
+
+  // Resume after a refresh: seed the store from the opportunity's latest
+  // orchestration so a running pipeline / pending approval picks up where it
+  // left off instead of reverting to the upload zone. Guarded so it never
+  // clobbers a fresh upload already in flight, and only for resumable states.
+  useEffect(() => {
+    if (!opportunityId || orchestrationId || isUploading) return;
+    const o = latest?.orchestration;
+    if (o && RESUMABLE_STATES.has(o.state)) {
+      setBidWorkspaceId(opportunityId);
+      setOrchestrationId(o.id);
+    }
+  }, [latest, opportunityId, orchestrationId, isUploading, setBidWorkspaceId, setOrchestrationId]);
 
   return (
     <div className="space-y-6">
