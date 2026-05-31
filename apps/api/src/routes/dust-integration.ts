@@ -10,6 +10,7 @@ import { prisma } from '@bidstack/db';
 import type { Logger as PinoLogger } from 'pino';
 import { DustClient } from '@bidstack/dust-client';
 
+import { resolveOrgDustCredentials } from '../lib/dust-credentials.js';
 import { enqueueDustResync } from '../queues/dust-poll.js';
 import {
   DustStatus,
@@ -92,10 +93,8 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
 
-      const apiKey = process.env.DUST_API_KEY;
-      const workspaceId = process.env.DUST_WORKSPACE_ID;
-      const dataSourceId = process.env.DUST_DATA_SOURCE_ID;
-      if (!apiKey || !workspaceId || !dataSourceId) {
+      const creds = await resolveOrgDustCredentials(req.auth.orgId);
+      if (!creds?.dataSourceId) {
         throw server.httpErrors.serviceUnavailable('Dust integration not configured');
       }
 
@@ -103,14 +102,14 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
       const documentId = `bidstack-deal-${opp.code}`;
 
       const dust = new DustClient({
-        apiKey,
-        workspaceId,
-        baseUrl: process.env.DUST_BASE_URL,
+        apiKey: creds.apiKey,
+        workspaceId: creds.workspaceId,
+        baseUrl: creds.baseUrl,
         timeoutMs: 10_000,
         logger: req.log.child({ kind: 'dust' }) as unknown as PinoLogger,
       });
 
-      const doc = await dust.upsertDocument(dataSourceId, documentId, text, {
+      const doc = await dust.upsertDocument(creds.dataSourceId, documentId, text, {
         opportunity_code: opp.code,
         org_id: req.auth.orgId,
         source: 'bidstack',
@@ -159,7 +158,10 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: { response: { 200: DustStatus } },
     },
     async (req) => {
-      return cachedDustStatus(req.auth.orgId, req.log);
+      return req.cache(() => cachedDustStatus(req.auth.orgId, req.log), {
+        ttlSeconds: 30,
+        tags: ['dust-status'],
+      });
     },
   );
 

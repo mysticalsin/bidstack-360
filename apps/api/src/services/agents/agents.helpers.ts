@@ -9,9 +9,14 @@
  */
 
 import { z } from 'zod';
-import { DustClient } from '@bidstack/dust-client';
+import type { DustClient } from '@bidstack/dust-client';
 import { AgentConfig } from '@bidstack/shared';
 import type { Agent, AgentRun, AgentProvider } from '@bidstack/shared';
+
+import { getOrgDustClient } from '../../lib/dust-credentials.js';
+import { createLogger } from '../../lib/logger.js';
+
+const dustLog = createLogger({ name: 'agents-dust' });
 
 // ─── Serializers ──────────────────────────────────────────────────────────────
 
@@ -83,16 +88,9 @@ export function serializeAgentRun(r: {
 
 // ─── Dust client factory ──────────────────────────────────────────────────────
 
-export function getDustClient(): DustClient | null {
-  const apiKey = process.env.DUST_API_KEY;
-  const workspaceId = process.env.DUST_WORKSPACE_ID;
-  if (!apiKey || !workspaceId) return null;
-  return new DustClient({
-    apiKey,
-    workspaceId,
-    baseUrl: process.env.DUST_BASE_URL,
-    timeoutMs: 30_000,
-  });
+export function getDustClient(orgId: string): Promise<DustClient | null> {
+  // Per-org: org IntegrationConfig first, DUST_* env fallback.
+  return getOrgDustClient(orgId, dustLog);
 }
 
 // ─── Schemas and types ────────────────────────────────────────────────────────

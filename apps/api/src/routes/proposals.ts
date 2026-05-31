@@ -430,6 +430,7 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
       ].join('\n');
 
       const draft = await draftProposalSection({
+        orgId: req.auth.orgId,
         sectionKey: section.key,
         sectionTitle: section.title,
         proposalName: proposal.name,

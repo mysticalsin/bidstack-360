@@ -171,10 +171,17 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
         return reply.notFound('Opportunity not found');
       }
 
-      const { totalScore, categoryScores, weightedSum, totalWeight, recommendation } = computeBidScore(criteria);
+      const { totalScore, categoryScores, weightedSum, totalWeight, recommendation } =
+        computeBidScore(criteria);
 
       // Fetch historical policies from MemOS for calibration
-      const policies = await memos.getPoliciesForScope(req.auth.orgId, 'opportunity', opportunityId, 'bid_pattern', 5);
+      const policies = await memos.getPoliciesForScope(
+        req.auth.orgId,
+        'opportunity',
+        opportunityId,
+        'bid_pattern',
+        5,
+      );
 
       const latest = await prisma.bidScore.findFirst({
         where: { orgId: req.auth.orgId, opportunityId },
@@ -255,7 +262,13 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
       }
 
       // Fetch MemOS policies for calibration
-      const policies = await memos.getPoliciesForScope(req.auth.orgId, 'opportunity', opportunityId, undefined, 10);
+      const policies = await memos.getPoliciesForScope(
+        req.auth.orgId,
+        'opportunity',
+        opportunityId,
+        undefined,
+        10,
+      );
       const worldModels = await memos.retrieveContext('', {
         orgId: req.auth.orgId,
         tier: 'l3',
@@ -290,7 +303,10 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
           calibratedCriteria.risk_profile = Math.max(0, (calibratedCriteria.risk_profile ?? 3) - 1);
         }
         if (insight.toLowerCase().includes('profit') || insight.toLowerCase().includes('margin')) {
-          calibratedCriteria.profitability = Math.min(5, (calibratedCriteria.profitability ?? 3) + 1);
+          calibratedCriteria.profitability = Math.min(
+            5,
+            (calibratedCriteria.profitability ?? 3) + 1,
+          );
         }
       }
 
@@ -319,7 +335,9 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
 
       const reasoning = [
         `Calibrated from ${policies.length} MemOS policy(ies) and ${worldModels.length} world model(s).`,
-        hasDust ? 'Dust AI layer available for deeper analysis.' : 'Dust AI layer in stub mode; using heuristic calibration.',
+        hasDust
+          ? 'Dust AI layer available for deeper analysis.'
+          : 'Dust AI layer in stub mode; using heuristic calibration.',
         opp ? `Opportunity stage: ${opp.stage}, probability: ${opp.probability}%.` : '',
       ]
         .filter(Boolean)
@@ -359,7 +377,13 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
       const opportunityName = opp?.name ?? 'Unknown';
 
       // Build MemOS context
-      const policies = await memos.getPoliciesForScope(req.auth.orgId, 'opportunity', row.opportunityId, undefined, 10);
+      const policies = await memos.getPoliciesForScope(
+        req.auth.orgId,
+        'opportunity',
+        row.opportunityId,
+        undefined,
+        10,
+      );
       const worldModels = await memos.retrieveContext('', {
         orgId: req.auth.orgId,
         tier: 'l3',
@@ -375,6 +399,7 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
       ].join('\n');
 
       const result = await defendBidScore({
+        orgId: req.auth.orgId,
         opportunityName,
         customer,
         totalScore: row.totalScore,

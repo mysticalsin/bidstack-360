@@ -248,7 +248,7 @@ export async function runAgent(
     const providerResult =
       config.provider === 'claude'
         ? await runClaudeAgent(agent.systemPrompt, input, config)
-        : await runDustAgent(getDustClient(), agent.systemPrompt, input, config);
+        : await runDustAgent(await getDustClient(orgId), agent.systemPrompt, input, config);
     const finishedAt = new Date();
     const latencyMs = finishedAt.getTime() - startedAt.getTime();
     const output = JSON.parse(

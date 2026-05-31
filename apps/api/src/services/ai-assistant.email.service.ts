@@ -11,6 +11,7 @@ import {
   type EmailDraftInput,
   type EmailDraftResult,
   buildDustClient,
+  resolveAgentId,
   checkDailyCap,
   estimateCost,
   persistSession,
@@ -37,12 +38,13 @@ export async function draftEmail(
     `Draft 3 email variations. Tone: ${input.tone}. Intent: ${input.intent}.` +
     `${contextStr}\n\nReturn JSON array: [{"subject":"...","body":"..."}, ...]`;
 
-  const dust = buildDustClient(childLog);
+  const { client: dust, creds } = await buildDustClient(input.orgId, childLog);
+  const emailDraftAgentId = resolveAgentId(creds, 'emailDraft', process.env.DUST_AGENT_EMAIL_DRAFT);
   let responseText = '';
 
-  if (dust && process.env.DUST_AGENT_EMAIL_DRAFT) {
+  if (dust && emailDraftAgentId) {
     try {
-      const run = await dust.runAgent(process.env.DUST_AGENT_EMAIL_DRAFT, prompt);
+      const run = await dust.runAgent(emailDraftAgentId, prompt);
       responseText = run.output ?? '';
     } catch (err) {
       childLog.warn({ err }, 'Dust email-draft agent failed, using stub');

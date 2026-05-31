@@ -9,6 +9,8 @@ import { prisma } from '@bidstack/db';
 import { DustClient } from '@bidstack/dust-client';
 import pino from 'pino';
 
+import { resolveOrgDustCredentials } from './dust-credentials.js';
+
 const log = pino({ name: 'dust-push', level: process.env.LOG_LEVEL ?? 'info' });
 
 /** Retry an async operation with exponential backoff on transient errors.
@@ -45,14 +47,6 @@ async function withRetry<T>(
     }
   }
   throw lastErr;
-}
-
-function getDustConfig() {
-  const apiKey = process.env.DUST_API_KEY;
-  const workspaceId = process.env.DUST_WORKSPACE_ID;
-  const dataSourceId = process.env.DUST_DATA_SOURCE_ID;
-  if (!apiKey || !workspaceId || !dataSourceId) return null;
-  return { apiKey, workspaceId, dataSourceId };
 }
 
 function serializeOpportunityToMarkdown(opp: {
@@ -95,17 +89,19 @@ function serializeOpportunityToMarkdown(opp: {
 /** Push an opportunity to Dust. Called after create or update.
  *  orgId is required so the lookup stays org-scoped and respects multi-tenancy. */
 export async function pushOpportunityToDust(oppId: string, orgId: string): Promise<void> {
-  const cfg = getDustConfig();
-  if (!cfg) return;
+  const creds = await resolveOrgDustCredentials(orgId);
+  if (!creds?.dataSourceId) return; // a data source is required to push documents
 
   try {
     const opp = await prisma.opportunity.findUnique({ where: { id: oppId, orgId } });
     if (!opp) return;
 
     const dust = new DustClient({
-      apiKey: cfg.apiKey,
-      workspaceId: cfg.workspaceId,
+      apiKey: creds.apiKey,
+      workspaceId: creds.workspaceId,
+      baseUrl: creds.baseUrl,
       timeoutMs: 10_000,
+      logger: log,
     });
 
     const documentId = `bidstack-deal-${opp.code}`;
@@ -117,7 +113,7 @@ export async function pushOpportunityToDust(oppId: string, orgId: string): Promi
     // exponential backoff (1 s, 2 s, 4 s) cover the vast majority of
     // transient failures while staying well within the 10 s handler timeout.
     await withRetry(() =>
-      dust.upsertDocument(cfg.dataSourceId, documentId, text, {
+      dust.upsertDocument(creds.dataSourceId!, documentId, text, {
         opportunity_code: opp.code,
         opportunity_name: opp.name,
         customer_name: opp.customer,
@@ -138,17 +134,19 @@ export async function pushOpportunityToDust(oppId: string, orgId: string): Promi
 /** Push a lead to Dust. Called after create or update.
  *  orgId is required so the lookup stays org-scoped and respects multi-tenancy. */
 export async function pushLeadToDust(leadId: string, orgId: string): Promise<void> {
-  const cfg = getDustConfig();
-  if (!cfg) return;
+  const creds = await resolveOrgDustCredentials(orgId);
+  if (!creds?.dataSourceId) return; // a data source is required to push documents
 
   try {
     const lead = await prisma.lead.findUnique({ where: { id: leadId, orgId } });
     if (!lead) return;
 
     const dust = new DustClient({
-      apiKey: cfg.apiKey,
-      workspaceId: cfg.workspaceId,
+      apiKey: creds.apiKey,
+      workspaceId: creds.workspaceId,
+      baseUrl: creds.baseUrl,
       timeoutMs: 10_000,
+      logger: log,
     });
 
     const documentId = `bidstack-lead-${lead.id}`;
@@ -175,7 +173,7 @@ export async function pushLeadToDust(leadId: string, orgId: string): Promise<voi
     ].join('\n');
 
     await withRetry(() =>
-      dust.upsertDocument(cfg.dataSourceId, documentId, text, {
+      dust.upsertDocument(creds.dataSourceId!, documentId, text, {
         lead_email: lead.email ?? '',
         lead_first_name: lead.firstName,
         lead_last_name: lead.lastName,

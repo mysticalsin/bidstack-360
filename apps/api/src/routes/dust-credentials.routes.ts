@@ -181,7 +181,7 @@ export const dustCredentialsRoutes: FastifyPluginAsyncZod = async (server) => {
       const affected = await prisma.$executeRaw`
         UPDATE integration_configs
         SET is_active = false, deleted_at = now(), updated_at = now()
-        WHERE org_id = ${req.auth.orgId}::uuid AND type = 'dust' AND name = 'dust'
+        WHERE org_id = ${req.auth.orgId}::uuid AND type::text = 'dust' AND name = 'dust'
           AND deleted_at IS NULL
       `;
       if (affected === 0) {

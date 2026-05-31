@@ -11,37 +11,13 @@
  * and per-template agent ID resolution. Callers should migrate to this.
  */
 
-import { DustClient } from '@bidstack/dust-client';
 import { RFP_AGENT_TEMPLATES } from '@bidstack/shared';
 import { buildAgentUserMessage } from '../../lib/prompt-safety.js';
 import { logAiInvocation } from '../../lib/ai-audit.js';
 import { createLogger } from '../../lib/logger.js';
+import { getOrgDust, resolveAgentId } from '../../lib/dust-credentials.js';
 
 const log = createLogger({ name: 'dust-agent' });
-
-// ─── Client factory ──────────────────────────────────────────────────────────
-
-interface DustConfig {
-  apiKey: string;
-  workspaceId: string;
-  dataSourceId?: string;
-}
-
-function getDefaultDustConfig(): DustConfig | null {
-  const apiKey = process.env.DUST_API_KEY;
-  const workspaceId = process.env.DUST_WORKSPACE_ID;
-  if (!apiKey || !workspaceId) return null;
-  return { apiKey, workspaceId, dataSourceId: process.env.DUST_DATA_SOURCE_ID };
-}
-
-function buildClient(cfg: DustConfig): DustClient {
-  return new DustClient({
-    apiKey: cfg.apiKey,
-    workspaceId: cfg.workspaceId,
-    timeoutMs: 15_000,
-    logger: log,
-  });
-}
 
 // ─── runRfpAgent ─────────────────────────────────────────────────────────────
 
@@ -79,17 +55,18 @@ export interface RunRfpAgentResult {
  * them here before falling back.
  */
 export async function runRfpAgent(input: RunRfpAgentInput): Promise<RunRfpAgentResult> {
-  const cfg = getDefaultDustConfig();
-  if (!cfg) {
-    throw new Error(
-      'Dust not configured: DUST_API_KEY and DUST_WORKSPACE_ID env vars are required',
-    );
+  const { client, creds } = await getOrgDust(input.orgId, log);
+  if (!client) {
+    throw new Error('Dust not configured: connect a workspace in Settings (or set DUST_* env)');
   }
 
-  // Resolve agent ID: per-template env var first, then generic exec brief fallback.
-  // WHY env-based: allows per-environment Dust agent routing without code changes.
+  // Resolve agent ID: org config (by templateId, then execBrief) first, then the
+  // per-template / exec-brief env vars. WHY: per-org routing without code changes.
   const envKey = `DUST_${input.templateId.replace(/-/g, '_').toUpperCase()}_AGENT_ID`;
-  const agentId = process.env[envKey] ?? process.env.DUST_AGENT_EXEC_BRIEF ?? '';
+  const agentId =
+    resolveAgentId(creds, input.templateId, process.env[envKey]) ??
+    resolveAgentId(creds, 'execBrief', process.env.DUST_AGENT_EXEC_BRIEF) ??
+    '';
 
   if (!agentId) {
     throw new Error(
@@ -113,7 +90,6 @@ export async function runRfpAgent(input: RunRfpAgentInput): Promise<RunRfpAgentR
     userText: input.userText,
   });
 
-  const client = buildClient(cfg);
   const model = template?.defaultConfig.model ?? 'dust';
 
   const startMs = Date.now();
@@ -165,18 +141,13 @@ export async function runRfpAgent(input: RunRfpAgentInput): Promise<RunRfpAgentR
 
 // ─── Legacy functions (kept for existing callers) ────────────────────────────
 
-function getLegacyClient(): DustClient | null {
-  const cfg = getDefaultDustConfig();
-  if (!cfg) return null;
-  return buildClient(cfg);
-}
-
 /**
  * @deprecated Use runRfpAgent() instead.
  * WHY kept: bid-scores and workspace routes call this directly; migrating them
  * is a separate story to avoid a large cross-scope diff.
  */
 export async function defendBidScore(props: {
+  orgId: string;
   agentId?: string;
   opportunityName: string;
   customer: string;
@@ -185,15 +156,16 @@ export async function defendBidScore(props: {
   criteria: Record<string, number>;
   memosContext: string;
 }): Promise<{ reasoning: string; sources: string[] }> {
-  const client = getLegacyClient();
+  const { client, creds } = await getOrgDust(props.orgId, log);
   if (!client) {
     return {
-      reasoning: `Score ${props.totalScore}/100 (${props.recommendation}) for ${props.opportunityName}. This is a heuristic fallback because DUST_API_KEY is not configured.`,
+      reasoning: `Score ${props.totalScore}/100 (${props.recommendation}) for ${props.opportunityName}. This is a heuristic fallback because Dust is not configured.`,
       sources: ['heuristic'],
     };
   }
 
-  const agentId = props.agentId ?? process.env.DUST_AGENT_EXEC_BRIEF ?? '';
+  const agentId =
+    resolveAgentId(creds, 'execBrief', props.agentId ?? process.env.DUST_AGENT_EXEC_BRIEF) ?? '';
   if (!agentId) {
     return {
       reasoning: `No Dust agent configured for score defense. Set DUST_AGENT_EXEC_BRIEF env var.`,
@@ -244,6 +216,7 @@ export async function defendBidScore(props: {
  * WHY kept: bid-workspace routes call this directly; migration is a separate story.
  */
 export async function draftProposalSection(props: {
+  orgId: string;
   agentId?: string;
   sectionKey: string;
   sectionTitle: string;
@@ -253,7 +226,7 @@ export async function draftProposalSection(props: {
   memosContext: string;
   existingContent: string;
 }): Promise<{ content: string; sources: string[] }> {
-  const client = getLegacyClient();
+  const { client, creds } = await getOrgDust(props.orgId, log);
   if (!client) {
     return {
       content: `[Dust not configured] Draft for ${props.sectionTitle} of ${props.proposalName}.`,
@@ -261,7 +234,8 @@ export async function draftProposalSection(props: {
     };
   }
 
-  const agentId = props.agentId ?? process.env.DUST_AGENT_EXEC_BRIEF ?? '';
+  const agentId =
+    resolveAgentId(creds, 'sectionDraft', props.agentId ?? process.env.DUST_AGENT_EXEC_BRIEF) ?? '';
   if (!agentId) {
     return {
       content: `[No agent configured] Draft for ${props.sectionTitle}. Set DUST_AGENT_EXEC_BRIEF.`,

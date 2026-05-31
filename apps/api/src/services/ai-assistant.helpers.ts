@@ -11,7 +11,10 @@
 import type { Logger as PinoLogger } from 'pino';
 
 import { prisma } from '@bidstack/db';
-import { DustClient } from '@bidstack/dust-client';
+import type { DustClient } from '@bidstack/dust-client';
+
+import { getOrgDust, type DustCredentials } from '../lib/dust-credentials.js';
+export { resolveAgentId } from '../lib/dust-credentials.js';
 
 import { redis } from '../redis.js';
 
@@ -217,17 +220,13 @@ export function sanitiseContactForPrompt(contact: {
 
 // ─── Dust client factory ──────────────────────────────────────────────────
 
-export function buildDustClient(log: PinoLogger): DustClient | null {
-  const apiKey = process.env.DUST_API_KEY;
-  const workspaceId = process.env.DUST_WORKSPACE_ID;
-  if (!apiKey || !workspaceId) return null;
-  return new DustClient({
-    apiKey,
-    workspaceId,
-    baseUrl: process.env.DUST_BASE_URL,
-    timeoutMs: 30_000,
-    logger: log,
-  });
+export function buildDustClient(
+  orgId: string,
+  log: PinoLogger,
+): Promise<{ client: DustClient | null; creds: DustCredentials | null }> {
+  // Per-org: org IntegrationConfig first, DUST_* env fallback. Returns the creds
+  // too so callers can resolve purpose-specific agent ids (resolveAgentId).
+  return getOrgDust(orgId, log);
 }
 
 // ─── Cost estimation ──────────────────────────────────────────────────────

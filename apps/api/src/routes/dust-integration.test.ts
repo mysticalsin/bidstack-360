@@ -71,7 +71,9 @@ describe('dust integration routes', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({
-      workspace: 'mantu-presales',
+      // Per-org resolver: with no org IntegrationConfig and no DUST_* env, the
+      // status is honestly "Not configured" rather than a hardcoded workspace.
+      workspace: 'Not configured',
       configured: false,
       agentsError: null,
       agents: [],

@@ -10,6 +10,7 @@ import {
   type AccountIntelResult,
   type DealSentimentResult,
   buildDustClient,
+  resolveAgentId,
   checkDailyCap,
   estimateCost,
   persistSession,
@@ -43,12 +44,13 @@ export async function analyzeDealSentiment(
     `Recent activities (newest first):\n${activitiesSummary || 'No activities recorded.'}\n\n` +
     `Return JSON: {"score": <-1..1>, "label": "positive|neutral|negative", "summary": "...", "riskFlags": [...], "suggestedActions": [...]}`;
 
-  const dust = buildDustClient(childLog);
+  const { client: dust, creds } = await buildDustClient(opts.orgId, childLog);
+  const sentimentAgentId = resolveAgentId(creds, 'sentiment', process.env.DUST_AGENT_SENTIMENT);
   let responseText = '';
 
-  if (dust && process.env.DUST_AGENT_SENTIMENT) {
+  if (dust && sentimentAgentId) {
     try {
-      const run = await dust.runAgent(process.env.DUST_AGENT_SENTIMENT, prompt);
+      const run = await dust.runAgent(sentimentAgentId, prompt);
       responseText = run.output ?? '';
     } catch (err) {
       childLog.warn({ err }, 'Dust sentiment agent failed, using stub');
@@ -146,12 +148,17 @@ export async function summarizeAccountIntel(
     `Contacts: ${contactSummary || 'none'}.\n\n` +
     `Return JSON: {"healthScore":<0-100>,"summary":"...","expansionOpportunities":["..."],"churnRisks":["..."]}`;
 
-  const dust = buildDustClient(childLog);
+  const { client: dust, creds } = await buildDustClient(opts.orgId, childLog);
+  const accountIntelAgentId = resolveAgentId(
+    creds,
+    'accountIntel',
+    process.env.DUST_AGENT_ACCOUNT_INTEL,
+  );
   let responseText = '';
 
-  if (dust && process.env.DUST_AGENT_ACCOUNT_INTEL) {
+  if (dust && accountIntelAgentId) {
     try {
-      const run = await dust.runAgent(process.env.DUST_AGENT_ACCOUNT_INTEL, prompt);
+      const run = await dust.runAgent(accountIntelAgentId, prompt);
       responseText = run.output ?? '';
     } catch (err) {
       childLog.warn({ err }, 'Dust account-intel agent failed, using stub');

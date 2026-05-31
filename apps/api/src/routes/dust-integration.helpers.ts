@@ -7,6 +7,8 @@ import { type z } from 'zod';
 import { prisma, type Opportunity } from '@bidstack/db';
 import { DustClient } from '@bidstack/dust-client';
 
+import { resolveOrgDustCredentials, type DustCredentials } from '../lib/dust-credentials.js';
+
 import { config } from '../config.js';
 import { isPublicHostname } from '../lib/ssrf-guard.js';
 import {
@@ -33,17 +35,16 @@ interface DustAgentStatus {
   error: string | null;
 }
 
-async function listDustAgents(log: {
-  warn: (a: object, msg?: string) => void;
-}): Promise<DustAgentStatus> {
-  const apiKey = process.env.DUST_API_KEY;
-  const workspaceId = process.env.DUST_WORKSPACE_ID;
-  if (!apiKey || !workspaceId) return { agents: [], error: null };
+async function listDustAgents(
+  creds: DustCredentials | null,
+  log: { warn: (a: object, msg?: string) => void },
+): Promise<DustAgentStatus> {
+  if (!creds) return { agents: [], error: null };
   try {
     const dust = new DustClient({
-      apiKey,
-      workspaceId,
-      baseUrl: process.env.DUST_BASE_URL,
+      apiKey: creds.apiKey,
+      workspaceId: creds.workspaceId,
+      baseUrl: creds.baseUrl,
       timeoutMs: 5_000,
     });
     return { agents: await dust.listAgents(), error: null };
@@ -96,6 +97,7 @@ async function buildDustStatus(
   orgId: string,
   log: { warn: (a: object, msg?: string) => void },
 ): Promise<DustStatusPayload> {
+  const creds = await resolveOrgDustCredentials(orgId);
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const [pulled, pushed, lastErr, lastSync, agentStatus] = await Promise.all([
     prisma.syncEvent.count({
@@ -120,13 +122,13 @@ async function buildDustStatus(
       where: { orgId, source: 'dust.poll', status: 'processed' },
       orderBy: { receivedAt: 'desc' },
     }),
-    listDustAgents(log),
+    listDustAgents(creds, log),
   ]);
 
-  const configured = Boolean(process.env.DUST_API_KEY && process.env.DUST_WORKSPACE_ID);
+  const configured = Boolean(creds);
 
   return {
-    workspace: process.env.DUST_WORKSPACE_ID ?? 'mantu-presales',
+    workspace: creds?.workspaceId ?? 'Not configured',
     lastSyncAt: lastSync?.processedAt?.toISOString() ?? lastSync?.receivedAt.toISOString() ?? null,
     nextSyncAt: lastSync
       ? new Date(lastSync.receivedAt.getTime() + 5 * 60 * 1000).toISOString()

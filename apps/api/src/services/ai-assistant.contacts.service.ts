@@ -10,6 +10,7 @@ import {
   type ContactEnrichResult,
   type MeetingPrepResult,
   buildDustClient,
+  resolveAgentId,
   checkDailyCap,
   estimateCost,
   persistSession,
@@ -43,12 +44,17 @@ export async function prepMeeting(
     `Recent interactions: ${actSummary || 'none'}.\n\n` +
     `Return JSON: {"talkingPoints":["..."],"suggestedQuestions":["..."]}`;
 
-  const dust = buildDustClient(childLog);
+  const { client: dust, creds } = await buildDustClient(opts.orgId, childLog);
+  const meetingPrepAgentId = resolveAgentId(
+    creds,
+    'meetingPrep',
+    process.env.DUST_AGENT_MEETING_PREP,
+  );
   let responseText = '';
 
-  if (dust && process.env.DUST_AGENT_MEETING_PREP) {
+  if (dust && meetingPrepAgentId) {
     try {
-      const run = await dust.runAgent(process.env.DUST_AGENT_MEETING_PREP, prompt);
+      const run = await dust.runAgent(meetingPrepAgentId, prompt);
       responseText = run.output ?? '';
     } catch (err) {
       childLog.warn({ err }, 'Dust meeting-prep agent failed, using stub');
@@ -134,13 +140,14 @@ export async function enrichContact(
     `email domain="${emailDomain ?? 'unknown'}".\n` +
     `Return JSON: {"jobTitle":"...","company":"...","linkedinUrl":"...","seniority":"..."}`;
 
-  const dust = buildDustClient(childLog);
+  const { client: dust, creds } = await buildDustClient(opts.orgId, childLog);
+  const enrichAgentId = resolveAgentId(creds, 'enrich', process.env.DUST_AGENT_ENRICH);
   let responseText = '';
   let enrichSource: 'apollo' | 'domain-inference' | 'none' = 'none';
 
-  if (dust && process.env.DUST_AGENT_ENRICH) {
+  if (dust && enrichAgentId) {
     try {
-      const run = await dust.runAgent(process.env.DUST_AGENT_ENRICH, prompt);
+      const run = await dust.runAgent(enrichAgentId, prompt);
       responseText = run.output ?? '';
       enrichSource = 'domain-inference';
     } catch (err) {
