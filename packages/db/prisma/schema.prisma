@@ -936,6 +936,9 @@ model ProposalSection {
   content    String   @default("")
   wordCount  Int      @default(0) @map("word_count")
   aiDrafted  Boolean  @default(false) @map("ai_drafted")
+  // Set by a reviewer in the RFP draft-review pane (the approval stage); lets
+  // reviewers track which AI-drafted sections a human has signed off on.
+  humanReviewed Boolean @default(false) @map("human_reviewed")
   sortOrder  Int      @default(0) @map("sort_order")
   required   Boolean  @default(true)
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)

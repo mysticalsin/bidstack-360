@@ -63,6 +63,7 @@ import { crewRoutes } from './routes/crews.js';
 import { activityRoutes } from './routes/activities.js';
 import { bidWorkspaceRoutes } from './routes/bid-workspace.js';
 import { bidWorkspaceRequirementRoutes } from './routes/bid-workspace-requirements.js';
+import { bidWorkspaceRfpRoutes } from './routes/bid-workspace-rfp.js';
 import { calendarRoutes } from './routes/calendar.js';
 import { bookingsRoutes } from './routes/bookings.js';
 // NocoBase RFP integration
@@ -174,6 +175,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(activityRoutes, { prefix: '/api/v1' });
   await server.register(bidWorkspaceRoutes, { prefix: '/api/v1' });
   await server.register(bidWorkspaceRequirementRoutes, { prefix: '/api/v1' });
+  await server.register(bidWorkspaceRfpRoutes, { prefix: '/api/v1' });
   await server.register(exchangeRatesRoutes, { prefix: '/api/v1' });
   // Wave 3 — calendar + booking
   await server.register(calendarRoutes, { prefix: '/api/v1' });
