@@ -26,6 +26,7 @@ import {
 import { Card } from '@/components/ui/Card';
 import { cn } from '@/lib/cn';
 import { useRfpPipelineStore, type PipelineStage } from '@/stores/rfpPipeline';
+import { useRfpCrewLayout } from '@/hooks/rfp/useRfpCrewLayout';
 import { RfpCrewCard, type CrewStatus } from './RfpCrewCard';
 import {
   CREW_STAGES,
@@ -35,6 +36,12 @@ import {
   type CrewStation,
   type RfpCrewMember,
 } from './rfpCrew';
+
+// Roster default station per member — the base layer the saved layout and the
+// user's session drags are merged over.
+const DEFAULT_STATIONS: Record<string, CrewStation> = Object.fromEntries(
+  RFP_CREW.map((m) => [m.key, m.station]),
+);
 
 // Where the live pipeline currently is, as an index into CREW_STAGES.
 // -1 = not started; CREW_STAGES.length = every working stage complete.
@@ -95,22 +102,46 @@ function Lane({
 export function RfpCrewBoard() {
   const { t } = useTranslation('rfp');
   const stage = useRfpPipelineStore((s) => s.stage);
+  const bidWorkspaceId = useRfpPipelineStore((s) => s.bidWorkspaceId);
+  const { query: layoutQuery, save: saveLayout } = useRfpCrewLayout(bidWorkspaceId);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
-  // Per-member station, seeded from the roster. Drag / arrow keys re-station.
-  const [stations, setStations] = useState<Record<string, CrewStation>>(() =>
-    Object.fromEntries(RFP_CREW.map((m) => [m.key, m.station])),
-  );
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  // Session drag changes. Displayed stations are DERIVED during render —
+  // roster defaults < saved layout < these overrides — so there is no
+  // setState-in-effect and an in-progress drag is never clobbered by a refetch.
+  const [overrides, setOverrides] = useState<Record<string, CrewStation>>({});
+
+  const savedLayout = useMemo(
+    () => (layoutQuery.data?.layout ?? {}) as Record<string, CrewStation>,
+    [layoutQuery.data],
+  );
+  const stations = useMemo(
+    () => ({ ...DEFAULT_STATIONS, ...savedLayout, ...overrides }),
+    [savedLayout, overrides],
+  );
 
   const activeIdx = activeStageIndex(stage);
   const finished = stage === 'approved' || stage === 'completed';
 
-  const restation = useCallback((key: string, station: CrewStation) => {
-    const member = crewMemberByKey(key);
-    if (!member || member.isMaster) return; // the master never leaves oversight
-    setStations((prev) => (prev[key] === station ? prev : { ...prev, [key]: station }));
-  }, []);
+  // Persist the full stations map; the server sanitizes against the roster.
+  const persist = useCallback(
+    (next: Record<string, CrewStation>) => {
+      if (bidWorkspaceId) saveLayout.mutate(next);
+    },
+    [bidWorkspaceId, saveLayout],
+  );
+
+  const restation = useCallback(
+    (key: string, station: CrewStation) => {
+      const member = crewMemberByKey(key);
+      if (!member || member.isMaster) return; // the master never leaves oversight
+      if (stations[key] === station) return;
+      setOverrides((prev) => ({ ...prev, [key]: station }));
+      persist({ ...stations, [key]: station });
+    },
+    [stations, persist],
+  );
 
   const handleDragEnd = useCallback(
     (e: DragEndEvent) => {
@@ -123,15 +154,18 @@ export function RfpCrewBoard() {
   );
 
   // Keyboard re-station: move a stage-stationed agent left/right along the lanes.
-  const moveByKeyboard = useCallback((key: string, dir: -1 | 1) => {
-    setStations((prev) => {
-      const current = prev[key];
-      if (!current || current === 'oversight') return prev;
+  const moveByKeyboard = useCallback(
+    (key: string, dir: -1 | 1) => {
+      const current = stations[key];
+      if (!current || current === 'oversight') return;
       const idx = (CREW_STAGES as readonly string[]).indexOf(current);
       const next = CREW_STAGES[idx + dir];
-      return next ? { ...prev, [key]: next } : prev;
-    });
-  }, []);
+      if (!next) return;
+      setOverrides((prev) => ({ ...prev, [key]: next }));
+      persist({ ...stations, [key]: next });
+    },
+    [stations, persist],
+  );
 
   const oversight = useMemo(
     () => RFP_CREW.filter((m) => stations[m.key] === 'oversight'),

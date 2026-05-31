@@ -169,6 +169,7 @@ model Org {
   leadStageRotConfigs    LeadStageRotConfig[]
   // Wave 9 — RFP Automation Engine
   rfpOrchestrations           RfpOrchestration[]
+  rfpCrewLayouts              RfpCrewLayout[]
   requirementReferenceMatches RequirementReferenceMatch[]
   referenceEmbeddings         ReferenceEmbedding[]
   requirementEmbeddings       RequirementEmbedding[]
@@ -4495,6 +4496,23 @@ model RfpOrchestration {
   @@index([rootJobId])
   @@index([deletedAt])
   @@map("rfp_orchestrations")
+}
+
+/// Per-workspace RFP crew-board arrangement — where the user has dragged each
+/// role agent (memberKey -> station). Persists the board layout per opportunity.
+/// Accessed via raw SQL (Wave-9 table; dev Prisma client may lag the schema).
+model RfpCrewLayout {
+  id            String   @id @default(uuid()) @db.Uuid
+  orgId         String   @map("org_id") @db.Uuid
+  opportunityId String   @map("opportunity_id") @db.Uuid
+  layout        Json     @default("{}")
+  createdAt     DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt     DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, opportunityId], map: "uniq_org_opportunity_crew_layout")
+  @@map("rfp_crew_layouts")
 }
 
 /// Persisted semantic match between an RFP requirement and a success story.

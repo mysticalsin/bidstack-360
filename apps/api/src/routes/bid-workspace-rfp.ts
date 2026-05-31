@@ -18,8 +18,26 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
+import { RFP_CREW, CREW_STAGES, crewMemberByKey } from '@bidstack/shared';
 
 import { WorkspaceParams, ensureOpportunity } from './bid-workspace.helpers.js';
+
+// Crew-board layout = a map of crew memberKey -> station (a pipeline stage or
+// 'oversight'). Sanitized against the shared roster on every read + write so a
+// forged key, an invalid station, or a roster change can never persist or
+// resurface; the master (Bid Director) is pinned to oversight.
+const VALID_STATIONS = new Set<string>([...CREW_STAGES, 'oversight']);
+const CREW_KEYS = new Set(RFP_CREW.map((m) => m.key));
+
+function sanitizeCrewLayout(input: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, station] of Object.entries(input ?? {})) {
+    if (!CREW_KEYS.has(key) || !VALID_STATIONS.has(station)) continue;
+    if (crewMemberByKey(key)?.isMaster && station !== 'oversight') continue;
+    out[key] = station;
+  }
+  return out;
+}
 
 const StoryMatch = z.object({
   id: z.string().uuid(),
@@ -218,6 +236,56 @@ export const bidWorkspaceRfpRoutes: FastifyPluginAsyncZod = async (server) => {
       const updated = rows[0];
       if (!updated) return reply.notFound('Section not found');
       return toDraftSection(updated);
+    },
+  );
+
+  // ─── GET the saved crew-board layout for this workspace ──────────────────────
+  server.get(
+    '/bid-workspaces/:opportunityId/crew-layout',
+    {
+      preHandler: server.requirePermission('documents:read'),
+      schema: {
+        params: WorkspaceParams,
+        response: { 200: z.object({ layout: z.record(z.string()) }) },
+      },
+    },
+    async (req, reply) => {
+      const opportunity = await ensureOpportunity(req.auth.orgId, req.params.opportunityId);
+      if (!opportunity) return reply.notFound('Opportunity not found');
+
+      const rows = await prisma.$queryRaw<{ layout: Record<string, string> }[]>`
+        SELECT layout FROM rfp_crew_layouts
+        WHERE org_id = ${req.auth.orgId}::uuid AND opportunity_id = ${opportunity.id}::uuid
+      `;
+      return { layout: sanitizeCrewLayout(rows[0]?.layout ?? {}) };
+    },
+  );
+
+  // ─── PUT the crew-board layout (persists drag-to-restation per workspace) ────
+  server.put(
+    '/bid-workspaces/:opportunityId/crew-layout',
+    {
+      preHandler: server.requirePermission('documents:write'),
+      config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
+      schema: {
+        params: WorkspaceParams,
+        body: z.object({ layout: z.record(z.string()) }),
+        response: { 200: z.object({ layout: z.record(z.string()) }) },
+      },
+    },
+    async (req, reply) => {
+      const opportunity = await ensureOpportunity(req.auth.orgId, req.params.opportunityId);
+      if (!opportunity) return reply.notFound('Opportunity not found');
+
+      const layout = sanitizeCrewLayout(req.body.layout);
+      const json = JSON.stringify(layout);
+      await prisma.$executeRaw`
+        INSERT INTO rfp_crew_layouts (id, org_id, opportunity_id, layout, created_at, updated_at)
+        VALUES (gen_random_uuid(), ${req.auth.orgId}::uuid, ${opportunity.id}::uuid, ${json}::jsonb, now(), now())
+        ON CONFLICT ON CONSTRAINT uniq_org_opportunity_crew_layout
+        DO UPDATE SET layout = ${json}::jsonb, updated_at = now()
+      `;
+      return { layout };
     },
   );
 };
