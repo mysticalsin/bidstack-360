@@ -65,7 +65,9 @@ export function ExtractStep({
                       <div className="text-sm font-medium text-[var(--fg-primary)] truncate">
                         {name}
                       </div>
-                      {error && <div className="text-[10px] text-red-500 truncate">{error}</div>}
+                      {error && (
+                        <div className="truncate text-[10px] text-[var(--danger)]">{error}</div>
+                      )}
                     </div>
                   </div>
                   <StatusBadge status={status} />
@@ -108,12 +110,12 @@ export function ExtractStep({
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    pending: 'bg-amber-100 text-amber-700',
-    running: 'bg-blue-100 text-blue-700',
-    done: 'bg-emerald-100 text-emerald-700',
-    completed: 'bg-emerald-100 text-emerald-700',
-    error: 'bg-red-100 text-red-700',
-    failed: 'bg-red-100 text-red-700',
+    pending: 'bg-[var(--warning-tint)] text-[var(--warning)]',
+    running: 'bg-[var(--info-tint)] text-[var(--info)]',
+    done: 'bg-[var(--success-tint)] text-[var(--success)]',
+    completed: 'bg-[var(--success-tint)] text-[var(--success)]',
+    error: 'bg-[var(--danger-tint)] text-[var(--danger)]',
+    failed: 'bg-[var(--danger-tint)] text-[var(--danger)]',
   };
   const label = status === 'done' ? 'Completed' : status.charAt(0).toUpperCase() + status.slice(1);
   return (

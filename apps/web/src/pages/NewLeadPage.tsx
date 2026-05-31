@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/Button';
@@ -10,6 +10,9 @@ import type { LeadCreate } from '@bidstack/shared';
 export function NewLeadPage() {
   const nav = useNavigate();
   const create = useCreateLead();
+  const firstNameRef = useRef<HTMLInputElement>(null);
+  const lastNameRef = useRef<HTMLInputElement>(null);
+  const [errors, setErrors] = useState<{ firstName?: boolean; lastName?: boolean }>({});
   const [form, setForm] = useState<LeadCreate>({
     firstName: '',
     lastName: '',
@@ -24,10 +27,16 @@ export function NewLeadPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.firstName.trim() || !form.lastName.trim()) {
+    const next = { firstName: !form.firstName.trim(), lastName: !form.lastName.trim() };
+    if (next.firstName || next.lastName) {
+      setErrors(next);
+      // Move focus to the first invalid field so a keyboard/SR user lands on
+      // the problem, not just hears a transient toast.
+      (next.firstName ? firstNameRef : lastNameRef).current?.focus();
       toast.error('First and last name are required');
       return;
     }
+    setErrors({});
     create.mutate(form, {
       onError: () => toast.error('Failed to create lead'),
     });
@@ -72,10 +81,15 @@ export function NewLeadPage() {
               </label>
               <input
                 id="lead-first-name"
+                ref={firstNameRef}
                 required
+                aria-invalid={errors.firstName || undefined}
                 value={form.firstName}
-                onChange={field('firstName')}
-                className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
+                onChange={(e) => {
+                  field('firstName')(e);
+                  if (errors.firstName) setErrors((s) => ({ ...s, firstName: false }));
+                }}
+                className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20 aria-[invalid=true]:border-[var(--danger)] aria-[invalid=true]:ring-[var(--danger)]/20"
               />
             </div>
             <div>
@@ -87,10 +101,15 @@ export function NewLeadPage() {
               </label>
               <input
                 id="lead-last-name"
+                ref={lastNameRef}
                 required
+                aria-invalid={errors.lastName || undefined}
                 value={form.lastName}
-                onChange={field('lastName')}
-                className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
+                onChange={(e) => {
+                  field('lastName')(e);
+                  if (errors.lastName) setErrors((s) => ({ ...s, lastName: false }));
+                }}
+                className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20 aria-[invalid=true]:border-[var(--danger)] aria-[invalid=true]:ring-[var(--danger)]/20"
               />
             </div>
             <div>

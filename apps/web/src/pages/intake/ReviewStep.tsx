@@ -133,10 +133,10 @@ function ExtractedGroup({
 
 function ConfidenceBadge({ bps }: { bps: number }) {
   const pct = Math.round(bps / 100);
-  let color = 'text-gray-500 bg-gray-100';
-  if (bps >= 8000) color = 'text-emerald-700 bg-emerald-100';
-  else if (bps >= 6000) color = 'text-blue-700 bg-blue-100';
-  else if (bps >= 4000) color = 'text-amber-700 bg-amber-100';
+  let color = 'text-[var(--fg-tertiary)] bg-[var(--surface-sunken)]';
+  if (bps >= 8000) color = 'text-[var(--success)] bg-[var(--success-tint)]';
+  else if (bps >= 6000) color = 'text-[var(--info)] bg-[var(--info-tint)]';
+  else if (bps >= 4000) color = 'text-[var(--warning)] bg-[var(--warning-tint)]';
   return (
     <span
       className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${color}`}

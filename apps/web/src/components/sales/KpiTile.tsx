@@ -24,8 +24,8 @@ interface Props {
 const TONE_BG: Record<NonNullable<Props['tone']>, string> = {
   blue: 'bg-[var(--surface-card)]',
   jade: 'bg-[var(--surface-card)]',
-  amber: 'bg-[#fff7ea]',
-  tomato: 'bg-[#ffeded]',
+  amber: 'bg-[var(--warning-tint)]',
+  tomato: 'bg-[var(--danger-tint)]',
   gray: 'bg-[var(--surface-card)]',
 };
 

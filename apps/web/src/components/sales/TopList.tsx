@@ -44,8 +44,7 @@ export function TopList({ items, showSalesperson = true, variant = 'quotation' }
     const v = Number(BigInt(it.revenueMicros) / BigInt(1_000_000));
     return v > acc ? v : acc;
   }, 1);
-  const barClass =
-    variant === 'order' ? 'bg-[#fff7ea]' : variant === 'customer' ? 'bg-[#eef4ff]' : 'bg-[#eef4ff]';
+  const barClass = variant === 'order' ? 'bg-[var(--warning-tint)]' : 'bg-[var(--info-tint)]';
 
   return (
     <div className="overflow-hidden rounded-md">

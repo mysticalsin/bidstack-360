@@ -116,7 +116,7 @@ export function IntakePage() {
                 step === s.id
                   ? 'bg-[var(--fg-primary)] text-[var(--surface-page)]'
                   : i < STEPS.findIndex((x) => x.id === step)
-                    ? 'bg-[#ecfdf5] text-[#059669]'
+                    ? 'bg-[var(--success-tint)] text-[var(--success)]'
                     : 'bg-[var(--surface-sunken)] text-[var(--fg-secondary)]'
               }`}
             >

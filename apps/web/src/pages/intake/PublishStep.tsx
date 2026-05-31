@@ -21,8 +21,8 @@ export function PublishStep({ accountId, onBack, onDone }: PublishStepProps) {
   return (
     <Card className="p-5 space-y-4">
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#ecfdf5]">
-          <Icon name="check" size={20} className="text-[#059669]" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--success-tint)]">
+          <Icon name="check" size={20} className="text-[var(--success)]" />
         </div>
         <div>
           <h2 className="text-sm font-semibold text-[var(--fg-primary)]">Published</h2>
