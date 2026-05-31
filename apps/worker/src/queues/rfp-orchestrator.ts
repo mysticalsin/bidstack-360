@@ -194,3 +194,64 @@ export async function startRfpOrchestrator(
   workers.push(worker);
   log.info({ queue: QUEUE_NAME }, 'rfp-orchestrator worker started');
 }
+
+// ─── Stuck-orchestration reaper ──────────────────────────────────────────────
+
+const REAPER_QUEUE = 'rfp-orchestration-reaper';
+const REAPER_EVERY_MS = 5 * 60 * 1000;
+
+/**
+ * Sweep RFP orchestrations stuck in an ACTIVE state with no activity for 30
+ * minutes and mark them failed, so a pipeline whose worker died mid-phase stops
+ * sitting "running" forever in the UI. Only queued/running are swept —
+ * awaiting_approval (the human gate) and paused are legitimately long-lived and
+ * are never touched, nor are terminal states. Keyed on updated_at (every phase
+ * transition bumps it via raw SQL), so a slow-but-alive pipeline is safe.
+ * System-wide + idempotent; 'queued'/'running' are valid enum labels so the
+ * literal comparison is safe. `interval '30 minutes'` is a SQL literal.
+ */
+async function reapStuckOrchestrations(log: pino.Logger): Promise<void> {
+  const reaped = await prisma.$executeRaw`
+    UPDATE rfp_orchestrations
+    SET state = 'failed',
+        failed_phase = current_phase,
+        failure_reason = 'Pipeline exceeded the 30-minute inactivity limit and was marked failed',
+        completed_at = now(),
+        updated_at = now()
+    WHERE state IN ('queued', 'running')
+      AND deleted_at IS NULL
+      AND updated_at < now() - interval '30 minutes'
+  `;
+  if (reaped > 0) {
+    log.warn({ reaped }, 'rfp-orchestration reaper: marked stuck pipelines failed');
+  }
+}
+
+export async function startRfpOrchestrationReaper(
+  connection: IORedis,
+  log: pino.Logger,
+  workers: Worker[],
+  queues: Queue[],
+): Promise<void> {
+  const queue = new BullQueue(REAPER_QUEUE, { connection });
+  queues.push(queue);
+  await queue.add(
+    'rfp-orchestration.reap',
+    {},
+    {
+      repeat: { every: REAPER_EVERY_MS },
+      removeOnComplete: { age: 3600, count: 50 },
+      removeOnFail: { age: 86400 },
+    },
+  );
+  const worker = new BullWorker(
+    REAPER_QUEUE,
+    async () => reapStuckOrchestrations(log.child({ kind: 'rfp-reaper' })),
+    { connection },
+  );
+  worker.on('failed', (job, err) =>
+    log.error({ jobId: job?.id, err }, 'rfp-orchestration reaper: failed'),
+  );
+  workers.push(worker);
+  log.info({ queue: REAPER_QUEUE }, 'rfp-orchestration reaper started');
+}

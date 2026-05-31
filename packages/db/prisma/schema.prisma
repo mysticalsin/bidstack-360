@@ -4485,6 +4485,9 @@ model RfpOrchestration {
 
   @@unique([orgId, rfpRequestId], map: "uniq_org_rfp_active")
   @@index([orgId, state])
+  // Supports the stuck-orchestration reaper sweep (state IN queued/running AND
+  // updated_at < cutoff) so the 5-minute sweep is an index scan, not a seq scan.
+  @@index([state, updatedAt], map: "rfp_orchestrations_state_updated_idx")
   // FK-lookup paths: joins rfp_orchestrations -> opportunities / proposals.
   // map: matches the hand-written migration so `prisma migrate diff` sees no drift.
   @@index([orgId, opportunityId], map: "rfp_orchestrations_org_opp_idx")

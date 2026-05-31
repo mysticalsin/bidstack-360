@@ -29,7 +29,7 @@ import { startCallWorkers } from './queues/calls.js';
 // Wave 8 — Predictive ML scoring retrain worker
 import { startPredictiveRetrainWorker } from './queues/predictive-retrain.js';
 // Wave 9 — RFP Automation Engine workers
-import { startRfpOrchestrator } from './queues/rfp-orchestrator.js';
+import { startRfpOrchestrator, startRfpOrchestrationReaper } from './queues/rfp-orchestrator.js';
 import { startRfpRequirementExtract } from './queues/rfp-requirement-extract.js';
 import { startRfpStoryMatch } from './queues/rfp-story-match.js';
 import { startRfpSectionDraft } from './queues/rfp-section-draft.js';
@@ -90,6 +90,7 @@ await Promise.all([
   startPredictiveRetrainWorker(connection, log, workers, queues),
   // Wave 9 — RFP Automation Engine
   startRfpOrchestrator(connection, log, workers, queues),
+  startRfpOrchestrationReaper(connection, log, workers, queues),
   startRfpRequirementExtract(connection, log, workers, queues),
   startRfpStoryMatch(connection, log, workers, queues),
   startRfpSectionDraft(connection, log, workers, queues),
