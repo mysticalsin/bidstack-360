@@ -18,8 +18,9 @@ import { prisma } from '@bidstack/db';
 
 import { RFP_COMPLIANCE_FILL, rolePreambleForKey } from '@bidstack/shared';
 import { buildAgentUserMessage } from '../lib/prompt-safety.js';
-import { logAiInvocation } from '../lib/ai-audit-worker.js';
 import { getOrgDust, resolveAgentId } from '../lib/dust-credentials.js';
+import { runRfpCompletion } from '../lib/rfp-llm.js';
+import { coerceJsonObject } from '../lib/llm-provider.js';
 
 const QUEUE_NAME = RFP_COMPLIANCE_FILL.name;
 const DEFAULT_COMPLIANCE_AGENT_ID = 'rfp-compliance-fill-agent';
@@ -83,61 +84,37 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
     DEFAULT_COMPLIANCE_AGENT_ID;
   let result: ComplianceResult;
 
-  if (dust) {
-    const userMessage = buildAgentUserMessage({
-      template:
-        `${rolePreambleForKey('compliance_officer')}\n\n` +
-        'Assess compliance for the following requirement{{CATEGORY_SUFFIX}}. ' +
-        'Return ONLY a JSON object with: status (YES|NO|PARTIAL|NOT_APPLICABLE), ' +
-        'justification (string, max 200 chars), confidence (0-10000).',
-      trusted: {
-        CATEGORY_SUFFIX: category ? ` in category "${category}"` : '',
-      },
-      rfpContent: requirementText,
-    });
+  const userMessage = buildAgentUserMessage({
+    template:
+      `${rolePreambleForKey('compliance_officer')}\n\n` +
+      'Assess compliance for the following requirement{{CATEGORY_SUFFIX}}. ' +
+      'Return ONLY a JSON object with: status (YES|NO|PARTIAL|NOT_APPLICABLE), ' +
+      'justification (string, max 200 chars), confidence (0-10000).',
+    trusted: {
+      CATEGORY_SUFFIX: category ? ` in category "${category}"` : '',
+    },
+    rfpContent: requirementText,
+  });
 
-    const t0 = Date.now();
+  // Provider-agnostic: direct LLM (RFP_LLM_PROVIDER) → Dust agent → PARTIAL fallback.
+  const completion = await runRfpCompletion({
+    orgId,
+    log,
+    dust,
+    agentId: complianceAgentId,
+    userMessage,
+    system:
+      'You are an RFP compliance officer. Respond with ONLY a valid JSON object — no prose, no markdown fences.',
+    agentType: 'rfp-compliance',
+    traceId: job.id ?? undefined,
+  });
+
+  if (completion) {
     try {
-      const run = await dust.runAgent(complianceAgentId, userMessage);
-      const responseText = run.output ?? '{}';
-      const durationMs = Date.now() - t0;
-
-      await logAiInvocation(
-        {
-          orgId,
-          agentType: 'rfp-compliance',
-          // DustAgentRun does not expose model or tokenCount — use fixed values
-          model: 'dust',
-          prompt: userMessage,
-          response: responseText,
-          tokenCount: 0,
-          durationMs,
-          status: 'success',
-          traceId: job.id ?? undefined,
-        },
-        log,
-      );
-
-      const p2 = ComplianceResult.safeParse(JSON.parse(responseText));
+      const p2 = ComplianceResult.safeParse(JSON.parse(coerceJsonObject(completion.text)));
       result = p2.success ? p2.data : fallbackCompliance();
-    } catch (err) {
-      log.warn({ err, matrixItemId }, 'rfp-compliance-fill: Dust call failed, falling back');
+    } catch {
       result = fallbackCompliance();
-      await logAiInvocation(
-        {
-          orgId,
-          agentType: 'rfp-compliance',
-          model: 'dust',
-          prompt: userMessage,
-          response: '',
-          tokenCount: 0,
-          durationMs: Date.now() - t0,
-          status: 'error',
-          errorMsg: (err as Error).message?.slice(0, 500),
-          traceId: job.id ?? undefined,
-        },
-        log,
-      );
     }
   } else {
     result = fallbackCompliance();

@@ -27,8 +27,9 @@ import { prisma, type Prisma } from '@bidstack/db';
 
 import { RFP_QA_REVIEW, rolePreambleForKey } from '@bidstack/shared';
 import { buildAgentUserMessage } from '../lib/prompt-safety.js';
-import { logAiInvocation } from '../lib/ai-audit-worker.js';
 import { getOrgDust, resolveAgentId } from '../lib/dust-credentials.js';
+import { runRfpCompletion } from '../lib/rfp-llm.js';
+import { coerceJsonObject } from '../lib/llm-provider.js';
 import {
   markOrchestrationFailed,
   markOrchestrationAwaitingApproval,
@@ -100,7 +101,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
     resolveAgentId(creds, 'qaReview', process.env.DUST_RFP_QA_AGENT_ID) ?? DEFAULT_QA_AGENT_ID;
   let result: QaResult;
 
-  if (dust && proposal.compiledContent) {
+  if (proposal.compiledContent) {
     const userMessage = buildAgentUserMessage({
       template:
         `${rolePreambleForKey('qa_reviewer')}\n\n` +
@@ -110,50 +111,31 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
       rfpContent: proposal.compiledContent.slice(0, MAX_PROPOSAL_CHARS),
     });
 
-    const t0 = Date.now();
-    try {
-      const run = await dust.runAgent(qaAgentId, userMessage);
-      const responseText = run.output ?? '{}';
-      const durationMs = Date.now() - t0;
+    // Provider-agnostic: direct LLM (RFP_LLM_PROVIDER) → Dust agent → zero-score fallback.
+    const completion = await runRfpCompletion({
+      orgId,
+      log,
+      dust,
+      agentId: qaAgentId,
+      userMessage,
+      system:
+        'You are an RFP QA reviewer. Respond with ONLY a valid JSON object — no prose, no markdown fences.',
+      agentType: 'rfp-qa',
+      traceId: job.id ?? undefined,
+    });
 
-      await logAiInvocation(
-        {
-          orgId,
-          agentType: 'rfp-qa',
-          model: 'dust',
-          prompt: userMessage,
-          response: responseText,
-          tokenCount: 0,
-          durationMs,
-          status: 'success',
-          traceId: job.id ?? undefined,
-        },
-        log,
-      );
-
-      const p2 = QaResult.safeParse(JSON.parse(responseText));
-      result = p2.success ? p2.data : fallbackQa();
-    } catch (err) {
-      log.warn({ err, proposalId }, 'rfp-qa-review: Dust call failed, falling back to zero score');
+    if (completion) {
+      try {
+        const p2 = QaResult.safeParse(JSON.parse(coerceJsonObject(completion.text)));
+        result = p2.success ? p2.data : fallbackQa();
+      } catch {
+        result = fallbackQa();
+      }
+    } else {
       result = fallbackQa();
-      await logAiInvocation(
-        {
-          orgId,
-          agentType: 'rfp-qa',
-          model: 'dust',
-          prompt: userMessage,
-          response: '',
-          tokenCount: 0,
-          durationMs: Date.now() - t0,
-          status: 'error',
-          errorMsg: (err as Error).message?.slice(0, 500),
-          traceId: job.id ?? undefined,
-        },
-        log,
-      );
     }
   } else {
-    // No Dust client or no compiled content — degrade gracefully.
+    // No compiled content to score — degrade gracefully.
     result = fallbackQa();
   }
 

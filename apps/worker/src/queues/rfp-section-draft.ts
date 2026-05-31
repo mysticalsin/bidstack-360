@@ -22,8 +22,8 @@ import { MemOSService } from '@bidstack/memos';
 
 import { RFP_SECTION_DRAFT, RFP_LEGAL_SCAN, rolePreambleForKey } from '@bidstack/shared';
 import { buildAgentUserMessage } from '../lib/prompt-safety.js';
-import { logAiInvocation } from '../lib/ai-audit-worker.js';
 import { getOrgDust, resolveAgentId } from '../lib/dust-credentials.js';
+import { runRfpCompletion } from '../lib/rfp-llm.js';
 import { updateOrchestrationPhase } from './rfp-requirement-extract.helpers.js';
 
 const QUEUE_NAME = RFP_SECTION_DRAFT.name;
@@ -127,61 +127,31 @@ async function processJob(job: Job<JobData>, log: pino.Logger, memos: MemOSServi
   const draftAgentId =
     resolveAgentId(creds, 'sectionDraft', process.env.DUST_RFP_DRAFT_AGENT_ID) ??
     DEFAULT_DRAFT_AGENT_ID;
-  let draftContent: string;
+  const userMessage = buildAgentUserMessage({
+    template:
+      `${rolePreambleForKey('proposal_writer')}\n\n` +
+      'Write a professional proposal section titled "{{SECTION_TITLE}}" for proposal {{PROPOSAL_ID}}. ' +
+      'Use the matched success story context below to ground claims in real delivery evidence. ' +
+      'Output only the section content in Markdown. Do not include a heading — it will be added by the renderer.',
+    trusted: { SECTION_TITLE: sectionTitle, PROPOSAL_ID: proposalId },
+    userText: storyContextText,
+  });
 
-  if (dust) {
-    const userMessage = buildAgentUserMessage({
-      template:
-        `${rolePreambleForKey('proposal_writer')}\n\n` +
-        'Write a professional proposal section titled "{{SECTION_TITLE}}" for proposal {{PROPOSAL_ID}}. ' +
-        'Use the matched success story context below to ground claims in real delivery evidence. ' +
-        'Output only the section content in Markdown. Do not include a heading — it will be added by the renderer.',
-      trusted: { SECTION_TITLE: sectionTitle, PROPOSAL_ID: proposalId },
-      userText: storyContextText,
-    });
+  // Provider-agnostic: direct LLM (RFP_LLM_PROVIDER) → Dust agent → placeholder.
+  const completion = await runRfpCompletion({
+    orgId,
+    log,
+    dust,
+    agentId: draftAgentId,
+    userMessage,
+    system: 'You are an expert proposal writer. Output only the section content in Markdown.',
+    agentType: 'rfp-draft',
+    traceId: job.id ?? undefined,
+  });
 
-    const t0 = Date.now();
-    try {
-      const run = await dust.runAgent(draftAgentId, userMessage);
-      draftContent = run.output ?? `[Draft pending for: ${sectionTitle}]`;
-
-      await logAiInvocation(
-        {
-          orgId,
-          agentType: 'rfp-draft',
-          // DustAgentRun does not expose model or tokenCount — use fixed values
-          model: 'dust',
-          prompt: userMessage,
-          response: draftContent,
-          tokenCount: 0,
-          durationMs: Date.now() - t0,
-          status: 'success',
-          traceId: job.id ?? undefined,
-        },
-        log,
-      );
-    } catch (err) {
-      log.warn({ err, sectionId }, 'rfp-section-draft: Dust call failed, using placeholder');
-      draftContent = `[Draft generation failed for: ${sectionTitle}. Please complete manually.]`;
-      await logAiInvocation(
-        {
-          orgId,
-          agentType: 'rfp-draft',
-          model: 'dust',
-          prompt: userMessage,
-          response: '',
-          tokenCount: 0,
-          durationMs: Date.now() - t0,
-          status: 'error',
-          errorMsg: (err as Error).message?.slice(0, 500),
-          traceId: job.id ?? undefined,
-        },
-        log,
-      );
-    }
-  } else {
-    draftContent = `[Draft pending for: ${sectionTitle}. Connect Dust in Settings to enable AI drafting.]`;
-  }
+  const draftContent =
+    completion?.text.trim() ||
+    `[Draft pending for: ${sectionTitle}. Connect an AI provider (Dust or RFP_LLM_PROVIDER) to enable AI drafting.]`;
 
   // Write draft to ProposalSection — content field holds draft text, aiDrafted
   // flags that this was machine-generated. ProposalSection has no dustRunId,
