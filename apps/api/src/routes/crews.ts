@@ -66,7 +66,7 @@ function serializeCrew(c: CrewRow, tasks: TaskRow[]) {
   };
 }
 
-function serializeRun(r: RunRow) {
+function serializeRun(r: RunRow, isAdmin: boolean) {
   return {
     id: r.id,
     crewId: r.crew_id,
@@ -74,11 +74,40 @@ function serializeRun(r: RunRow) {
     status: r.status,
     finalOutput: r.final_output,
     results: r.results ?? null,
-    error: r.error,
+    // Raw error text can carry LLM/internal detail. Only admins see it; members
+    // get a coarse signal so they know it failed without leaking specifics.
+    error: r.error === null ? null : isAdmin ? r.error : 'Run failed — ask an admin for details',
     createdAt: r.created_at.toISOString(),
     completedAt: r.completed_at?.toISOString() ?? null,
   };
 }
+
+// Bounds on crew run inputs — defense against oversized/abusive payloads that
+// would bloat the job, the prompt, and the LLM bill. Enforced at the edge so
+// the worker never receives an unbounded blob.
+const MAX_INPUT_KEYS = 20;
+const MAX_INPUT_VALUE_CHARS = 20_000;
+const MAX_INPUT_TOTAL_CHARS = 100_000;
+const RunInputs = z
+  .record(
+    z.string().max(MAX_INPUT_VALUE_CHARS, `Each value must be ≤ ${MAX_INPUT_VALUE_CHARS} chars`),
+  )
+  .default({})
+  .superRefine((inputs, ctx) => {
+    if (Object.keys(inputs).length > MAX_INPUT_KEYS) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `At most ${MAX_INPUT_KEYS} input keys are allowed`,
+      });
+    }
+    const total = Object.values(inputs).reduce((n, v) => n + v.length, 0);
+    if (total > MAX_INPUT_TOTAL_CHARS) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Total input size must be ≤ ${MAX_INPUT_TOTAL_CHARS} chars`,
+      });
+    }
+  });
 
 // ─── Validation ─────────────────────────────────────────────────────────────
 
@@ -321,7 +350,7 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
       config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
       schema: {
         params: z.object({ id: z.string().uuid() }),
-        body: z.object({ inputs: z.record(z.string()).default({}) }),
+        body: z.object({ inputs: RunInputs }),
       },
     },
     async (req, reply) => {
@@ -375,7 +404,7 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
       `;
       const run = rows[0];
       if (!run) throw server.httpErrors.notFound('Run not found');
-      return serializeRun(run);
+      return serializeRun(run, isAdmin);
     },
   );
 
@@ -396,7 +425,7 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
         ORDER BY created_at DESC
         LIMIT 100
       `;
-      return { items: rows.map(serializeRun) };
+      return { items: rows.map((r) => serializeRun(r, isAdmin)) };
     },
   );
 };
