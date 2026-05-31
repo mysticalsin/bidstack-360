@@ -19,7 +19,6 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 import {
-  ALLOWED_FILE_CONTENT_TYPES,
   FILE_MAX_BYTES,
   FileAttachment,
   FileFinalizeRequest,
@@ -80,18 +79,6 @@ function serialize(row: DbFileRow): FileAttachment {
 }
 
 export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
-  // Local-mode binary uploads (PUT /files/local-upload) arrive with the file's
-  // own Content-Type (application/pdf, image/png, …). Fastify has no parser for
-  // those, so without this it 415s before the handler runs — breaking every
-  // upload (RFP intake included) under STORAGE_DRIVER=local. Register a no-op
-  // pass-through (the documented Fastify idiom) so the raw stream reaches the
-  // handler, which pipes req.raw to disk via writeLocal. Scoped to this plugin,
-  // so the JSON routes (upload-url, finalize) keep using the JSON parser. In S3
-  // mode the client PUTs straight to the bucket and never hits this route.
-  server.addContentTypeParser([...ALLOWED_FILE_CONTENT_TYPES], (_req, _payload, done) =>
-    done(null),
-  );
-
   // 1. Issue a pre-signed upload URL.
   server.post(
     '/files/upload-url',
@@ -121,32 +108,40 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
     },
   );
 
-  // 2. Local-mode PUT target. Streams body to disk under apps/api/.uploads/.
-  // S3 mode never reaches this endpoint — clients PUT directly to the bucket.
-  server.put<{ Querystring: { key: string } }>(
-    '/files/local-upload',
-    {
-      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
-      schema: { querystring: z.object({ key: z.string().min(1).max(500) }) },
-      // Why: Fastify's default 1 MB cap blocks larger files. We lift the cap
-      // to FILE_MAX_BYTES at the route boundary so the global cap stays small.
-      bodyLimit: FILE_MAX_BYTES,
-    },
-    async (req, reply) => {
-      const storage = await getStorage();
-      if (storage.driver !== 'local' || !storage.writeLocal) {
-        throw server.httpErrors.badRequest('Local upload only available with STORAGE_DRIVER=local');
-      }
-      // S-M6: Verify the key belongs to the caller's org. The first path
-      // segment must match the sanitized orgId so a malicious client can't
-      // target another tenant's storage namespace.
-      if (!keyBelongsToOrg(req.query.key, req.auth.orgId)) {
-        throw server.httpErrors.forbidden('Storage key does not belong to your organization');
-      }
-      const result = await storage.writeLocal(req.query.key, req.raw);
-      return reply.code(200).send({ bytes: result.bytes });
-    },
-  );
+  // 2. Local-mode PUT target. Streams the raw upload body to disk under
+  // apps/api/.uploads/. Encapsulated in its own context with a catch-all raw
+  // parser so the bytes of ANY uploaded file type (pdf, docx, json, txt, image…)
+  // reach req.raw UNCONSUMED — without swallowing the JSON request bodies that
+  // upload-url/finalize need parsed (those keep the inherited JSON parser in the
+  // parent scope). WHY this matters: ALLOWED_FILE_CONTENT_TYPES includes
+  // application/json, so a plugin-wide passthrough would null out the JSON bodies
+  // of the sibling routes. S3 mode never hits this endpoint — clients PUT to the
+  // bucket. The bodyLimit override lifts Fastify's 1 MB cap to FILE_MAX_BYTES.
+  await server.register(async (raw) => {
+    raw.removeAllContentTypeParsers();
+    raw.addContentTypeParser('*', (_req, _payload, done) => done(null));
+    raw.put<{ Querystring: { key: string } }>(
+      '/files/local-upload',
+      {
+        config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+        schema: { querystring: z.object({ key: z.string().min(1).max(500) }) },
+        bodyLimit: FILE_MAX_BYTES,
+      },
+      async (req, reply) => {
+        const storage = await getStorage();
+        if (storage.driver !== 'local' || !storage.writeLocal) {
+          throw raw.httpErrors.badRequest('Local upload only available with STORAGE_DRIVER=local');
+        }
+        // S-M6: Verify the key belongs to the caller's org so a malicious client
+        // can't target another tenant's storage namespace.
+        if (!keyBelongsToOrg(req.query.key, req.auth.orgId)) {
+          throw raw.httpErrors.forbidden('Storage key does not belong to your organization');
+        }
+        const result = await storage.writeLocal(req.query.key, req.raw);
+        return reply.code(200).send({ bytes: result.bytes });
+      },
+    );
+  });
 
   // 3. Persist metadata after the client confirms the upload.
   server.post(
