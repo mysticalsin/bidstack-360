@@ -51,6 +51,19 @@ const log = pino({
   name: 'worker',
 });
 
+// Fail fast on bad production config instead of booting "healthy" and failing
+// every job. Postgres + Redis are the worker's universal hard dependencies; the
+// API enforces its own env via getEnv(), but the worker can't import that
+// app-specific schema, so it checks its must-haves here. (DATABASE_URL is read
+// by the Prisma client; REDIS_URL by every BullMQ queue below.)
+if (process.env.NODE_ENV === 'production') {
+  const missing = (['DATABASE_URL', 'REDIS_URL'] as const).filter((k) => !process.env[k]?.trim());
+  if (missing.length > 0) {
+    log.fatal({ missing }, 'worker: missing required production env — refusing to boot');
+    process.exit(1);
+  }
+}
+
 const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6380';
 const redisEndpoint = (() => {
   try {
