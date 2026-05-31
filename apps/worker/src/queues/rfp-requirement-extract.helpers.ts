@@ -50,14 +50,36 @@ export const DustExtractionResponse = z.object({
 // ─── Deterministic fallback ─────────────────────────────────────────────────
 
 export function fallbackExtract(rawText: string): Array<z.infer<typeof ExtractedRequirement>> {
-  const lines = rawText.split('\n').filter((l) => l.trim().length > 20);
-  const reqPatterns = /^\s*(shall|must|should|required|the system|the vendor|bidder)/i;
-  return lines
-    .filter((l) => reqPatterns.test(l))
+  // Deterministic, no-LLM extraction used when no AI provider is configured.
+  // WHY strip the leading list marker FIRST: real RFPs number or bullet their
+  // requirements ("1. The vendor must…", "- The system shall…"). The previous
+  // anchored test (/^\s*(shall|must|…)/) silently missed every numbered line,
+  // so a perfectly good RFP yielded zero requirements. We strip the marker, then
+  // keep a line if it carries an obligation verb anywhere OR opens with a classic
+  // RFP subject — catching numbered, bulleted, and prose-style requirements.
+  const stripMarker = (l: string): string =>
+    l.replace(/^\s*(?:[-*•·–—]|\(?\d+[.)]|[a-z][.)])\s+/i, '').trim();
+  const obligation =
+    /\b(shall|must|should|will|required|responsible for|expected to|needs? to|has to)\b/i;
+  const opener =
+    /^(the (system|vendor|solution|supplier|contractor|service|platform|proposal|product|bidder)|vendor|bidder|supplier|offeror|respondent)\b/i;
+
+  const seen = new Set<string>();
+  return rawText
+    .split(/\r?\n/)
+    .map(stripMarker)
+    .filter((l) => l.length > 20 && (obligation.test(l) || opener.test(l)))
+    .filter((l) => {
+      // De-dupe repeated lines (headers/footers repeated across pages).
+      const key = l.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
     .slice(0, 50)
     .map((text, i) => ({
       externalRef: `REQ-${String(i + 1).padStart(4, '0')}`,
-      text: text.trim().slice(0, 2000),
+      text: text.slice(0, 2000),
       requirementType: 'functional',
       mandatory: true,
       priority: 'medium' as const,

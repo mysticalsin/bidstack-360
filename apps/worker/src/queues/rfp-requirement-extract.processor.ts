@@ -13,6 +13,7 @@ import { RFP_STORY_MATCH, rolePreambleForKey } from '@bidstack/shared';
 import { buildAgentUserMessage } from '../lib/prompt-safety.js';
 import { logAiInvocation } from '../lib/ai-audit-worker.js';
 import { getOrgDust, resolveAgentId } from '../lib/dust-credentials.js';
+import { resolveLlmFromEnv, completeChat, coerceJsonObject } from '../lib/llm-provider.js';
 
 import {
   JobData,
@@ -72,20 +73,75 @@ export async function processJob(
   let requirements: Array<z.infer<typeof ExtractedRequirement>>;
   let dustRunId: string | null = null;
 
-  // ─── Call Dust rfp-extractor-agent ───────────────────────────────────
-  if (dust) {
-    const userMessage = buildAgentUserMessage({
-      template:
-        `${rolePreambleForKey('requirements_analyst')}\n\n` +
-        'Extract all requirements from the following RFP document chunk ' +
-        '(chunk {{CHUNK_INDEX}} of {{TOTAL_CHUNKS}}). ' +
-        'Return ONLY a JSON object with a "requirements" array. Each item must have: ' +
-        'externalRef (string), text (string), requirementType (string), mandatory (boolean), ' +
-        'priority (low|medium|high|critical), confidenceBps (0-10000), sourceChunkIndex (integer).',
-      trusted: { CHUNK_INDEX: chunkIndex + 1, TOTAL_CHUNKS: totalChunks },
-      rfpContent: rawText,
-    });
+  // One prompt, any provider. The role preamble + JSON-shape instructions live
+  // in the user message; chat providers also get a short JSON-only system prompt.
+  const userMessage = buildAgentUserMessage({
+    template:
+      `${rolePreambleForKey('requirements_analyst')}\n\n` +
+      'Extract all requirements from the following RFP document chunk ' +
+      '(chunk {{CHUNK_INDEX}} of {{TOTAL_CHUNKS}}). ' +
+      'Return ONLY a JSON object with a "requirements" array. Each item must have: ' +
+      'externalRef (string), text (string), requirementType (string), mandatory (boolean), ' +
+      'priority (low|medium|high|critical), confidenceBps (0-10000), sourceChunkIndex (integer).',
+    trusted: { CHUNK_INDEX: chunkIndex + 1, TOTAL_CHUNKS: totalChunks },
+    rfpContent: rawText,
+  });
 
+  const envLlm = resolveLlmFromEnv();
+
+  // ─── Tier 1: direct LLM provider — OpenAI (GPT) / Anthropic (Claude) / Moonshot
+  // (Kimi). Selected via RFP_LLM_PROVIDER + the provider's API key, so an org can
+  // run extraction on GPT/Claude/Kimi without a Dust workspace. ────────────────
+  if (envLlm) {
+    const t0 = Date.now();
+    try {
+      const responseText = await completeChat(envLlm, {
+        system:
+          'You are an RFP requirements-extraction engine. Respond with ONLY a valid ' +
+          'JSON object — no prose, no markdown fences.',
+        user: userMessage,
+      });
+      await logAiInvocation(
+        {
+          orgId,
+          agentType: 'rfp-extractor',
+          model: `${envLlm.kind}:${envLlm.model}`,
+          prompt: userMessage,
+          response: responseText,
+          tokenCount: 0,
+          durationMs: Date.now() - t0,
+          status: 'success',
+          traceId: job.id ?? undefined,
+        },
+        log,
+      );
+      const parsed = DustExtractionResponse.safeParse(JSON.parse(coerceJsonObject(responseText)));
+      requirements = parsed.success ? parsed.data.requirements : fallbackExtract(rawText);
+    } catch (llmErr) {
+      log.warn(
+        { err: llmErr, provider: envLlm.kind },
+        'rfp-requirement-extract: LLM provider call failed, falling back',
+      );
+      requirements = fallbackExtract(rawText);
+      await logAiInvocation(
+        {
+          orgId,
+          agentType: 'rfp-extractor',
+          model: `${envLlm.kind}:${envLlm.model}`,
+          prompt: userMessage,
+          response: '',
+          tokenCount: 0,
+          durationMs: Date.now() - t0,
+          status: 'error',
+          errorMsg: (llmErr as Error).message?.slice(0, 500),
+          traceId: job.id ?? undefined,
+        },
+        log,
+      );
+    }
+
+    // ─── Tier 2: Dust agent (per-org or global workspace) ──────────────────────
+  } else if (dust) {
     const t0 = Date.now();
     try {
       const run = await dust.runAgent(extractAgentId, userMessage);
@@ -129,6 +185,8 @@ export async function processJob(
         log,
       );
     }
+
+    // ─── Tier 3: nothing configured → deterministic keyword/obligation parse ───
   } else {
     requirements = fallbackExtract(rawText);
   }
