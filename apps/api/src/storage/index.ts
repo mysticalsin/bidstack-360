@@ -7,7 +7,7 @@
 // unless `@aws-sdk/client-s3` and `@aws-sdk/s3-request-presigner` are present.
 
 import { randomUUID } from 'node:crypto';
-import { createReadStream, createWriteStream } from 'node:fs';
+import { createReadStream, createWriteStream, existsSync } from 'node:fs';
 import { mkdir, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
@@ -77,7 +77,28 @@ export interface StorageAdapter {
 
 // ─── Local filesystem adapter ────────────────────────────────────────────
 
-const LOCAL_ROOT = path.resolve(process.cwd(), '.uploads');
+// Local uploads must live in ONE directory shared by the API (writer) and the
+// worker (reader). In dev the two run from different cwds (apps/api, apps/worker)
+// so a plain `process.cwd()/.uploads` diverges and the worker can't read what the
+// API wrote. Anchor to the monorepo root's apps/api/.uploads so both converge on
+// the same absolute path regardless of cwd; LOCAL_STORAGE_ROOT overrides (e.g. a
+// shared volume in prod). Mirrored in apps/worker/src/lib/storage-read.ts.
+function resolveLocalUploadsRoot(): string {
+  if (process.env.LOCAL_STORAGE_ROOT) return path.resolve(process.env.LOCAL_STORAGE_ROOT);
+  let dir = process.cwd();
+  for (let i = 0; i < 8; i += 1) {
+    if (existsSync(path.join(dir, 'pnpm-workspace.yaml'))) {
+      return path.join(dir, 'apps', 'api', '.uploads');
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  // Fallback: cwd-relative (preserves prior behavior if the root isn't found).
+  return path.resolve(process.cwd(), '.uploads');
+}
+
+const LOCAL_ROOT = resolveLocalUploadsRoot();
 
 function safeJoin(root: string, key: string): string {
   // Why: defend against `../` escapes. We resolve and verify the result is

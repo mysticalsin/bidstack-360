@@ -416,6 +416,22 @@ export async function startRfpStoryMatch(
 
   worker.on('failed', (job, err) => {
     log.error({ jobId: job?.id, err }, 'rfp-story-match: failed');
+    // The section-planning bridge advances the pipeline by counting story-match
+    // completions until done >= total. A job that exhausts all retries never
+    // reaches the `completed` handler, so without counting it here `done` never
+    // catches up to `total` and the whole pipeline freezes at story_match until
+    // the 30-min reaper kills it. On the FINAL attempt only (so retries aren't
+    // double-counted), record this requirement as done — the pipeline then
+    // proceeds with the matches that did succeed instead of stalling.
+    if (!job) return;
+    const maxAttempts = job.opts.attempts ?? 1;
+    if (job.attemptsMade < maxAttempts) return; // more retries pending — don't count yet
+    void advanceToSectionDraftIfReady(
+      job.data.orgId,
+      job.data.orchestrationId,
+      sectionDraftQueue,
+      log,
+    );
   });
 
   workers.push(worker);

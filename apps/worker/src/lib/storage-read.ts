@@ -1,5 +1,5 @@
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { createReadStream } from 'node:fs';
+import { createReadStream, existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
@@ -47,8 +47,27 @@ async function streamToBuffer(stream: Readable): Promise<Buffer> {
   });
 }
 
+// Resolve the SAME local uploads directory the API writes to. In dev the API and
+// this worker run from different cwds, so a cwd-relative '.uploads' diverges and
+// the file the API just stored is unreadable here. Anchor to the monorepo root's
+// apps/api/.uploads so both converge; LOCAL_STORAGE_ROOT overrides (shared volume
+// in prod). Mirrors resolveLocalUploadsRoot() in apps/api/src/storage/index.ts.
+function resolveLocalUploadsRoot(): string {
+  if (process.env.LOCAL_STORAGE_ROOT) return path.resolve(process.env.LOCAL_STORAGE_ROOT);
+  let dir = process.cwd();
+  for (let i = 0; i < 10; i += 1) {
+    if (existsSync(path.join(dir, 'pnpm-workspace.yaml'))) {
+      return path.join(dir, 'apps', 'api', '.uploads');
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return path.resolve(process.cwd(), '.uploads');
+}
+
 async function readLocal(storageKey: string): Promise<StoredDocument> {
-  const root = path.resolve(process.env.LOCAL_STORAGE_ROOT ?? path.join(process.cwd(), '.uploads'));
+  const root = resolveLocalUploadsRoot();
   const sourcePath = safeJoin(root, storageKey);
   const s = await stat(sourcePath);
   if (s.size > MAX_EXTRACTION_BYTES) {

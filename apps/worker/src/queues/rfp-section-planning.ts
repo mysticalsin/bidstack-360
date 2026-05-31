@@ -72,7 +72,7 @@ export async function advanceToSectionDraftIfReady(
   const claim = await prisma.$queryRaw<{ id: string }[]>`
     UPDATE rfp_orchestrations
     SET current_phase = 'section_draft'::"RfpResponsePhase",
-        completed_phases = array_append(completed_phases, 'story_match'),
+        completed_phases = array_append(completed_phases, 'story_match'::"RfpResponsePhase"),
         updated_at = now()
     WHERE id = ${orchestrationId}::uuid
       AND org_id = ${orgId}::uuid

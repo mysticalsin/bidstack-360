@@ -134,8 +134,17 @@ export async function processJob(
 
   if (requirements.length === 0) {
     log.info({ orgId, orchestrationId }, 'rfp-requirement-extract: no requirements found');
-    // RfpResponsePhase enum: 'requirement_extract' = this phase, 'story_match' = next
-    await updateOrchestrationPhase(orchestrationId, orgId, 'story_match', 'requirement_extract');
+    // WHY fail (not advance to story_match): with zero requirements there are no
+    // story-match jobs to enqueue and story_match_total is never written, so the
+    // section-planning bridge can never fire — the pipeline would freeze at
+    // story_match until the 30-min reaper. Fail loud with an actionable reason so
+    // the user knows immediately the document yielded no requirements.
+    await markOrchestrationFailed(
+      orchestrationId,
+      orgId,
+      'requirement_extract',
+      'No requirements could be extracted from this document. It may be empty, image-only, or not a structured RFP.',
+    );
     try {
       await memos.logTrace({
         orgId,

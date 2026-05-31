@@ -19,6 +19,7 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 import {
+  ALLOWED_FILE_CONTENT_TYPES,
   FILE_MAX_BYTES,
   FileAttachment,
   FileFinalizeRequest,
@@ -79,6 +80,18 @@ function serialize(row: DbFileRow): FileAttachment {
 }
 
 export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
+  // Local-mode binary uploads (PUT /files/local-upload) arrive with the file's
+  // own Content-Type (application/pdf, image/png, …). Fastify has no parser for
+  // those, so without this it 415s before the handler runs — breaking every
+  // upload (RFP intake included) under STORAGE_DRIVER=local. Register a no-op
+  // pass-through (the documented Fastify idiom) so the raw stream reaches the
+  // handler, which pipes req.raw to disk via writeLocal. Scoped to this plugin,
+  // so the JSON routes (upload-url, finalize) keep using the JSON parser. In S3
+  // mode the client PUTs straight to the bucket and never hits this route.
+  server.addContentTypeParser([...ALLOWED_FILE_CONTENT_TYPES], (_req, _payload, done) =>
+    done(null),
+  );
+
   // 1. Issue a pre-signed upload URL.
   server.post(
     '/files/upload-url',

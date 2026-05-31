@@ -61,7 +61,7 @@ async function upsertOrchestration(
       ${data.startedByUserId ?? null}::uuid,
       'running',
       'requirement_extract',
-      ARRAY[]::text[],
+      ARRAY[]::"RfpResponsePhase"[],
       ${rootJobId},
       now(),
       now(),
@@ -89,9 +89,14 @@ async function markOrchestrationFailed(
   phase: string,
   reason: string,
 ): Promise<void> {
+  // failed_phase is a RfpResponsePhase enum; 'orchestrate' (the only caller's
+  // phase) is NOT one of its labels — the orchestrate step launches the pipeline,
+  // it is not itself a pipeline phase. Writing it would raise invalid-enum-input
+  // and leave the row stuck. Record NULL and fold the step into failure_reason.
+  const detail = `[${phase}] ${reason}`.slice(0, 2000);
   await prisma.$executeRaw`
     UPDATE rfp_orchestrations
-    SET state = 'failed', failed_phase = ${phase}, failure_reason = ${reason}, updated_at = now()
+    SET state = 'failed', failed_phase = NULL, failure_reason = ${detail}, updated_at = now()
     WHERE org_id = ${orgId}::uuid AND rfp_request_id = ${rfpRequestId}
   `;
 }

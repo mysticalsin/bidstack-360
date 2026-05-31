@@ -3,7 +3,7 @@
 // Three authenticated routes + SSE stream (registered as sub-plugin):
 //
 //   1. POST /opportunities/:opportunityId/rfp/upload
-//      — Accepts a PDF/DOCX/PPTX, creates an RfpOrchestration row and
+//      — Accepts supported RFP document/text/image formats, creates an RfpOrchestration row and
 //        enqueues the rfp.orchestrate job to start the pipeline.
 //
 //   2. GET /bid-workspaces/:workspaceId/rfp/:orchestrationId/stream
@@ -112,7 +112,7 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
       // Validate mime type against allowed set.
       if (!(ALLOWED_MIME_TYPES as readonly string[]).includes(file.contentType)) {
         throw server.httpErrors.unsupportedMediaType(
-          `RFP documents must be PDF, DOCX, or PPTX. Received: ${file.contentType}`,
+          `RFP upload format is not supported. Received: ${file.contentType}`,
         );
       }
       if (file.bytes > RFP_MAX_BYTES) {
@@ -155,9 +155,11 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
         select: { id: true },
       });
 
-      // Create the RfpOrchestration row and enqueue the pipeline in a transaction.
-      // WHY transaction: if the enqueue call fails we roll back the row so there
-      // is no orphaned orchestration without a BullMQ job behind it.
+      // Create the RfpOrchestration row, then enqueue the pipeline. If the
+      // enqueue fails we delete the row below, so there is never an orphaned
+      // orchestration without a BullMQ job behind it. Not a DB transaction: the
+      // enqueue is a Redis op outside Postgres, so the rollback is an explicit
+      // delete in the catch.
       const orchestration = await prisma.rfpOrchestration.create({
         data: {
           orgId,
@@ -177,7 +179,25 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
         opportunityId: opportunity.id,
         startedByUserId: userId,
       };
-      const jobId = await enqueueRfpOrchestrate(job);
+      // enqueueRfpOrchestrate returns null only for the intentional test-mode
+      // skip; on a genuine failure it throws. Roll back the orchestration on
+      // failure so the client gets a 503 (retryable) rather than a 202 over a
+      // dead row.
+      let jobId: string | null;
+      try {
+        jobId = await enqueueRfpOrchestrate(job);
+      } catch (err) {
+        await prisma.rfpOrchestration
+          .delete({ where: { id: orchestration.id } })
+          .catch(() => undefined);
+        log.error(
+          { err, orchestrationId: orchestration.id, orgId, opportunityId: opportunity.id },
+          'RFP enqueue failed — rolled back orchestration',
+        );
+        throw server.httpErrors.serviceUnavailable(
+          'RFP pipeline could not be started (queue unavailable). Please retry.',
+        );
+      }
 
       if (jobId) {
         // Persist the BullMQ root job ID for progress correlation.
@@ -210,7 +230,13 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
       );
 
       reply.status(202);
-      return { orchestrationId: orchestration.id, status: 'queued' as const };
+      // bidWorkspaceId === opportunityId in this domain model; the web client
+      // needs it to open the RFP progress SSE stream.
+      return {
+        orchestrationId: orchestration.id,
+        bidWorkspaceId: opportunity.id,
+        status: 'queued' as const,
+      };
     },
   );
 

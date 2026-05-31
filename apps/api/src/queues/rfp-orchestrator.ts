@@ -44,8 +44,13 @@ function getQueue(): Queue {
 }
 
 /**
- * Enqueue an RFP orchestration job. Returns the BullMQ job id, or null if
- * Redis is unreachable (fail-open so the API route still responds).
+ * Enqueue an RFP orchestration job and return the BullMQ job id.
+ *
+ * Returns null ONLY for the intentional test-mode skip (integration tests run
+ * without a live Redis). On a genuine failure (Redis unreachable, add() error)
+ * it THROWS — the upload route relies on this to roll back the orchestration row
+ * and surface a 503, instead of stranding an orphan that sits "queued" in the UI
+ * until the reaper marks it failed 30 minutes later.
  */
 export async function enqueueRfpOrchestrate(job: RfpOrchestrateJob): Promise<string | null> {
   if (process.env.NODE_ENV === 'test' && process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS !== 'true') {
@@ -70,6 +75,6 @@ export async function enqueueRfpOrchestrate(job: RfpOrchestrateJob): Promise<str
       { err, orgId: job.orgId, rfpRequestId: job.rfpRequestId },
       'Failed to enqueue RFP orchestrate job',
     );
-    return null;
+    throw err;
   }
 }

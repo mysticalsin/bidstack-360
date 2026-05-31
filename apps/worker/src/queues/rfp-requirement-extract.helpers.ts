@@ -12,6 +12,7 @@ import { prisma } from '@bidstack/db';
 import { RFP_REQUIREMENT_EXTRACT, RFP_EMBED_REQUIREMENT, RFP_STORY_MATCH } from '@bidstack/shared';
 
 import { readStoredDocument } from '../lib/storage-read.js';
+import { extractTextFromBuffer, extractWithOmniParse } from '../lib/extract-text.js';
 import { extractTextFromBufferSandboxed } from '../lib/extract-text-sandbox.js';
 
 export const QUEUE_NAME = RFP_REQUIREMENT_EXTRACT.name;
@@ -115,22 +116,38 @@ export async function ensureExtractedText(
 
   try {
     const stored = await readStoredDocument({ orgId, storageKey: docVersion.storageKey });
-    const text = await extractTextFromBufferSandboxed({
-      buffer: stored.buffer,
-      contentType: docVersion.contentType,
-      name: docVersion.fileAttachment?.name ?? 'document',
-      sourcePath: stored.sourcePath,
-    });
+    const name = docVersion.fileAttachment?.name ?? 'document';
+    const omni = await extractWithOmniParse(stored.buffer, docVersion.contentType, name);
+    const text =
+      omni ??
+      (docVersion.contentType.startsWith('image/')
+        ? await extractTextFromBuffer({
+            buffer: stored.buffer,
+            contentType: docVersion.contentType,
+            name,
+            sourcePath: stored.sourcePath,
+          })
+        : await extractTextFromBufferSandboxed({
+            buffer: stored.buffer,
+            contentType: docVersion.contentType,
+            name,
+            sourcePath: stored.sourcePath,
+          }));
     if (!text || text.trim().length === 0) {
       throw new Error('Extraction produced no text — document may be empty or image-only');
     }
 
     await prisma.documentVersion.updateMany({
       where: { id: documentVersionId, orgId, deletedAt: null },
-      data: { extractedText: text, extractionStatus: 'succeeded', ocrStatus: 'succeeded' },
+      data: {
+        extractedText: text,
+        extractionStatus: 'succeeded',
+        ocrStatus: 'succeeded',
+        ocrEngine: omni ? 'omniparse' : 'bidstack-worker',
+      },
     });
     log.info(
-      { orgId, documentVersionId, chars: text.length },
+      { orgId, documentVersionId, chars: text.length, parser: omni ? 'omniparse' : 'worker' },
       'rfp-requirement-extract: source text extracted',
     );
     return text;
@@ -163,7 +180,7 @@ export async function updateOrchestrationPhase(
     UPDATE rfp_orchestrations
     SET
       current_phase    = ${phase}::"RfpResponsePhase",
-      completed_phases = array_append(completed_phases, ${completedPhase}),
+      completed_phases = array_append(completed_phases, ${completedPhase}::"RfpResponsePhase"),
       updated_at       = now()
     WHERE id = ${orchestrationId}::uuid AND org_id = ${orgId}::uuid
   `;
@@ -193,7 +210,7 @@ export async function markOrchestrationAwaitingApproval(
     UPDATE rfp_orchestrations
     SET state = 'awaiting_approval',
         current_phase = 'awaiting_approval'::"RfpResponsePhase",
-        completed_phases = array_append(completed_phases, 'qa_review'),
+        completed_phases = array_append(completed_phases, 'qa_review'::"RfpResponsePhase"),
         updated_at = now()
     WHERE id = ${orchestrationId}::uuid AND org_id = ${orgId}::uuid
   `;

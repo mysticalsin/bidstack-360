@@ -26,6 +26,73 @@ interface ServerSseFrame {
   progress: number | null;
   message: string | null;
   updatedAt: string;
+  error?: string | null;
+}
+
+// The worker keeps RfpOrchestration.state = 'running' for the ENTIRE active
+// pipeline and moves only current_phase between steps. So the granular UI stage
+// must be derived from `phase`, not `state` — mapping state→stage directly would
+// surface the unknown value 'running' for minutes and freeze the progress UI.
+
+// DB current_phase (RfpResponsePhase) → UI PipelineStage.
+const PHASE_TO_STAGE: Record<string, PipelineEvent['stage']> = {
+  requirement_extract: 'extracting',
+  embed: 'extracting',
+  story_match: 'story_matching',
+  section_draft: 'section_drafting',
+  compliance_fill: 'compliance_fill',
+  legal_scan: 'legal_scan',
+  // No dedicated 'compiling' UI stage — proposal_compile rolls into qa_review,
+  // the finalize tail, so the bar reads near-complete during compile.
+  proposal_compile: 'qa_review',
+  qa_review: 'qa_review',
+  awaiting_approval: 'awaiting_approval',
+};
+
+// DB state → UI stage for values that carry their own UI meaning: the initial
+// queued frame and every terminal/gate state. 'running'/'paused' are absent on
+// purpose — while running, the granularity lives in current_phase.
+const STATE_TO_STAGE: Record<string, PipelineEvent['stage']> = {
+  queued: 'queued',
+  awaiting_approval: 'awaiting_approval',
+  approved: 'approved',
+  completed: 'completed',
+  rejected: 'rejected',
+  failed: 'failed',
+  timeout: 'failed',
+};
+
+// Spine phase order, used to scale the numeric progress bar (0-100).
+// awaiting_approval is the human gate, not a processing phase, so it's excluded.
+const PHASE_ORDER = [
+  'requirement_extract',
+  'embed',
+  'story_match',
+  'section_draft',
+  'legal_scan',
+  'proposal_compile',
+  'qa_review',
+];
+
+function deriveStage(frame: ServerSseFrame): PipelineEvent['stage'] {
+  const byState = STATE_TO_STAGE[frame.state];
+  if (byState) return byState;
+  if (frame.phase && PHASE_TO_STAGE[frame.phase]) {
+    return PHASE_TO_STAGE[frame.phase] as PipelineEvent['stage'];
+  }
+  // state is 'running'/'paused' with an unknown/absent phase — keep the bar on
+  // the first processing step rather than freezing on an unmapped stage.
+  return 'extracting';
+}
+
+function deriveProgress(frame: ServerSseFrame, stage: PipelineEvent['stage']): number | undefined {
+  if (stage === 'awaiting_approval' || stage === 'approved' || stage === 'completed') return 100;
+  if (stage === 'queued') return 0;
+  if (frame.phase) {
+    const idx = PHASE_ORDER.indexOf(frame.phase);
+    if (idx >= 0) return Math.round(((idx + 1) / PHASE_ORDER.length) * 100);
+  }
+  return frame.progress ?? undefined;
 }
 
 export function useRfpPipeline(
@@ -49,15 +116,18 @@ export function useRfpPipeline(
       try {
         const frame = JSON.parse(e.data as string) as ServerSseFrame;
 
-        // Map server field names → PipelineEvent shape.
-        // WHY: server uses `state` (DB column) and `phase` (sub-stage label).
-        // The store tracks `stage` (UI enum) so we forward state → stage.
+        // Map server fields → PipelineEvent. The DB `state` stays 'running' the
+        // whole active pipeline, so derive the granular UI stage from `phase`
+        // (see deriveStage). Forward the failure reason so the error banner can
+        // show it instead of a generic message.
+        const stage = deriveStage(frame);
         const event: PipelineEvent = {
-          stage: frame.state as PipelineEvent['stage'],
+          stage,
           message: frame.message ?? '',
           timestamp: frame.updatedAt,
-          progress: frame.progress ?? undefined,
+          progress: deriveProgress(frame, stage),
           phase: frame.phase ?? undefined,
+          ...(frame.error ? { error: frame.error } : {}),
         };
 
         applyEvent(event);

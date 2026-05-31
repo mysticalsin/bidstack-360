@@ -55,10 +55,22 @@ interface RfpPipelineState {
   progress: number; // 0-100 overall
   error: string | null;
   lastEventAt: string | null; // ISO timestamp of the most-recently applied event
+  // Upload-phase state — byte-level progress of the file → storage PUT.
+  // WHY in the store (not hook-local): RfpUploadZone starts the upload and
+  // RfpUploadProgress renders it, and both call useRfpUpload(). Hook-local
+  // useState would give each component its own copy, so the progress bar would
+  // sit at 0% forever. The store is the single source both instances read.
+  uploadProgress: number; // 0-100
+  isUploading: boolean;
+  uploadError: string | null;
   // Actions
   setOrchestrationId: (id: string) => void;
   setBidWorkspaceId: (id: string) => void;
+  setUpload: (
+    partial: Partial<Pick<RfpPipelineState, 'uploadProgress' | 'isUploading' | 'uploadError'>>,
+  ) => void;
   applyEvent: (event: PipelineEvent) => void;
+  retry: () => void;
   reset: () => void;
 }
 
@@ -70,8 +82,12 @@ export const useRfpPipelineStore = create<RfpPipelineState>((set) => ({
   progress: 0,
   error: null,
   lastEventAt: null,
+  uploadProgress: 0,
+  isUploading: false,
+  uploadError: null,
   setOrchestrationId: (id) => set({ orchestrationId: id }),
   setBidWorkspaceId: (id) => set({ bidWorkspaceId: id }),
+  setUpload: (partial) => set(partial),
   applyEvent: (event) =>
     set((s) => {
       // WHY idempotency guard: EventSource auto-reconnect on network drop can
@@ -90,6 +106,23 @@ export const useRfpPipelineStore = create<RfpPipelineState>((set) => ({
         events: [...s.events, event].slice(-50),
       };
     }),
+  retry: () =>
+    set((s) =>
+      s.stage === 'failed'
+        ? {
+            stage: 'queued' as const,
+            error: null,
+            events: [
+              ...s.events,
+              {
+                stage: 'queued' as const,
+                message: 'Retrying from failed state…',
+                timestamp: new Date().toISOString(),
+              } satisfies PipelineEvent,
+            ].slice(-50),
+          }
+        : s,
+    ),
   reset: () =>
     set({
       orchestrationId: null,
@@ -99,5 +132,8 @@ export const useRfpPipelineStore = create<RfpPipelineState>((set) => ({
       progress: 0,
       error: null,
       lastEventAt: null,
+      uploadProgress: 0,
+      isUploading: false,
+      uploadError: null,
     }),
 }));

@@ -20,7 +20,7 @@ const REVIEW_STEPS = [
 type ReviewStep = (typeof REVIEW_STEPS)[number];
 
 interface ApprovePayload {
-  reviewNotes: string;
+  notes: string;
 }
 
 export function ApprovalGate() {
@@ -46,10 +46,16 @@ export function ApprovalGate() {
 
   const approveMutation = useMutation({
     mutationFn: (payload: ApprovePayload) =>
-      api<{ id: string }>(`/api/v1/proposals/${proposalId}/approve`, {
-        method: 'POST',
-        body: payload,
-      }),
+      // WHY /rfp-approve (not /approve): the human approval gate lives at
+      // POST /proposals/:id/rfp-approve (rfp-pipeline.ts). /approve does not
+      // exist → 404. Body field is `notes` to match the server ApproveBody schema.
+      api<{ approvedAt: string; approvedByUserId: string }>(
+        `/api/v1/proposals/${proposalId}/rfp-approve`,
+        {
+          method: 'POST',
+          body: payload,
+        },
+      ),
     onSuccess: () => {
       applyEvent({
         stage: 'approved',
@@ -59,19 +65,16 @@ export function ApprovalGate() {
       });
     },
     onError: (err: unknown) => {
-      const message = err instanceof Error ? err.message : t('approval.errorGeneric');
-      applyEvent({
-        stage: 'failed',
-        message,
-        timestamp: new Date().toISOString(),
-        error: message,
-      });
+      // P0 FIX: Do NOT overwrite the pipeline stage to 'failed'.
+      // The mutation's isError state already surfaces the error in the UI.
+      // Nuking the stage destroys the approval context and forces a full restart.
+      console.error('Approval mutation failed:', err);
     },
   });
 
   const handleApprove = () => {
     if (!canApprove) return;
-    approveMutation.mutate({ reviewNotes });
+    approveMutation.mutate({ notes: reviewNotes });
   };
 
   return (
