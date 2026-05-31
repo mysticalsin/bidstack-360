@@ -298,11 +298,10 @@ export async function recordPayment(
 
   const { amountMicros, currency, method, reference, receivedAt } = payment;
   const amount = BigInt(amountMicros);
-  const newPaidMicros = invoice.paidMicros + amount;
-  const nowPaid = newPaidMicros >= invoice.totalMicros;
+  const paidState = toPrismaState('paid');
 
-  await prisma.$transaction([
-    prisma.payment.create({
+  await prisma.$transaction(async (tx) => {
+    await tx.payment.create({
       data: {
         orgId,
         invoiceId: invoice.id,
@@ -312,15 +311,21 @@ export async function recordPayment(
         reference: reference ?? null,
         receivedAt: receivedAt ? new Date(receivedAt) : new Date(),
       },
-    }),
-    prisma.invoice.update({
+    });
+    // Atomic increment so concurrent payments can't lost-update each other (the
+    // previous read-then-write of the absolute paid total dropped money).
+    const updated = await tx.invoice.update({
       where: { id: invoice.id },
-      data: {
-        paidMicros: newPaidMicros,
-        ...(nowPaid ? { state: toPrismaState('paid'), paidAt: new Date() } : {}),
-      },
-    }),
-    prisma.auditLog.create({
+      data: { paidMicros: { increment: amount } },
+    });
+    const nowPaid = updated.paidMicros >= updated.totalMicros;
+    if (nowPaid && updated.state !== paidState) {
+      await tx.invoice.update({
+        where: { id: invoice.id },
+        data: { state: paidState, paidAt: new Date() },
+      });
+    }
+    await tx.auditLog.create({
       data: {
         orgId,
         userId,
@@ -330,12 +335,12 @@ export async function recordPayment(
         diff: {
           amountMicros: amount.toString(),
           method,
-          newPaidMicros: newPaidMicros.toString(),
+          newPaidMicros: updated.paidMicros.toString(),
           autoPaid: nowPaid,
         },
       },
-    }),
-  ]);
+    });
+  });
 
   return loadInvoiceDetail(orgId, invoice.id);
 }

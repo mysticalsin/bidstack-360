@@ -147,13 +147,10 @@ export const invoicePaymentsPlugin: FastifyPluginAsyncZod = async (server) => {
 
       const { amountMicros, currency, method, reference, receivedAt } = req.body;
       const amount = BigInt(amountMicros);
-      const newPaidMicros = invoice.paidMicros + amount;
-      // Auto-pay: when cumulative payments meet or exceed the invoice total,
-      // flip state to 'paid' so the invoice doesn't linger as overdue.
-      const nowPaid = newPaidMicros >= invoice.totalMicros;
+      const paidState = toPrismaState('paid');
 
-      await prisma.$transaction([
-        prisma.payment.create({
+      await prisma.$transaction(async (tx) => {
+        await tx.payment.create({
           data: {
             orgId: req.auth.orgId,
             invoiceId: invoice.id,
@@ -163,15 +160,24 @@ export const invoicePaymentsPlugin: FastifyPluginAsyncZod = async (server) => {
             reference: reference ?? null,
             receivedAt: receivedAt ? new Date(receivedAt) : new Date(),
           },
-        }),
-        prisma.invoice.update({
+        });
+        // Atomic increment (paid_micros = paid_micros + amount) so two concurrent
+        // payments can't lost-update each other — the previous read-then-write of
+        // the absolute total silently dropped money under concurrency.
+        const updated = await tx.invoice.update({
           where: { id: invoice.id },
-          data: {
-            paidMicros: newPaidMicros,
-            ...(nowPaid ? { state: toPrismaState('paid'), paidAt: new Date() } : {}),
-          },
-        }),
-        prisma.auditLog.create({
+          data: { paidMicros: { increment: amount } },
+        });
+        // Auto-pay once cumulative payments meet the total, re-checked from the
+        // post-increment row (not a stale read). Idempotent if two payments race.
+        const nowPaid = updated.paidMicros >= updated.totalMicros;
+        if (nowPaid && updated.state !== paidState) {
+          await tx.invoice.update({
+            where: { id: invoice.id },
+            data: { state: paidState, paidAt: new Date() },
+          });
+        }
+        await tx.auditLog.create({
           data: {
             orgId: req.auth.orgId,
             userId: req.auth.userId,
@@ -181,12 +187,12 @@ export const invoicePaymentsPlugin: FastifyPluginAsyncZod = async (server) => {
             diff: {
               amountMicros: amount.toString(),
               method,
-              newPaidMicros: newPaidMicros.toString(),
+              newPaidMicros: updated.paidMicros.toString(),
               autoPaid: nowPaid,
             },
           },
-        }),
-      ]);
+        });
+      });
 
       return reply.code(201).send(await loadInvoiceDetail(req.auth.orgId, invoice.id));
     },
