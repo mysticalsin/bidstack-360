@@ -18,7 +18,6 @@ import { startDocumentExtract } from './queues/document-extract.js';
 import { startCalendarSync } from './queues/calendar-sync.js';
 import { startEmailSync } from './queues/email-sync.js';
 import { startSmsWorker } from './queues/sms.js';
-import { startNativePushWorker } from './queues/notifications.js';
 import { startWebhookDeliveryWorker } from './queues/webhook-delivery.js';
 // Wave 8 — Y.js CRDT compaction
 import { startYjsCompaction } from './queues/yjs-compaction.js';
@@ -96,7 +95,6 @@ await Promise.all([
   startCalendarSync(connection, log, workers, queues),
   startEmailSync(connection, log, workers, queues),
   startSmsWorker(connection, log, workers as never, queues),
-  startNativePushWorker(connection, log, workers, queues),
   startWebhookDeliveryWorker(connection, log, workers, queues),
   startYjsCompaction(connection, log, workers, queues),
   startCsWorkers(connection, log, workers, queues),
@@ -122,7 +120,7 @@ await Promise.all([
 ]);
 
 log.info(
-  'BidStack worker ready (dust-poll + webhook-processor + company-enrich-apollo + document-extract + calendar-sync + email-sync + sms + native-push + webhook-delivery + yjs-compact + cs + call-processing + predictive-retrain + rfp-orchestrator + rfp-requirement-extract + rfp-story-match + rfp-section-draft + rfp-compliance-fill + rfp-embed-reference + rfp-embed-requirement)',
+  'BidStack worker ready (dust-poll + webhook-processor + company-enrich-apollo + document-extract + calendar-sync + email-sync + sms + webhook-delivery + yjs-compact + cs + call-processing + predictive-retrain + rfp-orchestrator + rfp-requirement-extract + rfp-story-match + rfp-section-draft + rfp-compliance-fill + rfp-embed-reference + rfp-embed-requirement)',
 );
 
 const healthPort = Number(process.env.WORKER_HEALTH_PORT || 4002);
@@ -152,6 +150,24 @@ const healthServer = http.createServer((_req, res) => {
   })();
 });
 
+// Survive a hot-reload (or any transient port overlap) instead of crashing the
+// whole worker over the health endpoint: without an 'error' handler an
+// EADDRINUSE is thrown as an unhandled event and kills the process. Retry a
+// bounded number of times while the previous instance releases the port.
+let healthListenRetries = 0;
+healthServer.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE' && healthListenRetries < 10) {
+    healthListenRetries += 1;
+    log.warn(
+      { healthPort, attempt: healthListenRetries },
+      'health port busy, retrying in 1s (hot-reload overlap?)',
+    );
+    setTimeout(() => healthServer.listen(healthPort), 1000);
+  } else {
+    log.error({ err }, 'health server error — continuing without health endpoint');
+  }
+});
+
 healthServer.listen(healthPort, () => {
   log.info({ healthPort }, 'health server listening');
 });
@@ -163,10 +179,13 @@ const shutdown = async (signal: string) => {
     process.exit(1);
   }, 10_000);
   try {
+    // Release the health port FIRST so a hot-reload's replacement can bind it
+    // without a long EADDRINUSE retry window — BullMQ worker.close() below can
+    // take seconds while it drains the active job.
+    healthServer.close();
     await Promise.all(workers.map((w) => w.close()));
     await Promise.all(queues.map((q) => q.close()));
     await connection.quit();
-    healthServer.close();
     clearTimeout(timeout);
     process.exit(0);
   } catch (err) {
