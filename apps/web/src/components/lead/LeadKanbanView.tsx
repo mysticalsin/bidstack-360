@@ -6,7 +6,7 @@
 // threshold (configured in Settings → Lead rot rules, with defaults from
 // @bidstack/shared/LEAD_ROT_DEFAULTS).
 
-import { memo, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import {
   DndContext,
   PointerSensor,
@@ -73,23 +73,39 @@ export function LeadKanbanView({ leads }: Props) {
     return m;
   }, [leads]);
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const leadId = String(event.active.id);
-    const overId = event.over?.id ? String(event.over.id) : null;
-    if (!overId) return;
-    const targetStatus = COLUMNS.find((c) => c.status === overId)?.status;
-    if (!targetStatus) return;
-    const lead = leads.find((l) => l.id === leadId);
-    if (!lead || lead.status === targetStatus) return;
+  const applyMove = useCallback(
+    (lead: LeadSummary, targetStatus: LeadStatus) => {
+      if (lead.status === targetStatus) return;
+      update.mutate(
+        { id: lead.id, patch: { status: targetStatus } },
+        {
+          onSuccess: () => toast.success(`Moved to ${targetStatus}`),
+          onError: () => toast.error('Could not move lead'),
+        },
+      );
+    },
+    [update],
+  );
 
-    update.mutate(
-      { id: lead.id, patch: { status: targetStatus } },
-      {
-        onSuccess: () => toast.success(`Moved to ${targetStatus}`),
-        onError: () => toast.error('Could not move lead'),
-      },
-    );
+  const handleDragEnd = (event: DragEndEvent) => {
+    const overId = event.over?.id ? String(event.over.id) : null;
+    const targetStatus = overId ? COLUMNS.find((c) => c.status === overId)?.status : undefined;
+    const lead = leads.find((l) => l.id === String(event.active.id));
+    if (lead && targetStatus) applyMove(lead, targetStatus);
   };
+
+  // Keyboard a11y (WCAG 2.1.1): move the focused card to the previous/next
+  // column with the arrow keys, so the board is operable without a pointer.
+  const moveLeadByKeyboard = useCallback(
+    (leadId: string, dir: -1 | 1) => {
+      const lead = leads.find((l) => l.id === leadId);
+      if (!lead) return;
+      const idx = COLUMNS.findIndex((c) => c.status === lead.status);
+      const target = idx >= 0 ? COLUMNS[idx + dir] : undefined;
+      if (target) applyMove(lead, target.status);
+    },
+    [leads, applyMove],
+  );
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
@@ -105,6 +121,7 @@ export function LeadKanbanView({ leads }: Props) {
             label={col.label}
             leads={byStatus.get(col.status) ?? []}
             rottenDays={rotByStatus.get(col.status) ?? null}
+            onMove={moveLeadByKeyboard}
           />
         ))}
       </div>
@@ -117,11 +134,13 @@ const Column = memo(function Column({
   label,
   leads,
   rottenDays,
+  onMove,
 }: {
   status: LeadStatus;
   label: string;
   leads: LeadSummary[];
   rottenDays: number | null;
+  onMove: (leadId: string, dir: -1 | 1) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   return (
@@ -146,7 +165,7 @@ const Column = memo(function Column({
         <ul className="flex flex-col gap-2 overflow-y-auto" aria-label={`${label} leads`}>
           {leads.map((lead) => (
             <li key={lead.id}>
-              <Card lead={lead} rottenDays={rottenDays} />
+              <Card lead={lead} rottenDays={rottenDays} onMove={onMove} />
             </li>
           ))}
         </ul>
@@ -155,7 +174,15 @@ const Column = memo(function Column({
   );
 });
 
-function Card({ lead, rottenDays }: { lead: LeadSummary; rottenDays: number | null }) {
+function Card({
+  lead,
+  rottenDays,
+  onMove,
+}: {
+  lead: LeadSummary;
+  rottenDays: number | null;
+  onMove: (leadId: string, dir: -1 | 1) => void;
+}) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: lead.id });
   const days = daysSince(lead.statusChangedAt);
   const isRotten = rottenDays !== null && days >= rottenDays;
@@ -165,6 +192,21 @@ function Card({ lead, rottenDays }: { lead: LeadSummary; rottenDays: number | nu
       ref={setNodeRef}
       {...listeners}
       {...attributes}
+      // Focusable + arrow-key move so the board is keyboard-operable (WCAG
+      // 2.1.1) without a pointer — the dnd-kit pointer path stays for mice.
+      // These come AFTER the spreads so they win over dnd-kit's defaults.
+      tabIndex={0}
+      aria-roledescription="draggable lead"
+      aria-label={`${lead.firstName} ${lead.lastName}, ${lead.companyName}, in ${lead.status}. Use the left and right arrow keys to move between columns.`}
+      onKeyDown={(e: KeyboardEvent<HTMLElement>) => {
+        if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          onMove(lead.id, 1);
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          onMove(lead.id, -1);
+        }
+      }}
       style={{
         transform: transform ? `translate3d(${transform.x}px,${transform.y}px,0)` : undefined,
       }}
@@ -198,6 +240,8 @@ function RotBadge({ leadId, daysOver }: { leadId: string; daysOver: number }) {
   const [open, setOpen] = useState(false);
   const [plays, setPlays] = useState<RecoveryPlay[]>([]);
   const suggest = useRecoverySuggest();
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const onOpen = async () => {
     setOpen(true);
@@ -207,12 +251,38 @@ function RotBadge({ leadId, daysOver }: { leadId: string; daysOver: number }) {
     }
   };
 
+  // Real dismissible menu: Escape + outside-click close it, focus moves into the
+  // menu on open and back to the trigger on close, items are role="menuitem".
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+    const onPointer = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (!menuRef.current?.contains(t) && !triggerRef.current?.contains(t)) setOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onPointer);
+    menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onPointer);
+    };
+  }, [open, plays.length]);
+
   return (
     <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => (open ? setOpen(false) : void onOpen())}
-        className="inline-flex h-5 items-center gap-1 rounded-full bg-[color:#FB7185] px-2 text-[10px] font-semibold text-white"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="inline-flex h-5 items-center gap-1 rounded-full bg-[var(--danger)] px-2 text-[10px] font-semibold text-white"
         aria-label={`Rotting: ${daysOver} days past threshold. Open recovery plays.`}
       >
         <Icon name="warning" size={10} ariaHidden />
@@ -220,7 +290,9 @@ function RotBadge({ leadId, daysOver }: { leadId: string; daysOver: number }) {
       </button>
       {open ? (
         <div
+          ref={menuRef}
           role="menu"
+          aria-label="Suggested recovery plays"
           className="absolute right-0 top-6 z-20 w-64 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] p-2 shadow-xl"
         >
           <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
@@ -234,23 +306,20 @@ function RotBadge({ leadId, daysOver }: { leadId: string; daysOver: number }) {
             <ul className="flex flex-col gap-0.5">
               {plays.map((play) => (
                 <li key={play.kind}>
-                  <button
-                    type="button"
-                    className="block w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-[var(--surface-sunken)]"
+                  {/* Open the lead with the suggested play as a hint, where the
+                      user can actually act on it — instead of a dead toast. */}
+                  <Link
+                    role="menuitem"
+                    to={`/leads/${leadId}?recovery=${play.kind}`}
+                    className="block w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
                     title={play.rationale}
-                    // Sprint 1 stub: clicks just toast; wiring each play to
-                    // the actual compose flow / lost-reason picker is the
-                    // Sprint 2 polish item.
-                    onClick={() => {
-                      toast.info(`Selected: ${play.kind}`);
-                      setOpen(false);
-                    }}
+                    onClick={() => setOpen(false)}
                   >
                     <div className="font-medium text-[var(--fg-primary)]">
                       {labelFor(play.kind)}
                     </div>
                     <div className="text-[10px] text-[var(--fg-tertiary)]">{play.rationale}</div>
-                  </button>
+                  </Link>
                 </li>
               ))}
             </ul>
