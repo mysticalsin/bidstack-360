@@ -35,17 +35,14 @@ import {
   CALL_ANALYZE,
   CALL_UPDATE_DEAL,
 } from '@bidstack/shared';
-import { transcribeAudioUrl } from '../../src/services/calls/transcription.service.js';
-import {
-  analyzeCallTranscript,
-  meddicDimensionToKey,
-} from '../../src/services/calls/analysis.service.js';
+import { transcribeAudioUrl } from '../services/calls/transcription.service.js';
+import { analyzeCallTranscript, meddicDimensionToKey } from '../services/calls/analysis.service.js';
 import {
   uploadRecording,
   getSignedRecordingUrl,
-} from '../../src/services/calls/recording-storage.service.js';
-import { downloadTwilioRecording } from '../../src/services/calls/twilio-voice.service.js';
-import { getZoomRecordings } from '../../src/services/calls/zoom.service.js';
+} from '../services/calls/recording-storage.service.js';
+import { downloadTwilioRecording } from '../services/calls/twilio-voice.service.js';
+import { getZoomRecordings } from '../services/calls/zoom.service.js';
 
 // ─── Job data schemas ──────────────────────────────────────────────────────
 
