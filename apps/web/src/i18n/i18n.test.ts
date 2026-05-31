@@ -88,8 +88,10 @@ describe('isSupportedLocale', () => {
   });
 
   it('rejects unknown locales', () => {
+    // de/ja are genuinely unshipped; pt/it/zh were promoted into SUPPORTED_LOCALES
+    // (their locale files ship), so they are no longer "unknown".
     expect(isSupportedLocale('de')).toBe(false);
-    expect(isSupportedLocale('zh')).toBe(false);
+    expect(isSupportedLocale('ja')).toBe(false);
     expect(isSupportedLocale(null)).toBe(false);
     expect(isSupportedLocale(undefined)).toBe(false);
   });

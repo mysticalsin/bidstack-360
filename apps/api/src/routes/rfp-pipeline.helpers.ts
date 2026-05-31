@@ -16,8 +16,27 @@ const log = createLogger({ name: 'rfp-pipeline' });
 /** Allowed mime types for RFP source documents. */
 export const ALLOWED_MIME_TYPES = [
   'application/pdf',
+  'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/json',
+  'application/xml',
+  'application/rtf',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+  'text/markdown',
+  'text/csv',
+  'text/html',
+  'text/xml',
+  'text/rtf',
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'image/tiff',
+  'image/bmp',
 ] as const;
 
 /** 50 MiB — enforced at the route boundary to override the global 10 MiB cap. */
@@ -71,6 +90,12 @@ export const ApproveBody = z.object({ notes: z.string().max(2000).optional() });
 
 export const UploadResponse = z.object({
   orchestrationId: z.string().uuid(),
+  // WHY bidWorkspaceId: the web client seeds its pipeline store from this field
+  // so the SSE progress stream (GET /bid-workspaces/:workspaceId/rfp/:id/stream)
+  // can open — without it the stream never connects. It equals the opportunityId
+  // in this domain model. As a zod response schema, omitting it here also strips
+  // the field during serialization even if the handler returns it.
+  bidWorkspaceId: z.string().uuid(),
   status: z.literal('queued'),
 });
 

@@ -13,16 +13,19 @@
 //   reports      — report builder, chart labels, periods
 //   signatures   — e-signature send modal, signing pad, timeline
 //   integrations — connector status labels, connect/disconnect flows
+//   rfp          — RFP pipeline: upload, stage progress, review, approval
 //
+// Shipped locales: en, fr, es, pt (Português), it (Italiano), zh (中文), ar.
 // Adding a new locale: drop apps/web/public/locales/{lng}/{ns}.json files,
-// add the code to SUPPORTED_LOCALES below.
+// add the code to SUPPORTED_LOCALES below, and add it to DISPLAY_LOCALES in
+// components/settings/LanguageSwitcher.tsx so it appears in the picker.
 
 import i18n from 'i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import HttpBackend from 'i18next-http-backend';
 import { initReactI18next } from 'react-i18next';
 
-export const SUPPORTED_LOCALES = ['en', 'fr', 'es', 'ar'] as const;
+export const SUPPORTED_LOCALES = ['en', 'fr', 'es', 'pt', 'it', 'zh', 'ar'] as const;
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
 
 export const RTL_LOCALES: ReadonlySet<SupportedLocale> = new Set(['ar']);
@@ -39,6 +42,7 @@ export const NAMESPACES = [
   'reports',
   'signatures',
   'integrations',
+  'rfp',
 ] as const;
 
 export function isSupportedLocale(value: string | null | undefined): value is SupportedLocale {
@@ -54,8 +58,18 @@ export function isRtl(locale: string): boolean {
 // from /locales/{lng}/{ns}.json.
 const isTest = typeof import.meta.env !== 'undefined' && import.meta.env.MODE === 'test';
 
-void i18n
-  .use(HttpBackend)
+function createTestResources(): Record<string, Record<string, object>> {
+  return Object.fromEntries(
+    SUPPORTED_LOCALES.map((locale) => [
+      locale,
+      Object.fromEntries(NAMESPACES.map((namespace) => [namespace, {}])),
+    ]),
+  );
+}
+
+const i18nPipeline = isTest ? i18n : i18n.use(HttpBackend);
+
+void i18nPipeline
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
@@ -74,6 +88,7 @@ void i18n
       // values that legitimately contain HTML entities (e.g. company names).
       escapeValue: false,
     },
+    ...(isTest ? { resources: createTestResources() } : {}),
     detection: {
       // Cookie wins so a server-rendered locale (Set-Cookie from the API
       // Accept-Language middleware) takes precedence over the browser; the
@@ -84,9 +99,7 @@ void i18n
       caches: ['cookie', 'localStorage'],
       cookieOptions: { path: '/', sameSite: 'lax' },
     },
-    backend: {
-      loadPath: '/locales/{{lng}}/{{ns}}.json',
-    },
+    ...(isTest ? {} : { backend: { loadPath: '/locales/{{lng}}/{{ns}}.json' } }),
     react: {
       // Wait for translations before rendering — prevents the
       // English-key flash on initial paint for non-en users.

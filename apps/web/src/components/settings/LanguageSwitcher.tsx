@@ -1,4 +1,4 @@
-// LanguageSwitcher — lets the user pick their UI language (EN | FR | ES).
+// LanguageSwitcher — lets the user pick their UI language (EN | FR | ES | PT | IT | 中文).
 // Persists the choice to localStorage + cookie (bidstack-locale) so both the
 // i18next LanguageDetector and the API Accept-Language middleware pick it up.
 // Updates <html lang> immediately for screen-reader accuracy.
@@ -13,11 +13,11 @@ import { Card, SectionHeader } from '@/components/ui/Card';
 import { cn } from '@/lib/cn';
 import { isSupportedLocale, type SupportedLocale } from '@/i18n';
 
-// The locales we expose in the switcher this wave. AR is supported in the
-// codebase but deferred from the UI switcher until RTL layout is fully QA'd.
-type DisplayLocale = 'en' | 'fr' | 'es';
+// The locales we expose in the switcher. AR is supported in the codebase but
+// deferred from the UI switcher until RTL layout is fully QA'd.
+type DisplayLocale = 'en' | 'fr' | 'es' | 'pt' | 'it' | 'zh';
 
-const DISPLAY_LOCALES: readonly DisplayLocale[] = ['en', 'fr', 'es'];
+const DISPLAY_LOCALES: readonly DisplayLocale[] = ['en', 'fr', 'es', 'pt', 'it', 'zh'];
 
 // Human-readable label always shown in the language itself so the user can
 // recognise their own language even when the UI is in another tongue.
@@ -25,12 +25,18 @@ const LOCALE_NATIVE_LABEL: Readonly<Record<DisplayLocale, string>> = {
   en: 'EN',
   fr: 'FR',
   es: 'ES',
+  pt: 'PT',
+  it: 'IT',
+  zh: '中文',
 };
 
 const LOCALE_FULL_LABEL: Readonly<Record<DisplayLocale, string>> = {
   en: 'English',
   fr: 'Français',
   es: 'Español',
+  pt: 'Português',
+  it: 'Italiano',
+  zh: '中文',
 };
 
 const COOKIE_NAME = 'bidstack-locale';
@@ -54,9 +60,7 @@ export function LanguageSwitcher() {
   const { t, i18n } = useTranslation('settings');
 
   const rawLocale = isSupportedLocale(i18n.language) ? i18n.language : 'en';
-  const activeLocale: DisplayLocale = DISPLAY_LOCALES.includes(
-    rawLocale as DisplayLocale,
-  )
+  const activeLocale: DisplayLocale = DISPLAY_LOCALES.includes(rawLocale as DisplayLocale)
     ? (rawLocale as DisplayLocale)
     : 'en';
 
@@ -70,7 +74,9 @@ export function LanguageSwitcher() {
       // a circular dep (LiveAnnouncer already imports from i18n).
       window.dispatchEvent(
         new CustomEvent('bidstack:announce', {
-          detail: { message: t('languageSwitcher.changeSuccess', { lang: LOCALE_FULL_LABEL[locale] }) },
+          detail: {
+            message: t('languageSwitcher.changeSuccess', { lang: LOCALE_FULL_LABEL[locale] }),
+          },
         }),
       );
     },
@@ -86,8 +92,12 @@ export function LanguageSwitcher() {
       <div className="p-5">
         <fieldset>
           <legend className="sr-only">{t('languageSwitcher.ariaLabel')}</legend>
-          {/* Badge-style toggle row: EN | FR | ES */}
-          <div role="group" aria-label={t('languageSwitcher.ariaLabel')} className="flex gap-2 flex-wrap">
+          {/* Badge-style toggle row: EN | FR | ES | PT | IT | 中文 */}
+          <div
+            role="group"
+            aria-label={t('languageSwitcher.ariaLabel')}
+            className="flex gap-2 flex-wrap"
+          >
             {DISPLAY_LOCALES.map((locale) => {
               const isActive = locale === activeLocale;
               return (

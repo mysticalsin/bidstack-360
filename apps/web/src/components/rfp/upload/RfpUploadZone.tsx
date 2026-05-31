@@ -8,9 +8,54 @@ import { useRfpUpload } from '@/hooks/rfp/useRfpUpload';
 
 const ACCEPTED_TYPES = [
   'application/pdf',
+  'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/json',
+  'application/xml',
+  'application/rtf',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+  'text/markdown',
+  'text/csv',
+  'text/html',
+  'text/xml',
+  'text/rtf',
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'image/tiff',
+  'image/bmp',
 ];
-const ACCEPTED_EXTS = '.pdf,.docx';
+const ACCEPTED_EXTS = [
+  '.pdf',
+  '.doc',
+  '.docx',
+  '.ppt',
+  '.pptx',
+  '.xls',
+  '.xlsx',
+  '.txt',
+  '.md',
+  '.markdown',
+  '.csv',
+  '.json',
+  '.xml',
+  '.html',
+  '.htm',
+  '.rtf',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.tif',
+  '.tiff',
+  '.bmp',
+];
 const MAX_MB = 50;
 
 export function RfpUploadZone() {
@@ -23,7 +68,8 @@ export function RfpUploadZone() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const validate = (file: File): string | null => {
-    if (!ACCEPTED_TYPES.includes(file.type)) {
+    const ext = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
+    if (!ACCEPTED_TYPES.includes(file.type) && !ACCEPTED_EXTS.includes(ext)) {
       return t('upload.errorType');
     }
     if (file.size > MAX_MB * 1024 * 1024) {
@@ -108,7 +154,9 @@ export function RfpUploadZone() {
         <div>
           <p className="text-sm font-semibold text-[var(--fg-primary)]">{t('upload.title')}</p>
           <p className="mt-1 text-xs text-[var(--fg-secondary)]">{t('upload.dropzone')}</p>
-          <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">PDF or DOCX, max {MAX_MB} MB</p>
+          <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
+            PDF, Office, text/CSV/JSON/HTML or image, max {MAX_MB} MB
+          </p>
         </div>
         <Button
           type="button"
@@ -123,7 +171,7 @@ export function RfpUploadZone() {
         <input
           ref={inputRef}
           type="file"
-          accept={ACCEPTED_EXTS}
+          accept={[...ACCEPTED_EXTS, ...ACCEPTED_TYPES].join(',')}
           className="sr-only"
           aria-hidden="true"
           onChange={onInputChange}
