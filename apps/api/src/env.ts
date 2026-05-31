@@ -70,6 +70,19 @@ export const envSchema = z.object({
   HUBSPOT_REDIRECT_URI: z.string().url().optional().or(z.literal('')),
   // AES-256-GCM key for encrypting OAuth tokens at rest.
   INTEGRATION_TOKEN_KEY: z.string().min(1).optional().or(z.literal('')),
+
+  // ─── E-signature (DocuSign JWT bearer integration) ────────────────────
+  // All optional. When unset, the signature service throws a 503 at call time
+  // (getDocuSignAccessToken / sendDocuSignEnvelope / handleDocuSignWebhook)
+  // rather than failing boot — so local/dev and the INTERNAL signing provider
+  // work without DocuSign credentials. Secrets: never hardcode; supply via the
+  // deployment secret store.
+  DOCUSIGN_INTEGRATION_KEY: z.string().min(1).optional().or(z.literal('')),
+  DOCUSIGN_USER_ID: z.string().min(1).optional().or(z.literal('')),
+  DOCUSIGN_PRIVATE_KEY: z.string().min(1).optional().or(z.literal('')), // base64-encoded RSA PEM
+  DOCUSIGN_ACCOUNT_ID: z.string().min(1).optional().or(z.literal('')),
+  DOCUSIGN_BASE_URL: z.string().url().optional().or(z.literal('')),
+  DOCUSIGN_WEBHOOK_HMAC_KEY: z.string().min(1).optional().or(z.literal('')),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -98,6 +111,15 @@ export function getEnv(): Env {
   }
   if (env.STORAGE_DRIVER === 's3' && !env.S3_BUCKET) {
     semanticErrors.push('S3_BUCKET is required when STORAGE_DRIVER=s3');
+  }
+  // The AES-256-GCM key that encrypts per-org Dust credentials and OAuth tokens
+  // at rest. Optional in dev (those features degrade gracefully) but mandatory
+  // in production — booting without it would let admins save secrets the app
+  // then can't decrypt, or (worse) store them weakly.
+  if (env.NODE_ENV === 'production' && !env.INTEGRATION_TOKEN_KEY) {
+    semanticErrors.push(
+      'INTEGRATION_TOKEN_KEY is required in production (encrypts per-org Dust + OAuth secrets at rest)',
+    );
   }
   if (semanticErrors.length > 0) {
     throw new Error(`Environment validation failed:\n  Invalid: ${semanticErrors.join(', ')}`);

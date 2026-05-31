@@ -2,7 +2,10 @@ version: '3.9'
 
 services:
   postgres:
-    image: postgres:16-alpine
+    # pgvector image (not postgres:16-alpine): the schema's RFP embeddings use
+    # `CREATE EXTENSION vector` + vector(1024) columns + HNSW indexes, which the
+    # stock image can't provide — migrate deploy would fail on a fresh DB.
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
@@ -33,6 +36,26 @@ services:
         limits:
           memory: 256M
 
+  # One-shot migration job: applies pending Prisma migrations, then exits 0.
+  # api / worker / mcp-server wait for it to complete successfully, so the whole
+  # stack is plug-and-play — `docker compose up` migrates then boots, with no
+  # hand-run prisma. A failed migration exits non-zero and blocks the apps.
+  migrate:
+    build:
+      context: .
+      target: migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+    restart: 'no'
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
   api:
     build:
       context: .
@@ -46,6 +69,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      migrate:
+        condition: service_completed_successfully
     environment:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
@@ -119,6 +144,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      migrate:
+        condition: service_completed_successfully
     environment:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
@@ -154,6 +181,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      migrate:
+        condition: service_completed_successfully
     environment:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}

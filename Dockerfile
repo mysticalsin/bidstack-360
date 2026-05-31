@@ -42,6 +42,18 @@ RUN if [ "$BIDSTACK_BUILD_AUTH_MODE" = "clerk" ]; then pnpm --filter @bidstack/w
 RUN pnpm --filter @bidstack/worker build
 RUN pnpm --filter @bidstack/mcp-server build
 
+# ─── Migrate (one-shot: applies pending migrations, then exits) ───────────────
+# Run this image to completion BEFORE rolling app revisions — locally via the
+# `migrate` compose service, on Azure as a Container Apps Job. It uses the
+# `base` stage because that has the full dependency set including the `prisma`
+# CLI (a devDependency the --prod app images intentionally omit). `migrate
+# deploy` is non-interactive + idempotent and exits non-zero on failure, so a
+# broken migration halts the deploy instead of booting an app on a stale schema.
+FROM base AS migrate
+ENV NODE_ENV=production
+COPY --from=builder /app/packages/db/prisma ./packages/db/prisma
+CMD ["pnpm", "--filter", "@bidstack/db", "migrate:deploy"]
+
 # ─── API ────────────────────────────────────────────────────────────────────
 FROM node:${NODE_VERSION} AS api
 ENV NODE_ENV=production
