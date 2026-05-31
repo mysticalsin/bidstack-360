@@ -1,0 +1,130 @@
+# ============================================================================
+#  BidStack 360° — Azure deploy pipeline        ⚠️ UNVALIDATED DRAFT ⚠️
+# ============================================================================
+#  This is a DRAFT. It is intentionally named *.draft and lives in infra/azure/
+#  so it is NOT an active workflow. Per CLAUDE.md, .github/workflows/ is
+#  coordinate-before-edit — review this, then a maintainer moves it to
+#  .github/workflows/deploy.yml.
+#
+#  Contract it encodes (the whole point of "zero-touch, no hand-run prisma"):
+#    build all images → push to ACR → RUN THE MIGRATE JOB TO COMPLETION →
+#    only then roll the api/worker/mcp/web revisions. A failed migration stops
+#    the deploy before any app sees the new schema.
+#
+#  Prerequisites (configure once, see README.md):
+#    - Azure OIDC login (federated credential) → secrets: AZURE_CLIENT_ID,
+#      AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+#    - An ACR, a resource group, and the bicep already deployed once
+#      (infra/azure/main.bicep) so the apps + migrate job exist.
+#    - Repo vars: ACR_LOGIN_SERVER, AZURE_RG, NAME_PREFIX
+# ============================================================================
+
+name: deploy (DRAFT)
+
+on:
+  workflow_dispatch: {}
+  # push:
+  #   branches: [main]      # enable after review
+
+permissions:
+  id-token: write # OIDC login to Azure
+  contents: read
+
+env:
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: ACR login
+        run: az acr login --name "${{ vars.ACR_LOGIN_SERVER }}"
+
+      - name: Build + push all images (api, web, worker, mcp-server, migrate)
+        run: |
+          set -euo pipefail
+          ACR="${{ vars.ACR_LOGIN_SERVER }}"
+          TAG="${IMAGE_TAG}"
+          # web needs the Clerk publishable key baked in at build time
+          for target in api web worker mcp-server migrate; do
+            docker build \
+              --target "$target" \
+              --build-arg VITE_CLERK_PUBLISHABLE_KEY="${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}" \
+              --build-arg BIDSTACK_BUILD_AUTH_MODE=clerk \
+              -t "$ACR/bidstack-$target:$TAG" \
+              -f Dockerfile .
+            docker push "$ACR/bidstack-$target:$TAG"
+          done
+
+  migrate:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Point the migrate job at the new image, start it, and BLOCK until it
+      # finishes. A non-zero exit (failed migration) fails the deploy here, so
+      # the app-roll job below never runs.
+      - name: Run migrations to completion
+        run: |
+          set -euo pipefail
+          RG="${{ vars.AZURE_RG }}"
+          ACR="${{ vars.ACR_LOGIN_SERVER }}"
+          JOB="${{ vars.NAME_PREFIX }}-migrate"
+          az containerapp job update -g "$RG" -n "$JOB" \
+            --image "$ACR/bidstack-migrate:${IMAGE_TAG}"
+          EXEC=$(az containerapp job start -g "$RG" -n "$JOB" --query name -o tsv)
+          echo "Started migrate execution: $EXEC"
+          # Poll until terminal.
+          for i in $(seq 1 60); do
+            STATUS=$(az containerapp job execution show -g "$RG" -n "$JOB" \
+              --job-execution-name "$EXEC" --query properties.status -o tsv)
+            echo "migrate status: $STATUS"
+            case "$STATUS" in
+              Succeeded) exit 0 ;;
+              Failed|Degraded) echo "::error::migration job failed"; exit 1 ;;
+              *) sleep 10 ;;
+            esac
+          done
+          echo "::error::migration job timed out"; exit 1
+
+  roll-apps:
+    needs: migrate
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        svc: [api, worker, mcp, web]
+    steps:
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Update ${{ matrix.svc }} revision
+        run: |
+          set -euo pipefail
+          RG="${{ vars.AZURE_RG }}"
+          ACR="${{ vars.ACR_LOGIN_SERVER }}"
+          # web image is bidstack-web; others map app name -> image suffix
+          case "${{ matrix.svc }}" in
+            mcp) IMG="mcp-server" ;;
+            *)   IMG="${{ matrix.svc }}" ;;
+          esac
+          az containerapp update -g "$RG" -n "${{ vars.NAME_PREFIX }}-${{ matrix.svc }}" \
+            --image "$ACR/bidstack-$IMG:${IMAGE_TAG}"
