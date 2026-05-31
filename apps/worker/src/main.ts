@@ -9,6 +9,8 @@ import { type Queue, type Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import pino from 'pino';
 
+import { prisma } from '@bidstack/db';
+
 import { startCompanyEnrichApollo } from './queues/company-enrich-apollo.js';
 import { startDustPoller } from './queues/dust-poll.js';
 import { startWebhookProcessor } from './queues/webhook-processor.js';
@@ -112,14 +114,28 @@ log.info(
 const healthPort = Number(process.env.WORKER_HEALTH_PORT || 4002);
 
 const healthServer = http.createServer((_req, res) => {
-  const redisReady = connection.status === 'ready';
-  res.writeHead(redisReady ? 200 : 503, { 'Content-Type': 'application/json' });
-  res.end(
-    JSON.stringify({
-      status: redisReady ? 'ok' : 'error',
-      queue: redisReady ? 'connected' : 'disconnected',
-    }),
-  );
+  // Probe BOTH dependencies: nearly every queue handler hits Postgres, so a
+  // worker with a dead DB must not report healthy (it would keep receiving jobs
+  // it can only fail).
+  void (async () => {
+    const redisReady = connection.status === 'ready';
+    let dbReady: boolean;
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      dbReady = true;
+    } catch {
+      dbReady = false;
+    }
+    const ok = redisReady && dbReady;
+    res.writeHead(ok ? 200 : 503, { 'Content-Type': 'application/json' });
+    res.end(
+      JSON.stringify({
+        status: ok ? 'ok' : 'error',
+        queue: redisReady ? 'connected' : 'disconnected',
+        db: dbReady ? 'connected' : 'disconnected',
+      }),
+    );
+  })();
 });
 
 healthServer.listen(healthPort, () => {

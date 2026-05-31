@@ -120,8 +120,15 @@ export async function buildMcpServer(): Promise<FastifyInstance> {
     },
   });
 
-  // Public liveness endpoint for MCP client registration checks.
-  server.get('/health', async () => ({ ok: true, name: 'bidstack-mcp' }));
+  // Public readiness endpoint — probes the DB, since every MCP tool hits Prisma.
+  server.get('/health', async (_req, reply) => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      return { ok: true, name: 'bidstack-mcp' };
+    } catch {
+      return reply.code(503).send({ ok: false, name: 'bidstack-mcp', db: 'down' });
+    }
+  });
 
   server.get('/.well-known/mcp', async () => ({
     name: 'BidStack 360',
