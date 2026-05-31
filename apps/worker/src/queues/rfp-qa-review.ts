@@ -24,18 +24,18 @@ import type pino from 'pino';
 import { Worker as BullWorker } from 'bullmq';
 import { z } from 'zod';
 import { prisma, type Prisma } from '@bidstack/db';
-import { DustClient } from '@bidstack/dust-client';
 
 import { RFP_QA_REVIEW } from '@bidstack/shared';
 import { buildAgentUserMessage } from '../lib/prompt-safety.js';
 import { logAiInvocation } from '../lib/ai-audit-worker.js';
+import { getOrgDust, resolveAgentId } from '../lib/dust-credentials.js';
 import {
   markOrchestrationFailed,
   markOrchestrationAwaitingApproval,
 } from './rfp-requirement-extract.helpers.js';
 
 const QUEUE_NAME = RFP_QA_REVIEW.name;
-const DUST_AGENT_ID = process.env.DUST_RFP_QA_AGENT_ID ?? 'rfp-qa-agent';
+const DEFAULT_QA_AGENT_ID = 'rfp-qa-agent';
 
 // Proposal content sent to Dust is capped to avoid token budget spikes.
 // WHY 12 000 chars: empirically covers ~3 000-word proposals within Dust limits.
@@ -74,18 +74,6 @@ function fallbackQa(): QaResult {
   };
 }
 
-// ─── Dust client (fail-open) ────────────────────────────────────────────────
-
-function getDustClient(log: pino.Logger): DustClient | null {
-  const apiKey = process.env.DUST_API_KEY;
-  const workspaceId = process.env.DUST_WORKSPACE_ID;
-  if (!apiKey || !workspaceId) {
-    log.warn('DUST_API_KEY or DUST_WORKSPACE_ID not set — QA review degraded to fallback score');
-    return null;
-  }
-  return new DustClient({ apiKey, workspaceId, logger: log });
-}
-
 // ─── Core processor ────────────────────────────────────────────────────────
 
 async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
@@ -107,7 +95,9 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
     throw err;
   }
 
-  const dust = getDustClient(log);
+  const { client: dust, creds } = await getOrgDust(orgId, log);
+  const qaAgentId =
+    resolveAgentId(creds, 'qaReview', process.env.DUST_RFP_QA_AGENT_ID) ?? DEFAULT_QA_AGENT_ID;
   let result: QaResult;
 
   if (dust && proposal.compiledContent) {
@@ -121,7 +111,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
 
     const t0 = Date.now();
     try {
-      const run = await dust.runAgent(DUST_AGENT_ID, userMessage);
+      const run = await dust.runAgent(qaAgentId, userMessage);
       const responseText = run.output ?? '{}';
       const durationMs = Date.now() - t0;
 

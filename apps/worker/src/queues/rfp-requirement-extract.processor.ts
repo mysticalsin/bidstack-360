@@ -12,19 +12,20 @@ import { prisma } from '@bidstack/db';
 import { RFP_STORY_MATCH } from '@bidstack/shared';
 import { buildAgentUserMessage } from '../lib/prompt-safety.js';
 import { logAiInvocation } from '../lib/ai-audit-worker.js';
+import { getOrgDust, resolveAgentId } from '../lib/dust-credentials.js';
 
 import {
   JobData,
   type ExtractedRequirement,
   DustExtractionResponse,
-  getDustClient,
   fallbackExtract,
   ensureExtractedText,
   updateOrchestrationPhase,
   markOrchestrationFailed,
   isDocumentAiSafe,
-  DUST_AGENT_ID,
 } from './rfp-requirement-extract.helpers.js';
+
+const DEFAULT_EXTRACT_AGENT_ID = 'rfp-extractor-agent';
 
 // ─── Core processor ────────────────────────────────────────────────────────
 
@@ -63,7 +64,10 @@ export async function processJob(
     return; // graceful exit — no AI call, no requirement extraction
   }
 
-  const dust = getDustClient(log);
+  const { client: dust, creds } = await getOrgDust(orgId, log);
+  const extractAgentId =
+    resolveAgentId(creds, 'requirementExtract', process.env.DUST_RFP_EXTRACTOR_AGENT_ID) ??
+    DEFAULT_EXTRACT_AGENT_ID;
 
   let requirements: Array<z.infer<typeof ExtractedRequirement>>;
   let dustRunId: string | null = null;
@@ -83,7 +87,7 @@ export async function processJob(
 
     const t0 = Date.now();
     try {
-      const run = await dust.runAgent(DUST_AGENT_ID, userMessage);
+      const run = await dust.runAgent(extractAgentId, userMessage);
       dustRunId = run.run_id;
       const durationMs = Date.now() - t0;
       const responseText = run.output ?? '{}';

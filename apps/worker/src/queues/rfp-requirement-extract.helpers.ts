@@ -9,7 +9,6 @@ import type pino from 'pino';
 
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
-import { DustClient } from '@bidstack/dust-client';
 import { RFP_REQUIREMENT_EXTRACT, RFP_EMBED_REQUIREMENT, RFP_STORY_MATCH } from '@bidstack/shared';
 
 import { readStoredDocument } from '../lib/storage-read.js';
@@ -18,8 +17,6 @@ import { extractTextFromBufferSandboxed } from '../lib/extract-text-sandbox.js';
 export const QUEUE_NAME = RFP_REQUIREMENT_EXTRACT.name;
 export const EMBED_QUEUE_NAME = RFP_EMBED_REQUIREMENT.name;
 export const STORY_MATCH_QUEUE_NAME = RFP_STORY_MATCH.name;
-
-export const DUST_AGENT_ID = process.env.DUST_RFP_EXTRACTOR_AGENT_ID ?? 'rfp-extractor-agent';
 
 // ─── Job schema ────────────────────────────────────────────────────────────
 
@@ -48,18 +45,6 @@ export const ExtractedRequirement = z.object({
 export const DustExtractionResponse = z.object({
   requirements: z.array(ExtractedRequirement),
 });
-
-// ─── Dust client (fail-open) ────────────────────────────────────────────────
-
-export function getDustClient(log: pino.Logger): DustClient | null {
-  const apiKey = process.env.DUST_API_KEY;
-  const workspaceId = process.env.DUST_WORKSPACE_ID;
-  if (!apiKey || !workspaceId) {
-    log.warn('DUST_API_KEY or DUST_WORKSPACE_ID not set — rfp extraction degraded to empty result');
-    return null;
-  }
-  return new DustClient({ apiKey, workspaceId, logger: log });
-}
 
 // ─── Deterministic fallback ─────────────────────────────────────────────────
 

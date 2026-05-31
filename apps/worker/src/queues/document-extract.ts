@@ -17,32 +17,20 @@ import { z } from 'zod';
 import { prisma, type Prisma } from '@bidstack/db';
 
 import { DOCUMENT_EXTRACT } from '@bidstack/shared';
-import { DustClient } from '@bidstack/dust-client';
+import type { DustClient } from '@bidstack/dust-client';
 // Use the sandboxed wrapper so untrusted upload bytes are parsed inside a
 // worker_thread with a memory ceiling and a hard timeout, isolated from the
 // queue worker's heap. See docs/audits/2026-05-24-twenty-agent-deep-audit.md
 // HIGH-2 for the threat model.
 import { extractTextFromBufferSandboxed } from '../lib/extract-text-sandbox.js';
 import { readStoredDocument } from '../lib/storage-read.js';
+import { getOrgDust, resolveAgentId } from '../lib/dust-credentials.js';
 
 import { deterministicExtract } from './document-extract-analysis.js';
 import { writeBidWorkspaceArtifacts } from './document-extract-db.js';
 import type { ExtractionResult } from './document-extract-types.js';
 
 const QUEUE_NAME = DOCUMENT_EXTRACT.name;
-
-// ─── Dust client (lazy, fail-open) ─────────────────────────────────────────
-
-function getDustClient(log: pino.Logger): DustClient | null {
-  const apiKey = process.env.DUST_API_KEY;
-  const workspaceId = process.env.DUST_WORKSPACE_ID;
-  if (!apiKey || !workspaceId) return null;
-  return new DustClient({ apiKey, workspaceId, logger: log });
-}
-
-function getDustAgentId(): string | null {
-  return process.env.DUST_DOCUMENT_EXTRACT_AGENT_ID ?? null;
-}
 
 // ─── Prompt builder ────────────────────────────────────────────────────────
 
@@ -189,8 +177,9 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
   let result: ExtractionResult;
   let dustRunId: string | null = null;
 
-  const dust = getDustClient(log);
-  const agentId = getDustAgentId();
+  const { client: dust, creds } = await getOrgDust(orgId, log);
+  const agentId =
+    resolveAgentId(creds, 'documentExtract', process.env.DUST_DOCUMENT_EXTRACT_AGENT_ID) ?? null;
 
   if (dust && agentId) {
     try {

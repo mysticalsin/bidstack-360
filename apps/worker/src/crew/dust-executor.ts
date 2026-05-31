@@ -10,26 +10,36 @@ import type pino from 'pino';
 
 import { DustClient } from '@bidstack/dust-client';
 
+import { resolveOrgDustCredentials, resolveAgentId } from '../lib/dust-credentials.js';
 import type { AgentExecutor } from './types.js';
 
-/** Dust agent id used to execute crew personas. Configurable; falls back to a
- *  conventional default so local/dev runs work once a key is present. */
-const DUST_CREW_AGENT_ID = process.env.DUST_CREW_AGENT_ID ?? 'rfp-crew-agent';
+/** Conventional fallback agent id when neither the org config nor env sets one. */
+const DEFAULT_CREW_AGENT_ID = 'rfp-crew-agent';
 
-function getDustClient(log: pino.Logger): DustClient | null {
-  const apiKey = process.env.DUST_API_KEY;
-  const workspaceId = process.env.DUST_WORKSPACE_ID;
-  if (!apiKey || !workspaceId) {
-    log.warn('crew: DUST_API_KEY / DUST_WORKSPACE_ID not set — crew runs return placeholders');
-    return null;
+/**
+ * Build a Dust-backed executor for one org. Credentials are resolved ONCE here
+ * (org IntegrationConfig first, DUST_* env fallback) and closed over, so a crew
+ * run does a single credential lookup rather than one per task. Fail-open: with
+ * no credentials, every task resolves to a readable placeholder.
+ */
+export async function createDustExecutor(log: pino.Logger, orgId: string): Promise<AgentExecutor> {
+  const creds = await resolveOrgDustCredentials(orgId);
+  const dust = creds
+    ? new DustClient({
+        apiKey: creds.apiKey,
+        workspaceId: creds.workspaceId,
+        baseUrl: creds.baseUrl,
+        logger: log,
+      })
+    : null;
+  const crewAgentId =
+    resolveAgentId(creds, 'crew', process.env.DUST_CREW_AGENT_ID) ?? DEFAULT_CREW_AGENT_ID;
+  if (!dust) {
+    log.warn({ orgId }, 'crew: no Dust credentials for org — crew runs return placeholders');
   }
-  return new DustClient({ apiKey, workspaceId, logger: log });
-}
 
-export function createDustExecutor(log: pino.Logger): AgentExecutor {
   return {
     async run({ agent, prompt }) {
-      const dust = getDustClient(log);
       if (!dust) {
         return {
           output: `[crew] ${agent.role}: LLM not configured — placeholder output.`,
@@ -38,7 +48,7 @@ export function createDustExecutor(log: pino.Logger): AgentExecutor {
         };
       }
       try {
-        const run = await dust.runAgent(DUST_CREW_AGENT_ID, prompt);
+        const run = await dust.runAgent(crewAgentId, prompt);
         if (run.status !== 'succeeded' || !run.output) {
           log.warn({ agent: agent.id, status: run.status }, 'crew: dust run did not succeed');
           return {

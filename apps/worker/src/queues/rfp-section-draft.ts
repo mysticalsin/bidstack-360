@@ -18,16 +18,16 @@ import type pino from 'pino';
 import { Worker as BullWorker, Queue as BullQueue } from 'bullmq';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
-import { DustClient } from '@bidstack/dust-client';
 import { MemOSService } from '@bidstack/memos';
 
 import { RFP_SECTION_DRAFT, RFP_LEGAL_SCAN } from '@bidstack/shared';
 import { buildAgentUserMessage } from '../lib/prompt-safety.js';
 import { logAiInvocation } from '../lib/ai-audit-worker.js';
+import { getOrgDust, resolveAgentId } from '../lib/dust-credentials.js';
 import { updateOrchestrationPhase } from './rfp-requirement-extract.helpers.js';
 
 const QUEUE_NAME = RFP_SECTION_DRAFT.name;
-const DUST_AGENT_ID = process.env.DUST_RFP_DRAFT_AGENT_ID ?? 'rfp-draft-agent';
+const DEFAULT_DRAFT_AGENT_ID = 'rfp-draft-agent';
 const MAX_STORY_CONTEXT_CHARS = 4000;
 
 // ─── Job schema ────────────────────────────────────────────────────────────
@@ -41,18 +41,6 @@ const JobData = z.object({
   requirementIds: z.array(z.string().uuid()).min(0),
 });
 type JobData = z.infer<typeof JobData>;
-
-// ─── Dust client (fail-open) ────────────────────────────────────────────────
-
-function getDustClient(log: pino.Logger): DustClient | null {
-  const apiKey = process.env.DUST_API_KEY;
-  const workspaceId = process.env.DUST_WORKSPACE_ID;
-  if (!apiKey || !workspaceId) {
-    log.warn('DUST_API_KEY or DUST_WORKSPACE_ID not set — section draft degraded to placeholder');
-    return null;
-  }
-  return new DustClient({ apiKey, workspaceId, logger: log });
-}
 
 // ─── Story context builder ─────────────────────────────────────────────────
 
@@ -135,7 +123,10 @@ async function processJob(job: Job<JobData>, log: pino.Logger, memos: MemOSServi
   const storyContexts = await buildStoryContext(orgId, requirementIds);
   const storyContextText = formatStoryContext(storyContexts);
 
-  const dust = getDustClient(log);
+  const { client: dust, creds } = await getOrgDust(orgId, log);
+  const draftAgentId =
+    resolveAgentId(creds, 'sectionDraft', process.env.DUST_RFP_DRAFT_AGENT_ID) ??
+    DEFAULT_DRAFT_AGENT_ID;
   let draftContent: string;
 
   if (dust) {
@@ -150,7 +141,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger, memos: MemOSServi
 
     const t0 = Date.now();
     try {
-      const run = await dust.runAgent(DUST_AGENT_ID, userMessage);
+      const run = await dust.runAgent(draftAgentId, userMessage);
       draftContent = run.output ?? `[Draft pending for: ${sectionTitle}]`;
 
       await logAiInvocation(
@@ -188,7 +179,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger, memos: MemOSServi
       );
     }
   } else {
-    draftContent = `[Draft pending for: ${sectionTitle}. Configure DUST_API_KEY to enable AI drafting.]`;
+    draftContent = `[Draft pending for: ${sectionTitle}. Connect Dust in Settings to enable AI drafting.]`;
   }
 
   // Write draft to ProposalSection — content field holds draft text, aiDrafted

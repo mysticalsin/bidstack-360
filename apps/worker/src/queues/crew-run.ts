@@ -132,7 +132,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
   }
 
   try {
-    const result = await kickoff(crew, inputs, createDustExecutor(log));
+    const result = await kickoff(crew, inputs, await createDustExecutor(log, orgId));
     await prisma.$executeRaw`
       UPDATE crew_runs SET
         status = ${result.ok ? 'completed' : 'partial'},

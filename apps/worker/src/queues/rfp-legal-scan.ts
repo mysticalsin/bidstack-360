@@ -18,17 +18,17 @@ import type pino from 'pino';
 import { Worker as BullWorker, Queue as BullQueue } from 'bullmq';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
-import { DustClient } from '@bidstack/dust-client';
 import { RFP_LEGAL_SCAN, RFP_PROPOSAL_COMPILE } from '@bidstack/shared';
 import { buildAgentUserMessage } from '../lib/prompt-safety.js';
 import { logAiInvocation } from '../lib/ai-audit-worker.js';
+import { getOrgDust, resolveAgentId } from '../lib/dust-credentials.js';
 import {
   updateOrchestrationPhase,
   markOrchestrationFailed,
 } from './rfp-requirement-extract.helpers.js';
 
 const QUEUE_NAME = RFP_LEGAL_SCAN.name;
-const DUST_AGENT_ID = process.env.DUST_RFP_LEGAL_SCAN_AGENT_ID ?? 'rfp-legal-scan-agent';
+const DEFAULT_LEGAL_AGENT_ID = 'rfp-legal-scan-agent';
 
 // Cap concatenated section text sent to Dust — legal scan is whole-document,
 // so we budget more chars than per-section drafting but still hard-cap to
@@ -44,18 +44,6 @@ const JobData = z.object({
   proposalId: z.string().uuid(),
 });
 type JobData = z.infer<typeof JobData>;
-
-// ─── Dust client (fail-open) ────────────────────────────────────────────────
-
-function getDustClient(log: pino.Logger): DustClient | null {
-  const apiKey = process.env.DUST_API_KEY;
-  const workspaceId = process.env.DUST_WORKSPACE_ID;
-  if (!apiKey || !workspaceId) {
-    log.warn('DUST_API_KEY or DUST_WORKSPACE_ID not set — legal scan degraded to placeholder');
-    return null;
-  }
-  return new DustClient({ apiKey, workspaceId, logger: log });
-}
 
 // ─── Core processor ────────────────────────────────────────────────────────
 
@@ -95,7 +83,10 @@ async function processJob(
     .join('\n\n')
     .slice(0, MAX_SECTION_CONTENT_CHARS);
 
-  const dust = getDustClient(log);
+  const { client: dust, creds } = await getOrgDust(orgId, log);
+  const legalAgentId =
+    resolveAgentId(creds, 'legalScan', process.env.DUST_RFP_LEGAL_SCAN_AGENT_ID) ??
+    DEFAULT_LEGAL_AGENT_ID;
   let findings: string;
 
   if (dust) {
@@ -109,7 +100,7 @@ async function processJob(
 
     const t0 = Date.now();
     try {
-      const run = await dust.runAgent(DUST_AGENT_ID, userMessage);
+      const run = await dust.runAgent(legalAgentId, userMessage);
       findings = run.output ?? '[Legal scan returned no output — review manually.]';
 
       await logAiInvocation(
@@ -151,7 +142,7 @@ async function processJob(
       );
     }
   } else {
-    findings = '[Legal scan skipped — configure DUST_API_KEY.]';
+    findings = '[Legal scan skipped — connect Dust in Settings.]';
   }
 
   // Advance orchestration state then chain proposal-compile.

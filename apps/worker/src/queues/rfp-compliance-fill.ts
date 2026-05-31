@@ -15,14 +15,14 @@ import type pino from 'pino';
 import { Worker as BullWorker } from 'bullmq';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
-import { DustClient } from '@bidstack/dust-client';
 
 import { RFP_COMPLIANCE_FILL } from '@bidstack/shared';
 import { buildAgentUserMessage } from '../lib/prompt-safety.js';
 import { logAiInvocation } from '../lib/ai-audit-worker.js';
+import { getOrgDust, resolveAgentId } from '../lib/dust-credentials.js';
 
 const QUEUE_NAME = RFP_COMPLIANCE_FILL.name;
-const DUST_AGENT_ID = process.env.DUST_RFP_COMPLIANCE_AGENT_ID ?? 'rfp-compliance-fill-agent';
+const DEFAULT_COMPLIANCE_AGENT_ID = 'rfp-compliance-fill-agent';
 
 // ─── Job schema ────────────────────────────────────────────────────────────
 
@@ -43,18 +43,6 @@ const ComplianceResult = z.object({
   confidence: z.number().int().min(0).max(10000).optional(),
 });
 type ComplianceResult = z.infer<typeof ComplianceResult>;
-
-// ─── Dust client (fail-open) ────────────────────────────────────────────────
-
-function getDustClient(log: pino.Logger): DustClient | null {
-  const apiKey = process.env.DUST_API_KEY;
-  const workspaceId = process.env.DUST_WORKSPACE_ID;
-  if (!apiKey || !workspaceId) {
-    log.warn('DUST_API_KEY or DUST_WORKSPACE_ID not set — compliance fill degraded');
-    return null;
-  }
-  return new DustClient({ apiKey, workspaceId, logger: log });
-}
 
 // ─── Deterministic fallback ─────────────────────────────────────────────────
 
@@ -89,7 +77,10 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
     throw err;
   }
 
-  const dust = getDustClient(log);
+  const { client: dust, creds } = await getOrgDust(orgId, log);
+  const complianceAgentId =
+    resolveAgentId(creds, 'complianceFill', process.env.DUST_RFP_COMPLIANCE_AGENT_ID) ??
+    DEFAULT_COMPLIANCE_AGENT_ID;
   let result: ComplianceResult;
 
   if (dust) {
@@ -106,7 +97,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
 
     const t0 = Date.now();
     try {
-      const run = await dust.runAgent(DUST_AGENT_ID, userMessage);
+      const run = await dust.runAgent(complianceAgentId, userMessage);
       const responseText = run.output ?? '{}';
       const durationMs = Date.now() - t0;
 

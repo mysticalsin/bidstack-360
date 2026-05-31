@@ -32,15 +32,35 @@ export async function resolveOrgDustCredentials(orgId: string): Promise<DustCred
   return dustCredentialsFromConfigRow(rows[0] ?? null) ?? dustCredentialsFromEnv(process.env);
 }
 
+/**
+ * Resolve the org's credentials AND a ready Dust client in a single lookup.
+ * Workers need both — the client to run agents and the creds to resolve
+ * purpose-specific agent ids (resolveAgentId). client/creds are null together
+ * when nothing is configured (fail-open: the caller writes a placeholder).
+ */
+export async function getOrgDust(
+  orgId: string,
+  log: pino.Logger,
+): Promise<{ client: DustClient | null; creds: DustCredentials | null }> {
+  const creds = await resolveOrgDustCredentials(orgId);
+  if (!creds) return { client: null, creds: null };
+  return {
+    client: new DustClient({
+      apiKey: creds.apiKey,
+      workspaceId: creds.workspaceId,
+      baseUrl: creds.baseUrl,
+      logger: log,
+    }),
+    creds,
+  };
+}
+
 /** A Dust client bound to the org's credentials, or null when none are configured. */
 export async function getOrgDustClient(
   orgId: string,
   log: pino.Logger,
 ): Promise<DustClient | null> {
-  const creds = await resolveOrgDustCredentials(orgId);
-  if (!creds) {
-    log.warn({ orgId }, 'dust: no per-org or global credentials configured');
-    return null;
-  }
-  return new DustClient({ apiKey: creds.apiKey, workspaceId: creds.workspaceId, logger: log });
+  const { client } = await getOrgDust(orgId, log);
+  if (!client) log.warn({ orgId }, 'dust: no per-org or global credentials configured');
+  return client;
 }

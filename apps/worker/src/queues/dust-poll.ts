@@ -9,7 +9,6 @@ import type pino from 'pino';
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
-import { DustClient } from '@bidstack/dust-client';
 import { DUST_POLL } from '@bidstack/shared';
 import {
   upsertOpportunityFromDust,
@@ -17,6 +16,7 @@ import {
   upsertNoteFromDust,
   upsertLeadFromDust,
 } from './dust-sync-helpers.js';
+import { getOrgDust } from '../lib/dust-credentials.js';
 
 const QUEUE_NAME = DUST_POLL.name;
 const REPEAT_EVERY_MS = 5 * 60 * 1000;
@@ -31,6 +31,76 @@ let consecutiveFailures = 0;
 const CIRCUIT_THRESHOLD = 3;
 const CIRCUIT_COOLDOWN_MS = 10 * 60 * 1000; // 10 min
 let circuitOpenUntil = 0;
+
+/**
+ * Poll one org's OWN Dust workspace and ingest its documents into that org.
+ *
+ * Per-org/plug-and-play model: each org brings its own Dust workspace (admins
+ * enter the key + data source in Settings; the global DUST_* env still resolves
+ * as a fallback for single-tenant deployments). Because the workspace belongs to
+ * the org, every document in it is that org's — no cross-org metadata gate; the
+ * metadata only routes a doc to the right entity type. Writes a stub sync_event
+ * when the org has no Dust configured, so the integration UI still has feedback.
+ */
+async function pollOrgDust(orgId: string, log: pino.Logger): Promise<void> {
+  const { client: dust, creds } = await getOrgDust(orgId, log.child({ orgId, kind: 'dust' }));
+  const dataSourceId = creds?.dataSourceId;
+  if (!dust || !dataSourceId) {
+    await prisma.syncEvent.create({
+      data: {
+        orgId,
+        source: 'dust.poll',
+        eventType: 'tick.stub',
+        payload: {
+          reason: 'Dust not configured for org — add credentials + data source in Settings',
+        },
+        status: 'processed',
+        processedAt: new Date(),
+      },
+    });
+    return;
+  }
+
+  const docs = await dust.listDocuments(dataSourceId);
+  log.info({ orgId, count: docs.length }, 'pulled from dust');
+  const results = { opportunity: 0, company: 0, note: 0, lead: 0, skipped: 0, errors: 0 };
+
+  for (const doc of docs) {
+    try {
+      const detail = await dust.getDocument(dataSourceId, doc.document_id);
+      const meta = (detail.metadata ?? {}) as Record<string, unknown>;
+      if (typeof meta.opportunity_code === 'string') {
+        const res = await upsertOpportunityFromDust(orgId, detail);
+        if (res.skipped) results.skipped++;
+        else results.opportunity++;
+      } else if (typeof meta.lead_email === 'string') {
+        const res = await upsertLeadFromDust(orgId, detail);
+        if (res.skipped) results.skipped++;
+        else results.lead++;
+      } else if (typeof meta.company_name === 'string') {
+        await upsertCompanyFromDust(orgId, detail);
+        results.company++;
+      } else {
+        const note = await upsertNoteFromDust(orgId, detail);
+        if (note) results.note++;
+      }
+    } catch (docErr) {
+      results.errors++;
+      log.warn({ docId: doc.document_id, err: docErr }, 'failed to process dust document');
+    }
+  }
+
+  await prisma.syncEvent.create({
+    data: {
+      orgId,
+      source: 'dust.poll',
+      eventType: 'poll.completed',
+      payload: { documentCount: docs.length, ...results },
+      status: 'processed',
+      processedAt: new Date(),
+    },
+  });
+}
 
 export async function startDustPoller(
   connection: IORedis,
@@ -66,94 +136,16 @@ export async function startDustPoller(
         return;
       }
 
-      const apiKey = process.env.DUST_API_KEY;
-      const workspaceId = process.env.DUST_WORKSPACE_ID;
-      const dataSourceId = process.env.DUST_DATA_SOURCE_ID;
-
-      // No keys => stub: log to sync_events for every seeded org so the
-      // integration UI has feedback during dev.
-      if (!apiKey || !workspaceId || !dataSourceId) {
-        const orgs = await prisma.org.findMany({ select: { id: true } });
-        await prisma.syncEvent.createMany({
-          data: orgs.map((o) => ({
-            orgId: o.id,
-            source: 'dust.poll',
-            eventType: 'tick.stub',
-            payload: { reason: 'DUST_API_KEY/DUST_WORKSPACE_ID/DUST_DATA_SOURCE_ID not set' },
-            status: 'processed' as const,
-            processedAt: new Date(),
-          })),
-        });
-        return;
-      }
+      // Target orgs: explicit orgId from a manual resync, else every org for the
+      // scheduled poll. Each org is polled against its OWN Dust workspace.
+      const targetOrgIds = data.orgId
+        ? [data.orgId]
+        : (await prisma.org.findMany({ select: { id: true } })).map((o) => o.id);
 
       try {
-        const dust = new DustClient({ apiKey, workspaceId, logger: log.child({ kind: 'dust' }) });
-        const docs = await dust.listDocuments(dataSourceId);
-        log.info({ count: docs.length }, 'pulled from dust');
-
-        // Target orgs: explicit orgId from manual resync, or all orgs for scheduled poll.
-        const targetOrgIds = data.orgId
-          ? [data.orgId]
-          : (await prisma.org.findMany({ select: { id: true } })).map((o) => o.id);
-
-        const results = { opportunity: 0, company: 0, note: 0, lead: 0, skipped: 0, errors: 0 };
-
-        for (const doc of docs) {
-          try {
-            const detail = await dust.getDocument(dataSourceId, doc.document_id);
-            const meta = (detail.metadata ?? {}) as Record<string, unknown>;
-            const metaOrgId = meta.org_id && typeof meta.org_id === 'string' ? meta.org_id : null;
-            if (!metaOrgId || !targetOrgIds.includes(metaOrgId)) {
-              results.skipped++;
-              log.warn(
-                { docId: doc.document_id, metaOrgId, targetOrgIds },
-                'skipping dust document with missing or mismatched org metadata',
-              );
-              continue;
-            }
-            const orgsToProcess = [metaOrgId];
-
-            for (const orgId of orgsToProcess) {
-              if (meta.opportunity_code && typeof meta.opportunity_code === 'string') {
-                const res = await upsertOpportunityFromDust(orgId, detail);
-                if (res.skipped) results.skipped++;
-                else results.opportunity++;
-              } else if (meta.lead_email && typeof meta.lead_email === 'string') {
-                const res = await upsertLeadFromDust(orgId, detail);
-                if (res.skipped) results.skipped++;
-                else results.lead++;
-              } else if (meta.company_name && typeof meta.company_name === 'string') {
-                await upsertCompanyFromDust(orgId, detail);
-                results.company++;
-              } else {
-                const note = await upsertNoteFromDust(orgId, detail);
-                if (note) results.note++;
-              }
-            }
-          } catch (docErr) {
-            results.errors++;
-            log.warn({ docId: doc.document_id, err: docErr }, 'failed to process dust document');
-          }
-        }
-
         for (const orgId of targetOrgIds) {
-          await prisma.syncEvent.create({
-            data: {
-              orgId,
-              source: 'dust.poll',
-              eventType: 'poll.completed',
-              payload: {
-                documentCount: docs.length,
-                ...results,
-                orgCount: targetOrgIds.length,
-              },
-              status: 'processed',
-              processedAt: new Date(),
-            },
-          });
+          await pollOrgDust(orgId, log);
         }
-
         consecutiveFailures = 0;
       } catch (err) {
         consecutiveFailures++;
