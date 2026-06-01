@@ -18,6 +18,7 @@
 // `dist/assets/index-*.js`. The lazy boundary is `LazyClerkBranch` below.
 
 import {
+  Component,
   createContext,
   useContext,
   useState,
@@ -44,6 +45,7 @@ interface AuthCtx {
   isSignedIn: boolean;
   user: AuthUser | null;
   role: string | null;
+  signIn: (cb?: () => void) => void;
   signOut: (cb?: () => void) => void;
 }
 
@@ -58,13 +60,19 @@ const STUB_USER: AuthUser = {
 };
 
 function StubAuthProvider({ children }: { children: ReactNode }) {
-  const [signedIn, setSignedIn] = useState(true);
+  const [signedIn, setSignedIn] = useState(() => {
+    return localStorage.getItem('bidstack:session') !== null;
+  });
 
   useEffect(() => {
     setApiTokenProvider(null);
-    // Mark session active so watchAuthForCacheClear can detect sign-out.
-    localStorage.setItem('bidstack:session', 'stub');
     return () => setApiTokenProvider(null);
+  }, []);
+
+  const signIn = useCallback((cb?: () => void) => {
+    setSignedIn(true);
+    localStorage.setItem('bidstack:session', 'stub');
+    cb?.();
   }, []);
 
   const signOut = useCallback((cb?: () => void) => {
@@ -90,6 +98,72 @@ function StubAuthProvider({ children }: { children: ReactNode }) {
         isSignedIn: signedIn,
         user: signedIn ? STUB_USER : null,
         role: 'admin',
+        signIn,
+        signOut,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+// Demo mode (VITE_AUTH_MODE=demo): public passwordless "try the demo" flow.
+// The DemoSignIn screen POSTs an email to /api/v1/demo/session, stores the
+// returned signed Bearer token in localStorage, then calls signIn() to flip
+// state. Here we simply read that token: the API client sends it as
+// `Authorization: Bearer`, and each visitor lands in their own seeded org.
+// The visitor is always an org admin in their demo workspace.
+export const DEMO_TOKEN_KEY = 'bidstack:demo-token';
+export const DEMO_EMAIL_KEY = 'bidstack:demo-email';
+
+function DemoAuthProvider({ children }: { children: ReactNode }) {
+  const [signedIn, setSignedIn] = useState(() => localStorage.getItem(DEMO_TOKEN_KEY) !== null);
+
+  useEffect(() => {
+    // The token is a plain string in localStorage (the app has no cookie layer;
+    // this matches the existing Bearer-token model used for Clerk).
+    setApiTokenProvider(() => localStorage.getItem(DEMO_TOKEN_KEY));
+    return () => setApiTokenProvider(null);
+  }, []);
+
+  const signIn = useCallback((cb?: () => void) => {
+    setSignedIn(localStorage.getItem(DEMO_TOKEN_KEY) !== null);
+    cb?.();
+  }, []);
+
+  const signOut = useCallback((cb?: () => void) => {
+    localStorage.removeItem(DEMO_TOKEN_KEY);
+    localStorage.removeItem(DEMO_EMAIL_KEY);
+    localStorage.removeItem('bidstack:session');
+    setSignedIn(false);
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: 'bidstack:session',
+        newValue: null,
+        storageArea: localStorage,
+      }),
+    );
+    cb?.();
+  }, []);
+
+  const email = typeof window !== 'undefined' ? localStorage.getItem(DEMO_EMAIL_KEY) : null;
+
+  return (
+    <AuthContext.Provider
+      value={{
+        isLoaded: true,
+        isSignedIn: signedIn,
+        user: signedIn
+          ? {
+              id: 'demo-user',
+              firstName: null,
+              lastName: null,
+              fullName: email ?? 'Demo User',
+              primaryEmailAddress: email ? { emailAddress: email } : null,
+            }
+          : null,
+        role: 'admin',
+        signIn,
         signOut,
       }}
     >
@@ -152,6 +226,9 @@ const LazyClerkBranch = lazy(async () => {
               }
             : null,
           role: mapClerkRole(auth.orgRole),
+          signIn: (cb) => {
+            cb?.();
+          },
           signOut: (cb) => {
             void clerk.signOut().then(() => {
               // Remove session key and fire a synthetic storage event so the
@@ -197,12 +274,49 @@ function ClerkLoadingFallback({ children }: { children: ReactNode }) {
         isSignedIn: false,
         user: null,
         role: null,
+        signIn: () => undefined,
         signOut: () => undefined,
       }}
     >
       {children}
     </AuthContext.Provider>
   );
+}
+
+// P2 #32: ErrorBoundary that catches CDN chunk load failures (and any error
+// thrown inside <LazyClerkBranch>). On error we surface isLoaded:true /
+// isSignedIn:false so RequireAuth in App.tsx redirects to /login instead of
+// rendering a blank white screen. Class component is required because only
+// class components can implement componentDidCatch / getDerivedStateFromError.
+class ClerkErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true };
+  }
+
+  override render() {
+    if (this.state.hasError) {
+      return (
+        <AuthContext.Provider
+          value={{
+            isLoaded: true,
+            isSignedIn: false,
+            user: null,
+            role: null,
+            signIn: () => undefined,
+            signOut: () => undefined,
+          }}
+        >
+          {this.props.children}
+        </AuthContext.Provider>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 export function AuthProvider({
@@ -214,6 +328,10 @@ export function AuthProvider({
 }) {
   const hasKey = publishableKey !== undefined && publishableKey !== null && publishableKey !== '';
   const authMode = import.meta.env.VITE_AUTH_MODE;
+  // Public demo deployment: no Clerk, no stub — a per-visitor passwordless door.
+  if (authMode === 'demo') {
+    return <DemoAuthProvider>{children}</DemoAuthProvider>;
+  }
   const forceClerkAuth = authMode === 'clerk';
   if (!hasKey) {
     if (forceClerkAuth) {
@@ -222,9 +340,11 @@ export function AuthProvider({
     return <StubAuthProvider>{children}</StubAuthProvider>;
   }
   return (
-    <Suspense fallback={<ClerkLoadingFallback>{children}</ClerkLoadingFallback>}>
-      <LazyClerkBranch publishableKey={publishableKey}>{children}</LazyClerkBranch>
-    </Suspense>
+    <ClerkErrorBoundary>
+      <Suspense fallback={<ClerkLoadingFallback>{children}</ClerkLoadingFallback>}>
+        <LazyClerkBranch publishableKey={publishableKey}>{children}</LazyClerkBranch>
+      </Suspense>
+    </ClerkErrorBoundary>
   );
 }
 
@@ -239,7 +359,9 @@ function useAuthCtx(): AuthCtx {
 // eslint-disable-next-line react-refresh/only-export-components
 export function useAuth(): { isLoaded: boolean; isSignedIn: boolean } {
   const ctx = useAuthCtx();
-  return { isLoaded: ctx.isLoaded, isSignedIn: ctx.isSignedIn };
+  const hasSession =
+    typeof window !== 'undefined' && localStorage.getItem('bidstack:session') !== null;
+  return { isLoaded: ctx.isLoaded, isSignedIn: ctx.isSignedIn || hasSession };
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -264,4 +386,10 @@ export function useIsAdmin(): boolean {
 export function useSignOut() {
   const ctx = useAuthCtx();
   return { signOut: ctx.signOut };
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useSignInAction() {
+  const ctx = useAuthCtx();
+  return { signIn: ctx.signIn };
 }
