@@ -53,6 +53,7 @@ import { companiesRoutes } from './routes/companies.js';
 import { customFieldsRoutes } from './routes/custom-fields.js';
 import { roleRoutes } from './routes/roles.js';
 import { microsoftRoutes } from './routes/microsoft.js';
+import { pipelineStageRoutes } from './routes/pipeline-stages.js';
 import { accountsRoutes } from './routes/accounts.js';
 import { referencesRoutes } from './routes/references.js';
 import { agentsRoutes } from './routes/agents.js';
@@ -88,8 +89,6 @@ import { helpRoutes } from './routes/help.js';
 import { customObjectRoutes } from './routes/custom-objects.js';
 // Wave 7 — Twilio SMS (webhook = unauthenticated, sms routes = authenticated)
 import { twilioWebhookRoutes, smsRoutes } from './routes/integrations/twilio.js';
-// Wave 7 — Mobile native push registration
-import { nativePushRoutes } from './routes/notifications.js';
 // Wave 8 — Voice + Video calls
 import { callsRoutes } from './routes/calls.js';
 import {
@@ -109,6 +108,8 @@ import { monitoringRoutes } from './routes/monitoring.js';
 import { migrationRoutes } from './routes/migrations.js';
 // Data migration: HubSpot OAuth + import
 import { hubspotMigrationRoutes } from './routes/migrations-hubspot.routes.js';
+// Public demo door (only self-registers when DEMO_MODE is armed)
+import { demoRoutes } from './routes/demo.js';
 
 export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(opportunityRoutes, { prefix: '/api/v1' });
@@ -164,6 +165,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(companiesRoutes, { prefix: '/api/v1' });
   await server.register(customFieldsRoutes, { prefix: '/api/v1' });
   await server.register(roleRoutes, { prefix: '/api/v1' });
+  await server.register(pipelineStageRoutes, { prefix: '/api/v1' });
   await server.register(microsoftRoutes, { prefix: '/api/v1' });
   await server.register(accountsRoutes, { prefix: '/api/v1' });
   await server.register(referencesRoutes, { prefix: '/api/v1' });
@@ -221,9 +223,6 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   // The WebSocket endpoint /api/realtime is registered by the realtimePlugin above.
   await server.register(realtimeRoutes, { prefix: '/api/v1' });
 
-  // Wave 7 — Mobile native push token registration (Expo push service)
-  await server.register(nativePushRoutes, { prefix: '/api/v1' });
-
   // Wave 8 — Voice + Video calls
   // Authenticated call management routes
   await server.register(callsRoutes, { prefix: '/api/v1' });
@@ -250,4 +249,8 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(migrationRoutes, { prefix: '/api/v1' });
   // Data migration: HubSpot OAuth + import
   await server.register(hubspotMigrationRoutes, { prefix: '/api/v1' });
+
+  // Public demo door — POST /api/v1/demo/session + GET /api/v1/demo/status.
+  // Self-gates on DEMO_MODE; registering it unconditionally is safe.
+  await server.register(demoRoutes, { prefix: '/api/v1' });
 }

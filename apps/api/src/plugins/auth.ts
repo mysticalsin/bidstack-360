@@ -17,6 +17,7 @@ import { prisma } from '@bidstack/db';
 
 import { writeAuthAudit } from './auth-audit.js';
 import { ensureAdminRoleGrant, mapClerkRole } from './auth-helpers.js';
+import { isDemoMode, resolveDemoAuth } from './demo-auth.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -40,6 +41,19 @@ export interface AuthContext {
 const STUB_CLERK_ORG = 'org_seed_mantu';
 
 async function resolveStubAuth(req: FastifyRequest): Promise<AuthContext> {
+  // P1 #19: restrict stub auth to loopback interfaces only — a mis-configured dev
+  // environment should NOT be exploitable from another host on the same network.
+  // Fastify normalises the IPv4-mapped form (::ffff:127.0.0.1) to 127.0.0.1 when
+  // trustProxy is false, but we guard all three variants to be safe.
+  const remoteIp = req.ip;
+  const isLoopback =
+    remoteIp === '127.0.0.1' || remoteIp === '::1' || remoteIp === '::ffff:127.0.0.1';
+  if (!isLoopback) {
+    throw req.server.httpErrors.forbidden(
+      `Stub auth is restricted to localhost (remote: ${remoteIp})`,
+    );
+  }
+
   const org = await prisma.org.findUnique({ where: { clerkOrg: STUB_CLERK_ORG } });
   if (!org) {
     throw req.server.httpErrors.serviceUnavailable(
@@ -316,18 +330,34 @@ async function verifyApiKey(req: FastifyRequest): Promise<AuthContext | null> {
 const plugin: FastifyPluginAsync = fp(
   async (server) => {
     const hasClerkKey = !!process.env.CLERK_SECRET_KEY;
+    const demoMode = isDemoMode();
     // Stub auth is allowed in dev and test only — production must provide a key.
     // Do NOT default to 'development' — if NODE_ENV is unset, allowStub is false.
     const allowStub = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
 
-    if (!hasClerkKey && !allowStub) {
+    // DEMO_MODE arms a PUBLIC passwordless door — it must never co-exist with real
+    // Clerk auth. Refuse to boot if both are configured.
+    if (demoMode && hasClerkKey) {
+      server.log.error(
+        'AUTH CONFIG ERROR: DEMO_MODE=true and CLERK_SECRET_KEY are mutually exclusive.',
+      );
+      throw new Error('DEMO_MODE cannot run with CLERK_SECRET_KEY set');
+    }
+
+    // Real auth is required unless we're in dev/test stub mode or the explicit
+    // public demo mode.
+    if (!hasClerkKey && !allowStub && !demoMode) {
       server.log.error(
         'AUTH CONFIG ERROR: CLERK_SECRET_KEY is missing and NODE_ENV is not development/test. Refusing to start.',
       );
       throw new Error('CLERK_SECRET_KEY required in production');
     }
 
-    if (!hasClerkKey) {
+    if (demoMode) {
+      server.log.warn(
+        'AUTH DEMO MODE — public passwordless sign-in is ENABLED. This is NOT real authentication; use only for the public demo deployment.',
+      );
+    } else if (!hasClerkKey) {
       server.log.warn(
         'AUTH STUB MODE — no CLERK_SECRET_KEY set; minting seed org session (dev only)',
       );
@@ -348,10 +378,12 @@ const plugin: FastifyPluginAsync = fp(
         return;
       }
 
-      if (!hasClerkKey) {
-        req.auth = await resolveStubAuth(req);
-      } else {
+      if (hasClerkKey) {
         req.auth = await verifyClerkAuth(req);
+      } else if (demoMode) {
+        req.auth = await resolveDemoAuth(req);
+      } else {
+        req.auth = await resolveStubAuth(req);
       }
 
       Sentry.setTag('orgId', req.auth.orgId);

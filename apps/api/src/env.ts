@@ -23,6 +23,15 @@ export const envSchema = z.object({
 
   SSO_ALLOWED_EMAIL_DOMAINS: z.string().optional().or(z.literal('')),
 
+  // ─── Demo mode (public passwordless "try the demo" door) ──────────────
+  // DEMO_MODE=true arms a PUBLIC sign-in: any email → its own freshly-seeded
+  // org. Mutually exclusive with Clerk (enforced in the semantic checks below).
+  // Use ONLY for the public demo deployment, never a real tenant.
+  DEMO_MODE: z.enum(['true', 'false']).default('false'),
+  DEMO_SESSION_SECRET: z.string().min(1).optional().or(z.literal('')),
+  DEMO_ORG_TTL_HOURS: z.coerce.number().int().positive().default(24),
+  DEMO_MAX_ORGS: z.coerce.number().int().positive().default(500),
+
   DUST_API_KEY: z.string().min(1).optional().or(z.literal('')),
   DUST_WORKSPACE_ID: z.string().min(1).optional().or(z.literal('')),
   DUST_DATA_SOURCE_ID: z.string().min(1).optional().or(z.literal('')),
@@ -120,6 +129,16 @@ export function getEnv(): Env {
     semanticErrors.push(
       'INTEGRATION_TOKEN_KEY is required in production (encrypts per-org Dust + OAuth secrets at rest)',
     );
+  }
+  // Demo-mode gate: the public passwordless door must never run alongside real
+  // Clerk auth, and needs its own HMAC secret to sign session tokens.
+  if (env.DEMO_MODE === 'true') {
+    if (env.CLERK_SECRET_KEY) {
+      semanticErrors.push('DEMO_MODE=true is mutually exclusive with CLERK_SECRET_KEY');
+    }
+    if (!env.DEMO_SESSION_SECRET) {
+      semanticErrors.push('DEMO_SESSION_SECRET is required when DEMO_MODE=true');
+    }
   }
   if (semanticErrors.length > 0) {
     throw new Error(`Environment validation failed:\n  Invalid: ${semanticErrors.join(', ')}`);
