@@ -1,21 +1,22 @@
-// CRM-style settings layout: fixed left sidebar (200px) + scrollable content area.
-// Sections are grouped into Personal, Integrations, and Workspace.
-
 import { useState } from 'react';
 import { cn } from '@/lib/cn';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useIsAdmin } from '@/lib/auth';
 
 export type SettingsSection =
+  | 'overview'
   | 'profile'
   | 'appearance'
   | 'notifications'
   | 'security'
-  | 'microsoft'
-  | 'mobile'
   | 'workspace'
   | 'language'
-  | 'advanced';
+  | 'crm'
+  | 'rfp-analytics'
+  | 'integrations'
+  | 'webhooks'
+  | 'audit-log'
+  | 'developer';
 
 interface Group {
   label: string;
@@ -23,6 +24,10 @@ interface Group {
 }
 
 const GROUPS: Group[] = [
+  {
+    label: 'Command center',
+    items: [{ id: 'overview', label: 'Overview', icon: 'dashboard' }],
+  },
   {
     label: 'Personal',
     items: [
@@ -34,17 +39,15 @@ const GROUPS: Group[] = [
     ],
   },
   {
-    label: 'Integrations',
-    items: [
-      { id: 'microsoft', label: 'Microsoft 365', icon: 'building' },
-      { id: 'mobile', label: 'Mobile App', icon: 'phone' },
-    ],
-  },
-  {
-    label: 'Workspace',
+    label: 'Enterprise controls',
     items: [
       { id: 'workspace', label: 'Workspace', icon: 'settings' },
-      { id: 'advanced', label: 'Advanced', icon: 'sliders', admin: true },
+      { id: 'crm', label: 'CRM configuration', icon: 'sliders', admin: true },
+      { id: 'rfp-analytics', label: 'RFP Analytics', icon: 'trophy', admin: true },
+      { id: 'integrations', label: 'Integrations', icon: 'link' },
+      { id: 'webhooks', label: 'Webhooks', icon: 'webhook', admin: true },
+      { id: 'audit-log', label: 'Audit log', icon: 'shield', admin: true },
+      { id: 'developer', label: 'Developer access', icon: 'zap', admin: true },
     ],
   },
 ];
@@ -57,7 +60,7 @@ interface Props {
 
 export function SettingsLayout({ active, onChange, children }: Props) {
   const isAdmin = useIsAdmin();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const navId = 'settings-section-nav';
 
   return (
@@ -65,9 +68,9 @@ export function SettingsLayout({ active, onChange, children }: Props) {
       {/* Mobile toggle */}
       <button
         type="button"
-        onClick={() => setMobileOpen((v) => !v)}
+        onClick={() => setMenuOpen((v) => !v)}
         aria-controls={navId}
-        aria-expanded={mobileOpen}
+        aria-expanded={menuOpen}
         className="mb-3 flex items-center gap-2 text-sm font-medium text-[var(--fg-secondary)] lg:hidden"
       >
         <Icon name="menu" size={16} ariaHidden />
@@ -81,7 +84,7 @@ export function SettingsLayout({ active, onChange, children }: Props) {
           className={cn(
             'w-full shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-page)] lg:w-56 lg:border-b-0 lg:border-r',
             'lg:block',
-            mobileOpen ? 'block' : 'hidden',
+            menuOpen ? 'block' : 'hidden',
           )}
         >
           <nav className="sticky top-0 px-3 py-4">
@@ -99,7 +102,7 @@ export function SettingsLayout({ active, onChange, children }: Props) {
                           type="button"
                           onClick={() => {
                             onChange(item.id);
-                            setMobileOpen(false);
+                            setMenuOpen(false);
                           }}
                           className={cn(
                             'flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors',

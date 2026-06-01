@@ -103,15 +103,12 @@ export const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
-export const ADMIN_SETTINGS: NavItem[] = [
-  { to: '/admin/rfp', label: 'RFP Analytics', icon: 'trophy' },
-  { to: '/integrations', label: 'Integrations', icon: 'link' },
-  { to: '/webhooks', label: 'Webhooks', icon: 'webhook' },
-  { to: '/audit-log', label: 'Audit log', icon: 'shield' },
-  { to: '/settings', label: 'Settings', icon: 'settings' },
-];
+// RFP Analytics, Integrations, Webhooks and Audit log are now TABS inside the
+// Settings page (see SettingsLayout GROUPS — RFP Analytics/Webhooks/Audit log are
+// admin-gated there), so the sidebar shows a single "Settings" entry for everyone
+// instead of duplicating those destinations as standalone nav links.
+export const ADMIN_SETTINGS: NavItem[] = [{ to: '/settings', label: 'Settings', icon: 'settings' }];
 
 export const MEMBER_SETTINGS: NavItem[] = [
-  { to: '/integrations', label: 'Integrations', icon: 'link' },
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ];
