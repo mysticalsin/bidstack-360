@@ -39,7 +39,7 @@ export interface RfpCompletionOpts {
 
 export interface RfpCompletionResult {
   text: string;
-  /** 'openai' | 'anthropic' | 'moonshot' | 'dust' */
+  /** 'openai' | 'anthropic' | 'moonshot' | 'gemma' | 'dust' */
   provider: string;
   /** Dust run id when the Dust tier answered; undefined otherwise. */
   runId?: string;

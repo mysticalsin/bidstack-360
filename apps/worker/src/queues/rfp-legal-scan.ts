@@ -27,6 +27,7 @@ import { resolveLlmFromEnv } from '../lib/llm-provider.js';
 import {
   updateOrchestrationPhase,
   markOrchestrationFailed,
+  isDocumentAiSafe,
 } from './rfp-requirement-extract.helpers.js';
 
 const QUEUE_NAME = RFP_LEGAL_SCAN.name;
@@ -276,6 +277,24 @@ async function processJob(
   }
 
   const { orgId, orchestrationId, documentVersionId, proposalId } = parsed.data;
+
+  // NDA confidentiality re-check (defence-in-depth + TOCTOU): the gate runs once
+  // at extraction, but THIS stage re-reads the raw RFP source and ships it to an
+  // external provider — and ndaTier can change between stages (minutes apart).
+  // Fail CLOSED rather than send confidential source to an LLM.
+  if (!(await isDocumentAiSafe(documentVersionId, orgId))) {
+    log.warn(
+      { orchestrationId },
+      'rfp-legal-scan: document is NDA-restricted — blocking AI review',
+    );
+    await markOrchestrationFailed(
+      orchestrationId,
+      orgId,
+      'legal_scan',
+      'Document is NDA-restricted; AI review blocked',
+    ).catch(() => undefined);
+    return;
+  }
 
   // Verify proposal belongs to this org before touching any data
   const proposal = await prisma.proposal.findUnique({

@@ -27,7 +27,7 @@ export interface ChatInput {
   system?: string;
   user: string;
   maxTokens?: number;
-  /** Force JSON output (OpenAI/Moonshot only). Omit for Markdown/prose steps. */
+  /** Force JSON (OpenAI-compatible providers: OpenAI/Moonshot/Gemma). Omit for Markdown/prose steps. */
   responseFormat?: 'json_object' | 'text';
   /** Per-call abort timeout in ms (default 120s). */
   timeoutMs?: number;
