@@ -11,6 +11,12 @@ type ApiTokenProvider = () => string | null | Promise<string | null>;
 
 let apiTokenProvider: ApiTokenProvider | null = null;
 
+// In the hybrid deploy (SPA on Vercel, API on Railway) the API lives on a
+// different origin. VITE_API_URL is inlined at build time and prefixed onto
+// every request. Empty in local dev (Vite proxies /api) and in single-origin
+// deploys, so behavior there is unchanged.
+const API_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -67,7 +73,7 @@ export async function downloadFromApi(
     : '';
   const url = qs ? `${resolvedPath}?${qs}` : resolvedPath;
 
-  const res = await fetch(url, {
+  const res = await fetch(`${API_BASE}${url}`, {
     method: 'GET',
     headers: Object.keys(headers).length > 0 ? headers : undefined,
     credentials: 'include',
@@ -98,7 +104,7 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
-  const res = await fetch(resolvedPath, {
+  const res = await fetch(`${API_BASE}${resolvedPath}`, {
     method: opts.method ?? 'GET',
     headers: Object.keys(headers).length > 0 ? headers : undefined,
     body: opts.body ? JSON.stringify(opts.body) : undefined,
