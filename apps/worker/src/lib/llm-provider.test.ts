@@ -133,6 +133,28 @@ describe('completeChat', () => {
     );
   });
 
+  it('sets response_format ONLY when responseFormat is json_object (Markdown steps stay free)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '{}' } }] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const llm = {
+      kind: 'openai' as const,
+      apiKey: 'k',
+      model: 'm',
+      baseUrl: 'https://api.openai.com/v1',
+    };
+
+    await completeChat(llm, { user: 'hi' }); // no responseFormat → must NOT force JSON
+    await completeChat(llm, { user: 'hi', responseFormat: 'json_object' });
+
+    const body0 = JSON.parse((fetchMock.mock.calls[0] as [string, { body: string }])[1].body);
+    const body1 = JSON.parse((fetchMock.mock.calls[1] as [string, { body: string }])[1].body);
+    expect(body0.response_format).toBeUndefined();
+    expect(body1.response_format).toEqual({ type: 'json_object' });
+  });
+
   it('throws an HTTP error without leaking the API key', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({}) });
     vi.stubGlobal('fetch', fetchMock);

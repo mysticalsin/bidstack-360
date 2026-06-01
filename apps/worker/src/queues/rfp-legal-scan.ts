@@ -60,6 +60,8 @@ export interface ReviewCrewFinding {
   status: ReviewStatus;
   agentId: string | null;
   output: string;
+  /** Which provider actually answered ('openai'|'anthropic'|'moonshot'|'dust'); undefined if skipped/errored. */
+  provider?: string;
 }
 
 export const RFP_REVIEW_AGENTS: readonly ReviewAgentConfig[] = [
@@ -186,6 +188,8 @@ async function runReviewAgent(opts: {
     agentId,
     userMessage,
     agentType: `rfp-review-${agent.key}`,
+    responseFormat: 'text',
+    maxTokens: 8000,
     traceId,
   });
 
@@ -204,6 +208,7 @@ async function runReviewAgent(opts: {
     role: agent.role,
     status: 'success',
     agentId,
+    provider: completion.provider,
     output: completion.text.trim() || `[${agent.role} returned no output - review manually.]`,
   };
 }
@@ -215,9 +220,14 @@ async function persistReviewCrewFindings(opts: {
   findings: ReviewCrewFinding[];
 }): Promise<void> {
   const { orgId, orchestrationId, proposalId, findings } = opts;
+  // Record the provider(s) that actually answered (was hardcoded 'dust', which
+  // mis-attributed the EU AI Act Art. 50 provenance on a direct-LLM deployment).
+  const usedProviders = [
+    ...new Set(findings.map((f) => f.provider).filter((p): p is string => Boolean(p))),
+  ];
   const payload = {
     reviewCrew: {
-      provider: 'dust',
+      provider: usedProviders.length ? usedProviders.join('+') : 'none',
       process: 'sequential',
       completedAt: new Date().toISOString(),
       proposalId,

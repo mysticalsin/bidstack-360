@@ -100,6 +100,7 @@ export async function processJob(
           'You are an RFP requirements-extraction engine. Respond with ONLY a valid ' +
           'JSON object — no prose, no markdown fences.',
         user: userMessage,
+        responseFormat: 'json_object',
       });
       await logAiInvocation(
         {
@@ -164,8 +165,14 @@ export async function processJob(
         log,
       );
 
-      const p2 = DustExtractionResponse.safeParse(JSON.parse(responseText));
-      requirements = p2.success ? p2.data.requirements : fallbackExtract(rawText);
+      // Parse in its own try (+ coerceJsonObject) so a non-JSON Dust reply falls
+      // back WITHOUT being mislabeled as a Dust API failure or double-audited.
+      try {
+        const p2 = DustExtractionResponse.safeParse(JSON.parse(coerceJsonObject(responseText)));
+        requirements = p2.success ? p2.data.requirements : fallbackExtract(rawText);
+      } catch {
+        requirements = fallbackExtract(rawText);
+      }
     } catch (dustErr) {
       log.warn({ err: dustErr }, 'rfp-requirement-extract: Dust call failed, falling back');
       requirements = fallbackExtract(rawText);
@@ -233,7 +240,7 @@ export async function processJob(
   // without this lookup every requirement persists with a null opportunity and
   // the "Extracted Requirements" / story-match panels stay empty on a good run.
   const orch = await prisma.rfpOrchestration.findFirst({
-    where: { id: orchestrationId, orgId },
+    where: { id: orchestrationId, orgId, deletedAt: null },
     select: { opportunityId: true },
   });
   await prisma.requirement.createMany({

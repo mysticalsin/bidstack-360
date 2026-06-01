@@ -31,6 +31,10 @@ export interface RfpCompletionOpts {
   /** Audit label, e.g. 'rfp-qa-review'. */
   agentType: string;
   traceId?: string;
+  /** Force JSON for direct chat providers (extract/QA/compliance); omit for Markdown steps. */
+  responseFormat?: 'json_object' | 'text';
+  /** Max output tokens for direct chat providers (Markdown drafts need more than the default). */
+  maxTokens?: number;
 }
 
 export interface RfpCompletionResult {
@@ -49,14 +53,30 @@ export interface RfpCompletionResult {
 export async function runRfpCompletion(
   opts: RfpCompletionOpts,
 ): Promise<RfpCompletionResult | null> {
-  const { orgId, log, dust, agentId, userMessage, system, agentType, traceId } = opts;
+  const {
+    orgId,
+    log,
+    dust,
+    agentId,
+    userMessage,
+    system,
+    agentType,
+    traceId,
+    responseFormat,
+    maxTokens,
+  } = opts;
   const envLlm = resolveLlmFromEnv();
 
   // ── Tier 1: direct LLM provider (GPT / Claude / Kimi) ───────────────────────
   if (envLlm) {
     const t0 = Date.now();
     try {
-      const text = await completeChat(envLlm, { system, user: userMessage });
+      const text = await completeChat(envLlm, {
+        system,
+        user: userMessage,
+        responseFormat,
+        maxTokens,
+      });
       await logAiInvocation(
         {
           orgId,

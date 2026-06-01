@@ -89,7 +89,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
       `${rolePreambleForKey('compliance_officer')}\n\n` +
       'Assess compliance for the following requirement{{CATEGORY_SUFFIX}}. ' +
       'Return ONLY a JSON object with: status (YES|NO|PARTIAL|NOT_APPLICABLE), ' +
-      'justification (string, max 200 chars), confidence (0-10000).',
+      'justification (concise string, max 1000 chars), confidence (0-10000).',
     trusted: {
       CATEGORY_SUFFIX: category ? ` in category "${category}"` : '',
     },
@@ -106,6 +106,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
     system:
       'You are an RFP compliance officer. Respond with ONLY a valid JSON object — no prose, no markdown fences.',
     agentType: 'rfp-compliance',
+    responseFormat: 'json_object',
     traceId: job.id ?? undefined,
   });
 

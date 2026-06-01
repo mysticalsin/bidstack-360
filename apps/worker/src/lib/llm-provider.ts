@@ -27,6 +27,10 @@ export interface ChatInput {
   system?: string;
   user: string;
   maxTokens?: number;
+  /** Force JSON output (OpenAI/Moonshot only). Omit for Markdown/prose steps. */
+  responseFormat?: 'json_object' | 'text';
+  /** Per-call abort timeout in ms (default 120s). */
+  timeoutMs?: number;
 }
 
 /**
@@ -87,9 +91,14 @@ export function coerceJsonObject(raw: string): string {
 /** Provider-agnostic chat completion. Returns the assistant text (possibly JSON). */
 export async function completeChat(llm: ResolvedLlm, input: ChatInput): Promise<string> {
   const maxTokens = input.maxTokens ?? 4096;
+  // Bound every provider call: a hung provider must not pin a worker concurrency
+  // slot forever (BullMQ keeps renewing the lock while we await fetch, so the job
+  // is never declared stalled). On timeout fetch throws → caller's fail-open path.
+  const signal = AbortSignal.timeout(input.timeoutMs ?? 120_000);
   if (llm.kind === 'anthropic') {
     const res = await fetch(`${llm.baseUrl}/v1/messages`, {
       method: 'POST',
+      signal,
       headers: {
         'content-type': 'application/json',
         'x-api-key': llm.apiKey,
@@ -112,6 +121,7 @@ export async function completeChat(llm: ResolvedLlm, input: ChatInput): Promise<
   // openai + moonshot: OpenAI-compatible /chat/completions.
   const res = await fetch(`${llm.baseUrl}/chat/completions`, {
     method: 'POST',
+    signal,
     headers: {
       'content-type': 'application/json',
       authorization: `Bearer ${llm.apiKey}`,
@@ -124,7 +134,12 @@ export async function completeChat(llm: ResolvedLlm, input: ChatInput): Promise<
       ],
       max_tokens: maxTokens,
       temperature: 0.2,
-      response_format: { type: 'json_object' },
+      // Only force JSON when the caller asks. Markdown steps (section-draft,
+      // review crew) must NOT get json_object — it makes the model emit JSON (or
+      // 400) and the step silently degrades to a placeholder.
+      ...(input.responseFormat === 'json_object'
+        ? { response_format: { type: 'json_object' as const } }
+        : {}),
     }),
   });
   if (!res.ok) {

@@ -121,6 +121,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
       system:
         'You are an RFP QA reviewer. Respond with ONLY a valid JSON object — no prose, no markdown fences.',
       agentType: 'rfp-qa',
+      responseFormat: 'json_object',
       traceId: job.id ?? undefined,
     });
 

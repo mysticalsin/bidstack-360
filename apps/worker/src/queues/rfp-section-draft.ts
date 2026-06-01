@@ -146,6 +146,8 @@ async function processJob(job: Job<JobData>, log: pino.Logger, memos: MemOSServi
     userMessage,
     system: 'You are an expert proposal writer. Output only the section content in Markdown.',
     agentType: 'rfp-draft',
+    responseFormat: 'text',
+    maxTokens: 8000,
     traceId: job.id ?? undefined,
   });
 
