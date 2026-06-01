@@ -31,6 +31,11 @@ export const envSchema = z.object({
   DEMO_SESSION_SECRET: z.string().min(1).optional().or(z.literal('')),
   DEMO_ORG_TTL_HOURS: z.coerce.number().int().positive().default(24),
   DEMO_MAX_ORGS: z.coerce.number().int().positive().default(500),
+  // When true (demo mode only), each new visitor org kicks off a LIVE Apollo
+  // enrichment refresh of its seeded companies. Needs APOLLO_API_KEY (worker) +
+  // BIDSTACK_JOB_SIGNING_SECRET. Off by default to bound Apollo credit usage —
+  // the seed already ships realistic employee/revenue values.
+  DEMO_AUTO_ENRICH: z.enum(['true', 'false']).default('false'),
 
   DUST_API_KEY: z.string().min(1).optional().or(z.literal('')),
   DUST_WORKSPACE_ID: z.string().min(1).optional().or(z.literal('')),

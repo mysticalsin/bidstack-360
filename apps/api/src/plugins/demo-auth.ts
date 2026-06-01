@@ -19,6 +19,8 @@ import type { FastifyRequest } from 'fastify';
 
 import { prisma, seedOrgData } from '@bidstack/db';
 
+import { enqueueApolloEnrich } from '../queues/company-enrich-apollo.js';
+
 import type { AuthContext } from './auth.js';
 
 /** Every demo org's clerkOrg starts with this — the reaper + dedup key off it. */
@@ -111,6 +113,34 @@ async function reapStaleDemoOrgs(): Promise<void> {
   });
 }
 
+/**
+ * Optionally kick off a LIVE Apollo enrichment refresh for the freshly-seeded
+ * companies. Off by default (the seed already ships realistic employee/revenue
+ * values) so a public demo doesn't burn Apollo credits per visitor. Enable with
+ * DEMO_AUTO_ENRICH=true once APOLLO_API_KEY + BIDSTACK_JOB_SIGNING_SECRET are
+ * set — the worker then overwrites the seeded rows with provider data. Failures
+ * are swallowed (enqueue is best-effort) so they can never block sign-in.
+ */
+async function maybeAutoEnrich(orgId: string): Promise<void> {
+  if (process.env.DEMO_AUTO_ENRICH !== 'true') return;
+  try {
+    const companies = await prisma.company.findMany({
+      where: { orgId },
+      select: { name: true, domain: true },
+      take: 50,
+    });
+    for (const c of companies) {
+      await enqueueApolloEnrich({
+        orgId,
+        companyName: c.name,
+        ...(c.domain ? { domain: c.domain } : {}),
+      });
+    }
+  } catch {
+    // best-effort — never fail a demo sign-in over enrichment enqueue
+  }
+}
+
 export interface DemoSession {
   token: string;
   email: string;
@@ -157,6 +187,8 @@ export async function provisionDemoSession(email: string, name?: string): Promis
     select: { id: true },
   });
   if (!visitor) throw new Error('demo provisioning failed: visitor user missing after seed');
+
+  await maybeAutoEnrich(org.id);
 
   return { token: signDemoToken(visitor.id, org.id), email: normalized, orgId: org.id };
 }

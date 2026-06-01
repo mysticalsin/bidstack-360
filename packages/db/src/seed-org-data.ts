@@ -2,18 +2,23 @@
  * seed-org-data.ts — curated, multi-tenant demo dataset.
  *
  * Populates ONE org with a compact, realistic Mantu bid/presales workspace:
- * teammates, opportunities, contacts, leads, tasks, and a spread of proposals
- * across every status (so RFP Analytics, the pipeline, and the lead Kanban all
- * look alive). Unlike `src/seed.ts` (which targets the single dev
- * `org_seed_mantu` fixture and bulk-upserts), this is parameterized by `orgId`,
- * generates fresh UUIDs, and namespaces globally-unique fields — so it is safe
- * to call once per visitor org at runtime (the demo sign-in door) as well as
- * from the `db:seed:demo` CLI.
+ * teammates, real enterprise accounts (with company + enrichment rows so
+ * employee count / revenue show out of the box), opportunities, contacts,
+ * leads, tasks, and a spread of proposals across every status (so RFP
+ * Analytics, the pipeline, and the lead Kanban all look alive).
  *
- * The org it populates contains ONLY what this function creates. That is the
- * guarantee behind "demo accounts are never full of test/ops junk."
+ * Accounts use REAL companies (Siemens, IKEA, …) so the live Apollo / open-data
+ * enrichment (POST /crm/companies/:id/enrich) returns real employee + revenue
+ * data when an APOLLO_API_KEY is configured — the pre-seeded values here are
+ * public approximations so the demo looks populated even with no key set.
+ *
+ * Unlike `src/seed.ts` (single dev `org_seed_mantu` fixture), this is
+ * parameterized by `orgId`, generates fresh UUIDs, and namespaces
+ * globally-unique fields — safe to call once per visitor org at runtime (the
+ * demo sign-in door) and from the `db:seed:demo` CLI. The org contains ONLY what
+ * this function creates — the guarantee behind "no test/ops junk".
  */
-import type { PrismaClient } from '../generated/client/index.js';
+import type { Prisma, PrismaClient } from '../generated/client/index.js';
 
 import { seedRolesAndPermissions } from './seed.rbac.js';
 
@@ -64,6 +69,69 @@ const TEAMMATES: TeammateSpec[] = [
   },
 ];
 
+// Real, well-known enterprises so Apollo / open-data enrichment returns real
+// data. employeeCount + revenueBillions are public approximations used for the
+// pre-seed (a live enrich refresh overwrites them with provider data).
+interface CompanySpec {
+  name: string;
+  domain: string;
+  industry: string;
+  country: string;
+  employeeCount: number;
+  revenueBillions: number; // EUR, approximate
+}
+
+const COMPANIES: CompanySpec[] = [
+  {
+    name: 'Siemens',
+    domain: 'siemens.com',
+    industry: 'Manufacturing',
+    country: 'DE',
+    employeeCount: 311_000,
+    revenueBillions: 78,
+  },
+  {
+    name: 'IKEA',
+    domain: 'ikea.com',
+    industry: 'Retail',
+    country: 'SE',
+    employeeCount: 170_000,
+    revenueBillions: 39,
+  },
+  {
+    name: 'Sanofi',
+    domain: 'sanofi.com',
+    industry: 'Healthcare',
+    country: 'FR',
+    employeeCount: 91_000,
+    revenueBillions: 43,
+  },
+  {
+    name: 'HSBC',
+    domain: 'hsbc.com',
+    industry: 'Financial Services',
+    country: 'GB',
+    employeeCount: 220_000,
+    revenueBillions: 60,
+  },
+  {
+    name: 'Stellantis',
+    domain: 'stellantis.com',
+    industry: 'Automotive',
+    country: 'IT',
+    employeeCount: 258_000,
+    revenueBillions: 189,
+  },
+  {
+    name: 'Spotify',
+    domain: 'spotify.com',
+    industry: 'Media',
+    country: 'SE',
+    employeeCount: 9_800,
+    revenueBillions: 13,
+  },
+];
+
 type OppStage =
   | 's1_lead'
   | 's1_ongoing'
@@ -87,8 +155,8 @@ interface OppSpec {
 
 const OPPS: OppSpec[] = [
   {
-    code: 'ACME-26-001',
-    customer: 'Acme Manufacturing',
+    code: 'SIEM-26-001',
+    customer: 'Siemens',
     name: 'Global ERP Modernization',
     stage: 's3_technical_iteration',
     value: 1_200_000,
@@ -98,8 +166,8 @@ const OPPS: OppSpec[] = [
     probability: 60,
   },
   {
-    code: 'NORD-26-002',
-    customer: 'Nordic Retail Group',
+    code: 'IKEA-26-002',
+    customer: 'IKEA',
     name: 'Cloud Migration & FinOps',
     stage: 's4_negotiation',
     value: 850_000,
@@ -109,8 +177,8 @@ const OPPS: OppSpec[] = [
     probability: 75,
   },
   {
-    code: 'MEDL-26-003',
-    customer: 'Medline Health',
+    code: 'SNFI-26-003',
+    customer: 'Sanofi',
     name: 'Patient Data Platform',
     stage: 's2_sent',
     value: 2_400_000,
@@ -120,8 +188,8 @@ const OPPS: OppSpec[] = [
     probability: 40,
   },
   {
-    code: 'LUMN-26-004',
-    customer: 'Lumen Financial',
+    code: 'HSBC-26-004',
+    customer: 'HSBC',
     name: 'Cybersecurity Transformation',
     stage: 's1_ongoing',
     value: 1_750_000,
@@ -131,8 +199,8 @@ const OPPS: OppSpec[] = [
     probability: 25,
   },
   {
-    code: 'VOLT-26-005',
-    customer: 'Voltaic Mobility',
+    code: 'STLA-26-005',
+    customer: 'Stellantis',
     name: 'EV Fleet Telematics',
     stage: 'closed_won',
     value: 620_000,
@@ -142,14 +210,14 @@ const OPPS: OppSpec[] = [
     probability: 100,
   },
   {
-    code: 'ORBT-26-006',
-    customer: 'Orbit Media',
+    code: 'SPOT-26-006',
+    customer: 'Spotify',
     name: 'Data Lakehouse Build',
     stage: 'closed_lost',
     value: 430_000,
     owner: 'PN',
     industry: 'Media',
-    country: 'ES',
+    country: 'SE',
     probability: 0,
   },
 ];
@@ -169,52 +237,52 @@ interface PropSpec {
 // by-owner breakdown rather than an empty rollup.
 const PROPOSALS: PropSpec[] = [
   {
-    oppCode: 'ACME-26-001',
-    name: 'Acme ERP — Technical Proposal',
+    oppCode: 'SIEM-26-001',
+    name: 'Siemens ERP — Technical Proposal',
     status: 'review',
     owner: 'SA',
     complianceScore: 82,
   },
   {
-    oppCode: 'ACME-26-001',
-    name: 'Acme ERP — Executive Summary',
+    oppCode: 'SIEM-26-001',
+    name: 'Siemens ERP — Executive Summary',
     status: 'draft',
     owner: 'SA',
     complianceScore: null,
   },
   {
-    oppCode: 'NORD-26-002',
-    name: 'Nordic Cloud Migration — Final Bid',
+    oppCode: 'IKEA-26-002',
+    name: 'IKEA Cloud Migration — Final Bid',
     status: 'approved',
     owner: 'MB',
     complianceScore: 94,
     approved: true,
   },
   {
-    oppCode: 'MEDL-26-003',
-    name: 'Medline Patient Platform — Draft',
+    oppCode: 'SNFI-26-003',
+    name: 'Sanofi Patient Platform — Draft',
     status: 'draft',
     owner: 'PN',
     complianceScore: null,
   },
   {
-    oppCode: 'LUMN-26-004',
-    name: 'Lumen Cyber — Discovery Response',
+    oppCode: 'HSBC-26-004',
+    name: 'HSBC Cyber — Discovery Response',
     status: 'submitted',
     owner: 'SA',
     complianceScore: 70,
   },
   {
-    oppCode: 'VOLT-26-005',
-    name: 'Voltaic Telematics — Winning Bid',
+    oppCode: 'STLA-26-005',
+    name: 'Stellantis Telematics — Winning Bid',
     status: 'won',
     owner: 'MB',
     complianceScore: 91,
     approved: true,
   },
   {
-    oppCode: 'ORBT-26-006',
-    name: 'Orbit Lakehouse — Submitted Bid',
+    oppCode: 'SPOT-26-006',
+    name: 'Spotify Lakehouse — Submitted Bid',
     status: 'lost',
     owner: 'PN',
     complianceScore: 64,
@@ -235,7 +303,7 @@ interface ContactSpec {
 
 const CONTACTS: ContactSpec[] = [
   {
-    customer: 'Acme Manufacturing',
+    customer: 'Siemens',
     name: 'Klaus Vogt',
     role: 'VP Operations',
     emailLocal: 'klaus.vogt',
@@ -244,7 +312,7 @@ const CONTACTS: ContactSpec[] = [
     sentiment: 'hot',
   },
   {
-    customer: 'Acme Manufacturing',
+    customer: 'Siemens',
     name: 'Lena Fischer',
     role: 'IT Director',
     emailLocal: 'lena.fischer',
@@ -253,7 +321,7 @@ const CONTACTS: ContactSpec[] = [
     sentiment: 'warm',
   },
   {
-    customer: 'Nordic Retail Group',
+    customer: 'IKEA',
     name: 'Erik Lindqvist',
     role: 'CFO',
     emailLocal: 'erik.lindqvist',
@@ -262,7 +330,7 @@ const CONTACTS: ContactSpec[] = [
     sentiment: 'warm',
   },
   {
-    customer: 'Medline Health',
+    customer: 'Sanofi',
     name: 'Camille Rousseau',
     role: 'Chief Medical Information Officer',
     emailLocal: 'camille.rousseau',
@@ -271,7 +339,7 @@ const CONTACTS: ContactSpec[] = [
     sentiment: 'hot',
   },
   {
-    customer: 'Lumen Financial',
+    customer: 'HSBC',
     name: 'James Whitfield',
     role: 'CISO',
     emailLocal: 'james.whitfield',
@@ -280,7 +348,7 @@ const CONTACTS: ContactSpec[] = [
     sentiment: 'neutral',
   },
   {
-    customer: 'Voltaic Mobility',
+    customer: 'Stellantis',
     name: 'Giulia Ferrari',
     role: 'Head of Digital',
     emailLocal: 'giulia.ferrari',
@@ -375,36 +443,36 @@ interface TaskSpec {
 
 const TASKS: TaskSpec[] = [
   {
-    oppCode: 'ACME-26-001',
-    title: 'Finalize technical volume for Acme ERP',
+    oppCode: 'SIEM-26-001',
+    title: 'Finalize technical volume for Siemens ERP',
     status: 'in_progress',
     dueInDays: 5,
     assignee: 'SA',
   },
   {
-    oppCode: 'NORD-26-002',
-    title: 'Prepare pricing annex for Nordic',
+    oppCode: 'IKEA-26-002',
+    title: 'Prepare pricing annex for IKEA',
     status: 'open',
     dueInDays: 3,
     assignee: 'MB',
   },
   {
-    oppCode: 'MEDL-26-003',
-    title: 'Schedule discovery workshop with Medline CMIO',
+    oppCode: 'SNFI-26-003',
+    title: 'Schedule discovery workshop with Sanofi CMIO',
     status: 'open',
     dueInDays: 7,
     assignee: 'PN',
   },
   {
-    oppCode: 'LUMN-26-004',
-    title: 'Security questionnaire response — Lumen',
+    oppCode: 'HSBC-26-004',
+    title: 'Security questionnaire response — HSBC',
     status: 'in_progress',
     dueInDays: 4,
     assignee: 'SA',
   },
   {
-    oppCode: 'VOLT-26-005',
-    title: 'Kickoff handover to delivery — Voltaic',
+    oppCode: 'STLA-26-005',
+    title: 'Kickoff handover to delivery — Stellantis',
     status: 'done',
     dueInDays: -2,
     assignee: 'MB',
@@ -417,10 +485,25 @@ function eur(value: number): bigint {
   return BigInt(Math.round(value * 1_000_000));
 }
 
+/** EUR billions → micros (×1e6), via integer BigInt math to avoid float drift. */
+function revenueMicros(billions: number): bigint {
+  return BigInt(billions) * 1_000_000_000_000_000n;
+}
+
 function daysFromNow(days: number): Date {
   const d = new Date();
   d.setDate(d.getDate() + days);
   return d;
+}
+
+/** Mirrors the app's company normalization (worker + crm routes) so the cockpit
+ *  enrichment join + a live enrich refresh target the same row. */
+function normalizeName(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
 /** Grant a seeded org Role to a user (mirrors auth-helpers.ensureAdminRoleGrant). */
@@ -480,6 +563,63 @@ async function seedUsers(
   }
 
   return { byInitials, visitorId: visitor.id };
+}
+
+/** Company rows back the /accounts + /companies pages (employee count, logo…). */
+async function seedCompanies(prisma: PrismaClient, orgId: string): Promise<void> {
+  for (const c of COMPANIES) {
+    await prisma.company.create({
+      data: {
+        orgId,
+        name: c.name,
+        legalName: c.name,
+        domain: c.domain,
+        industry: c.industry,
+        employeeCount: c.employeeCount,
+        countryCode: c.country,
+        website: `https://${c.domain}/`,
+        logoUrl: `https://logo.clearbit.com/${c.domain}`,
+        source: 'verified_data',
+        confidence: 0.72,
+        enrichedAt: new Date(),
+      },
+    });
+  }
+}
+
+/** CompanyEnrichment rows back the CRM cockpit + are the target a live
+ *  /crm/companies/:id/enrich refresh overwrites with Apollo/open-data values. */
+async function seedCompanyEnrichments(prisma: PrismaClient, orgId: string): Promise<void> {
+  for (const c of COMPANIES) {
+    await prisma.companyEnrichment.create({
+      data: {
+        orgId,
+        normalizedName: normalizeName(c.name),
+        legalName: c.name,
+        tradeName: c.name,
+        domain: c.domain,
+        website: `https://${c.domain}/`,
+        logoUrl: `https://logo.clearbit.com/${c.domain}`,
+        logoSource: 'manual',
+        registryIds: {},
+        formerNames: [],
+        industryCodes: [c.industry],
+        status: 'active',
+        employeeCount: c.employeeCount,
+        annualRevenueMicros: revenueMicros(c.revenueBillions),
+        confidenceBps: 7200,
+        sourceAttribution: [
+          {
+            source: 'verified_data_source',
+            label: 'BidStack demo data (public approximation)',
+            confidence: 0.72,
+          },
+        ] as Prisma.InputJsonValue,
+        providerMetadata: {},
+        cacheExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      },
+    });
+  }
 }
 
 async function seedOpps(
@@ -616,6 +756,9 @@ export async function seedOrgData(
     const id = byInitials.get(t.initials);
     if (id) await grantRole(prisma, orgId, id, t.roleName);
   }
+
+  await seedCompanies(prisma, orgId);
+  await seedCompanyEnrichments(prisma, orgId);
 
   const oppByCode = await seedOpps(prisma, orgId, byInitials);
   await seedProposals(prisma, orgId, byInitials, oppByCode, visitorId);
