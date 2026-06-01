@@ -164,7 +164,11 @@ healthServer.on('error', (err: NodeJS.ErrnoException) => {
     );
     setTimeout(() => healthServer.listen(healthPort), 1000);
   } else {
-    log.error({ err }, 'health server error — continuing without health endpoint');
+    // Non-EADDRINUSE error, or the retry budget is exhausted. Running headless
+    // makes an external liveness probe kill the pod anyway, so exit non-zero and
+    // let the supervisor (or tsx-watch in dev) restart us cleanly.
+    log.error({ err }, 'health server error — exiting for a clean restart');
+    process.exit(1);
   }
 });
 

@@ -282,9 +282,11 @@ async function processJob(job: Job<JobData>, log: pino.Logger, memos: MemOSServi
 
   const { orgId, orchestrationId, requirementId, topK } = parsed.data;
 
-  // Verify requirement belongs to this org (uses existing Wave 1 Requirement model)
-  const requirement = await prisma.requirement.findUnique({
-    where: { id: requirementId, orgId },
+  // Verify requirement belongs to this org. findFirst (not findUnique) so the
+  // orgId is an explicit AND filter rather than relying on Prisma's
+  // extended-where-unique default — version-stable cross-tenant scoping.
+  const requirement = await prisma.requirement.findFirst({
+    where: { id: requirementId, orgId, deletedAt: null },
     select: { id: true, text: true, priority: true },
   });
   if (!requirement) {

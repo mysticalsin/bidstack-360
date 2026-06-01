@@ -49,6 +49,11 @@ export const DustExtractionResponse = z.object({
 
 // ─── Deterministic fallback ─────────────────────────────────────────────────
 
+// Cap the deterministic fallback: an RFP rarely has >50 atomic requirements and a
+// human reviews everything at the approval gate. Excess matched lines are dropped
+// on purpose — this is a no-AI floor (English, single-line), not a full extractor.
+const MAX_FALLBACK_REQUIREMENTS = 50;
+
 export function fallbackExtract(rawText: string): Array<z.infer<typeof ExtractedRequirement>> {
   // Deterministic, no-LLM extraction used when no AI provider is configured.
   // WHY strip the leading list marker FIRST: real RFPs number or bullet their
@@ -76,7 +81,7 @@ export function fallbackExtract(rawText: string): Array<z.infer<typeof Extracted
       seen.add(key);
       return true;
     })
-    .slice(0, 50)
+    .slice(0, MAX_FALLBACK_REQUIREMENTS)
     .map((text, i) => ({
       externalRef: `REQ-${String(i + 1).padStart(4, '0')}`,
       text: text.slice(0, 2000),
@@ -247,7 +252,9 @@ export async function markOrchestrationAwaitingApproval(
 // WHY no documentVersionId in the false-path log: existence of a Tier-D
 // document must not leak to log aggregators (information-disclosure risk).
 export async function isDocumentAiSafe(documentVersionId: string, orgId: string): Promise<boolean> {
-  const docVersion = await prisma.documentVersion.findUnique({
+  // findFirst (not findUnique) so orgId is an explicit AND filter — version-stable
+  // org-scoping rather than relying on Prisma's extended-where-unique default.
+  const docVersion = await prisma.documentVersion.findFirst({
     where: { id: documentVersionId, orgId },
     select: { bidDocumentId: true },
   });

@@ -6,11 +6,11 @@
 // Advances the orchestration to proposal_compile and chains the compile job.
 //
 // WHY sequential (not per-section): legal scan requires the full draft in
-// context â€” individual section scans would miss cross-section risk patterns.
+// context -- individual section scans would miss cross-section risk patterns.
 //
-// FAIL-OPEN: if DUST_API_KEY / DUST_WORKSPACE_ID are absent the worker writes
-// a "[Legal scan skipped â€” configure DUST_API_KEY.]" placeholder and
-// continues. Pipeline is never blocked by a missing Dust credential.
+// FAIL-OPEN: with no AI provider configured (RFP_LLM_PROVIDER or Dust) each role
+// returns a “[... review pending ...]” placeholder and the pipeline continues --
+// it is never blocked by a missing AI credential.
 
 import type { Queue, Worker, Job } from 'bullmq';
 import type IORedis from 'ioredis';

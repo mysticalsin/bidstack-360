@@ -81,7 +81,7 @@ export function RfpCrewCard({
           <button
             type="button"
             onClick={() => onSelect(member)}
-            className="block w-full truncate text-left text-sm font-semibold text-[var(--fg-primary)] focus-visible:outline-none focus-visible:underline"
+            className="block w-full truncate rounded-sm text-left text-sm font-semibold text-[var(--fg-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)]"
             aria-label={`${member.role} — view role details`}
           >
             {member.role}
