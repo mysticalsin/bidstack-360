@@ -134,26 +134,37 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const orgId = req.auth.orgId;
-      const rows = await prisma.proposal.findMany({
-        where: { orgId, deletedAt: null },
-        select: {
-          status: true,
-          ownerId: true,
-          opportunity: { select: { valueMicros: true } },
-        },
-      });
+      // Aggregate in SQL: COUNT + SUM(linked opportunity value) grouped by status
+      // and owner in one pass. A grouped $queryRaw (not a findMany) bypasses the dev
+      // query-guard's row cap and stays correct at any org size. Parameterized +
+      // org-scoped; status cast to text and the bigint sum to text for safe transport.
+      const rows = await prisma.$queryRaw<
+        Array<{ status: string; owner_id: string | null; cnt: number; val: string }>
+      >`
+        SELECT p.status::text AS status,
+               p.owner_id      AS owner_id,
+               COUNT(*)::int   AS cnt,
+               COALESCE(SUM(o.value_micros), 0)::text AS val
+        FROM proposals p
+        LEFT JOIN opportunities o ON o.id = p.opportunity_id
+        WHERE p.org_id = ${orgId}::uuid AND p.deleted_at IS NULL
+        GROUP BY p.status, p.owner_id
+      `;
 
       const statusCounts = new Map<string, number>();
       const ownerAgg = new Map<string, { count: number; value: bigint }>();
       let totalValue = BigInt(0);
+      let totalCount = 0;
       for (const r of rows) {
-        statusCounts.set(r.status, (statusCounts.get(r.status) ?? 0) + 1);
-        const v = r.opportunity?.valueMicros ?? BigInt(0);
-        totalValue += v;
-        const key = r.ownerId ?? '';
+        const cnt = Number(r.cnt);
+        const val = BigInt(r.val);
+        totalCount += cnt;
+        totalValue += val;
+        statusCounts.set(r.status, (statusCounts.get(r.status) ?? 0) + cnt);
+        const key = r.owner_id ?? '';
         const cur = ownerAgg.get(key) ?? { count: 0, value: BigInt(0) };
-        cur.count += 1;
-        cur.value += v;
+        cur.count += cnt;
+        cur.value += val;
         ownerAgg.set(key, cur);
       }
 
@@ -162,12 +173,13 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
         ? await prisma.user.findMany({
             where: { id: { in: ownerIds }, orgId, deletedAt: null },
             select: { id: true, name: true, email: true },
+            take: ownerIds.length, // bounded to the distinct owners we just collected
           })
         : [];
       const nameById = new Map(users.map((u) => [u.id, u.name ?? u.email]));
 
       return {
-        totalCount: rows.length,
+        totalCount,
         wonCount: statusCounts.get('won') ?? 0,
         lostCount: statusCounts.get('lost') ?? 0,
         totalValueMicros: totalValue.toString(),
