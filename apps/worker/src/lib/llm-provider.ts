@@ -49,6 +49,8 @@ export interface ChatInput {
  *       http://localhost:11434/v1, keyless — on-prem & private (best for NDA-Tier-D RFPs).
  *     • hosted: point GEMMA_BASE_URL at an OpenAI-compatible gateway
  *       (Vertex AI / OpenRouter / Groq / Together) + set GEMMA_API_KEY.
+ *   RFP_LLM_TIMEOUT_MS  per-call abort timeout (default 120000) — raise it for slow
+ *     local inference so big drafts complete instead of failing open to a placeholder.
  */
 export function resolveLlmFromEnv(env: NodeJS.ProcessEnv = process.env): ResolvedLlm | null {
   const kind = (env.RFP_LLM_PROVIDER ?? '').trim().toLowerCase();
@@ -110,7 +112,11 @@ export async function completeChat(llm: ResolvedLlm, input: ChatInput): Promise<
   // Bound every provider call: a hung provider must not pin a worker concurrency
   // slot forever (BullMQ keeps renewing the lock while we await fetch, so the job
   // is never declared stalled). On timeout fetch throws → caller's fail-open path.
-  const signal = AbortSignal.timeout(input.timeoutMs ?? 120_000);
+  // 120s default suits fast hosted APIs; raise RFP_LLM_TIMEOUT_MS for slow LOCAL
+  // inference (a full Markdown section on local Gemma can exceed 120s and would
+  // otherwise fail-open to a placeholder).
+  const defaultTimeoutMs = Number(process.env.RFP_LLM_TIMEOUT_MS) || 120_000;
+  const signal = AbortSignal.timeout(input.timeoutMs ?? defaultTimeoutMs);
   if (llm.kind === 'anthropic') {
     const res = await fetch(`${llm.baseUrl}/v1/messages`, {
       method: 'POST',
