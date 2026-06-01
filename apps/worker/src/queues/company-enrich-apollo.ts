@@ -43,7 +43,11 @@ const ApolloOrganization = z
     website_url: z.string().nullish(),
     industry: z.string().nullish(),
     estimated_num_employees: z.union([z.number(), z.string()]).nullish(),
+    // Apollo returns revenue under `annual_revenue` on some plans/endpoints and
+    // `organization_revenue` on others (verified live: bulk enrich returns the
+    // latter). Accept both so revenue is never silently dropped.
     annual_revenue: z.union([z.number(), z.string()]).nullish(),
+    organization_revenue: z.union([z.number(), z.string()]).nullish(),
     founded_year: z.union([z.number(), z.string()]).nullish(),
     logo_url: z.string().nullish(),
     organization_industries: z.array(z.string()).nullish(),
@@ -80,7 +84,7 @@ interface ApolloSignaturePayload {
  */
 export function mapApolloOrganization(org: ApolloOrganization): MappedEnrichment {
   const employees = coerceInt(org.estimated_num_employees);
-  const revenue = coerceNumber(org.annual_revenue);
+  const revenue = coerceNumber(org.annual_revenue ?? org.organization_revenue);
   const foundedYear = coerceInt(org.founded_year);
 
   return {

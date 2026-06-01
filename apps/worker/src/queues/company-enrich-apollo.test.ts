@@ -52,6 +52,30 @@ describe('mapApolloOrganization', () => {
     expect(mapped.incorporationDate?.getUTCFullYear()).toBe(1998);
   });
 
+  it('falls back to organization_revenue when annual_revenue is absent', () => {
+    // Apollo returns revenue under `organization_revenue` on some endpoints
+    // (verified live against the bulk enrich API) rather than `annual_revenue`.
+    // Without this fallback the worker captured employees but DROPPED revenue.
+    const mapped = mapApolloOrganization({
+      name: 'Demo Co',
+      estimated_num_employees: 500,
+      organization_revenue: 7_500_000,
+    });
+
+    expect(mapped.employeeCount).toBe(500);
+    expect(mapped.annualRevenueMicros).toBe(7_500_000_000_000n);
+  });
+
+  it('prefers annual_revenue over organization_revenue when both are present', () => {
+    const mapped = mapApolloOrganization({
+      name: 'Demo Co',
+      annual_revenue: 1_000_000,
+      organization_revenue: 9_999_999,
+    });
+
+    expect(mapped.annualRevenueMicros).toBe(1_000_000_000_000n);
+  });
+
   it('returns null fields when Apollo omits or nulls them', () => {
     const mapped = mapApolloOrganization({ name: null });
 
