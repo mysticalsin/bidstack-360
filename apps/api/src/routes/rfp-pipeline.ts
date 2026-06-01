@@ -57,6 +57,9 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
     '/opportunities/:opportunityId/rfp/upload',
     {
       config: { permission: 'documents:write' },
+      // config.permission is observability-only — enforce the gate with a real
+      // preHandler so a read-only org member can't start AI/Dust spend.
+      preHandler: server.requirePermission('documents:write'),
       // WHY bodyLimit override: global cap is 10 MiB; RFP documents can be up
       // to 50 MiB. Override here, not globally, to avoid widening attack surface.
       bodyLimit: RFP_MAX_BYTES,
@@ -245,6 +248,9 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
     '/bid-workspaces/:workspaceId/matrix/:rowId/rfp-autofill',
     {
       config: { permission: 'documents:write' },
+      // Enforce the gate (config.permission is observability-only): autofill
+      // writes AI content to compliance rows, so require documents:write.
+      preHandler: server.requirePermission('documents:write'),
       schema: {
         params: AutofillParams,
         body: AutofillBody,

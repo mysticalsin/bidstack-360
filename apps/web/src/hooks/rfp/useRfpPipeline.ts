@@ -95,11 +95,18 @@ function deriveProgress(frame: ServerSseFrame, stage: PipelineEvent['stage']): n
   return frame.progress ?? undefined;
 }
 
-export function useRfpPipeline(
-  workspaceId: string | null,
-  orchestrationId: string | null,
-  _opportunityId?: string,
-): void {
+// Stages after which the server ends the SSE response — close client-side too so
+// EventSource doesn't keep reconnecting to a finished stream. awaiting_approval is
+// NOT terminal: the human gate keeps streaming until approved/rejected.
+const TERMINAL_STAGES = new Set<PipelineEvent['stage']>([
+  'completed',
+  'failed',
+  'rejected',
+  'approved',
+  'timeout',
+]);
+
+export function useRfpPipeline(workspaceId: string | null, orchestrationId: string | null): void {
   const applyEvent = useRfpPipelineStore((s) => s.applyEvent);
   const esRef = useRef<EventSource | null>(null);
 
@@ -131,6 +138,13 @@ export function useRfpPipeline(
         };
 
         applyEvent(event);
+
+        // Terminal frame: close so EventSource doesn't keep reconnecting to a
+        // stream the server has already ended.
+        if (TERMINAL_STAGES.has(stage)) {
+          es.close();
+          esRef.current = null;
+        }
       } catch {
         // Malformed SSE data — discard silently.
         // WHY: SSE events are best-effort; a malformed frame should not break the stream.
@@ -138,8 +152,8 @@ export function useRfpPipeline(
     };
 
     es.onerror = () => {
-      // EventSource auto-reconnects on transient network errors.
-      // Only close explicitly on a terminal stage (handled via store subscriber).
+      // EventSource auto-reconnects on transient network errors; terminal frames
+      // are closed in onmessage above, so there's nothing to do here.
     };
 
     return () => {

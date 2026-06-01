@@ -75,6 +75,7 @@ export const rfpPipelineStreamRoutes: FastifyPluginAsyncZod = async (server) => 
         'Cache-Control': 'no-cache',
         Connection: 'keep-alive',
         'Access-Control-Allow-Origin': allowedOrigin,
+        Vary: 'Origin', // don't let a shared cache serve this ACAO to another origin
         'X-Accel-Buffering': 'no', // disable Nginx buffering for SSE
       });
 

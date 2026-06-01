@@ -60,6 +60,19 @@ function inferRfpContentType(file: File): FileUploadUrlRequest['contentType'] {
   return contentType;
 }
 
+// crypto.randomUUID is only defined in secure contexts (HTTPS/localhost) — on a
+// plain-HTTP host it throws, turning a finished upload into a generic failure.
+// rfpRequestId only needs to be unique per upload (not unguessable), so fall back
+// to a non-crypto v4 when randomUUID is unavailable.
+function newRequestId(): string {
+  const c = globalThis.crypto;
+  if (c && typeof c.randomUUID === 'function') return c.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (ch) => {
+    const r = (Math.random() * 16) | 0;
+    return (ch === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
 /** PUT the raw bytes to storage with byte-level progress. Resolves on 2xx. */
 function putBytesWithProgress(
   uploadUrl: string,
@@ -158,7 +171,7 @@ async function runUpload(file: File, opportunityId: string, actions: UploadActio
     // recent proposal, so multiple runs per opportunity resolve to the latest.
     const result = await api<UploadResult>(`/api/v1/opportunities/${opportunityId}/rfp/upload`, {
       method: 'POST',
-      body: { fileAttachmentId: finalized.id, rfpRequestId: crypto.randomUUID() },
+      body: { fileAttachmentId: finalized.id, rfpRequestId: newRequestId() },
     });
 
     setUpload({ isUploading: false, uploadProgress: 100 });
