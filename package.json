@@ -19,7 +19,7 @@
     "build": "pnpm -r --stream build",
     "lint": "pnpm -r --stream lint",
     "typecheck": "pnpm db:generate && pnpm --filter @bidstack/shared build && pnpm --filter @bidstack/dust-client build && pnpm --filter @bidstack/odoo-mcp-client build && pnpm -r --stream typecheck",
-    "test": "pnpm --filter @bidstack/shared build && pnpm --filter @bidstack/dust-client build && pnpm --filter @bidstack/odoo-mcp-client build && pnpm -r --stream test",
+    "test": "pnpm --filter @bidstack/shared build && pnpm --filter @bidstack/dust-client build && pnpm --filter @bidstack/odoo-mcp-client build && node scripts/run-worker-tests.mjs && pnpm -r --filter \"!@bidstack/worker\" --workspace-concurrency=1 --stream test",
     "test:watch": "pnpm -r --parallel --stream test:watch",
     "e2e": "pnpm --filter @bidstack/web e2e",
     "load-test": "k6 run scripts/load-test.js",
@@ -31,6 +31,7 @@
     "db:migrate": "pnpm --filter @bidstack/db migrate",
     "db:migrate:deploy": "pnpm --filter @bidstack/db migrate:deploy",
     "db:seed": "pnpm --filter @bidstack/db seed",
+    "db:seed:demo": "pnpm --filter @bidstack/db seed:demo",
     "db:reset": "pnpm --filter @bidstack/db reset",
     "db:studio": "pnpm --filter @bidstack/db studio",
     "clean": "pnpm -r exec rimraf dist build .turbo .vite",
@@ -74,7 +75,8 @@
       "d3-color@<3.1.0": ">=3.1.0",
       "js-cookie": "3.0.7",
       "tar": "7.5.11",
-      "@xmldom/xmldom": "0.8.13"
+      "@xmldom/xmldom": "0.8.13",
+      "tmp": "0.2.6"
     }
   }
 }

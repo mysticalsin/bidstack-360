@@ -88,6 +88,7 @@ export default tseslint.config(
       'load-tests/**', // k6 load-test scripts — not Node.js, use k6 globals
       'scripts/**', // one-off ops scripts — console is intentional there
       'scratch/**', // local scratch scripts (gitignored)
+      'apps/*/_*.mjs', // local workspace probes (gitignored)
       '.claire/**', // ephemeral agent worktrees
       '.clone/**', // ephemeral agent worktrees
       '.swarm_state/**', // agent swarm output directory
@@ -186,6 +187,7 @@ export default tseslint.config(
       'apps/marketing/scripts/**/*.mjs',
       'packages/db/src/seed.ts',
       'packages/db/src/seed.rbac.ts',
+      'packages/db/src/seed-demo.ts',
     ],
     rules: {
       'no-console': 'off',

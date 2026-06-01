@@ -16,6 +16,7 @@
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "seed": "tsx src/seed.ts",
+    "seed:demo": "tsx src/seed-demo.ts",
     "reset": "prisma migrate reset --force",
     "studio": "prisma studio",
     "build": "tsc -p tsconfig.json",

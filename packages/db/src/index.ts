@@ -112,3 +112,8 @@ export {
   IntegrationProvider,
   EmailProvider,
 } from '../generated/client/index.js';
+
+// Curated multi-tenant demo seeding — shared by the `db:seed:demo` CLI and the
+// runtime demo sign-in door, which populates a fresh per-visitor org on sign-in.
+export { seedOrgData } from './seed-org-data.js';
+export type { SeedOrgDataOptions } from './seed-org-data.js';
