@@ -48,6 +48,30 @@ describe('resolveLlmFromEnv', () => {
       baseUrl: 'https://api.moonshot.ai/v1',
     });
   });
+
+  it('resolves gemma LOCALLY and keyless by default (open weights via Ollama)', () => {
+    expect(resolveLlmFromEnv({ RFP_LLM_PROVIDER: 'gemma' })).toMatchObject({
+      kind: 'gemma',
+      apiKey: 'local',
+      baseUrl: 'http://localhost:11434/v1',
+    });
+  });
+
+  it('resolves gemma against a hosted gateway when GEMMA_BASE_URL + key are set', () => {
+    expect(
+      resolveLlmFromEnv({
+        RFP_LLM_PROVIDER: 'gemma',
+        GEMMA_API_KEY: 'k',
+        GEMMA_MODEL: 'gemma4',
+        GEMMA_BASE_URL: 'https://openrouter.ai/api/v1',
+      }),
+    ).toMatchObject({
+      kind: 'gemma',
+      apiKey: 'k',
+      model: 'gemma4',
+      baseUrl: 'https://openrouter.ai/api/v1',
+    });
+  });
 });
 
 describe('coerceJsonObject', () => {

@@ -14,7 +14,7 @@
 // OpenAI / Anthropic SDKs into the worker bundle. OpenAI and Moonshot share the
 // OpenAI-compatible /chat/completions shape; Anthropic uses /v1/messages.
 
-export type LlmProviderKind = 'openai' | 'anthropic' | 'moonshot';
+export type LlmProviderKind = 'openai' | 'anthropic' | 'moonshot' | 'gemma';
 
 export interface ResolvedLlm {
   kind: LlmProviderKind;
@@ -44,6 +44,11 @@ export interface ChatInput {
  *   RFP_LLM_PROVIDER=openai     OPENAI_API_KEY=…     [OPENAI_MODEL, OPENAI_BASE_URL]
  *   RFP_LLM_PROVIDER=anthropic  ANTHROPIC_API_KEY=…  [ANTHROPIC_MODEL, ANTHROPIC_BASE_URL]
  *   RFP_LLM_PROVIDER=moonshot   MOONSHOT_API_KEY=…   [MOONSHOT_MODEL, MOONSHOT_BASE_URL]   (Kimi; alias: RFP_LLM_PROVIDER=kimi)
+ *   RFP_LLM_PROVIDER=gemma      (no key for local)   [GEMMA_MODEL, GEMMA_BASE_URL, GEMMA_API_KEY]
+ *     • local (default): open-weights Gemma via Ollama/vLLM/LM Studio at
+ *       http://localhost:11434/v1, keyless — on-prem & private (best for NDA-Tier-D RFPs).
+ *     • hosted: point GEMMA_BASE_URL at an OpenAI-compatible gateway
+ *       (Vertex AI / OpenRouter / Groq / Together) + set GEMMA_API_KEY.
  */
 export function resolveLlmFromEnv(env: NodeJS.ProcessEnv = process.env): ResolvedLlm | null {
   const kind = (env.RFP_LLM_PROVIDER ?? '').trim().toLowerCase();
@@ -70,6 +75,17 @@ export function resolveLlmFromEnv(env: NodeJS.ProcessEnv = process.env): Resolve
       apiKey: env.MOONSHOT_API_KEY,
       model: env.MOONSHOT_MODEL ?? 'moonshot-v1-32k',
       baseUrl: (env.MOONSHOT_BASE_URL ?? 'https://api.moonshot.ai/v1').replace(/\/$/, ''),
+    };
+  }
+  // Gemma is open-weights, so unlike the others it resolves WITHOUT a key:
+  // local servers (Ollama/vLLM/LM Studio) are keyless. Defaults to a local Ollama
+  // endpoint; set GEMMA_BASE_URL (+ GEMMA_API_KEY) to use a hosted gateway instead.
+  if (kind === 'gemma') {
+    return {
+      kind: 'gemma',
+      apiKey: env.GEMMA_API_KEY ?? 'local', // placeholder — local servers ignore the bearer token
+      model: env.GEMMA_MODEL ?? 'gemma3',
+      baseUrl: (env.GEMMA_BASE_URL ?? 'http://localhost:11434/v1').replace(/\/$/, ''),
     };
   }
   return null;
