@@ -45,12 +45,10 @@ ENV PATH=$PNPM_HOME:$PATH
 # sidecar. Omitting these only degrades OCR + predictive scoring; Apollo
 # enrichment + the core RFP pipeline run on Node alone.
 RUN apk add --no-cache curl ghostscript ocrmypdf openssl qpdf tesseract-ocr tesseract-ocr-data-eng python3 py3-pip
-COPY --from=builder /app/apps/worker/python/requirements.txt /tmp/worker-py-reqs.txt
-RUN python3 -m venv /opt/python-venv \
- && /opt/python-venv/bin/pip install --no-cache-dir -r /tmp/worker-py-reqs.txt \
- && rm /tmp/worker-py-reqs.txt
-ENV PATH="/opt/python-venv/bin:$PATH"
-ENV PREDICTIVE_PYTHON_BIN=/opt/python-venv/bin/python3
+# Predictive (XGBoost) scoring sidecar omitted for the demo: xgboost has no musl
+# wheel and building from source needs cmake/g++. The worker degrades gracefully
+# when PREDICTIVE_PYTHON_BIN is unset — Apollo enrichment + the RFP pipeline run
+# on Node. OCR tools above stay for document parsing.
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 WORKDIR /app
 # Ship the builder's fully-resolved workspace wholesale — see apps/api/Dockerfile
