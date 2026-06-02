@@ -36,33 +36,23 @@ RUN pnpm --filter @bidstack/shared build \
  && pnpm --filter @bidstack/api build
 
 # ─── Runtime ──────────────────────────────────────────────────────────────────
+# Ship the builder's fully-resolved workspace wholesale (node_modules with all
+# pnpm symlinks + every dist + generated Prisma client). A fresh `--prod`
+# install pruned hoisted/undeclared deps (e.g. pino) that the compiled bundle
+# resolves at runtime, crashing the boot. Copying the proven tree eliminates
+# that whole class of failure. Larger image, but image size is not a concern
+# for the demo. Runs as root — acceptable for an isolated demo container.
 FROM node:${NODE_VERSION} AS runtime
 ENV NODE_ENV=production
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 WORKDIR /app
-COPY --from=builder /app/pnpm-workspace.yaml /app/package.json /app/pnpm-lock.yaml ./
-COPY --from=builder /app/apps/api/package.json ./apps/api/
-COPY --from=builder /app/packages/db/package.json ./packages/db/
-COPY --from=builder /app/packages/shared/package.json ./packages/shared/
-COPY --from=builder /app/packages/dust-client/package.json ./packages/dust-client/
-COPY --from=builder /app/packages/memos/package.json ./packages/memos/
-COPY --from=builder /app/packages/odoo-mcp-client/package.json ./packages/odoo-mcp-client/
-RUN pnpm install --no-frozen-lockfile --prod
-COPY --from=builder /app/apps/api/dist ./apps/api/dist
-COPY --from=builder /app/packages/db/dist ./packages/db/dist
-COPY --from=builder /app/packages/db/generated ./packages/db/generated
-COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
-COPY --from=builder /app/packages/dust-client/dist ./packages/dust-client/dist
-COPY --from=builder /app/packages/memos/dist ./packages/memos/dist
-COPY --from=builder /app/packages/odoo-mcp-client/dist ./packages/odoo-mcp-client/dist
-COPY --from=builder /app/packages/db/prisma ./packages/db/prisma
+COPY --from=builder /app ./
 WORKDIR /app/apps/api
-RUN addgroup -S bidstack && adduser -S -G bidstack bidstack && chown -R bidstack:bidstack /app
-USER bidstack
 EXPOSE 4000
-# Apply pending migrations (idempotent) then boot. Only the API runs migrations.
-# Uses npx prisma (devDep is absent in --prod) → fall back to the workspace bin
-# if present; migrations are also runnable out-of-band (see DEPLOY.md).
-CMD ["node", "dist/main.js"]
+# Apply pending Prisma migrations against Railway's private Postgres (reachable
+# only from inside the container) then boot. `migrate deploy` is idempotent —
+# it applies only unapplied migrations, so it's safe on every restart. The
+# Prisma CLI is present because the runtime ships the builder's full deps.
+CMD ["sh", "-c", "pnpm --filter @bidstack/db migrate:deploy && node dist/main.js"]

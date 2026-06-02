@@ -51,24 +51,9 @@ ENV PATH="/opt/python-venv/bin:$PATH"
 ENV PREDICTIVE_PYTHON_BIN=/opt/python-venv/bin/python3
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 WORKDIR /app
-COPY --from=builder /app/pnpm-workspace.yaml /app/package.json /app/pnpm-lock.yaml ./
-COPY --from=builder /app/apps/worker/package.json ./apps/worker/
-COPY --from=builder /app/packages/db/package.json ./packages/db/
-COPY --from=builder /app/packages/shared/package.json ./packages/shared/
-COPY --from=builder /app/packages/dust-client/package.json ./packages/dust-client/
-COPY --from=builder /app/packages/odoo-mcp-client/package.json ./packages/odoo-mcp-client/
-COPY --from=builder /app/packages/memos/package.json ./packages/memos/
-RUN pnpm install --no-frozen-lockfile --prod
-COPY --from=builder /app/apps/worker/dist ./apps/worker/dist
-COPY --from=builder /app/packages/db/dist ./packages/db/dist
-COPY --from=builder /app/packages/db/generated ./packages/db/generated
-COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
-COPY --from=builder /app/packages/dust-client/dist ./packages/dust-client/dist
-COPY --from=builder /app/packages/odoo-mcp-client/dist ./packages/odoo-mcp-client/dist
-COPY --from=builder /app/packages/memos/dist ./packages/memos/dist
-COPY --from=builder /app/apps/worker/python ./apps/worker/python
+# Ship the builder's fully-resolved workspace wholesale — see apps/api/Dockerfile
+# for the rationale (a --prod install prunes hoisted deps the bundle needs).
+COPY --from=builder /app ./
 WORKDIR /app/apps/worker
-RUN addgroup -S bidstack && adduser -S -G bidstack bidstack && chown -R bidstack:bidstack /app
-USER bidstack
 EXPOSE 4002
 CMD ["node", "dist/main.js"]
