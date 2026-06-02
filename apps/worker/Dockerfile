@@ -27,8 +27,8 @@ RUN pnpm install --no-frozen-lockfile
 FROM base AS builder
 COPY . .
 RUN pnpm db:generate
-RUN pnpm --filter @bidstack/db build \
- && pnpm --filter @bidstack/shared build \
+RUN pnpm --filter @bidstack/shared build \
+ && pnpm --filter @bidstack/db build \
  && pnpm --filter @bidstack/dust-client build \
  && pnpm --filter @bidstack/memos build \
  && pnpm --filter @bidstack/odoo-mcp-client build \
