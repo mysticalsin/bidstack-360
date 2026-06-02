@@ -308,7 +308,7 @@ const CONTACTS: ContactSpec[] = [
     role: 'VP Operations',
     emailLocal: 'klaus.vogt',
     phone: '+49 30 1234 5670',
-    influence: 90,
+    influence: 5,
     sentiment: 'hot',
   },
   {
@@ -317,7 +317,7 @@ const CONTACTS: ContactSpec[] = [
     role: 'IT Director',
     emailLocal: 'lena.fischer',
     phone: '+49 30 1234 5671',
-    influence: 70,
+    influence: 4,
     sentiment: 'warm',
   },
   {
@@ -326,7 +326,7 @@ const CONTACTS: ContactSpec[] = [
     role: 'CFO',
     emailLocal: 'erik.lindqvist',
     phone: '+46 8 555 0102',
-    influence: 85,
+    influence: 4,
     sentiment: 'warm',
   },
   {
@@ -335,7 +335,7 @@ const CONTACTS: ContactSpec[] = [
     role: 'Chief Medical Information Officer',
     emailLocal: 'camille.rousseau',
     phone: '+33 1 4455 6677',
-    influence: 95,
+    influence: 5,
     sentiment: 'hot',
   },
   {
@@ -344,7 +344,7 @@ const CONTACTS: ContactSpec[] = [
     role: 'CISO',
     emailLocal: 'james.whitfield',
     phone: '+44 20 7946 0102',
-    influence: 80,
+    influence: 4,
     sentiment: 'neutral',
   },
   {
@@ -353,7 +353,7 @@ const CONTACTS: ContactSpec[] = [
     role: 'Head of Digital',
     emailLocal: 'giulia.ferrari',
     phone: '+39 02 1234 567',
-    influence: 88,
+    influence: 5,
     sentiment: 'hot',
   },
 ];
