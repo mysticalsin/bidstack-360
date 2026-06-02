@@ -22,7 +22,7 @@ COPY packages/shared/package.json ./packages/shared/
 COPY packages/dust-client/package.json ./packages/dust-client/
 COPY packages/memos/package.json ./packages/memos/
 COPY packages/odoo-mcp-client/package.json ./packages/odoo-mcp-client/
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --no-frozen-lockfile
 
 # ─── Builder ──────────────────────────────────────────────────────────────────
 FROM base AS builder
@@ -49,7 +49,7 @@ COPY --from=builder /app/packages/shared/package.json ./packages/shared/
 COPY --from=builder /app/packages/dust-client/package.json ./packages/dust-client/
 COPY --from=builder /app/packages/memos/package.json ./packages/memos/
 COPY --from=builder /app/packages/odoo-mcp-client/package.json ./packages/odoo-mcp-client/
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile --prod
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --no-frozen-lockfile --prod
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/packages/db/dist ./packages/db/dist
 COPY --from=builder /app/packages/db/generated ./packages/db/generated
