@@ -10,6 +10,8 @@ FROM node:${NODE_VERSION} AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+# Prisma's query/schema engines dynamically link libssl; node:alpine ships none.
+RUN apk add --no-cache openssl
 WORKDIR /app
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml .npmrc* ./
 COPY apps/api/package.json ./apps/api/
@@ -42,7 +44,7 @@ ENV PATH=$PNPM_HOME:$PATH
 # OCR pipeline (ocrmypdf/tesseract/ghostscript) + Python for the XGBoost scoring
 # sidecar. Omitting these only degrades OCR + predictive scoring; Apollo
 # enrichment + the core RFP pipeline run on Node alone.
-RUN apk add --no-cache curl ghostscript ocrmypdf qpdf tesseract-ocr tesseract-ocr-data-eng python3 py3-pip
+RUN apk add --no-cache curl ghostscript ocrmypdf openssl qpdf tesseract-ocr tesseract-ocr-data-eng python3 py3-pip
 COPY --from=builder /app/apps/worker/python/requirements.txt /tmp/worker-py-reqs.txt
 RUN python3 -m venv /opt/python-venv \
  && /opt/python-venv/bin/pip install --no-cache-dir -r /tmp/worker-py-reqs.txt \

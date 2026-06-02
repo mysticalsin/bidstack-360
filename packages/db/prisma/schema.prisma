@@ -5,6 +5,9 @@
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
+  // Alpine runtime is musl + OpenSSL 3; ship that engine alongside native so
+  // both `prisma generate` (build) and migrate/query (runtime) resolve libssl.
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
   output          = "../generated/client"
 }
 

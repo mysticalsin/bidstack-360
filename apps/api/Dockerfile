@@ -11,6 +11,8 @@ FROM node:${NODE_VERSION} AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+# Prisma's query/schema engines dynamically link libssl; node:alpine ships none.
+RUN apk add --no-cache openssl
 WORKDIR /app
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml .npmrc* ./
 COPY apps/api/package.json ./apps/api/
@@ -47,6 +49,7 @@ ENV NODE_ENV=production
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+RUN apk add --no-cache openssl
 WORKDIR /app
 COPY --from=builder /app ./
 WORKDIR /app/apps/api
