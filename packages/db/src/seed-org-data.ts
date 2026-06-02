@@ -155,7 +155,7 @@ interface OppSpec {
 
 const OPPS: OppSpec[] = [
   {
-    code: 'SIEM-26-001',
+    code: 'OP-0001',
     customer: 'Siemens',
     name: 'Global ERP Modernization',
     stage: 's3_technical_iteration',
@@ -166,7 +166,7 @@ const OPPS: OppSpec[] = [
     probability: 60,
   },
   {
-    code: 'IKEA-26-002',
+    code: 'OP-0002',
     customer: 'IKEA',
     name: 'Cloud Migration & FinOps',
     stage: 's4_negotiation',
@@ -177,7 +177,7 @@ const OPPS: OppSpec[] = [
     probability: 75,
   },
   {
-    code: 'SNFI-26-003',
+    code: 'OP-0003',
     customer: 'Sanofi',
     name: 'Patient Data Platform',
     stage: 's2_sent',
@@ -188,7 +188,7 @@ const OPPS: OppSpec[] = [
     probability: 40,
   },
   {
-    code: 'HSBC-26-004',
+    code: 'OP-0004',
     customer: 'HSBC',
     name: 'Cybersecurity Transformation',
     stage: 's1_ongoing',
@@ -199,7 +199,7 @@ const OPPS: OppSpec[] = [
     probability: 25,
   },
   {
-    code: 'STLA-26-005',
+    code: 'OP-0005',
     customer: 'Stellantis',
     name: 'EV Fleet Telematics',
     stage: 'closed_won',
@@ -210,7 +210,7 @@ const OPPS: OppSpec[] = [
     probability: 100,
   },
   {
-    code: 'SPOT-26-006',
+    code: 'OP-0006',
     customer: 'Spotify',
     name: 'Data Lakehouse Build',
     stage: 'closed_lost',
@@ -237,21 +237,21 @@ interface PropSpec {
 // by-owner breakdown rather than an empty rollup.
 const PROPOSALS: PropSpec[] = [
   {
-    oppCode: 'SIEM-26-001',
+    oppCode: 'OP-0001',
     name: 'Siemens ERP — Technical Proposal',
     status: 'review',
     owner: 'SA',
     complianceScore: 82,
   },
   {
-    oppCode: 'SIEM-26-001',
+    oppCode: 'OP-0001',
     name: 'Siemens ERP — Executive Summary',
     status: 'draft',
     owner: 'SA',
     complianceScore: null,
   },
   {
-    oppCode: 'IKEA-26-002',
+    oppCode: 'OP-0002',
     name: 'IKEA Cloud Migration — Final Bid',
     status: 'approved',
     owner: 'MB',
@@ -259,21 +259,21 @@ const PROPOSALS: PropSpec[] = [
     approved: true,
   },
   {
-    oppCode: 'SNFI-26-003',
+    oppCode: 'OP-0003',
     name: 'Sanofi Patient Platform — Draft',
     status: 'draft',
     owner: 'PN',
     complianceScore: null,
   },
   {
-    oppCode: 'HSBC-26-004',
+    oppCode: 'OP-0004',
     name: 'HSBC Cyber — Discovery Response',
     status: 'submitted',
     owner: 'SA',
     complianceScore: 70,
   },
   {
-    oppCode: 'STLA-26-005',
+    oppCode: 'OP-0005',
     name: 'Stellantis Telematics — Winning Bid',
     status: 'won',
     owner: 'MB',
@@ -281,7 +281,7 @@ const PROPOSALS: PropSpec[] = [
     approved: true,
   },
   {
-    oppCode: 'SPOT-26-006',
+    oppCode: 'OP-0006',
     name: 'Spotify Lakehouse — Submitted Bid',
     status: 'lost',
     owner: 'PN',
@@ -443,35 +443,35 @@ interface TaskSpec {
 
 const TASKS: TaskSpec[] = [
   {
-    oppCode: 'SIEM-26-001',
+    oppCode: 'OP-0001',
     title: 'Finalize technical volume for Siemens ERP',
     status: 'in_progress',
     dueInDays: 5,
     assignee: 'SA',
   },
   {
-    oppCode: 'IKEA-26-002',
+    oppCode: 'OP-0002',
     title: 'Prepare pricing annex for IKEA',
     status: 'open',
     dueInDays: 3,
     assignee: 'MB',
   },
   {
-    oppCode: 'SNFI-26-003',
+    oppCode: 'OP-0003',
     title: 'Schedule discovery workshop with Sanofi CMIO',
     status: 'open',
     dueInDays: 7,
     assignee: 'PN',
   },
   {
-    oppCode: 'HSBC-26-004',
+    oppCode: 'OP-0004',
     title: 'Security questionnaire response — HSBC',
     status: 'in_progress',
     dueInDays: 4,
     assignee: 'SA',
   },
   {
-    oppCode: 'STLA-26-005',
+    oppCode: 'OP-0005',
     title: 'Kickoff handover to delivery — Stellantis',
     status: 'done',
     dueInDays: -2,
