@@ -20,5 +20,16 @@
     "isolatedModules": true,
     "incremental": true
   },
-  "exclude": ["node_modules", "dist", "build", ".vite", "**/generated/**"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    ".vite",
+    "**/generated/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "**/*.test-helpers.ts"
+  ]
 }
