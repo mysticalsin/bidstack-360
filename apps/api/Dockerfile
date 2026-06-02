@@ -29,6 +29,8 @@ FROM base AS builder
 COPY . .
 RUN pnpm db:generate
 RUN pnpm --filter @bidstack/shared build \
+ && echo "DIAG shared/dist/crypto:" && ls -la packages/shared/dist/crypto/ \
+ && echo "DIAG shared symlink:" && ls -la node_modules/@bidstack/shared \
  && pnpm --filter @bidstack/db build \
  && pnpm --filter @bidstack/dust-client build \
  && pnpm --filter @bidstack/memos build \
