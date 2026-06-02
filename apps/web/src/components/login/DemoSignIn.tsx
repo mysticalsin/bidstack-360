@@ -129,7 +129,7 @@ export function DemoSignIn() {
               transition={{ duration: 0.6, delay: 0.1 }}
               className="mb-8 max-w-xl text-base leading-relaxed text-[#4a5266] md:text-lg"
             >
-              Step inside a working bid &amp; presales CRM — real accounts, live pipeline, and an
+              Step inside a working bid &amp; presales CRM with real accounts, live pipeline, and an
               RFP response engine. Enter your email to open a private workspace.
             </motion.p>
 
