@@ -35,7 +35,7 @@
     "db:reset": "pnpm --filter @bidstack/db reset",
     "db:studio": "pnpm --filter @bidstack/db studio",
     "clean": "pnpm -r exec rimraf dist build .turbo .vite",
-    "prepare": "husky",
+    "prepare": "husky || true",
     "merge:status": "node scripts/merge/merge-status.mjs",
     "merge:predict": "node scripts/merge/predict-conflicts.mjs",
     "merge:next": "bash scripts/merge/merge-next.sh",
