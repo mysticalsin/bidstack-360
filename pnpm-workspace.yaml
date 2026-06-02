@@ -1,5 +1,5 @@
 packages:
-  # apps/* covers api, web, worker, mcp-server, marketing, and mobile (Wave 7)
+  # apps/* covers api, web, worker, mcp-server, and marketing.
   - 'apps/*'
   - 'packages/*'
   # twenty-bidstack is preserved verbatim from the handoff zip as a future
@@ -7,3 +7,7 @@ packages:
   # only resolve when this package is dropped into the upstream Twenty fork
   # at packages/twenty-bidstack. Excluded from the standalone workspace.
   - '!packages/twenty-bidstack'
+  # apps/mobile is an Expo/React Native app whose deps aren't part of the web /
+  # api / worker deploy; its specifiers were never lockfile-synced, which broke
+  # frozen installs on Railway + Vercel. Excluded from the standalone workspace.
+  - '!apps/mobile'
