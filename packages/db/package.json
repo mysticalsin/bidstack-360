@@ -30,6 +30,7 @@
     "seed": "tsx src/seed.ts"
   },
   "dependencies": {
+    "@bidstack/shared": "workspace:*",
     "@prisma/client": "^5.22.0",
     "dotenv-flow": "^4.1.0"
   },
