@@ -120,7 +120,10 @@ export function getEnv(): Env {
   }
   const env = parsed.data;
   const semanticErrors: string[] = [];
-  if (env.NODE_ENV === 'production' && env.STORAGE_DRIVER !== 's3') {
+  // Production normally requires S3 object storage. The public demo runs without
+  // an S3 bucket and its data is ephemeral by design, so demo mode may use local
+  // disk storage (lost on restart — acceptable for a throwaway demo).
+  if (env.NODE_ENV === 'production' && env.STORAGE_DRIVER !== 's3' && env.DEMO_MODE !== 'true') {
     semanticErrors.push('STORAGE_DRIVER=s3 is required in production');
   }
   if (env.STORAGE_DRIVER === 's3' && !env.S3_BUCKET) {
