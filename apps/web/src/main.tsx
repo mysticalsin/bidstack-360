@@ -83,9 +83,7 @@ watchAuthForCacheClear(queryClient);
 
 window.addEventListener('unhandledrejection', (event) => {
   if (import.meta.env.DEV) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('[unhandledrejection]', event.reason);
-    }
+    console.error('[unhandledrejection]', event.reason);
   }
   Sentry.captureException(event.reason);
 });

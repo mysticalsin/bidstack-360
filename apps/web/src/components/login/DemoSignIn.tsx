@@ -1,13 +1,18 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, useReducedMotion } from 'motion/react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 
 import { api, ApiError } from '@/lib/api';
 import { DEMO_TOKEN_KEY, DEMO_EMAIL_KEY, useSignInAction } from '@/lib/auth';
 
 /**
- * Demo sign-in card (VITE_AUTH_MODE=demo). Passwordless: POST an email to
- * /api/v1/demo/session, store the returned signed Bearer token, then flip auth
- * state and enter the app. Each email gets its own freshly-seeded workspace.
+ * Demo sign-in (VITE_AUTH_MODE=demo) rendered as the full branded login.
+ *
+ * Same cinematic background as the production Hero, but the SSO buttons are
+ * swapped for the passwordless flow: POST an email to /api/v1/demo/session,
+ * store the signed Bearer token, then enter the app. Each email gets its own
+ * freshly-seeded workspace.
  */
 interface DemoSessionResponse {
   token: string;
@@ -15,9 +20,15 @@ interface DemoSessionResponse {
   orgId: string;
 }
 
+// Mirrors the production Hero background.
+const VIDEO_URL =
+  'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260428_193507_4286c423-2fd9-4efd-92bd-91a939453fc1.mp4';
+const LINKEDIN_URL = 'https://www.linkedin.com/in/tonywalteur/';
+
 export function DemoSignIn() {
   const navigate = useNavigate();
   const { signIn } = useSignInAction();
+  const reduceMotion = useReducedMotion();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,62 +57,146 @@ export function DemoSignIn() {
     }
   }
 
+  const fade = reduceMotion
+    ? {}
+    : { initial: { opacity: 0, y: 16 }, animate: { opacity: 1, y: 0 } };
+
   return (
-    <div className="relative z-[100] flex min-h-screen items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-2xl border border-white/40 bg-white/80 p-8 shadow-xl backdrop-blur-xl">
-        <div className="mb-6 text-center">
-          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--brand-primary)]">
-            Live demo
-          </p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
-            Explore BidStack 360°
-          </h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Enter any email to get your own private demo workspace — no password, no signup.
-          </p>
-        </div>
+    <div className="flex h-dvh w-full items-center justify-center bg-[#f0f0f0]">
+      <section className="relative flex h-full w-full flex-col overflow-hidden">
+        {/* Cinematic background */}
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          className="absolute inset-0 z-0 h-full w-full object-cover object-[65%] lg:object-center"
+        >
+          <source src={VIDEO_URL} type="video/mp4" />
+        </video>
+        {/* Legibility scrim — keeps text/controls AA-contrast over any video frame */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 z-[1] bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.62),rgba(255,255,255,0.22)_58%,rgba(255,255,255,0.12))]"
+        />
 
-        <form onSubmit={onSubmit} className="space-y-4" noValidate>
-          <div>
-            <label htmlFor="demo-email" className="block text-sm font-medium text-slate-700">
-              Email
-            </label>
-            <input
-              id="demo-email"
-              type="email"
-              required
-              autoFocus
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              disabled={loading}
-              aria-invalid={error ? true : undefined}
-              aria-describedby={error ? 'demo-error' : undefined}
-              className="mt-1 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-slate-900 placeholder:text-slate-400 focus:border-[var(--brand-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/40 disabled:opacity-60"
+        <div className="relative z-10 flex h-full flex-col">
+          {/* Header: real logo + author attribution */}
+          <header className="flex items-center justify-between gap-4 px-6 py-5 md:px-10">
+            <img
+              src="/brand/bidstack360-logo.png"
+              alt="BidStack 360"
+              className="h-8 w-auto drop-shadow-sm sm:h-9 md:h-10"
+              width={1170}
+              height={315}
             />
+            <a
+              href={LINKEDIN_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group inline-flex items-center gap-2 rounded-full bg-white/55 px-3.5 py-2 text-[13px] font-medium text-[rgba(30,50,90,0.85)] ring-1 ring-white/50 backdrop-blur-md transition hover:bg-white/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/50"
+            >
+              <LinkedInIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">Built by Tony Walteur</span>
+              <span className="sm:hidden">Tony Walteur</span>
+            </a>
+          </header>
+
+          {/* Centered hero + passwordless entry */}
+          <div className="flex flex-1 flex-col items-center justify-center px-6 pb-24 text-center">
+            <motion.div
+              {...fade}
+              transition={{ duration: 0.5 }}
+              className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/60 px-4 py-2 ring-1 ring-white/50 backdrop-blur-md"
+            >
+              <Sparkles className="h-4 w-4 text-[var(--brand-primary)]" aria-hidden="true" />
+              <span className="text-sm font-medium text-[rgba(30,50,90,0.9)]">
+                Live demo · no signup
+              </span>
+            </motion.div>
+
+            <motion.h1
+              {...fade}
+              transition={{ duration: 0.6, delay: 0.05 }}
+              className="mb-4 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-tight text-[#34405a] sm:text-5xl md:text-6xl"
+            >
+              Explore BidStack 360°
+            </motion.h1>
+
+            <motion.p
+              {...fade}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="mb-8 max-w-xl text-base leading-relaxed text-[#4a5266] md:text-lg"
+            >
+              Step inside a working bid &amp; presales CRM — real accounts, live pipeline, and an
+              RFP response engine. Enter your email to open a private workspace.
+            </motion.p>
+
+            <motion.form
+              {...fade}
+              transition={{ duration: 0.6, delay: 0.15 }}
+              onSubmit={onSubmit}
+              noValidate
+              className="w-full max-w-md rounded-2xl bg-white/75 p-2 shadow-[0_8px_40px_rgba(30,50,90,0.14)] ring-1 ring-white/60 backdrop-blur-xl sm:flex sm:items-center sm:gap-2"
+            >
+              <label htmlFor="demo-email" className="sr-only">
+                Work email
+              </label>
+              <input
+                id="demo-email"
+                type="email"
+                required
+                autoFocus
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@company.com"
+                disabled={loading}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? 'demo-error' : undefined}
+                className="h-12 w-full rounded-xl bg-transparent px-4 text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:opacity-60 sm:flex-1"
+              />
+              <button
+                type="submit"
+                disabled={loading || email.trim().length === 0}
+                className="mt-2 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--brand-primary)] px-6 font-medium text-white transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/50 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-0 sm:w-auto"
+              >
+                {loading ? (
+                  'Setting up…'
+                ) : (
+                  <>
+                    Enter the demo
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </>
+                )}
+              </button>
+            </motion.form>
+
+            {error ? (
+              <p id="demo-error" role="alert" className="mt-3 text-sm font-medium text-red-600">
+                {error}
+              </p>
+            ) : null}
+
+            <motion.p
+              {...fade}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="mt-5 text-xs text-[#4a5266]/75"
+            >
+              Passwordless · your own isolated sandbox · resets periodically
+            </motion.p>
           </div>
-
-          {error ? (
-            <p id="demo-error" role="alert" className="text-sm text-red-600">
-              {error}
-            </p>
-          ) : null}
-
-          <button
-            type="submit"
-            disabled={loading || email.trim().length === 0}
-            className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-[var(--brand-primary)] px-4 font-medium text-white transition-colors hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/50 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading ? 'Setting up your workspace…' : 'Enter the demo'}
-          </button>
-        </form>
-
-        <p className="mt-5 text-center text-xs text-slate-500">
-          A sandbox workspace pre-filled with sample accounts, opportunities, and RFPs. Resets
-          periodically.
-        </p>
-      </div>
+        </div>
+      </section>
     </div>
+  );
+}
+
+function LinkedInIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={className}>
+      <path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.47-.9 1.63-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0z" />
+    </svg>
   );
 }

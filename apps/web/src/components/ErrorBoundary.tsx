@@ -26,9 +26,7 @@ function FallbackComponent({ error, componentStack }: FallbackProps) {
 
   // Log to console so devs can see the actual error even if Sentry isn't configured
   if (IS_DEV) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('ErrorBoundary caught:', error, componentStack);
-    }
+    console.error('ErrorBoundary caught:', error, componentStack);
   }
 
   const errorMessage = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
