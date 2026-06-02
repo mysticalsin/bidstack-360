@@ -173,6 +173,11 @@ export const AccountCockpitSnapshot = z.object({
       value: z.string().min(1),
       detail: z.string().nullable(),
       tone: z.enum(['blue', 'jade', 'purple', 'amber', 'teal', 'rose']),
+      sourceLabel: z.string().min(1).optional(),
+      sourceState: z
+        .enum(['apollo_fresh', 'apollo_stale', 'verified', 'crm', 'missing'])
+        .optional(),
+      sourceHint: z.string().min(1).optional(),
     }),
   ),
   technicalStack: z.array(TechnicalStackCategory),

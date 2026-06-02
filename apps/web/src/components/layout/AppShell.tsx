@@ -1,9 +1,5 @@
 import type { ReactNode } from 'react';
 
-import { FlowFieldBackground } from '@/components/ui/FlowFieldBackground';
-import { AmbientOrbs } from '@/components/motion/AmbientOrbs';
-import { usePreferences } from '@/stores/preferences';
-import { useThemeStore } from '@/stores/theme';
 import { useUiStore } from '@/stores/ui';
 import { cn } from '@/lib/cn';
 
@@ -14,8 +10,6 @@ import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const visualEffects = usePreferences((s) => s.visualEffects);
-  const theme = useThemeStore((s) => s.theme);
   // WHY: the sidebar collapses from 220px → 72px via Sidebar.tsx, but the
   // app-shell grid template needs to reflow at the same time or the main
   // content column leaves a 168px empty gutter beside the icon rail.
@@ -24,11 +18,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className={cn('app-shell', sidebarCollapsed && 'has-collapsed-sidebar')}>
       <Sidebar />
-      <div className={cn('main', visualEffects && 'has-flow-field')}>
-        {visualEffects ? (
-          <FlowFieldBackground className="app-flow-field" density="compact" />
-        ) : null}
-        {theme === 'dark' && <AmbientOrbs />}
+      <div className="main">
         <Topbar />
         <main id="main" className="page" tabIndex={-1}>
           {children}

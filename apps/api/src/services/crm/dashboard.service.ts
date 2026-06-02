@@ -74,7 +74,7 @@ export async function buildDashboardSnapshot(
     releaseScoreRow,
   ] = await Promise.all([
     prisma.opportunity.findMany({
-      where: { orgId },
+      where: { orgId, deletedAt: null },
       select: {
         id: true,
         code: true,
@@ -106,7 +106,7 @@ export async function buildDashboardSnapshot(
       take: 100,
     }),
     prisma.contact.findMany({
-      where: { orgId },
+      where: { orgId, deletedAt: null },
       select: {
         id: true,
         customer: true,
@@ -121,7 +121,7 @@ export async function buildDashboardSnapshot(
       take: 200,
     }),
     prisma.task.findMany({
-      where: { orgId },
+      where: { orgId, deletedAt: null },
       select: {
         id: true,
         title: true,
@@ -135,7 +135,7 @@ export async function buildDashboardSnapshot(
       take: 100,
     }),
     prisma.companyEnrichment.findMany({
-      where: { orgId },
+      where: { orgId, deletedAt: null },
       select: {
         id: true,
         tradeName: true,
@@ -160,7 +160,7 @@ export async function buildDashboardSnapshot(
       take: 200,
     }),
     prisma.aiInsight.findMany({
-      where: { orgId, status: 'active' },
+      where: { orgId, status: 'active', deletedAt: null },
       select: {
         id: true,
         kind: true,
@@ -176,7 +176,7 @@ export async function buildDashboardSnapshot(
       take: 25,
     }),
     prisma.dashboardWidget.findMany({
-      where: { orgId },
+      where: { orgId, deletedAt: null },
       select: {
         id: true,
         kind: true,
@@ -191,7 +191,7 @@ export async function buildDashboardSnapshot(
       take: 20,
     }),
     prisma.bidOpportunity.findMany({
-      where: { orgId },
+      where: { orgId, deletedAt: null },
       select: {
         id: true,
         source: true,
@@ -213,7 +213,7 @@ export async function buildDashboardSnapshot(
       take: 50,
     }),
     prisma.riskRegisterItem.findMany({
-      where: { orgId },
+      where: { orgId, deletedAt: null },
       select: {
         id: true,
         title: true,
@@ -228,7 +228,7 @@ export async function buildDashboardSnapshot(
       take: 50,
     }),
     prisma.complianceCheck.findMany({
-      where: { orgId },
+      where: { orgId, deletedAt: null },
       select: {
         id: true,
         label: true,
@@ -240,7 +240,7 @@ export async function buildDashboardSnapshot(
       take: 50,
     }),
     prisma.providerHealth.findMany({
-      where: { orgId },
+      where: { orgId, deletedAt: null },
       select: {
         provider: true,
         status: true,
@@ -252,7 +252,7 @@ export async function buildDashboardSnapshot(
       take: 50,
     }),
     prisma.queueHealth.findMany({
-      where: { orgId },
+      where: { orgId, deletedAt: null },
       select: {
         queueName: true,
         waiting: true,

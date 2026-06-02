@@ -133,6 +133,10 @@ export function OpportunitiesPage() {
   );
 
   const [isExporting, setIsExporting] = useState(false);
+  // Tracks bulk-delete in-flight so OppBulkBar can disable its buttons (P1 #24).
+  // bulkDelete is a plain async fn (no React Query mutation), so isPending isn't
+  // available from a mutation object — local boolean is the right tool here.
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
   const patch = usePatchOpportunity();
   const stageMove = useStageMutation();
@@ -171,13 +175,18 @@ export function OpportunitiesPage() {
     const snapshot = [...selectedOpps];
     clearSelection();
     let failed = 0;
-    await Promise.all(
-      snapshot.map((o) =>
-        api(`/api/opportunities/${o.id}`, { method: 'DELETE' }).catch(() => {
-          failed += 1;
-        }),
-      ),
-    );
+    setIsDeletingBulk(true);
+    try {
+      await Promise.all(
+        snapshot.map((o) =>
+          api(`/api/opportunities/${o.id}`, { method: 'DELETE' }).catch(() => {
+            failed += 1;
+          }),
+        ),
+      );
+    } finally {
+      setIsDeletingBulk(false);
+    }
     // Invalidate regardless of partial failure — some may have succeeded.
     void qc.invalidateQueries({ queryKey: ['opportunities'] });
     if (failed === 0) {
@@ -218,7 +227,21 @@ export function OpportunitiesPage() {
 
   return (
     <div className="space-y-6">
-      {!isLoading && data && data.items.length > 0 && <OppKpiBar opps={data.items} />}
+      {isLoading ? (
+        <div aria-hidden="true" className="grid min-h-[74px] grid-cols-2 gap-3 sm:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
+            >
+              <div className="h-3 w-20 rounded bg-[var(--surface-sunken)]" />
+              <div className="mt-2 h-5 w-24 rounded bg-[var(--surface-sunken)]" />
+            </div>
+          ))}
+        </div>
+      ) : data && data.items.length > 0 ? (
+        <OppKpiBar opps={data.items} />
+      ) : null}
 
       {/* sr-only live region — announces filter/search result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
@@ -257,7 +280,7 @@ export function OpportunitiesPage() {
           onBulkStageChange={(id) => void bulkStageChange(id)}
           onBulkDelete={() => void bulkDelete()}
           onClearSelection={clearSelection}
-          isPending={stageMove.isPending}
+          isPending={stageMove.isPending || isDeletingBulk}
         />
       )}
 

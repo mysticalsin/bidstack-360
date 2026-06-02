@@ -3,11 +3,33 @@
 
 import { randomUUID } from 'node:crypto';
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+
+// Spy on the embed-reference producer so we can assert the route enqueues a
+// background embedding job on create/update. WHY a module mock (not a real
+// enqueue): the producer skips Redis entirely in test mode (NODE_ENV=test
+// guard in rfp-embed-reference.ts), so the only observable contract at this
+// layer is "the route called the producer with the embeddable content". We
+// assert that call directly. references.ts is this module's only importer in
+// the api app, and it imports just enqueueRfpEmbedReference — so a minimal
+// factory is sufficient.
+const { enqueueRfpEmbedReferenceMock } = vi.hoisted(() => ({
+  enqueueRfpEmbedReferenceMock: vi.fn(
+    async (_job: {
+      orgId: string;
+      referenceId: string;
+      contentText: string;
+    }): Promise<string | null> => null,
+  ),
+}));
+
+vi.mock('../queues/rfp-embed-reference.js', () => ({
+  enqueueRfpEmbedReference: enqueueRfpEmbedReferenceMock,
+}));
 
 describe.skipIf(!process.env.DATABASE_URL)('references routes', () => {
   let server: Awaited<ReturnType<typeof buildServer>>;
@@ -157,6 +179,81 @@ describe.skipIf(!process.env.DATABASE_URL)('references routes', () => {
       payload: { title: 'Valid title', contactEmail: 'not-an-email' },
     });
     expect(res.statusCode).toBe(400);
+  });
+
+  // ── Embedding pipeline trigger ──────────────────────────────────────────────
+  // Guards the wiring that feeds reference_embeddings (pgvector), which
+  // rfp-story-match queries. Without this enqueue the table stays empty and
+  // every requirement match returns "no candidates found".
+
+  it('POST /api/v1/references enqueues an embedding job with the embeddable content', async () => {
+    enqueueRfpEmbedReferenceMock.mockClear();
+
+    const title = `Embed Create ${randomUUID().slice(0, 8)}`;
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/v1/references',
+      payload: {
+        title,
+        description: 'Migrated a bank to zero-downtime Kubernetes',
+        industry: 'Financial Services',
+        tags: ['kubernetes', 'migration'],
+      },
+    });
+    expect(res.statusCode).toBe(201);
+    const body = res.json();
+    createdReferenceIds.push(body.id);
+
+    // The route must enqueue exactly one embedding job for the new reference,
+    // scoped to the caller's org.
+    expect(enqueueRfpEmbedReferenceMock).toHaveBeenCalledTimes(1);
+    const job = enqueueRfpEmbedReferenceMock.mock.calls[0]![0];
+    expect(job.orgId).toBe(body.orgId);
+    expect(job.referenceId).toBe(body.id);
+    // WHY assert every field is present: the embedding must cover title,
+    // description, industry AND tags so Spotlight Ref / story-match can retrieve
+    // a story by any of them. A regression that drops a field silently narrows
+    // recall — these assertions catch it.
+    expect(job.contentText).toContain(title);
+    expect(job.contentText).toContain('Migrated a bank to zero-downtime Kubernetes');
+    expect(job.contentText).toContain('Financial Services');
+    expect(job.contentText).toContain('kubernetes');
+    expect(job.contentText).toContain('migration');
+    // Worker contract: contentText must be a non-empty string (z.string().min(1)).
+    expect(typeof job.contentText).toBe('string');
+    expect(job.contentText.length).toBeGreaterThan(0);
+  });
+
+  it('PATCH /api/v1/references/:id re-enqueues embedding with the updated content', async () => {
+    // Seed a reference to edit (this create also enqueues — cleared below).
+    const create = await server.inject({
+      method: 'POST',
+      url: '/api/v1/references',
+      payload: { title: `Embed Update ${randomUUID().slice(0, 8)}`, tags: [] },
+    });
+    expect(create.statusCode).toBe(201);
+    const { id } = create.json();
+    createdReferenceIds.push(id);
+
+    // Assert only on the enqueue triggered by the PATCH, not the seed create.
+    enqueueRfpEmbedReferenceMock.mockClear();
+
+    const newTitle = `Edited ${randomUUID().slice(0, 8)}`;
+    const res = await server.inject({
+      method: 'PATCH',
+      url: `/api/v1/references/${id}`,
+      payload: { title: newTitle, industry: 'Healthcare' },
+    });
+    expect(res.statusCode).toBe(200);
+
+    // Editing content must re-embed so semantic retrieval reflects the edit.
+    // The worker content-hashes contentText, so a no-op edit stays cheap — but
+    // the route still enqueues; dedup is the worker's job, not the route's.
+    expect(enqueueRfpEmbedReferenceMock).toHaveBeenCalledTimes(1);
+    const job = enqueueRfpEmbedReferenceMock.mock.calls[0]![0];
+    expect(job.referenceId).toBe(id);
+    expect(job.contentText).toContain(newTitle);
+    expect(job.contentText).toContain('Healthcare');
   });
 
   // ── Use (increment usage) ──────────────────────────────────────────────────

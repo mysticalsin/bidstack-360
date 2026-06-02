@@ -28,6 +28,22 @@ import {
 import { redis } from '../redis.js';
 import { PublicBookingCreate, sendBookingConfirmationEmail } from './bookings.helpers.js';
 
+const BOOKING_BLOCKING_LOOKUP_LIMIT = 1000;
+const bookingCreateRateLimitMax = Number(process.env.PUBLIC_BOOKING_RATE_LIMIT_MAX ?? 5);
+
+function dateKeyInTz(d: Date, tz: string): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(d);
+  const year = parts.find((p) => p.type === 'year')?.value ?? '1970';
+  const month = parts.find((p) => p.type === 'month')?.value ?? '01';
+  const day = parts.find((p) => p.type === 'day')?.value ?? '01';
+  return `${year}-${month}-${day}`;
+}
+
 function getPushQueue(): Queue {
   return new Queue(CALENDAR_PUSH.name, {
     connection: redis,
@@ -71,7 +87,7 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!page) throw server.httpErrors.notFound('Booking page not found');
 
-      const rangeStart = new Date(`${date}T00:00:00Z`);
+      const rangeStart = new Date(`${date}T12:00:00Z`);
       const rangeEnd = new Date(`${date}T23:59:59Z`);
 
       const maxDate = new Date();
@@ -100,6 +116,8 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
           startAt: { lte: fetchEnd },
           endAt: { gte: fetchStart },
         },
+        orderBy: { startAt: 'asc' },
+        take: BOOKING_BLOCKING_LOOKUP_LIMIT,
         select: { startAt: true, endAt: true, isAllDay: true },
       });
 
@@ -111,6 +129,8 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
           startAt: { lte: fetchEnd },
           endAt: { gte: fetchStart },
         },
+        orderBy: { startAt: 'asc' },
+        take: BOOKING_BLOCKING_LOOKUP_LIMIT,
         select: { startAt: true, endAt: true },
       });
 
@@ -156,7 +176,11 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       config: {
         auth: 'none',
-        rateLimit: { max: 5, timeWindow: '1 hour', keyGenerator: (req) => req.ip },
+        rateLimit: {
+          max: Number.isFinite(bookingCreateRateLimitMax) ? bookingCreateRateLimitMax : 5,
+          timeWindow: '1 hour',
+          keyGenerator: (req) => req.ip,
+        },
       },
       schema: {
         params: z.object({ slug: z.string().min(1).max(60) }),
@@ -174,7 +198,14 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const { slug } = req.params;
-      const { attendeeName, attendeeEmail, attendeePhone, startAt: startAtRaw, answers } = req.body;
+      const {
+        attendeeName,
+        attendeeEmail,
+        attendeePhone,
+        startAt: startAtRaw,
+        answers,
+        tz,
+      } = req.body;
 
       const page = await prisma.bookingPage.findFirst({
         where: { slug, isActive: true, deletedAt: null },
@@ -185,8 +216,8 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
       const startAt = new Date(startAtRaw);
       const endAt = new Date(startAt.getTime() + page.durationMinutes * 60_000);
 
-      const dayStr = startAt.toISOString().slice(0, 10);
-      const rangeStart = new Date(`${dayStr}T00:00:00Z`);
+      const dayStr = dateKeyInTz(startAt, tz);
+      const rangeStart = new Date(`${dayStr}T12:00:00Z`);
       const rangeEnd = new Date(`${dayStr}T23:59:59Z`);
 
       const blockingEvents = await prisma.calendarEvent.findMany({
@@ -199,6 +230,8 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
           startAt: { lte: endAt },
           endAt: { gte: startAt },
         },
+        orderBy: { startAt: 'asc' },
+        take: BOOKING_BLOCKING_LOOKUP_LIMIT,
         select: { startAt: true, endAt: true, isAllDay: true },
       });
 
@@ -210,6 +243,8 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
           startAt: { lte: endAt },
           endAt: { gte: startAt },
         },
+        orderBy: { startAt: 'asc' },
+        take: BOOKING_BLOCKING_LOOKUP_LIMIT,
         select: { startAt: true, endAt: true },
       });
 
@@ -230,6 +265,7 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
         durationMinutes: page.durationMinutes,
         bufferBeforeMinutes: page.bufferBeforeMinutes,
         bufferAfterMinutes: page.bufferAfterMinutes,
+        tz,
         minNoticeHours: page.minNoticeHours,
       });
 

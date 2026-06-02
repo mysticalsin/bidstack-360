@@ -39,7 +39,12 @@
       "section_drafting": "Draft",
       "compliance_fill": "Compliance",
       "legal_scan": "Legal",
-      "qa_review": "QA Review"
+      "qa_review": "QA Review",
+      "awaiting_approval": "Awaiting Approval",
+      "approved": "Approved",
+      "completed": "Completed",
+      "rejected": "Rejected",
+      "timeout": "Timed Out"
     }
   },
   "requirements": {

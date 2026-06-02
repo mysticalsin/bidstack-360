@@ -12,8 +12,11 @@ interface NavItem {
 
 const navItems: NavItem[] = [];
 
+import { useSignInAction } from '@/lib/auth';
+
 export function Navbar() {
   const navigate = useNavigate();
+  const { signIn } = useSignInAction();
   const [showEmail, setShowEmail] = useState(false);
 
   const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -28,8 +31,10 @@ export function Navbar() {
       aria-label="Site navigation"
       className="flex items-center justify-between py-6 px-6 md:px-10 w-full relative z-10"
     >
-      {/* Left Side (hidden spacer for centering) */}
-      <div className="flex-1 hidden md:block" />
+      {/* Left Side (hidden spacer for centering, display creator) */}
+      <div className="flex-1 hidden md:block">
+        <span className="text-[12px] font-normal text-[rgba(30,50,90,0.75)]">Created by Tony</span>
+      </div>
 
       {/* Center Menu */}
       <div className="hidden md:flex items-center gap-8 text-[rgb(45,45,45)] font-normal text-sm">
@@ -48,9 +53,12 @@ export function Navbar() {
       </div>
 
       {/* Mobile Logo */}
-      <div className="md:hidden">
+      <div className="md:hidden flex flex-col items-start leading-none">
         <span className="font-regular tracking-tighter text-xl text-[rgba(30,50,90,0.9)]">
           BidStack
+        </span>
+        <span className="text-[9px] text-[rgba(30,50,90,0.5)] font-normal mt-0.5">
+          Created by Tony
         </span>
       </div>
 
@@ -58,26 +66,20 @@ export function Navbar() {
       <div className="flex-1 flex justify-end items-center gap-2 md:gap-3">
         {isStub ? (
           <>
-            {/* Dev preview — disabled buttons; tabIndex={-1} ensures they're excluded
-                from tab order in all browsers even with the disabled attribute */}
             <button
               type="button"
-              disabled
-              tabIndex={-1}
-              aria-disabled="true"
-              aria-label="Sign in with Microsoft (requires Clerk configuration)"
-              className="flex items-center bg-[rgba(30,50,90,0.4)] text-white/70 rounded-full px-3 md:px-5 py-1.5 md:py-2 gap-2 text-xs md:text-sm font-normal cursor-not-allowed"
+              onClick={() => signIn(() => navigate('/dashboard', { replace: true }))}
+              aria-label="Sign in with Microsoft"
+              className="flex items-center bg-[rgba(30,50,90,0.8)] text-white rounded-full px-3 md:px-5 py-1.5 md:py-2 gap-2 text-xs md:text-sm font-normal cursor-pointer hover:bg-[rgba(30,50,90,0.9)] active:scale-[0.98] transition-all"
             >
               <MicrosoftLogo />
               <span className="hidden sm:inline">{microsoftLabel}</span>
             </button>
             <button
               type="button"
-              disabled
-              tabIndex={-1}
-              aria-disabled="true"
-              aria-label="Sign in with Google (requires Clerk configuration)"
-              className="flex items-center bg-white/40 text-[rgba(30,50,90,0.6)] rounded-full px-3 md:px-5 py-1.5 md:py-2 gap-2 text-xs md:text-sm font-normal cursor-not-allowed"
+              onClick={() => signIn(() => navigate('/dashboard', { replace: true }))}
+              aria-label="Sign in with Google"
+              className="flex items-center bg-white text-[rgba(30,50,90,0.8)] rounded-full px-3 md:px-5 py-1.5 md:py-2 gap-2 text-xs md:text-sm font-normal border border-[rgba(30,50,90,0.1)] cursor-pointer hover:bg-gray-50 active:scale-[0.98] transition-all"
             >
               <GoogleLogo />
               <span className="hidden sm:inline">{googleLabel}</span>
@@ -106,7 +108,7 @@ export function Navbar() {
       {isStub && (
         <motion.button
           type="button"
-          onClick={() => navigate('/dashboard', { replace: true })}
+          onClick={() => signIn(() => navigate('/dashboard', { replace: true }))}
           aria-label="Dev bypass — enter dashboard without auth"
           className="ml-2 md:ml-3 flex items-center gap-1 text-[11px] font-normal text-amber-600/80 hover:text-amber-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/50 rounded-sm"
           whileHover={{ scale: 1.02 }}

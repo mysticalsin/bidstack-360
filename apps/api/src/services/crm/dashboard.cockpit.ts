@@ -273,7 +273,7 @@ export function buildCockpit({
   );
   const annualRevenue = company.annualRevenueMicros
     ? formatMicrosCompact(company.annualRevenueMicros)
-    : '$1.2B CAD';
+    : 'Not verified';
   const companyRisks = risks.filter(
     (risk) => risk.companyName && normalizeName(risk.companyName) === normalizeName(company.name),
   );
@@ -284,41 +284,99 @@ export function buildCockpit({
     ),
   );
   const visibleCompliance = companyCompliance.length ? companyCompliance : compliance;
+  const apolloIntel = company.strategicIntel;
+  const apolloLastSyncedAt = apolloIntel?.lastSyncedAt ?? null;
+  const apolloSource =
+    apolloIntel?.freshness === 'fresh' && apolloLastSyncedAt
+      ? {
+          sourceLabel: 'Apollo fresh',
+          sourceState: 'apollo_fresh' as const,
+          sourceHint: `Synced ${apolloLastSyncedAt.slice(0, 10)}`,
+        }
+      : apolloIntel?.freshness === 'stale' && apolloLastSyncedAt
+        ? {
+            sourceLabel: 'Apollo stale',
+            sourceState: 'apollo_stale' as const,
+            sourceHint: `Last synced ${apolloLastSyncedAt.slice(0, 10)}`,
+          }
+        : {
+            sourceLabel: 'Needs Apollo',
+            sourceState: 'missing' as const,
+            sourceHint: 'Connect Apollo MCP/API to refresh this field.',
+          };
+  const verifiedSource = {
+    sourceLabel: company.source === 'verified_data' ? 'Verified' : 'CRM',
+    sourceState: company.source === 'verified_data' ? ('verified' as const) : ('crm' as const),
+    sourceHint:
+      company.source === 'verified_data'
+        ? 'Verified company cache'
+        : 'BidStack CRM pipeline record',
+  };
+  const missingApolloSource = {
+    sourceLabel: 'Needs Apollo',
+    sourceState: 'missing' as const,
+    sourceHint: 'Connect Apollo MCP/API to verify this company attribute.',
+  };
+  const fieldSource = (hasValue: boolean) =>
+    hasValue ? (apolloIntel ? apolloSource : verifiedSource) : missingApolloSource;
+  const crmSource = {
+    sourceLabel: 'CRM',
+    sourceState: 'crm' as const,
+    sourceHint: 'Computed from BidStack opportunities.',
+  };
 
   return {
     company,
     kpis: [
       {
         label: 'Industry',
-        value: titleCase(company.industry ?? 'Financial services'),
-        detail: null,
+        value: company.industry ? titleCase(company.industry) : 'Not verified',
+        detail: company.industry ? 'company profile' : 'connect Apollo to verify',
         tone: 'blue',
+        ...fieldSource(Boolean(company.industry)),
       },
       {
         label: 'Employees',
-        value: company.employeeCount ? `${company.employeeCount.toLocaleString()}+` : '2,500+',
-        detail: 'verified profile',
-        tone: 'jade',
+        value: company.employeeCount
+          ? `${company.employeeCount.toLocaleString()}+`
+          : 'Not verified',
+        detail: company.employeeCount ? 'company headcount' : 'connect Apollo to verify',
+        tone: company.employeeCount ? 'jade' : 'amber',
+        ...fieldSource(Boolean(company.employeeCount)),
       },
       {
         label: 'Annual revenue',
         value: annualRevenue,
-        detail: 'with source confidence',
-        tone: 'purple',
+        detail: company.annualRevenueMicros ? 'company revenue' : 'connect Apollo to verify',
+        tone: company.annualRevenueMicros ? 'purple' : 'amber',
+        ...fieldSource(Boolean(company.annualRevenueMicros)),
       },
       {
         label: 'Projects',
-        value: Math.max(companyOpps.length, 5).toString(),
+        value: companyOpps.length.toString(),
         detail: 'active and historical',
         tone: 'blue',
+        ...crmSource,
       },
       {
         label: 'Open deals',
         value: openDeals.length.toString(),
         detail: 'External CRM pipeline',
         tone: 'amber',
+        ...crmSource,
       },
-      { label: 'Total devices', value: '1,842', detail: 'verified data estimate', tone: 'purple' },
+      {
+        label: 'Apollo sync',
+        value:
+          apolloIntel?.freshness === 'fresh'
+            ? 'Fresh'
+            : apolloIntel?.freshness === 'stale'
+              ? 'Stale'
+              : 'Not synced',
+        detail: apolloIntel ? apolloIntel.creditPolicy.replace('_', ' ') : 'connect in Settings',
+        tone: apolloIntel?.freshness === 'fresh' ? 'jade' : 'amber',
+        ...(apolloIntel ? apolloSource : missingApolloSource),
+      },
     ],
     technicalStack: mergeTechnicalStack(company.technicalStack ?? [], defaultTechnicalStack()),
     health: {

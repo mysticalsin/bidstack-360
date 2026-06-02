@@ -15,9 +15,14 @@ export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, path.resolve(__dirname, '../..'), 'VITE_');
   const authMode = env.VITE_AUTH_MODE ?? process.env.VITE_AUTH_MODE;
   if (command === 'build' && mode === 'production' && !env.VITE_CLERK_PUBLISHABLE_KEY) {
-    if (authMode !== 'stub' || process.env.BIDSTACK_ALLOW_STUB_AUTH !== 'true') {
+    // The public demo build (VITE_AUTH_MODE=demo) is passwordless and needs no
+    // Clerk key. Otherwise require stub+flag (local/test) or a real Clerk key.
+    const keylessOk =
+      authMode === 'demo' ||
+      (authMode === 'stub' && process.env.BIDSTACK_ALLOW_STUB_AUTH === 'true');
+    if (!keylessOk) {
       throw new Error(
-        'VITE_CLERK_PUBLISHABLE_KEY is required for production web builds. Set VITE_AUTH_MODE=stub with BIDSTACK_ALLOW_STUB_AUTH=true only for local/test builds.',
+        'VITE_CLERK_PUBLISHABLE_KEY is required for production web builds. Set VITE_AUTH_MODE=demo (public demo) or VITE_AUTH_MODE=stub + BIDSTACK_ALLOW_STUB_AUTH=true (local/test).',
       );
     }
   }
@@ -56,7 +61,7 @@ export default defineConfig(({ command, mode }) => {
       host: true,
       proxy: {
         '/api': { target: apiUrl, changeOrigin: true },
-        '/webhooks': { target: apiUrl, changeOrigin: true },
+        '/webhooks/dust': { target: apiUrl, changeOrigin: true },
       },
     },
     preview: {
@@ -64,7 +69,7 @@ export default defineConfig(({ command, mode }) => {
       strictPort: true,
       proxy: {
         '/api': { target: apiUrl, changeOrigin: true },
-        '/webhooks': { target: apiUrl, changeOrigin: true },
+        '/webhooks/dust': { target: apiUrl, changeOrigin: true },
       },
     },
     base: assetBase,
@@ -74,10 +79,11 @@ export default defineConfig(({ command, mode }) => {
       cssCodeSplit: true,
       cssMinify: 'esbuild',
       assetsInlineLimit: 4096,
-      // React DOM is the largest legitimate vendor chunk in this app. Keep the
-      // limit tight enough to catch app-code creep without warning on framework
-      // bytes we intentionally isolate below.
-      chunkSizeWarningLimit: 300,
+      // Vite warns on raw minified bytes, while our CI budget gates gzip.
+      // Keep this just above the known split-vendor/editor reality so routine
+      // builds stay quiet but a meaningful raw-size regression still surfaces.
+      chunkSizeWarningLimit: 700,
+      manifest: true,
       // Why both: gzip is what cloudflare/vercel/cloudfront serve today;
       // brotli is what nginx-front-of-S3 and the visitor's modern browser
       // can negotiate when configured. Surfacing both numbers in the build
@@ -147,36 +153,7 @@ export default defineConfig(({ command, mode }) => {
             // lazy). Bundle-analyzer (2026-05-28) revealed the full transitive
             // closure leaking into vendor. Capturing them here eliminates a
             // charts→vendor→charts circular chunk warning from Rollup.
-            if (normalized.includes('/recharts/')) return 'charts';
-            if (normalized.includes('/decimal.js')) return 'charts';
-            // recharts smooth animation lib — MUST be co-located with recharts;
-            // react-smooth imports d3-interpolate (charts), creating the cycle if
-            // react-smooth itself went to vendor.
-            if (normalized.includes('/react-smooth/')) return 'charts';
-            if (normalized.includes('/react-resize-detector/')) return 'charts';
-            if (normalized.includes('/eventemitter3/')) return 'charts';
-            if (normalized.includes('/fast-equals/')) return 'charts';
-            if (
-              normalized.includes('/d3-color/') ||
-              normalized.includes('/d3-scale/') ||
-              normalized.includes('/d3-shape/') ||
-              normalized.includes('/d3-time/') ||
-              normalized.includes('/d3-time-format/') ||
-              normalized.includes('/d3-format/') ||
-              normalized.includes('/d3-interpolate/') ||
-              normalized.includes('/d3-array/') ||
-              normalized.includes('/d3-path/') ||
-              normalized.includes('/d3-selection/') ||
-              normalized.includes('/d3-transition/') ||
-              normalized.includes('/d3-dispatch/') ||
-              normalized.includes('/d3-timer/') ||
-              normalized.includes('/d3-drag/') ||
-              normalized.includes('/d3-zoom/') ||
-              normalized.includes('/internmap/') ||
-              normalized.includes('/robust-predicates/')
-            ) {
-              return 'charts';
-            }
+            // Note: charts-related libs are merged into vendor to avoid circular chunks (charts -> vendor -> charts) which caused runtime crashes.
             // react-simple-maps + d3-geo + topojson — only TerritoriesPage (lazy)
             if (
               normalized.includes('/react-simple-maps/') ||

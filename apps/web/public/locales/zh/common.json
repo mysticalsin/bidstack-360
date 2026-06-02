@@ -245,15 +245,15 @@
       "title": "设置",
       "subtitle": "管理您的账户、偏好设置和工作区集成。",
       "sections": {
+        "overview": "概览",
         "profile": "个人资料",
         "appearance": "外观",
         "language": "语言",
         "notifications": "通知",
         "security": "安全",
-        "microsoft": "Microsoft 365",
-        "mobile": "移动应用",
         "workspace": "工作区",
-        "advanced": "高级",
+        "crm": "CRM 配置",
+        "developer": "开发者访问",
         "emailTemplates": "邮件模板",
         "tags": "标签",
         "leadRot": "线索过期规则"

@@ -4,13 +4,16 @@
 // open feeds are live and which licensed connectors need wiring.
 
 import { useMemo, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { LoadingSkeleton, ErrorState, EmptyState } from '@/components/ui/StateMessages';
-import { useConnectorCatalog } from '@/hooks/useCrmIntegrations';
+import { useConnectorCatalog, useUserIntegrationsStatus } from '@/hooks/useCrmIntegrations';
 import { relativeTime } from '@/lib/format';
+import { api } from '@/lib/api';
+import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
 import type { CrmConnector } from '@bidstack/shared';
 
 type Category = CrmConnector['category'];
@@ -69,7 +72,9 @@ export function ConnectorsSection() {
         title="Connectors catalog"
         caption="External data sources the CRM can reach. Open feeds run without keys; licensed feeds need credentials."
         action={
-          <Badge tone={statusCounts.down > 0 ? 'tomato' : statusCounts.degraded > 0 ? 'amber' : 'jade'}>
+          <Badge
+            tone={statusCounts.down > 0 ? 'tomato' : statusCounts.degraded > 0 ? 'amber' : 'jade'}
+          >
             {items.length} sources
           </Badge>
         }
@@ -183,8 +188,75 @@ function ConnectorStat({
 }
 
 function ConnectorRow({ connector }: { connector: CrmConnector }) {
+  const qc = useQueryClient();
+  const { data: userIntegrationsData } = useUserIntegrationsStatus();
+
+  // Connect mutation
+  const connectMutation = useMutation({
+    mutationFn: async () => {
+      let startUrl = '';
+      if (connector.id === 'gmail') {
+        startUrl = '/api/integrations/gmail/oauth/start';
+      } else if (connector.id === 'slack') {
+        startUrl = '/api/integrations/slack/oauth/start';
+      } else if (connector.id === 'microsoft') {
+        startUrl = '/api/integrations/microsoft/mail/oauth/start';
+      }
+      if (!startUrl) return;
+      const res = await api<{ authUrl: string }>(startUrl);
+      if (res.authUrl) {
+        window.location.href = res.authUrl;
+      }
+    },
+  });
+
+  // Disconnect mutation
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      let disconnectUrl = '';
+      if (connector.id === 'gmail') {
+        disconnectUrl = '/api/integrations/gmail/disconnect';
+      } else if (connector.id === 'slack') {
+        disconnectUrl = '/api/integrations/slack/disconnect';
+      } else if (connector.id === 'microsoft') {
+        disconnectUrl = '/api/integrations/microsoft/mail/disconnect';
+      }
+      if (!disconnectUrl) return;
+      await api(disconnectUrl, { method: 'DELETE' });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['user-integrations-status'] });
+      qc.invalidateQueries({ queryKey: ['crm-connectors'] });
+      qc.invalidateQueries({ queryKey: ['crm-provider-health'] });
+    },
+  });
+
+  const isUserIntegration = ['gmail', 'slack', 'microsoft'].includes(connector.id);
+  const match = isUserIntegration
+    ? userIntegrationsData?.integrations?.find((ui) => {
+        if (connector.id === 'gmail') return ui.provider === 'gmail';
+        if (connector.id === 'slack') return ui.provider === 'slack';
+        if (connector.id === 'microsoft') return ui.provider === 'microsoft_graph';
+        return false;
+      })
+    : null;
+
+  const isConnected = match ? match.status === 'CONNECTED' : false;
+  const status = match
+    ? match.status === 'CONNECTED'
+      ? 'healthy'
+      : match.status === 'ERROR'
+        ? 'down'
+        : 'disabled'
+    : connector.status;
+
+  const connectedEmail = match?.connectedEmail;
+
   return (
-    <li className="flex flex-wrap items-start justify-between gap-4 px-5 py-4 transition hover:bg-[var(--surface-secondary)]/70">
+    <li
+      data-testid={`integration-card-${connector.id}`}
+      className="flex flex-wrap items-start justify-between gap-4 px-5 py-4 transition hover:bg-[var(--surface-secondary)]/70"
+    >
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="grid size-9 place-items-center rounded-2xl bg-[var(--surface-secondary)] text-[var(--text-secondary)]">
@@ -225,12 +297,35 @@ function ConnectorRow({ connector }: { connector: CrmConnector }) {
         </div>
       </div>
       <div className="flex items-center gap-2">
-        {connector.requiresCredential ? (
+        {isUserIntegration ? (
+          <>
+            {connectedEmail ? <Badge tone="jade">{connectedEmail}</Badge> : null}
+            {isConnected ? (
+              <LiquidGlassButton
+                tone="danger"
+                size="sm"
+                onClick={() => disconnectMutation.mutate()}
+                disabled={disconnectMutation.isPending}
+              >
+                {disconnectMutation.isPending ? 'Disconnecting...' : 'Disconnect'}
+              </LiquidGlassButton>
+            ) : (
+              <LiquidGlassButton
+                tone="primary"
+                size="sm"
+                onClick={() => connectMutation.mutate()}
+                disabled={connectMutation.isPending}
+              >
+                {connectMutation.isPending ? 'Connecting...' : 'Connect'}
+              </LiquidGlassButton>
+            )}
+          </>
+        ) : connector.requiresCredential ? (
           <Badge tone="amber">requires key</Badge>
         ) : (
           <Badge tone="blue">open</Badge>
         )}
-        <StatusBadge status={connector.status} />
+        <StatusBadge status={status} />
       </div>
     </li>
   );

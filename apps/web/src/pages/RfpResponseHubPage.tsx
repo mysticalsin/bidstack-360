@@ -370,7 +370,7 @@ function AgentTile({
         <span
           className="grid h-8 w-8 place-items-center rounded-lg"
           style={{
-            background: 'linear-gradient(135deg, #B49CFF 0%, #7C3AED 100%)',
+            background: 'var(--brand-gradient)',
             color: 'white',
           }}
         >

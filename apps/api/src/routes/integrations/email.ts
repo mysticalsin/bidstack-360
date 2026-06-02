@@ -8,11 +8,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
-import {
-  SendEmailRequest,
-  type EmailMessageDto,
-  EmailListResponse,
-} from '@bidstack/shared';
+import { SendEmailRequest, type EmailMessageDto, EmailListResponse } from '@bidstack/shared';
 import { sendEmail } from '../../services/email-integration.service.js';
 
 export const emailRoutes: FastifyPluginAsync = async (server) => {
@@ -130,6 +126,7 @@ export const emailRoutes: FastifyPluginAsync = async (server) => {
 
       const tokens = await prisma.integrationToken.findMany({
         where: { orgId, userId, deletedAt: null },
+        take: 100,
       });
 
       const ALL_PROVIDERS = ['gmail', 'microsoft_graph', 'slack'] as const;

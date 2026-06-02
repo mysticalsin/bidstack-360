@@ -1,6 +1,8 @@
 // Integration tests for /api/leads/*.
 // Covers list, detail, CRUD, conversion, and soft-delete.
 
+import { randomUUID } from 'node:crypto';
+
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { prisma } from '@bidstack/db';
@@ -10,6 +12,16 @@ import { buildServer } from '../server.js';
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 const createdLeadIds: string[] = [];
+// Convert creates an Opportunity + Contact whose org-scoped unique code the route
+// derives from a small deterministic namespace (OP-<last 4 of Date.now()>). Track
+// them so afterAll frees the code and accumulated rows can't collide on a later
+// run. See docs/solutions/idempotent-integration-fixtures.md.
+const createdOpportunityIds: string[] = [];
+const createdContactIds: string[] = [];
+// Stable prefix → beforeAll can purge leftovers from a prior interrupted run;
+// per-run suffix → each run's convert fixtures are unique in the shared test DB.
+const CONVERT_COMPANY_PREFIX = 'ConvertCorp';
+const convertCompany = `${CONVERT_COMPANY_PREFIX}-${randomUUID().slice(0, 8)}`;
 
 beforeAll(async () => {
   try {
@@ -32,6 +44,18 @@ afterAll(async () => {
       } catch {
         /* ignore */
       }
+    }
+    // Delete after leads (which reference the opportunity) so the next run starts
+    // without this run's convert Opportunity occupying its OP-code.
+    try {
+      if (createdOpportunityIds.length > 0) {
+        await prisma.opportunity.deleteMany({ where: { id: { in: createdOpportunityIds } } });
+      }
+      if (createdContactIds.length > 0) {
+        await prisma.contact.deleteMany({ where: { id: { in: createdContactIds } } });
+      }
+    } catch {
+      /* ignore */
     }
     await prisma.$disconnect();
   }
@@ -72,7 +96,9 @@ describe('leads routes', () => {
     const res = await server.inject({ method: 'GET', url: '/api/leads?search=TechFlow' });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.items.some((l: { companyName: string }) => l.companyName === 'TechFlow Inc')).toBe(true);
+    expect(body.items.some((l: { companyName: string }) => l.companyName === 'TechFlow Inc')).toBe(
+      true,
+    );
   });
 
   skipIfNoDb('GET /api/leads/:id returns full detail', async () => {
@@ -144,7 +170,7 @@ describe('leads routes', () => {
       payload: {
         firstName: 'Convert',
         lastName: 'Me',
-        companyName: 'ConvertCorp',
+        companyName: convertCompany,
         source: 'event',
         priority: 'high',
         score: 80,
@@ -156,13 +182,21 @@ describe('leads routes', () => {
     const convert = await server.inject({
       method: 'POST',
       url: `/api/leads/${id}/convert`,
-      payload: { opportunityName: 'Convert Opp', opportunityValueMicros: 1_000_000_000, stage: 's1_lead' },
+      payload: {
+        opportunityName: `Convert Opp ${convertCompany}`,
+        opportunityValueMicros: 1_000_000_000,
+        stage: 's1_lead',
+      },
     });
     expect(convert.statusCode).toBe(200);
     const body = convert.json();
     expect(body.leadId).toBe(id);
     expect(body.opportunityId).toBeDefined();
     expect(body.contactId).toBeDefined();
+    // Track for afterAll cleanup so the route's deterministic OP-code is freed and
+    // cannot collide on the org-scoped unique constraint in a later run.
+    createdOpportunityIds.push(body.opportunityId);
+    createdContactIds.push(body.contactId);
 
     // Lead should now be converted
     const leadRes = await server.inject({ method: 'GET', url: `/api/leads/${id}` });

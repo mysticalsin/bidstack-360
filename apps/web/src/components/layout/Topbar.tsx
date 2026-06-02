@@ -81,7 +81,7 @@ export function Topbar() {
       {/* Hamburger — visible only below md breakpoint where sidebar is hidden */}
       <button
         type="button"
-        className="iconbtn md:hidden"
+        className="iconbtn md:!hidden"
         aria-label="Open navigation"
         aria-controls="mobile-nav-drawer"
         aria-expanded={mobileNavOpen}

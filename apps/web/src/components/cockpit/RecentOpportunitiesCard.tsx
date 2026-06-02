@@ -8,7 +8,8 @@ import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import type { useOpportunities } from '@/hooks/useOpportunities';
-import { formatMoney, formatStage } from '@/lib/format';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { formatStage } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
 
 interface Props {
@@ -23,6 +24,7 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
   items,
 }: Props) {
   const reducedMotion = useReducedMotion();
+  const { formatMoney } = useFormatMoney();
   const visibleItems = items ?? opps.data?.items ?? [];
   const accountScoped = Boolean(accountName);
   return (

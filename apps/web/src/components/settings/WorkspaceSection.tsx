@@ -2,7 +2,6 @@ import { WorkspaceSection as OriginalWorkspaceSection } from './WorkspaceSection
 import { TeamSection } from './TeamSection';
 import { RolesSection } from './RolesSection';
 import { CurrencyLocaleSection } from './CurrencyLocaleSection';
-import { PipelineStagesSection } from './PipelineStagesSection';
 
 export function WorkspaceSection() {
   return (
@@ -11,7 +10,6 @@ export function WorkspaceSection() {
       <TeamSection />
       <RolesSection />
       <CurrencyLocaleSection />
-      <PipelineStagesSection />
     </div>
   );
 }

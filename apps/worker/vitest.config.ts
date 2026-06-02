@@ -12,10 +12,12 @@ export default defineConfig({
     include: ['src/**/*.test.ts'],
     passWithNoTests: true,
     testTimeout: 30_000,
-    // Use child_process forks instead of worker_threads so tests that spawn
-    // their own worker_threads (the document-extract sandbox) don't fight
-    // with vitest's own thread isolation.
-    pool: 'forks',
+    // Use threads instead of child-process forks. The worker package tests
+    // spawn their own sandbox worker_threads, and Tinypool's fork IPC can fail
+    // with ERR_IPC_CHANNEL_CLOSED on Windows after all assertions pass.
+    pool: 'threads',
+    fileParallelism: false,
+    isolate: false,
     env: {
       NODE_ENV: 'test',
     },

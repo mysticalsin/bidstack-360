@@ -68,6 +68,48 @@ async function main() {
   }
   console.log(`  ✓ users: ${fixtureUsers.length}`);
 
+  const bookingOwnerId = usersByInitials.get('JS');
+  if (bookingOwnerId) {
+    const availabilityRules = [
+      { dayOfWeek: 0, startTime: '09:00', endTime: '17:00' },
+      { dayOfWeek: 1, startTime: '09:00', endTime: '17:00' },
+      { dayOfWeek: 2, startTime: '09:00', endTime: '17:00' },
+      { dayOfWeek: 3, startTime: '09:00', endTime: '17:00' },
+      { dayOfWeek: 4, startTime: '09:00', endTime: '17:00' },
+      { dayOfWeek: 5, startTime: '09:00', endTime: '17:00' },
+      { dayOfWeek: 6, startTime: '09:00', endTime: '17:00' },
+    ];
+
+    await prisma.bookingPage.upsert({
+      where: { orgId_slug: { orgId: org.id, slug: 'test-slug' } },
+      create: {
+        orgId: org.id,
+        userId: bookingOwnerId,
+        slug: 'test-slug',
+        name: 'BidStack discovery call',
+        description:
+          'A public scheduling page used to verify booking availability and slot creation.',
+        durationMinutes: 30,
+        minNoticeHours: 0,
+        maxAdvanceDays: 14,
+        availabilityRules,
+      },
+      update: {
+        userId: bookingOwnerId,
+        name: 'BidStack discovery call',
+        description:
+          'A public scheduling page used to verify booking availability and slot creation.',
+        durationMinutes: 30,
+        minNoticeHours: 0,
+        maxAdvanceDays: 14,
+        availabilityRules,
+        isActive: true,
+        deletedAt: null,
+      },
+    });
+  }
+  console.log('  ✓ booking page: test-slug');
+
   await seedRolesAndPermissions(prisma, org.id, usersByInitials);
 
   // Opportunities
@@ -246,6 +288,49 @@ async function main() {
     });
   }
   console.log(`  ✓ tasks: ${fixtureTasks.length}`);
+
+  // Seed a document and signature request for E2E tests
+  const testOpp = await prisma.opportunity.findFirst({ where: { orgId: org.id } });
+  if (testOpp) {
+    const testDoc = await prisma.document.upsert({
+      where: { id: 'd0c00000-0000-0000-0000-000000000000' },
+      create: {
+        id: 'd0c00000-0000-0000-0000-000000000000',
+        orgId: org.id,
+        oppId: testOpp.id,
+        name: 'Test Contract.pdf',
+        kind: 'proposal',
+        storageUrl: 'https://example.com/test-contract.pdf',
+      },
+      update: {
+        oppId: testOpp.id,
+        name: 'Test Contract.pdf',
+        kind: 'proposal',
+        storageUrl: 'https://example.com/test-contract.pdf',
+      },
+    });
+
+    await prisma.signatureRequest.upsert({
+      where: { id: 'e5160000-0000-0000-0000-000000000000' },
+      create: {
+        id: 'e5160000-0000-0000-0000-000000000000',
+        orgId: org.id,
+        documentId: testDoc.id,
+        provider: 'INTERNAL',
+        providerRequestId: 'test-sign-token',
+        status: 'SENT',
+        recipients: [{ email: 'recipient@example.com', name: 'John Doe', role: 'signer' }],
+      },
+      update: {
+        documentId: testDoc.id,
+        provider: 'INTERNAL',
+        providerRequestId: 'test-sign-token',
+        status: 'SENT',
+        recipients: [{ email: 'recipient@example.com', name: 'John Doe', role: 'signer' }],
+      },
+    });
+    console.log('  ✓ seeded signature request for test-sign-token');
+  }
 
   // ─── Sales module — categories, products, orders ──────────────────────
   const categoryIds = new Map<string, string>();

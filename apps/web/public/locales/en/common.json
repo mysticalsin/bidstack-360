@@ -245,15 +245,15 @@
       "title": "Settings",
       "subtitle": "Manage your account, preferences, and workspace integrations.",
       "sections": {
+        "overview": "Overview",
         "profile": "Profile",
         "appearance": "Appearance",
         "language": "Language",
         "notifications": "Notifications",
         "security": "Security",
-        "microsoft": "Microsoft 365",
-        "mobile": "Mobile App",
         "workspace": "Workspace",
-        "advanced": "Advanced",
+        "crm": "CRM configuration",
+        "developer": "Developer access",
         "emailTemplates": "Email templates",
         "tags": "Tags",
         "leadRot": "Lead rot rules"

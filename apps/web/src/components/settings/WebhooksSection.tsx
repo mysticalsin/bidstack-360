@@ -1,251 +1,570 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+
+import { Badge, type BadgeTone } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Icon, type IconName } from '@/components/ui/Icon';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { confirm } from '@/components/ui/ConfirmDialog';
+import { toast } from '@/components/ui/Toast';
+import { CreateWebhookDialog } from '@/components/webhooks/CreateWebhookDialog';
+import { DeliveryHistoryPanel } from '@/components/webhooks/DeliveryHistoryPanel';
+import { SignatureGuide } from '@/components/webhooks/SignatureGuide';
 import {
   useWebhookSubscriptions,
   useCreateWebhookSubscription,
   useUpdateWebhookSubscription,
   useDeleteWebhookSubscription,
+  useTestWebhookPing,
+  type WebhookSub,
+  type TestPingResult,
 } from '@/hooks/useWebhookSubscriptions';
-import { Card, SectionHeader } from '@/components/ui/Card';
-import { Icon } from '@/components/ui/Icon';
-import { Button } from '@/components/ui/Button';
-import { LoadingSkeleton } from '@/components/ui/StateMessages';
-import { Badge } from '@/components/ui/Badge';
-import { confirm } from '@/components/ui/ConfirmDialog';
-import { toast } from '@/components/ui/Toast';
+import { cn } from '@/lib/cn';
+import { relativeTime } from '@/lib/format';
+import { useIsAdmin } from '@/lib/auth';
 
-const EVENT_OPTIONS = [
-  'opportunity.created',
-  'opportunity.updated',
-  'opportunity.stage_changed',
-  'bid.score_updated',
-  'proposal.submitted',
-  'document.extracted',
-  'dust.agent.completed',
-  'contact.created',
-  'task.created',
-  'task.completed',
-  'invoice.sent',
-  'invoice.paid',
-  'lead.converted',
-];
+interface CreatedSecret {
+  url: string;
+  secret: string;
+}
 
 export function WebhooksSection() {
-  const subs = useWebhookSubscriptions();
+  const isAdmin = useIsAdmin();
+  const subs = useWebhookSubscriptions({ enabled: isAdmin });
   const create = useCreateWebhookSubscription();
-  const del = useDeleteWebhookSubscription();
-  const [showNew, setShowNew] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [createdSecret, setCreatedSecret] = useState<CreatedSecret | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const metrics = useMemo(() => buildWebhookMetrics(subs.data ?? []), [subs.data]);
+
+  if (!isAdmin) {
+    return <AdminOnlyNotice />;
+  }
 
   return (
-    <Card>
-      <SectionHeader
-        title="Webhook subscriptions"
-        caption="Send real-time HTTP callbacks to your own endpoints."
-      />
-      <div className="p-5">
-        <div className="mb-4 flex justify-end">
-          <Button onClick={() => setShowNew(true)}>
-            <Icon name="plus" size={14} />
-            Add subscription
-          </Button>
+    <div className="space-y-6">
+      <Card className="overflow-hidden">
+        <div className="grid gap-5 p-5 xl:grid-cols-[1.35fr,0.65fr]">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-primary-tint)] px-3 py-1 text-xs font-medium text-[var(--brand-primary)]">
+              <Icon name="webhook" size={14} ariaHidden />
+              Admin webhook control plane
+            </div>
+            <h3 className="mt-4 text-xl font-semibold tracking-tight text-[var(--fg-primary)]">
+              Deliver trusted CRM events to every downstream system.
+            </h3>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--fg-secondary)]">
+              Create signed outbound subscriptions for Dust, MCP workflows, data warehouses, Slack
+              automations, and customer systems. Every endpoint is HTTPS-only, HMAC-signed,
+              rate-limited for tests, and tracked with delivery history.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => setShowCreate(true)}>
+                <Icon name="plus" size={14} className="mr-1.5" />
+                Add subscription
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => void subs.refetch()}
+                disabled={subs.isFetching}
+              >
+                <Icon
+                  name={subs.isFetching ? 'loader' : 'refresh'}
+                  size={14}
+                  className={cn('mr-1.5', subs.isFetching && 'animate-spin')}
+                />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <MetricCard label="Total" value={metrics.total} icon="webhook" tone="blue" />
+            <MetricCard label="Active" value={metrics.active} icon="checkCircle" tone="jade" />
+            <MetricCard label="Failing" value={metrics.failing} icon="warning" tone="tomato" />
+            <MetricCard label="Events" value={metrics.eventCount} icon="list" tone="purple" />
+          </div>
+        </div>
+      </Card>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <ReadinessCard
+          icon="shield"
+          title="Signed by default"
+          body="Every delivery includes X-BidStack-Signature with a timestamped HMAC."
+          status="Required"
+          tone="jade"
+        />
+        <ReadinessCard
+          icon="clock"
+          title="10 second receiver budget"
+          body="Acknowledge fast, then process asynchronously. Non-2xx responses are retried."
+          status="Operational"
+          tone="blue"
+        />
+        <ReadinessCard
+          icon="warning"
+          title="Private networks blocked"
+          body="HTTPS is enforced and internal hostnames, localhost, and private IP ranges are rejected."
+          status="Protected"
+          tone="purple"
+        />
+      </div>
+
+      {createdSecret ? (
+        <SigningSecretCard secret={createdSecret.secret} url={createdSecret.url} />
+      ) : null}
+
+      <Card className="overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
+              Webhook subscriptions
+            </h2>
+            <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
+              {metrics.lastActivity
+                ? `Last activity ${relativeTime(metrics.lastActivity)}`
+                : 'No delivery activity recorded yet.'}
+            </p>
+          </div>
+          <Badge tone={metrics.failing > 0 ? 'tomato' : 'jade'}>
+            {metrics.failing > 0 ? `${metrics.failing} need attention` : 'All clear'}
+          </Badge>
         </div>
 
-        {showNew && (
-          <NewWebhookDialog
-            onClose={() => setShowNew(false)}
-            onCreate={async (body) => {
-              await create.mutateAsync(body);
-              setShowNew(false);
-            }}
-            isPending={create.isPending}
-          />
-        )}
-
         {subs.isLoading ? (
-          <LoadingSkeleton rows={3} />
+          <div className="p-5">
+            <LoadingSkeleton rows={4} />
+          </div>
+        ) : subs.isError ? (
+          <div className="p-5">
+            <ErrorState
+              title="Failed to load webhooks"
+              message="Could not load webhook subscriptions. Check your admin permissions or refresh."
+              action={
+                <Button variant="secondary" size="sm" onClick={() => void subs.refetch()}>
+                  Retry
+                </Button>
+              }
+            />
+          </div>
         ) : !subs.data || subs.data.length === 0 ? (
-          <p className="text-sm text-[var(--fg-secondary)]">No webhook subscriptions yet.</p>
+          <div className="p-5">
+            <EmptyState
+              title="No subscriptions yet"
+              message="Create a subscription to start sending signed CRM events to your systems."
+              action={
+                <Button size="sm" onClick={() => setShowCreate(true)}>
+                  <Icon name="plus" size={14} className="mr-1.5" />
+                  Add subscription
+                </Button>
+              }
+            />
+          </div>
         ) : (
-          <div className="space-y-2">
-            {subs.data.map((s) => (
-              <WebhookRow
-                key={s.id}
-                subscription={s}
-                onDelete={async (id) => {
-                  try {
-                    await del.mutateAsync(id);
-                    toast.success('Webhook subscription deleted');
-                  } catch (err) {
-                    toast.error('Delete failed', {
-                      description:
-                        err instanceof Error ? err.message : 'The server rejected the request.',
-                    });
-                  }
-                }}
+          <ul className="divide-y divide-[var(--border-subtle)]">
+            {subs.data.map((sub) => (
+              <SubscriptionRow
+                key={sub.id}
+                subscription={sub}
+                expanded={expandedId === sub.id}
+                onToggleExpand={() => setExpandedId((prev) => (prev === sub.id ? null : sub.id))}
               />
             ))}
-          </div>
+          </ul>
         )}
+      </Card>
+
+      <SignatureGuide />
+
+      {showCreate ? (
+        <CreateWebhookDialog
+          onClose={() => setShowCreate(false)}
+          onSubmit={async (body) => {
+            try {
+              const created = await create.mutateAsync(body);
+              setCreatedSecret({ url: created.url, secret: created.signingSecret });
+              toast.success('Webhook subscription created');
+              setShowCreate(false);
+            } catch (err) {
+              toast.error('Failed to create subscription', {
+                description: err instanceof Error ? err.message : 'Server error',
+              });
+            }
+          }}
+          isPending={create.isPending}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function AdminOnlyNotice() {
+  return (
+    <Card className="p-5">
+      <div className="flex items-start gap-4">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--surface-sunken)] text-[var(--brand-primary)]">
+          <Icon name="shield" size={20} />
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
+            Webhooks are limited to administrators
+          </h3>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--fg-secondary)]">
+            Webhook subscriptions can push sensitive CRM data to external systems, so only admins
+            can view, create, test, pause, or delete them.
+          </p>
+        </div>
       </div>
     </Card>
   );
 }
 
-function WebhookRow({
-  subscription,
-  onDelete,
+function MetricCard({
+  label,
+  value,
+  icon,
+  tone,
 }: {
-  subscription: { id: string; url: string; events: string[]; active: boolean };
-  onDelete: (id: string) => Promise<void> | void;
+  label: string;
+  value: number;
+  icon: IconName;
+  tone: BadgeTone;
 }) {
-  const update = useUpdateWebhookSubscription(subscription.id);
-
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[var(--border-subtle)] px-4 py-3">
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-[var(--fg-primary)] truncate">
-          {subscription.url}
-        </div>
-        <div className="mt-1 flex flex-wrap gap-1">
-          {subscription.events.map((e) => (
-            <Badge key={e} tone="gray" className="text-[10px]">
-              {e}
-            </Badge>
-          ))}
-        </div>
+    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-4">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-[var(--fg-secondary)]">{label}</span>
+        <span className="text-[var(--brand-primary)]">
+          <Icon name={icon} size={15} />
+        </span>
       </div>
-      <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => update.mutate({ active: !subscription.active })}
-        >
-          {subscription.active ? 'Pause' : 'Resume'}
-        </Button>
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={async () => {
-            const ok = await confirm({
-              title: 'Delete webhook subscription?',
-              description:
-                'The endpoint will stop receiving BidStack events immediately. Existing audit history is kept.',
-              confirmLabel: 'Delete webhook',
-              destructive: true,
-            });
-            if (ok) await onDelete(subscription.id);
-          }}
-        >
-          Delete
-        </Button>
+      <div className="mt-2 flex items-end justify-between gap-2">
+        <span className="text-2xl font-semibold tabular-nums text-[var(--fg-primary)]">
+          {value}
+        </span>
+        <Badge tone={tone}>{value === 0 ? 'None' : 'Live'}</Badge>
       </div>
     </div>
   );
 }
 
-function NewWebhookDialog({
-  onClose,
-  onCreate,
-  isPending,
+function ReadinessCard({
+  icon,
+  title,
+  body,
+  status,
+  tone,
 }: {
-  onClose: () => void;
-  onCreate: (body: { url: string; events: string[] }) => void;
-  isPending: boolean;
+  icon: IconName;
+  title: string;
+  body: string;
+  status: string;
+  tone: BadgeTone;
 }) {
-  const [url, setUrl] = useState('');
-  const [selected, setSelected] = useState<string[]>([]);
+  return (
+    <Card className="p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--surface-sunken)] text-[var(--brand-primary)]">
+          <Icon name={icon} size={16} />
+        </div>
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-semibold text-[var(--fg-primary)]">{title}</h3>
+            <Badge tone={tone}>{status}</Badge>
+          </div>
+          <p className="mt-1 text-xs leading-5 text-[var(--fg-secondary)]">{body}</p>
+        </div>
+      </div>
+    </Card>
+  );
+}
 
-  const toggleEvent = (e: string) => {
-    setSelected((prev) => (prev.includes(e) ? prev.filter((x) => x !== e) : [...prev, e]));
+function SigningSecretCard({ secret, url }: { secret: string; url: string }) {
+  return (
+    <Card className="border-[var(--brand-primary)]/35 p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Icon name="shield" size={16} className="text-[var(--brand-primary)]" />
+            <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
+              Copy the signing secret now
+            </h3>
+            <Badge tone="amber">Shown once</Badge>
+          </div>
+          <p className="mt-2 text-sm leading-6 text-[var(--fg-secondary)]">
+            Store this secret in the receiver for <span className="font-mono"> {url}</span>. It will
+            not be shown again.
+          </p>
+          <code className="mt-3 block overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 font-mono text-xs text-[var(--fg-primary)]">
+            {secret}
+          </code>
+        </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(secret);
+              toast.success('Signing secret copied');
+            } catch {
+              toast.error('Copy failed', { description: 'Clipboard access was not available.' });
+            }
+          }}
+        >
+          <Icon name="copy" size={14} className="mr-1.5" />
+          Copy secret
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+function SubscriptionRow({
+  subscription,
+  expanded,
+  onToggleExpand,
+}: {
+  subscription: WebhookSub;
+  expanded: boolean;
+  onToggleExpand: () => void;
+}) {
+  const update = useUpdateWebhookSubscription(subscription.id);
+  const del = useDeleteWebhookSubscription();
+  const ping = useTestWebhookPing();
+  const [pingResult, setPingResult] = useState<TestPingResult | null>(null);
+  const [editing, setEditing] = useState(false);
+
+  const handleToggleActive = async () => {
+    try {
+      await update.mutateAsync({ active: !subscription.active });
+      toast.success(subscription.active ? 'Subscription paused' : 'Subscription resumed');
+    } catch {
+      toast.error('Failed to update subscription');
+    }
   };
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!url || selected.length === 0) return;
-    onCreate({ url, events: selected });
+  const handleDelete = async () => {
+    const ok = await confirm({
+      title: 'Delete webhook subscription?',
+      description:
+        'The endpoint will stop receiving BidStack events immediately. Delivery history is retained.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await del.mutateAsync(subscription.id);
+      toast.success('Webhook subscription deleted');
+    } catch {
+      toast.error('Failed to delete subscription');
+    }
   };
+
+  const handlePing = async () => {
+    setPingResult(null);
+    try {
+      const result = await ping.mutateAsync(subscription.id);
+      setPingResult(result);
+      if (result.success) {
+        toast.success(`Ping delivered - ${result.statusCode} in ${result.durationMs}ms`);
+      } else {
+        toast.error('Ping failed', {
+          description: result.error ?? `HTTP ${result.statusCode}`,
+        });
+      }
+    } catch (err) {
+      toast.error('Ping error', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      });
+    }
+  };
+
+  const failureHealth =
+    subscription.failureCount === 0
+      ? 'healthy'
+      : subscription.failureCount < 5
+        ? 'warning'
+        : 'critical';
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') onClose();
-      }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="wh-title"
-        className="w-full max-w-lg rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] p-6 shadow-lg"
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 id="wh-title" className="text-lg font-semibold text-[var(--fg-primary)]">
-            New webhook subscription
-          </h2>
-          <button
-            type="button"
-            aria-label="Close"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
-            onClick={onClose}
-          >
-            <Icon name="close" size={18} />
-          </button>
-        </div>
-        <form onSubmit={submit} className="space-y-4">
-          <div>
-            <label
-              htmlFor="wh-url"
-              className="block text-xs font-medium text-[var(--fg-secondary)] mb-1"
-            >
-              Endpoint URL
-            </label>
-            <input
-              id="wh-url"
-              className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
-              type="url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://your-app.com/webhooks/bidstack"
-              required
-            />
+    <li>
+      <div className="grid gap-4 px-5 py-4 xl:grid-cols-[1fr,auto]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <HealthDot health={failureHealth} />
+            <span className="break-all font-mono text-sm font-medium text-[var(--fg-primary)]">
+              {subscription.url}
+            </span>
+            <Badge tone={subscription.active ? 'jade' : 'gray'}>
+              {subscription.active ? 'Active' : 'Paused'}
+            </Badge>
+            {subscription.failureCount > 0 ? (
+              <Badge tone="tomato">
+                {subscription.failureCount} failure{subscription.failureCount !== 1 ? 's' : ''}
+              </Badge>
+            ) : null}
           </div>
-          <div>
-            <p
-              id="wh-events-label"
-              className="block text-xs font-medium text-[var(--fg-secondary)] mb-1"
-            >
-              Events
-            </p>
+
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {subscription.events.map((event) => (
+              <Badge key={event} tone="gray" className="font-mono text-[10px]">
+                {event}
+              </Badge>
+            ))}
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--fg-tertiary)]">
+            <span>Created {relativeTime(subscription.createdAt)}</span>
+            {subscription.lastDeliveryAt ? (
+              <span>Last delivery {relativeTime(subscription.lastDeliveryAt)}</span>
+            ) : null}
+            {subscription.lastFailureAt ? (
+              <span className="text-[var(--warning-fg)]">
+                Last failure {relativeTime(subscription.lastFailureAt)}
+              </span>
+            ) : null}
+          </div>
+
+          {pingResult ? (
             <div
-              role="group"
-              aria-labelledby="wh-events-label"
-              className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+              className={cn(
+                'mt-3 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs',
+                pingResult.success
+                  ? 'bg-[var(--success-surface)] text-[var(--success-fg)]'
+                  : 'bg-[var(--error-surface)] text-[var(--error-fg)]',
+              )}
+              role="status"
             >
-              {EVENT_OPTIONS.map((e) => (
-                <label
-                  key={e}
-                  className="flex cursor-pointer items-center gap-2 rounded-md border border-[var(--border-subtle)] px-3 py-2 hover:bg-[var(--surface-sunken)]"
-                >
-                  <input
-                    type="checkbox"
-                    className="accent-[var(--brand-primary)]"
-                    checked={selected.includes(e)}
-                    onChange={() => toggleEvent(e)}
-                  />
-                  <span className="text-sm text-[var(--fg-primary)]">{e}</span>
-                </label>
-              ))}
+              <Icon name={pingResult.success ? 'check' : 'x'} size={12} />
+              {pingResult.success
+                ? `HTTP ${pingResult.statusCode} - ${pingResult.durationMs}ms`
+                : (pingResult.error ?? `HTTP ${pingResult.statusCode ?? 'timeout'}`)}
             </div>
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isPending}>
-              {isPending ? 'Creating…' : 'Create subscription'}
-            </Button>
-          </div>
-        </form>
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handlePing}
+            disabled={ping.isPending || !subscription.active}
+            aria-label="Send test ping"
+            title="Send test ping"
+          >
+            <Icon
+              name={ping.isPending ? 'loader' : 'zap'}
+              size={14}
+              className={cn(ping.isPending && 'animate-spin')}
+            />
+            <span className="ml-1.5">Ping</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onToggleExpand}
+            aria-expanded={expanded}
+            aria-controls={`deliveries-${subscription.id}`}
+          >
+            <Icon name="list" size={14} />
+            <span className="ml-1.5">History</span>
+            <Icon
+              name="chevron-down"
+              size={12}
+              className={cn('ml-1 transition-transform', expanded && 'rotate-180')}
+            />
+          </Button>
+
+          <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
+            <Icon name="pencil" size={14} />
+            <span className="ml-1.5">Edit</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleToggleActive}
+            disabled={update.isPending}
+            aria-label={subscription.active ? 'Pause subscription' : 'Resume subscription'}
+          >
+            <Icon name={subscription.active ? 'pause' : 'play'} size={14} />
+          </Button>
+
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={handleDelete}
+            disabled={del.isPending}
+            aria-label="Delete subscription"
+          >
+            <Icon name="trash" size={14} />
+          </Button>
+        </div>
       </div>
-    </div>
+
+      {expanded ? (
+        <DeliveryHistoryPanel
+          id={`deliveries-${subscription.id}`}
+          subscriptionId={subscription.id}
+        />
+      ) : null}
+
+      {editing ? (
+        <CreateWebhookDialog
+          mode="edit"
+          initialUrl={subscription.url}
+          initialEvents={subscription.events}
+          onClose={() => setEditing(false)}
+          onSubmit={async (body) => {
+            try {
+              await update.mutateAsync(body);
+              toast.success('Webhook subscription updated');
+              setEditing(false);
+            } catch (err) {
+              toast.error('Failed to update subscription', {
+                description: err instanceof Error ? err.message : 'Server error',
+              });
+            }
+          }}
+          isPending={update.isPending}
+        />
+      ) : null}
+    </li>
   );
+}
+
+function HealthDot({ health }: { health: 'healthy' | 'warning' | 'critical' }) {
+  return (
+    <span
+      className={cn(
+        'h-2.5 w-2.5 shrink-0 rounded-full',
+        health === 'healthy' && 'bg-[var(--success-fg)]',
+        health === 'warning' && 'bg-[var(--warning-fg)]',
+        health === 'critical' && 'bg-[var(--error-fg)]',
+      )}
+      aria-label={`Health: ${health}`}
+    />
+  );
+}
+
+function buildWebhookMetrics(subscriptions: WebhookSub[]) {
+  const active = subscriptions.filter((subscription) => subscription.active).length;
+  const failing = subscriptions.filter((subscription) => subscription.failureCount > 0).length;
+  const eventCount = new Set(subscriptions.flatMap((subscription) => subscription.events)).size;
+  const lastActivity = subscriptions
+    .flatMap((subscription) => [subscription.lastDeliveryAt, subscription.lastFailureAt])
+    .filter((value): value is string => Boolean(value))
+    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
+
+  return {
+    total: subscriptions.length,
+    active,
+    failing,
+    eventCount,
+    lastActivity,
+  };
 }

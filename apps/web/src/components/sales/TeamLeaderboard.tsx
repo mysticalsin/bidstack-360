@@ -46,11 +46,11 @@ export function TeamLeaderboard({ members, isLoading }: Props) {
                           {member.name}
                         </div>
                         <div className="flex items-center gap-2 text-[10px] text-[var(--fg-tertiary)]">
-                          <span className="text-emerald-600 dark:text-emerald-400">
+                          <span className="text-emerald-700 dark:text-emerald-400">
                             {member.wonCount} won
                           </span>
                           <span>·</span>
-                          <span className="text-rose-600 dark:text-rose-400">
+                          <span className="text-rose-700 dark:text-rose-400">
                             {member.lostCount} lost
                           </span>
                           <span>·</span>

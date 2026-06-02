@@ -73,6 +73,21 @@ export const Row = memo(function Row({
   const flash = (field: 'stage' | 'value' | 'probability' | 'dueDate') =>
     setSaved((s) => ({ ...s, [field]: s[field] + 1 }));
 
+  // Per-field in-flight tracking (P1 #22). The shared `patch` mutation can
+  // only tell us SOMETHING is saving — not which row or field. Local booleans
+  // give each cell its own cursor-wait / aria-busy state so the UX is precise.
+  const [saving, setSaving] = useState<{
+    stage: boolean;
+    value: boolean;
+    probability: boolean;
+    dueDate: boolean;
+  }>({ stage: false, value: false, probability: false, dueDate: false });
+
+  const startSave = (field: 'stage' | 'value' | 'probability' | 'dueDate') =>
+    setSaving((s) => ({ ...s, [field]: true }));
+  const endSave = (field: 'stage' | 'value' | 'probability' | 'dueDate') =>
+    setSaving((s) => ({ ...s, [field]: false }));
+
   const savedToast = (field: string) => toast.success(`${field} updated`, { duration: 2200 });
   const errorToast = (err: unknown) =>
     toast.error('Update failed', {
@@ -141,8 +156,10 @@ export const Row = memo(function Row({
         <StageCell
           stage={resolvePipelineStage(opp)}
           options={stageOptions}
+          isSaving={saving.stage}
           onSave={(nextId) => {
             const nextStage = stageOptions.find((s) => s.id === nextId);
+            startSave('stage');
             patch.mutate(
               {
                 id: opp.id,
@@ -152,6 +169,7 @@ export const Row = memo(function Row({
               },
               {
                 onSuccess: () => {
+                  endSave('stage');
                   savedToast('Stage');
                   flash('stage');
                   // Confetti only on closed_won, never on closed_lost —
@@ -165,7 +183,10 @@ export const Row = memo(function Row({
                   // region keeps SR users in sync.
                   announceStageChange(`${opp.name} moved to ${nextStage?.name ?? nextId}`);
                 },
-                onError: errorToast,
+                onError: (err) => {
+                  endSave('stage');
+                  errorToast(err);
+                },
               },
             );
           }}
@@ -179,19 +200,25 @@ export const Row = memo(function Row({
           step={1000}
           min={0}
           align="right"
+          isSaving={saving.value}
           format={(v) => formatMoney(v, 'EUR')}
-          onSave={(next) =>
+          onSave={(next) => {
+            startSave('value');
             patch.mutate(
               { id: opp.id, patch: { value: next } },
               {
                 onSuccess: () => {
+                  endSave('value');
                   savedToast('Value');
                   flash('value');
                 },
-                onError: errorToast,
+                onError: (err) => {
+                  endSave('value');
+                  errorToast(err);
+                },
               },
-            )
-          }
+            );
+          }}
         />
         <SavedFlash trigger={saved.value} />
       </td>
@@ -203,19 +230,25 @@ export const Row = memo(function Row({
           max={100}
           step={5}
           align="right"
+          isSaving={saving.probability}
           format={(v) => `${v}%`}
-          onSave={(next) =>
+          onSave={(next) => {
+            startSave('probability');
             patch.mutate(
               { id: opp.id, patch: { probability: next } },
               {
                 onSuccess: () => {
+                  endSave('probability');
                   savedToast('Probability');
                   flash('probability');
                 },
-                onError: errorToast,
+                onError: (err) => {
+                  endSave('probability');
+                  errorToast(err);
+                },
               },
-            )
-          }
+            );
+          }}
         />
         <SavedFlash trigger={saved.probability} />
       </td>
@@ -224,18 +257,24 @@ export const Row = memo(function Row({
         <DateCell
           value={opp.dueDate}
           format={(v) => formatDate(v)}
-          onSave={(next) =>
+          isSaving={saving.dueDate}
+          onSave={(next) => {
+            startSave('dueDate');
             patch.mutate(
               { id: opp.id, patch: { dueDate: next } },
               {
                 onSuccess: () => {
+                  endSave('dueDate');
                   savedToast('Due date');
                   flash('dueDate');
                 },
-                onError: errorToast,
+                onError: (err) => {
+                  endSave('dueDate');
+                  errorToast(err);
+                },
               },
-            )
-          }
+            );
+          }}
         />
         <SavedFlash trigger={saved.dueDate} />
       </td>

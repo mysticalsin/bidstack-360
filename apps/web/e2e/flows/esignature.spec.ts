@@ -20,9 +20,9 @@ test.describe('E-signature flow', () => {
     const expired = await signPage.isExpired();
     test.skip(expired, 'Sign token is expired or invalid — seed a pending Document');
 
-    await expect(
-      signPage.signaturePad.or(signPage.documentViewer),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(signPage.signaturePad.or(signPage.documentViewer)).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test('signing page shows error for an expired token', async ({ page }) => {
@@ -42,12 +42,17 @@ test.describe('E-signature flow', () => {
     const expired = await signPage.isExpired();
     test.skip(expired, 'Sign token expired — cannot test signature pad');
 
-    const padVisible = await signPage.signaturePad.isVisible({ timeout: 10_000 }).catch(() => false);
+    await signPage.startSigning();
+
+    const padVisible = await signPage.signaturePad
+      .isVisible({ timeout: 10_000 })
+      .catch(() => false);
     test.skip(!padVisible, 'Signature pad not visible');
 
     await signPage.drawSignature();
-    // After drawing, submit button should be enabled
-    await expect(signPage.submitButton).toBeEnabled({ timeout: 3_000 });
+    // After drawing, continue button should be visible/enabled
+    const continueBtn = page.getByRole('button', { name: /continue/i });
+    await expect(continueBtn).toBeEnabled({ timeout: 3_000 });
   });
 
   test('full sign flow: draw → submit → confirmation', async ({ page }) => {
@@ -57,7 +62,11 @@ test.describe('E-signature flow', () => {
     const expired = await signPage.isExpired();
     test.skip(expired, 'Sign token expired');
 
-    const padVisible = await signPage.signaturePad.isVisible({ timeout: 10_000 }).catch(() => false);
+    await signPage.startSigning();
+
+    const padVisible = await signPage.signaturePad
+      .isVisible({ timeout: 10_000 })
+      .catch(() => false);
     test.skip(!padVisible, 'Signature pad not visible');
 
     await signPage.signAndSubmit();

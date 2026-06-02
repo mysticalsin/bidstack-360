@@ -4,8 +4,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
-
-import { isPublicHostname } from '../lib/ssrf-guard.js';
+import { WebhookEventKeySchema, assertSafeWebhookUrl } from '@bidstack/shared';
 
 const WebhookSub = z.object({
   id: z.string().uuid(),
@@ -16,6 +15,10 @@ const WebhookSub = z.object({
   lastDeliveryAt: z.string().datetime().nullable(),
   lastFailureAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
+});
+
+const WebhookSubCreated = WebhookSub.extend({
+  signingSecret: z.string(),
 });
 
 const WebhookDeliveryRecord = z.object({
@@ -34,35 +37,21 @@ const TEST_PING_TIMEOUT_MS = 10_000;
 
 const WebhookSubCreate = z.object({
   url: z.string().url().max(500),
-  events: z.array(z.string().min(1).max(100)).max(50).min(1),
+  events: z.array(WebhookEventKeySchema).max(50).min(1),
   active: z.boolean().default(true),
 });
 
 const WebhookSubUpdate = z.object({
   url: z.string().url().max(500).optional(),
-  events: z.array(z.string().min(1).max(100)).max(50).optional(),
+  events: z.array(WebhookEventKeySchema).max(50).min(1).optional(),
   active: z.boolean().optional(),
 });
-
-function assertSafeWebhookUrl(rawUrl: string): void {
-  let url: URL;
-  try {
-    url = new URL(rawUrl);
-  } catch {
-    throw new Error('url must be a valid URL');
-  }
-  if (url.protocol !== 'https:') {
-    throw new Error('url must use HTTPS');
-  }
-  if (!isPublicHostname(url.hostname)) {
-    throw new Error('url must not point to a private or internal address');
-  }
-}
 
 export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/webhook-subscriptions',
     {
+      preHandler: [server.requirePermission('webhooks:read'), server.requireRole('admin')],
       schema: {
         response: { 200: z.array(WebhookSub) },
       },
@@ -103,7 +92,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
       preHandler: [server.requirePermission('webhooks:write'), server.requireRole('admin')],
       schema: {
         body: WebhookSubCreate,
-        response: { 201: WebhookSub },
+        response: { 201: WebhookSubCreated },
       },
     },
     async (req, reply) => {
@@ -132,6 +121,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
         lastDeliveryAt: null,
         lastFailureAt: null,
         createdAt: created.createdAt.toISOString(),
+        signingSecret: secret,
       });
     },
   );
@@ -208,6 +198,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
   server.get(
     '/webhook-subscriptions/:id/deliveries',
     {
+      preHandler: [server.requirePermission('webhooks:read'), server.requireRole('admin')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         querystring: z.object({
@@ -288,9 +279,19 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
     async (req) => {
       const sub = await prisma.webhookSubscription.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
-        select: { id: true, url: true, secret: true },
+        select: { id: true, orgId: true, url: true, secret: true },
       });
       if (!sub) throw server.httpErrors.notFound('Subscription not found');
+
+      try {
+        assertSafeWebhookUrl(sub.url);
+      } catch (err) {
+        throw server.httpErrors.badRequest(
+          err instanceof Error
+            ? `Stored webhook URL is unsafe: ${err.message}`
+            : 'Stored webhook URL is unsafe',
+        );
+      }
 
       const pingBody = JSON.stringify({
         id: crypto.randomUUID(),
@@ -301,12 +302,16 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
       });
 
       const t = Math.floor(Date.now() / 1000);
-      const sig = createHmac('sha256', sub.secret)
-        .update(`${t}.${pingBody}`)
-        .digest('hex');
+      const sig = createHmac('sha256', sub.secret).update(`${t}.${pingBody}`).digest('hex');
       const signature = `t=${t},v1=${sig}`;
       const start = Date.now();
 
+      let result: {
+        success: boolean;
+        statusCode: number | null;
+        durationMs: number;
+        error?: string;
+      };
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), TEST_PING_TIMEOUT_MS);
@@ -325,19 +330,39 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
         } finally {
           clearTimeout(timeoutId);
         }
-        return {
+        result = {
           success: res.status >= 200 && res.status < 300,
           statusCode: res.status,
           durationMs: Date.now() - start,
         };
       } catch (err) {
-        return {
+        result = {
           success: false,
           statusCode: null,
           durationMs: Date.now() - start,
           error: err instanceof Error ? err.message : String(err),
         };
       }
+
+      await prisma.webhookDelivery.create({
+        data: {
+          orgId: sub.orgId,
+          subscriptionId: sub.id,
+          event: 'ping',
+          statusCode: result.statusCode,
+          success: result.success,
+          durationMs: result.durationMs,
+          attempt: 1,
+          errorMessage: result.error ?? null,
+        },
+      });
+
+      await prisma.webhookSubscription.update({
+        where: { id: sub.id },
+        data: result.success ? { lastDeliveryAt: new Date() } : { lastFailureAt: new Date() },
+      });
+
+      return result;
     },
   );
 };

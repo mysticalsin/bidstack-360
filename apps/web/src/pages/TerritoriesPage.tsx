@@ -238,7 +238,14 @@ export function TerritoriesPage() {
             </div>
           ) : (
             <div className="h-[480px] w-full">
-              <WorldMap data={aItems} onCountryClick={setSelected} className="h-full w-full" />
+              <WorldMap
+                data={aItems}
+                onCountryClick={(item) =>
+                  setSelected((prev) => (prev?.countryCode === item.countryCode ? null : item))
+                }
+                selectedCountryCode={selected?.countryCode}
+                className="h-full w-full"
+              />
             </div>
           )}
         </Card>
@@ -249,7 +256,12 @@ export function TerritoriesPage() {
         variants={reducedMotion ? undefined : staggerChild}
         className="grid grid-cols-1 gap-6 lg:grid-cols-3"
       >
-        <CountryDetailPanel selected={selected} formatMoneyMicros={formatMoneyMicros} />
+        <CountryDetailPanel
+          selected={selected}
+          formatMoneyMicros={formatMoneyMicros}
+          globalTotals={totals}
+          onClear={() => setSelected(null)}
+        />
         <TerritoryListPanel
           items={tItems}
           isLoading={territories.isLoading}
@@ -261,6 +273,7 @@ export function TerritoriesPage() {
             setTerritoryDialogOpen(true);
           }}
           onDelete={handleDeleteTerritory}
+          selectedCountryCode={selected?.countryCode}
         />
         <RoutingRuleListPanel
           items={rItems}
@@ -273,6 +286,7 @@ export function TerritoriesPage() {
             setRuleDialogOpen(true);
           }}
           onDelete={handleDeleteRule}
+          selectedCountryCode={selected?.countryCode}
         />
       </motion.div>
     </motion.div>

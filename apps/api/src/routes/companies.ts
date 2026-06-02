@@ -252,45 +252,58 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!root) throw server.httpErrors.notFound('Company not found');
 
-      // Build ancestors
+      // WHY single query: the previous implementation issued one findMany
+      // per node in the recursive buildTree() (N+1) and one findFirst per
+      // ancestor level in the while-loop (also N+1). For a 6-level, 50-node
+      // hierarchy that was 56+ round-trips. A single flat query for all org
+      // companies collapses that to 2 DB calls total (root + all nodes) and
+      // keeps memory flat: only the ~50-byte {id, name, parentId} tuples are
+      // loaded, not full company rows.
+      const ORG_COMPANY_CAP = 2_000;
+      const allNodes = await prisma.company.findMany({
+        where: { orgId: req.auth.orgId, deletedAt: null },
+        select: { id: true, name: true, parentId: true },
+        orderBy: { name: 'asc' },
+        take: ORG_COMPANY_CAP,
+      });
+
+      // Pre-group children by parentId for O(n) tree assembly.
+      type FlatNode = (typeof allNodes)[number];
+      const childrenByParent = new Map<string, FlatNode[]>();
+      for (const node of allNodes) {
+        if (node.parentId) {
+          const siblings = childrenByParent.get(node.parentId) ?? [];
+          siblings.push(node);
+          childrenByParent.set(node.parentId, siblings);
+        }
+      }
+
+      // Build lookup map for O(1) ancestor resolution.
+      const byId = new Map(allNodes.map((n) => [n.id, n]));
+
+      // Ancestors: follow parentId chain in-memory.
       const ancestors: Array<{ id: string; name: string }> = [];
       let ancestorId: string | null = root.parentId;
       while (ancestorId) {
-        const row = await prisma.company.findFirst({
-          where: { id: ancestorId, orgId: req.auth.orgId, deletedAt: null },
-          select: { id: true, name: true, parentId: true },
-        });
-        if (!row) break;
-        ancestors.unshift({ id: row.id, name: row.name });
-        ancestorId = row.parentId;
+        const ancestor = byId.get(ancestorId);
+        if (!ancestor) break;
+        ancestors.unshift({ id: ancestor.id, name: ancestor.name });
+        ancestorId = ancestor.parentId;
       }
 
-      // Build direct children
-      const directChildren = await prisma.company.findMany({
-        where: { parentId: root.id, orgId: req.auth.orgId, deletedAt: null },
-        select: { id: true, name: true },
-        orderBy: { name: 'asc' },
-        take: 500,
-      });
+      // Direct children: already grouped and sorted by the orderBy above.
+      const directChildren = (childrenByParent.get(root.id) ?? []).map((n) => ({
+        id: n.id,
+        name: n.name,
+      }));
 
-      // Build full tree recursively
-      async function buildTree(
-        id: string,
-        name: string,
-        parentId: string | null,
-      ): Promise<CompanyHierarchyNode> {
-        const kids = await prisma.company.findMany({
-          where: { parentId: id, orgId: req.auth.orgId, deletedAt: null },
-          select: { id: true, name: true },
-          orderBy: { name: 'asc' },
-          take: 500,
-        });
-        const children: CompanyHierarchyNode[] = await Promise.all(
-          kids.map((k): Promise<CompanyHierarchyNode> => buildTree(k.id, k.name, id)),
-        );
+      // Build full tree recursively in-memory — zero additional DB calls.
+      function buildTree(id: string, name: string, parentId: string | null): CompanyHierarchyNode {
+        const kids = childrenByParent.get(id) ?? [];
+        const children = kids.map((k): CompanyHierarchyNode => buildTree(k.id, k.name, id));
         return { id, name, parentId, children };
       }
-      const tree = await buildTree(root.id, root.name, root.parentId);
+      const tree = buildTree(root.id, root.name, root.parentId);
 
       return { ancestors, directChildren, tree };
     },

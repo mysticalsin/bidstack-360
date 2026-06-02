@@ -231,7 +231,10 @@ function GroupNode({
       ...group,
       conditions: [
         ...group.conditions,
-        { field: '', operator: 'eq' as FilterOperator, value: '' },
+        // WHY crypto.randomUUID(): AnimatePresence requires stable keys that
+        // survive array mutations — index keys break exit animations and corrupt
+        // ConditionRow's local fieldDef state when a preceding row is deleted.
+        { id: crypto.randomUUID(), field: '', operator: 'eq' as FilterOperator, value: '' },
       ],
     });
   };
@@ -241,7 +244,7 @@ function GroupNode({
       ...group,
       conditions: [
         ...group.conditions,
-        { logic: 'AND' as FilterLogic, conditions: [] },
+        { id: crypto.randomUUID(), logic: 'AND' as FilterLogic, conditions: [] },
       ],
     });
   };
@@ -250,12 +253,15 @@ function GroupNode({
     onChange({ ...group, logic: group.logic === 'AND' ? 'OR' : 'AND' });
   };
 
-  const depthColor = depth === 0 ? 'border-[var(--border-subtle)]' : depth === 1 ? 'border-[var(--chart-2)]' : 'border-[var(--chart-4)]';
+  const depthColor =
+    depth === 0
+      ? 'border-[var(--border-subtle)]'
+      : depth === 1
+        ? 'border-[var(--chart-2)]'
+        : 'border-[var(--chart-4)]';
 
   return (
-    <div
-      className={cn('rounded-lg border p-3 space-y-2', depthColor)}
-    >
+    <div className={cn('rounded-lg border p-3 space-y-2', depthColor)}>
       {/* Group header */}
       <div className="flex items-center gap-2">
         <button
@@ -273,7 +279,9 @@ function GroupNode({
           <ChevronDown size={12} />
         </button>
         <span className="text-xs text-[var(--fg-tertiary)]">
-          {group.conditions.length === 0 ? 'No conditions yet' : `${group.conditions.length} condition${group.conditions.length !== 1 ? 's' : ''}`}
+          {group.conditions.length === 0
+            ? 'No conditions yet'
+            : `${group.conditions.length} condition${group.conditions.length !== 1 ? 's' : ''}`}
         </span>
         {onRemove && (
           <button
@@ -295,7 +303,7 @@ function GroupNode({
         {group.conditions.map((child, i) =>
           'logic' in child ? (
             <GroupNode
-              key={i}
+              key={child.id ?? String(i)}
               entity={entity}
               group={child as FilterGroup}
               onChange={(g) => updateChild(i, g)}
@@ -304,7 +312,7 @@ function GroupNode({
             />
           ) : (
             <ConditionRow
-              key={i}
+              key={child.id ?? String(i)}
               entity={entity}
               condition={child as FilterCondition}
               onChange={(c) => updateChild(i, c)}

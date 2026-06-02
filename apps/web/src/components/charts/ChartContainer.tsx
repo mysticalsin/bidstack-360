@@ -5,7 +5,7 @@
 
 import { motion, useReducedMotion } from 'framer-motion';
 import { MoreHorizontal, RefreshCw } from 'lucide-react';
-import { type ReactNode, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { cn } from '@/lib/cn';
 import { springSoft } from '@/lib/motion';
@@ -46,6 +46,18 @@ export function ChartContainer({
   const reduced = useReducedMotion();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // WHY Escape closes the menu: onBlur alone isn't enough — users navigating
+  // via keyboard expect Escape to dismiss a menu without moving focus away from
+  // the trigger. ARIA 1.2 §menu specifies Escape closes the menu.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
   const allActions: Action[] = [
     ...(onRefresh ? [{ label: 'Refresh', icon: <RefreshCw size={14} />, onClick: onRefresh }] : []),
     ...actions,
@@ -71,9 +83,7 @@ export function ChartContainer({
                 {title}
               </h3>
             )}
-            {subtitle && (
-              <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">{subtitle}</p>
-            )}
+            {subtitle && <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">{subtitle}</p>}
           </div>
           {allActions.length > 0 && (
             <div className="relative" ref={menuRef}>

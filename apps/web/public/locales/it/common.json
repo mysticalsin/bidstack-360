@@ -245,15 +245,15 @@
       "title": "Impostazioni",
       "subtitle": "Gestisci account, preferenze e integrazioni dell'area di lavoro.",
       "sections": {
+        "overview": "Panoramica",
         "profile": "Profilo",
         "appearance": "Aspetto",
         "language": "Lingua",
         "notifications": "Notifiche",
         "security": "Sicurezza",
-        "microsoft": "Microsoft 365",
-        "mobile": "App mobile",
         "workspace": "Area di lavoro",
-        "advanced": "Avanzate",
+        "crm": "Configurazione CRM",
+        "developer": "Accesso sviluppatore",
         "emailTemplates": "Modelli email",
         "tags": "Etichette",
         "leadRot": "Regole di obsolescenza"

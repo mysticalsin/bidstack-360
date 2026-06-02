@@ -32,7 +32,7 @@ export function OpportunitiesTableHead({
   toggleAll,
 }: Props) {
   return (
-    <thead className="sticky top-0 z-10 bg-[var(--surface-sunken)] text-xs uppercase tracking-wider text-[var(--fg-tertiary)]">
+    <thead className="sticky top-0 z-10 bg-[var(--surface-sunken)] text-xs uppercase tracking-wider text-[var(--fg-secondary)]">
       <tr>
         <th scope="col" className="w-10 px-5 py-3">
           <label className="table-checkbox-hit">

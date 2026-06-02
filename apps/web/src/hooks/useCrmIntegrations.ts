@@ -37,3 +37,20 @@ export function useProviderHealth() {
     refetchOnWindowFocus: true,
   });
 }
+
+export interface UserIntegrationStatus {
+  provider: string;
+  status: 'CONNECTED' | 'DISCONNECTED' | 'ERROR';
+  connectedEmail: string | null;
+  lastSyncedAt: string | null;
+  errorMessage: string | null;
+  scopes: string[];
+}
+
+export function useUserIntegrationsStatus() {
+  return useQuery({
+    queryKey: ['user-integrations-status'],
+    queryFn: ({ signal }) =>
+      api<{ integrations: UserIntegrationStatus[] }>('/api/integrations/status', { signal }),
+  });
+}

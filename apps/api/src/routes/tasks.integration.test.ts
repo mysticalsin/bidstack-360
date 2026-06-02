@@ -81,6 +81,32 @@ describe('tasks routes', () => {
     expect(body.items).toBeUndefined();
   });
 
+  skipIfNoDb('GET /api/tasks/summary refreshes after task mutations', async () => {
+    const before = await server.inject({ method: 'GET', url: '/api/tasks/summary' });
+    expect(before.statusCode).toBe(200);
+    const beforeBody = before.json() as { total: number; open: number };
+
+    const create = await server.inject({
+      method: 'POST',
+      url: '/api/tasks',
+      payload: {
+        oppId: null,
+        title: `Summary cache invalidation ${Date.now()}`,
+        dueDate: null,
+        status: 'open',
+        assignee: null,
+      },
+    });
+    expect(create.statusCode).toBe(201);
+    createdTaskIds.push((create.json() as { id: string }).id);
+
+    const after = await server.inject({ method: 'GET', url: '/api/tasks/summary' });
+    expect(after.statusCode).toBe(200);
+    const afterBody = after.json() as { total: number; open: number };
+    expect(afterBody.total).toBe(beforeBody.total + 1);
+    expect(afterBody.open).toBe(beforeBody.open + 1);
+  });
+
   skipIfNoDb('POST /api/tasks creates a task', async () => {
     const res = await server.inject({
       method: 'POST',

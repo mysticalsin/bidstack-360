@@ -15,7 +15,7 @@
 // but WOULD break the bundle-size assertion that lives in CI / the audit
 // (grep `dist/assets/index-*.js` for "clerk").
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 
@@ -60,7 +60,12 @@ function Probe() {
 }
 
 describe('AuthProvider — stub mode (no publishableKey)', () => {
-  it('mounts synchronously and exposes the stub user without throwing', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('mounts synchronously and exposes the stub user when signed in', () => {
+    localStorage.setItem('bidstack:session', 'stub');
     render(
       <AuthProvider publishableKey={undefined}>
         <Probe />
@@ -75,7 +80,20 @@ describe('AuthProvider — stub mode (no publishableKey)', () => {
     expect(screen.getByTestId('email').textContent).toBe('jane@mantu.com');
   });
 
+  it('mounts synchronously as signed out when no session exists', () => {
+    render(
+      <AuthProvider publishableKey={undefined}>
+        <Probe />
+      </AuthProvider>,
+    );
+
+    expect(screen.getByTestId('loaded').textContent).toBe('true');
+    expect(screen.getByTestId('signed-in').textContent).toBe('false');
+    expect(screen.getByTestId('email').textContent).toBe('none');
+  });
+
   it('treats empty string as missing key (defensive against misconfigured CI)', () => {
+    localStorage.setItem('bidstack:session', 'stub');
     // Vite exposes unset env vars as undefined, but a misconfigured CI could
     // set VITE_CLERK_PUBLISHABLE_KEY="" — that must NOT trigger the lazy
     // Clerk branch (it would pull the chunk for nothing and then crash when

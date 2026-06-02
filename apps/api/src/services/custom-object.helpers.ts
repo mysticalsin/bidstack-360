@@ -82,6 +82,14 @@ export interface SearchRecordsInput {
   limit?: number;
 }
 
+export function customObjectFieldEntityType(defId: string): string {
+  return `CUSTOM_OBJECT:${defId}`;
+}
+
+export function customObjectFieldEntityTypes(defId: string): string[] {
+  return ['CUSTOM_OBJECT', customObjectFieldEntityType(defId)];
+}
+
 // ─── Private record utilities ────────────────────────────────────────────────
 
 /**
@@ -111,7 +119,12 @@ export async function validateValues(
   isCreate: boolean,
 ): Promise<Record<string, unknown>> {
   const fields = await prisma.customFieldDefinition.findMany({
-    where: { orgId, customObjectDefId: defId, entityType: 'CUSTOM_OBJECT', active: true },
+    where: {
+      orgId,
+      customObjectDefId: defId,
+      entityType: { in: customObjectFieldEntityTypes(defId) },
+      active: true,
+    },
     select: { fieldKey: true, required: true, defaultValue: true },
   });
 
@@ -158,7 +171,12 @@ export async function applyDefaults(
   valuesJson: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const fields = await prisma.customFieldDefinition.findMany({
-    where: { orgId, customObjectDefId: defId, entityType: 'CUSTOM_OBJECT', active: true },
+    where: {
+      orgId,
+      customObjectDefId: defId,
+      entityType: { in: customObjectFieldEntityTypes(defId) },
+      active: true,
+    },
     select: { fieldKey: true, defaultValue: true },
   });
 

@@ -9,13 +9,15 @@ import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { downloadFileUrl, useDeleteFile, useFiles, useUploadFile } from '@/hooks/useFiles';
 import { relativeTime } from '@/lib/format';
-import { ALLOWED_FILE_CONTENT_TYPES, type FileAttachment } from '@bidstack/shared';
+import {
+  FILE_INPUT_ACCEPT,
+  inferAllowedFileContentType,
+  type FileAttachment,
+} from '@bidstack/shared';
 
 interface FilesPanelProps {
   accountId: string;
 }
-
-const ACCEPT = ALLOWED_FILE_CONTENT_TYPES.join(',');
 
 export function FilesPanel({ accountId }: FilesPanelProps) {
   const list = useFiles(accountId);
@@ -32,12 +34,8 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
     Array.from(files).forEach((file) => {
       // Why client-side type check: gives instant feedback before round-tripping
       // a multi-MB file. Server still re-validates via Zod (defense in depth).
-      if (
-        !ALLOWED_FILE_CONTENT_TYPES.includes(
-          file.type as (typeof ALLOWED_FILE_CONTENT_TYPES)[number],
-        )
-      ) {
-        setUploadError(`Unsupported file type: ${file.type || 'unknown'}`);
+      if (!inferAllowedFileContentType(file.name, file.type)) {
+        setUploadError(`Unsupported file type: ${file.type || file.name || 'unknown'}`);
         return;
       }
       upload.mutate(file, {
@@ -111,7 +109,7 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
           ref={inputRef}
           type="file"
           multiple
-          accept={ACCEPT}
+          accept={FILE_INPUT_ACCEPT}
           onChange={onChange}
           className="sr-only"
         />

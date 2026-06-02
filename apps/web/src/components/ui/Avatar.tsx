@@ -84,7 +84,7 @@ export function Avatar({ seed, src, size = 32, initials, className, decorative }
         background: gradient,
         // White text wins contrast on every gradient in our palette (all
         // mid-tone hues at 50–58% lightness).
-        color: '#fff',
+        color: 'white',
       }}
       className={cn(
         'inline-flex items-center justify-center font-semibold select-none',
@@ -126,11 +126,12 @@ export function OnlineDot({ online, label, className }: OnlineDotProps) {
       title={statusText}
       className={cn(
         'inline-block h-2.5 w-2.5 shrink-0 rounded-full',
-        // Colours: hardcoded rather than via CSS var so we can guarantee the
-        // exact contrast ratios computed above.
+        // Colours: CSS vars from index.css — ratios documented in token comments.
+        // Light: online=#1a9e5c (4.7:1), offline=#8a8a8a (3.3:1) — both pass 3:1 AA.
+        // Dark:  online=#34d399, offline=#6b7280.
         online
-          ? 'bg-[#1a9e5c] shadow-[0_0_0_1.5px_rgba(26,158,92,0.25)]'
-          : 'bg-[#8a8a8a]',
+          ? 'bg-[var(--presence-online)] shadow-[0_0_0_1.5px_var(--presence-online-ring)]'
+          : 'bg-[var(--presence-offline)]',
         className,
       )}
     />

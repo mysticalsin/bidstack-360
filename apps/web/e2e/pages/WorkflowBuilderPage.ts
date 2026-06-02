@@ -20,7 +20,9 @@ export class WorkflowBuilderPage {
   constructor(page: Page) {
     this.page = page;
     this.heading = page.getByRole('heading', { name: /workflow/i, level: 1 });
-    this.newWorkflowButton = page.getByRole('button', { name: /new workflow|create workflow/i });
+    this.newWorkflowButton = page
+      .getByRole('button', { name: /new workflow|create workflow/i })
+      .first();
     this.triggerPanel = page.getByText(/trigger|when/i).first();
     this.actionPanel = page.getByText(/action|then do/i).first();
     this.saveButton = page.getByRole('button', { name: /save workflow|save/i });

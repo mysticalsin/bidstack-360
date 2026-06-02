@@ -180,6 +180,12 @@ export function OpportunityDetailPage() {
                     </Button>
                   }
                 />
+                <Link to={`/rfp/${data.id}/pipeline`}>
+                  <Button variant="ghost" size="sm" className="rounded-full">
+                    <Icon name="wand" size={12} className="text-[var(--brand-primary)] mr-1" />
+                    RFP Pipeline
+                  </Button>
+                </Link>
                 <MagneticButton
                   onClick={() => setBriefOpen(true)}
                   className="h-8 px-4 text-xs shadow-none"

@@ -116,6 +116,21 @@ export const RFP_QA_REVIEW: QueueConfig = {
 };
 
 /**
+ * rfp.proposal-compile — Assembles all drafted sections into final proposal.
+ * Runs after legal scan. Sequential (one per proposal).
+ * concurrency: 2 (long-running Dust call).
+ */
+export const RFP_PROPOSAL_COMPILE: QueueConfig = {
+  name: 'rfp.proposal-compile',
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'exponential', delay: 15_000 },
+    removeOnComplete: { age: 86_400 * 7, count: 200 },
+    removeOnFail: { age: 86_400 * 30, count: 200 },
+  },
+};
+
+/**
  * rfp.embed-reference — Generates + upserts ReferenceEmbedding for a success story.
  * Triggered on SuccessStory create/update. LOW priority (background enrichment).
  * WHY 5 attempts: embedding API (Cohere/OpenAI) occasionally rate-limits.
@@ -153,6 +168,7 @@ export const RFP_QUEUES = {
   COMPLIANCE_FILL: RFP_COMPLIANCE_FILL,
   SECTION_DRAFT: RFP_SECTION_DRAFT,
   LEGAL_SCAN: RFP_LEGAL_SCAN,
+  PROPOSAL_COMPILE: RFP_PROPOSAL_COMPILE,
   QA_REVIEW: RFP_QA_REVIEW,
   EMBED_REFERENCE: RFP_EMBED_REFERENCE,
   EMBED_REQUIREMENT: RFP_EMBED_REQUIREMENT,

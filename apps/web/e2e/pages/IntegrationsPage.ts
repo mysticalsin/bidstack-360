@@ -17,9 +17,9 @@ export class IntegrationsPage {
   constructor(page: Page) {
     this.page = page;
     this.heading = page.getByRole('heading', { name: /integrations/i, level: 1 });
-    this.gmailCard = page.getByText(/gmail/i).first();
-    this.slackCard = page.getByText(/slack/i).first();
-    this.microsoftCard = page.getByText(/microsoft|outlook/i).first();
+    this.gmailCard = page.locator('[data-testid="integration-card-gmail"]');
+    this.slackCard = page.locator('[data-testid="integration-card-slack"]');
+    this.microsoftCard = page.locator('[data-testid="integration-card-microsoft"]');
   }
 
   async navigate(): Promise<void> {
@@ -28,21 +28,20 @@ export class IntegrationsPage {
   }
 
   async assertIntegrationCardsVisible(): Promise<void> {
-    await expect(
-      this.gmailCard.or(this.slackCard).or(this.microsoftCard).first(),
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(this.gmailCard.or(this.slackCard).or(this.microsoftCard).first()).toBeVisible({
+      timeout: 10_000,
+    });
   }
 
   /** Click the Connect button for a specific integration by name. */
   async connectIntegration(name: string): Promise<void> {
-    const card = this.page.locator(`[data-testid="integration-card-${name.toLowerCase()}"]`)
-      .or(this.page.getByText(new RegExp(name, 'i')).locator('..').locator('..'));
+    const card = this.page.locator(`[data-testid="integration-card-${name.toLowerCase()}"]`);
     const connectBtn = card.getByRole('button', { name: /connect/i });
     await connectBtn.click();
   }
 
   async assertConnected(name: string): Promise<void> {
-    const card = this.page.getByText(new RegExp(name, 'i')).locator('..').locator('..');
+    const card = this.page.locator(`[data-testid="integration-card-${name.toLowerCase()}"]`);
     await expect(card.getByText(/connected|active/i)).toBeVisible({ timeout: 10_000 });
   }
 }

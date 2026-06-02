@@ -53,6 +53,13 @@ export const STANDARD_AGENTS: StdAgent[] = [
     backstory: 'A pricing strategist who builds defensible, competitive commercial models.',
   },
   {
+    key: 'presales',
+    role: 'Presales Lead',
+    goal: 'Validate solution fit, delivery assumptions and technical response gaps',
+    backstory:
+      'A senior presales leader who stress-tests feasibility, integrations, dependencies and SME follow-ups.',
+  },
+  {
     key: 'marketing',
     role: 'Marketing Strategist',
     goal: 'Craft win themes and proof points',
@@ -97,6 +104,13 @@ const STANDARD_CREW = {
       agentKey: 'finance',
       description: 'Outline a pricing and commercial approach that fits the RFP constraints.',
       expectedOutput: 'A pricing approach.',
+    },
+    {
+      key: 'presales_review',
+      agentKey: 'presales',
+      description:
+        'Assess solution fit, technical gaps, delivery assumptions and SME follow-up needs.',
+      expectedOutput: 'A presales feasibility review.',
     },
     {
       key: 'win_themes',

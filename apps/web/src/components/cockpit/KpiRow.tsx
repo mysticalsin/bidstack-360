@@ -4,8 +4,6 @@ import { memo } from 'react';
 import { AnimatedNumber } from '@/components/motion/AnimatedNumber';
 import { Icon } from '@/components/ui/Icon';
 import { springSnap, staggerChild, staggerParent } from '@/lib/motion';
-import { Sparkline } from './Sparkline';
-import { seedSeries } from './sparkSeed';
 import { GlassCard } from '@/components/ui/GlassCard';
 
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
@@ -57,17 +55,52 @@ export const KpiRow = memo(function KpiRow({ cockpit }: Props) {
             aria-hidden
             style={{
               color: KPI_TONE_FG[kpi.tone],
-              alignSelf: 'flex-end',
-              marginBottom: 4,
+              alignSelf: 'flex-start',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-end',
+              gap: 2,
             }}
           >
-            <Sparkline values={seedSeries(kpi.label)} />
+            <SourceBadge
+              label={kpi.sourceLabel ?? 'CRM'}
+              state={kpi.sourceState ?? 'crm'}
+              hint={kpi.sourceHint ?? kpi.detail ?? 'BidStack CRM data'}
+            />
           </div>
         </GlassCard>
       ))}
     </motion.section>
   );
 });
+
+function SourceBadge({
+  label,
+  state,
+  hint,
+}: {
+  label: string;
+  state: NonNullable<AccountCockpitSnapshot['kpis'][number]['sourceState']>;
+  hint: string;
+}) {
+  const className =
+    state === 'apollo_fresh'
+      ? 'bg-[var(--success-tint)] text-[var(--success)]'
+      : state === 'apollo_stale' || state === 'missing'
+        ? 'bg-[var(--warning-tint)] text-[var(--warning)]'
+        : state === 'verified'
+          ? 'bg-[var(--brand-primary-tint)] text-[var(--brand-primary)]'
+          : 'bg-[var(--surface-sunken)] text-[var(--fg-tertiary)]';
+  return (
+    <span
+      className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${className}`}
+      aria-label={hint}
+      title={hint}
+    >
+      {label}
+    </span>
+  );
+}
 
 // Parse a formatted KPI value like "€12,345", "48%", "2.5x", "1,200 days"
 // and animate just the numeric portion. The prefix and suffix render as

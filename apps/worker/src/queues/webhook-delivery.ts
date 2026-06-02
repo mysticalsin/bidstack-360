@@ -28,7 +28,7 @@ import type pino from 'pino';
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
-import { WEBHOOK_DELIVERY } from '@bidstack/shared';
+import { WEBHOOK_DELIVERY, assertSafeWebhookUrl } from '@bidstack/shared';
 
 const QUEUE_NAME = WEBHOOK_DELIVERY.name;
 
@@ -66,6 +66,17 @@ async function deliver(
   secret: string,
   body: string,
 ): Promise<{ statusCode: number | null; durationMs: number; success: boolean; error?: string }> {
+  try {
+    assertSafeWebhookUrl(url);
+  } catch (err) {
+    return {
+      statusCode: null,
+      durationMs: 0,
+      success: false,
+      error: err instanceof Error ? `Unsafe webhook URL: ${err.message}` : 'Unsafe webhook URL',
+    };
+  }
+
   const signature = buildSignatureHeader(secret, body);
   const start = Date.now();
 
@@ -104,7 +115,10 @@ async function deliver(
 async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger): Promise<void> {
   const parsed = DeliveryJobSchema.safeParse(job.data);
   if (!parsed.success) {
-    log.warn({ jobId: job.id, issues: parsed.error.issues }, 'invalid webhook delivery job payload');
+    log.warn(
+      { jobId: job.id, issues: parsed.error.issues },
+      'invalid webhook delivery job payload',
+    );
     return; // don't retry malformed jobs
   }
 
@@ -186,9 +200,7 @@ async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger): Prom
     }
 
     // Throw so BullMQ schedules a retry (up to WEBHOOK_DELIVERY.defaultJobOptions.attempts).
-    const err = new Error(
-      result.error ?? `HTTP ${result.statusCode} from ${sub.url}`,
-    );
+    const err = new Error(result.error ?? `HTTP ${result.statusCode} from ${sub.url}`);
     throw err;
   }
 }

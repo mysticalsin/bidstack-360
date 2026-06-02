@@ -31,41 +31,60 @@ const TopAccountResponse = KeyAccountResponse.extend({
 export const accountsRoutes: FastifyPluginAsync = async (server) => {
   const app = server.withTypeProvider<ZodTypeProvider>();
 
-  // GET /api/v1/accounts/key — list key accounts
+  // GET /api/v1/accounts/key — list key accounts (cursor-paginated)
   app.get('/accounts/key', {
     schema: {
       querystring: z.object({
         search: z.string().max(200).optional(),
         industry: z.string().max(100).optional(),
         ownerId: z.string().uuid().optional(),
+        // WHY cursor pagination: the previous take:1000 ceiling silently dropped
+        // key accounts past position 1,000 and loaded the full set on every
+        // request even when the caller only needed a screenful. Cursor + limit
+        // bounds both problems.
+        limit: z.coerce.number().int().min(1).max(200).default(50),
+        cursor: z.string().uuid().optional(),
       }),
-      response: { 200: z.object({ items: z.array(KeyAccountResponse) }) },
+      response: {
+        200: z.object({
+          items: z.array(KeyAccountResponse),
+          nextCursor: z.string().uuid().nullable(),
+        }),
+      },
     },
     handler: async (req, reply) => {
       const { orgId } = req.auth;
-      const { search, industry, ownerId } = req.query;
+      const { search, industry, ownerId, limit, cursor } = req.query;
 
+      const where = {
+        orgId,
+        tier: 'key' as const,
+        deletedAt: null,
+        ...(search
+          ? {
+              OR: [
+                { name: { contains: search, mode: 'insensitive' as const } },
+                { domain: { contains: search, mode: 'insensitive' as const } },
+              ],
+            }
+          : {}),
+        ...(industry ? { industry: { equals: industry, mode: 'insensitive' as const } } : {}),
+        ...(ownerId ? { keyAccountOwnerId: ownerId } : {}),
+      };
+
+      // Fetch one extra row to detect whether a next page exists.
       const companies = await prisma.company.findMany({
-        where: {
-          orgId,
-          tier: 'key',
-          deletedAt: null,
-          ...(search
-            ? {
-                OR: [
-                  { name: { contains: search, mode: 'insensitive' } },
-                  { domain: { contains: search, mode: 'insensitive' } },
-                ],
-              }
-            : {}),
-          ...(industry ? { industry: { equals: industry, mode: 'insensitive' } } : {}),
-          ...(ownerId ? { keyAccountOwnerId: ownerId } : {}),
-        },
-        orderBy: { name: 'asc' },
-        take: 1000,
+        where,
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+        take: limit + 1,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       });
 
-      const companyIds = companies.map((c) => c.id);
+      const hasMore = companies.length > limit;
+      const page = hasMore ? companies.slice(0, limit) : companies;
+      const nextCursor = hasMore ? (page[page.length - 1]?.id ?? null) : null;
+
+      const companyIds = page.map((c) => c.id);
 
       const [opps, contacts] = await Promise.all([
         prisma.opportunity.findMany({
@@ -94,7 +113,7 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
         oppMap.set(o.companyId, existing);
       }
 
-      const enriched = companies.map((c) => {
+      const items = page.map((c) => {
         const o = oppMap.get(c.id) ?? { totalValue: 0, openDeals: 0, count: 0 };
         return {
           id: c.id,
@@ -113,11 +132,11 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
         };
       });
 
-      return reply.send({ items: enriched });
+      return reply.send({ items, nextCursor });
     },
   });
 
-  // GET /api/v1/accounts/top — list top N accounts by revenue
+  // GET /api/v1/accounts/top — list top N accounts by total opportunity value
   app.get('/accounts/top', {
     schema: {
       querystring: z.object({
@@ -131,90 +150,99 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
       const { orgId } = req.auth;
       const { limit, search, industry } = req.query;
 
-      const companies = await prisma.company.findMany({
-        where: {
-          orgId,
-          deletedAt: null,
-          ...(search
-            ? {
-                OR: [
-                  { name: { contains: search, mode: 'insensitive' } },
-                  { domain: { contains: search, mode: 'insensitive' } },
-                ],
-              }
-            : {}),
-          ...(industry ? { industry: { equals: industry, mode: 'insensitive' } } : {}),
-        },
-        take: 1000,
+      // WHY raw SQL: the previous implementation loaded all companies (take:1000)
+      // and their opportunities (take:1000) into JS, then sorted and sliced.
+      // For orgs with >1,000 companies this silently missed high-value accounts
+      // beyond position 1,000, and always loaded the full company+opp set even
+      // when limit=5. A single GROUP BY query pushes all aggregation to Postgres
+      // and returns exactly `limit` rows regardless of org size.
+      //
+      // Conditional filters are expressed as (${param}::text IS NULL OR ...)
+      // so Prisma can parameterize all values safely without dynamic SQL.
+      const searchPat = search ? `%${search}%` : null;
+      const industryVal = industry ?? null;
+
+      type TopRow = {
+        id: string;
+        name: string;
+        domain: string | null;
+        industry: string | null;
+        logoUrl: string | null;
+        tier: string | null;
+        keyAccountSince: Date | null;
+        keyAccountOwnerId: string | null;
+        keyAccountNotes: string | null;
+        topAccountRank: number | null;
+        totalValue: number;
+        wonValue: number;
+        openDeals: bigint; // Postgres COUNT → BigInt
+        opportunityCount: bigint;
+      };
+
+      const rows = await prisma.$queryRaw<TopRow[]>`
+        SELECT
+          c.id,
+          c.name,
+          c.domain,
+          c.industry,
+          c.logo_url             AS "logoUrl",
+          c.tier::text           AS "tier",
+          c.key_account_since    AS "keyAccountSince",
+          c.key_account_owner_id AS "keyAccountOwnerId",
+          c.key_account_notes    AS "keyAccountNotes",
+          c.top_account_rank     AS "topAccountRank",
+          COALESCE(SUM(o.value_micros), 0)::float8 / 1000000.0 AS "totalValue",
+          COALESCE(SUM(CASE WHEN o.stage = 'closed_won'::opportunity_stage
+                            THEN o.value_micros ELSE 0 END), 0)::float8 / 1000000.0
+                                                                         AS "wonValue",
+          COUNT(CASE WHEN o.stage NOT IN ('closed_won'::opportunity_stage,
+                                          'closed_lost'::opportunity_stage)
+                     THEN 1 ELSE NULL END)                               AS "openDeals",
+          COUNT(o.id)                                                    AS "opportunityCount"
+        FROM companies c
+        LEFT JOIN opportunities o
+          ON  o.company_id = c.id
+          AND o.org_id     = ${orgId}::uuid
+          AND o.deleted_at IS NULL
+        WHERE c.org_id    = ${orgId}::uuid
+          AND c.deleted_at IS NULL
+          AND (${searchPat}::text IS NULL
+               OR c.name   ILIKE ${searchPat}
+               OR c.domain ILIKE ${searchPat})
+          AND (${industryVal}::text IS NULL OR c.industry ILIKE ${industryVal})
+        GROUP BY c.id
+        ORDER BY "totalValue" DESC
+        LIMIT ${limit}
+      `;
+
+      // Fetch contact counts for just the returned company IDs.
+      const companyIds = rows.map((r) => r.id);
+      const contacts = await prisma.contact.groupBy({
+        by: ['companyId'],
+        where: { orgId, companyId: { in: companyIds }, deletedAt: null },
+        _count: { id: true },
       });
-
-      const companyIds = companies.map((c) => c.id);
-
-      const [opps, contacts] = await Promise.all([
-        prisma.opportunity.findMany({
-          where: { orgId, companyId: { in: companyIds }, deletedAt: null },
-          select: { companyId: true, valueMicros: true, stage: true },
-          take: 1000,
-        }),
-        prisma.contact.groupBy({
-          by: ['companyId'],
-          where: { orgId, companyId: { in: companyIds }, deletedAt: null },
-          _count: { id: true },
-        }),
-      ]);
-
       const contactMap = new Map(contacts.map((c) => [c.companyId, c._count.id]));
-      const oppMap = new Map<
-        string,
-        { totalValue: number; wonValue: number; openDeals: number; count: number }
-      >();
 
-      for (const o of opps) {
-        if (!o.companyId) continue;
-        const existing = oppMap.get(o.companyId) ?? {
-          totalValue: 0,
-          wonValue: 0,
-          openDeals: 0,
-          count: 0,
-        };
-        existing.totalValue += Number(o.valueMicros) / 1_000_000;
-        existing.count += 1;
-        if (o.stage === 'closed_won') {
-          existing.wonValue += Number(o.valueMicros) / 1_000_000;
-        }
-        if (o.stage !== 'closed_won' && o.stage !== 'closed_lost') {
-          existing.openDeals += 1;
-        }
-        oppMap.set(o.companyId, existing);
-      }
+      const items = rows.map((row, index) => ({
+        id: row.id,
+        name: row.name,
+        domain: row.domain,
+        industry: row.industry,
+        logoUrl: row.logoUrl,
+        tier: row.tier,
+        keyAccountSince: row.keyAccountSince?.toISOString() ?? null,
+        keyAccountOwnerId: row.keyAccountOwnerId,
+        keyAccountNotes: row.keyAccountNotes,
+        topAccountRank: index + 1, // rank = position in result (sorted by totalValue DESC)
+        totalValue: row.totalValue,
+        wonValue: row.wonValue,
+        openDeals: Number(row.openDeals),
+        contactCount: contactMap.get(row.id) ?? 0,
+        opportunityCount: Number(row.opportunityCount),
+      }));
 
-      const ranked = companies
-        .map((c) => {
-          const o = oppMap.get(c.id) ?? { totalValue: 0, wonValue: 0, openDeals: 0, count: 0 };
-          return {
-            id: c.id,
-            name: c.name,
-            domain: c.domain,
-            industry: c.industry,
-            logoUrl: c.logoUrl,
-            tier: c.tier,
-            keyAccountSince: c.keyAccountSince?.toISOString() ?? null,
-            keyAccountOwnerId: c.keyAccountOwnerId,
-            keyAccountNotes: c.keyAccountNotes,
-            topAccountRank: c.topAccountRank,
-            totalValue: o.totalValue,
-            wonValue: o.wonValue,
-            openDeals: o.openDeals,
-            contactCount: contactMap.get(c.id) ?? 0,
-            opportunityCount: o.count,
-          };
-        })
-        .sort((a, b) => b.totalValue - a.totalValue)
-        .slice(0, limit);
-
-      const rankedWithRank = ranked.map((c, index) => ({ ...c, topAccountRank: index + 1 }));
-
-      return reply.send({ items: rankedWithRank });
+      return reply.send({ items });
     },
   });
 

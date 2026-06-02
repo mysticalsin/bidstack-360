@@ -156,7 +156,15 @@ export function LeadDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {canConvert && <Button onClick={() => setIsConverting(true)}>Convert</Button>}
+            {canConvert ? (
+              <Button data-testid="lead-convert-action" onClick={() => setIsConverting(true)}>
+                Convert to opportunity
+              </Button>
+            ) : (
+              <Button data-testid="lead-convert-action" disabled variant="secondary">
+                Convert lead unavailable
+              </Button>
+            )}
             <Button variant="ghost" onClick={handleDelete}>
               Delete
             </Button>
@@ -185,7 +193,7 @@ export function LeadDetailPage() {
                 to={`/opportunities/${l.convertedToOpportunityId}`}
                 className="font-medium text-[var(--brand-primary)] hover:underline"
               >
-                an opportunity
+                converted opportunity
               </Link>
               .
             </span>

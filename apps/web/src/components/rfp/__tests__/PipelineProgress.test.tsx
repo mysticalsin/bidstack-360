@@ -31,7 +31,7 @@ vi.mock('react-i18next', () => ({
         'pipeline.stages.story_matching': 'Matching Stories',
         'pipeline.stages.section_drafting': 'Drafting',
         'pipeline.stages.compliance_fill': 'Compliance',
-        'pipeline.stages.legal_scan': 'Legal Scan',
+        'pipeline.stages.legal_scan': 'Review Crew',
         'pipeline.stages.qa_review': 'QA Review',
         'pipeline.progressLabel': 'Pipeline progress',
       };
@@ -101,7 +101,7 @@ describe('PipelineProgress — stage labels', () => {
       story_matching: 'Matching Stories',
       section_drafting: 'Drafting',
       compliance_fill: 'Compliance',
-      legal_scan: 'Legal Scan',
+      legal_scan: 'Review Crew',
       qa_review: 'QA Review',
       idle: 'idle',
       awaiting_approval: 'awaiting_approval',

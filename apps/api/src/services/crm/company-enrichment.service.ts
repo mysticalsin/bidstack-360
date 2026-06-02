@@ -7,7 +7,12 @@
  */
 import { type z } from 'zod';
 
-import type { CrmCompany, CrmLogoSource } from '@bidstack/shared';
+import {
+  CompanyStrategicIntel,
+  type CrmCompany,
+  type CrmLogoSource,
+  type SourceAttribution,
+} from '@bidstack/shared';
 
 import { COMPANY_DOMAINS, COMPANY_WEBSITES } from './dashboard.defaults.js';
 import {
@@ -94,6 +99,7 @@ export function serializeCompany(enrichment: {
   const name = enrichment.tradeName ?? enrichment.legalName;
   const metadata = record(enrichment.providerMetadata);
   const industryCodes = stringArray(enrichment.industryCodes);
+  const sourceAttribution = parseAttribution(enrichment.sourceAttribution);
   return {
     id: enrichment.id,
     source: 'verified_data',
@@ -114,10 +120,97 @@ export function serializeCompany(enrichment: {
       : null,
     logo: logoFor(name, enrichment.logoUrl, enrichment.logoSource),
     technicalStack: parseTechnicalStack(metadata.meetingTechStack),
+    strategicIntel: parseStrategicIntel({
+      metadata,
+      sourceAttribution,
+      employeeCount: enrichment.employeeCount,
+      annualRevenueMicros: enrichment.annualRevenueMicros,
+    }),
     confidence: enrichment.confidenceBps / 10_000,
-    sourceAttribution: parseAttribution(enrichment.sourceAttribution),
+    sourceAttribution,
     updatedAt: enrichment.updatedAt.toISOString(),
   };
+}
+
+function parseStrategicIntel({
+  metadata,
+  sourceAttribution,
+  employeeCount,
+  annualRevenueMicros,
+}: {
+  metadata: Record<string, unknown>;
+  sourceAttribution: SourceAttribution[];
+  employeeCount: number | null;
+  annualRevenueMicros: bigint | null;
+}): z.infer<typeof CompanyStrategicIntel> | undefined {
+  const apollo = record(metadata.apollo);
+  if (!Object.keys(apollo).length) return undefined;
+
+  const parsed = CompanyStrategicIntel.safeParse(apollo.strategicIntel);
+  if (parsed.success) return parsed.data;
+
+  const lastSyncedAt = stringDate(apollo.lastSyncedAt) ?? latestSourceDate(sourceAttribution);
+  const freshness = freshnessFor(lastSyncedAt);
+  const syncMode =
+    apollo.syncMode === 'apollo_mcp_company_search'
+      ? 'apollo_mcp_company_search'
+      : apollo.syncMode === 'apollo_mcp_get_company'
+        ? 'apollo_mcp_get_company'
+        : apollo.syncMode === 'apollo_api_organization_enrich'
+          ? 'apollo_api_organization_enrich'
+          : 'none';
+  const creditPolicy =
+    apollo.creditPolicy === 'free_search'
+      ? 'free_search'
+      : apollo.creditPolicy === 'uses_credits'
+        ? 'uses_credits'
+        : apollo.creditPolicy === 'mixed'
+          ? 'mixed'
+          : 'unknown';
+
+  return {
+    provider: 'apollo_io',
+    lastSyncedAt,
+    syncMode,
+    creditPolicy,
+    freshness,
+    employeeTrend: 'unknown',
+    employeeCount,
+    annualRevenueMicros: annualRevenueMicros === null ? null : Number(annualRevenueMicros),
+    intentTopics: [],
+    hiringSignals: [],
+    leadershipSignals: [],
+    revenueSignals: [],
+    summary:
+      lastSyncedAt === null
+        ? 'Apollo has not synced this account yet.'
+        : `Apollo sync refreshed ${lastSyncedAt.slice(0, 10)}.`,
+    limitations: stringArray(apollo.limitations),
+    signals: [],
+  };
+}
+
+function stringDate(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? new Date(time).toISOString() : null;
+}
+
+function latestSourceDate(sources: SourceAttribution[]): string | null {
+  let latest: string | null = null;
+  for (const source of sources) {
+    if (source.source !== 'apollo_io') continue;
+    if (!latest || source.fetchedAt > latest) latest = source.fetchedAt;
+  }
+  return latest;
+}
+
+function freshnessFor(
+  lastSyncedAt: string | null,
+): z.infer<typeof CompanyStrategicIntel>['freshness'] {
+  if (!lastSyncedAt) return 'never';
+  const ageMs = Date.now() - new Date(lastSyncedAt).getTime();
+  return ageMs > 30 * 24 * 60 * 60 * 1000 ? 'stale' : 'fresh';
 }
 
 // ─── Fallback company ─────────────────────────────────────────────────────────

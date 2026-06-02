@@ -43,13 +43,17 @@ test.describe('Custom objects', () => {
     const available = await admin.isAvailable();
     test.skip(!available, '/settings/custom-objects not found');
 
-    const newObjectVisible = await admin.newObjectButton.isVisible({ timeout: 3_000 }).catch(() => false);
+    const newObjectVisible = await admin.newObjectButton
+      .isVisible({ timeout: 3_000 })
+      .catch(() => false);
     test.skip(!newObjectVisible, 'New object button not visible');
 
     const objectName = `E2EProject${Date.now()}`;
     await admin.createObject({ name: objectName, pluralName: `${objectName}s` });
     // Admin page should now list the new object type
-    await expect(page.getByText(new RegExp(objectName, 'i'))).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId(`custom-object-${objectName.toLowerCase()}`)).toBeVisible({
+      timeout: 10_000,
+    });
   });
 
   test('seeded or created custom object has a records list route', async ({ page }) => {
@@ -67,7 +71,10 @@ test.describe('Custom objects', () => {
     await expect(page.locator('#main')).toBeVisible({ timeout: 10_000 });
     // List or empty-state should appear
     await expect(
-      page.getByRole('table').or(page.getByText(/no records|empty/i)).first(),
+      page
+        .getByRole('table')
+        .or(page.getByText(/no records|empty/i))
+        .first(),
     ).toBeVisible({ timeout: 10_000 });
   });
 });

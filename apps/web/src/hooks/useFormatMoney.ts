@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+
 import { useCurrencyStore } from '@/stores/currency';
 import { formatMoney, formatMoneyMicros } from '@/lib/format';
 
@@ -6,7 +8,11 @@ import { formatMoney, formatMoneyMicros } from '@/lib/format';
  * based on the user's selected display currency.
  */
 export function useFormatMoney() {
-  const { currency, convert } = useCurrencyStore();
+  const { currency, convert, fetchRates } = useCurrencyStore();
+
+  useEffect(() => {
+    void fetchRates();
+  }, [fetchRates]);
 
   return {
     currency,

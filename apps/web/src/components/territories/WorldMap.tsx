@@ -4,12 +4,21 @@
 // react-simple-maps uses ISO 3166-1 numeric codes in its default topojson;
 // we map our alpha-3 codes to those numeric codes via a small lookup table.
 
-import { memo, useMemo, useState } from 'react';
-import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simple-maps';
+import { memo, useCallback, useMemo, useState } from 'react';
+import {
+  ComposableMap,
+  Geographies,
+  Geography,
+  ZoomableGroup,
+  Graticule,
+  Marker,
+} from 'react-simple-maps';
 import { scaleSequential } from 'd3-scale';
 
 import { cn } from '@/lib/cn';
 import { formatMoneyMicros } from '@/lib/format';
+import { useThemeStore } from '@/stores/theme';
+import { Icon } from '@/components/ui/Icon';
 
 import type { TerritoryAnalyticsItem } from '@/hooks/useTerritories';
 
@@ -193,18 +202,75 @@ const A3_TO_NUMERIC: Record<string, string> = {
   ZWE: '716',
 };
 
+const COUNTRY_CENTROIDS: Record<string, [number, number]> = {
+  DE: [10.4515, 51.1657], // Germany
+  FR: [2.2137, 46.2276], // France
+  US: [-95.7129, 37.0902], // USA
+  GB: [-3.436, 55.3781], // UK
+  CA: [-106.3468, 56.1304], // Canada
+  JP: [138.2529, 36.2048], // Japan
+  AU: [133.7751, -25.2744], // Australia
+  BR: [-51.9253, -14.235], // Brazil
+  IN: [78.9629, 20.5937], // India
+  CN: [104.1954, 35.8617], // China
+  ZA: [22.9375, -30.5595], // South Africa
+  IT: [12.5674, 41.8719], // Italy
+  ES: [-3.7492, 40.4637], // Spain
+  NL: [5.2913, 52.1326], // Netherlands
+  SE: [18.6435, 60.1282], // Sweden
+  CH: [8.2275, 46.8182], // Switzerland
+  SG: [103.8198, 1.3521], // Singapore
+};
+
+const REGIONAL_PRESETS = [
+  { label: 'Global', coordinates: [10, 35] as [number, number], zoom: 1 },
+  { label: 'N. America', coordinates: [-100, 45] as [number, number], zoom: 2.2 },
+  { label: 'Europe', coordinates: [15, 50] as [number, number], zoom: 3.5 },
+  { label: 'Asia Pac', coordinates: [115, 15] as [number, number], zoom: 2.2 },
+  { label: 'L. America', coordinates: [-60, -15] as [number, number], zoom: 2.0 },
+  { label: 'ME & Africa', coordinates: [25, 10] as [number, number], zoom: 1.8 },
+];
+
 interface WorldMapProps {
   data: TerritoryAnalyticsItem[];
   className?: string;
   onCountryClick?: (item: TerritoryAnalyticsItem) => void;
+  selectedCountryCode?: string | null;
 }
 
-export const WorldMap = memo(function WorldMap({ data, className, onCountryClick }: WorldMapProps) {
+export const WorldMap = memo(function WorldMap({
+  data,
+  className,
+  onCountryClick,
+  selectedCountryCode,
+}: WorldMapProps) {
+  const theme = useThemeStore((s) => s.theme);
   const [hovered, setHovered] = useState<{
     item: TerritoryAnalyticsItem;
     x: number;
     y: number;
   } | null>(null);
+
+  const [position, setPosition] = useState({ coordinates: [10, 35] as [number, number], zoom: 1 });
+  const [hoveredLegendIndex, setHoveredLegendIndex] = useState<number | null>(null);
+
+  const handleZoomIn = useCallback(() => {
+    setPosition((pos) => {
+      if (pos.zoom >= 8) return pos;
+      return { ...pos, zoom: pos.zoom * 1.5 };
+    });
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setPosition((pos) => {
+      if (pos.zoom <= 1) return pos;
+      return { ...pos, zoom: pos.zoom / 1.5 };
+    });
+  }, []);
+
+  const handleReset = useCallback(() => {
+    setPosition({ coordinates: [10, 35], zoom: 1 });
+  }, []);
 
   const byNumeric = useMemo(() => {
     const map = new Map<string, TerritoryAnalyticsItem>();
@@ -220,20 +286,29 @@ export const WorldMap = memo(function WorldMap({ data, className, onCountryClick
     [data],
   );
 
-  // Brand-aware interpolation: surface-sunken → brand-primary
-  // Uses CSS custom properties for consistency with the design system.
-  const interpolateBrand = (t: number) => {
-    // Surface sunken (light): ~#F8F9FB  →  Brand primary (light): ~#2C4BFF
-    // We interpolate in HSL space for cleaner perceptual gradients.
-    const h = 230 + t * 8; // 230 → 238
-    const s = 20 + t * 60; // 20% → 80%
-    const l = 97 - t * 42; // 97% → 55%
-    return `hsl(${h} ${s}% ${l}%)`;
-  };
+  // Brand-aware interpolation with highly visible, contrast-safe gradient scales
+  const interpolateBrand = useCallback(
+    (t: number) => {
+      if (theme === 'dark') {
+        // Dark mode: deep contrastive slate-indigo (low value) → bright neon violet-purple (high value)
+        const h = 230 + t * 25; // 230 → 255
+        const s = 25 + t * 65; // 25% → 90%
+        const l = 20 + t * 45; // 20% → 65%
+        return `hsl(${h} ${s}% ${l}%)`;
+      } else {
+        // Light mode: soft sky blue (low value) → rich brand blue (high value)
+        const h = 225 + t * 5; // 225 → 230
+        const s = 45 + t * 45; // 45% → 90%
+        const l = 93 - t * 45; // 93% → 48%
+        return `hsl(${h} ${s}% ${l}%)`;
+      }
+    },
+    [theme],
+  );
 
   const colorScale = useMemo(
     () => scaleSequential(interpolateBrand).domain([0, maxValue]),
-    [maxValue],
+    [interpolateBrand, maxValue],
   );
 
   const legendSteps = 5;
@@ -244,13 +319,61 @@ export const WorldMap = memo(function WorldMap({ data, className, onCountryClick
   });
 
   return (
-    <div className={cn('relative', className)}>
+    <div
+      className={cn(
+        'relative w-full h-full rounded-xl overflow-hidden border border-[var(--border-subtle)] transition-colors duration-300',
+        className,
+      )}
+      style={{
+        background: theme === 'dark' ? '#090a0f' : '#eef1f6',
+      }}
+    >
+      <style>{`
+        @keyframes map-pulse {
+          0% {
+            r: 3px;
+            opacity: 0.88;
+          }
+          100% {
+            r: 12px;
+            opacity: 0;
+          }
+        }
+        .map-pulsing-ring {
+          animation: map-pulse 2s cubic-bezier(0.215, 0.610, 0.355, 1) infinite;
+          transform-origin: center;
+        }
+      `}</style>
       <ComposableMap
         projection="geoMercator"
-        projectionConfig={{ scale: 140, center: [10, 35] }}
+        projectionConfig={{ scale: 140 }}
         style={{ width: '100%', height: '100%' }}
       >
-        <ZoomableGroup>
+        <defs>
+          <filter id="glow-selected" x="-10%" y="-10%" width="120%" height="120%">
+            <feDropShadow
+              dx="0"
+              dy="0"
+              stdDeviation="2.5"
+              floodColor="#eab308"
+              floodOpacity="0.85"
+            />
+          </filter>
+          <filter id="glow-active-hover" x="-10%" y="-10%" width="120%" height="120%">
+            <feDropShadow
+              dx="0"
+              dy="0"
+              stdDeviation="2"
+              floodColor={theme === 'dark' ? '#c084fc' : '#3b82f6'}
+              floodOpacity="0.75"
+            />
+          </filter>
+        </defs>
+        <ZoomableGroup zoom={position.zoom} center={position.coordinates} onMoveEnd={setPosition}>
+          <Graticule
+            stroke={theme === 'dark' ? 'rgba(255, 255, 255, 0.035)' : 'rgba(0, 0, 0, 0.03)'}
+            strokeWidth={0.5}
+          />
           <Geographies geography={GEO_URL}>
             {({ geographies }) =>
               geographies.map((geo) => {
@@ -258,23 +381,56 @@ export const WorldMap = memo(function WorldMap({ data, className, onCountryClick
                 const item = byNumeric.get(numeric);
                 const hasData = !!item && item.opportunityCount > 0;
                 const fill = (
-                  hasData ? colorScale(item.totalValueMicros) : 'var(--surface-sunken)'
+                  hasData
+                    ? colorScale(item.totalValueMicros)
+                    : theme === 'dark'
+                      ? '#1c1d24'
+                      : '#ffffff'
                 ) as string;
+
+                const isSelected = item && selectedCountryCode === item.countryCode;
+                const stroke = isSelected
+                  ? '#eab308' // Amber highlight border when selected
+                  : theme === 'dark'
+                    ? '#2c2f3c'
+                    : '#d1d5db';
+                const strokeWidth = isSelected ? 1.5 : 0.5;
+
+                const tVal = item ? item.totalValueMicros / maxValue : 0;
+                const bracket = Math.round(tVal * (legendSteps - 1));
+                const isFilteredOut =
+                  hoveredLegendIndex !== null && (!hasData || bracket !== hoveredLegendIndex);
+                const opacity = isFilteredOut ? 0.15 : 1.0;
+
                 return (
                   <Geography
                     key={geo.rsmKey}
                     geography={geo}
                     fill={fill}
-                    stroke="var(--border-subtle)"
-                    strokeWidth={0.5}
+                    stroke={stroke}
+                    strokeWidth={strokeWidth}
                     style={{
-                      default: { outline: 'none', transition: 'fill 150ms ease' },
+                      default: {
+                        outline: 'none',
+                        transition: 'all 150ms ease',
+                        filter: isSelected ? 'url(#glow-selected)' : 'none',
+                        opacity,
+                      },
                       hover: {
                         outline: 'none',
                         fill: hasData
                           ? (colorScale(Math.min(item.totalValueMicros * 1.15, maxValue)) as string)
-                          : 'var(--surface-hover)',
+                          : theme === 'dark'
+                            ? '#262933'
+                            : '#f3f4f6',
                         cursor: hasData ? 'pointer' : 'default',
+                        transition: 'all 150ms ease',
+                        filter: isSelected
+                          ? 'url(#glow-selected)'
+                          : hasData
+                            ? 'url(#glow-active-hover)'
+                            : 'none',
+                        opacity,
                       },
                       pressed: { outline: 'none' },
                     }}
@@ -305,31 +461,131 @@ export const WorldMap = memo(function WorldMap({ data, className, onCountryClick
               })
             }
           </Geographies>
+
+          {/* Pulse indicators on active opportunity centroids */}
+          {data.map((item) => {
+            const coords = COUNTRY_CENTROIDS[item.countryCode];
+            if (!coords || item.opportunityCount === 0) return null;
+
+            const tVal = item.totalValueMicros / maxValue;
+            const bracket = Math.round(tVal * (legendSteps - 1));
+            const isFilteredOut = hoveredLegendIndex !== null && bracket !== hoveredLegendIndex;
+            const opacity = isFilteredOut ? 0.15 : 1.0;
+
+            return (
+              <Marker key={item.countryCode} coordinates={coords}>
+                <g style={{ opacity, transition: 'opacity 200ms ease' }}>
+                  <circle
+                    cx={0}
+                    cy={0}
+                    fill={theme === 'dark' ? '#c084fc' : '#3b82f6'}
+                    className="map-pulsing-ring"
+                    pointerEvents="none"
+                  />
+                  <circle
+                    cx={0}
+                    cy={0}
+                    r={3.5}
+                    fill={theme === 'dark' ? '#a855f7' : '#2563eb'}
+                    stroke="#ffffff"
+                    strokeWidth={1}
+                    pointerEvents="none"
+                  />
+                </g>
+              </Marker>
+            );
+          })}
         </ZoomableGroup>
       </ComposableMap>
 
+      {/* Floating regional presets */}
+      <div className="absolute left-3 top-3 flex flex-wrap gap-1 max-w-[calc(100%-100px)] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)]/90 p-1 shadow-[var(--shadow-sm)] backdrop-blur select-none z-10">
+        {REGIONAL_PRESETS.map((p) => {
+          const isActive = position.coordinates[0] === p.coordinates[0] && position.zoom === p.zoom;
+          return (
+            <button
+              key={p.label}
+              onClick={() => setPosition({ coordinates: p.coordinates, zoom: p.zoom })}
+              className={cn(
+                'px-2.5 py-1 text-[10px] font-semibold rounded-md transition-all active:scale-95 cursor-pointer',
+                isActive
+                  ? 'bg-[var(--brand-primary)] text-white shadow-sm'
+                  : 'text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)]',
+              )}
+            >
+              {p.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Floating Zoom controls */}
+      <div className="absolute right-3 top-3 flex flex-col gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)]/90 p-1 shadow-[var(--shadow-sm)] backdrop-blur z-10">
+        <button
+          onClick={handleZoomIn}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)] active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] cursor-pointer"
+          title="Zoom In"
+        >
+          <Icon name="plus" size={14} />
+        </button>
+        <button
+          onClick={handleZoomOut}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)] active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] cursor-pointer"
+          title="Zoom Out"
+        >
+          <Icon name="minus" size={14} />
+        </button>
+        <div className="h-px bg-[var(--border-subtle)] mx-1" />
+        <button
+          onClick={handleReset}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)] active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] cursor-pointer"
+          title="Reset View"
+        >
+          <Icon name="refresh" size={12} />
+        </button>
+      </div>
+
       {/* Legend */}
-      <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)]/90 px-2.5 py-1.5 text-[10px] shadow-[var(--shadow-xs)] backdrop-blur">
-        <span className="text-[var(--fg-tertiary)]">Pipeline</span>
+      <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)]/90 px-2.5 py-1.5 text-[10px] shadow-[var(--shadow-xs)] backdrop-blur select-none z-10">
+        <span className="text-[var(--fg-tertiary)] font-medium">Pipeline</span>
         <div className="flex items-center gap-1">
           {legendItems.map((l, i) => (
-            <div key={i} className="flex flex-col items-center gap-0.5">
-              <div className="h-3 w-5 rounded-sm" style={{ backgroundColor: l.color }} />
+            <div
+              key={i}
+              className="flex flex-col items-center gap-0.5 cursor-pointer"
+              onMouseEnter={() => setHoveredLegendIndex(i)}
+              onMouseLeave={() => setHoveredLegendIndex(null)}
+              style={{
+                transform: hoveredLegendIndex === i ? 'scale(1.05)' : 'scale(1)',
+                transition: 'transform 150ms ease',
+              }}
+            >
+              <div
+                className={cn(
+                  'h-3 w-5 rounded-sm transition-all duration-150',
+                  hoveredLegendIndex !== null && hoveredLegendIndex !== i
+                    ? 'opacity-30'
+                    : 'opacity-100',
+                )}
+                style={{ backgroundColor: l.color }}
+              />
               <span className="tabular-nums text-[var(--fg-tertiary)]">{l.label}</span>
             </div>
           ))}
         </div>
       </div>
 
+      {/* Tooltip */}
       {hovered ? (
         <div
-          className="pointer-events-none fixed z-50 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-2 shadow-[var(--shadow-md)]"
+          className="pointer-events-none fixed z-50 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)]/95 px-3 py-2 shadow-[var(--shadow-md)] backdrop-blur animate-in fade-in duration-100"
           style={{
-            left: hovered.x + 12,
-            top: hovered.y - 12,
+            left: hovered.x,
+            top: hovered.y,
+            transform: `translate(${hovered.x > window.innerWidth / 2 ? '-115%' : '12px'}, -50%)`,
           }}
         >
-          <div className="text-xs font-semibold text-[var(--fg-primary)]">
+          <div className="text-xs font-bold text-[var(--fg-primary)]">
             {hovered.item.countryCode}
           </div>
           <div className="mt-1 flex items-center gap-2 text-[11px] tabular-nums text-[var(--fg-secondary)]">
@@ -337,10 +593,12 @@ export const WorldMap = memo(function WorldMap({ data, className, onCountryClick
               {hovered.item.opportunityCount} opp{hovered.item.opportunityCount === 1 ? '' : 's'}
             </span>
             <span className="text-[var(--border-subtle)]">·</span>
-            <span>{formatMoneyMicros(hovered.item.totalValueMicros, 'EUR')}</span>
+            <span className="font-semibold text-[var(--brand-primary)]">
+              {formatMoneyMicros(hovered.item.totalValueMicros, 'EUR')}
+            </span>
           </div>
-          <div className="text-[11px] tabular-nums text-[var(--fg-tertiary)]">
-            Avg prob {hovered.item.avgProbability}%
+          <div className="text-[10px] font-medium tabular-nums text-[var(--fg-tertiary)] mt-0.5">
+            Avg probability {hovered.item.avgProbability}%
           </div>
         </div>
       ) : null}

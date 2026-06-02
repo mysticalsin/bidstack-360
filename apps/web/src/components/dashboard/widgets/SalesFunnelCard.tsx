@@ -12,7 +12,7 @@ import { motion } from 'framer-motion';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Icon } from '@/components/ui/Icon';
 import { springSoft } from '@/lib/motion';
-import { formatMoney } from '@/lib/format';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 
 // ─── SalesFunnelCard ─────────────────────────────────────────────────────────
 
@@ -29,6 +29,7 @@ export function SalesFunnelCard({
   pipelineValue: number;
   reduced: boolean | null;
 }) {
+  const { formatMoney } = useFormatMoney();
   const stages = [
     { label: 'Leads', count: leads, color: 'var(--tag-purple-fg)', bg: 'var(--tag-purple-bg)' },
     {
@@ -44,11 +45,10 @@ export function SalesFunnelCard({
       display: formatMoney(pipelineValue, 'EUR'),
       color: 'var(--tag-jade-fg)',
       bg: 'var(--tag-jade-bg)',
-      isMoney: true,
     },
   ];
 
-  const maxVal = Math.max(leads, opportunities, openOpps, 1);
+  const maxVal = Math.max(leads, opportunities, openOpps, pipelineValue, 1);
 
   return (
     <GlassCard padding="md" hoverable={false}>
@@ -65,7 +65,7 @@ export function SalesFunnelCard({
       </div>
       <div className="funnel-viz">
         {stages.map((stage, i) => {
-          const widthPct = stage.isMoney ? 100 : Math.max(20, (stage.count / maxVal) * 100);
+          const widthPct = Math.max(20, (stage.count / maxVal) * 100);
           return (
             <motion.div
               key={stage.label}

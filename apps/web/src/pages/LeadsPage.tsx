@@ -282,7 +282,7 @@ export function LeadsPage() {
           action={<Button onClick={() => nav('/leads/new')}>New lead</Button>}
         />
       ) : (
-        <Card className="p-3">
+        <Card className="min-w-0 overflow-hidden p-3">
           <SpotlightTable
             query={deferredSearch}
             minWidth={900}

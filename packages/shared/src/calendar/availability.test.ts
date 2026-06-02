@@ -38,9 +38,7 @@ describe('computeSlots', () => {
   });
 
   it('returns empty array when rangeStart is after rangeEnd', () => {
-    const rules: AvailabilityRule[] = [
-      { dayOfWeek: 1, startTime: '09:00', endTime: '17:00' },
-    ];
+    const rules: AvailabilityRule[] = [{ dayOfWeek: 1, startTime: '09:00', endTime: '17:00' }];
     const result = computeSlots({
       rules,
       existingEvents: [],
@@ -53,9 +51,7 @@ describe('computeSlots', () => {
 
   it('generates correct slots for a Monday 09:00–11:00 window', () => {
     // 2024-01-15 is a Monday UTC
-    const rules: AvailabilityRule[] = [
-      { dayOfWeek: 1, startTime: '09:00', endTime: '11:00' },
-    ];
+    const rules: AvailabilityRule[] = [{ dayOfWeek: 1, startTime: '09:00', endTime: '11:00' }];
     const result = computeSlots({
       rules,
       existingEvents: [],
@@ -70,10 +66,23 @@ describe('computeSlots', () => {
     expect(result[3]).toBe('2024-01-15T10:30:00.000Z');
   });
 
+  it('maps wall-clock slots in an IANA timezone to the correct UTC instants', () => {
+    const rules: AvailabilityRule[] = [{ dayOfWeek: 5, startTime: '09:00', endTime: '10:00' }];
+    const result = computeSlots({
+      rules,
+      existingEvents: [],
+      rangeStart: new Date('2026-06-05T12:00:00Z'),
+      rangeEnd: new Date('2026-06-05T23:59:59Z'),
+      durationMinutes: 30,
+      tz: 'America/New_York',
+      minNoticeHours: 0,
+    });
+
+    expect(result).toEqual(['2026-06-05T13:00:00.000Z', '2026-06-05T13:30:00.000Z']);
+  });
+
   it('excludes slots blocked by existing events', () => {
-    const rules: AvailabilityRule[] = [
-      { dayOfWeek: 1, startTime: '09:00', endTime: '11:00' },
-    ];
+    const rules: AvailabilityRule[] = [{ dayOfWeek: 1, startTime: '09:00', endTime: '11:00' }];
     const existingEvents: BlockingEvent[] = [
       {
         startAt: new Date('2024-01-15T09:30:00Z'),
@@ -97,9 +106,7 @@ describe('computeSlots', () => {
   });
 
   it('respects buffer before and after blocked events', () => {
-    const rules: AvailabilityRule[] = [
-      { dayOfWeek: 1, startTime: '09:00', endTime: '12:00' },
-    ];
+    const rules: AvailabilityRule[] = [{ dayOfWeek: 1, startTime: '09:00', endTime: '12:00' }];
     // Event at 10:00–10:30 with 30 min buffer before and after
     const existingEvents: BlockingEvent[] = [
       {
@@ -129,9 +136,7 @@ describe('computeSlots', () => {
   });
 
   it('blocks the entire day for an all-day event', () => {
-    const rules: AvailabilityRule[] = [
-      { dayOfWeek: 1, startTime: '09:00', endTime: '17:00' },
-    ];
+    const rules: AvailabilityRule[] = [{ dayOfWeek: 1, startTime: '09:00', endTime: '17:00' }];
     const existingEvents: BlockingEvent[] = [
       {
         startAt: new Date('2024-01-15T00:00:00Z'),
@@ -152,9 +157,7 @@ describe('computeSlots', () => {
 
   it('excludes slots within minNoticeHours from now', () => {
     // Now = 10:00 UTC. minNoticeHours = 2 → slots before 12:00 are excluded
-    const rules: AvailabilityRule[] = [
-      { dayOfWeek: 1, startTime: '09:00', endTime: '14:00' },
-    ];
+    const rules: AvailabilityRule[] = [{ dayOfWeek: 1, startTime: '09:00', endTime: '14:00' }];
     const result = computeSlots({
       rules,
       existingEvents: [],
@@ -194,9 +197,7 @@ describe('computeSlots', () => {
 
   it('returns empty when no rules match days in range', () => {
     // Range is only a Sunday (2024-01-14) but rules only cover Monday
-    const rules: AvailabilityRule[] = [
-      { dayOfWeek: 1, startTime: '09:00', endTime: '17:00' },
-    ];
+    const rules: AvailabilityRule[] = [{ dayOfWeek: 1, startTime: '09:00', endTime: '17:00' }];
     const result = computeSlots({
       rules,
       existingEvents: [],

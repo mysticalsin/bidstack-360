@@ -32,7 +32,7 @@ admin controls from members as defense-in-depth.
 | Data         | `packages/db` (`crew_agents`, `crews`, `crew_tasks`, `crew_runs`) | Org-scoped; raw SQL (Wave-9 Windows-DLL-lock pattern). Migration `20260530010000_crew_infrastructure`.                                                                     |
 | Queue        | `crew-run` (`apps/worker/src/queues/crew-run.ts`)                 | Loads a crew → `kickoff` → persists status + per-task results + final output.                                                                                              |
 | API          | `apps/api/src/routes/crew-agents.ts`, `crews.ts`                  | Admin-gated CRUD + `POST /crews/:id/run` (member) + owner-scoped run reads.                                                                                                |
-| Seed         | `apps/api/src/lib/crew-standard.ts`                               | 6 standard agents + a default hierarchical "RFP Response Crew". `POST /crews/seed-standard` (admin).                                                                       |
+| Seed         | `apps/api/src/lib/crew-standard.ts`                               | 7 standard agents + a default hierarchical "RFP Response Crew". `POST /crews/seed-standard` (admin).                                                                       |
 | UI           | `apps/web/src/pages/AgentStudioPage.tsx` (`/agent-studio`)        | Agent Studio — author agents (admin), run a crew + watch the result (member).                                                                                              |
 
 ## Standard agents
@@ -62,9 +62,21 @@ win-themes, then the Bid Manager consolidates.
 - **NDA-D:** `kickoff()` documents the caller obligation — never feed Tier-D
   ("never-in-AI") content into crew inputs (mirror `isDocumentAiSafe`).
 
-## Possible next step (not yet built)
+## Historical note
 
 Auto-trigger the RFP Response Crew from document upload so it runs as part of
 the existing BullMQ RFP orchestration (alongside / instead of the
 requirement-extract → … → qa-review stages). Today the crew runs standalone
 from the Agent Studio, which fully covers "build agents that answer each step."
+
+## RFP pipeline auto-run
+
+The BullMQ RFP orchestration now runs the CrewAI-style specialist pattern inside
+the `legal_scan` gate before proposal compilation:
+
+`Legal Counsel -> Finance Lead -> Marketing Strategist -> Presales Lead -> Bid Manager`
+
+Each specialist receives the extracted RFP source plus the current proposal
+draft. Their outputs are written to `rfp_orchestrations.config.reviewCrew` and
+to the AI audit log, then the workflow continues to proposal compilation and QA
+review. Agent Studio still lets admins seed, edit, and manually run crews.

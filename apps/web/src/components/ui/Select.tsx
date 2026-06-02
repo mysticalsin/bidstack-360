@@ -215,7 +215,11 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     return (
       <div ref={containerRef} className={cn('flex flex-col gap-1 w-full relative', className)}>
         {label && (
-          <label htmlFor={selectId} className="text-xs font-medium text-[var(--fg-secondary)]">
+          <label
+            id={`${selectId}-label`}
+            htmlFor={selectId}
+            className="text-xs font-medium text-[var(--fg-secondary)]"
+          >
             {label}
           </label>
         )}
@@ -237,6 +241,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             aria-activedescendant={
               isOpen && highlightedIndex >= 0 ? `${selectId}-opt-${highlightedIndex}` : undefined
             }
+            aria-label={rest['aria-label']}
+            aria-labelledby={rest['aria-labelledby'] || (label ? `${selectId}-label` : undefined)}
             disabled={disabled || isLoading}
             className={cn(
               'w-full flex items-center justify-between rounded-lg border bg-[var(--surface-card)] text-[var(--fg-primary)] transition-all text-left cursor-pointer',

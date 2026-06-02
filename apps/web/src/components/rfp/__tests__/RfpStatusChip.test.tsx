@@ -29,20 +29,20 @@ afterEach(() => {
 type StageCaseRow = { stage: PipelineStage; label: string; colorSubstring: string };
 
 const STAGE_CASES: StageCaseRow[] = [
-  { stage: 'idle', label: 'Idle', colorSubstring: 'surface-sunken' },
-  { stage: 'queued', label: 'Queued', colorSubstring: 'blue-100' },
-  { stage: 'extracting', label: 'Extracting', colorSubstring: 'violet-100' },
-  { stage: 'story_matching', label: 'Matching Stories', colorSubstring: 'indigo-100' },
-  { stage: 'section_drafting', label: 'Drafting', colorSubstring: 'purple-100' },
-  { stage: 'compliance_fill', label: 'Compliance', colorSubstring: 'cyan-100' },
-  { stage: 'legal_scan', label: 'Legal Scan', colorSubstring: 'orange-100' },
-  { stage: 'qa_review', label: 'QA Review', colorSubstring: 'yellow-100' },
-  { stage: 'awaiting_approval', label: 'Awaiting Approval', colorSubstring: 'amber-100' },
-  { stage: 'approved', label: 'Approved', colorSubstring: 'green-100' },
-  { stage: 'completed', label: 'Completed', colorSubstring: 'green-100' },
-  { stage: 'failed', label: 'Failed', colorSubstring: 'red-100' },
-  { stage: 'rejected', label: 'Rejected', colorSubstring: 'red-100' },
-  { stage: 'timeout', label: 'Timed Out', colorSubstring: 'surface-sunken' },
+  { stage: 'idle', label: 'Idle', colorSubstring: 'tag-gray' },
+  { stage: 'queued', label: 'Queued', colorSubstring: 'tag-blue' },
+  { stage: 'extracting', label: 'Extracting', colorSubstring: 'tag-purple' },
+  { stage: 'story_matching', label: 'Matching Stories', colorSubstring: 'tag-purple' },
+  { stage: 'section_drafting', label: 'Drafting', colorSubstring: 'tag-purple' },
+  { stage: 'compliance_fill', label: 'Compliance', colorSubstring: 'tag-teal' },
+  { stage: 'legal_scan', label: 'Review Crew', colorSubstring: 'tag-amber' },
+  { stage: 'qa_review', label: 'QA Review', colorSubstring: 'tag-amber' },
+  { stage: 'awaiting_approval', label: 'Awaiting Approval', colorSubstring: 'tag-amber' },
+  { stage: 'approved', label: 'Approved', colorSubstring: 'tag-jade' },
+  { stage: 'completed', label: 'Completed', colorSubstring: 'tag-jade' },
+  { stage: 'failed', label: 'Failed', colorSubstring: 'tag-tomato' },
+  { stage: 'rejected', label: 'Rejected', colorSubstring: 'tag-tomato' },
+  { stage: 'timeout', label: 'Timed Out', colorSubstring: 'tag-gray' },
 ] as unknown[] as StageCaseRow[];
 
 describe('RfpStatusChip — label rendering', () => {
@@ -64,22 +64,22 @@ describe('RfpStatusChip — color class per stage', () => {
 });
 
 describe('RfpStatusChip — semantic groupings', () => {
-  it('approved stage carries green class', () => {
+  it('approved stage carries green/jade class', () => {
     render(<RfpStatusChip stage={'approved' as unknown as PipelineStage} />);
     const chip = screen.getByLabelText(/Pipeline status:/);
-    expect(chip.className).toContain('green');
+    expect(chip.className).toContain('tag-jade');
   });
 
-  it('failed stage carries red class', () => {
+  it('failed stage carries red/tomato class', () => {
     render(<RfpStatusChip stage={'failed' as unknown as PipelineStage} />);
     const chip = screen.getByLabelText(/Pipeline status:/);
-    expect(chip.className).toContain('red');
+    expect(chip.className).toContain('tag-tomato');
   });
 
   it('queued stage carries blue class', () => {
     render(<RfpStatusChip stage={'queued' as unknown as PipelineStage} />);
     const chip = screen.getByLabelText(/Pipeline status:/);
-    expect(chip.className).toContain('blue');
+    expect(chip.className).toContain('tag-blue');
   });
 });
 

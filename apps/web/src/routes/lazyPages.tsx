@@ -215,6 +215,9 @@ export const WorkflowsPage = lazy(() =>
 export const PublicSignPage = lazy(() =>
   import('@/pages/PublicSignPage').then((m) => ({ default: m.PublicSignPage })),
 );
+export const PublicBookingPage = lazy(() =>
+  import('@/pages/PublicBookingPage').then((m) => ({ default: m.PublicBookingPage })),
+);
 
 // ─── Auth callbacks ───────────────────────────────────────────────────────────
 

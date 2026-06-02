@@ -40,6 +40,20 @@ export function useCustomObjectDef(id: string) {
   });
 }
 
+function upsertCustomObjectDef(
+  current: CustomObjectDefList | undefined,
+  def: CustomObjectDef,
+): CustomObjectDefList {
+  if (!current) return { items: [{ ...def, recordCount: def.recordCount ?? 0 }] };
+  const nextDef = { ...def, recordCount: def.recordCount ?? 0 };
+  const exists = current.items.some((item) => item.id === def.id);
+  return {
+    items: exists
+      ? current.items.map((item) => (item.id === def.id ? nextDef : item))
+      : [...current.items, nextDef],
+  };
+}
+
 export function useCreateCustomObjectDef() {
   const qc = useQueryClient();
   return useMutation({
@@ -48,8 +62,15 @@ export function useCreateCustomObjectDef() {
         method: 'POST',
         body,
       }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['custom-objects'] });
+    onSuccess: async (created) => {
+      await qc.cancelQueries({ queryKey: ['custom-objects'] });
+      qc.setQueryData<CustomObjectDefList>(['custom-objects'], (current) =>
+        upsertCustomObjectDef(current, created),
+      );
+      await qc.invalidateQueries({ queryKey: ['custom-objects'] });
+      qc.setQueryData<CustomObjectDefList>(['custom-objects'], (current) =>
+        upsertCustomObjectDef(current, created),
+      );
     },
   });
 }

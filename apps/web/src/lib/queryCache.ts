@@ -21,6 +21,16 @@ function isQueryKeySerializable(key: unknown[]): boolean {
   );
 }
 
+function shouldPersistQueryKey(key: unknown[]): boolean {
+  // Account cockpit payloads include freshness-sensitive enrichment data
+  // such as Apollo sync status. Persisting them makes refreshed pages show
+  // stale company intelligence until the global React Query stale window ends.
+  if (key[0] === 'crm-dashboard' && typeof key[1] === 'string' && key[1] !== 'default') {
+    return false;
+  }
+  return true;
+}
+
 export function persistCache(queryClient: QueryClient): void {
   const cache = queryClient.getQueryCache();
   cache.subscribe((event) => {
@@ -28,6 +38,7 @@ export function persistCache(queryClient: QueryClient): void {
     // Only persist GET queries (queries, not mutations)
     const queryKey = event.query.queryKey;
     if (!Array.isArray(queryKey) || !isQueryKeySerializable(queryKey)) return;
+    if (!shouldPersistQueryKey(queryKey)) return;
 
     try {
       const stored = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}') as Record<
@@ -56,6 +67,7 @@ export function hydrateCache(queryClient: QueryClient): void {
     for (const [keyStr, entry] of Object.entries(stored)) {
       if (now - entry.timestamp > MAX_AGE_MS) continue;
       const queryKey = JSON.parse(keyStr) as unknown[];
+      if (!shouldPersistQueryKey(queryKey)) continue;
       queryClient.setQueryData(queryKey, (entry.state as { data?: unknown }).data);
     }
   } catch {

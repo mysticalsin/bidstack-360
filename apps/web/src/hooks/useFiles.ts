@@ -9,12 +9,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
-import type {
-  FileAttachment,
-  FileFinalizeRequest,
-  FileListResponse,
-  FileUploadUrlRequest,
-  FileUploadUrlResponse,
+import {
+  inferAllowedFileContentType,
+  type FileAttachment,
+  type FileFinalizeRequest,
+  type FileListResponse,
+  type FileUploadUrlRequest,
+  type FileUploadUrlResponse,
 } from '@bidstack/shared';
 
 const KEY = (accountId: string) => ['files', accountId];
@@ -36,10 +37,16 @@ interface UploadVars {
 }
 
 async function performUpload({ accountId, file }: UploadVars): Promise<FileAttachment> {
+  const contentType = inferAllowedFileContentType(file.name, file.type);
+  if (!contentType) {
+    throw new Error(
+      `Unsupported file type for "${file.name}". Upload PDF, Office, text/data, image, audio, or video files.`,
+    );
+  }
   const presignReq: FileUploadUrlRequest = {
     accountId,
     name: file.name,
-    contentType: file.type as FileUploadUrlRequest['contentType'],
+    contentType,
     bytes: file.size,
   };
   const presigned = await api<FileUploadUrlResponse>('/api/files/upload-url', {
@@ -64,7 +71,7 @@ async function performUpload({ accountId, file }: UploadVars): Promise<FileAttac
     accountId,
     storageKey: presigned.storageKey,
     name: file.name,
-    contentType: file.type as FileFinalizeRequest['contentType'],
+    contentType,
     bytes: file.size,
   };
   return api<FileAttachment>('/api/files/finalize', {

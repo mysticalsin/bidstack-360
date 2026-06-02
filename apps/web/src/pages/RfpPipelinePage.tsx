@@ -10,6 +10,8 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useRfpPipeline } from '@/hooks/rfp/useRfpPipeline';
 import { useRfpLatestOrchestration, RESUMABLE_STATES } from '@/hooks/rfp/useRfpLatestOrchestration';
 import { useRfpPipelineStore } from '@/stores/rfpPipeline';
+import { useRfpDraft } from '@/hooks/rfp/useRfpDraft';
+import { Button } from '@/components/ui/Button';
 
 import { PipelineProgress } from '@/components/rfp/shared/PipelineProgress';
 import { RfpUploadZone } from '@/components/rfp/upload/RfpUploadZone';
@@ -52,6 +54,9 @@ export function RfpPipelinePage() {
   const setOrchestrationId = useRfpPipelineStore((s) => s.setOrchestrationId);
   const setBidWorkspaceId = useRfpPipelineStore((s) => s.setBidWorkspaceId);
   const reset = useRfpPipelineStore((s) => s.reset);
+
+  const { query: draftQuery } = useRfpDraft(bidWorkspaceId);
+  const proposalId = draftQuery?.data?.proposalId ?? null;
 
   // Latest orchestration for this opportunity — used to resume a run on refresh.
   const { data: latest } = useRfpLatestOrchestration(opportunityId);
@@ -157,14 +162,17 @@ export function RfpPipelinePage() {
       {stage === 'approved' && (
         <div
           role="status"
-          className="rounded-2xl border border-green-200 bg-green-50 p-6 text-center dark:border-green-800 dark:bg-green-950/20"
+          className="rounded-2xl border border-[var(--success)] bg-[var(--success-tint)] p-6 text-center"
         >
-          <p className="text-lg font-bold text-green-800 dark:text-green-200">
-            {t('approval.approved')}
-          </p>
-          <p className="mt-1 text-sm text-green-700 dark:text-green-300">
-            {t('approval.approvedMessage')}
-          </p>
+          <p className="text-lg font-bold text-[var(--success)]">{t('approval.approved')}</p>
+          <p className="mt-1 text-sm text-[var(--fg-secondary)]">{t('approval.approvedMessage')}</p>
+          {proposalId && (
+            <div className="mt-4">
+              <Link to={`/proposals/${proposalId}`}>
+                <Button variant="primary">View Proposal</Button>
+              </Link>
+            </div>
+          )}
         </div>
       )}
 

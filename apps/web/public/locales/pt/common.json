@@ -245,15 +245,15 @@
       "title": "Definições",
       "subtitle": "Gira a sua conta, preferências e integrações do espaço de trabalho.",
       "sections": {
+        "overview": "Visão geral",
         "profile": "Perfil",
         "appearance": "Aparência",
         "language": "Idioma",
         "notifications": "Notificações",
         "security": "Segurança",
-        "microsoft": "Microsoft 365",
-        "mobile": "Aplicação móvel",
         "workspace": "Espaço de trabalho",
-        "advanced": "Avançado",
+        "crm": "Configuração CRM",
+        "developer": "Acesso de desenvolvedor",
         "emailTemplates": "Modelos de email",
         "tags": "Etiquetas",
         "leadRot": "Regras de envelhecimento"

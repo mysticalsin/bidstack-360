@@ -245,15 +245,15 @@
       "title": "Paramètres",
       "subtitle": "Gérez votre compte, vos préférences et vos intégrations d'espace de travail.",
       "sections": {
+        "overview": "Vue d'ensemble",
         "profile": "Profil",
         "appearance": "Apparence",
         "language": "Langue",
         "notifications": "Notifications",
         "security": "Sécurité",
-        "microsoft": "Microsoft 365",
-        "mobile": "Application mobile",
         "workspace": "Espace de travail",
-        "advanced": "Avancé",
+        "crm": "Configuration CRM",
+        "developer": "Accès développeur",
         "emailTemplates": "Modèles d'e-mails",
         "tags": "Étiquettes",
         "leadRot": "Règles de vieillissement"

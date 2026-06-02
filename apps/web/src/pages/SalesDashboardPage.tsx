@@ -300,7 +300,7 @@ export function SalesDashboardPage() {
                           transition={springSoft}
                         />
                         <div className="relative truncate font-medium">{product.product}</div>
-                        <div className="relative text-[10px] uppercase tracking-wider text-[var(--fg-tertiary)]">
+                        <div className="relative text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-secondary)]">
                           {product.category}
                         </div>
                       </td>

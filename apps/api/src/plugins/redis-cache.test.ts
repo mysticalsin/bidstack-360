@@ -1,9 +1,13 @@
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, afterAll, beforeEach } from 'vitest';
 import Fastify from 'fastify';
 import { redisCachePlugin } from './redis-cache.js';
 import { cacheDel } from '../lib/redis-cache.js';
 
 describe('redisCachePlugin', () => {
+  beforeEach(async () => {
+    await cacheDel('bidstack:cache:*');
+  });
+
   afterAll(async () => {
     // Clean up test keys
     await cacheDel('bidstack:cache:*');
@@ -11,7 +15,7 @@ describe('redisCachePlugin', () => {
 
   it('decorates FastifyRequest and caches the route response', async () => {
     const server = Fastify({ logger: false });
-    await server.register(redisCachePlugin);
+    await server.register(redisCachePlugin, { enabledInTest: true });
 
     let handlerCalls = 0;
 
@@ -42,7 +46,7 @@ describe('redisCachePlugin', () => {
 
   it('scopes cache by tenant orgId (tenant isolation)', async () => {
     const server = Fastify({ logger: false });
-    await server.register(redisCachePlugin);
+    await server.register(redisCachePlugin, { enabledInTest: true });
 
     let handlerCalls = 0;
 
@@ -70,7 +74,7 @@ describe('redisCachePlugin', () => {
 
   it('differentiates cache keys by query parameters', async () => {
     const server = Fastify({ logger: false });
-    await server.register(redisCachePlugin);
+    await server.register(redisCachePlugin, { enabledInTest: true });
 
     let handlerCalls = 0;
 
@@ -95,15 +99,49 @@ describe('redisCachePlugin', () => {
     expect(handlerCalls).toBe(2); // Differentiated by query hash
   });
 
+  it('coalesces concurrent cache misses for the same tenant key', async () => {
+    const server = Fastify({ logger: false });
+    await server.register(redisCachePlugin, { enabledInTest: true });
+
+    let handlerCalls = 0;
+
+    server.get('/test-inflight', async (req) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test stub: auth injected by plugin in production; bare FastifyRequest has no auth property
+      (req as any).auth = { orgId: 'inflight-org' };
+      return req.cache(
+        async () => {
+          handlerCalls++;
+          await new Promise((resolve) => setTimeout(resolve, 25));
+          return { count: handlerCalls };
+        },
+        { ttlSeconds: 10, tags: ['inflight-tag'] },
+      );
+    });
+
+    const [res1, res2, res3] = await Promise.all([
+      server.inject({ method: 'GET', url: '/test-inflight' }),
+      server.inject({ method: 'GET', url: '/test-inflight' }),
+      server.inject({ method: 'GET', url: '/test-inflight' }),
+    ]);
+
+    expect(res1.json()).toEqual({ count: 1 });
+    expect(res2.json()).toEqual({ count: 1 });
+    expect(res3.json()).toEqual({ count: 1 });
+    expect(handlerCalls).toBe(1);
+  });
+
   it('invalidates cache on successful mutation requests', async () => {
     const server = Fastify({ logger: false });
-    await server.register(redisCachePlugin);
+    await server.register(redisCachePlugin, { enabledInTest: true });
+    const orgId = `mutation-org-${Date.now()}`;
+    server.addHook('preHandler', async (req) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test stub: production auth is assigned before route handlers run
+      (req as any).auth = { orgId };
+    });
 
     let getCalls = 0;
 
     server.get('/test-read', async (req) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test stub: auth injected by plugin in production; bare FastifyRequest has no auth property
-      (req as any).auth = { orgId: 'mutation-org' };
       return req.cache(
         async () => {
           getCalls++;
@@ -113,9 +151,7 @@ describe('redisCachePlugin', () => {
       );
     });
 
-    server.post('/test-mutate', async (req) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test stub: auth injected by plugin in production; bare FastifyRequest has no auth property
-      (req as any).auth = { orgId: 'mutation-org' };
+    server.post('/test-mutate', async () => {
       return { mutated: true };
     });
 

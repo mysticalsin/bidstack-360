@@ -223,7 +223,7 @@ export function ConnectionCommandCenter({
               key={item.label}
               className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3"
             >
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-secondary)]">
                 {item.label}
               </div>
               <div className="mt-2 flex items-center justify-between gap-2">
@@ -238,35 +238,42 @@ export function ConnectionCommandCenter({
       <div className="grid gap-0 xl:grid-cols-[320px_1fr]">
         <div className="border-b border-[var(--border-subtle)] p-3 xl:border-b-0 xl:border-r">
           <div role="tablist" aria-label="Integration setup paths" className="space-y-2">
-            {PATHS.map((path) => (
-              <button
-                key={path.key}
-                type="button"
-                role="tab"
-                aria-selected={active === path.key}
-                onClick={() => setActive(path.key)}
-                className={`flex w-full items-start gap-3 rounded-lg border px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] ${
-                  active === path.key
-                    ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)]'
-                    : 'border-transparent hover:border-[var(--border-subtle)] hover:bg-[var(--surface-sunken)]'
-                }`}
-              >
-                <span className="mt-0.5 text-[var(--brand-primary)]">
-                  <Icon name={path.icon} size={17} />
-                </span>
-                <span>
-                  <span className="block text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-                    {path.eyebrow}
+            {PATHS.map((path) => {
+              const isActive = active === path.key;
+              return (
+                <button
+                  key={path.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setActive(path.key)}
+                  className={`flex w-full items-start gap-3 rounded-lg border px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] ${
+                    isActive
+                      ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)]'
+                      : 'border-transparent hover:border-[var(--border-subtle)] hover:bg-[var(--surface-sunken)]'
+                  }`}
+                >
+                  <span className="mt-0.5 text-[var(--brand-primary)]">
+                    <Icon name={path.icon} size={17} />
                   </span>
-                  <span className="mt-0.5 block text-sm font-semibold text-[var(--fg-primary)]">
-                    {path.title}
+                  <span>
+                    <span
+                      className={`block text-[10px] font-semibold uppercase tracking-wider ${
+                        isActive ? 'text-[var(--fg-secondary)]' : 'text-[var(--fg-tertiary)]'
+                      }`}
+                    >
+                      {path.eyebrow}
+                    </span>
+                    <span className="mt-0.5 block text-sm font-semibold text-[var(--fg-primary)]">
+                      {path.title}
+                    </span>
+                    <span className="mt-1 block text-xs leading-5 text-[var(--fg-secondary)]">
+                      {path.summary}
+                    </span>
                   </span>
-                  <span className="mt-1 block text-xs leading-5 text-[var(--fg-secondary)]">
-                    {path.summary}
-                  </span>
-                </span>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         </div>
 

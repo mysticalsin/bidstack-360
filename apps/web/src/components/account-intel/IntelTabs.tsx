@@ -1,9 +1,9 @@
-// Pure display sub-components for AccountIntelPanel — no hooks, no mutations.
+// Display sub-components for AccountIntelPanel: no mutations; money uses the display-currency hook.
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/StateMessages';
 import { Icon } from '@/components/ui/Icon';
-import { formatMoney } from '@/lib/format';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 
 // ─── Shared helper (module-private) ────────────────────────────────────────
 
@@ -129,6 +129,8 @@ export function ProductsTab({
   onDelete: (id: string) => void;
   isDeleting: boolean;
 }) {
+  const { formatMoneyMicros } = useFormatMoney();
+
   if (products.length === 0) {
     return (
       <EmptyState
@@ -152,7 +154,7 @@ export function ProductsTab({
                   </span>
                   {p.priceRangeMicros ? (
                     <span className="rounded-full bg-tag-blue-bg px-2 py-0.5 text-[10px] font-medium text-tag-blue-fg">
-                      {formatMoney(Number(p.priceRangeMicros), p.currency)}
+                      {formatMoneyMicros(p.priceRangeMicros, p.currency)}
                     </span>
                   ) : null}
                 </div>

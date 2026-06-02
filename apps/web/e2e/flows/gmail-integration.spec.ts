@@ -12,15 +12,18 @@ test.describe('Gmail integration (mocked OAuth)', () => {
   test('integrations page renders Gmail card', async ({ page }) => {
     const integrations = new IntegrationsPage(page);
     await integrations.navigate();
+    await page.getByRole('tab', { name: /connectors/i }).click();
     await expect(integrations.gmailCard).toBeVisible({ timeout: 15_000 });
   });
 
   test('Gmail card shows Connect or Connected status', async ({ page }) => {
     const integrations = new IntegrationsPage(page);
     await integrations.navigate();
-    const gmailSection = integrations.gmailCard.locator('..').locator('..');
+    await page.getByRole('tab', { name: /connectors/i }).click();
+    const gmailSection = integrations.gmailCard;
     await expect(
-      gmailSection.getByRole('button', { name: /connect|disconnect/i })
+      gmailSection
+        .getByRole('button', { name: /connect|disconnect/i })
         .or(gmailSection.getByText(/connected|active/i)),
     ).toBeVisible({ timeout: 10_000 });
   });
@@ -40,7 +43,10 @@ test.describe('Gmail integration (mocked OAuth)', () => {
     if (await emailTab.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await emailTab.click();
       await expect(
-        page.getByText(/no emails|inbox|thread/i).or(page.locator('[data-testid="email-thread"]')).first(),
+        page
+          .getByText(/no emails|inbox|thread/i)
+          .or(page.locator('[data-testid="email-thread"]'))
+          .first(),
       ).toBeVisible({ timeout: 10_000 });
     } else {
       // Email may be in-line in the activity feed

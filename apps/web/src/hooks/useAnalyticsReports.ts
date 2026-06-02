@@ -48,6 +48,11 @@ export type ChartType =
   | 'radar';
 
 export interface FilterCondition {
+  // WHY id: AnimatePresence needs a stable key that survives array mutations
+  // (insertions, deletions, reorders). Without it, React maps key={index} to
+  // the wrong element after deletion, corrupting animation state and local
+  // component state (e.g. the ConditionRow's fieldDef useState).
+  id?: string;
   field: string;
   operator: FilterOperator;
   value?: unknown;
@@ -56,6 +61,9 @@ export interface FilterCondition {
 export type FilterLogic = 'AND' | 'OR';
 
 export interface FilterGroup {
+  // WHY id: same stable-key reason as FilterCondition — groups can also be
+  // deleted from their parent's conditions array.
+  id?: string;
   logic: FilterLogic;
   conditions: (FilterCondition | FilterGroup)[];
 }
@@ -177,8 +185,7 @@ export function useReportRun(reportId: string, runId: string) {
 export function useCreateReport() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: CreateReportInput) =>
-      api<Report>('/api/reports', { method: 'POST', body }),
+    mutationFn: (body: CreateReportInput) => api<Report>('/api/reports', { method: 'POST', body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.list() }),
   });
 }

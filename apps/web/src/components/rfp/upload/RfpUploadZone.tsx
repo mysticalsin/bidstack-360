@@ -5,57 +5,8 @@ import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { useRfpUpload } from '@/hooks/rfp/useRfpUpload';
+import { FILE_INPUT_ACCEPT, inferAllowedFileContentType } from '@bidstack/shared';
 
-const ACCEPTED_TYPES = [
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/json',
-  'application/xml',
-  'application/rtf',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'text/plain',
-  'text/markdown',
-  'text/csv',
-  'text/html',
-  'text/xml',
-  'text/rtf',
-  'image/png',
-  'image/jpeg',
-  'image/gif',
-  'image/webp',
-  'image/tiff',
-  'image/bmp',
-];
-const ACCEPTED_EXTS = [
-  '.pdf',
-  '.doc',
-  '.docx',
-  '.ppt',
-  '.pptx',
-  '.xls',
-  '.xlsx',
-  '.txt',
-  '.md',
-  '.markdown',
-  '.csv',
-  '.json',
-  '.xml',
-  '.html',
-  '.htm',
-  '.rtf',
-  '.png',
-  '.jpg',
-  '.jpeg',
-  '.gif',
-  '.webp',
-  '.tif',
-  '.tiff',
-  '.bmp',
-];
 const MAX_MB = 50;
 
 export function RfpUploadZone() {
@@ -68,8 +19,7 @@ export function RfpUploadZone() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const validate = (file: File): string | null => {
-    const ext = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
-    if (!ACCEPTED_TYPES.includes(file.type) && !ACCEPTED_EXTS.includes(ext)) {
+    if (!inferAllowedFileContentType(file.name, file.type)) {
       return t('upload.errorType');
     }
     if (file.size > MAX_MB * 1024 * 1024) {
@@ -146,16 +96,16 @@ export function RfpUploadZone() {
       >
         <span
           className="grid h-12 w-12 place-items-center rounded-xl"
-          style={{ background: 'linear-gradient(135deg, #B49CFF 0%, #7C3AED 100%)' }}
+          style={{ background: 'var(--brand-gradient)' }}
           aria-hidden="true"
         >
-          <Icon name="files" size={24} ariaHidden />
+          <Icon name="file" size={24} ariaHidden />
         </span>
         <div>
           <p className="text-sm font-semibold text-[var(--fg-primary)]">{t('upload.title')}</p>
           <p className="mt-1 text-xs text-[var(--fg-secondary)]">{t('upload.dropzone')}</p>
           <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
-            PDF, Office, text/CSV/JSON/HTML or image, max {MAX_MB} MB
+            PDF, Office, text/data, image, audio, or video, max {MAX_MB} MB
           </p>
         </div>
         <Button
@@ -171,14 +121,14 @@ export function RfpUploadZone() {
         <input
           ref={inputRef}
           type="file"
-          accept={[...ACCEPTED_EXTS, ...ACCEPTED_TYPES].join(',')}
+          accept={FILE_INPUT_ACCEPT}
           className="sr-only"
           aria-hidden="true"
           onChange={onInputChange}
         />
       </div>
       {displayError && (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="text-sm text-[var(--danger)]">
           {displayError}
         </p>
       )}

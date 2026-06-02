@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useMutation } from '@tanstack/react-query';
 
 import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 import { useIsAdmin } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { useRfpPipelineStore } from '@/stores/rfpPipeline';
@@ -85,7 +86,7 @@ export function ApprovalGate() {
       {!isAdmin && (
         <div
           role="alert"
-          className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+          className="rounded-lg border border-[var(--tag-amber-bg)] bg-[var(--tag-amber-bg)]/20 p-3 text-xs text-[var(--tag-amber-fg)]"
         >
           {t('approval.requiresAdmin')}
         </div>
@@ -119,7 +120,7 @@ export function ApprovalGate() {
                   'flex min-h-[44px] cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors',
                   'focus-within:ring-2 focus-within:ring-[var(--brand-primary)] focus-within:ring-offset-1',
                   checked[step]
-                    ? 'border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950/20 dark:text-green-200'
+                    ? 'border-[var(--tag-jade-bg)] bg-[var(--tag-jade-bg)]/20 text-[var(--tag-jade-fg)]'
                     : isEnabled
                       ? 'border-[var(--border-subtle)] bg-[var(--surface-card)] text-[var(--fg-primary)] hover:border-[var(--brand-primary)]'
                       : 'cursor-not-allowed border-[var(--border-subtle)] bg-[var(--surface-sunken)] text-[var(--fg-tertiary)] opacity-60',
@@ -161,7 +162,7 @@ export function ApprovalGate() {
 
       {/* Error from mutation */}
       {approveMutation.isError && (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="text-sm text-[var(--danger)]">
           {approveMutation.error instanceof Error
             ? approveMutation.error.message
             : t('approval.errorGeneric')}
@@ -169,18 +170,12 @@ export function ApprovalGate() {
       )}
 
       {/* Approve button */}
-      <button
+      <Button
         type="button"
         disabled={!canApprove || approveMutation.isPending}
         onClick={handleApprove}
-        className={[
-          'min-h-[44px] w-full rounded-xl px-6 py-3 text-sm font-semibold transition-colors',
-          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
-          canApprove && !approveMutation.isPending
-            ? 'bg-[var(--brand-primary)] text-white hover:bg-[var(--brand-primary)]/90 cursor-pointer'
-            : 'cursor-not-allowed bg-[var(--surface-sunken)] text-[var(--fg-tertiary)] opacity-60',
-        ].join(' ')}
-        aria-disabled={!canApprove || approveMutation.isPending}
+        variant="primary"
+        className="w-full"
         title={
           !isAdmin
             ? t('approval.requiresAdmin')
@@ -196,7 +191,7 @@ export function ApprovalGate() {
           : stage === 'approved'
             ? t('approval.approved')
             : t('approval.approve')}
-      </button>
+      </Button>
     </Card>
   );
 }

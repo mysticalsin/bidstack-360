@@ -9,7 +9,13 @@ test.describe('Navigation accessibility', () => {
     const primaryNav = page.getByRole('navigation', { name: 'Primary navigation' });
 
     await expect(primaryNav.getByRole('link', { name: 'Dashboard' })).toBeVisible();
+
+    // Hover over the Sales button to reveal the flyout menu
+    await primaryNav.getByRole('button', { name: 'Sales' }).hover();
     await expect(primaryNav.getByRole('link', { name: 'Quotations & Orders' })).toBeVisible();
+
+    // Hover over the Pipeline button to reveal the flyout menu
+    await primaryNav.getByRole('button', { name: 'Pipeline' }).hover();
     await expect(primaryNav.getByRole('link', { name: 'Opportunities' })).toBeVisible();
   });
 

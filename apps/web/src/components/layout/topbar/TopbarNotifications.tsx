@@ -38,6 +38,7 @@ export function NotificationsBell() {
         <button
           type="button"
           className="iconbtn relative"
+          data-testid="notification-bell"
           aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
           aria-haspopup="menu"
           aria-expanded={open}
@@ -45,7 +46,10 @@ export function NotificationsBell() {
         >
           <Icon name="bell" size={16} ariaHidden />
           {unreadCount > 0 && (
-            <span className="absolute right-0 top-0 flex h-4 min-w-4 -translate-y-1/4 translate-x-1/4 items-center justify-center rounded-full bg-[var(--danger)] px-1 text-[10px] font-bold text-white">
+            <span
+              className="absolute right-0 top-0 flex h-4 min-w-4 -translate-y-1/4 translate-x-1/4 items-center justify-center rounded-full bg-[var(--danger)] px-1 text-[10px] font-bold text-white"
+              data-testid="notification-badge"
+            >
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
@@ -56,6 +60,8 @@ export function NotificationsBell() {
         {open && (
           <motion.div
             role="menu"
+            data-testid="notification-tray"
+            aria-label="Notifications"
             initial={reduced ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={reduced ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.98 }}
@@ -86,6 +92,7 @@ export function NotificationsBell() {
                   <div
                     key={m.id}
                     role="menuitem"
+                    data-testid="notification-item"
                     className="flex items-start gap-3 border-b border-[var(--border-subtle)] last:border-0 rounded-md px-3 py-2.5 transition-colors hover:bg-[var(--surface-hover)]"
                   >
                     <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-[var(--brand-primary)]" />

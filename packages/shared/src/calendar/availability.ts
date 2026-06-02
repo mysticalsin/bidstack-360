@@ -6,14 +6,14 @@
  *
  * Rules:
  *   - Each rule is a recurring weekly window: { dayOfWeek 0-6, startTime "HH:mm", endTime "HH:mm" }
- *   - existingEvents block any slot that overlaps (including buffer time around the event)
+ *   - existingEvents block any slot that overlaps, including buffer time around the event
  *   - All-day events block the whole day
- *   - DST transitions: we work in ISO strings and let Date handle wall-clock
- *   - Midnight-crossing windows (e.g. 23:00 → 01:00) are NOT supported; validate at the API layer
+ *   - Timezone conversion maps wall-clock availability to UTC instants
+ *   - Midnight-crossing windows (e.g. 23:00 to 01:00) are not supported
  */
 
 export interface AvailabilityRule {
-  /** 0 = Sunday … 6 = Saturday (same as Date.getDay()) */
+  /** 0 = Sunday ... 6 = Saturday (same as Date.getDay()) */
   dayOfWeek: number;
   /** "HH:mm" in the booking page owner's local timezone */
   startTime: string;
@@ -72,34 +72,37 @@ export function computeSlots(opts: SlotComputeOptions): Slot[] {
 
   const results: Slot[] = [];
 
-  // Iterate day-by-day from rangeStart to rangeEnd
   const dayMs = 24 * 60 * 60 * 1000;
   let cursor = startOfDayInTz(rangeStart, tz);
 
   while (cursor <= rangeEnd) {
     const dow = getDayOfWeekInTz(cursor, tz);
-
     const rulesForDay = rules.filter((r) => r.dayOfWeek === dow);
 
     for (const rule of rulesForDay) {
       const windowStart = applyTimeInTz(cursor, rule.startTime, tz);
       const windowEnd = applyTimeInTz(cursor, rule.endTime, tz);
 
-      if (windowEnd <= windowStart) continue; // malformed rule
+      if (windowEnd <= windowStart) continue;
 
-      // Generate slots within the window
       let slotStart = new Date(windowStart);
       while (slotStart.getTime() + durationMinutes * 60_000 <= windowEnd.getTime()) {
         const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60_000);
 
-        // Minimum notice check
         if (minNoticeHours > 0 && slotStart.getTime() - now.getTime() < noticeMs) {
           slotStart = new Date(slotStart.getTime() + durationMinutes * 60_000);
           continue;
         }
 
-        // Collision check against existing events (plus buffers)
-        if (!collidesWithEvents(slotStart, slotEnd, existingEvents, bufferBeforeMinutes, bufferAfterMinutes)) {
+        if (
+          !collidesWithEvents(
+            slotStart,
+            slotEnd,
+            existingEvents,
+            bufferBeforeMinutes,
+            bufferAfterMinutes,
+          )
+        ) {
           results.push(slotStart.toISOString());
         }
 
@@ -113,8 +116,6 @@ export function computeSlots(opts: SlotComputeOptions): Slot[] {
   return results;
 }
 
-// ─── Internal helpers ──────────────────────────────────────────────────────
-
 function collidesWithEvents(
   slotStart: Date,
   slotEnd: Date,
@@ -124,117 +125,100 @@ function collidesWithEvents(
 ): boolean {
   for (const ev of events) {
     if (ev.isAllDay) {
-      // All-day events block the whole calendar day of slotStart.
-      // Compare UTC midnight boundaries.
       const evDay = ev.startAt.toISOString().slice(0, 10);
       const slotDay = slotStart.toISOString().slice(0, 10);
       if (evDay === slotDay) return true;
       continue;
     }
 
-    // Expand the blocking window by the buffer times
     const blockStart = new Date(ev.startAt.getTime() - bufferBefore * 60_000);
     const blockEnd = new Date(ev.endAt.getTime() + bufferAfter * 60_000);
 
-    // Standard interval overlap: A starts before B ends AND A ends after B starts
     if (slotStart < blockEnd && slotEnd > blockStart) return true;
   }
   return false;
 }
 
-/**
- * Returns midnight (00:00:00) on the given date in the specified timezone,
- * as a UTC Date object.
- *
- * WHY: We need to iterate day-by-day in the owner's local timezone so DST
- * transitions don't cause midnight to shift.
- */
 function startOfDayInTz(d: Date, tz: string): Date {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: tz,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(d);
-
-  const year = parts.find((p) => p.type === 'year')!.value;
-  const month = parts.find((p) => p.type === 'month')!.value;
-  const day = parts.find((p) => p.type === 'day')!.value;
-
-  // Parse as local ISO-like string and convert back to UTC
-  return new Date(`${year}-${month}-${day}T00:00:00`);
+  const { year, month, day } = getZonedDateTimeParts(d, tz);
+  return zonedTimeToUtc(year, month, day, 0, 0, 0, tz);
 }
 
-/**
- * Returns the day-of-week (0-6) for a Date in the given timezone.
- * WHY: Date.getDay() always returns UTC day, which drifts for late-night TZs.
- */
 function getDayOfWeekInTz(d: Date, tz: string): number {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: tz,
     weekday: 'short',
   }).formatToParts(d);
 
-  const short = parts.find((p) => p.type === 'weekday')!.value;
+  const short = parts.find((p) => p.type === 'weekday')?.value;
   const map: Record<string, number> = {
-    Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
   };
-  return map[short] ?? 0;
+  return short ? (map[short] ?? 0) : 0;
 }
 
-/**
- * Given a day (midnight UTC) and a "HH:mm" time string, returns a Date
- * representing that wall-clock time in `tz` as a UTC instant.
- */
 function applyTimeInTz(dayMidnight: Date, hhmm: string, tz: string): Date {
-  const [hh, mm] = hhmm.split(':').map(Number);
+  const [hour = 0, minute = 0] = hhmm.split(':').map(Number);
+  const { year, month, day } = getZonedDateTimeParts(dayMidnight, tz);
+  return zonedTimeToUtc(year, month, day, hour, minute, 0, tz);
+}
 
-  // Build an ISO string in local time and let Intl resolve the UTC offset
+function getZonedDateTimeParts(d: Date, tz: string) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: tz,
+    hourCycle: 'h23',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).formatToParts(dayMidnight);
-
-  const year = parts.find((p) => p.type === 'year')!.value;
-  const month = parts.find((p) => p.type === 'month')!.value;
-  const day = parts.find((p) => p.type === 'day')!.value;
-
-  // We use a trick: format a known UTC time to the target TZ and back to
-  // measure the UTC offset, then apply it to the desired wall-clock time.
-  // Construct a Date by parsing without a timezone suffix (treated as local
-  // by V8) — this is intentional: we want the wall-clock interpretation.
-  // We then correct with the TZ offset.
-  const utcForOffset = new Date(dayMidnight);
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: tz,
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  formatter.format(utcForOffset);
-  // The naive approach: compose the date string and parse via Date.
-  // This is reliable because we always work in the same TZ for a given day.
-  const naive = new Date(`${year}-${month}-${day}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00Z`);
+    second: '2-digit',
+  }).formatToParts(d);
 
-  // Compute offset: how far is the TZ from UTC at midnight?
-  const refUtc = new Date(`${year}-${month}-${day}T00:00:00Z`);
-  const refTzParts = new Intl.DateTimeFormat('en-US', {
-    timeZone: tz,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(refUtc);
+  const pick = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((p) => p.type === type)?.value ?? 0);
 
-  const tzHour = Number(refTzParts.find((p) => p.type === 'hour')!.value);
-  const tzMin = Number(refTzParts.find((p) => p.type === 'minute')!.value);
-  // Offset in minutes (positive means TZ is ahead of UTC)
-  // WHY: We subtract TZ midnight-offset to map wall-clock → UTC correctly.
-  const offsetMs = (tzHour * 60 + tzMin) * 60_000;
+  return {
+    year: pick('year'),
+    month: pick('month'),
+    day: pick('day'),
+    hour: pick('hour'),
+    minute: pick('minute'),
+    second: pick('second'),
+  };
+}
 
-  return new Date(naive.getTime() - offsetMs);
+function getTimeZoneOffsetMs(d: Date, tz: string): number {
+  const parts = getZonedDateTimeParts(d, tz);
+  const zonedAsUtc = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second,
+  );
+  return zonedAsUtc - d.getTime();
+}
+
+function zonedTimeToUtc(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+  tz: string,
+): Date {
+  const utcGuess = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  const firstOffset = getTimeZoneOffsetMs(utcGuess, tz);
+  const firstResult = new Date(utcGuess.getTime() - firstOffset);
+  const secondOffset = getTimeZoneOffsetMs(firstResult, tz);
+  return new Date(utcGuess.getTime() - secondOffset);
 }

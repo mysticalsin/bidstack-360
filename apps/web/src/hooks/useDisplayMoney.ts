@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+
 import { useCurrencyStore } from '@/stores/currency';
 import { formatMoney, formatMoneyMicros } from '@/lib/format';
 
@@ -6,7 +8,10 @@ import { formatMoney, formatMoneyMicros } from '@/lib/format';
  * Uses live exchange rates fetched from open.er-api.com.
  */
 export function useDisplayMoney(value: number, sourceCurrency = 'EUR'): string {
-  const { currency, convert } = useCurrencyStore();
+  const { currency, convert, fetchRates } = useCurrencyStore();
+  useEffect(() => {
+    void fetchRates();
+  }, [fetchRates]);
   const converted = convert(value, sourceCurrency);
   return formatMoney(converted, currency);
 }
@@ -17,7 +22,10 @@ export function useDisplayMoneyMicros(
   sourceCurrency = 'CAD',
   options?: { compact?: boolean },
 ): string {
-  const { currency, convert } = useCurrencyStore();
+  const { currency, convert, fetchRates } = useCurrencyStore();
+  useEffect(() => {
+    void fetchRates();
+  }, [fetchRates]);
   // Convert micros to unit value
   const asBigInt =
     typeof micros === 'bigint'

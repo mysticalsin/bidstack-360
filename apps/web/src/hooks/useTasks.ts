@@ -32,6 +32,8 @@ export function useCreateTask() {
       // bundles tasks into the same payload — without this the new task
       // would appear in the Tasks page but not the opportunity tab.
       void qc.invalidateQueries({ queryKey: ['opportunity'] });
+      // P1 #30: creating a task also affects dashboard activity counters
+      void qc.invalidateQueries({ queryKey: ['crm-dashboard'] });
     },
   });
 }

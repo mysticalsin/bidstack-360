@@ -240,6 +240,9 @@ export async function crmSummaryRoutes(app: FastifyInstance) {
         .send({ error: 'Invalid query parameters', issues: queryResult.error.issues });
     }
 
-    return cachedCrmSummary(orgId, queryResult.data.limit);
+    return req.cache(() => cachedCrmSummary(orgId, queryResult.data.limit), {
+      ttlSeconds: 30,
+      tags: ['crm-summary'],
+    });
   });
 }

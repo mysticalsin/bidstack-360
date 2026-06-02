@@ -49,7 +49,7 @@ export function MagneticButton({
     <motion.button
       ref={ref}
       className={cn(
-        'relative inline-flex items-center justify-center rounded-full bg-[var(--brand-primary)] px-6 py-2.5 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-[var(--brand-primary-dark)] active:bg-[var(--brand-primary-darker)]',
+        'relative inline-flex items-center justify-center rounded-full bg-[var(--brand-primary)] px-6 py-2.5 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-[var(--brand-primary-hover)] active:bg-[var(--brand-primary-press)]',
         // P1 #20: WCAG 2.2 — explicit focus-visible ring (2px, 3:1 contrast, offset so it clears the rounded shape)
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2',
         className,

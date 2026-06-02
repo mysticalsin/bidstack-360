@@ -9,10 +9,10 @@ test.describe('Intake page', () => {
   test('stepper steps are rendered', async ({ page, gotoAndWait }) => {
     await gotoAndWait('/intake');
     // The intake flow has 4 stepper steps
-    await expect(page.getByRole('button', { name: 'Receive' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Extract' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Review' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Publish' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '1 Receive', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '2 Extract', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '3 Review', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '4 Publish', exact: true })).toBeVisible();
   });
 
   test('initial step shows document upload area', async ({ page, gotoAndWait }) => {

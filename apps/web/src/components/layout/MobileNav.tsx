@@ -5,7 +5,7 @@
 import * as RadixDialog from '@radix-ui/react-dialog';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 
 import { useUiStore } from '@/stores/ui';
 import { useAccountHistory } from '@/stores/accountHistory';
@@ -91,7 +91,14 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
           <div className="sb-mark" aria-hidden>
             B
           </div>
-          <span className="font-semibold text-[var(--fg-primary)]">BidStack 360</span>
+          <div className="flex flex-col">
+            <span className="font-semibold text-[var(--fg-primary)] leading-tight">
+              BidStack 360
+            </span>
+            <span className="text-[10px] text-[var(--fg-tertiary)] font-normal leading-tight">
+              Creator: Tony
+            </span>
+          </div>
         </div>
         <button type="button" onClick={onClose} className="iconbtn" aria-label="Close navigation">
           <Icon name="close" size={18} ariaHidden />
@@ -155,17 +162,37 @@ function MobileNavItem({
   onNavigate: () => void;
 }) {
   const badge = item.badgeKey ? badges[item.badgeKey] : 0;
+  const location = useLocation();
+
+  const isActive = (() => {
+    try {
+      const toUrl = new URL(item.to, window.location.origin);
+      const toPath = toUrl.pathname;
+      const toTab = toUrl.searchParams.get('tab');
+
+      const currentTab = new URLSearchParams(location.search).get('tab');
+
+      if (location.pathname !== toPath) return false;
+
+      if (toTab) {
+        return currentTab === toTab;
+      } else {
+        return !currentTab || currentTab === 'overview';
+      }
+    } catch {
+      return false;
+    }
+  })();
+
   return (
     <NavLink
       to={item.to}
-      className={({ isActive }) =>
-        cn(
-          'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-          isActive
-            ? 'bg-[var(--brand-primary-tint)] text-[var(--brand-deep)]'
-            : 'text-[var(--fg-secondary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)]',
-        )
-      }
+      className={cn(
+        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+        isActive
+          ? 'bg-[var(--brand-primary-tint)] text-[var(--brand-deep)]'
+          : 'text-[var(--fg-secondary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)]',
+      )}
       end={item.end ?? item.to === '/'}
       onClick={onNavigate}
       onMouseEnter={() => prefetchRoute(item.to)}

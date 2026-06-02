@@ -9,6 +9,7 @@ import { useOpportunities } from '@/hooks/useOpportunities';
 vi.mock('@/hooks/useOpportunities', () => ({
   useOpportunities: vi.fn(),
   usePatchOpportunity: vi.fn(() => ({ mutate: vi.fn() })),
+  useCreateOpportunity: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
 vi.mock('@/hooks/useStageMutation', () => ({
@@ -27,7 +28,7 @@ function renderWithProviders(ui: React.ReactElement) {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>{ui}</MemoryRouter>
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -49,7 +50,7 @@ describe('OpportunitiesPage', () => {
     });
 
     renderWithProviders(<OpportunitiesPage />);
-    
+
     // The skeleton has no explicit role, but we can verify it doesn't render the table
     expect(screen.queryByRole('table')).toBeNull();
   });

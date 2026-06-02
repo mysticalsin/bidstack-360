@@ -7,6 +7,58 @@
 import { z } from 'zod';
 import { CrmObjectSource, SourceAttribution, CrmLogo, TechnicalStackCategory } from './crm.base.js';
 
+export const CompanyStrategicSignalKind = z.enum([
+  'intent',
+  'hiring',
+  'headcount',
+  'revenue',
+  'funding',
+  'leadership',
+  'technology',
+  'news',
+  'risk',
+  'other',
+]);
+export type CompanyStrategicSignalKind = z.infer<typeof CompanyStrategicSignalKind>;
+
+export const CompanyStrategicSignal = z.object({
+  id: z.string().min(1),
+  kind: CompanyStrategicSignalKind,
+  label: z.string().min(1),
+  detail: z.string().nullable(),
+  observedAt: z.string().datetime(),
+  source: z.string().min(1),
+  confidence: z.number().min(0).max(1),
+  url: z.string().url().nullable(),
+  metadata: z.record(z.unknown()).default({}),
+});
+export type CompanyStrategicSignal = z.infer<typeof CompanyStrategicSignal>;
+
+export const CompanyStrategicIntel = z.object({
+  provider: z.string().min(1),
+  lastSyncedAt: z.string().datetime().nullable(),
+  syncMode: z.enum([
+    'apollo_mcp_company_search',
+    'apollo_mcp_get_company',
+    'apollo_api_organization_enrich',
+    'open_data',
+    'none',
+  ]),
+  creditPolicy: z.enum(['free_search', 'uses_credits', 'mixed', 'unknown']),
+  freshness: z.enum(['fresh', 'stale', 'never']),
+  employeeTrend: z.enum(['hiring', 'contracting', 'flat', 'unknown']),
+  employeeCount: z.number().int().nonnegative().nullable(),
+  annualRevenueMicros: z.number().int().nonnegative().nullable(),
+  intentTopics: z.array(z.string()).default([]),
+  hiringSignals: z.array(CompanyStrategicSignal).default([]),
+  leadershipSignals: z.array(CompanyStrategicSignal).default([]),
+  revenueSignals: z.array(CompanyStrategicSignal).default([]),
+  summary: z.string().min(1),
+  limitations: z.array(z.string()).default([]),
+  signals: z.array(CompanyStrategicSignal).default([]),
+});
+export type CompanyStrategicIntel = z.infer<typeof CompanyStrategicIntel>;
+
 export const CrmCompany = z.object({
   id: z.string(),
   source: CrmObjectSource.default('external_crm'),
@@ -24,6 +76,7 @@ export const CrmCompany = z.object({
   incorporationDate: z.string().date().nullable(),
   logo: CrmLogo.nullable(),
   technicalStack: z.array(TechnicalStackCategory).optional(),
+  strategicIntel: CompanyStrategicIntel.optional(),
   confidence: z.number().min(0).max(1),
   sourceAttribution: z.array(SourceAttribution).default([]),
   updatedAt: z.string().datetime(),

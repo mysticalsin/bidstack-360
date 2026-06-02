@@ -57,7 +57,7 @@ export const PublicBookingCreate = z.object({
   startAt: z.string().datetime(),
   /** Answers keyed by customQuestion.id */
   answers: z.record(z.unknown()).default({}),
-  /** Optional IANA timezone for display in confirmation (not used for booking logic) */
+  /** IANA timezone used to validate the selected slot against page availability. */
   tz: z.string().max(50).default('UTC'),
 });
 

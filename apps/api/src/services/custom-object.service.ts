@@ -19,6 +19,11 @@
 
 import { prisma, Prisma } from '@bidstack/db';
 
+import {
+  customObjectFieldEntityType,
+  customObjectFieldEntityTypes,
+} from './custom-object.helpers.js';
+
 // Re-export types and record functions so callers (`import * as svc`) work unchanged
 export type {
   DefineObjectInput,
@@ -70,6 +75,8 @@ export async function defineObject(input: {
     });
 
     // Bootstrap default fields — entityType 'CUSTOM_OBJECT' + FK
+    // Namespace field definitions per object to avoid field-key collisions.
+    const entityType = customObjectFieldEntityType(created.id);
     const defaultFields = [
       { fieldKey: 'name', label: 'Name', fieldType: 'text', required: true, orderIndex: 0 },
       { fieldKey: 'owner', label: 'Owner', fieldType: 'text', required: false, orderIndex: 1 },
@@ -86,7 +93,7 @@ export async function defineObject(input: {
       await tx.customFieldDefinition.create({
         data: {
           orgId: input.orgId,
-          entityType: 'CUSTOM_OBJECT',
+          entityType,
           customObjectDefId: created.id,
           fieldKey: f.fieldKey,
           label: f.label,
@@ -203,7 +210,7 @@ export async function addFieldToObject(input: {
   return prisma.customFieldDefinition.create({
     data: {
       orgId: input.orgId,
-      entityType: 'CUSTOM_OBJECT',
+      entityType: customObjectFieldEntityType(input.objectId),
       customObjectDefId: input.objectId,
       fieldKey: input.fieldKey,
       label: input.label,
@@ -225,7 +232,7 @@ export async function listObjectFields(orgId: string, objectId: string) {
     where: {
       orgId,
       customObjectDefId: objectId,
-      entityType: 'CUSTOM_OBJECT',
+      entityType: { in: customObjectFieldEntityTypes(objectId) },
       active: true,
     },
     orderBy: { orderIndex: 'asc' },

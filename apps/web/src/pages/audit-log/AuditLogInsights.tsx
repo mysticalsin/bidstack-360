@@ -97,7 +97,7 @@ export function AuditInsightStrip({ rows }: { rows: AuditLogEntry[] }) {
             <Icon name="shield" className="size-4" />
           </span>
         </div>
-        <dl className="mt-4 grid gap-3">
+        <div className="mt-4 grid gap-3">
           <AuditWatchItem
             label="Top actor"
             value={topActor?.value ?? 'None'}
@@ -113,7 +113,7 @@ export function AuditInsightStrip({ rows }: { rows: AuditLogEntry[] }) {
             value={`${riskTotal} attention events`}
             detail={`${stats.destructive} destructive, ${stats.security} security/API`}
           />
-        </dl>
+        </div>
       </Card>
 
       <EvidenceHealthCard health={evidenceHealth} />
@@ -137,7 +137,7 @@ function EvidenceHealthCard({ health }: { health: EvidenceHealth }) {
           {health.score}/100
         </Badge>
       </div>
-      <dl className="mt-4 grid gap-3">
+      <div className="mt-4 grid gap-3">
         <EvidenceHealthRow
           label="Structured diffs"
           value={health.diffPct}
@@ -153,7 +153,7 @@ function EvidenceHealthCard({ health }: { health: EvidenceHealth }) {
           value={health.actorPct}
           detail={`${health.withActor}/${health.total} attributed`}
         />
-      </dl>
+      </div>
     </Card>
   );
 }
@@ -172,13 +172,17 @@ function EvidenceHealthRow({
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between gap-3">
-        <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
           {label}
-        </dt>
-        <dd className="text-xs font-semibold text-[var(--text-secondary)]">{detail}</dd>
+        </div>
+        <div className="text-xs font-semibold text-[var(--text-secondary)]">{detail}</div>
       </div>
       <div
         className="h-2 overflow-hidden rounded-full bg-[var(--surface-secondary)]"
+        role="progressbar"
+        aria-valuenow={value}
+        aria-valuemin={0}
+        aria-valuemax={100}
         aria-label={`${label}: ${value}%`}
       >
         <div
@@ -203,15 +207,15 @@ function AuditWatchItem({
 }) {
   return (
     <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-3 py-2.5">
-      <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
         {label}
-      </dt>
-      <dd className="mt-1 flex flex-wrap items-end justify-between gap-2">
+      </div>
+      <div className="mt-1 flex flex-wrap items-end justify-between gap-2">
         <span className="min-w-0 truncate text-sm font-semibold text-[var(--text-primary)]">
           {value}
         </span>
         <span className="text-xs text-[var(--text-secondary)]">{detail}</span>
-      </dd>
+      </div>
     </div>
   );
 }

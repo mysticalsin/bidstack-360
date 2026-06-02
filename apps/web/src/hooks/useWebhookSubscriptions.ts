@@ -12,6 +12,10 @@ export interface WebhookSub {
   createdAt: string;
 }
 
+export interface WebhookCreatedSub extends WebhookSub {
+  signingSecret: string;
+}
+
 export interface WebhookDeliveryRecord {
   id: string;
   event: string;
@@ -23,10 +27,11 @@ export interface WebhookDeliveryRecord {
   createdAt: string;
 }
 
-export function useWebhookSubscriptions() {
+export function useWebhookSubscriptions(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['webhook-subscriptions'],
     queryFn: ({ signal }) => api<WebhookSub[]>('/api/v1/webhook-subscriptions', { signal }),
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -46,7 +51,7 @@ export function useCreateWebhookSubscription() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: { url: string; events: string[]; active?: boolean }) =>
-      api<WebhookSub>('/api/v1/webhook-subscriptions', {
+      api<WebhookCreatedSub>('/api/v1/webhook-subscriptions', {
         method: 'POST',
         body,
       }),
@@ -83,8 +88,13 @@ export interface TestPingResult {
 }
 
 export function useTestWebhookPing() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
       api<TestPingResult>(`/api/v1/webhook-subscriptions/${id}/test`, { method: 'POST' }),
+    onSuccess: (_result, id) => {
+      void qc.invalidateQueries({ queryKey: ['webhook-subscriptions'] });
+      void qc.invalidateQueries({ queryKey: ['webhook-deliveries', id] });
+    },
   });
 }

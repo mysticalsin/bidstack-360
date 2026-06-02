@@ -18,28 +18,30 @@ Content-Type: application/json
 
 {
   "url": "https://your-server.example.com/webhooks/bidstack",
-  "events": ["lead.created", "opportunity.stage_changed", "contact.updated"],
+  "events": ["lead.created", "opportunity.stage_changed", "invoice.paid"],
   "active": true
 }
 ```
 
-Your endpoint **must** use HTTPS and must not resolve to a private/internal IP address (SSRF protection).
+The create response includes a one-time `signingSecret`. Store it immediately; list and update responses never return it again. Your endpoint **must** use HTTPS and must not resolve to a private/internal IP address (SSRF protection).
 
 ### Available Events
 
-| Event | Fired when |
-|-------|-----------|
-| `lead.created` | A new lead is created |
-| `lead.qualified` | Lead status changes to `QUALIFIED` |
-| `lead.converted` | Lead is converted to an opportunity |
-| `opportunity.created` | New opportunity |
-| `opportunity.stage_changed` | Deal stage changes |
-| `opportunity.won` | Stage = `WON` |
-| `opportunity.lost` | Stage = `LOST` |
-| `contact.created` | New contact |
-| `contact.updated` | Contact fields updated |
-| `proposal.submitted` | Proposal sent to customer |
-| `task.completed` | Task marked done |
+| Event                        | Fired when                                |
+| ---------------------------- | ----------------------------------------- |
+| `lead.created`               | A new lead is created                     |
+| `contact.created`            | A new contact is created                  |
+| `opportunity.created`        | New opportunity                           |
+| `opportunity.stage_changed`  | Deal stage changes                        |
+| `opportunity.score_degraded` | Predictive scoring detects increased risk |
+| `proposal.submitted`         | Proposal sent to customer                 |
+| `task.created`               | Task created                              |
+| `task.completed`             | Task marked done                          |
+| `invoice.sent`               | Invoice sent                              |
+| `invoice.paid`               | Invoice paid                              |
+| `document.extracted`         | RFP/document extraction completes         |
+| `dust.agent.completed`       | Dust agent run completes                  |
+| `nps.survey_dispatched`      | Customer success NPS survey is sent       |
 
 ## Payload Format
 
@@ -97,10 +99,7 @@ function verifySignature(
   const ageMs = Date.now() - Number(t) * 1000;
   if (ageMs > toleranceMs || ageMs < -30_000) return false; // replay protection
 
-  const expected = createHmac('sha256', secret)
-    .update(`${t}.`)
-    .update(rawBody)
-    .digest('hex');
+  const expected = createHmac('sha256', secret).update(`${t}.`).update(rawBody).digest('hex');
 
   return timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(v1, 'hex'));
 }
@@ -169,12 +168,12 @@ app.post('/webhooks/bidstack', express.raw({ type: '*/*' }), (req, res) => {
 BidStack retries failed deliveries with exponential backoff:
 
 | Attempt | Delay after previous |
-|---------|---------------------|
-| 1 | immediate |
-| 2 | 30 seconds |
-| 3 | 2 minutes |
-| 4 | 15 minutes |
-| 5 | 1 hour |
+| ------- | -------------------- |
+| 1       | immediate            |
+| 2       | 30 seconds           |
+| 3       | 2 minutes            |
+| 4       | 15 minutes           |
+| 5       | 1 hour               |
 
 After 5 failed attempts, the delivery is dead-lettered and the `failureCount` counter on the subscription increments. Subscriptions with `failureCount ≥ 10` are auto-disabled — re-enable them in **Settings → Webhooks**.
 

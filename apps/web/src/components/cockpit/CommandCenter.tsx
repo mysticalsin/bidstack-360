@@ -4,7 +4,7 @@ import { memo } from 'react';
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
-import { formatMoneyMicros } from '@/lib/format';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSnap, springSoft } from '@/lib/motion';
 
 import type { AccountCockpitSnapshot, RiskItem } from '@bidstack/shared';
@@ -25,6 +25,7 @@ interface CommandSignal {
 
 export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
   const reducedMotion = useReducedMotion();
+  const { formatMoneyMicros } = useFormatMoney();
   const readiness = deriveReadiness(cockpit);
   const nextMove = deriveNextMove(cockpit);
   const committee = deriveCommittee(cockpit);

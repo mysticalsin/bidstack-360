@@ -3,7 +3,8 @@ import { memo } from 'react';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { formatMoney, relativeTime } from '@/lib/format';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { relativeTime } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
 
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
@@ -18,9 +19,20 @@ interface Props {
 // avoids re-render churn when sibling cards refetch).
 export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit }: Props) {
   const reducedMotion = useReducedMotion();
+  const { formatMoney } = useFormatMoney();
   const c = cockpit.company;
   const headquarters = headquartersFor(c.name);
   const sourceCount = c.sourceAttribution.length;
+  const strategic = c.strategicIntel;
+  const intentSummary = strategic?.intentTopics.length
+    ? strategic.intentTopics.slice(0, 3).join(', ')
+    : 'Not verified';
+  const hiringSummary = strategic
+    ? `${strategic.employeeTrend} (${strategic.hiringSignals.length} signals)`
+    : 'Not verified';
+  const leadershipSummary = strategic?.leadershipSignals.length
+    ? `${strategic.leadershipSignals.length} C-level signals`
+    : 'Not verified';
   const rows: Array<[string, string]> = [
     ['Legal name', c.legalName ?? c.name],
     ['Founded', c.incorporationDate ? c.incorporationDate.slice(0, 4) : 'Not verified'],
@@ -32,6 +44,15 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
         : 'Not verified',
     ],
     ['Employees', c.employeeCount ? c.employeeCount.toLocaleString() : 'Not verified'],
+    ['Intent topics', intentSummary],
+    ['Hiring movement', hiringSummary],
+    ['Leadership changes', leadershipSummary],
+    [
+      'Apollo sync',
+      strategic?.lastSyncedAt
+        ? `${strategic.freshness} - ${relativeTime(strategic.lastSyncedAt)}`
+        : 'Not synced',
+    ],
     ['Source receipts', `${sourceCount} ${sourceCount === 1 ? 'source' : 'sources'}`],
     ['Last refreshed', relativeTime(c.updatedAt)],
     ['Confidence', `${Math.round(c.confidence * 100)}%`],

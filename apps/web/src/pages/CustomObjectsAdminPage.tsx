@@ -7,7 +7,7 @@
  * Design: Apple HIG card grid. Dark-mode via CSS vars. WCAG 2.2 AA.
  */
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { Modal } from '@/components/ui/Modal';
@@ -52,7 +52,6 @@ export function CustomObjectsAdminPage() {
   const { data, isLoading, isError } = useCustomObjectDefs();
   const createDef = useCreateCustomObjectDef();
   const deleteDef = useDeleteCustomObjectDef();
-  const navigate = useNavigate();
 
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<CreateFormState>(INITIAL_FORM);
@@ -91,7 +90,7 @@ export function CustomObjectsAdminPage() {
       return;
     }
     try {
-      const created = await createDef.mutateAsync({
+      await createDef.mutateAsync({
         key: form.key,
         labelSingular: form.labelSingular,
         labelPlural: form.labelPlural,
@@ -101,7 +100,7 @@ export function CustomObjectsAdminPage() {
       });
       setShowCreate(false);
       setForm(INITIAL_FORM);
-      navigate(`/settings/custom-objects/${created.id}`);
+      toast.success('Custom object created');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to create';
       setFormError(msg);
@@ -184,9 +183,9 @@ export function CustomObjectsAdminPage() {
 
       {/* State: list */}
       {!isLoading && !isError && data && data.items.length > 0 && (
-        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4" data-testid="custom-object-list">
           {data.items.map((def) => (
-            <li key={def.id} className="group relative">
+            <li key={def.id} className="group relative" data-testid={`custom-object-${def.key}`}>
               <Link
                 to={`/settings/custom-objects/${def.id}`}
                 className={cn(

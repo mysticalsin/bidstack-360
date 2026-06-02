@@ -3,6 +3,7 @@
 // in stores/theme.ts; this one covers everything else).
 
 import { create } from 'zustand';
+import { startTransition } from 'react';
 
 const STORAGE_KEY = 'bidstack-ui.v1';
 
@@ -40,6 +41,16 @@ function write(state: PersistedState): void {
   }
 }
 
+function writeLater(state: PersistedState): void {
+  if (typeof window === 'undefined') return;
+  const persist = () => write(state);
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(persist, { timeout: 1_000 });
+    return;
+  }
+  globalThis.setTimeout(persist, 0);
+}
+
 interface UiStore extends PersistedState {
   toggleSidebar: () => void;
   setSidebarCollapsed: (v: boolean) => void;
@@ -54,18 +65,18 @@ export const useUiStore = create<UiStore>((set, get) => ({
   mobileNavOpen: false,
   toggleSidebar: () => {
     const next = !get().sidebarCollapsed;
-    write({ sidebarCollapsed: next, collapsedSections: get().collapsedSections });
-    set({ sidebarCollapsed: next });
+    writeLater({ sidebarCollapsed: next, collapsedSections: get().collapsedSections });
+    startTransition(() => set({ sidebarCollapsed: next }));
   },
   setSidebarCollapsed: (v) => {
-    write({ sidebarCollapsed: v, collapsedSections: get().collapsedSections });
-    set({ sidebarCollapsed: v });
+    writeLater({ sidebarCollapsed: v, collapsedSections: get().collapsedSections });
+    startTransition(() => set({ sidebarCollapsed: v }));
   },
   toggleSection: (key) => {
     const current = get().collapsedSections;
     const next = { ...current, [key]: !current[key] };
-    write({ sidebarCollapsed: get().sidebarCollapsed, collapsedSections: next });
-    set({ collapsedSections: next });
+    writeLater({ sidebarCollapsed: get().sidebarCollapsed, collapsedSections: next });
+    startTransition(() => set({ collapsedSections: next }));
   },
   setMobileNavOpen: (v) => set({ mobileNavOpen: v }),
   toggleMobileNav: () => set({ mobileNavOpen: !get().mobileNavOpen }),

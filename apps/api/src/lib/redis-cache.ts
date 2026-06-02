@@ -39,22 +39,26 @@ export async function cacheSet<T>(key: string, value: T, ttlSeconds: number): Pr
   IN_MEMORY.set(key, { value: raw, expiresAt: Date.now() + ttlSeconds * 1000 });
 }
 
+function deleteInMemory(pattern: string): void {
+  const prefix = pattern.replace(/\*$/, '');
+  for (const key of IN_MEMORY.keys()) {
+    if (key.includes(prefix)) {
+      IN_MEMORY.delete(key);
+    }
+  }
+}
+
 export async function cacheDel(pattern: string): Promise<void> {
   try {
     if (isRedisUp()) {
       const keys = await redis.keys(pattern);
       if (keys.length) await redis.del(...keys);
-      return;
     }
   } catch {
-    // fall through
+    // Redis may be mid-connect or unavailable; always clear fallback cache below.
   }
 
-  for (const key of IN_MEMORY.keys()) {
-    if (key.includes(pattern.replace(/\*$/, ''))) {
-      IN_MEMORY.delete(key);
-    }
-  }
+  deleteInMemory(pattern);
 }
 
 export function cacheKey(parts: string[]): string {

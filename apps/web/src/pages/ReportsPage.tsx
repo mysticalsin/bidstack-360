@@ -1,8 +1,10 @@
 import { memo, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge, stageTone } from '@/components/ui/Badge';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { Icon } from '@/components/ui/Icon';
 import {
   usePipelineReport,
   useLeadReport,
@@ -26,11 +28,21 @@ export function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">Reports</h1>
-        <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          Analytics across pipeline, leads, service desk, and tasks.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">Reports</h1>
+          <p className="mt-1 text-sm text-[var(--fg-secondary)]">
+            Analytics across pipeline, leads, service desk, and tasks.
+          </p>
+        </div>
+        <Link
+          to="/reports/new"
+          role="button"
+          className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--brand-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
+        >
+          <Icon name="plus" size={14} ariaHidden />
+          New report
+        </Link>
       </header>
 
       <div className="flex flex-wrap items-center gap-1" data-tour="reports-new">
@@ -38,6 +50,7 @@ export function ReportsPage() {
           <button
             key={t.key}
             type="button"
+            aria-label={`${t.label} report tab`}
             aria-pressed={tab === t.key}
             onClick={() => setTab(t.key)}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px] ${

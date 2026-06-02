@@ -74,7 +74,23 @@ function inferExtension(name?: string): string {
 function isImageContentType(contentType: string, ext: string): boolean {
   return (
     contentType.startsWith('image/') ||
-    ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.tif', '.tiff', '.bmp'].includes(ext)
+    ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.tif', '.tiff', '.bmp', '.heic', '.heif'].includes(
+      ext,
+    )
+  );
+}
+
+function isAudioContentType(contentType: string, ext: string): boolean {
+  return (
+    contentType.startsWith('audio/') ||
+    ['.mp3', '.wav', '.aac', '.m4a', '.ogg', '.flac'].includes(ext)
+  );
+}
+
+function isVideoContentType(contentType: string, ext: string): boolean {
+  return (
+    contentType.startsWith('video/') ||
+    ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.mpeg', '.mpg'].includes(ext)
   );
 }
 
@@ -203,7 +219,50 @@ function extractBinaryPpt(buffer: Buffer): string {
 // falls through to the built-in CPU parsers. The pipeline therefore NEVER
 // depends on OmniParse or on GPU hosting — OmniParse only upgrades quality when
 // it happens to be available.
-async function extractWithOmniParse(
+function isOmniParseImage(contentType: string, ext: string): boolean {
+  return isImageContentType(contentType, ext) && ext !== '.svg' && contentType !== 'image/svg+xml';
+}
+
+function omniparseEndpoint(contentType: string, ext: string): string {
+  if (isOmniParseImage(contentType, ext)) return '/parse_media/image';
+  if (isAudioContentType(contentType, ext)) return '/parse_media/audio';
+  if (isVideoContentType(contentType, ext)) return '/parse_media/video';
+  return '/parse_document';
+}
+
+function isOmniParseDocument(contentType: string, ext: string): boolean {
+  return (
+    ['application/pdf', 'application/msword'].includes(contentType) ||
+    contentType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    contentType === 'application/vnd.ms-powerpoint' ||
+    contentType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+    ['.pdf', '.doc', '.docx', '.ppt', '.pptx'].includes(ext)
+  );
+}
+
+function isOmniParseSupported(contentType: string, ext: string): boolean {
+  return (
+    isOmniParseDocument(contentType, ext) ||
+    isOmniParseImage(contentType, ext) ||
+    isAudioContentType(contentType, ext) ||
+    isVideoContentType(contentType, ext)
+  );
+}
+
+function extractOmniParseText(data: unknown): string {
+  if (typeof data === 'string') return data.trim();
+  if (!data || typeof data !== 'object') return '';
+  const record = data as Record<string, unknown>;
+  for (const key of ['markdown', 'text', 'content', 'result', 'output']) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim().length > 0) return value.trim();
+  }
+  const nested = record.data;
+  if (nested && typeof nested === 'object') return extractOmniParseText(nested);
+  return '';
+}
+
+export async function extractWithOmniParse(
   buffer: Buffer,
   contentType: string,
   name: string,
@@ -215,16 +274,19 @@ async function extractWithOmniParse(
   const timeoutMs = Number.isFinite(rawTimeout) && rawTimeout > 0 ? rawTimeout : 60_000;
 
   try {
+    const ct = (contentType.toLowerCase().split(';')[0] ?? '').trim();
+    const ext = inferExtension(name);
+    if (!isOmniParseSupported(ct, ext)) return null;
     const form = new FormData();
     form.append('file', new Blob([buffer], { type: contentType }), name || 'document');
-    const res = await fetch(`${base.replace(/\/+$/, '')}/parse_document`, {
+    const res = await fetch(`${base.replace(/\/+$/, '')}${omniparseEndpoint(ct, ext)}`, {
       method: 'POST',
       body: form,
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) return null;
-    const data = (await res.json()) as { text?: string; markdown?: string };
-    const text = (data.markdown ?? data.text ?? '').trim();
+    const data = (await res.json()) as unknown;
+    const text = extractOmniParseText(data);
     return text.length > 0 ? text : null;
   } catch {
     // Network error, timeout, non-JSON body, or unexpected shape — all
@@ -240,10 +302,18 @@ export async function extractTextFromBuffer(opts: ExtractOptions): Promise<strin
 
   if (ct.startsWith('text/')) return buffer.toString('utf-8');
   if (
-    ['application/json', 'application/csv', 'application/xml', 'application/javascript'].includes(
-      ct,
-    ) ||
-    ['.json', '.csv', '.xml', '.md', '.yaml', '.yml'].includes(ext)
+    [
+      'application/json',
+      'application/csv',
+      'application/xml',
+      'message/rfc822',
+      'application/javascript',
+      'application/yaml',
+      'application/x-yaml',
+      'application/rtf',
+      'application/x-rtf',
+    ].includes(ct) ||
+    ['.json', '.csv', '.xml', '.md', '.yaml', '.yml', '.eml'].includes(ext)
   ) {
     return buffer.toString('utf-8');
   }
@@ -312,6 +382,10 @@ export async function extractTextFromBuffer(opts: ExtractOptions): Promise<strin
     ext === '.xls'
   ) {
     return extractXlsx(buffer);
+  }
+
+  if (isAudioContentType(ct, ext) || isVideoContentType(ct, ext)) {
+    throw new Error('Audio and video extraction requires OMNIPARSE_BASE_URL on the worker runtime');
   }
 
   const text = buffer.toString('utf-8');

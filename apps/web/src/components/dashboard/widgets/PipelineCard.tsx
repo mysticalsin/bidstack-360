@@ -99,7 +99,7 @@ function PipelineLiveChart({
   } Z`;
 
   return (
-    <div className="pipeline-live-visual" aria-label="Pipeline stage value distribution">
+    <div className="pipeline-live-visual" role="img" aria-label="Pipeline stage value distribution">
       <svg viewBox={`0 0 ${width} ${height}`} className="pipeline-live-chart" aria-hidden>
         <defs>
           <linearGradient id="pipeline-live-fill" x1="0" x2="0" y1="0" y2="1">

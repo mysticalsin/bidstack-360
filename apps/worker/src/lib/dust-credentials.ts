@@ -25,7 +25,7 @@ export { resolveAgentId, maskApiKey, type DustCredentials } from '@bidstack/shar
 export async function resolveOrgDustCredentials(orgId: string): Promise<DustCredentials | null> {
   const rows = await prisma.$queryRaw<{ config: unknown; credentials: unknown }[]>`
     SELECT config, credentials FROM integration_configs
-    WHERE org_id = ${orgId}::uuid AND type = 'dust' AND name = 'dust'
+    WHERE org_id = ${orgId}::uuid AND type::text = 'dust' AND name = 'dust'
       AND is_active = true AND deleted_at IS NULL
     LIMIT 1
   `;

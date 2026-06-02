@@ -1,14 +1,13 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useState, type FormEvent } from 'react';
 
 import { Button } from '@/components/ui/Button';
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from '@/components/ui/Dialog';
 import { LookupFieldPicker, type LookupOption } from '@/components/ui/LookupFieldPicker';
 import { Select } from '@/components/ui/Select';
+import { useCreateOpportunity } from '@/hooks/useOpportunities';
 import { api } from '@/lib/api';
 import {
   INDUSTRIES,
-  type Opportunity,
   type OpportunityCreate,
   OpportunityCreate as OpportunityCreateSchema,
   OpportunityStage,
@@ -27,9 +26,10 @@ interface Props {
 
 export function CreateOpportunityDialog({ trigger, defaultCustomer }: Props = {}) {
   const [open, setOpen] = useState(false);
-  const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  // Force form remount on every open so uncontrolled inputs clear stale DOM values.
+  const [formKey, setFormKey] = useState(0);
 
   // Company lookup (Twenty pattern A4 — LookupFieldPicker).
   // We track the selected company separately so we can pass its name as the
@@ -53,24 +53,10 @@ export function CreateOpportunityDialog({ trigger, defaultCustomer }: Props = {}
   // Recent company options — empty for now; could be wired to accountHistory.
   const recentCompanies = useMemo<LookupOption[]>(() => [], []);
 
-  const create = useMutation({
-    mutationFn: (body: OpportunityCreate) =>
-      api<Opportunity>('/api/opportunities', { method: 'POST', body }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['opportunities'] });
-      void qc.invalidateQueries({ queryKey: ['report:pipeline'] });
-      // P1 #9: keep count badge, dashboard KPIs, forecasts, and goals fresh
-      void qc.invalidateQueries({ queryKey: ['opportunities', 'count'] });
-      void qc.invalidateQueries({ queryKey: ['crm-dashboard'] });
-      void qc.invalidateQueries({ queryKey: ['forecasts'] });
-      void qc.invalidateQueries({ queryKey: ['goals'] });
-      setOpen(false);
-      setError(null);
-      setFieldErrors({});
-      setSelectedCompany(defaultCustomer ? { id: '', label: defaultCustomer } : null);
-    },
-    onError: (err: Error) => setError(err.message),
-  });
+  // P2 #31: create mutation lives in useCreateOpportunity (shared hook).
+  // Cache invalidation happens there; dialog-local state resets are passed as
+  // per-call callbacks in create.mutate(data, { onSuccess, onError }).
+  const create = useCreateOpportunity();
 
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -99,7 +85,15 @@ export function CreateOpportunityDialog({ trigger, defaultCustomer }: Props = {}
       setFieldErrors(parsed.error.flatten().fieldErrors as FieldErrors);
       return;
     }
-    create.mutate(parsed.data);
+    create.mutate(parsed.data, {
+      onSuccess: () => {
+        setOpen(false);
+        setError(null);
+        setFieldErrors({});
+        setSelectedCompany(defaultCustomer ? { id: '', label: defaultCustomer } : null);
+      },
+      onError: (err: Error) => setError(err.message),
+    });
   };
 
   return (
@@ -107,6 +101,10 @@ export function CreateOpportunityDialog({ trigger, defaultCustomer }: Props = {}
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
+        if (next) {
+          // Increment key so the form remounts with fresh uncontrolled inputs.
+          setFormKey((k) => k + 1);
+        }
         // Reset picker when dialog closes without submitting.
         if (!next) {
           setSelectedCompany(defaultCustomer ? { id: '', label: defaultCustomer } : null);
@@ -122,7 +120,7 @@ export function CreateOpportunityDialog({ trigger, defaultCustomer }: Props = {}
         title="New opportunity"
         description="Add a bid to your pipeline. You can refine intel after Dust data verification runs."
       >
-        <form onSubmit={submit} className="space-y-4">
+        <form key={formKey} onSubmit={submit} className="space-y-4">
           {/* A4 — LookupFieldPicker replaces plain text input for company relation field.
               Hidden input carries the selected label for FormData fallback. */}
           <Field label="Customer" htmlFor="customer-picker" error={fieldErrors.customer?.[0]}>

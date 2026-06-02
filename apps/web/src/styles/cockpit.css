@@ -1,9 +1,9 @@
 /* ---------- Platform pulse / pipeline fills ---------- */
 .pulse-stack {
-  padding: 14px 18px 18px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 .pulse-row {
   position: relative;
@@ -27,12 +27,12 @@
   animation: bs-progress-fill 0.74s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 .pulse-row > span {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--fg-secondary);
   font-weight: 600;
 }
 .pulse-row > strong {
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
@@ -74,8 +74,8 @@
 .stage-pipeline-row {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  padding: 3px 0 5px;
+  gap: 8px;
+  padding: 4px 0;
 }
 .stage-pipeline-head {
   display: flex;
@@ -108,7 +108,7 @@
   min-height: 36px;
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
-  padding: 7px 8px;
+  padding: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -200,7 +200,7 @@
 }
 .proto-row-code {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 10px;
   color: var(--fg-tertiary);
   padding: 2px 6px;
   border-radius: 4px;
@@ -251,7 +251,7 @@
   display: grid;
   grid-template-columns: 180px 1fr;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
   padding: 12px 4px;
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -259,7 +259,7 @@
   border-bottom: 0;
 }
 .tech-label {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--fg-secondary);
 }
@@ -276,7 +276,7 @@
   border-radius: 999px;
   background: var(--surface-sunken);
   border: 1px solid var(--border-subtle);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--fg-secondary);
   transition:
@@ -294,7 +294,7 @@
 
 /* ---------- Live Data Mesh ---------- */
 .data-mesh {
-  padding: 14px 18px 18px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -305,7 +305,7 @@
   border-radius: 12px;
   background: var(--surface-soft);
   box-shadow: inset 3px 0 0 var(--brand-primary);
-  padding: 14px;
+  padding: 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -324,7 +324,7 @@
   pointer-events: none;
 }
 .mesh-kicker {
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -351,7 +351,7 @@
   flex-shrink: 0;
 }
 .mesh-stat span {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 800;
   color: var(--brand-primary);
   line-height: 1;
@@ -376,7 +376,7 @@
   border-radius: 999px;
   background: var(--surface-card);
   color: var(--fg-secondary);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   text-decoration: none;
   transition:
@@ -437,14 +437,14 @@
 }
 .mesh-signal strong {
   display: block;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--fg-primary);
   line-height: 1.3;
 }
 .mesh-signal span {
   display: block;
   margin-top: 3px;
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.45;
   color: var(--fg-tertiary);
 }
@@ -488,7 +488,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
-  padding: 16px 18px 18px;
+  padding: 16px 20px 20px;
 }
 .health-stage {
   align-items: center;
@@ -557,7 +557,7 @@
 .health-core strong {
   color: var(--fg-primary);
   font-family: var(--font-display);
-  font-size: 32px;
+  font-size: 28px;
   line-height: 0.98;
   margin-top: 4px;
 }
@@ -578,11 +578,11 @@
   display: flex;
   justify-content: space-between;
   margin-bottom: 6px;
-  padding-bottom: 9px;
+  padding-bottom: 8px;
 }
 .health-summary-head span {
   color: var(--fg-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
 }
 .health-summary-head strong {
@@ -600,7 +600,7 @@
 .health-legend li {
   align-items: center;
   display: grid;
-  font-size: 12.5px;
+  font-size: 12px;
   gap: 8px;
   grid-template-columns: 10px minmax(0, 1fr) minmax(42px, 0.85fr) auto;
   min-width: 0;

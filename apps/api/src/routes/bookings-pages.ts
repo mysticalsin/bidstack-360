@@ -13,6 +13,8 @@ import { z } from 'zod';
 import { prisma, type Prisma } from '@bidstack/db';
 import { BookingPageCreate, BookingPagePatch } from './bookings.helpers.js';
 
+const BOOKING_PAGE_LIST_LIMIT = 500;
+
 export const bookingsPagesRoutes: FastifyPluginAsyncZod = async (server) => {
   // ── POST /booking-pages ────────────────────────────────────────────────
   server.post(
@@ -158,6 +160,7 @@ export const bookingsPagesRoutes: FastifyPluginAsyncZod = async (server) => {
       const pages = await prisma.bookingPage.findMany({
         where: { orgId: req.auth.orgId, userId: req.auth.userId, deletedAt: null },
         orderBy: { createdAt: 'desc' },
+        take: BOOKING_PAGE_LIST_LIMIT,
         select: {
           id: true,
           slug: true,

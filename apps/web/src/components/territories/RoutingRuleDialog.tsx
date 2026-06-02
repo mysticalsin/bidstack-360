@@ -3,7 +3,11 @@ import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { useUsers } from '@/hooks/useUsers';
 import { useTerritories } from '@/hooks/useTerritories';
-import type { LeadRoutingRule, LeadRoutingRuleCreate, LeadRoutingRulePatch } from '@bidstack/shared';
+import type {
+  LeadRoutingRule,
+  LeadRoutingRuleCreate,
+  LeadRoutingRulePatch,
+} from '@bidstack/shared';
 
 type AssignmentType = 'user' | 'territory' | 'round_robin';
 
@@ -52,7 +56,9 @@ function RoutingRuleDialogForm({
   const [assignType, setAssignType] = useState<AssignmentType>(() => detectAssignType(rule));
   const [assignToUserId, setAssignToUserId] = useState(rule?.assignToUserId ?? '');
   const [assignToTerritoryId, setAssignToTerritoryId] = useState(rule?.assignToTerritoryId ?? '');
-  const [roundRobinTeam, setRoundRobinTeam] = useState(rule?.roundRobinTeam.join(', ') ?? '');
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>(
+    () => rule?.roundRobinTeam ?? [],
+  );
   const [active, setActive] = useState(rule?.active ?? true);
 
   const isEdit = Boolean(rule);
@@ -69,15 +75,9 @@ function RoutingRuleDialogForm({
       priority: Number(priority),
       criteria,
       active,
-      assignToUserId: assignType === 'user' ? (assignToUserId || null) : assignType === 'round_robin' ? null : null,
-      assignToTerritoryId: assignType === 'territory' ? (assignToTerritoryId || null) : null,
-      roundRobinTeam:
-        assignType === 'round_robin'
-          ? roundRobinTeam
-              .split(',')
-              .map((id) => id.trim())
-              .filter(Boolean)
-          : [],
+      assignToUserId: assignType === 'user' ? assignToUserId || null : null,
+      assignToTerritoryId: assignType === 'territory' ? assignToTerritoryId || null : null,
+      roundRobinTeam: assignType === 'round_robin' ? selectedUserIds : [],
     };
     onSubmit(body);
   };
@@ -221,19 +221,40 @@ function RoutingRuleDialogForm({
       )}
 
       {assignType === 'round_robin' && (
-        <div className="space-y-1.5">
-          <label htmlFor="r-team" className="text-sm font-medium text-[var(--fg-primary)]">
-            Round-robin team
+        <div className="space-y-1.5 flex flex-col">
+          <label className="text-sm font-medium text-[var(--fg-primary)]">
+            Round-robin team members
           </label>
-          <input
-            id="r-team"
-            value={roundRobinTeam}
-            onChange={(e) => setRoundRobinTeam(e.target.value)}
-            placeholder="user-id-1, user-id-2, user-id-3"
-            className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none placeholder:text-[var(--fg-tertiary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
-          />
+          <div className="max-h-40 overflow-y-auto rounded-lg border border-[var(--border-default)] bg-[var(--surface-sunken)] p-2 space-y-1">
+            {users.data?.map((u) => {
+              const isChecked = selectedUserIds.includes(u.id);
+              return (
+                <label
+                  key={u.id}
+                  className="flex items-center gap-2 px-2 py-1.5 hover:bg-[var(--surface-hover)] rounded-md cursor-pointer text-sm text-[var(--fg-secondary)] transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedUserIds([...selectedUserIds, u.id]);
+                      } else {
+                        setSelectedUserIds(selectedUserIds.filter((id) => id !== u.id));
+                      }
+                    }}
+                    className="h-4 w-4 rounded border-[var(--border-default)] text-[var(--brand-primary)] focus:ring-[var(--brand-primary)]"
+                  />
+                  <span className="truncate">{u.name ?? u.email}</span>
+                </label>
+              );
+            })}
+            {(!users.data || users.data.length === 0) && (
+              <div className="text-xs text-[var(--fg-tertiary)] italic p-2">No users available</div>
+            )}
+          </div>
           <p className="text-xs text-[var(--fg-tertiary)]">
-            Comma-separated user IDs. The system will cycle through this team.
+            Select one or more team members. The system will cycle through this team.
           </p>
         </div>
       )}
@@ -252,7 +273,16 @@ function RoutingRuleDialogForm({
         <Button type="button" variant="ghost" onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isPending}>
+        <Button
+          type="submit"
+          disabled={
+            isPending ||
+            !name ||
+            (assignType === 'user' && !assignToUserId) ||
+            (assignType === 'territory' && !assignToTerritoryId) ||
+            (assignType === 'round_robin' && selectedUserIds.length === 0)
+          }
+        >
           {isEdit ? 'Save changes' : 'Create rule'}
         </Button>
       </div>
@@ -260,7 +290,13 @@ function RoutingRuleDialogForm({
   );
 }
 
-export function RoutingRuleDialog({ rule, open, onClose, onSubmit, isPending }: RoutingRuleDialogProps) {
+export function RoutingRuleDialog({
+  rule,
+  open,
+  onClose,
+  onSubmit,
+  isPending,
+}: RoutingRuleDialogProps) {
   const isEdit = Boolean(rule);
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>

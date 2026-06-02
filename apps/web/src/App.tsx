@@ -26,9 +26,6 @@ import { usePreferences } from '@/stores/preferences';
 import { useCockpitLayout } from '@/stores/cockpitLayout';
 import { useGlobalUndoHotkey } from '@/stores/undoStack';
 import { AppRoutes } from '@/routes/AppRoutes';
-import { lazy } from 'react';
-
-const LoginPage = lazy(() => import('@/pages/LoginPage').then((m) => ({ default: m.LoginPage })));
 
 export function App() {
   const palette = useCommandPalette();
@@ -37,7 +34,7 @@ export function App() {
   useGlobalShortcuts();
   useGlobalUndoHotkey();
   const location = useLocation();
-  const isLogin = location.pathname === '/login';
+  const isShellLess = location.pathname === '/login' || location.pathname.startsWith('/sign/');
 
   const { user } = useUser();
   const scopePreferences = usePreferences((s) => s.scopeToUser);
@@ -58,10 +55,12 @@ export function App() {
   return (
     <MotionConfig reducedMotion={reducedMotion}>
       <RouteProgress />
-      {isLogin ? (
-        <Suspense fallback={<LoadingSkeleton rows={6} />}>
-          <LoginPage />
-        </Suspense>
+      {isShellLess ? (
+        <ErrorBoundary>
+          <Suspense fallback={<LoadingSkeleton rows={6} />}>
+            <AppRoutes />
+          </Suspense>
+        </ErrorBoundary>
       ) : (
         <AppShell>
           {/* ErrorBoundary scoped inside AppShell so a render error in any page

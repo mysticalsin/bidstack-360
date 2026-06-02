@@ -196,7 +196,7 @@ export const OrgDashboard = memo(function OrgDashboard() {
           <h1 className="page-title gradient-text">Workspace Command Center</h1>
           <div className="page-sub">
             {s?.companies ?? 0} companies · {s?.openOpportunities ?? 0} open deals ·{' '}
-            {formatMoney(s?.pipelineValue ?? 0, 'EUR')} pipeline
+            {formatMoney(convert(s?.pipelineValue ?? 0, 'EUR'), currency)} pipeline
           </div>
         </div>
         <div className="page-actions">
@@ -321,6 +321,7 @@ export const OrgDashboard = memo(function OrgDashboard() {
           <Reveal delay={0.12}>
             <WeeklyGoalCard
               pipelineValue={convert(s?.pipelineValue ?? 0, 'EUR')}
+              targetValue={convert(500_000, 'EUR')}
               currency={currency}
             />
           </Reveal>

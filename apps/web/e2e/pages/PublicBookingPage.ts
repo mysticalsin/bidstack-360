@@ -12,6 +12,7 @@ export class PublicBookingPage {
   readonly page: Page;
   readonly heading: Locator;
   readonly calendarGrid: Locator;
+  readonly dateButtons: Locator;
   readonly timeSlots: Locator;
   readonly nameInput: Locator;
   readonly emailInput: Locator;
@@ -22,11 +23,14 @@ export class PublicBookingPage {
     this.page = page;
     this.heading = page.getByRole('heading', { level: 1 });
     this.calendarGrid = page.getByRole('grid').or(page.locator('[data-testid="booking-calendar"]'));
-    this.timeSlots = page.locator('[data-testid="time-slot"], button[aria-label*="slot"], button[aria-label*="available"]');
+    this.dateButtons = page.locator('[data-testid="booking-calendar"] button');
+    this.timeSlots = page.locator(
+      '[data-testid="time-slot"], button[aria-label*="slot"], button[aria-label*="available"]',
+    );
     this.nameInput = page.getByRole('textbox', { name: /name/i });
     this.emailInput = page.getByRole('textbox', { name: /email/i });
     this.confirmButton = page.getByRole('button', { name: /confirm|book|schedule/i });
-    this.successMessage = page.getByText(/booking confirmed|you're booked|thank you/i);
+    this.successMessage = page.getByRole('heading', { name: /booking confirmed/i });
   }
 
   async navigate(slug: string): Promise<void> {
@@ -35,14 +39,40 @@ export class PublicBookingPage {
   }
 
   async isAvailable(): Promise<boolean> {
-    return this.heading.isVisible({ timeout: 5_000 }).catch(() => false);
+    const terminalState = this.calendarGrid
+      .or(this.timeSlots.first())
+      .or(this.page.getByText(/booking page not found|invalid|no longer accepting/i))
+      .first();
+    await terminalState.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+    return !(await this.page
+      .getByText(/booking page not found|invalid|no longer accepting/i)
+      .isVisible()
+      .catch(() => false));
   }
 
   async pickFirstAvailableSlot(): Promise<boolean> {
-    const count = await this.timeSlots.count();
-    if (count === 0) return false;
-    await this.timeSlots.first().click();
-    return true;
+    const dayCount = await this.dateButtons.count();
+    const attempts = Math.max(dayCount, 1);
+
+    for (let i = 0; i < attempts; i += 1) {
+      if (i > 0) {
+        const availabilityResponse = this.page
+          .waitForResponse((res) => res.url().includes('/availability') && res.status() === 200, {
+            timeout: 10_000,
+          })
+          .catch(() => null);
+        await this.dateButtons.nth(i).click();
+        await availabilityResponse;
+      }
+
+      const firstSlot = this.timeSlots.first();
+      if (await firstSlot.isVisible({ timeout: 2_000 }).catch(() => false)) {
+        await firstSlot.click();
+        return true;
+      }
+    }
+
+    return false;
   }
 
   async fillContactDetails(opts: { name: string; email: string }): Promise<void> {

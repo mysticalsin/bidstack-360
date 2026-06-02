@@ -17,10 +17,13 @@ export function StageCell({
   stage,
   options,
   onSave,
+  isSaving = false,
 }: {
   stage: PipelineStage | null;
   options: PipelineStage[];
   onSave: (nextId: string) => void;
+  /** True while the PATCH for this field is in flight (P1 #22). */
+  isSaving?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const value = stage?.id ?? '';
@@ -29,7 +32,12 @@ export function StageCell({
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="inline-edit-trigger"
+        disabled={isSaving}
+        aria-busy={isSaving}
+        className={cn(
+          'inline-edit-trigger',
+          isSaving && 'opacity-50 cursor-wait pointer-events-none',
+        )}
         aria-label={`Stage: ${stage?.name ?? 'Unknown'}. Click to change.`}
       >
         {/* Key on `value` so the badge remounts when the stage changes —
@@ -85,6 +93,7 @@ export function NumberCell({
   max,
   step,
   align = 'left',
+  isSaving = false,
 }: {
   value: number;
   onSave: (next: number) => void;
@@ -93,6 +102,8 @@ export function NumberCell({
   max?: number;
   step?: number;
   align?: 'left' | 'right';
+  /** True while the PATCH for this field is in flight (P1 #22). */
+  isSaving?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(value));
@@ -114,7 +125,13 @@ export function NumberCell({
           setDraft(String(value));
           setEditing(true);
         }}
-        className={cn('inline-edit-trigger tabular-nums', align === 'right' && 'text-right')}
+        disabled={isSaving}
+        aria-busy={isSaving}
+        className={cn(
+          'inline-edit-trigger tabular-nums',
+          align === 'right' && 'text-right',
+          isSaving && 'opacity-50 cursor-wait pointer-events-none',
+        )}
         aria-label={`${format(value)}. Click to edit.`}
       >
         {format(value)}
@@ -152,10 +169,13 @@ export function DateCell({
   value,
   onSave,
   format,
+  isSaving = false,
 }: {
   value: string | null;
   onSave: (next: string | null) => void;
   format: (v: string | null) => string;
+  /** True while the PATCH for this field is in flight (P1 #22). */
+  isSaving?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? '');
@@ -175,7 +195,12 @@ export function DateCell({
           setDraft(value ?? '');
           setEditing(true);
         }}
-        className="inline-edit-trigger text-[var(--fg-secondary)]"
+        disabled={isSaving}
+        aria-busy={isSaving}
+        className={cn(
+          'inline-edit-trigger text-[var(--fg-secondary)]',
+          isSaving && 'opacity-50 cursor-wait pointer-events-none',
+        )}
         aria-label={`Due ${format(value)}. Click to edit.`}
       >
         {format(value)}

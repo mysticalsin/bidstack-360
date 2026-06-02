@@ -34,68 +34,76 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const { pipelineStageId, stage, owner, industry, search, cursor, limit } = req.query;
-      const items = await prisma.opportunity.findMany({
-        where: {
-          orgId: req.auth.orgId,
-          deletedAt: null,
-          ...(pipelineStageId ? { pipelineStageId } : {}),
-          ...(stage ? { stage } : {}),
-          ...(industry ? { industry } : {}),
-          ...(owner ? { owner: { email: owner } } : {}),
-          ...(search
-            ? {
-                OR: [
-                  { customer: { contains: search, mode: 'insensitive' } },
-                  { name: { contains: search, mode: 'insensitive' } },
-                  { code: { contains: search, mode: 'insensitive' } },
-                ],
-              }
-            : {}),
-        },
-        include: {
-          owner: { select: { id: true, name: true, email: true } },
-          territory: { select: { name: true } },
-          pipelineStage: {
-            select: {
-              id: true,
-              name: true,
-              probability: true,
-              color: true,
-              isWon: true,
-              isLost: true,
+      return req.cache(
+        async () => {
+          const items = await prisma.opportunity.findMany({
+            where: {
+              orgId: req.auth.orgId,
+              deletedAt: null,
+              ...(pipelineStageId ? { pipelineStageId } : {}),
+              ...(stage ? { stage } : {}),
+              ...(industry ? { industry } : {}),
+              ...(owner ? { owner: { email: owner } } : {}),
+              ...(search
+                ? {
+                    OR: [
+                      { customer: { contains: search, mode: 'insensitive' } },
+                      { name: { contains: search, mode: 'insensitive' } },
+                      { code: { contains: search, mode: 'insensitive' } },
+                    ],
+                  }
+                : {}),
             },
-          },
-          _count: { select: { tasks: true } },
-        },
-        orderBy: { updatedAt: 'desc' },
-        take: limit + 1,
-        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-      });
-      const hasMore = items.length > limit;
-      const page = hasMore ? items.slice(0, limit) : items;
-      // Batch-fetch comment counts for the page
-      const commentCounts =
-        page.length > 0
-          ? await prisma.comment.groupBy({
-              by: ['targetId'],
-              where: {
-                orgId: req.auth.orgId,
-                targetType: 'opportunity',
-                targetId: { in: page.map((o) => o.id) },
+            include: {
+              owner: { select: { id: true, name: true, email: true } },
+              territory: { select: { name: true } },
+              pipelineStage: {
+                select: {
+                  id: true,
+                  name: true,
+                  probability: true,
+                  color: true,
+                  isWon: true,
+                  isLost: true,
+                },
               },
-              _count: { targetId: true },
-            })
-          : [];
-      const commentCountById = new Map(commentCounts.map((c) => [c.targetId, c._count.targetId]));
-      return {
-        items: page.map((o) =>
-          serializeOpportunity(o, {
-            taskCount: o._count.tasks,
-            commentCount: commentCountById.get(o.id) ?? 0,
-          }),
-        ),
-        nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
-      };
+              _count: { select: { tasks: true } },
+            },
+            orderBy: { updatedAt: 'desc' },
+            take: limit + 1,
+            ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+          });
+          const hasMore = items.length > limit;
+          const page = hasMore ? items.slice(0, limit) : items;
+          // Batch-fetch comment counts for the page.
+          const commentCounts =
+            page.length > 0
+              ? await prisma.comment.groupBy({
+                  by: ['targetId'],
+                  where: {
+                    orgId: req.auth.orgId,
+                    targetType: 'opportunity',
+                    targetId: { in: page.map((o) => o.id) },
+                    deletedAt: null,
+                  },
+                  _count: { targetId: true },
+                })
+              : [];
+          const commentCountById = new Map(
+            commentCounts.map((c) => [c.targetId, c._count.targetId]),
+          );
+          return {
+            items: page.map((o) =>
+              serializeOpportunity(o, {
+                taskCount: o._count.tasks,
+                commentCount: commentCountById.get(o.id) ?? 0,
+              }),
+            ),
+            nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
+          };
+        },
+        { ttlSeconds: 20, tags: ['opportunities-list'] },
+      );
     },
   );
 
@@ -113,17 +121,22 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const { pipelineStageId, excludeClosed } = req.query;
-      const count = await prisma.opportunity.count({
-        where: {
-          orgId: req.auth.orgId,
-          deletedAt: null,
-          ...(pipelineStageId ? { pipelineStageId } : {}),
-          ...(excludeClosed
-            ? { stage: { notIn: ['closed_won', 'closed_lost'] as PrismaStage[] } }
-            : {}),
+      return req.cache(
+        async () => {
+          const count = await prisma.opportunity.count({
+            where: {
+              orgId: req.auth.orgId,
+              deletedAt: null,
+              ...(pipelineStageId ? { pipelineStageId } : {}),
+              ...(excludeClosed
+                ? { stage: { notIn: ['closed_won', 'closed_lost'] as PrismaStage[] } }
+                : {}),
+            },
+          });
+          return { count };
         },
-      });
-      return { count };
+        { ttlSeconds: 20, tags: ['opportunities-count'] },
+      );
     },
   );
 

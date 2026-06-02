@@ -45,6 +45,7 @@ const slackCommandsPlugin: FastifyPluginAsync = async (fastify) => {
   app.post(
     '/integrations/slack/commands',
     {
+      config: { public: true },
       schema: {
         body: slashCommandBody,
       },

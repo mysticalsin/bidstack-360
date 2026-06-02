@@ -57,6 +57,14 @@ export function Hero() {
               AI-powered RFP analysis, proposal generation, and compliance tracking — built for
               enterprise presales teams.
             </motion.p>
+
+            <motion.div
+              className="text-xs text-[#5E6470]/60 mt-3 font-normal"
+              {...pAnim}
+              transition={{ duration: 0.8, delay: 0.5 }}
+            >
+              Created by Tony
+            </motion.div>
           </div>
 
           <BottomLeftCard />

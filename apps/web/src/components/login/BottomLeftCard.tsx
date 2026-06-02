@@ -1,9 +1,11 @@
 import { motion, useReducedMotion } from 'motion/react';
 import { ArrowUpRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useSignInAction } from '@/lib/auth';
 
 export function BottomLeftCard() {
   const navigate = useNavigate();
+  const { signIn } = useSignInAction();
   const isStub = !import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
   const shouldReduceMotion = useReducedMotion();
 
@@ -30,7 +32,7 @@ export function BottomLeftCard() {
           className="flex items-center bg-white rounded-full pl-1.5 pr-5 py-1.5 gap-2 hover:bg-white/90 transition-colors self-start group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(30,50,90,0.3)] rounded-full"
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          onClick={() => navigate('/dashboard', { replace: true })}
+          onClick={() => signIn(() => navigate('/dashboard', { replace: true }))}
         >
           <div
             className="bg-[rgba(30,50,90,0.1)] p-1 rounded-full flex items-center justify-center"

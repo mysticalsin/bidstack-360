@@ -27,6 +27,433 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 <!-- New entries appended at the top of this section. -->
 
+### 2026-05-31 TESTING: Full E2E timeout produced misleading connection-refused artifacts
+
+- **What went wrong:** I ran the full Playwright suite with a 10-minute shell timeout, which killed the Playwright web server near the end and left failure artifacts showing `ERR_CONNECTION_REFUSED` instead of the real state.
+- **Root cause:** The suite takes roughly eight minutes plus build/server startup on this machine, so the shell timeout was too close to the actual gate runtime.
+- **Prevention rule:** Full E2E gates need a timeout comfortably above the expected suite duration; if the shell times out, inspect artifacts as timeout fallout before treating connection-refused traces as product bugs.
+- **Files affected:** none.
+
+### 2026-05-31 TESTING: Worker Vitest wrapper crashed under package lifecycle on Windows
+
+- **What went wrong:** `pnpm test` failed inside the worker test preflight even though the worker tests passed when run directly from the repo root.
+- **Root cause:** The wrapper derived the workspace path from the script URL and then launched Vitest from a package lifecycle cwd; on Windows this combination made the child Vitest process exit before collecting tests.
+- **Prevention rule:** Workspace-level helper scripts that may be launched from root or package cwd should discover the repo root from a durable workspace marker such as `pnpm-workspace.yaml`.
+- **Files affected:** `scripts/run-worker-tests.mjs`.
+
+### 2026-05-31 BUG: Booking timezone validation rejected slots it had offered
+
+- **What went wrong:** The public booking UI could display an available America/New_York slot, but booking the same wall-clock time could be rejected as unavailable.
+- **Root cause:** The timezone conversion path mixed UTC setters with local wall-clock intent and the create route derived the booking date from UTC instead of the visitor/page timezone.
+- **Prevention rule:** Calendar availability must centralize IANA timezone conversion and include regression coverage for western timezones where UTC date and local date can differ.
+- **Files affected:** `packages/shared/src/calendar/availability.ts`, `packages/shared/src/calendar/availability.test.ts`, `apps/api/src/routes/bookings-public.ts`.
+
+### 2026-05-31 INFRA: Prisma schema drift hid behind generated client success
+
+- **What went wrong:** Proposal-related tests failed earlier because the generated client knew about fields that the local database had not migrated yet.
+- **Root cause:** `prisma generate` succeeded, but pending migrations had not been deployed to the active local database.
+- **Prevention rule:** When a test fails with a missing database column after typecheck succeeds, check migration status and run migrate deploy against the active test/dev database without printing secrets.
+- **Files affected:** database state only.
+
+### 2026-05-30 TESTING: E-signature success locator matched hidden/live copy
+
+- **What went wrong:** After the public signing flow reached confirmation, Playwright still failed because the success locator matched the screen-reader announcement, heading, and body copy at once.
+- **Root cause:** The POM used a broad text regex for a terminal state that has multiple valid success strings on the same screen.
+- **Prevention rule:** Public flow POMs should assert a unique semantic element for terminal states, usually the visible heading, not broad text that can collide with aria-live or body copy.
+- **Files affected:** `apps/web/e2e/pages/PublicSignPage.ts`.
+
+### 2026-05-30 BUG: Internal signing crashed when optional PDF renderer was absent
+
+- **What went wrong:** After the frontend submitted a valid signature, the API returned 500 because `htmlToPdf` treated Puppeteer as optional at startup but threw at runtime with no fallback.
+- **Root cause:** The document service had a lazy optional dependency contract without a second renderer path, so the internal provider could not complete in clean installs that lack Puppeteer.
+- **Prevention rule:** Optional runtime renderers must have a verified fallback or startup must fail closed before any user can enter the workflow.
+- **Files affected:** `apps/api/src/services/documents/document.service.ts`, `apps/api/package.json`, `pnpm-lock.yaml`.
+
+### 2026-05-30 BUG: E-signature submit step lost drawn signature
+
+- **What went wrong:** Full E2E failed because a signer could draw a signature, continue to review, accept terms, and then receive "Signature is missing."
+- **Root cause:** The canvas-backed `SignaturePad` unmounted when the flow moved from the sign step to the submit step, so the submit handler could no longer read `padRef.current`.
+- **Prevention rule:** Multi-step forms must persist canonical user input before unmounting the step that owns the interactive widget; submit handlers must not depend on refs from previous steps.
+- **Files affected:** `apps/web/src/pages/PublicSignPage.tsx`.
+
+### 2026-05-30 TESTING: DB utility script used disallowed console logs
+
+- **What went wrong:** Workspace lint failed because `packages/db/scripts/drop-index.ts` used `console.log`, while the repo lint policy only allows `console.error` and `console.warn`.
+- **Root cause:** A utility script used casual status logging instead of the repo-approved output path.
+- **Prevention rule:** CLI utility status output should use `process.stdout.write` or the package logger; reserve `console.error/warn` for actual errors and warnings.
+- **Files affected:** `packages/db/scripts/drop-index.ts`.
+
+### 2026-05-30 TESTING: Root lint hid the package-level JSX escape error
+
+- **What went wrong:** The root lint gate returned exit code 1 with no useful detail until package-level lint exposed `react/no-unescaped-entities` in the public booking confirmation copy.
+- **Root cause:** A JSX apostrophe in user-facing copy was not escaped, and the recursive lint wrapper did not surface package output reliably in this shell.
+- **Prevention rule:** When root lint fails without detail, run targeted package lint immediately; JSX copy must escape apostrophes or use string expressions.
+- **Files affected:** `apps/web/src/pages/PublicBookingPage.tsx`.
+
+### 2026-05-30 BUG: Booking create recomputed availability without visitor timezone
+
+- **What went wrong:** The public booking UI showed a slot from the timezone-aware availability endpoint, but submitting the same slot could return "That time is no longer available."
+- **Root cause:** `POST /booking-pages/:slug/bookings` accepted `tz` but did not pass it into `computeSlots`, so creation validation used UTC while availability used the visitor timezone.
+- **Prevention rule:** Reservation-style create endpoints must replay the exact same validation inputs as their preview/availability endpoints.
+- **Files affected:** `apps/api/src/routes/bookings-public.ts`, `apps/api/src/routes/bookings.helpers.ts`.
+
+### 2026-05-30 UX: Selected integration tab failed contrast and dashboard chart had invalid ARIA
+
+- **What went wrong:** Axe found a low-contrast selected integration tab eyebrow and an ARIA label on a generic dashboard chart wrapper.
+- **Root cause:** The selected tab reused muted text on a tinted background, and the decorative chart container had `aria-label` without an explicit semantic role.
+- **Prevention rule:** When adding ARIA labels to non-interactive visual wrappers, provide a valid role or keep them decorative; selected states must use foreground tokens with WCAG AA contrast on tinted surfaces.
+- **Files affected:** `apps/web/src/pages/integrations/ConnectionCommandCenter.tsx`, `apps/web/src/components/dashboard/widgets/PipelineCard.tsx`.
+
+### 2026-05-30 TESTING: Core Web Vitals suite self-contended under full parallelism
+
+- **What went wrong:** The expanded E2E cluster reported extreme LCP failures on dashboard, pipeline, leads, and opportunities, but the Web Vitals suite passed when run alone with one worker.
+- **Root cause:** The performance file inherited Playwright `fullyParallel`, so multiple lab measurements hit the same preview/API server at once and measured local contention instead of route paint quality.
+- **Prevention rule:** Performance-budget specs must opt into serial execution, and the default E2E gate should use one worker unless the harness provisions isolated servers per worker.
+- **Files affected:** `apps/web/e2e/performance/core-web-vitals.spec.ts`.
+
+### 2026-05-30 INFRA: Static app-shell cache lookup respected `Vary: Origin`
+
+- **What went wrong:** The service worker served the offline HTML shell, but module scripts such as `index`, `react`, and `react-dom` still failed to load offline.
+- **Root cause:** The service worker cached static assets from its own fetch context, while Vite responses include `Vary: Origin`; later page module requests had different request headers, so `cache.match(request)` missed valid cached assets.
+- **Prevention rule:** For same-origin hashed static app-shell assets, use `cache.match(request, { ignoreVary: true })`; keep API/data cache lookups strict.
+- **Files affected:** `apps/web/public/sw.js`.
+
+### 2026-05-30 TESTING: PWA E2E used a fixed readiness sleep
+
+- **What went wrong:** The offline app-shell test passed in isolation but failed under parallel load because it switched the browser offline after a fixed 1-second delay.
+- **Root cause:** The test waited for time instead of waiting for an active service worker controller and verified Cache Storage entries for the app shell.
+- **Prevention rule:** PWA tests must wait on browser readiness signals and cached app-shell assets, never arbitrary sleeps, before forcing offline mode.
+- **Files affected:** `apps/web/e2e/flows/pwa-offline.spec.ts`.
+
+### 2026-05-30 INFRA: PWA warmup used conditional cache responses
+
+- **What went wrong:** Offline reload still failed because core JS chunks such as `index`, `react`, `router`, and `vendor` were not available from Cache Storage.
+- **Root cause:** `cache.add` allowed browser conditional-cache behavior during warmup; trace showed service-worker warmup requests with validators and empty captured bodies.
+- **Prevention rule:** PWA warmup for app-shell JS/CSS must fetch with `cache: "reload"` and then `cache.put` the full response explicitly.
+- **Files affected:** `apps/web/public/sw.js`, `apps/web/src/main.tsx`.
+
+### 2026-05-30 BUG: Service worker served stale booking availability API data
+
+- **What went wrong:** The public booking UI showed a slot that the booking mutation then rejected as no longer available.
+- **Root cause:** The service worker used stale-while-revalidate for all GET API calls, including booking availability where stale data is unsafe.
+- **Prevention rule:** Service workers must use network-first for API data and avoid stale responses for reservation, auth, permission, or financial reads.
+- **Files affected:** `apps/web/public/sw.js`.
+
+### 2026-05-30 TESTING: Booking confirmation selector matched heading and copy
+
+- **What went wrong:** The full booking E2E succeeded in the UI but failed strict mode because the confirmation locator matched both the heading and supporting copy.
+- **Root cause:** The POM used broad page text instead of the stable confirmation heading.
+- **Prevention rule:** Success-state POM locators must target a single role or test id, especially when headings and body copy intentionally repeat the same concept.
+- **Files affected:** `apps/web/e2e/pages/PublicBookingPage.ts`.
+
+### 2026-05-30 INFRA: PWA page-side cache warming was load-sensitive
+
+- **What went wrong:** The offline app-shell test passed in isolation but failed in a parallel E2E cluster.
+- **Root cause:** Page-side cache warming could still be racing with the test's offline switch under load, leaving hashed Vite chunks uncached.
+- **Prevention rule:** Service worker install must deterministically cache build-manifest assets; page-side cache warming is only a supplemental fallback.
+- **Files affected:** `apps/web/public/sw.js`, `apps/web/src/main.tsx`.
+
+### 2026-05-30 BUG: Public booking availability used unbounded reads
+
+- **What went wrong:** The public booking flow seeded `test-slug`, but availability returned 400 because the query guard rejected unbounded calendar-event and booking lookups.
+- **Root cause:** The route scoped by org/page/time range but did not include explicit `take` limits, so the development query guard correctly treated the reads as unsafe.
+- **Prevention rule:** Any `findMany` added to request paths must include an explicit, business-justified bound and deterministic order before E2E coverage depends on the route.
+- **Files affected:** `apps/api/src/routes/bookings-public.ts`, `apps/api/src/routes/bookings-pages.ts`.
+
+### 2026-05-30 INFRA: Offline app shell missed hashed Vite assets
+
+- **What went wrong:** After the service worker served `/dashboard` offline, the React app still did not render a main landmark.
+- **Root cause:** The service worker cached the HTML shell, but the first controlled page did not reliably cache the hashed JS/CSS assets before Playwright switched the browser offline.
+- **Prevention rule:** Production PWAs must warm the app-shell cache with the current document's hashed scripts and styles, not only `/` and `/index.html`.
+- **Files affected:** `apps/web/src/main.tsx`, `apps/web/public/sw.js`.
+
+### 2026-05-30 TOOLING: Root tsx could not resolve package-local dotenv-flow
+
+- **What went wrong:** I tried to inspect booking data with root `pnpm exec tsx`, but the script imported `dotenv-flow`, which is available to the DB package rather than the root runtime.
+- **Root cause:** I used the wrong workspace package context for a package-local inspection.
+- **Prevention rule:** Run ad-hoc package inspections with `pnpm --filter <package> exec` or use package-local scripts so dependency resolution matches the code being inspected.
+- **Files affected:** none.
+
+### 2026-05-30 BUG: Deferred UI persistence fallback used narrowed window
+
+- **What went wrong:** Web typecheck failed because the `requestIdleCallback` branch narrowed `window` such that `window.setTimeout` was typed as unavailable in the fallback.
+- **Root cause:** I used `window.setTimeout` after an `in` guard instead of the safer `globalThis.setTimeout`.
+- **Prevention rule:** When feature-detecting optional browser APIs, use `globalThis.setTimeout` or capture fallback functions before narrowing.
+- **Files affected:** `apps/web/src/stores/ui.ts`.
+
+### 2026-05-30 TESTING: Full E2E failure summary was hidden by noisy logs
+
+- **What went wrong:** The full Playwright run failed, but the terminal output was dominated by web-server logs and truncated before the actual failure list.
+- **Root cause:** I relied on raw command output instead of immediately reading `apps/web/test-results` artifacts after a large run.
+- **Prevention rule:** For full E2E runs, inspect Playwright artifacts first after any non-zero exit; use terminal output only as supplemental context.
+- **Files affected:** none.
+
+### 2026-05-30 TESTING: Booking availability POM returned before terminal state
+
+- **What went wrong:** `/book/test-slug` showed "Booking page not found", but the POM marked the page available because it checked while the loading heading was visible and before the fetch failure rendered.
+- **Root cause:** The availability helper checked for a heading instead of waiting for either a usable booking calendar/time-slot or the not-found error state.
+- **Prevention rule:** Public-flow availability helpers must wait for a terminal UI state before deciding to run or skip a flow.
+- **Files affected:** `apps/web/e2e/pages/PublicBookingPage.ts`.
+
+### 2026-05-30 TESTING: Workflow POM used an ambiguous creation button
+
+- **What went wrong:** The workflow builder test failed strict mode because the page intentionally renders "New workflow" in both the toolbar and empty state.
+- **Root cause:** The POM selected by broad accessible name without scoping to the first primary creation affordance.
+- **Prevention rule:** When a page has duplicate empty-state and toolbar actions, POMs must scope to a stable region or intentionally select `.first()` with the UX rationale.
+- **Files affected:** `apps/web/e2e/pages/WorkflowBuilderPage.ts`.
+
+### 2026-05-30 INFRA: Service worker did not serve SPA routes offline
+
+- **What went wrong:** Reloading `/dashboard` offline failed with `net::ERR_FAILED` even after the service worker registered.
+- **Root cause:** The service worker cached `/` and `/index.html` but did not use an app-shell fallback for navigation requests like `/dashboard`.
+- **Prevention rule:** PWA service workers for SPA routes must detect navigation requests and fall back to cached `/index.html` when the network is unavailable.
+- **Files affected:** `apps/web/public/sw.js`.
+
+### 2026-05-30 UX: Sales dashboard microcopy failed contrast
+
+- **What went wrong:** Axe reported serious color contrast failures on tiny uppercase product-category labels in the sales dashboard table.
+- **Root cause:** The label used tertiary text at 10px on a subtle blue row bar, below WCAG AA for normal text.
+- **Prevention rule:** Text below 18px must use a token with proven 4.5:1 contrast, especially on colored or tinted table backgrounds.
+- **Files affected:** `apps/web/src/pages/SalesDashboardPage.tsx`.
+
+### 2026-05-30 TESTING: Custom object spec used broad text selector
+
+- **What went wrong:** After the create flow rendered correctly, the spec still failed because `getByText(/objectName/i)` matched both the object label and the generated API key.
+- **Root cause:** The assertion used page-wide text instead of the durable list item test id introduced for custom object cards.
+- **Prevention rule:** For records that render both human labels and derived keys, assert against the row/card container or a role with a precise accessible name.
+- **Files affected:** `apps/web/e2e/flows/custom-objects.spec.ts`.
+
+### 2026-05-30 TESTING: Captured stale GET response after custom object create
+
+- **What went wrong:** I added a post-create list response assertion, but the Playwright response predicate matched an earlier in-flight GET instead of the refetch caused by the create mutation.
+- **Root cause:** The response predicate checked only method and URL, not whether the response was causally after the POST or contained the created object from the POST body.
+- **Prevention rule:** E2E create-to-list assertions should derive the canonical selector from the mutation response and then assert the rendered item, not infer causality from a broad GET response matcher.
+- **Files affected:** `apps/web/e2e/pages/CustomObjectsAdminPage.ts`.
+
+### 2026-05-30 TOOLING: Ran direct Prisma inspection without loading API env
+
+- **What went wrong:** I tried a direct Prisma inspection command from the API package, but `DATABASE_URL` was not loaded in that shell.
+- **Root cause:** I assumed the E2E web server environment would carry into a separate `pnpm exec tsx` process.
+- **Prevention rule:** Use existing API routes or app test harnesses for DB observations unless the shell explicitly loads the same env contract without printing secrets.
+- **Files affected:** none.
+
+### 2026-05-30 TESTING: Custom object create succeeded but list selector stayed stale
+
+- **What went wrong:** After fixing the backend create path, the focused E2E still failed because the admin list did not visibly expose the created object before the assertion.
+- **Root cause:** I verified the API mutation before proving the UI list contract and selector contract were aligned after cache invalidation.
+- **Prevention rule:** For create-to-list flows, assert all three layers explicitly: mutation response, refetched list payload, and scoped visible list item.
+- **Files affected:** `apps/web/e2e/pages/CustomObjectsAdminPage.ts`, `apps/web/src/hooks/useCustomObjects.ts`.
+
+### 2026-05-30 TOOLING: Assumed Playwright artifacts were rooted at workspace
+
+- **What went wrong:** I tried to read a Playwright `test-results` artifact from the repository root after a filtered web E2E run.
+- **Root cause:** The filtered package command writes artifacts under `apps/web/test-results`, not the root-level path shown in condensed Playwright output.
+- **Prevention rule:** Resolve package-scoped Playwright artifacts from the package directory before opening screenshots, traces, or error contexts.
+- **Files affected:** none.
+
+### 2026-05-30 TESTING: Custom object creation did not prove list persistence
+
+- **What went wrong:** The custom object E2E flow clicked create and waited for the object name in the admin list, but the product path did not reliably surface the newly created object.
+- **Root cause:** The creation flow returned to a UI state before proving the canonical list had refetched or rendered the new object.
+- **Prevention rule:** Creation flows must wait on the API mutation and then render/refetch durable list state with a user-visible success affordance.
+- **Files affected:** `apps/api/src/services/custom-object.helpers.ts`, `apps/api/src/services/custom-object.service.ts`, `apps/web/src/hooks/useCustomObjects.ts`, `apps/web/src/pages/CustomObjectsAdminPage.tsx`, `apps/web/e2e/pages/CustomObjectsAdminPage.ts`.
+
+### 2026-05-30 TESTING: E2E helpers raced valid/invalid public states
+
+- **What went wrong:** Focused E2E still failed after product fixes because the signing helper checked invalid-link state before the public request finished, and the lead helper fell through even though the conversion button rendered.
+- **Root cause:** The POM contracts were less specific than the product UI: public signing needed to wait for terminal states, and lead conversion needed to target the actual conversion CTA instead of a broad regex that can collide with other controls.
+- **Prevention rule:** E2E page objects must wait for a clear terminal state and use stable, scoped selectors for primary business actions.
+- **Files affected:** `apps/web/e2e/pages/PublicSignPage.ts`, `apps/web/e2e/flows/lead-management.spec.ts`.
+
+### 2026-05-30 TESTING: Full E2E run exhausted public exchange-rate rate limit
+
+- **What went wrong:** Full `pnpm e2e` produced `/api/v1/exchange-rates` 429 responses that surfaced as page console errors and failed the account cockpit regression.
+- **Root cause:** Every app-shell page could independently request exchange rates while the API capped the cached public endpoint at only 30 requests per minute per IP.
+- **Prevention rule:** Shared app-shell data must dedupe client requests, keep safe fallbacks on transient failures, and use rate limits sized for multi-page browser sessions.
+- **Files affected:** `apps/web/src/stores/currency.ts`, `apps/api/src/routes/exchange-rates.ts`.
+
+### 2026-05-30 TOOLING: Worker root typecheck replayed stale incremental diagnostics
+
+- **What went wrong:** Root `pnpm typecheck` reported missing Dust symbols that were no longer present in the current worker source, while direct worker typecheck passed.
+- **Root cause:** The worker package inherited `"incremental": true` from the base TypeScript config, leaving root recursive typecheck vulnerable to stale `.tsbuildinfo` diagnostics after rapid queue-file edits.
+- **Prevention rule:** Release-gate typecheck scripts for fragile worker packages should run non-incrementally; builds may stay incremental, but validation must read current source.
+- **Files affected:** `apps/worker/package.json`, `docs/solutions/production-gate-noise.md`.
+
+### 2026-05-30 TESTING: RFP extractor helper exported stale Dust API
+
+- **What went wrong:** Root `pnpm typecheck` failed because `rfp-requirement-extract.helpers.ts` referenced `DustClient` without importing it and `rfp-requirement-extract.processor.ts` imported a stale `DUST_AGENT_ID` export.
+- **Root cause:** The RFP extractor files were left between the old global Dust-client pattern and the newer org-scoped credential pattern used by section draft, compliance, legal scan, and QA review workers.
+- **Prevention rule:** RFP worker Dust migrations must be done by queue family, not one file at a time; helper exports and processor imports need to be verified together under root `pnpm typecheck`.
+- **Files affected:** `apps/worker/src/queues/rfp-requirement-extract.helpers.ts`, `apps/worker/src/queues/rfp-requirement-extract.processor.ts`.
+
+### 2026-05-30 TESTING: Root typecheck caught compliance-fill Dust constant drift
+
+- **What went wrong:** Root `pnpm typecheck` failed because `apps/worker/src/queues/rfp-compliance-fill.ts` referenced `DUST_AGENT_ID` without a valid module-level definition.
+- **Root cause:** The compliance-fill worker was partially migrated toward org-scoped Dust credentials but still used an old global constant name in the call path.
+- **Prevention rule:** When migrating RFP workers to per-org Dust credentials, replace both client creation and agent-id resolution in the same patch, then verify with the root typecheck gate.
+- **Files affected:** `apps/worker/src/queues/rfp-compliance-fill.ts`.
+
+### 2026-05-30 TESTING: Worker legal scan lost Dust symbols
+
+- **What went wrong:** `pnpm typecheck` failed because `apps/worker/src/queues/rfp-legal-scan.ts` referenced `getDustClient` and `DUST_AGENT_ID` without importing or defining them.
+- **Root cause:** The worker legal-scan implementation depended on Dust integration symbols that were not wired in the module, and the earlier gate pass happened before the dependency sync exposed the current compile state.
+- **Prevention rule:** When adding or modifying worker queues, run package-level and root typecheck immediately, and read existing Dust client helper patterns before referencing shared integration symbols.
+- **Files affected:** `apps/worker/src/queues/rfp-legal-scan.ts`.
+
+### 2026-05-30 SECURITY: Dependency audit blocked on transitive tmp advisory
+
+- **What went wrong:** `pnpm audit --audit-level high` failed because tooling packages pulled `tmp@0.2.5`, which is affected by GHSA-ph9p-34f9-6g65.
+- **Root cause:** Existing pnpm overrides covered several advisories but did not pin the vulnerable `tmp` transitive dependency to the patched release.
+- **Prevention rule:** After every dependency-audit fix, rerun the audit and keep security overrides current for transitive tooling dependencies that upstream packages have not yet bumped.
+- **Files affected:** `package.json`, `pnpm-lock.yaml`.
+
+### 2026-05-30 TOOLING: Did not strip lifecycle env for worker Vitest
+
+- **What went wrong:** Direct Node/Vitest worked from a normal shell, but the same command failed when launched by `pnpm test` because lifecycle env vars were still inherited.
+- **Root cause:** I changed the command path but not the child process environment, so the worker test still ran inside pnpm's lifecycle context.
+- **Prevention rule:** For fragile process-pool gates, use a dedicated runner script that spawns the test process with a deliberately filtered environment.
+- **Files affected:** `scripts/run-worker-tests.mjs`, `apps/worker/package.json`, `package.json`.
+
+### 2026-05-30 TOOLING: Let pnpm lifecycle launch the fragile worker Vitest binary
+
+- **What went wrong:** The worker test still failed under `pnpm test` even with explicit Vitest flags, while direct `node node_modules/vitest/vitest.mjs ...` passed.
+- **Root cause:** The remaining instability was in the package-manager lifecycle wrapper around the Vitest binary, not the assertions or the chosen pool mode.
+- **Prevention rule:** For fragile Windows process-pool gates, launch the local tool entrypoint with `node` directly from the package script and keep the exact flags visible.
+- **Files affected:** `apps/worker/package.json`.
+
+### 2026-05-30 TOOLING: Assumed Vitest was hoisted at the workspace root
+
+- **What went wrong:** I tried to inspect `node_modules/vitest`, but this pnpm workspace does not expose Vitest at the root path.
+- **Root cause:** I forgot pnpm keeps package executables/dependencies linked per workspace package unless explicitly hoisted.
+- **Prevention rule:** Inspect `apps/<package>/node_modules` or use `pnpm --dir <package> exec` when resolving package-local tooling.
+- **Files affected:** none; inspection command only.
+
+### 2026-05-30 TOOLING: Relied on worker Vitest config for critical pool flags
+
+- **What went wrong:** `pool: 'vmThreads'` in `apps/worker/vitest.config.ts` still produced a blank failing package script, while passing the same pool flags explicitly on the Vitest CLI succeeded.
+- **Root cause:** The critical runner settings were hidden behind config-loader behavior; the package script did not make the intended pool mode observable at the command line.
+- **Prevention rule:** Put fragile release-gate runner flags directly in the package script, even if they are also represented in config, so root logs show the actual execution mode.
+- **Files affected:** `apps/worker/package.json`.
+
+### 2026-05-30 TOOLING: Kept chasing fork-pool mitigations after IPC stayed flaky
+
+- **What went wrong:** Serial fork modes still intermittently failed with Tinypool `ERR_IPC_CHANNEL_CLOSED`; even direct package-directory runs could fail after prior fork failures.
+- **Root cause:** The core instability was the child-process fork channel itself, not only pnpm recursion, file parallelism, or test ordering.
+- **Prevention rule:** When an error is in the pool transport layer, validate a different transport (`vmThreads`) instead of stacking more mitigations onto the same failing transport.
+- **Files affected:** `apps/worker/vitest.config.ts`.
+
+### 2026-05-30 TOOLING: Used pnpm filter run for worker tests
+
+- **What went wrong:** `pnpm --filter @bidstack/worker test` failed with Tinypool `ERR_IPC_CHANNEL_CLOSED`, while `pnpm test` from `apps/worker` passed.
+- **Root cause:** `pnpm --filter ... test` still uses pnpm's recursive run wrapper, which is fragile for this worker/Vitest/fork-pool package on Windows.
+- **Prevention rule:** For root scripts that need this worker package, invoke it with `pnpm --dir apps/worker test` or direct `exec`, not filtered recursive run.
+- **Files affected:** `package.json`.
+
+### 2026-05-30 TOOLING: Left worker Vitest file isolation enabled
+
+- **What went wrong:** The root test gate still hit `ERR_IPC_CHANNEL_CLOSED` after moving worker tests earlier and disabling file parallelism.
+- **Root cause:** Vitest was still creating isolated fork workers per file; removing parallelism reduced concurrency but did not remove fork churn.
+- **Prevention rule:** For packages with queue/process-pool tests on Windows, stabilize both dimensions: disable file parallelism and disable per-file isolation, then verify with repeated package and root runs.
+- **Files affected:** `apps/worker/vitest.config.ts`.
+
+### 2026-05-30 TOOLING: Assumed the i18n module filename
+
+- **What went wrong:** I tried to open `apps/web/src/i18n/i18n.ts`, but the i18n singleton lives in `apps/web/src/i18n/index.ts`.
+- **Root cause:** I inferred the module path from the test filename instead of using the search results first.
+- **Prevention rule:** When a directory has an `index.ts`, inspect exports/search results before opening a guessed sibling filename.
+- **Files affected:** none; inspection command only.
+
+### 2026-05-30 TOOLING: Ran worker tests after API in the same root shell
+
+- **What went wrong:** Even after removing the worker from pnpm recursive streaming, `pnpm test` still failed when the root script launched worker tests after the heavy API suite in the same shell chain.
+- **Root cause:** The worker's fork-based Vitest pool is sensitive to inherited process state/resource pressure after the API test suite; the package test is stable when launched before API or as an isolated command.
+- **Prevention rule:** Run worker/queue packages that own process pools before heavy API/browser suites in aggregate release scripts, and document ordering as part of the gate contract.
+- **Files affected:** `package.json`.
+
+### 2026-05-30 TOOLING: Assumed package-local worker pass solved recursive root runner
+
+- **What went wrong:** After stabilizing `pnpm --filter @bidstack/worker test`, the root `pnpm test` still failed when pnpm launched the worker through the recursive `-r --stream` wrapper after the API package.
+- **Root cause:** I fixed Vitest's per-package parallelism but left the more fragile pnpm recursive wrapper path in the release gate.
+- **Prevention rule:** When a gate fails only under the aggregate runner, verify both the package script and the aggregate orchestration; isolate fragile packages out of recursive streaming if they own child processes or worker pools.
+- **Files affected:** `package.json`, `apps/worker/vitest.config.ts`.
+
+### 2026-05-30 TOOLING: Trusted one worker thread-pool pass before default-script verification
+
+- **What went wrong:** I changed the worker Vitest pool to `threads` after a direct CLI pass, but the default package script then crashed on Windows with exit `3221225477`.
+- **Root cause:** I treated one alternate-command pass as enough evidence for a persistent runner config, before verifying the actual package script users and CI run.
+- **Prevention rule:** Runner/config changes must be validated through the package's default script before considering them viable; direct override commands are only probes.
+- **Files affected:** `apps/worker/vitest.config.ts`, `docs/solutions/production-gate-noise.md`.
+
+### 2026-05-30 INFRA: Worker Vitest fork pool closed IPC channel after passing tests
+
+- **What went wrong:** The worker package tests passed their assertions but the release gate still failed with Tinypool `ERR_IPC_CHANNEL_CLOSED` during process-pool shutdown.
+- **Root cause:** The worker Vitest config used the `forks` pool, which is more fragile on this Node/Vitest combination than the thread pool even though document extraction tests spawn their own `worker_threads`.
+- **Prevention rule:** Prefer a proven runner mode over a theoretical isolation mode; if a package needs sandbox worker coverage, verify the full package under the chosen Vitest pool and document why.
+- **Files affected:** `apps/worker/vitest.config.ts`.
+
+### 2026-05-30 TOOLING: Let fastify-plugin erase typed options
+
+- **What went wrong:** I added a typed cache plugin option but wrapped the inline function with `fp(...)` in a way that TypeScript inferred `Record<never, never>`, breaking `pnpm --filter @bidstack/api typecheck`.
+- **Root cause:** I assumed the `FastifyPluginAsync<Options>` annotation on an inline exported const would survive the `fastify-plugin` wrapper inference.
+- **Prevention rule:** For Fastify plugins with options, type the implementation function first, then wrap/export it with `fp(...)` so plugin options remain visible to TypeScript.
+- **Files affected:** `apps/api/src/plugins/redis-cache.ts`.
+
+### 2026-05-30 TOOLING: Passed Playwright grep through the root script incorrectly
+
+- **What went wrong:** I ran `pnpm e2e --grep @bundle`, which the root script forwarded as `playwright test "--grep"` without the grep value, causing Playwright to fail argument parsing.
+- **Root cause:** I forgot that pnpm script argument forwarding around options needs an explicit separator or a direct filtered command.
+- **Prevention rule:** For Playwright options, prefer `pnpm --filter @bidstack/web exec playwright test --grep "<tag>"` so option values are preserved.
+- **Files affected:** none; verification command only.
+
+### 2026-05-30 TOOLING: PowerShell split an `rg` alternation pattern
+
+- **What went wrong:** A multi-alternation `rg` command for frontend imports was parsed by PowerShell as multiple arguments and paths, producing file/path errors instead of search results.
+- **Root cause:** I used shell-sensitive quoting for a complex regex instead of either single-quoting the whole pattern carefully or running smaller searches.
+- **Prevention rule:** On Windows, keep `rg` regexes simple or run several narrow searches; avoid mixed quote/pipe patterns that PowerShell can reinterpret.
+- **Files affected:** none; inspection command only.
+
+### 2026-05-30 TOOLING: Assumed Vite manifest path existed
+
+- **What went wrong:** I tried to read `apps/web/dist/.vite/manifest.json`, but the current Vite build does not emit a `.vite` manifest.
+- **Root cause:** I trusted the optional path mentioned in the bundle-budget test before checking whether `build.manifest` is enabled.
+- **Prevention rule:** Check filesystem output before opening optional build artifacts; when absent, use the test's fallback path or inspect `dist/assets`.
+- **Files affected:** none; inspection command only.
+
+### 2026-05-30 TOOLING: Assumed logger test filename existed
+
+- **What went wrong:** I tried to read `apps/api/src/lib/logger.test.ts`, but this workspace did not have a logger-specific test file yet.
+- **Root cause:** I inferred a natural test filename from the module path instead of discovering existing test coverage with `rg` first.
+- **Prevention rule:** Search for existing tests before opening assumed filenames; if no test exists, create one intentionally after inspecting local test conventions.
+- **Files affected:** none; inspection command only.
+
+### 2026-05-30 BUG: Cache invalidation happened after mutation responses
+
+- **What went wrong:** A mutation followed immediately by a read could still receive stale cached data because the cache plugin invalidated in `onResponse`, after Fastify had already completed the response lifecycle visible to the caller.
+- **Root cause:** I treated `onResponse` as a safe invalidation point for read-after-write behavior instead of using a pre-send hook.
+- **Prevention rule:** Cache invalidation that protects read-after-write consistency must happen before the mutation response is released, such as in `onSend`, not in post-response cleanup.
+- **Files affected:** `apps/api/src/plugins/redis-cache.ts`, `apps/api/src/plugins/redis-cache.test.ts`.
+
+### 2026-05-30 TESTING: Cache invalidation test assigned auth too late
+
+- **What went wrong:** The cache invalidation regression still failed after the helper fix because the test assigned `req.auth` inside route handlers, while the cache plugin invalidation hook reads auth from the normal pre-handler lifecycle.
+- **Root cause:** The test stub did not mirror production auth timing, where the auth plugin decorates the request before protected route handlers run.
+- **Prevention rule:** Tests for hooks that inspect request auth must assign auth in `preHandler` or use `buildServer`; assigning auth inside the route only validates handler-local behavior.
+- **Files affected:** `apps/api/src/plugins/redis-cache.test.ts`.
+
+### 2026-05-30 BUG: Cache invalidation trusted only the Redis branch
+
+- **What went wrong:** The concurrent-cache test pass exposed that `cacheDel` could leave stale fallback in-memory entries when Redis was considered connectable but the cached value had been written to the fallback map.
+- **Root cause:** `cacheDel` returned after the Redis `KEYS/DEL` path and did not always clear the process-local fallback cache.
+- **Prevention rule:** Multi-layer cache invalidation must clear every layer every time; optimized external cache paths must not short-circuit local fallback cleanup.
+- **Files affected:** `apps/api/src/lib/redis-cache.ts`, `apps/api/src/plugins/redis-cache.test.ts`.
+
+### 2026-05-30 TOOLING: Assumed collaboration test filename existed
+
+- **What went wrong:** I tried to read `apps/api/src/routes/collaboration.test.ts`, but that test file does not exist in this workspace.
+- **Root cause:** I inferred a conventional route test filename instead of using `rg` first to discover actual coverage.
+- **Prevention rule:** Before opening an assumed test filename, search for the route or endpoint string with `rg` and then read the discovered files.
+- **Files affected:** none; inspection command only.
+
 ### 2026-05-25 UX: Local CRM was allowed to render while auth mode emitted Clerk-key errors
 
 - **What went wrong:** A bare `vite` local server could show CRM pages while the browser console still recorded `VITE_CLERK_PUBLISHABLE_KEY` auth failures, making the app look functional but poisoning QA signal.

@@ -1,5 +1,6 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 
 import { TooltipBare, TooltipProvider } from '@/components/ui/Tooltip';
 import { Icon, type IconName } from '@/components/ui/Icon';
@@ -86,6 +87,11 @@ export function Sidebar() {
               BidStack<span className="deg">°</span>
             </div>
             <div className="sb-tag">Mantu · Bid &amp; presales</div>
+            {!collapsed && (
+              <div className="text-[9px] font-semibold text-[rgba(30,50,90,0.75)] dark:text-gray-400/60 tracking-wider uppercase mt-0.5">
+                Creator: Tony
+              </div>
+            )}
           </div>
         </div>
 
@@ -277,22 +283,36 @@ function SidebarItem({
   badges: Badges;
   collapsed: boolean;
 }) {
+  const location = useLocation();
   const badge = item.badgeKey ? badges[item.badgeKey] : 0;
-  // Hover/focus prefetch — kicks off the route's lazy chunk before the
-  // click lands. Apple-style "make the next view feel pre-loaded" trick.
   const prefetch = () => prefetchRoute(item.to);
-  // WHY a static string className (not the NavLink `({ isActive }) => …`
-  // render-prop): in collapsed mode each link is wrapped by a Radix Tooltip
-  // `Trigger asChild` (a Slot). The Slot merges className by joining, which
-  // STRINGIFIES a function className onto the <a> (class="({ isActive }) =>
-  // …") — silently dropping every `.sb-item` style. We instead let NavLink
-  // set `aria-current="page"` natively and style the active state via the
-  // `.sb-item[aria-current="page"]` selector, which survives the Slot merge.
+
+  const isActive = useMemo(() => {
+    try {
+      const toUrl = new URL(item.to, window.location.origin);
+      const toPath = toUrl.pathname;
+      const toTab = toUrl.searchParams.get('tab');
+
+      const currentTab = new URLSearchParams(location.search).get('tab');
+
+      if (location.pathname !== toPath) return false;
+
+      if (toTab) {
+        return currentTab === toTab;
+      } else {
+        return !currentTab || currentTab === 'overview';
+      }
+    } catch {
+      return false;
+    }
+  }, [location, item.to]);
+
   const link = (
     <NavLink
       to={item.to}
       end={item.end}
-      className="sb-item"
+      aria-current={isActive ? 'page' : undefined}
+      className={cn('sb-item', isActive && 'is-active')}
       aria-label={item.label}
       title={collapsed ? undefined : item.label}
       onMouseEnter={prefetch}

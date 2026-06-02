@@ -54,8 +54,9 @@ export const TableRow = forwardRef<HTMLTableRowElement, HTMLAttributes<HTMLTable
     <tr
       ref={ref}
       className={cn(
+        // hover: surface-sunken in light; --row-hover-tint (purple 6% opacity) in dark
         'transition-colors hover:bg-[var(--surface-sunken)] data-[selected=true]:bg-[var(--brand-primary-tint)]/60 ' +
-        'dark:hover:bg-[rgba(168,85,247,0.06)]',
+          'dark:hover:bg-[var(--row-hover-tint)]',
         className,
       )}
       {...rest}
@@ -90,6 +91,20 @@ export const TableCaption = forwardRef<
 ));
 TableCaption.displayName = 'TableCaption';
 
-export function TableScrollArea({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('overflow-x-auto', className)} {...rest} />;
+export function TableScrollArea({
+  className,
+  'aria-label': ariaLabel,
+  ...rest
+}: HTMLAttributes<HTMLDivElement>) {
+  // WHY conditional role: a landmark region MUST have an accessible name or
+  // screen readers will either skip it or announce it as "region" with no
+  // context. We only add the role when the caller supplies aria-label.
+  return (
+    <div
+      className={cn('overflow-x-auto', className)}
+      role={ariaLabel ? 'region' : undefined}
+      aria-label={ariaLabel}
+      {...rest}
+    />
+  );
 }

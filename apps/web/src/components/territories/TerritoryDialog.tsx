@@ -90,7 +90,6 @@ function TerritoryDialogForm({
           value={countryCodes}
           onChange={(e) => setCountryCodes(e.target.value)}
           placeholder="DE, AT, CH"
-          required
           className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none placeholder:text-[var(--fg-tertiary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
         />
         <p className="text-xs text-[var(--fg-tertiary)]">Comma-separated ISO-3166 alpha-2 codes.</p>
@@ -107,7 +106,9 @@ function TerritoryDialogForm({
           placeholder="Optional"
           className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none placeholder:text-[var(--fg-tertiary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
         />
-        <p className="text-xs text-[var(--fg-tertiary)]">Comma-separated postal codes for fine-grained routing.</p>
+        <p className="text-xs text-[var(--fg-tertiary)]">
+          Comma-separated postal codes for fine-grained routing.
+        </p>
       </div>
 
       <div className="space-y-1.5">
@@ -152,7 +153,13 @@ function TerritoryDialogForm({
   );
 }
 
-export function TerritoryDialog({ territory, open, onClose, onSubmit, isPending }: TerritoryDialogProps) {
+export function TerritoryDialog({
+  territory,
+  open,
+  onClose,
+  onSubmit,
+  isPending,
+}: TerritoryDialogProps) {
   const isEdit = Boolean(territory);
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>

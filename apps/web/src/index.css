@@ -54,7 +54,7 @@
   /* fg-tertiary darkened from #8a93a6 (3.09:1) → #6b7280 (4.6:1) to clear
      WCAG 1.4.3 normal text on white. */
   --fg-tertiary: #6b7280;
-  --fg-muted: #a0a8b8;
+  --fg-muted: #626c7d;
   --fg-inverted: #ffffff;
   --fg-on-brand: #ffffff;
 
@@ -111,7 +111,7 @@
   /* Legacy token aliases — AuditLog & older components */
   --text-primary: #1a1f36; /* = --fg-primary */
   --text-secondary: #5a6478; /* = --fg-secondary */
-  --text-muted: #a0a8b8; /* = --fg-muted */
+  --text-muted: #626c7d; /* = --fg-muted */
   --surface-primary: #ffffff; /* = --surface-card */
   --surface-secondary: #edeff5; /* = --surface-sunken */
   --accent-primary: #2c4bff; /* = --brand-primary */
@@ -202,7 +202,7 @@
   --fg-primary: #f8fafc;
   --fg-secondary: #a1a1aa;
   --fg-tertiary: #84848e; /* 5.28:1 on surface-card ✅ (was #71717a: 4.04:1 ❌) */
-  --fg-muted: #52525b;
+  --fg-muted: #8b8b94;
   --fg-inverted: #010102;
   --fg-on-brand: #ffffff;
 
@@ -261,7 +261,7 @@
   /* Legacy token aliases — AuditLog & older components */
   --text-primary: #f8fafc; /* = --fg-primary dark */
   --text-secondary: #a1a1aa; /* = --fg-secondary dark */
-  --text-muted: #52525b; /* = --fg-muted dark */
+  --text-muted: #8b8b94; /* = --fg-muted dark */
   --surface-primary: #0c0c0e; /* = --surface-card dark */
   --surface-secondary: #070708; /* = --surface-sunken dark */
   --accent-primary: #5e6ad2; /* = --brand-primary dark */
@@ -986,8 +986,8 @@ a {
   margin-left: auto;
   font-size: 11px;
   font-weight: 600;
-  background: var(--surface-sunken);
-  color: var(--fg-tertiary);
+  background: var(--sidebar-badge-bg);
+  color: var(--sidebar-badge-fg);
   padding: 1px 7px;
   border-radius: 999px;
   min-width: 0;
@@ -2484,12 +2484,7 @@ a {
   isolation: isolate;
 }
 [data-theme='dark'] .app-shell .main {
-  background:
-    radial-gradient(ellipse 80% 60% at 10% 20%, rgba(139, 92, 246, 0.18) 0%, transparent 60%),
-    radial-gradient(ellipse 70% 50% at 80% 40%, rgba(168, 85, 247, 0.14) 0%, transparent 55%),
-    radial-gradient(ellipse 60% 50% at 40% 80%, rgba(99, 102, 241, 0.12) 0%, transparent 50%),
-    radial-gradient(ellipse 50% 40% at 60% 10%, rgba(217, 70, 239, 0.1) 0%, transparent 50%),
-    var(--surface-page);
+  background: var(--surface-page);
 }
 .app-shell .page {
   min-width: 0;
@@ -2500,20 +2495,24 @@ a {
   position: relative;
   z-index: 1;
 }
-.app-flow-field {
-  inset: 0;
-  opacity: 0.72;
-  z-index: 0;
-  mix-blend-mode: multiply;
-  overflow: clip;
-  contain: paint;
-}
-[data-theme='dark'] .app-flow-field {
-  opacity: 0.46;
-  mix-blend-mode: screen;
-}
-[data-visual-effects='off'] .app-flow-field {
-  display: none;
+@media (min-width: 768px) and (max-width: 900px) {
+  .topbar {
+    gap: 8px;
+    padding: 0 20px;
+  }
+  .tb-search,
+  .tb-user .who,
+  .tb-signout {
+    display: none;
+  }
+  .crumbs {
+    flex: 1 1 auto;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .crumbs-seg {
+    min-width: 0;
+  }
 }
 @media (max-width: 767px) {
   .app-shell {
@@ -4334,6 +4333,8 @@ a {
 
 .spotlight-table-wrap {
   position: relative;
+  min-width: 0;
+  max-width: 100%;
   overflow-x: auto;
   border-radius: 12px;
   border: 1px solid var(--border-subtle);

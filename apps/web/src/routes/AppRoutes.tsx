@@ -51,6 +51,7 @@ import {
   TerritoriesPage,
   TopAccountsPage,
   PublicSignPage,
+  PublicBookingPage,
 } from './lazyPages';
 import { opsRouteElements } from './OpsRoutes';
 import { salesRouteElements } from './SalesRoutes';
@@ -74,6 +75,7 @@ export function AppRoutes() {
           {/* ── Public ──────────────────────────────────────────────────── */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/sign/:token" element={<PublicSignPage />} />
+          <Route path="/book/:slug" element={<PublicBookingPage />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/sso-callback" element={<SsoCallbackPage />} />
 

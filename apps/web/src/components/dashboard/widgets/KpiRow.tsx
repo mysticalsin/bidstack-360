@@ -46,8 +46,8 @@ export function KpiRow({ kpis, reduced }: { kpis: OrgKpi[]; reduced: boolean | n
         >
           <Link
             to={kpi.href}
-            className="flex gap-3"
-            style={{ textDecoration: 'none', color: 'inherit', flex: 1, minWidth: 0 }}
+            className="dashboard-kpi-link"
+            style={{ textDecoration: 'none', color: 'inherit' }}
           >
             <div
               className="kpi-icon"
@@ -78,10 +78,7 @@ export function KpiRow({ kpis, reduced }: { kpis: OrgKpi[]; reduced: boolean | n
                 )}
               </div>
             </div>
-            <div
-              aria-hidden
-              style={{ color: TONE_FG[kpi.tone], alignSelf: 'flex-end', marginBottom: 4 }}
-            >
+            <div className="dashboard-kpi-signal" aria-hidden style={{ color: TONE_FG[kpi.tone] }}>
               <KpiSignal points={kpi.signal} tone={kpi.tone} reduced={reduced} delay={i * 0.04} />
             </div>
           </Link>

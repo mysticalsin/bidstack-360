@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import type { usePipelineReport } from '@/hooks/usePipelineReport';
-import { formatMoney, formatStage } from '@/lib/format';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { formatStage } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
 
 export const PipelineByStageCard = memo(function PipelineByStageCard({ report }: Props) {
   const reducedMotion = useReducedMotion();
+  const { formatMoney } = useFormatMoney();
   const maxValue = report ? Math.max(1, ...report.byStage.map((stage) => stage.valueSum)) : 1;
   return (
     <Card role="region" aria-label="Portfolio pipeline by stage">

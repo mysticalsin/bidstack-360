@@ -11,11 +11,10 @@ test.describe('Onboarding flow', () => {
   test('product tour is visible on first login', async ({ page, context }) => {
     // Clear storage to simulate a fresh session (no completed-tour flag).
     await context.clearCookies();
-    await page.evaluate(() => {
+    await page.addInitScript(() => {
       localStorage.clear();
       sessionStorage.clear();
     });
-
     await page.goto('/dashboard', { waitUntil: 'load' });
     await page.getByRole('main').waitFor({ state: 'visible' });
 
@@ -28,18 +27,24 @@ test.describe('Onboarding flow', () => {
     const visible = await tourElement.isVisible({ timeout: 5_000 }).catch(() => false);
     if (!visible) {
       // Tour may only appear on very first session — skip if localStorage flag was set.
-      test.skip(true, 'Product tour not triggered — check that localStorage was cleared and tour feature is enabled');
+      test.skip(
+        true,
+        'Product tour not triggered — check that localStorage was cleared and tour feature is enabled',
+      );
     }
     await expect(tourElement.first()).toBeVisible();
   });
 
   test('sample data banner appears on clean state', async ({ page, context }) => {
     await context.clearCookies();
-    await page.evaluate(() => localStorage.clear());
-
+    await page.addInitScript(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
     await page.goto('/dashboard', { waitUntil: 'load' });
 
-    const banner = page.locator('[data-testid="sample-data-banner"]')
+    const banner = page
+      .locator('[data-testid="sample-data-banner"]')
       .or(page.getByText(/sample data|demo data/i).first());
     const visible = await banner.isVisible({ timeout: 5_000 }).catch(() => false);
     test.skip(!visible, 'Sample data banner not shown — may only appear on a truly empty org');
@@ -48,12 +53,15 @@ test.describe('Onboarding flow', () => {
 
   test('completing tour dismisses it', async ({ page, context }) => {
     await context.clearCookies();
-    await page.evaluate(() => localStorage.clear());
-
+    await page.addInitScript(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
     await page.goto('/dashboard', { waitUntil: 'load' });
     await page.getByRole('main').waitFor({ state: 'visible' });
 
-    const tourElement = page.locator('[data-testid="product-tour"]')
+    const tourElement = page
+      .locator('[data-testid="product-tour"]')
       .or(page.getByRole('dialog', { name: /tour|welcome/i }));
     const visible = await tourElement.isVisible({ timeout: 5_000 }).catch(() => false);
     test.skip(!visible, 'Tour not triggered — cannot test dismiss');

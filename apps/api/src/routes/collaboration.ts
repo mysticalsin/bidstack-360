@@ -10,6 +10,8 @@ import {
   PresenceUpdate,
 } from '@bidstack/shared';
 
+import { cacheKey } from '../lib/redis-cache.js';
+
 type MentionSummaryPayload = z.infer<typeof MentionSummary>;
 type MentionSummaryCacheEntry = {
   expiresAt: number;
@@ -222,7 +224,10 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      return cachedMentionSummary(req.auth.orgId, req.auth.userId);
+      return req.cache(() => cachedMentionSummary(req.auth.orgId, req.auth.userId), {
+        ttlSeconds: 30,
+        key: cacheKey([req.auth.orgId, 'mention-summary', req.auth.userId]),
+      });
     },
   );
 

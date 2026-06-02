@@ -50,7 +50,10 @@ export const crmDashboardRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       try {
-        const snapshot = await cachedDashboardSnapshot(req.auth.orgId, req.query.account, req.log);
+        const snapshot = await req.cache(
+          () => cachedDashboardSnapshot(req.auth.orgId, req.query.account, req.log),
+          { ttlSeconds: 30, tags: ['crm-dashboard'] },
+        );
         if (req.query.account) {
           const normalized = normalizeName(req.query.account);
           const matched = snapshot.companies.some(
@@ -72,7 +75,10 @@ export const crmDashboardRoutes: FastifyPluginAsyncZod = async (server) => {
 
   server.get('/crm/release-score', { schema: { response: { 200: ReleaseScore } } }, async (req) => {
     try {
-      const snapshot = await cachedDashboardSnapshot(req.auth.orgId, undefined, req.log);
+      const snapshot = await req.cache(
+        () => cachedDashboardSnapshot(req.auth.orgId, undefined, req.log),
+        { ttlSeconds: 30, tags: ['crm-release-score'] },
+      );
       return snapshot.releaseScore;
     } catch (err) {
       req.log.error({ err, orgId: req.auth.orgId }, 'Error in /crm/release-score route');

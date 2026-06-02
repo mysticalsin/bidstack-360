@@ -38,7 +38,7 @@ export function AuditHero({
         <div className="max-w-3xl space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="blue">Governance console</Badge>
-            <span className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
+            <span className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--text-secondary)]">
               Read-only evidence trail
             </span>
           </div>
@@ -125,7 +125,7 @@ function AuditMetricCard({
     <Card className="min-h-[128px] border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4">
       <div className="flex h-full flex-col justify-between gap-4">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--text-muted)]">
+          <span className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--text-secondary)]">
             {label}
           </span>
           <span className="grid size-9 place-items-center rounded-2xl bg-[var(--surface-primary)] text-[var(--text-secondary)]">

@@ -30,6 +30,7 @@ export function CustomObjectNavItem({
   return (
     <NavLink
       to={`/o/${objectKey}`}
+      data-testid={`nav-custom-object-${objectKey}`}
       className={({ isActive }) =>
         cn(
           // min-h-[44px] ensures WCAG 2.2 AA touch target

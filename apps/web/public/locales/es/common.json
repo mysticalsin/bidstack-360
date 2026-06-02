@@ -245,15 +245,15 @@
       "title": "Configuración",
       "subtitle": "Gestiona tu cuenta, preferencias e integraciones del espacio de trabajo.",
       "sections": {
+        "overview": "Resumen",
         "profile": "Perfil",
         "appearance": "Apariencia",
         "language": "Idioma",
         "notifications": "Notificaciones",
         "security": "Seguridad",
-        "microsoft": "Microsoft 365",
-        "mobile": "Aplicación móvil",
         "workspace": "Espacio de trabajo",
-        "advanced": "Avanzado",
+        "crm": "Configuración CRM",
+        "developer": "Acceso de desarrollador",
         "emailTemplates": "Plantillas de email",
         "tags": "Etiquetas",
         "leadRot": "Reglas de caducidad"

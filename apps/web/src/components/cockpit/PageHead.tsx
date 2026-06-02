@@ -95,6 +95,18 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
               <span data-tone="health">{labelForBand(cockpit.health.band)}</span>
               <span data-tone="confidence">{confidence}% attribution confidence</span>
               <span data-tone="muted">Refreshed {relativeTime(cockpit.company.updatedAt)}</span>
+              {cockpit.company.strategicIntel?.lastSyncedAt ? (
+                <span
+                  data-tone={
+                    cockpit.company.strategicIntel.freshness === 'fresh' ? 'linked' : 'warning'
+                  }
+                >
+                  Apollo {cockpit.company.strategicIntel.freshness} -{' '}
+                  {relativeTime(cockpit.company.strategicIntel.lastSyncedAt)}
+                </span>
+              ) : (
+                <span data-tone="warning">Apollo not synced</span>
+              )}
               {linkedOpp ? (
                 <span data-tone="linked">Opportunity linked</span>
               ) : (

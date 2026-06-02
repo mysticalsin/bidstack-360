@@ -1,12 +1,16 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = Number(process.env.E2E_WEB_PORT ?? process.env.PORT ?? 4174);
-const API_PORT = Number(process.env.E2E_API_PORT ?? 4010);
-const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
-const API_URL = process.env.E2E_API_URL ?? `http://localhost:${API_PORT}`;
+const portOffset = Number(process.env.E2E_PORT_OFFSET ?? 0);
+const PORT = Number(process.env.E2E_WEB_PORT ?? process.env.PORT ?? 4174 + portOffset);
+const API_PORT = Number(process.env.E2E_API_PORT ?? 4010 + portOffset);
+const baseURL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${PORT}`;
+const API_URL = process.env.E2E_API_URL ?? `http://127.0.0.1:${API_PORT}`;
 process.env.E2E_API_URL = API_URL;
 const reuseExistingServer = process.env.E2E_REUSE_SERVER === '1' && !process.env.CI;
 const webEnv = `BIDSTACK_ALLOW_STUB_AUTH=true VITE_AUTH_MODE=stub VITE_API_URL=${API_URL}`;
+const workerCount = Number(process.env.E2E_WORKERS ?? 1);
+const useStubAuthStorage =
+  !process.env.VITE_CLERK_PUBLISHABLE_KEY && process.env.VITE_AUTH_MODE !== 'clerk';
 
 /**
  * Fully automatic E2E orchestration.
@@ -24,7 +28,7 @@ const servers = process.env.E2E_BASE_URL
   : [
       // 1. Boot the API first so the web preview can hit endpoints immediately.
       {
-        command: `pnpm exec cross-env PORT_API=${API_PORT} PUBLIC_BASE_URL=${baseURL} PUBLIC_API_URL=${API_URL} API_RATE_LIMIT_MAX=5000 pnpm --filter @bidstack/api exec tsx src/main.ts`,
+        command: `pnpm exec cross-env PORT_API=${API_PORT} PUBLIC_BASE_URL=${baseURL} PUBLIC_API_URL=${API_URL} API_RATE_LIMIT_MAX=5000 PUBLIC_BOOKING_RATE_LIMIT_MAX=5000 pnpm --filter @bidstack/api exec tsx src/main.ts`,
         url: `${API_URL}/health`,
         reuseExistingServer,
         timeout: 120_000,
@@ -49,10 +53,24 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 2 : undefined,
+  // Performance budgets are part of the normal E2E gate, so the default run
+  // must be deterministic. Developers can opt into faster non-gate runs with
+  // E2E_WORKERS=2+ when they are not measuring Core Web Vitals.
+  workers: workerCount,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL,
+    storageState: useStubAuthStorage
+      ? {
+          cookies: [],
+          origins: [
+            {
+              origin: baseURL,
+              localStorage: [{ name: 'bidstack:session', value: 'stub' }],
+            },
+          ],
+        }
+      : undefined,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

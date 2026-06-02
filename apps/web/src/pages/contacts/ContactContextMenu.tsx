@@ -16,7 +16,7 @@
  *
  * Import DAG: zero local sibling imports — leaf node.
  */
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useRef } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 
@@ -39,6 +39,10 @@ export function ContactContextMenu({
   onDelete: (c: Contact) => void;
 }) {
   const menuRef = useRef<HTMLUListElement>(null);
+  // WHY useReducedMotion: users who have "reduce motion" set in their OS
+  // should not see scale spring animations — they can cause vestibular
+  // discomfort. We keep the opacity fade (subtle, non-spatial) but drop scale.
+  const reduced = useReducedMotion();
 
   // Move focus to the first menu item on mount so keyboard users don't have
   // to Tab into the menu manually.
@@ -113,9 +117,9 @@ export function ContactContextMenu({
       role="menu"
       aria-label={`Actions for ${contact.name}`}
       onKeyDown={handleKeyDown}
-      initial={{ opacity: 0, scale: 0.96 }}
+      initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ type: 'spring', stiffness: 280, damping: 26 }}
+      transition={reduced ? { duration: 0.15 } : { type: 'spring', stiffness: 280, damping: 26 }}
       style={{ left, top }}
       className="fixed z-[200] w-[220px] overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] py-1 text-sm shadow-[var(--shadow-lg)]"
       // Catch clicks inside so the document-level mousedown doesn't close

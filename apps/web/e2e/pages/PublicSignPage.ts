@@ -18,20 +18,40 @@ export class PublicSignPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.documentViewer = page.locator('[data-testid="document-viewer"], iframe, .pdf-viewer').first();
+    this.documentViewer = page
+      .locator('[data-testid="document-viewer"], iframe, .pdf-viewer')
+      .first();
     this.signaturePad = page.locator('[data-testid="signature-pad"], canvas').first();
     this.clearButton = page.getByRole('button', { name: /clear|reset signature/i });
     this.submitButton = page.getByRole('button', { name: /sign|submit|complete signing/i });
-    this.successMessage = page.getByText(/signed|thank you|signature recorded/i);
-    this.expiredMessage = page.getByText(/expired|invalid token|link has expired/i);
+    this.successMessage = page.getByRole('heading', { name: 'Signature submitted' });
+    this.expiredMessage = page.getByText(
+      /expired|invalid signing link|invalid token|link has expired/i,
+    );
   }
 
   async navigate(token: string): Promise<void> {
     await this.page.goto(`/sign/${token}`, { waitUntil: 'load' });
   }
 
+  async startSigning(): Promise<void> {
+    const startBtn = this.page.getByRole('button', { name: /review and sign/i });
+    if (await startBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await startBtn.click();
+    }
+  }
+
   async isExpired(): Promise<boolean> {
-    return this.expiredMessage.isVisible({ timeout: 5_000 }).catch(() => false);
+    await this.expiredMessage
+      .or(this.documentViewer)
+      .or(this.signaturePad)
+      .first()
+      .waitFor({ state: 'visible', timeout: 15_000 })
+      .catch(() => undefined);
+    return this.expiredMessage
+      .first()
+      .isVisible()
+      .catch(() => false);
   }
 
   async drawSignature(): Promise<void> {
@@ -46,6 +66,19 @@ export class PublicSignPage {
 
   async signAndSubmit(): Promise<void> {
     await this.drawSignature();
+
+    // Click Continue on the draw signature step
+    const continueBtn = this.page.getByRole('button', { name: /continue/i });
+    await expect(continueBtn).toBeEnabled({ timeout: 5_000 });
+    await continueBtn.click();
+
+    // Check terms checkbox on the submit step
+    const termsCheckbox = this.page.getByRole('checkbox');
+    await expect(termsCheckbox).toBeVisible({ timeout: 5_000 });
+    await termsCheckbox.check();
+
+    // Click Submit signature (which matches submitButton)
+    await expect(this.submitButton).toBeEnabled({ timeout: 5_000 });
     await this.submitButton.click();
   }
 

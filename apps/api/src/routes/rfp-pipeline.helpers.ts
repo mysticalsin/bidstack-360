@@ -6,6 +6,7 @@
 
 import type { FastifyReply } from 'fastify';
 import { z } from 'zod';
+import { ALLOWED_FILE_CONTENT_TYPES } from '@bidstack/shared';
 import { redis } from '../redis.js';
 import { createLogger } from '../lib/logger.js';
 
@@ -14,30 +15,7 @@ const log = createLogger({ name: 'rfp-pipeline' });
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** Allowed mime types for RFP source documents. */
-export const ALLOWED_MIME_TYPES = [
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/json',
-  'application/xml',
-  'application/rtf',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'text/plain',
-  'text/markdown',
-  'text/csv',
-  'text/html',
-  'text/xml',
-  'text/rtf',
-  'image/png',
-  'image/jpeg',
-  'image/gif',
-  'image/webp',
-  'image/tiff',
-  'image/bmp',
-] as const;
+export const ALLOWED_MIME_TYPES = ALLOWED_FILE_CONTENT_TYPES;
 
 /** 50 MiB — enforced at the route boundary to override the global 10 MiB cap. */
 export const RFP_MAX_BYTES = 50 * 1024 * 1024;

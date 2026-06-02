@@ -42,13 +42,51 @@ const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>
   });
 
 describe('webhook subscription routes', () => {
+  skipIfNoDb('POST /api/webhook-subscriptions returns a one-time signing secret', async () => {
+    const created = await server.inject({
+      method: 'POST',
+      url: '/api/v1/webhook-subscriptions',
+      payload: {
+        url: 'https://example.com/bidstack-webhook-secret',
+        events: ['lead.created'],
+        active: true,
+      },
+    });
+
+    expect(created.statusCode).toBe(201);
+    const body = created.json() as { id: string; signingSecret: string };
+    createdSubscriptionIds.push(body.id);
+    expect(body.signingSecret).toMatch(/^whsec_/);
+
+    const listed = await server.inject({
+      method: 'GET',
+      url: '/api/v1/webhook-subscriptions',
+    });
+    expect(listed.statusCode).toBe(200);
+    expect(JSON.stringify(listed.json())).not.toContain(body.signingSecret);
+  });
+
+  skipIfNoDb('POST /api/webhook-subscriptions rejects unsupported event names', async () => {
+    const created = await server.inject({
+      method: 'POST',
+      url: '/api/v1/webhook-subscriptions',
+      payload: {
+        url: 'https://example.com/bidstack-webhook-invalid-event',
+        events: ['fake.placeholder'],
+        active: true,
+      },
+    });
+
+    expect(created.statusCode).toBe(400);
+  });
+
   skipIfNoDb('PATCH /api/webhook-subscriptions/:id rejects private URLs', async () => {
     const created = await server.inject({
       method: 'POST',
       url: '/api/v1/webhook-subscriptions',
       payload: {
         url: 'https://example.com/bidstack-webhook',
-        events: ['opportunity.updated'],
+        events: ['opportunity.stage_changed'],
         active: true,
       },
     });

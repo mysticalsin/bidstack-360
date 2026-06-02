@@ -15,7 +15,7 @@ test.describe('Lead management', () => {
     await leads.navigate();
     await leads.waitForList();
     // Pass whether there's data or an empty-state — just must not crash.
-    const hasRows = await leads.leadRows.count() > 0;
+    const hasRows = (await leads.leadRows.count()) > 0;
     const hasEmpty = await leads.emptyState.isVisible({ timeout: 1_000 }).catch(() => false);
     expect(hasRows || hasEmpty).toBe(true);
   });
@@ -25,7 +25,7 @@ test.describe('Lead management', () => {
     await leads.navigate();
     await leads.waitForList();
 
-    const hasLinks = await leads.leadLinks.count() > 0;
+    const hasLinks = (await leads.leadLinks.count()) > 0;
     test.skip(!hasLinks, 'No lead rows — seeded data absent');
 
     await leads.clickFirstLead();
@@ -52,7 +52,7 @@ test.describe('Lead management', () => {
     await leads.navigate();
     await leads.waitForList();
 
-    const hasLinks = await leads.leadLinks.count() > 0;
+    const hasLinks = (await leads.leadLinks.count()) > 0;
     test.skip(!hasLinks, 'No lead rows — seeded data absent');
 
     await leads.clickFirstLead();
@@ -67,7 +67,7 @@ test.describe('Lead management', () => {
     await leads.navigate();
     await leads.waitForList();
 
-    const hasLinks = await leads.leadLinks.count() > 0;
+    const hasLinks = (await leads.leadLinks.count()) > 0;
     test.skip(!hasLinks, 'No lead rows — seeded data absent');
 
     await leads.clickFirstLead();
@@ -75,7 +75,10 @@ test.describe('Lead management', () => {
     if (await activityTab.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await activityTab.click();
       await expect(
-        page.getByText(/no activity|activity log/i).or(page.getByRole('listitem')).first(),
+        page
+          .getByText(/no activity|activity log/i)
+          .or(page.getByRole('listitem'))
+          .first(),
       ).toBeVisible({ timeout: 10_000 });
     } else {
       test.skip(true, 'Activity tab not present on lead detail');
@@ -87,17 +90,15 @@ test.describe('Lead management', () => {
     await leads.navigate();
     await leads.waitForList();
 
-    const hasLinks = await leads.leadLinks.count() > 0;
+    const hasLinks = (await leads.leadLinks.count()) > 0;
     test.skip(!hasLinks, 'No lead rows — seeded data absent');
 
     await leads.clickFirstLead();
-    const convertBtn = page.getByRole('button', { name: /convert|create opportunity/i });
+    const convertBtn = page
+      .locator('[data-testid="lead-convert-action"]')
+      .or(page.getByRole('button', { name: /convert to opportunity|convert lead/i }))
+      .first();
     // Verify the business action exists — even if conversion itself is blocked by permissions.
-    const visible = await convertBtn.isVisible({ timeout: 5_000 }).catch(() => false);
-    if (!visible) {
-      // Some builds show it as a link instead of a button.
-      const convertLink = page.getByRole('link', { name: /convert|create opportunity/i });
-      await expect(convertLink).toBeVisible({ timeout: 5_000 });
-    }
+    await expect(convertBtn).toBeVisible({ timeout: 5_000 });
   });
 });

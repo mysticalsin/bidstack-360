@@ -1,12 +1,3 @@
-/**
- * SignatureGuide — developer-facing HMAC-SHA256 verification code snippets.
- *
- * Shows Node.js / Python / Ruby examples for verifying the
- * X-BidStack-Signature header. Includes a copy-to-clipboard button
- * (silent fail when Clipboard API is unavailable) and a replay-attack
- * warning encouraging a 5-minute window check.
- */
-
 import { useState } from 'react';
 
 import { Card } from '@/components/ui/Card';
@@ -21,7 +12,6 @@ function verifySignature(rawBody, header, secret) {
   const t = tPart.replace('t=', '');
   const v1 = v1Part.replace('v1=', '');
 
-  // Reject stale events (> 5 min)
   if (Math.abs(Date.now() / 1000 - Number(t)) > 300) return false;
 
   const expected = crypto
@@ -40,7 +30,6 @@ def verify_signature(raw_body: bytes, header: str, secret: str) -> bool:
     parts = dict(item.split("=", 1) for item in header.split(","))
     t, v1 = parts.get("t", ""), parts.get("v1", "")
 
-    # Reject stale events (> 5 min)
     if abs(time.time() - int(t)) > 300:
         return False
 
@@ -55,7 +44,6 @@ def verify_signature(raw_body, header, secret)
   parts = Hash[header.split(',').map { |p| p.split('=', 2) }]
   t, v1 = parts['t'], parts['v1']
 
-  # Reject stale events (> 5 min)
   return false if (Time.now.to_i - t.to_i).abs > 300
 
   expected = OpenSSL::HMAC.hexdigest('sha256', secret, "#{t}.#{raw_body}")
@@ -75,26 +63,23 @@ export function SignatureGuide() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Clipboard API unavailable — silent fail
+      setCopied(false);
     }
   };
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <div className="border-b border-[var(--border-subtle)] px-5 py-4">
         <div className="flex items-center gap-2">
           <Icon name="shield" size={16} className="text-[var(--brand-primary)]" />
-          <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
-            Signature verification
-          </h2>
+          <h2 className="text-sm font-semibold text-[var(--fg-primary)]">Signature verification</h2>
         </div>
-        <p className="mt-1 text-xs text-[var(--fg-secondary)]">
+        <p className="mt-1 text-xs leading-5 text-[var(--fg-secondary)]">
           Every delivery includes an{' '}
           <code className="rounded bg-[var(--surface-sunken)] px-1 py-0.5 font-mono text-[11px]">
             X-BidStack-Signature
           </code>{' '}
-          header. Verify it to confirm the request originated from BidStack.
-          Format:{' '}
+          header. Verify it before trusting the payload. Format:{' '}
           <code className="rounded bg-[var(--surface-sunken)] px-1 py-0.5 font-mono text-[11px]">
             t=&lt;unix-seconds&gt;,v1=&lt;hmac-sha256-hex&gt;
           </code>
@@ -102,50 +87,47 @@ export function SignatureGuide() {
       </div>
 
       <div className="px-5 py-4">
-        {/* Lang tabs */}
         <div
-          className="mb-3 flex gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-1 w-fit"
+          className="mb-3 flex w-fit gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-1"
           role="tablist"
           aria-label="Signature verification language"
         >
-          {(Object.keys(SIGNATURE_SNIPPETS) as Lang[]).map((l) => (
+          {(Object.keys(SIGNATURE_SNIPPETS) as Lang[]).map((item) => (
             <button
-              key={l}
+              key={item}
               type="button"
               role="tab"
-              aria-selected={lang === l}
-              onClick={() => setLang(l)}
+              aria-selected={lang === item}
+              onClick={() => setLang(item)}
               className={cn(
-                'rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]',
-                lang === l
+                'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]',
+                lang === item
                   ? 'bg-[var(--surface-card)] text-[var(--fg-primary)] shadow-sm'
                   : 'text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]',
               )}
             >
-              {l}
+              {item}
             </button>
           ))}
         </div>
 
-        {/* Code block */}
         <div className="relative">
-          <pre className="overflow-x-auto rounded-lg bg-[var(--surface-sunken)] p-4 text-xs leading-relaxed text-[var(--fg-primary)]">
+          <pre className="max-h-[420px] overflow-auto rounded-xl bg-[var(--surface-sunken)] p-4 text-xs leading-relaxed text-[var(--fg-primary)]">
             <code>{SIGNATURE_SNIPPETS[lang]}</code>
           </pre>
           <button
             type="button"
             onClick={handleCopy}
             aria-label="Copy code"
-            className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] text-[var(--fg-tertiary)] transition-colors hover:text-[var(--fg-primary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
+            className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] text-[var(--fg-tertiary)] transition-colors hover:text-[var(--fg-primary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
           >
-            <Icon name={copied ? 'check' : 'copy'} size={13} />
+            <Icon name={copied ? 'check' : 'copy'} size={14} />
           </button>
         </div>
 
         <p className="mt-3 text-xs text-[var(--fg-tertiary)]">
-          Reject events where{' '}
-          <code className="font-mono">|now - t| &gt; 300</code>{' '}
-          seconds to prevent replay attacks. Always use a timing-safe comparison.
+          Reject events where <code className="font-mono">|now - t| &gt; 300</code> seconds to
+          prevent replay attacks. Always use a timing-safe comparison.
         </p>
       </div>
     </Card>

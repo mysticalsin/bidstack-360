@@ -8,6 +8,8 @@
  *
  * Import DAG: opportunities.helpers (leaf) ← this file ← opportunities.ts
  */
+import { randomUUID } from 'node:crypto';
+
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
@@ -238,94 +240,144 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
       const stageById = new Map(importPipelineStages.map((s) => [s.id, s]));
       const defaultImportStage = importPipelineStages[0];
 
+      // Phase 1: validate all rows against in-memory maps — zero DB queries.
+      // WHY batch approach: previous sequential loop issued 3 DB round-trips per row
+      // (mintNextCode + create + audit). A single transaction with createMany collapses
+      // that to ~3 queries total regardless of import batch size (1 findFirst for max
+      // code + 1 createMany for opportunities + 1 createMany for audit logs).
+      interface ValidRow {
+        index: number;
+        /** Pre-generated UUID so audit log can reference the opportunity id before it exists. */
+        id: string;
+        ownerId: string | null | undefined;
+        territoryId: string | null;
+        pipelineStageId: string | null | undefined;
+        stageKey: PrismaStage;
+        row: (typeof opportunities)[number];
+      }
+      const validRows: ValidRow[] = [];
+
       for (let i = 0; i < opportunities.length; i += 1) {
         const row = opportunities[i];
         if (!row) continue;
-        try {
-          let ownerId: string | null | undefined = undefined;
-          if (row.owner !== undefined && row.owner !== null) {
-            const userId = emailToUserId.get(row.owner);
-            if (!userId) {
-              errors.push({ index: i, message: `Owner user not found: ${row.owner}` });
-              continue;
-            }
-            ownerId = userId;
-          } else if (row.owner === null) {
-            ownerId = null;
-          }
 
-          // Auto-assign territory from country (map lookup — no DB query)
-          let territoryId: string | null = null;
-          if (row.country) {
-            territoryId = countryToTerritoryId.get(row.country) ?? null;
+        let ownerId: string | null | undefined = undefined;
+        if (row.owner !== undefined && row.owner !== null) {
+          const userId = emailToUserId.get(row.owner);
+          if (!userId) {
+            errors.push({ index: i, message: `Owner user not found: ${row.owner}` });
+            continue;
           }
+          ownerId = userId;
+        } else if (row.owner === null) {
+          ownerId = null;
+        }
 
-          // Resolve pipeline stage (map lookup — no DB query per row)
-          let pipelineStageId = row.pipelineStageId;
-          let stageKey: PrismaStage = 's1_lead';
-          if (pipelineStageId) {
-            const ps = stageById.get(pipelineStageId);
-            if (!ps) {
-              errors.push({ index: i, message: `Invalid pipeline stage: ${pipelineStageId}` });
-              continue;
-            }
-            stageKey = ps.key as PrismaStage;
-          } else if (defaultImportStage) {
-            pipelineStageId = defaultImportStage.id;
-            stageKey = defaultImportStage.key as PrismaStage;
+        // Auto-assign territory from country (map lookup — no DB query)
+        let territoryId: string | null = null;
+        if (row.country) {
+          territoryId = countryToTerritoryId.get(row.country) ?? null;
+        }
+
+        // Resolve pipeline stage (map lookup — no DB query per row)
+        let pipelineStageId = row.pipelineStageId;
+        let stageKey: PrismaStage = 's1_lead';
+        if (pipelineStageId) {
+          const ps = stageById.get(pipelineStageId);
+          if (!ps) {
+            errors.push({ index: i, message: `Invalid pipeline stage: ${pipelineStageId}` });
+            continue;
           }
+          stageKey = ps.key as PrismaStage;
+        } else if (defaultImportStage) {
+          pipelineStageId = defaultImportStage.id;
+          stageKey = defaultImportStage.key as PrismaStage;
+        }
 
-          let createdId: string | null = null;
-          for (let attempt = 0; attempt < 5 && !createdId; attempt += 1) {
-            try {
-              createdId = await prisma.$transaction(async (tx) => {
-                const code = row.code ?? (await mintNextCode(tx, req.auth.orgId));
-                const o = await tx.opportunity.create({
-                  data: {
+        validRows.push({
+          index: i,
+          id: randomUUID(),
+          ownerId,
+          territoryId,
+          pipelineStageId,
+          stageKey,
+          row,
+        });
+      }
+
+      if (validRows.length > 0) {
+        // Phase 2: single transaction — 1 findFirst + 2 createMany ≈ 3 queries for any N.
+        // On unique-code collision (concurrent imports), retry up to 5 times; mintedCodes
+        // is rebuilt fresh each attempt so codes are re-generated rather than replayed.
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          try {
+            await prisma.$transaction(async (tx) => {
+              // Mint codes for all rows that didn't supply one — single read inside the
+              // transaction so a concurrent import's just-inserted row is visible and we
+              // don't collide on the sequence counter.
+              const needsMinting = validRows.filter((vr) => !vr.row.code);
+              const mintedCodes = new Map<number, string>(); // row index → assigned code
+              if (needsMinting.length > 0) {
+                const last = await tx.opportunity.findFirst({
+                  where: { orgId: req.auth.orgId, code: { startsWith: 'OP-' }, deletedAt: null },
+                  orderBy: { code: 'desc' },
+                  select: { code: true },
+                });
+                let n = last ? Number(last.code.slice(3)) + 1 : 2001;
+                for (const vr of needsMinting) {
+                  mintedCodes.set(vr.index, `OP-${n.toString().padStart(4, '0')}`);
+                  n += 1;
+                }
+              }
+
+              await tx.opportunity.createMany({
+                data: validRows.map((vr) => {
+                  const code = vr.row.code ?? mintedCodes.get(vr.index)!;
+                  return {
+                    id: vr.id,
                     orgId: req.auth.orgId,
                     code,
-                    customer: row.customer,
-                    name: row.name,
-                    stage: stageKey,
-                    pipelineStageId,
-                    valueMicros: BigInt(Math.round(row.value * 1_000_000)),
-                    probability: row.probability,
-                    dueDate: row.dueDate ? new Date(row.dueDate) : null,
-                    industry: row.industry,
-                    logoUrl: row.logo,
-                    country: row.country ?? null,
-                    ...(territoryId !== null ? { territoryId } : {}),
+                    customer: vr.row.customer,
+                    name: vr.row.name,
+                    stage: vr.stageKey,
+                    pipelineStageId: vr.pipelineStageId ?? undefined,
+                    valueMicros: BigInt(Math.round(vr.row.value * 1_000_000)),
+                    probability: vr.row.probability,
+                    dueDate: vr.row.dueDate ? new Date(vr.row.dueDate) : null,
+                    industry: vr.row.industry ?? null,
+                    logoUrl: vr.row.logo ?? null,
+                    country: vr.row.country ?? null,
                     intel: {},
-                    ...(ownerId !== undefined ? { ownerId } : {}),
-                  },
-                });
-                await tx.auditLog.create({
-                  data: {
-                    orgId: req.auth.orgId,
-                    userId: req.auth.userId,
-                    action: 'opportunity.create',
-                    targetType: 'opportunity',
-                    targetId: o.id,
-                    diff: {
-                      code,
-                      customer: row.customer,
-                      name: row.name,
-                      pipelineStageId,
-                      source: 'import',
-                    },
-                  },
-                });
-                return o.id;
+                    ...(vr.territoryId !== null ? { territoryId: vr.territoryId } : {}),
+                    ...(vr.ownerId !== undefined ? { ownerId: vr.ownerId } : {}),
+                  };
+                }),
               });
-            } catch (err) {
-              if (isUniqueViolation(err) && attempt < 4) continue;
-              throw err;
-            }
+
+              await tx.auditLog.createMany({
+                data: validRows.map((vr) => ({
+                  orgId: req.auth.orgId,
+                  userId: req.auth.userId,
+                  action: 'opportunity.create',
+                  targetType: 'opportunity',
+                  targetId: vr.id,
+                  diff: {
+                    code: vr.row.code ?? mintedCodes.get(vr.index),
+                    customer: vr.row.customer,
+                    name: vr.row.name,
+                    pipelineStageId: vr.pipelineStageId,
+                    source: 'import',
+                  },
+                })),
+              });
+            });
+
+            created = validRows.length;
+            break;
+          } catch (err) {
+            if (isUniqueViolation(err) && attempt < 4) continue;
+            throw err;
           }
-          if (createdId) created += 1;
-        } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : String(err);
-          errors.push({ index: i, message });
         }
       }
 

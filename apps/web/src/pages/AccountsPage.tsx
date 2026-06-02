@@ -116,7 +116,6 @@ export function AccountsPage() {
 
   return (
     <>
-      <h1 className="sr-only">Accounts</h1>
       <motion.div
         className="page-head motion-page-head"
         initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, filter: 'blur(6px)' }}

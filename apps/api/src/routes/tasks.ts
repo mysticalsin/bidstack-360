@@ -104,7 +104,10 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      return cachedTaskSummary(req.auth.orgId);
+      return req.cache(() => cachedTaskSummary(req.auth.orgId), {
+        ttlSeconds: 30,
+        tags: ['task-summary'],
+      });
     },
   );
 

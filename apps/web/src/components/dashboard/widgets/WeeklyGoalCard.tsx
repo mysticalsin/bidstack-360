@@ -2,9 +2,8 @@
  * dashboard/widgets/WeeklyGoalCard.tsx — animated progress bar tracking the
  * weekly pipeline value target in the OrgDashboard sidebar.
  *
- * WHY a separate module: the target constant and progress calculation are
- * self-contained business logic (~46 source lines) that will move to a user-
- * configurable goal when the Goals feature ships.
+ * WHY a separate module: the progress calculation and compact goal display
+ * are self-contained and will move to a configurable Goals feature.
  */
 import { motion } from 'framer-motion';
 
@@ -14,17 +13,17 @@ import { formatMoney } from '@/lib/format';
 
 // ─── WeeklyGoalCard ───────────────────────────────────────────────────────────
 
-const WEEKLY_TARGET = 500_000; // €500K — will be user-configurable in v2
-
 export function WeeklyGoalCard({
   pipelineValue,
+  targetValue,
   currency,
 }: {
   pipelineValue: number;
+  targetValue: number;
   currency: string;
 }) {
-  const progress = Math.min(100, (pipelineValue / WEEKLY_TARGET) * 100);
-  const remaining = Math.max(0, WEEKLY_TARGET - pipelineValue);
+  const progress = Math.min(100, (pipelineValue / targetValue) * 100);
+  const remaining = Math.max(0, targetValue - pipelineValue);
 
   return (
     <GlassCard padding="sm" hoverable={false}>
@@ -36,7 +35,7 @@ export function WeeklyGoalCard({
           {formatMoney(pipelineValue, currency)}
         </span>
         <span className="text-xs text-[var(--fg-secondary)]">
-          of {formatMoney(WEEKLY_TARGET, currency)}
+          of {formatMoney(targetValue, currency)}
         </span>
       </div>
       <div className="h-2 w-full rounded-full bg-[var(--surface-sunken)] overflow-hidden">

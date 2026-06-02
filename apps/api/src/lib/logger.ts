@@ -30,10 +30,21 @@ export interface LoggerOptions {
   level?: string;
 }
 
-export function createLogger(options: LoggerOptions = {}): pino.Logger {
-  const isDev = process.env.NODE_ENV === 'development';
+let devPrettyTransport: ReturnType<typeof pino.transport> | undefined;
 
-  return pino({
+function getDevPrettyTransport(): ReturnType<typeof pino.transport> | undefined {
+  if (process.env.NODE_ENV !== 'development') return undefined;
+
+  devPrettyTransport ??= pino.transport({
+    target: 'pino-pretty',
+    options: { colorize: true, singleLine: true },
+  });
+
+  return devPrettyTransport;
+}
+
+export function createLogger(options: LoggerOptions = {}): pino.Logger {
+  const loggerOptions: pino.LoggerOptions = {
     name: options.name ?? 'bidstack',
     level: options.level ?? process.env.LOG_LEVEL ?? 'info',
 
@@ -69,14 +80,13 @@ export function createLogger(options: LoggerOptions = {}): pino.Logger {
       remove: true,
     },
 
-    transport: isDev
-      ? { target: 'pino-pretty', options: { colorize: true, singleLine: true } }
-      : undefined,
-
     // WHY timestamp: Datadog log pipeline uses the timestamp field for log ordering.
     // pino's default `time` field is already ISO 8601 which Datadog parses correctly.
     timestamp: pino.stdTimeFunctions.isoTime,
-  });
+  };
+
+  const transport = getDevPrettyTransport();
+  return transport ? pino(loggerOptions, transport) : pino(loggerOptions);
 }
 
 /**

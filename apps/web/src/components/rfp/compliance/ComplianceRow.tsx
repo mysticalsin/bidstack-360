@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { StarterKit } from '@tiptap/starter-kit';
+import DOMPurify from 'dompurify';
 
 import { AiDisclosureBadge } from '@/components/rfp/shared/AiDisclosureBadge';
 import type { ComplianceRow as ComplianceRowData } from '@/hooks/rfp/useRfpCompliance';
@@ -14,10 +15,10 @@ interface ComplianceRowProps {
 }
 
 const STATUS_STYLES: Record<ComplianceRowData['status'], string> = {
-  pending: 'bg-[var(--surface-sunken)] text-[var(--fg-secondary)]',
-  compliant: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-  partial: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-  non_compliant: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+  pending: 'bg-[var(--tag-gray-bg)] text-[var(--tag-gray-fg)]',
+  compliant: 'bg-[var(--tag-jade-bg)] text-[var(--tag-jade-fg)]',
+  partial: 'bg-[var(--tag-amber-bg)] text-[var(--tag-amber-fg)]',
+  non_compliant: 'bg-[var(--tag-tomato-bg)] text-[var(--tag-tomato-fg)]',
 };
 
 const STATUS_LABELS: Record<ComplianceRowData['status'], string> = {
@@ -104,11 +105,11 @@ export function ComplianceRow({ row, onSave, isSaving, style }: ComplianceRowPro
           {row.requirement}
         </p>
         {!isEditing && row.response && (
-          // WHY dangerouslySetInnerHTML: answerDraft is stored as HTML by TipTap.
-          // Content originates from this org's own users / AI — not external untrusted input.
+          // Sanitize TipTap HTML before rendering. Content originates from users/AI
+          // but XSS defense-in-depth is mandatory (CSP is not enough for stored HTML).
           <p
             className="mt-1 text-xs text-[var(--fg-secondary)] line-clamp-2 prose prose-xs max-w-none dark:prose-invert"
-            dangerouslySetInnerHTML={{ __html: row.response }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(row.response) }}
           />
         )}
         {!isEditing && !row.response && (

@@ -16,6 +16,7 @@ import {
   useRejectOutput,
   useRunAgent,
 } from '@/hooks/useAgents';
+import { Modal } from '@/components/ui/Modal';
 
 const STATUS_TONE: Record<string, 'jade' | 'amber' | 'tomato' | 'gray'> = {
   idle: 'jade',
@@ -243,66 +244,52 @@ export function RfpAgentsPage() {
       </section>
 
       {/* Custom assignment picker */}
-      {assignOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') setAssignOpen(false);
-          }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="rfp-assign-title"
-            className="w-full max-w-lg rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-5 shadow-[var(--shadow-lg)]"
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <h3 id="rfp-assign-title" className="text-lg font-semibold text-[var(--fg-primary)]">
-                Assign agent to RFP
-              </h3>
-              <button
-                type="button"
-                aria-label="Close"
-                onClick={() => setAssignOpen(false)}
-                className="rounded-lg p-1 text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)]"
-              >
-                <Icon name="x" size={18} />
-              </button>
-            </div>
-
-            {unassignedAgents.length === 0 ? (
-              <EmptyState
-                title="All agents assigned"
-                message="Every available agent is already on this RFP. Create a new agent from the Agents page to add more."
-              />
-            ) : (
-              <div className="max-h-80 space-y-2 overflow-y-auto">
-                {unassignedAgents.map((agent) => (
-                  <button
-                    key={agent.id}
-                    onClick={() => handleAssign(agent.id)}
-                    disabled={assignAgent.isPending}
-                    className="flex w-full items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-page)] p-3 text-left transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-sunken)]"
-                  >
-                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-primary-tint)] text-[var(--brand-primary)]">
-                      <Icon name="sparkle" size={15} />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-[var(--fg-primary)]">
-                        {agent.name}
-                      </div>
-                      <div className="text-xs text-[var(--fg-tertiary)]">
-                        {agent.config.phase ?? 'General'} · {agent.config.provider}
-                      </div>
-                    </div>
-                    <Icon name="plus" size={16} className="text-[var(--fg-tertiary)]" />
-                  </button>
-                ))}
-              </div>
-            )}
+      <Modal open={assignOpen} onClose={() => setAssignOpen(false)} labelId="rfp-assign-title">
+        <div className="w-full max-w-lg rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-5 shadow-[var(--shadow-lg)]">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 id="rfp-assign-title" className="text-lg font-semibold text-[var(--fg-primary)]">
+              Assign agent to RFP
+            </h3>
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={() => setAssignOpen(false)}
+              className="rounded-lg p-1 text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)]"
+            >
+              <Icon name="x" size={18} />
+            </button>
           </div>
+
+          {unassignedAgents.length === 0 ? (
+            <EmptyState
+              title="All agents assigned"
+              message="Every available agent is already on this RFP. Create a new agent from the Agents page to add more."
+            />
+          ) : (
+            <div className="max-h-80 space-y-2 overflow-y-auto">
+              {unassignedAgents.map((agent) => (
+                <button
+                  key={agent.id}
+                  onClick={() => handleAssign(agent.id)}
+                  disabled={assignAgent.isPending}
+                  className="flex w-full items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-page)] p-3 text-left transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-sunken)]"
+                >
+                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-primary-tint)] text-[var(--brand-primary)]">
+                    <Icon name="sparkle" size={15} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-[var(--fg-primary)]">{agent.name}</div>
+                    <div className="text-xs text-[var(--fg-tertiary)]">
+                      {agent.config.phase ?? 'General'} · {agent.config.provider}
+                    </div>
+                  </div>
+                  <Icon name="plus" size={16} className="text-[var(--fg-tertiary)]" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-      ) : null}
+      </Modal>
     </div>
   );
 }

@@ -12,6 +12,11 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 
+// WHY: Core Web Vitals are lab measurements. Running multiple LCP/CLS probes
+// for the same preview server in parallel turns the gate into a machine-load
+// test and creates false product regressions.
+test.describe.configure({ mode: 'serial' });
+
 /** Routes to measure — chosen as the highest-traffic journeys. */
 const PERF_ROUTES = [
   { name: 'dashboard', path: '/dashboard' },
@@ -83,7 +88,10 @@ async function injectCwvObservers(page: Page): Promise<void> {
 
 /** Wait for the page to reach a "quiet" state after load. */
 async function waitForPageIdle(page: Page): Promise<void> {
-  await page.getByRole('main').waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
+  await page
+    .getByRole('main')
+    .waitFor({ state: 'visible', timeout: 15_000 })
+    .catch(() => {});
   // Give React lazy chunks and images time to finish painting
   await page.waitForLoadState('networkidle').catch(() => {});
   await page.waitForTimeout(300);
@@ -195,12 +203,13 @@ test('navigation: LCP stays under budget after client-side route change', async 
   await waitForPageIdle(page);
 
   // Soft-navigate to leads list
-  const leadsLink = page
-    .getByRole('link', { name: /leads/i })
-    .first();
+  const leadsLink = page.getByRole('link', { name: /leads/i }).first();
   const t0 = Date.now();
   await leadsLink.click();
-  await page.getByRole('main').waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+  await page
+    .getByRole('main')
+    .waitFor({ state: 'visible', timeout: 10_000 })
+    .catch(() => {});
   const elapsed = Date.now() - t0;
 
   // WHY: Client-side navigation must complete within 1.5s (stricter than LCP

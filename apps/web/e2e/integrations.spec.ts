@@ -1,5 +1,8 @@
 import { test, expect } from './fixtures.js';
 
+const apiUrl = process.env.E2E_API_URL ?? 'http://localhost:4010';
+const probeUrl = new URL('/livez?token=secret#frag', apiUrl).toString();
+
 test.describe('Integrations page', () => {
   test('shows the connection command center and setup surfaces', async ({ page, gotoAndWait }) => {
     await gotoAndWait('/integrations');
@@ -19,9 +22,11 @@ test.describe('Integrations page', () => {
     await expect(page.getByText('No secrets sent')).toBeVisible();
 
     await page.getByRole('button', { name: /REST API Data sync endpoints/ }).click();
-    await page.getByLabel('Endpoint URL').fill('http://localhost:4010/livez?token=secret#frag');
+    await page.getByLabel('Endpoint URL').fill(probeUrl);
     await page.getByRole('button', { name: /Test endpoint/ }).click();
-    await expect(page.getByTestId('connection-probe-result')).toContainText('Endpoint is reachable.');
+    await expect(page.getByTestId('connection-probe-result')).toContainText(
+      'Endpoint is reachable.',
+    );
     await expect(page.getByText('HTTP 200')).toBeVisible();
     await expect(page.getByTestId('connection-probe-result')).not.toContainText('secret');
 
