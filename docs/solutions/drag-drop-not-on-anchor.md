@@ -96,6 +96,12 @@ or `<button type="button">` with explicit click handling. Use `<Link>` /
 `<a>` only when the _primary_ affordance is navigation and the element is
 not draggable.
 
+For pipeline cards, also add stable `data-testid`, `data-opportunity-id`, and
+`data-stage-id` hooks so E2E can assert both placement and persistence. A test
+that only checks "drag did not throw" is insufficient for CRM forecasting: it
+must prove the card appears in the target column and the opportunity detail API
+returns the new stage.
+
 ## Detection
 
 Grep for `Link.*draggable` or any anchor-typed element with `draggable={true}`:
@@ -109,3 +115,7 @@ rg 'draggable\s*=\s*\{?true' apps/web/src --type tsx
 
 - `apps/web/src/pages/PipelinePage.tsx` — converted `PipelineCard` from
   `<Link>` to `<div role="button">` (Phase: dark-purple sprint, fix wave).
+- `apps/web/src/pages/pipelineBoard/PipelineCard.tsx` - re-fixed the split card
+  component after it regressed to a draggable `Link` (2026-06-06).
+- `apps/web/e2e/flows/pipeline.spec.ts` - reversible keyboard-move regression
+  checks target-column placement and persisted API state.

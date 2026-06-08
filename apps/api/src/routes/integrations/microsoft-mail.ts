@@ -230,7 +230,7 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
         );
 
         // Create Graph webhook subscription (best-effort — incremental poll fallback if it fails)
-        void createSubscription({ integrationTokenId: savedToken.id, orgId }, server.log);
+        void createSubscription({ integrationTokenId: savedToken.id, orgId }, server.log).catch(err => server.log.warn({ err }, 'Failed to create subscription in background'));
       }
 
       server.log.info({ orgId, userId, email: externalEmail }, 'Outlook Mail connected');

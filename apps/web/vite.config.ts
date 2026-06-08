@@ -62,6 +62,8 @@ export default defineConfig(({ command, mode }) => {
       proxy: {
         '/api': { target: apiUrl, changeOrigin: true },
         '/webhooks/dust': { target: apiUrl, changeOrigin: true },
+        '/livez': { target: apiUrl, changeOrigin: true },
+        '/readyz': { target: apiUrl, changeOrigin: true },
       },
     },
     preview: {
@@ -70,6 +72,8 @@ export default defineConfig(({ command, mode }) => {
       proxy: {
         '/api': { target: apiUrl, changeOrigin: true },
         '/webhooks/dust': { target: apiUrl, changeOrigin: true },
+        '/livez': { target: apiUrl, changeOrigin: true },
+        '/readyz': { target: apiUrl, changeOrigin: true },
       },
     },
     base: assetBase,
@@ -121,6 +125,10 @@ export default defineConfig(({ command, mode }) => {
             // stub mode. Audit B2 (2026-05-10) regression guard.
             if (normalized.includes('/@clerk/')) return 'clerk';
             if (normalized.includes('/@sentry/')) return 'sentry';
+            // lucide-react is used by route-level reports/widgets and is safe
+            // to cache separately from the large vendor catch-all. Keep this
+            // split narrow; the shell uses the local SVG Icon component.
+            if (normalized.includes('/node_modules/lucide-react/')) return 'icons';
             // framer-motion ships ~50KB gzipped — isolate so the rest of
             // vendor stays lean and motion can be cached separately across
             // deploys where only app code changes.

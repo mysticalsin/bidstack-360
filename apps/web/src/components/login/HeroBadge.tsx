@@ -11,7 +11,7 @@ export function HeroBadge() {
       transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.6, ease: 'easeOut' }}
     >
       <Sparkles className="w-4 h-4 text-[rgba(30,50,90,0.8)]" />
-      <span className="text-[14px] font-normal text-[rgba(30,50,90,0.9)]">AI Bid Intelligence</span>
+      <span className="text-[14px] font-normal text-[rgba(30,50,90,0.9)]">Enterprise Bid Intelligence</span>
     </motion.div>
   );
 }

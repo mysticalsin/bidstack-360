@@ -38,6 +38,7 @@ export const crmSearchCompanies: Tool<typeof CompanySearchInput> = {
     const opportunities = await prisma.opportunity.findMany({
       where: {
         orgId: ctx.orgId,
+        deletedAt: null, // skip soft-deleted (Review)
         ...(q
           ? {
               OR: [
@@ -81,7 +82,7 @@ export const crmCreateDeal: Tool<typeof DealCreateInput> = {
     properties: {
       customer: { type: 'string', minLength: 1 },
       name: { type: 'string', minLength: 1 },
-      stage: { type: 'string', enum: Stage.options, default: 'discovery' },
+      stage: { type: 'string', enum: Stage.options, default: 's1_lead' },
       value: { type: 'number', minimum: 0, default: 0 },
       probability: { type: 'integer', minimum: 0, maximum: 100, default: 25 },
       dueDate: { type: ['string', 'null'], format: 'date' },
@@ -133,7 +134,9 @@ export const crmUpdateDeal: Tool<typeof DealUpdateInput> = {
     additionalProperties: false,
   },
   handler: async (args, ctx) => {
-    const before = await prisma.opportunity.findFirst({ where: { id: args.id, orgId: ctx.orgId } });
+    const before = await prisma.opportunity.findFirst({
+      where: { id: args.id, orgId: ctx.orgId, deletedAt: null }, // skip soft-deleted (Review)
+    });
     if (!before) throw new Error('Deal not found');
 
     const updated = await prisma.opportunity.update({
@@ -243,6 +246,7 @@ export const crmListActivities: Tool<typeof ActivityListInput> = {
     const tasks = await prisma.task.findMany({
       where: {
         orgId: ctx.orgId,
+        deletedAt: null, // skip soft-deleted (Review)
         ...(args.dealId ? { oppId: args.dealId } : {}),
         ...(args.company ? { opportunity: { customer: args.company } } : {}),
       },
@@ -277,7 +281,7 @@ export const crmCreateActivity: Tool<typeof ActivityCreateInput> = {
   },
   handler: async (args, ctx) => {
     const deal = await prisma.opportunity.findFirst({
-      where: { id: args.dealId, orgId: ctx.orgId },
+      where: { id: args.dealId, orgId: ctx.orgId, deletedAt: null }, // skip soft-deleted (Review)
     });
     if (!deal) throw new Error('Deal not found');
     const task = await prisma.task.create({
@@ -310,9 +314,15 @@ export const crmGenerateInsights: Tool<typeof GenerateInsightsInput> = {
   },
   handler: async (args, ctx) => {
     const deal = args.dealId
-      ? await prisma.opportunity.findFirst({ where: { id: args.dealId, orgId: ctx.orgId } })
+      ? await prisma.opportunity.findFirst({
+          where: { id: args.dealId, orgId: ctx.orgId, deletedAt: null }, // skip soft-deleted (Review)
+        })
       : await prisma.opportunity.findFirst({
-          where: { orgId: ctx.orgId, ...(args.company ? { customer: args.company } : {}) },
+          where: {
+            orgId: ctx.orgId,
+            deletedAt: null, // skip soft-deleted (Review)
+            ...(args.company ? { customer: args.company } : {}),
+          },
           orderBy: { updatedAt: 'desc' },
         });
 

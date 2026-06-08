@@ -38,11 +38,11 @@ export function Hero() {
           <Navbar />
 
           {/* Text Container */}
-          <div className="w-full flex flex-col items-center pt-8 px-6 text-center max-w-4xl">
+          <div className="w-full flex-1 flex flex-col items-center justify-center -mt-24 px-6 text-center max-w-4xl">
             <HeroBadge />
 
             <motion.h1
-              className="text-4xl sm:text-5xl md:text-6xl lg:text-[80px] font-normal text-[#5E6470] mb-2 tracking-tight leading-[1.05]"
+              className="text-4xl sm:text-5xl md:text-6xl lg:text-[80px] font-medium text-[#2d323c] drop-shadow-md mb-2 tracking-tight leading-[1.05]"
               {...h1Anim}
               transition={{ duration: 0.8, delay: 0.2 }}
             >
@@ -50,20 +50,24 @@ export function Hero() {
             </motion.h1>
 
             <motion.p
-              className="text-sm sm:text-base md:text-lg text-[#5E6470] opacity-80 leading-relaxed max-w-xl font-normal"
+              className="text-sm sm:text-base md:text-lg text-[#3A404D] drop-shadow-sm opacity-90 leading-relaxed max-w-xl font-normal"
               {...pAnim}
               transition={{ duration: 0.8, delay: 0.4 }}
             >
-              AI-powered RFP analysis, proposal generation, and compliance tracking — built for
-              enterprise presales teams.
+              The complete operating system for enterprise presales. Manage RFPs, generate proposals, and track compliance in one workspace.
             </motion.p>
 
             <motion.div
-              className="text-xs text-[#5E6470]/60 mt-3 font-normal"
+              className="mt-4"
               {...pAnim}
               transition={{ duration: 0.8, delay: 0.5 }}
             >
-              Created by Tony
+              <a 
+                href="https://github.com/tonywalteur" 
+                className="text-sm font-medium text-[#2d323c] drop-shadow-sm hover:text-black underline underline-offset-4 transition-colors"
+              >
+                Built by Tony Walteur
+              </a>
             </motion.div>
           </div>
 

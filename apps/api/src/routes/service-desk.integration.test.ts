@@ -289,7 +289,10 @@ describe('service-desk routes', () => {
     expect(delRes.statusCode).toBe(204);
 
     // Row still exists in DB but deletedAt is set.
-    const row = await prisma.serviceCase.findFirst({ where: { id }, select: { deletedAt: true } });
+    const row = await prisma.serviceCase.findFirst({
+      where: { id, deletedAt: { not: null } },
+      select: { deletedAt: true },
+    });
     expect(row?.deletedAt).toBeTruthy();
   });
 

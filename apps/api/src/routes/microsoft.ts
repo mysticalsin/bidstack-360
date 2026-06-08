@@ -63,7 +63,7 @@ export const microsoftRoutes: FastifyPluginAsync = async (server) => {
       body: MicrosoftConnectRequest,
       response: { 200: MicrosoftConnectResponse },
     },
-    handler: async (req, reply) => {
+    handler: async (req) => {
       const { userId, orgId } = req.auth;
       const { service } = req.body;
 
@@ -74,14 +74,15 @@ export const microsoftRoutes: FastifyPluginAsync = async (server) => {
         throw server.httpErrors.notFound('User not found');
       }
 
-      // Placeholder: in the full implementation this returns a Microsoft
-      // auth URL with the correct Graph API scope (Mail.Read or Calendars.Read).
-      const scope = service === 'email' ? 'Mail.Read' : 'Calendars.Read';
-      const placeholderUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=PLACEHOLDER&response_type=code&scope=${encodeURIComponent(
-        scope,
-      )}&redirect_uri=PLACEHOLDER&state=${userId}`;
+      if (service === 'email') {
+        throw server.httpErrors.serviceUnavailable(
+          'Use the Outlook mail OAuth connector at /api/v1/integrations/microsoft/mail/oauth/start.',
+        );
+      }
 
-      return reply.send({ authUrl: placeholderUrl });
+      throw server.httpErrors.serviceUnavailable(
+        'Microsoft calendar OAuth is not configured yet. Enable it before exposing this action.',
+      );
     },
   });
 

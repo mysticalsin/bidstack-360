@@ -1,15 +1,11 @@
 import { createHash } from 'crypto';
-import { redis } from '../redis.js';
+import { ensureRedisReady, redis } from '../redis.js';
 
 const IN_MEMORY = new Map<string, { value: string; expiresAt: number }>();
 
-function isRedisUp(): boolean {
-  return redis.status === 'ready' || redis.status === 'connect';
-}
-
 export async function cacheGet<T>(key: string): Promise<{ hit: boolean; data: T | null }> {
   try {
-    if (isRedisUp()) {
+    if (await ensureRedisReady()) {
       const raw = await redis.get(key);
       if (raw) return { hit: true, data: JSON.parse(raw) as T };
     }
@@ -28,7 +24,7 @@ export async function cacheGet<T>(key: string): Promise<{ hit: boolean; data: T 
 export async function cacheSet<T>(key: string, value: T, ttlSeconds: number): Promise<void> {
   const raw = JSON.stringify(value);
   try {
-    if (isRedisUp()) {
+    if (await ensureRedisReady()) {
       await redis.setex(key, ttlSeconds, raw);
       return;
     }
@@ -42,17 +38,31 @@ export async function cacheSet<T>(key: string, value: T, ttlSeconds: number): Pr
 function deleteInMemory(pattern: string): void {
   const prefix = pattern.replace(/\*$/, '');
   for (const key of IN_MEMORY.keys()) {
-    if (key.includes(prefix)) {
+    if (key.startsWith(prefix)) {
       IN_MEMORY.delete(key);
     }
   }
 }
 
+async function deleteRedisPattern(pattern: string): Promise<void> {
+  const batchSize = 500;
+  const maxKeys = 10_000;
+  let cursor = '0';
+  let touched = 0;
+
+  do {
+    const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', batchSize);
+    cursor = nextCursor;
+    touched += keys.length;
+    if (keys.length) await redis.del(...keys);
+    if (touched >= maxKeys) break;
+  } while (cursor !== '0');
+}
+
 export async function cacheDel(pattern: string): Promise<void> {
   try {
-    if (isRedisUp()) {
-      const keys = await redis.keys(pattern);
-      if (keys.length) await redis.del(...keys);
+    if (await ensureRedisReady()) {
+      await deleteRedisPattern(pattern);
     }
   } catch {
     // Redis may be mid-connect or unavailable; always clear fallback cache below.

@@ -15,7 +15,11 @@ import sensible from '@fastify/sensible';
 import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
 
-import { hourlyRateLimitPlugin, MAX_HOURLY } from './hourly-rate-limit.js';
+import {
+  hourlyRateLimitPlugin,
+  MAX_HOURLY,
+  mcpRateLimitFailsClosed,
+} from './hourly-rate-limit.js';
 
 // ─── Fake Redis ──────────────────────────────────────────────────────────────
 // Implements only the methods our plugin calls: pipeline().incr().expire().mget().exec().
@@ -105,14 +109,15 @@ class FailingRedis {
 
 interface ReplicaOpts {
   redis: FakeRedis | FailingRedis;
+  failClosedOnRedisError?: boolean;
 }
 
-async function buildReplica({ redis }: ReplicaOpts) {
+async function buildReplica({ redis, failClosedOnRedisError }: ReplicaOpts) {
   const server = Fastify({ logger: false });
   await server.register(sensible);
   // Cast: FakeRedis intentionally only implements the subset our plugin uses.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await server.register(hourlyRateLimitPlugin, { redis: redis as any });
+  await server.register(hourlyRateLimitPlugin, { redis: redis as any, failClosedOnRedisError });
   server.post('/mcp', async () => ({ ok: true }));
   await server.ready();
   return server;
@@ -186,12 +191,9 @@ describe('mcp hourly rate-limit (Redis-backed)', () => {
     }
   });
 
-  it('fails open when Redis is unreachable', async () => {
-    // Operations runbook: a Redis outage temporarily disables the hourly
-    // window guard. The 60/min @fastify/rate-limit (also Redis-backed but
-    // with skipOnError) covers the short window. Failing closed would 503
-    // every MCP call during a Redis incident, which is worse than a brief
-    // enforcement gap.
+  it('fails open by default outside production when Redis is unreachable', async () => {
+    // Local/test runs should not require Redis just to exercise MCP tool
+    // contracts. Production flips this default through mcpRateLimitFailsClosed.
     const replica = await buildReplica({ redis: new FailingRedis() });
     try {
       const res = await callMcp(replica, 'any-token');
@@ -199,6 +201,41 @@ describe('mcp hourly rate-limit (Redis-backed)', () => {
     } finally {
       await replica.close();
     }
+  });
+
+  it('fails closed when enterprise deployments require shared rate-limit enforcement', async () => {
+    const replica = await buildReplica({
+      redis: new FailingRedis(),
+      failClosedOnRedisError: true,
+    });
+    try {
+      const res = await callMcp(replica, 'any-token');
+      expect(res.statusCode).toBe(503);
+      expect(res.json()).toMatchObject({
+        error: 'Service Unavailable',
+        message: 'MCP rate limiter unavailable',
+      });
+    } finally {
+      await replica.close();
+    }
+  });
+
+  it('defaults to fail-closed in production and allows explicit override', () => {
+    expect(mcpRateLimitFailsClosed({ NODE_ENV: 'production' })).toBe(true);
+    expect(mcpRateLimitFailsClosed({ NODE_ENV: 'test' })).toBe(false);
+    expect(mcpRateLimitFailsClosed({ NODE_ENV: 'development' })).toBe(false);
+    expect(
+      mcpRateLimitFailsClosed({
+        NODE_ENV: 'development',
+        MCP_RATE_LIMIT_FAIL_CLOSED: 'true',
+      }),
+    ).toBe(true);
+    expect(
+      mcpRateLimitFailsClosed({
+        NODE_ENV: 'production',
+        MCP_RATE_LIMIT_FAIL_CLOSED: 'false',
+      }),
+    ).toBe(false);
   });
 
   it('only enforces on /mcp paths, leaving /health alone', async () => {

@@ -140,12 +140,14 @@ describeDb('MCP tools', () => {
     expect(audit).toBeTruthy();
   });
 
-  it('proposal.draft returns a stub markdown', async () => {
+  it('proposal.draft returns grounded markdown', async () => {
     const out = (await tools['proposal.draft'].handler(
       { oppId, section: 'executive_summary' as const, tone: 'consultative' as const },
       ctx,
     )) as { markdown: string };
     expect(typeof out.markdown).toBe('string');
+    expect(out.markdown).toContain('Source-grounded MCP draft');
+    expect(out.markdown).not.toMatch(/stub|DUST_API_KEY|ANTHROPIC_API_KEY/i);
   });
 
   it('leads.create creates a lead and writes audit_log', async () => {

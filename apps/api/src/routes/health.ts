@@ -26,7 +26,7 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 
-import { redis } from '../redis.js';
+import { pingRedis } from '../redis.js';
 
 // ── Health schemas ──────────────────────────────────────────────────────────
 
@@ -207,13 +207,7 @@ async function probeCoreHealth(): Promise<z.infer<typeof CoreHealthSchema>> {
     db = false;
   }
 
-  let redisOk: boolean;
-  try {
-    await redis.ping();
-    redisOk = true;
-  } catch {
-    redisOk = false;
-  }
+  const redisOk = await pingRedis();
 
   return { ok: db && redisOk, db, redis: redisOk };
 }

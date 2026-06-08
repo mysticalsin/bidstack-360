@@ -24,6 +24,7 @@ export const contactsList: Tool<typeof Input> = {
     const items = await prisma.contact.findMany({
       where: {
         orgId: ctx.orgId,
+        deletedAt: null, // never surface soft-deleted rows to agents (Review)
         ...(args.customer ? { customer: args.customer } : {}),
       },
       orderBy: { createdAt: 'desc' },
@@ -34,8 +35,9 @@ export const contactsList: Tool<typeof Input> = {
       customer: c.customer,
       name: c.name,
       role: c.role,
-      email: c.email,
-      phone: c.phone,
+      // Honor the per-contact AI opt-out — PII must not reach AI agents. (Review.)
+      email: c.aiOptOut ? null : c.email,
+      phone: c.aiOptOut ? null : c.phone,
       influence: c.influence,
       sentiment: c.sentiment,
       createdAt: c.createdAt.toISOString(),

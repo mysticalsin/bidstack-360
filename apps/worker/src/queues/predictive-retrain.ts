@@ -59,7 +59,7 @@ export async function enqueueRetrain(
     `retrain:${orgId}:${entityType}`,
     { orgId, entityType },
     {
-      jobId: `retrain:${orgId}:${entityType}:${Date.now()}`,
+      jobId: `retrain-${orgId}-${entityType}-${Date.now()}`,
     },
   );
   return job.id;

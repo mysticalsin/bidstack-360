@@ -19,8 +19,12 @@ export async function mintNextCode(tx: Prisma.TransactionClient, orgId: string):
   // Reads inside the active transaction so a concurrent create's row is
   // visible to whichever attempt wins. Unique violation on collision is
   // caught by the caller's bounded retry loop.
+  // NB: do NOT filter deletedAt here. The unique key is (orgId, code) and ignores
+  // soft-delete, so a soft-deleted row still owns its code. Excluding it would
+  // re-mint that code, collide (P2002), and exhaust the retry loop — permanently
+  // breaking creation after the highest-coded opp is deleted. (Review finding.)
   const last = await tx.opportunity.findFirst({
-    where: { orgId, code: { startsWith: 'OP-' }, deletedAt: null },
+    where: { orgId, code: { startsWith: 'OP-' } },
     orderBy: { code: 'desc' },
     select: { code: true },
   });

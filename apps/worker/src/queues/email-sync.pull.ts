@@ -6,7 +6,7 @@
  */
 import type pino from 'pino';
 
-import { prisma } from '@bidstack/db';
+import { prisma, EmailProvider } from '@bidstack/db';
 
 import { getAccessToken, RateLimitError } from './email-sync.helpers.js';
 
@@ -101,8 +101,7 @@ export async function pullDelta(
           orgId: params.orgId,
           userId: params.userId,
           integrationTokenId: params.integrationTokenId,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          provider: 'OUTLOOK' as any,
+          provider: EmailProvider.OUTLOOK,
           externalMessageId: msg.id,
           threadId: msg.conversationId ?? null,
           fromEmail,

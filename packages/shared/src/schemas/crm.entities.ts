@@ -53,6 +53,7 @@ export const CompanyStrategicIntel = z.object({
   hiringSignals: z.array(CompanyStrategicSignal).default([]),
   leadershipSignals: z.array(CompanyStrategicSignal).default([]),
   revenueSignals: z.array(CompanyStrategicSignal).default([]),
+  newsSignals: z.array(CompanyStrategicSignal).default([]),
   summary: z.string().min(1),
   limitations: z.array(z.string()).default([]),
   signals: z.array(CompanyStrategicSignal).default([]),

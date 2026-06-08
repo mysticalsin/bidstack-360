@@ -40,6 +40,12 @@ describe('crm dashboard routes', () => {
     expect(body.companies).toEqual(expect.any(Array));
     expect(body.releaseScore).toEqual(expect.any(Object));
     expect(body.generatedAt).toEqual(expect.any(String));
+    expect(body.activities.length).toBeLessThanOrEqual(12);
+    expect(body.cockpit.risks.length).toBeLessThanOrEqual(6);
+    expect(body.cockpit.compliance.length).toBeLessThanOrEqual(6);
+    expect(new Set(body.cockpit.risks.map((risk: { title: string }) => risk.title)).size).toBe(
+      body.cockpit.risks.length,
+    );
   });
 
   skipIfNoDb(

@@ -30,6 +30,7 @@ export const opportunitiesGet: Tool<typeof Input> = {
     const opp = await prisma.opportunity.findFirst({
       where: {
         orgId: ctx.orgId,
+        deletedAt: null, // skip soft-deleted (Review)
         ...(args.id ? { id: args.id } : { code: args.code }),
       },
       include: {

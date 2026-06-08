@@ -28,6 +28,7 @@ type Cleanup = {
   rfpOrchestrations: string[];
   complianceMatrixRows: string[];
   requirements: string[];
+  reviewIssues: string[];
   proposals: string[];
   /** AuditLog PK is BigInt (autoincrement). */
   auditLogs: bigint[];
@@ -59,6 +60,7 @@ export function makeRfpTestContext() {
       rfpOrchestrations: [],
       complianceMatrixRows: [],
       requirements: [],
+      reviewIssues: [],
       proposals: [],
       auditLogs: [],
     },
@@ -123,6 +125,12 @@ export function makeRfpTestContext() {
       if (ctx.cleanup.complianceMatrixRows.length > 0) {
         await prisma.complianceMatrixRow.deleteMany({
           where: { id: { in: ctx.cleanup.complianceMatrixRows } },
+        });
+      }
+      // ReviewIssue references opportunity + requirement — delete before both.
+      if (ctx.cleanup.reviewIssues.length > 0) {
+        await prisma.reviewIssue.deleteMany({
+          where: { id: { in: ctx.cleanup.reviewIssues } },
         });
       }
       if (ctx.cleanup.requirements.length > 0) {
@@ -298,6 +306,111 @@ export function makeRfpTestContext() {
     return { proposal, opp };
   }
 
+  /**
+   * Create a proposal that is wired to a real RFP orchestration sitting at the
+   * final human-approval gate (state='awaiting_approval', qa_review completed,
+   * proposalId linked) — the state RFP-GATE-001 requires before approval.
+   * Override orchestrationState / completedPhases to exercise the negative paths.
+   */
+  async function createApprovableProposal(
+    opts: {
+      humanReviewRequired?: boolean;
+      orchestrationState?: string;
+      completedPhases?: string[];
+      withOrchestration?: boolean;
+    } = {},
+  ) {
+    const opp = await createOpportunity('approve-gate');
+    const file = await createFile();
+
+    const bidDoc = await prisma.bidDocument.create({
+      data: {
+        orgId: ctx.orgId!,
+        opportunityId: opp.id,
+        title: file.name,
+        documentType: 'rfp',
+        status: 'intake',
+        source: 'upload',
+      },
+    });
+    ctx.cleanup.bidDocuments.push(bidDoc.id);
+
+    const docVersion = await prisma.documentVersion.create({
+      data: {
+        orgId: ctx.orgId!,
+        bidDocumentId: bidDoc.id,
+        versionNo: 1,
+        fileAttachmentId: file.id,
+        storageKey: file.storageKey,
+        contentType: file.contentType,
+        bytes: file.bytes,
+        extractionStatus: 'queued',
+        ocrStatus: 'queued',
+      },
+    });
+    ctx.cleanup.documentVersions.push(docVersion.id);
+
+    const proposal = await prisma.proposal.create({
+      data: {
+        orgId: ctx.orgId!,
+        opportunityId: opp.id,
+        name: `RFP Gate Proposal ${randomUUID().slice(0, 8)}`,
+        status: 'review',
+        humanReviewRequired: opts.humanReviewRequired ?? true,
+      },
+    });
+    ctx.cleanup.proposals.push(proposal.id);
+
+    let orch: { id: string } | null = null;
+    if (opts.withOrchestration ?? true) {
+      orch = await prisma.rfpOrchestration.create({
+        data: {
+          orgId: ctx.orgId!,
+          rfpRequestId: opp.id,
+          opportunityId: opp.id,
+          documentVersionId: docVersion.id,
+          proposalId: proposal.id,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma enum cast for test fixture
+          state: (opts.orchestrationState ?? 'awaiting_approval') as any,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma enum array cast for test fixture
+          completedPhases: (opts.completedPhases ?? ['qa_review']) as any,
+          startedByUserId: ctx.userId ?? undefined,
+        },
+        select: { id: true },
+      });
+      ctx.cleanup.rfpOrchestrations.push(orch.id);
+    }
+
+    return { opp, file, bidDoc, docVersion, proposal, orch };
+  }
+
+  /**
+   * Create a ReviewIssue blocker (defaults open/high). Pass `proposalId` to scope
+   * it to a proposal's run — the approval gate reads blockers by proposalId.
+   */
+  async function createReviewIssue(
+    opportunityId: string,
+    opts: { severity?: string; status?: string; category?: string; proposalId?: string } = {},
+  ) {
+    const issue = await prisma.reviewIssue.create({
+      data: {
+        orgId: ctx.orgId!,
+        opportunityId,
+        proposalId: opts.proposalId ?? null,
+        category: opts.category ?? 'rfp-review:legal',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma enum cast for test fixture
+        severity: (opts.severity ?? 'high') as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma enum cast for test fixture
+        status: (opts.status ?? 'open') as any,
+        title: `Test blocker ${randomUUID().slice(0, 8)}`,
+        description: 'Integration-test review issue',
+      },
+      select: { id: true },
+    });
+    ctx.cleanup.reviewIssues.push(issue.id);
+    return issue;
+  }
+
   return {
     ctx,
     skipIfNoDb,
@@ -306,5 +419,7 @@ export function makeRfpTestContext() {
     createOrchestrationFixture,
     createForeignOpportunity,
     createProposal,
+    createApprovableProposal,
+    createReviewIssue,
   };
 }

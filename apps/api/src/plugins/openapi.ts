@@ -22,7 +22,7 @@ import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import fp from 'fastify-plugin';
 
-import { config } from '../config.js';
+import { config } from '../env.js';
 
 const openapiPluginImpl: FastifyPluginAsync = async (server) => {
   // Always register swagger (spec generation). The spec endpoint is only

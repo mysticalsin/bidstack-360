@@ -20,6 +20,7 @@ import { crmWidgetRoutes } from './routes/crm/widgets.js';
 import { crmSummaryRoutes } from './routes/crm/summary.js';
 import { dustRoutes } from './routes/dust-integration.js';
 import { dustCredentialsRoutes } from './routes/dust-credentials.routes.js';
+import { agentProviderCredentialsRoutes } from './routes/agent-provider-credentials.routes.js';
 import { exchangeRatesRoutes } from './routes/exchange-rates.js';
 import { filesRoutes } from './routes/files.js';
 import { invoicesRoutes } from './routes/invoices.js';
@@ -102,6 +103,7 @@ import { csRoutes } from './routes/cs.js';
 import { publicNpsRoutes } from './routes/public-nps.js';
 // Wave 9 — RFP pipeline HTTP endpoints (upload, SSE stream, autofill, approval gate)
 import { rfpPipelineRoutes } from './routes/rfp-pipeline.js';
+import { competitorRoutes } from './routes/competitors.js';
 // Wave 10 — Operational monitoring (queue depths, embedding failure rate, alerts)
 import { monitoringRoutes } from './routes/monitoring.js';
 // Data migration: CSV import, cancel/undo destructive operations
@@ -133,6 +135,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(filesRoutes, { prefix: '/api/v1' });
   await server.register(dustRoutes, { prefix: '/api/v1/integrations' });
   await server.register(dustCredentialsRoutes, { prefix: '/api/v1/integrations' });
+  await server.register(agentProviderCredentialsRoutes, { prefix: '/api/v1/integrations' });
   await server.register(erpRoutes, { prefix: '/api/v1/integrations' });
 
   // Backward-compatible redirects: /api/v1/integrations/odoo/* → /api/v1/integrations/erp/*
@@ -241,6 +244,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
 
   // Wave 9 — RFP pipeline: upload, SSE progress stream, matrix autofill, approval gate
   await server.register(rfpPipelineRoutes, { prefix: '/api/v1' });
+  await server.register(competitorRoutes, { prefix: '/api/v1' });
 
   // Wave 10 — Operational monitoring: live queue depths, embedding failure rate, alert conditions
   await server.register(monitoringRoutes, { prefix: '/api/v1' });

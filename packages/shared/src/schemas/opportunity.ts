@@ -48,9 +48,15 @@ export const INDUSTRIES = [
 export const Industry = z.string().max(100);
 export type Industry = string;
 
+export const OpportunityCode = z.string().min(1).max(64);
+export const CanonicalOpportunityCode = z.string().regex(/^OP-\d{4}$/);
+
 export const Opportunity = z.object({
   id: z.string().uuid(),
-  code: z.string().regex(/^OP-\d{4}$/),
+  // Existing CRM data may carry legacy/RFP/test identifiers. Keep reads broad
+  // so dirty historical data cannot crash list/detail responses; create/import
+  // schemas below still enforce the canonical OP-NNNN format for supplied codes.
+  code: OpportunityCode,
   customer: z.string().min(1).max(255),
   name: z.string().min(1).max(255),
   stage: z.string().nullable(),
@@ -81,10 +87,7 @@ export const OpportunityCreate = Opportunity.omit({
   territoryName: true,
   pipelineStage: true,
 }).extend({
-  code: z
-    .string()
-    .regex(/^OP-\d{4}$/)
-    .optional(),
+  code: CanonicalOpportunityCode.optional(),
   stage: z.string().nullable().optional(),
   pipelineStageId: z.string().uuid().optional().nullable(),
 });
@@ -108,10 +111,7 @@ export const OpportunityImport = z.object({
   opportunities: z
     .array(
       OpportunityCreate.omit({ code: true }).extend({
-        code: z
-          .string()
-          .regex(/^OP-\d{4}$/)
-          .optional(),
+        code: CanonicalOpportunityCode.optional(),
       }),
     )
     .min(1)

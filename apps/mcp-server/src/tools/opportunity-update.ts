@@ -5,13 +5,15 @@ import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 import type { Tool } from './index.js';
 
 const Stage = z.enum([
-  'discovery',
-  'qualified',
-  'proposal',
-  'negotiation',
+  's1_lead',
+  's1_ongoing',
+  's2_sent',
+  's3_technical_iteration',
+  's4_negotiation',
   'closed_won',
   'closed_lost',
 ]);
+const STAGE_OPTIONS = [...Stage.options];
 
 const Patch = z.object({
   stage: Stage.optional(),
@@ -42,14 +44,7 @@ export const opportunityUpdate: Tool<typeof Input> = {
         properties: {
           stage: {
             type: 'string',
-            enum: [
-              'discovery',
-              'qualified',
-              'proposal',
-              'negotiation',
-              'closed_won',
-              'closed_lost',
-            ],
+            enum: STAGE_OPTIONS,
           },
           probability: { type: 'integer', minimum: 0, maximum: 100 },
           value: { type: 'number', minimum: 0 },
@@ -64,7 +59,7 @@ export const opportunityUpdate: Tool<typeof Input> = {
   },
   handler: async (args, ctx) => {
     const before = await prisma.opportunity.findFirst({
-      where: { id: args.id, orgId: ctx.orgId },
+      where: { id: args.id, orgId: ctx.orgId, deletedAt: null }, // skip soft-deleted (Review)
     });
     if (!before) throw new Error('Opportunity not found');
 

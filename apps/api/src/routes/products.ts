@@ -139,6 +139,7 @@ export const productsRoutes: FastifyPluginAsyncZod = async (server) => {
           listPriceMicros: p.listPriceMicros.toString(),
           currency: p.currency,
           active: p.active,
+          imageUrl: p.imageUrl,
           createdAt: p.createdAt.toISOString(),
           updatedAt: p.updatedAt.toISOString(),
         })),
@@ -171,6 +172,7 @@ export const productsRoutes: FastifyPluginAsyncZod = async (server) => {
         listPriceMicros: p.listPriceMicros.toString(),
         currency: p.currency,
         active: p.active,
+        imageUrl: p.imageUrl,
         createdAt: p.createdAt.toISOString(),
         updatedAt: p.updatedAt.toISOString(),
       };
@@ -204,6 +206,7 @@ export const productsRoutes: FastifyPluginAsyncZod = async (server) => {
               listPriceMicros: BigInt(body.listPriceMicros),
               currency: normalizeCurrency(body.currency),
               active: body.active,
+              imageUrl: body.imageUrl ?? null,
             },
             include: { category: { select: { name: true } } },
           });
@@ -221,6 +224,7 @@ export const productsRoutes: FastifyPluginAsyncZod = async (server) => {
                 listPriceMicros: row.listPriceMicros.toString(),
                 currency: row.currency,
                 active: row.active,
+                imageUrl: row.imageUrl,
               },
             },
           });
@@ -241,6 +245,7 @@ export const productsRoutes: FastifyPluginAsyncZod = async (server) => {
         listPriceMicros: created.listPriceMicros.toString(),
         currency: created.currency,
         active: created.active,
+        imageUrl: created.imageUrl,
         createdAt: created.createdAt.toISOString(),
         updatedAt: created.updatedAt.toISOString(),
       });
@@ -275,6 +280,7 @@ export const productsRoutes: FastifyPluginAsyncZod = async (server) => {
         ...(b.listPriceMicros !== undefined ? { listPriceMicros: BigInt(b.listPriceMicros) } : {}),
         ...(b.currency !== undefined ? { currency: normalizeCurrency(b.currency) } : {}),
         ...(b.active !== undefined ? { active: b.active } : {}),
+        ...(b.imageUrl !== undefined ? { imageUrl: b.imageUrl } : {}),
       };
       let updated;
       try {
@@ -299,6 +305,7 @@ export const productsRoutes: FastifyPluginAsyncZod = async (server) => {
                   listPriceMicros: existing.listPriceMicros.toString(),
                   currency: existing.currency,
                   active: existing.active,
+                  imageUrl: existing.imageUrl,
                 },
                 after: {
                   sku: row.sku,
@@ -307,6 +314,7 @@ export const productsRoutes: FastifyPluginAsyncZod = async (server) => {
                   listPriceMicros: row.listPriceMicros.toString(),
                   currency: row.currency,
                   active: row.active,
+                  imageUrl: row.imageUrl,
                 },
               },
             },
@@ -328,6 +336,7 @@ export const productsRoutes: FastifyPluginAsyncZod = async (server) => {
         listPriceMicros: updated.listPriceMicros.toString(),
         currency: updated.currency,
         active: updated.active,
+        imageUrl: updated.imageUrl,
         createdAt: updated.createdAt.toISOString(),
         updatedAt: updated.updatedAt.toISOString(),
       };

@@ -22,7 +22,7 @@ export const leadsGet: Tool<typeof Input> = {
   },
   handler: async (args, ctx) => {
     const lead = await prisma.lead.findFirst({
-      where: { id: args.id, orgId: ctx.orgId },
+      where: { id: args.id, orgId: ctx.orgId, deletedAt: null }, // skip soft-deleted (Review)
       include: { owner: true },
     });
     if (!lead) throw new Error('Lead not found');

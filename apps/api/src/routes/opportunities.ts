@@ -171,11 +171,14 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         },
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
-      // Increment view count — awaited so it actually lands (Fastify
-      // cancels dangling promises when the reply is sent).
-      await prisma.opportunity.update({
-        where: { id: opp.id },
+      // View counts are telemetry, not part of the read contract. Keep the
+      // detail page fast; a failed counter bump must not turn a valid read into
+      // a 500.
+      void prisma.opportunity.updateMany({
+        where: { id: opp.id, orgId: req.auth.orgId },
         data: { viewCount: { increment: 1 } },
+      }).catch((err: unknown) => {
+        req.log.warn({ err, opportunityId: opp.id }, 'Failed to update opportunity view count');
       });
       const customFieldValues = await prisma.customFieldValue.findMany({
         where: { orgId: req.auth.orgId, entityType: 'opportunity', entityId: opp.id },
@@ -190,6 +193,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
   server.patch(
     '/opportunities/:id',
     {
+      preHandler: [server.requirePermission('opportunities:write')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: OpportunityPatch,
@@ -256,7 +260,19 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
           }
         } else {
           const ps = await prisma.pipelineStage.findFirst({
-            where: { id: req.body.pipelineStageId, orgId: req.auth.orgId, deletedAt: null },
+            where: {
+              id: req.body.pipelineStageId,
+              orgId: req.auth.orgId,
+              archived: false,
+              deletedAt: null,
+              pipeline: {
+                is: {
+                  orgId: req.auth.orgId,
+                  archived: false,
+                  deletedAt: null,
+                },
+              },
+            },
             select: { key: true },
           });
           if (!ps) throw server.httpErrors.badRequest('Invalid pipeline stage');
@@ -353,6 +369,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/opportunities/:id',
     {
+      preHandler: [server.requirePermission('opportunities:write')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 204: z.null() },

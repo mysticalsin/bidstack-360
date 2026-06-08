@@ -9,6 +9,7 @@ import {
   AgentRunCreate,
   AgentListResult,
   AgentRunListResult,
+  AgentProviderStatusResult,
   RFP_RESPONSE_PHASES,
   RFP_AGENT_TEMPLATES,
   RfpAgentTemplateListResult,
@@ -24,7 +25,13 @@ import {
   provisionRfpTemplate,
   runAgent,
   listAgentRuns,
+  cancelAgentRun,
+  retryAgentRun,
+  ActiveAgentRunError,
+  AgentRunNotCancellableError,
+  AgentRunNotRetryableError,
 } from '../services/agents/agents.service.js';
+import { getAgentProviderStatus } from '../services/agents/agents.helpers.js';
 
 export const agentsRoutes: FastifyPluginAsyncZod = async (server) => {
   // GET /api/v1/agents
@@ -60,6 +67,19 @@ export const agentsRoutes: FastifyPluginAsyncZod = async (server) => {
       reply.status(201);
       return item;
     },
+  );
+
+  // GET /api/v1/agents/provider-status
+  server.get(
+    '/agents/provider-status',
+    {
+      preHandler: server.requirePermission('agents:read'),
+      config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
+      schema: {
+        response: { 200: AgentProviderStatusResult },
+      },
+    },
+    async (req) => getAgentProviderStatus(req.auth.orgId),
   );
 
   // GET /api/v1/agents/rfp-templates
@@ -165,12 +185,22 @@ export const agentsRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const item = await runAgent(
-        req.auth.orgId,
-        req.auth.userId,
-        req.params.id,
-        (req.body.input ?? {}) as Record<string, unknown>,
-      );
+      let item;
+      try {
+        item = await runAgent(
+          req.auth.orgId,
+          req.auth.userId,
+          req.params.id,
+          (req.body.input ?? {}) as Record<string, unknown>,
+        );
+      } catch (err) {
+        if (err instanceof ActiveAgentRunError) {
+          throw server.httpErrors.conflict(
+            `Agent already has an active ${err.status} run (${err.activeRunId})`,
+          );
+        }
+        throw err;
+      }
       if (!item) throw server.httpErrors.notFound('Agent not found');
       return item;
     },
@@ -217,6 +247,61 @@ export const agentsRoutes: FastifyPluginAsyncZod = async (server) => {
         limit: req.query.limit,
         cursor: req.query.cursor,
       });
+    },
+  );
+
+  // POST /api/v1/agent-runs/:id/cancel
+  server.post(
+    '/agent-runs/:id/cancel',
+    {
+      preHandler: server.requirePermission('agents:write'),
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: { 200: AgentRun },
+      },
+    },
+    async (req) => {
+      try {
+        const item = await cancelAgentRun(req.auth.orgId, req.auth.userId, req.params.id);
+        if (!item) throw server.httpErrors.notFound('Agent run not found');
+        return item;
+      } catch (err) {
+        if (err instanceof AgentRunNotCancellableError) {
+          throw server.httpErrors.conflict(`Agent run cannot be cancelled from ${err.status}`);
+        }
+        throw err;
+      }
+    },
+  );
+
+  // POST /api/v1/agent-runs/:id/retry
+  server.post(
+    '/agent-runs/:id/retry',
+    {
+      preHandler: server.requirePermission('agents:write'),
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: { 200: AgentRun },
+      },
+    },
+    async (req) => {
+      try {
+        const item = await retryAgentRun(req.auth.orgId, req.auth.userId, req.params.id);
+        if (!item) throw server.httpErrors.notFound('Agent run not found');
+        return item;
+      } catch (err) {
+        if (err instanceof AgentRunNotRetryableError) {
+          throw server.httpErrors.conflict(`Agent run cannot be retried from ${err.status}`);
+        }
+        if (err instanceof ActiveAgentRunError) {
+          throw server.httpErrors.conflict(
+            `Agent already has an active ${err.status} run (${err.activeRunId})`,
+          );
+        }
+        throw err;
+      }
     },
   );
 };

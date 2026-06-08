@@ -17,6 +17,8 @@ import {
   serializeCompany,
 } from './dashboard.service.js';
 
+const COMPANY_ENRICHMENT_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 export type RouteLog = {
   warn: (obj: unknown, msg?: string) => void;
   info: (obj: unknown, msg?: string) => void;
@@ -125,7 +127,7 @@ export async function upsertVerifiedCompanyEnrichment({
       confidenceBps,
       sourceAttribution: sourceAttribution as Prisma.InputJsonValue,
       providerMetadata,
-      cacheExpiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+      cacheExpiresAt: new Date(now.getTime() + COMPANY_ENRICHMENT_CACHE_TTL_MS),
     },
     update: {
       legalName,
@@ -143,7 +145,7 @@ export async function upsertVerifiedCompanyEnrichment({
       confidenceBps,
       sourceAttribution: sourceAttribution as Prisma.InputJsonValue,
       providerMetadata,
-      cacheExpiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+      cacheExpiresAt: new Date(now.getTime() + COMPANY_ENRICHMENT_CACHE_TTL_MS),
     },
   });
 

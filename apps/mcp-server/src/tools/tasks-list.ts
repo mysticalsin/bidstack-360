@@ -34,6 +34,7 @@ export const tasksList: Tool<typeof Input> = {
     const items = await prisma.task.findMany({
       where: {
         orgId: ctx.orgId,
+        deletedAt: null, // skip soft-deleted (Review)
         ...(args.oppId ? { oppId: args.oppId } : {}),
         ...(args.status ? { status: args.status as PrismaTaskStatus } : {}),
         ...(assignee ? { assigneeId: assignee.id } : {}),

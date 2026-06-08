@@ -56,7 +56,7 @@ export const IntegrationSetupGuide = z.object({
   }),
   rest: z.object({
     baseUrl: z.string(),
-    authHeader: z.literal('Authorization: Bearer <BIDSTACK_API_KEY>'),
+    authHeader: z.literal('x-api-key: <BIDSTACK_API_KEY>'),
     recommendedScopes: z.array(z.string()),
   }),
   webhooks: z.object({

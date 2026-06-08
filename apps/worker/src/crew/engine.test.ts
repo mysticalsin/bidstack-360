@@ -207,6 +207,32 @@ describe('kickoff — sequential', () => {
     expect(res.results.find((r) => r.taskId === 't2')?.ok).toBe(true);
     expect(res.finalOutput).toBe('out:t2');
   });
+
+  it('honors an already-aborted cancellation signal before running tasks', async () => {
+    const ctl = new AbortController();
+    ctl.abort();
+    const { executor, prompts } = recordingExecutor();
+
+    await expect(kickoff(crew, { topic: 'x' }, executor, { signal: ctl.signal })).rejects.toMatchObject(
+      { name: 'AbortError' },
+    );
+    expect(Object.keys(prompts)).toHaveLength(0);
+  });
+
+  it('passes the cancellation signal to the executor', async () => {
+    const ctl = new AbortController();
+    const seenSignals: Array<AbortSignal | undefined> = [];
+    const executor: AgentExecutor = {
+      run: async ({ task, signal }) => {
+        seenSignals.push(signal);
+        return { output: `out:${task.id}`, ok: true };
+      },
+    };
+
+    await kickoff(crew, { topic: 'x' }, executor, { signal: ctl.signal });
+
+    expect(seenSignals).toEqual([ctl.signal, ctl.signal]);
+  });
 });
 
 describe('kickoff — hierarchical', () => {

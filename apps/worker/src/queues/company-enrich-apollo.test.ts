@@ -4,9 +4,9 @@ import {
   ApolloEnrichJobData,
   callApolloEnrich,
   callApolloMcpCompanyIntel,
-  callApolloPeopleEnrich,
   callApolloPeopleSearch,
   createApolloEnrichJobSignature,
+  fetchCompanyNewsCrossCheck,
   mapApolloOrganization,
   normalizeName,
   sanitizeApolloPayload,
@@ -79,6 +79,21 @@ describe('mapApolloOrganization', () => {
         annual_revenue: 42_000_000,
         intent_topics: [{ topic: 'cloud migration' }, { name: 'managed security' }],
         technologies: [{ name: 'Salesforce' }, 'Snowflake'],
+        latest_news: [
+          {
+            title: 'Acme opens Brazil delivery hub',
+            summary: 'Expansion into Sao Paulo adds regional delivery capacity.',
+            url: 'https://news.example/acme-brazil',
+            published_at: '2026-05-28T10:00:00Z',
+          },
+        ],
+        funding_events: [
+          {
+            round: 'Strategic investment',
+            amount: '$40M',
+            date: '2026-05-20',
+          },
+        ],
         senior_leadership: [
           {
             name: 'Jane Doe',
@@ -93,6 +108,18 @@ describe('mapApolloOrganization', () => {
         syncMode: 'apollo_mcp_get_company',
         creditPolicy: 'free_search',
         now: new Date('2026-05-30T12:00:00Z'),
+        newsCrossCheck: {
+          articles: [
+            {
+              title: 'Acme accelerates Latin America expansion',
+              summary: 'A second source reports investment in Brazil and Colombia delivery.',
+              url: 'https://wire.example/acme-latam',
+              seendate: '2026-05-29T08:00:00Z',
+              domain: 'wire.example',
+              contact_email: 'editor@example.com',
+            },
+          ],
+        },
         jobPostings: {
           items: [
             {
@@ -113,7 +140,15 @@ describe('mapApolloOrganization', () => {
       'Director of Enterprise Architecture',
     );
     expect(mapped.strategicIntel.leadershipSignals[0]?.label).toContain('Chief Financial Officer');
-    expect(JSON.stringify(mapped.strategicIntel)).not.toMatch(/jane@example|555/);
+    expect(mapped.strategicIntel.newsSignals.map((signal) => signal.label)).toEqual([
+      'Acme opens Brazil delivery hub',
+      'Strategic investment',
+      'Acme accelerates Latin America expansion',
+    ]);
+    expect(mapped.strategicIntel.newsSignals.at(-1)?.source).toBe('gdelt_news');
+    expect(mapped.strategicIntel.signals.some((signal) => signal.kind === 'news')).toBe(true);
+    expect(mapped.strategicIntel.signals.some((signal) => signal.kind === 'funding')).toBe(true);
+    expect(JSON.stringify(mapped.strategicIntel)).not.toMatch(/jane@example|editor@example|555/);
     expect(mapped.technicalStack.map((item) => item.name)).toEqual(['Salesforce', 'Snowflake']);
   });
 
@@ -361,56 +396,60 @@ describe('callApolloPeopleSearch', () => {
   });
 });
 
-describe('callApolloPeopleEnrich', () => {
-  it('uses People Enrichment only with contact reveal and waterfall flags forced off', async () => {
+describe('fetchCompanyNewsCrossCheck', () => {
+  it('queries public news for strategic company signals and strips contact channels', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
-          person: {
-            id: 'person-1',
-            name: 'Jane Doe',
-            title: 'Chief Revenue Officer',
-          },
+          articles: [
+            {
+              title: 'Acme announces $40M investment',
+              url: 'https://news.example/acme',
+              seendate: '2026-05-29T08:00:00Z',
+              sourcecountry: 'US',
+              editor_email: 'editor@example.com',
+            },
+          ],
         }),
         { status: 200, headers: { 'content-type': 'application/json' } },
       ),
     );
 
-    const result = await callApolloPeopleEnrich({
-      apiKey: 'test-key',
-      domain: 'acme.com',
-      personId: 'person-1',
-      name: 'Jane Doe',
+    const result = await fetchCompanyNewsCrossCheck({
+      companyName: 'Acme',
+      domain: 'www.acme.com',
       fetchImpl: fetchMock as unknown as typeof fetch,
     });
 
-    expect(result.person).toEqual(
-      expect.objectContaining({ id: 'person-1', title: 'Chief Revenue Officer' }),
-    );
-    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(result.source).toBe('gdelt_news');
+    expect(result.articles).toEqual([
+      {
+        title: 'Acme announces $40M investment',
+        url: 'https://news.example/acme',
+        seendate: '2026-05-29T08:00:00Z',
+        sourcecountry: 'US',
+      },
+    ]);
+    const [url] = fetchMock.mock.calls[0]!;
     const requestUrl = new URL(String(url));
-    expect(requestUrl.toString()).toContain('https://api.apollo.io/api/v1/people/match?');
-    expect(requestUrl.searchParams.get('domain')).toBe('acme.com');
-    expect(requestUrl.searchParams.get('id')).toBe('person-1');
-    expect(requestUrl.searchParams.get('reveal_personal_emails')).toBe('false');
-    expect(requestUrl.searchParams.get('reveal_phone_number')).toBe('false');
-    expect(requestUrl.searchParams.get('run_waterfall_email')).toBe('false');
-    expect(requestUrl.searchParams.get('run_waterfall_phone')).toBe('false');
-    expect(init.method).toBe('POST');
+    expect(requestUrl.origin + requestUrl.pathname).toBe(
+      'https://api.gdeltproject.org/api/v2/doc/doc',
+    );
+    expect(requestUrl.searchParams.get('mode')).toBe('ArtList');
+    expect(requestUrl.searchParams.get('format')).toBe('json');
+    expect(requestUrl.searchParams.get('query')).toContain('"Acme"');
+    expect(requestUrl.searchParams.get('query')).toContain('"acme.com"');
   });
 
-  it('requires an identifier before using credit-sensitive people enrichment', async () => {
-    await expect(
-      callApolloPeopleEnrich({
-        apiKey: 'test-key',
-        domain: 'acme.com',
-      }),
-    ).rejects.toThrow(/requires personId, name, or linkedinUrl/);
+  it('fails loudly when the company name is missing', async () => {
+    await expect(fetchCompanyNewsCrossCheck({ companyName: '   ' })).rejects.toThrow(
+      /requires a company name/,
+    );
   });
 });
 
 describe('callApolloMcpCompanyIntel', () => {
-  it('uses MCP company search/get-company and excludes credit tools by default', async () => {
+  it('uses MCP company search/get-company and excludes people/credit tools by default', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
@@ -452,20 +491,6 @@ describe('callApolloMcpCompanyIntel', () => {
           }),
           { status: 200, headers: { 'content-type': 'application/json' } },
         ),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            jsonrpc: '2.0',
-            id: 4,
-            result: {
-              structuredContent: {
-                people: [{ name: 'Jane Doe', title: 'Chief Executive Officer' }],
-              },
-            },
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        ),
       );
 
     const intel = await callApolloMcpCompanyIntel({
@@ -477,9 +502,85 @@ describe('callApolloMcpCompanyIntel', () => {
     });
 
     expect(intel.syncMode).toBe('apollo_mcp_get_company');
-    expect(intel.creditPolicy).toBe('free_search');
+    expect(intel.creditPolicy).toBe('unknown');
     expect(intel.organization.name).toBe('Acme Corp');
 
+    const toolCalls = fetchMock.mock.calls
+      .map((call) => JSON.parse((call[1] as RequestInit).body as string))
+      .filter((body) => body.method === 'tools/call')
+      .map((body) => body.params.name);
+    expect(toolCalls).toEqual(['search_companies', 'get_company']);
+  });
+
+  it('calls MCP people search only when executive search is explicitly enabled', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: {} }), {
+          status: 200,
+          headers: { 'content-type': 'application/json', 'Mcp-Session-Id': 'session-1' },
+        }),
+      )
+      .mockResolvedValueOnce(new Response('', { status: 202 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            id: 2,
+            result: {
+              structuredContent: {
+                companies: [{ id: 'apollo-1', name: 'Acme', primary_domain: 'acme.com' }],
+              },
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            id: 3,
+            result: {
+              structuredContent: {
+                company: { id: 'apollo-1', name: 'Acme', primary_domain: 'acme.com' },
+              },
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            id: 4,
+            result: {
+              structuredContent: {
+                people: [
+                  {
+                    name: 'Jane Doe',
+                    title: 'Chief Executive Officer',
+                    email: 'jane@example.com',
+                    phone: '+1-555-0101',
+                  },
+                ],
+              },
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      );
+
+    const intel = await callApolloMcpCompanyIntel({
+      url: 'https://apollo.test/mcp',
+      companyName: 'Acme',
+      domain: 'acme.com',
+      includeExecutiveSearch: true,
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    });
+
+    expect(JSON.stringify(intel.raw.executives)).not.toMatch(/jane@example|555/);
     const toolCalls = fetchMock.mock.calls
       .map((call) => JSON.parse((call[1] as RequestInit).body as string))
       .filter((body) => body.method === 'tools/call')

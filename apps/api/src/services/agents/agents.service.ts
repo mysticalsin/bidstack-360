@@ -9,7 +9,35 @@ import {
   readAgentConfig,
   runDustAgent,
   runClaudeAgent,
+  runOpenAiCompatibleAgent,
 } from './agents.helpers.js';
+
+const ACTIVE_RUN_STATUSES = ['queued', 'running'] as const;
+const RETRYABLE_RUN_STATUSES = ['failed', 'cancelled'] as const;
+
+export class ActiveAgentRunError extends Error {
+  constructor(
+    public readonly activeRunId: string,
+    public readonly status: string,
+  ) {
+    super(`Agent already has an active ${status} run`);
+    this.name = 'ActiveAgentRunError';
+  }
+}
+
+export class AgentRunNotCancellableError extends Error {
+  constructor(public readonly status: string) {
+    super(`Agent run cannot be cancelled from ${status}`);
+    this.name = 'AgentRunNotCancellableError';
+  }
+}
+
+export class AgentRunNotRetryableError extends Error {
+  constructor(public readonly status: string) {
+    super(`Agent run cannot be retried from ${status}`);
+    this.name = 'AgentRunNotRetryableError';
+  }
+}
 
 // ─── Agent CRUD ───────────────────────────────────────────────────────────────
 
@@ -212,43 +240,57 @@ export async function runAgent(
   agentId: string,
   input: Record<string, unknown>,
 ) {
-  const agent = await prisma.agent.findFirst({
-    where: { id: agentId, orgId, deletedAt: null },
-  });
-  if (!agent) return null;
+  const initialized = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`agent-run:${orgId}:${agentId}`}))`;
 
-  // Create run record
-  let run = await prisma.agentRun.create({
-    data: {
-      orgId,
-      agentId: agent.id,
-      status: 'queued',
-      input: input as unknown as Prisma.InputJsonValue,
-    },
-  });
+    const agent = await tx.agent.findFirst({
+      where: { id: agentId, orgId, deletedAt: null },
+    });
+    if (!agent) return null;
 
-  const startedAt = new Date();
+    const activeRun = await tx.agentRun.findFirst({
+      where: {
+        orgId,
+        agentId: agent.id,
+        deletedAt: null,
+        status: { in: [...ACTIVE_RUN_STATUSES] },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (activeRun) {
+      throw new ActiveAgentRunError(activeRun.id, activeRun.status);
+    }
 
-  // Update agent and run to running
-  await prisma.$transaction([
-    prisma.agent.update({
+    const startedAt = new Date();
+    const run = await tx.agentRun.create({
+      data: {
+        orgId,
+        agentId: agent.id,
+        status: 'running',
+        input: input as unknown as Prisma.InputJsonValue,
+        startedAt,
+      },
+    });
+
+    await tx.agent.update({
       where: { id: agent.id },
       data: { status: 'running', lastRunAt: startedAt },
-    }),
-    prisma.agentRun.update({
-      where: { id: run.id },
-      data: { status: 'running', startedAt },
-    }),
-  ]);
+    });
 
-  run = await prisma.agentRun.findUniqueOrThrow({ where: { id: run.id } });
+    return { agent, run, startedAt };
+  });
+  if (!initialized) return null;
+
+  const { agent, run, startedAt } = initialized;
 
   try {
     const config = readAgentConfig(agent.config);
     const providerResult =
-      config.provider === 'claude'
-        ? await runClaudeAgent(agent.systemPrompt, input, config)
-        : await runDustAgent(await getDustClient(orgId), agent.systemPrompt, input, config);
+      config.provider === 'dust'
+        ? await runDustAgent(await getDustClient(orgId), agent.systemPrompt, input, config)
+        : config.provider === 'claude'
+          ? await runClaudeAgent(orgId, agent.systemPrompt, input, config)
+          : await runOpenAiCompatibleAgent(orgId, agent.systemPrompt, input, config);
     const finishedAt = new Date();
     const latencyMs = finishedAt.getTime() - startedAt.getTime();
     const output = JSON.parse(
@@ -261,9 +303,9 @@ export async function runAgent(
       }),
     ) as Prisma.InputJsonValue;
 
-    const [updated] = await prisma.$transaction([
-      prisma.agentRun.update({
-        where: { id: run.id },
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.agentRun.updateMany({
+        where: { id: run.id, status: 'running' },
         data: {
           status: 'completed',
           output,
@@ -271,28 +313,34 @@ export async function runAgent(
           finishedAt,
           latencyMs,
         },
-      }),
-      prisma.agent.update({
+      });
+
+      await tx.agent.update({
         where: { id: agent.id },
         data: { status: 'idle' },
-      }),
-      prisma.auditLog.create({
-        data: {
-          orgId,
-          userId,
-          action: 'agent.run',
-          targetType: 'agent',
-          targetId: agent.id,
-          diff: {
-            runId: run.id,
-            status: 'completed',
-            latencyMs,
-            provider: providerResult.provider,
-            phase: config.phase,
-          } as unknown as Prisma.InputJsonValue,
-        },
-      }),
-    ]);
+      });
+
+      if (result.count > 0) {
+        await tx.auditLog.create({
+          data: {
+            orgId,
+            userId,
+            action: 'agent.run',
+            targetType: 'agent',
+            targetId: agent.id,
+            diff: {
+              runId: run.id,
+              status: 'completed',
+              latencyMs,
+              provider: providerResult.provider,
+              phase: config.phase,
+            } as unknown as Prisma.InputJsonValue,
+          },
+        });
+      }
+
+      return tx.agentRun.findUniqueOrThrow({ where: { id: run.id } });
+    });
 
     return serializeAgentRun(updated);
   } catch (err) {
@@ -300,38 +348,153 @@ export async function runAgent(
     const latencyMs = finishedAt.getTime() - startedAt.getTime();
     const errorMessage = err instanceof Error ? err.message : String(err);
 
-    const [updated] = await prisma.$transaction([
-      prisma.agentRun.update({
-        where: { id: run.id },
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.agentRun.updateMany({
+        where: { id: run.id, status: 'running' },
         data: {
           status: 'failed',
           error: errorMessage,
           finishedAt,
           latencyMs,
         },
-      }),
-      prisma.agent.update({
+      });
+
+      await tx.agent.update({
         where: { id: agent.id },
-        data: { status: 'error' },
-      }),
-      prisma.auditLog.create({
-        data: {
-          orgId,
-          userId,
-          action: 'agent.run',
-          targetType: 'agent',
-          targetId: agent.id,
-          diff: {
-            runId: run.id,
-            status: 'failed',
-            error: errorMessage,
-          } as unknown as Prisma.InputJsonValue,
-        },
-      }),
-    ]);
+        data: { status: result.count > 0 ? 'error' : 'idle' },
+      });
+
+      if (result.count > 0) {
+        await tx.auditLog.create({
+          data: {
+            orgId,
+            userId,
+            action: 'agent.run',
+            targetType: 'agent',
+            targetId: agent.id,
+            diff: {
+              runId: run.id,
+              status: 'failed',
+              error: errorMessage,
+            } as unknown as Prisma.InputJsonValue,
+          },
+        });
+      }
+
+      return tx.agentRun.findUniqueOrThrow({ where: { id: run.id } });
+    });
 
     return serializeAgentRun(updated);
   }
+}
+
+export async function cancelAgentRun(orgId: string, userId: string, runId: string) {
+  const existing = await prisma.agentRun.findFirst({
+    where: { id: runId, orgId, deletedAt: null },
+  });
+  if (!existing) return null;
+  if (!ACTIVE_RUN_STATUSES.includes(existing.status as (typeof ACTIVE_RUN_STATUSES)[number])) {
+    throw new AgentRunNotCancellableError(existing.status);
+  }
+
+  const finishedAt = new Date();
+  const latencyMs = existing.startedAt ? finishedAt.getTime() - existing.startedAt.getTime() : null;
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.agentRun.updateMany({
+      where: { id: runId, orgId, status: { in: [...ACTIVE_RUN_STATUSES] }, deletedAt: null },
+      data: {
+        status: 'cancelled',
+        error: 'Cancelled by user',
+        finishedAt,
+        latencyMs,
+      },
+    });
+    if (result.count === 0) {
+      const current = await tx.agentRun.findUniqueOrThrow({ where: { id: runId } });
+      throw new AgentRunNotCancellableError(current.status);
+    }
+
+    const activeSibling = await tx.agentRun.findFirst({
+      where: {
+        orgId,
+        agentId: existing.agentId,
+        id: { not: runId },
+        deletedAt: null,
+        status: { in: [...ACTIVE_RUN_STATUSES] },
+      },
+      select: { id: true },
+    });
+
+    if (!activeSibling) {
+      await tx.agent.update({
+        where: { id: existing.agentId },
+        data: { status: 'idle' },
+      });
+    }
+
+    await tx.auditLog.create({
+      data: {
+        orgId,
+        userId,
+        action: 'agent.run.cancel',
+        targetType: 'agent_run',
+        targetId: runId,
+        diff: {
+          agentId: existing.agentId,
+          previousStatus: existing.status,
+          status: 'cancelled',
+        } as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    return tx.agentRun.findUniqueOrThrow({ where: { id: runId } });
+  });
+
+  return serializeAgentRun(updated);
+}
+
+export async function retryAgentRun(orgId: string, userId: string, runId: string) {
+  const existing = await prisma.agentRun.findFirst({
+    where: { id: runId, orgId, deletedAt: null },
+  });
+  if (!existing) return null;
+  if (!RETRYABLE_RUN_STATUSES.includes(existing.status as (typeof RETRYABLE_RUN_STATUSES)[number])) {
+    throw new AgentRunNotRetryableError(existing.status);
+  }
+
+  const agent = await prisma.agent.findFirst({
+    where: { id: existing.agentId, orgId, deletedAt: null },
+    select: { id: true },
+  });
+  if (!agent) return null;
+
+  const retried = await runAgent(
+    orgId,
+    userId,
+    existing.agentId,
+    (typeof existing.input === 'object' && existing.input !== null
+      ? existing.input
+      : {}) as Record<string, unknown>,
+  );
+  if (!retried) return null;
+
+  await prisma.auditLog.create({
+    data: {
+      orgId,
+      userId,
+      action: 'agent.run.retry',
+      targetType: 'agent_run',
+      targetId: runId,
+      diff: {
+        agentId: existing.agentId,
+        previousStatus: existing.status,
+        newRunId: retried.id,
+      } as unknown as Prisma.InputJsonValue,
+    },
+  });
+
+  return retried;
 }
 
 // ─── Agent run listing ────────────────────────────────────────────────────────

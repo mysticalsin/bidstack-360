@@ -140,38 +140,49 @@ export const dustCredentialsRoutes: FastifyPluginAsyncZod = async (server) => {
       if (dataSourceId) config.dataSourceId = dataSourceId;
       if (agentIds) config.agentIds = agentIds;
 
-      // Parameterized upsert; ::jsonb casts the bound string params.
-      await prisma.$executeRaw`
-        INSERT INTO integration_configs
-          (id, org_id, type, name, config, credentials, is_active, created_at, updated_at)
-        VALUES
-          (gen_random_uuid(), ${req.auth.orgId}::uuid, 'dust', 'dust',
-           ${JSON.stringify(config)}::jsonb, ${JSON.stringify({ encrypted })}::jsonb,
-           true, now(), now())
-        ON CONFLICT ON CONSTRAINT integration_configs_org_type_name_key
-        DO UPDATE SET
-          config = EXCLUDED.config,
-          credentials = EXCLUDED.credentials,
-          is_active = true,
-          deleted_at = NULL,
-          updated_at = now()
-      `;
+      await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`
+          SELECT pg_advisory_xact_lock(hashtext(${`${req.auth.orgId}:dust:dust`}))
+        `;
+        const affected = await tx.$executeRaw`
+          UPDATE integration_configs
+          SET
+            config = ${JSON.stringify(config)}::jsonb,
+            credentials = ${JSON.stringify({ encrypted })}::jsonb,
+            is_active = true,
+            deleted_at = NULL,
+            updated_at = now()
+          WHERE org_id = ${req.auth.orgId}::uuid
+            AND type::text = 'dust'
+            AND name = 'dust'
+        `;
+        if (affected === 0) {
+          await tx.$executeRaw`
+            INSERT INTO integration_configs
+              (id, org_id, type, name, config, credentials, is_active, created_at, updated_at)
+            VALUES
+              (gen_random_uuid(), ${req.auth.orgId}::uuid, 'dust'::integration_type, 'dust',
+               ${JSON.stringify(config)}::jsonb, ${JSON.stringify({ encrypted })}::jsonb,
+               true, now(), now())
+          `;
+        }
 
-      await prisma.auditLog.create({
-        data: {
-          orgId: req.auth.orgId,
-          userId: req.auth.userId,
-          action: 'dust.credentials.upsert',
-          targetType: 'IntegrationConfig',
-          targetId: null,
-          // Never log the key — only non-secret shape.
-          diff: {
-            workspaceId,
-            hasBaseUrl: Boolean(baseUrl),
-            hasDataSourceId: Boolean(dataSourceId),
-            agentCount: agentIds ? Object.keys(agentIds).length : 0,
+        await tx.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'dust.credentials.upsert',
+            targetType: 'IntegrationConfig',
+            targetId: null,
+            // Never log the key — only non-secret shape.
+            diff: {
+              workspaceId,
+              hasBaseUrl: Boolean(baseUrl),
+              hasDataSourceId: Boolean(dataSourceId),
+              agentCount: agentIds ? Object.keys(agentIds).length : 0,
+            },
           },
-        },
+        });
       });
 
       return toSummary({

@@ -46,6 +46,10 @@ export function sign(body: string, secret: string): string {
   return `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`;
 }
 
+function uniqueOpportunityCode(): string {
+  return `OP-PT-${randomUUID().slice(0, 8).toUpperCase()}`;
+}
+
 // ─── Factory ─────────────────────────────────────────────────────────────────
 
 export function makePentestContext() {
@@ -103,7 +107,7 @@ export function makePentestContext() {
     const foreignOpp = await prisma.opportunity.create({
       data: {
         orgId: foreignOrg.id,
-        code: `OP-${String(Math.floor(Math.random() * 8999) + 1000)}`,
+        code: uniqueOpportunityCode(),
         customer: 'PENTEST-FOREIGN',
         name: 'Cross-tenant probe target',
         stage: 's1_lead',
@@ -120,7 +124,7 @@ export function makePentestContext() {
     const ownOpp = await prisma.opportunity.create({
       data: {
         orgId: ctx.seedOrgId,
-        code: `OP-${String(Math.floor(Math.random() * 8999) + 1000)}`,
+        code: uniqueOpportunityCode(),
         customer: 'PENTEST-OWN',
         name: 'Mass-assignment probe target',
         stage: 's1_lead',

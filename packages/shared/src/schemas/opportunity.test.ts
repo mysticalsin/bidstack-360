@@ -56,8 +56,8 @@ describe('Opportunity', () => {
     expect(() => Opportunity.parse({ ...valid, probability: 101 })).toThrow();
   });
 
-  it('rejects code that does not match OP-NNNN — codes are externally communicated bid identifiers', () => {
-    expect(() => Opportunity.parse({ ...valid, code: 'BID-1' })).toThrow();
+  it('accepts legacy persisted codes on read so historical records do not crash list views', () => {
+    expect(() => Opportunity.parse({ ...valid, code: 'RFP-ABCD-1234' })).not.toThrow();
   });
 });
 
@@ -79,6 +79,26 @@ describe('OpportunityCreate', () => {
         territoryName: null,
       }),
     ).not.toThrow();
+  });
+
+  it('rejects noncanonical supplied codes on write', () => {
+    expect(() =>
+      OpportunityCreate.parse({
+        code: 'BID-1',
+        customer: 'X',
+        name: 'X bid',
+        pipelineStageId: '00000000-0000-0000-0000-000000000001',
+        value: 100,
+        probability: 30,
+        dueDate: null,
+        owner: null,
+        industry: null,
+        logo: null,
+        country: null,
+        territoryId: null,
+        territoryName: null,
+      }),
+    ).toThrow();
   });
 });
 

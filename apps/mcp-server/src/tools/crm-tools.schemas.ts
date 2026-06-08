@@ -7,10 +7,11 @@
 import { z } from 'zod';
 
 export const Stage = z.enum([
-  'discovery',
-  'qualified',
-  'proposal',
-  'negotiation',
+  's1_lead',
+  's1_ongoing',
+  's2_sent',
+  's3_technical_iteration',
+  's4_negotiation',
   'closed_won',
   'closed_lost',
 ]);
@@ -23,7 +24,7 @@ export const CompanySearchInput = z.object({
 export const DealCreateInput = z.object({
   customer: z.string().min(1),
   name: z.string().min(1),
-  stage: Stage.default('discovery'),
+  stage: Stage.default('s1_lead'),
   value: z.number().nonnegative().default(0),
   probability: z.number().int().min(0).max(100).default(25),
   dueDate: z.string().date().nullable().optional(),

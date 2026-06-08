@@ -94,13 +94,17 @@ export function useUpdateLeadById() {
     onMutate: async ({ id, patch }) => {
       await qc.cancelQueries({ queryKey: [LEADS_KEY] });
       const snapshots: Array<readonly [readonly unknown[], LeadPage | undefined]> = [];
-      qc.getQueriesData<LeadPage>({ queryKey: [LEADS_KEY] }).forEach(([key, value]) => {
-        snapshots.push([key, value]);
+      qc.getQueriesData<LeadPage | LeadDetail>({ queryKey: [LEADS_KEY] }).forEach(([key, value]) => {
+        snapshots.push([key, value] as any);
         if (!value) return;
-        qc.setQueryData<LeadPage>(key, {
-          ...value,
-          items: value.items.map((l) => (l.id === id ? { ...l, ...patch } : l)),
-        });
+        if ('items' in value && Array.isArray(value.items)) {
+          qc.setQueryData<LeadPage>(key, {
+            ...value,
+            items: value.items.map((l) => (l.id === id ? { ...l, ...patch } : l)),
+          });
+        } else if ('id' in value && value.id === id) {
+          qc.setQueryData<LeadDetail>(key, { ...value, ...patch } as any);
+        }
       });
       return { snapshots };
     },

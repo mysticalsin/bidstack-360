@@ -9,6 +9,7 @@ Warnings in release gates are easy to normalize, but they hide real regressions 
 - Share one development `pino-pretty` transport per process. Creating a new transport for every module logger adds process `exit` listeners and eventually emits `MaxListenersExceededWarning`.
 - Keep production logging on plain Pino JSON; the pretty transport is local-development only.
 - Treat Vite's raw chunk warning as a coarse signal. Use gzip budget tests for the hard gate, and set `chunkSizeWarningLimit` just above known split-vendor reality so true raw-size regressions still surface.
+- If the vendor chunk is only slightly over the raw warning threshold, prefer a narrow, low-risk dependency split before raising the warning limit. `lucide-react` can live in an `icons` chunk because the app shell uses the local SVG `Icon` component and lucide is mostly route/widget code.
 - Emit `dist/.vite/manifest.json` so performance tests can verify manual chunk boundaries instead of guessing from filenames.
 - Keep Core Web Vitals specs serial and run the default E2E gate with one Playwright worker. LCP/CLS measurements are lab-sensitive; parallel probes against the same preview/API server measure machine contention, not product performance. Use `E2E_WORKERS=2+` only for fast non-gate runs.
 - Run the root test gate serially across workspace packages when multiple Vitest pools spawn child processes. Package-local tests can stay fast; the release gate should prefer deterministic shutdown over parallel flakiness.
@@ -28,4 +29,4 @@ Warnings in release gates are easy to normalize, but they hide real regressions 
 
 ## Notes
 
-Do not split the chart or editor vendor chunks casually. `apps/web/vite.config.ts` documents previous circular chunk crashes around charts, so further raw-size reduction needs browser coverage for analytics widgets and RFP/editor routes.
+Do not split the chart or editor vendor chunks casually. `apps/web/vite.config.ts` documents previous circular chunk crashes around charts, so further raw-size reduction needs browser coverage for analytics widgets and RFP/editor routes. A narrow `lucide-react` split was verified on 2026-06-07 with web build, bundle budgets, typecheck, focused ESLint, smoke, and navigation E2E.

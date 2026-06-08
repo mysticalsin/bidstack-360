@@ -25,8 +25,29 @@ export const RFP_RESPONSE_PHASE_IDS = [
 export const RfpResponsePhase = z.enum(RFP_RESPONSE_PHASE_IDS);
 export type RfpResponsePhase = z.infer<typeof RfpResponsePhase>;
 
-export const AgentProvider = z.enum(['dust', 'claude']);
+export const AgentProvider = z.enum(['dust', 'claude', 'openai', 'kimi', 'nvidia_nim', 'gemma']);
 export type AgentProvider = z.infer<typeof AgentProvider>;
+
+export const AgentProviderStatus = z.object({
+  provider: AgentProvider,
+  label: z.string(),
+  configured: z.boolean(),
+  source: z.enum(['org', 'env', 'local']).nullable(),
+  model: z.string().nullable(),
+  baseUrl: z.string().nullable(),
+  requiredEnv: z.array(z.string()),
+  missingEnv: z.array(z.string()),
+  notes: z.array(z.string()),
+});
+export type AgentProviderStatus = z.infer<typeof AgentProviderStatus>;
+
+export const AgentProviderStatusResult = z.object({
+  items: z.array(AgentProviderStatus),
+  readyCount: z.number().int().nonnegative(),
+  totalCount: z.number().int().nonnegative(),
+  generatedAt: z.string().datetime(),
+});
+export type AgentProviderStatusResult = z.infer<typeof AgentProviderStatusResult>;
 
 export const AgentConfig = z
   .object({

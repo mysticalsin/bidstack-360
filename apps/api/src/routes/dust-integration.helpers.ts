@@ -9,7 +9,7 @@ import { DustClient } from '@bidstack/dust-client';
 
 import { resolveOrgDustCredentials, type DustCredentials } from '../lib/dust-credentials.js';
 
-import { config } from '../config.js';
+import { config } from '../env.js';
 import { isPublicHostname } from '../lib/ssrf-guard.js';
 import {
   type DustStatusPayload,
@@ -302,7 +302,7 @@ export function buildIntegrationSetupGuide() {
     },
     rest: {
       baseUrl: restBase,
-      authHeader: 'Authorization: Bearer <BIDSTACK_API_KEY>' as const,
+      authHeader: 'x-api-key: <BIDSTACK_API_KEY>' as const,
       recommendedScopes: ['read', 'write'],
     },
     webhooks: {
@@ -321,7 +321,7 @@ export function buildIntegrationSetupGuide() {
     snippets: {
       dustMcpToolConfig,
       mcpHealthCheck: `curl -H "Authorization: Bearer <BIDSTACK_API_KEY>" ${mcpUrl}`,
-      restOpportunitySearch: `curl -H "Authorization: Bearer <BIDSTACK_API_KEY>" "${restBase}/opportunities?limit=25"`,
+      restOpportunitySearch: `curl -H "x-api-key: <BIDSTACK_API_KEY>" "${restBase}/opportunities?limit=25"`,
       webhookReceiver: `curl -X POST "${receiverUrl}" \\\n  -H "x-dust-event: dust.agent.completed" \\\n  -H "x-dust-event-id: evt_example" \\\n  -H "x-dust-timestamp: <epoch_ms>" \\\n  -H "x-dust-signature: sha256=<hmac>" \\\n  -d '{"orgId":"<org_id>"}'`,
     },
   };

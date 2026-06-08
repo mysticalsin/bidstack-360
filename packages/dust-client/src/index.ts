@@ -140,11 +140,17 @@ export class DustClient {
     return DustDocument.parse(data.document);
   }
 
-  async runAgent(agentId: string, message: string): Promise<DustAgentRun> {
+  async runAgent(
+    agentId: string,
+    message: string,
+    opts: { signal?: AbortSignal } = {},
+  ): Promise<DustAgentRun> {
     const data = await this.request<unknown>(
       'POST',
       `/v1/w/${this.workspaceId}/assistant/agent_configurations/${agentId}/runs`,
       { message: { content: message, role: 'user' } },
+      0,
+      opts.signal,
     );
     return DustAgentRun.parse(data);
   }
@@ -162,10 +168,17 @@ export class DustClient {
     path: string,
     body?: unknown,
     attempt = 0,
+    externalSignal?: AbortSignal,
   ): Promise<T> {
     const url = `${this.baseUrl}${path}`;
     const ctl = new AbortController();
     const timeout = setTimeout(() => ctl.abort(), this.timeoutMs);
+    const abortFromExternal = () => ctl.abort(externalSignal?.reason);
+    if (externalSignal?.aborted) {
+      abortFromExternal();
+    } else {
+      externalSignal?.addEventListener('abort', abortFromExternal, { once: true });
+    }
 
     try {
       const res = await fetch(url, {
@@ -184,8 +197,8 @@ export class DustClient {
         const wait =
           Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 250 * 2 ** attempt;
         this.log.warn({ status: res.status, wait, attempt }, 'dust retry');
-        await new Promise((r) => setTimeout(r, wait));
-        return this.request<T>(method, path, body, attempt + 1);
+        await sleep(wait, ctl.signal);
+        return this.request<T>(method, path, body, attempt + 1, externalSignal);
       }
 
       const text = await res.text();
@@ -205,8 +218,26 @@ export class DustClient {
       throw err;
     } finally {
       clearTimeout(timeout);
+      externalSignal?.removeEventListener('abort', abortFromExternal);
     }
   }
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.reject(new DOMException('Aborted', 'AbortError'));
+  return new Promise((resolve, reject) => {
+    const cleanup = () => signal?.removeEventListener('abort', abort);
+    const timeout = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, ms);
+    const abort = () => {
+      clearTimeout(timeout);
+      cleanup();
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+    signal?.addEventListener('abort', abort, { once: true });
+  });
 }
 
 // HMAC verification helper for /webhooks/dust receivers.

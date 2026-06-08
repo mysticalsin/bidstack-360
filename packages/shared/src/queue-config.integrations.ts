@@ -245,3 +245,21 @@ export const PREDICTIVE_SCORE: QueueConfig = {
     removeOnFail: { age: 86_400, count: 5000 },
   },
 };
+
+/**
+ * competitor.research — grounded, cited competitor intelligence run.
+ * One job per (competitorProfile [, opportunity]). Pulls USASpending award
+ * pricing + optional SSRF-guarded web search → cite-or-omit extraction → writes
+ * CompetitorInsight rows. concurrency 2 (external I/O bound, modest).
+ * WHY 3 attempts: public APIs + provider calls have transient failures; the run
+ * is idempotent (supersede-then-insert), so a retry is safe.
+ */
+export const COMPETITOR_RESEARCH: QueueConfig = {
+  name: 'competitor.research',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 10_000 },
+    removeOnComplete: { age: 86_400 * 7, count: 200 },
+    removeOnFail: { age: 86_400 * 30, count: 500 },
+  },
+};

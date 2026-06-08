@@ -9,6 +9,7 @@ ARG PNPM_VERSION=10.0.0
 FROM node:${NODE_VERSION} AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
+RUN apk add --no-cache openssl
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 WORKDIR /app
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml .npmrc* ./
@@ -16,11 +17,13 @@ COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
 COPY apps/worker/package.json ./apps/worker/
 COPY apps/mcp-server/package.json ./apps/mcp-server/
+COPY apps/marketing/package.json ./apps/marketing/
 COPY packages/db/package.json ./packages/db/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/dust-client/package.json ./packages/dust-client/
 COPY packages/memos/package.json ./packages/memos/
 COPY packages/odoo-mcp-client/package.json ./packages/odoo-mcp-client/
+COPY packages/integrations/package.json ./packages/integrations/
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 # ─── Builder ────────────────────────────────────────────────────────────────
@@ -32,8 +35,8 @@ ENV VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}
 ENV VITE_API_URL=${VITE_API_URL}
 COPY . .
 RUN pnpm db:generate
-RUN pnpm --filter @bidstack/db build
 RUN pnpm --filter @bidstack/shared build
+RUN pnpm --filter @bidstack/db build
 RUN pnpm --filter @bidstack/dust-client build
 RUN pnpm --filter @bidstack/memos build
 RUN pnpm --filter @bidstack/odoo-mcp-client build
@@ -52,6 +55,9 @@ RUN pnpm --filter @bidstack/mcp-server build
 FROM base AS migrate
 ENV NODE_ENV=production
 COPY --from=builder /app/packages/db/prisma ./packages/db/prisma
+COPY --from=builder /app/packages/db/src ./packages/db/src
+COPY --from=builder /app/packages/db/generated ./packages/db/generated
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 CMD ["pnpm", "--filter", "@bidstack/db", "migrate:deploy"]
 
 # ─── API ────────────────────────────────────────────────────────────────────
@@ -59,6 +65,7 @@ FROM node:${NODE_VERSION} AS api
 ENV NODE_ENV=production
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
+RUN apk add --no-cache openssl
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 WORKDIR /app
 COPY --from=builder /app/pnpm-workspace.yaml /app/package.json /app/pnpm-lock.yaml ./
@@ -104,14 +111,16 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 # 5. For Cloudflare: enable Auto Minify + Brotli.
 
 # ─── Worker ─────────────────────────────────────────────────────────────────
-FROM node:${NODE_VERSION} AS worker
+FROM node:24-slim AS worker
 ENV NODE_ENV=production
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 # System tools: OCR pipeline (ocrmypdf, tesseract, ghostscript) + Python for
 # the XGBoost scoring sidecar (see apps/worker/python/README.md).
-RUN apk add --no-cache curl ghostscript ocrmypdf qpdf tesseract-ocr tesseract-ocr-data-eng \
-      python3 py3-pip
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      curl ghostscript ocrmypdf qpdf tesseract-ocr tesseract-ocr-eng \
+      python3 python3-pip python3-venv \
+    && rm -rf /var/lib/apt/lists/*
 # WHY a venv: PEP 668 "externally-managed" guard and isolation from system pip.
 # Packages pinned to same bounds as python/requirements.txt for consistency.
 COPY --from=builder /app/apps/worker/python/requirements.txt /tmp/worker-py-reqs.txt
@@ -127,6 +136,7 @@ COPY --from=builder /app/apps/worker/package.json ./apps/worker/
 COPY --from=builder /app/packages/db/package.json ./packages/db/
 COPY --from=builder /app/packages/shared/package.json ./packages/shared/
 COPY --from=builder /app/packages/dust-client/package.json ./packages/dust-client/
+COPY --from=builder /app/packages/memos/package.json ./packages/memos/
 COPY --from=builder /app/packages/odoo-mcp-client/package.json ./packages/odoo-mcp-client/
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile --prod
 COPY --from=builder /app/apps/worker/dist ./apps/worker/dist
@@ -134,11 +144,12 @@ COPY --from=builder /app/packages/db/dist ./packages/db/dist
 COPY --from=builder /app/packages/db/generated ./packages/db/generated
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/packages/dust-client/dist ./packages/dust-client/dist
+COPY --from=builder /app/packages/memos/dist ./packages/memos/dist
 COPY --from=builder /app/packages/odoo-mcp-client/dist ./packages/odoo-mcp-client/dist
 COPY --from=builder /app/apps/worker/python ./apps/worker/python
 WORKDIR /app/apps/worker
 # Run as non-root — reduces container-escape blast radius.
-RUN addgroup -S bidstack && adduser -S -G bidstack bidstack \
+RUN groupadd -r bidstack && useradd -r -g bidstack bidstack \
     && chown -R bidstack:bidstack /app
 USER bidstack
 EXPOSE 4002
@@ -151,7 +162,7 @@ FROM node:${NODE_VERSION} AS mcp-server
 ENV NODE_ENV=production
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
-RUN apk add --no-cache curl
+RUN apk add --no-cache curl openssl
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 WORKDIR /app
 COPY --from=builder /app/pnpm-workspace.yaml /app/package.json /app/pnpm-lock.yaml ./

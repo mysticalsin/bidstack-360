@@ -57,3 +57,25 @@ export async function enqueueCrewRun(job: CrewRunJob): Promise<string | null> {
     return null;
   }
 }
+
+/**
+ * Best-effort queue-side cancellation. The database status transition remains
+ * authoritative; removing the BullMQ job just prevents queued work from being
+ * picked up after the user cancelled it.
+ */
+export async function cancelQueuedCrewRun(runId: string): Promise<boolean> {
+  if (process.env.NODE_ENV === 'test' && process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS !== 'true') {
+    return true;
+  }
+  try {
+    const job = await getQueue().getJob(`crew-run-${runId}`);
+    if (!job) return true;
+    const state = await job.getState();
+    if (state === 'active') return false;
+    await job.remove();
+    return true;
+  } catch (err) {
+    log.error({ err, runId }, 'Failed to remove queued crew-run job');
+    return false;
+  }
+}

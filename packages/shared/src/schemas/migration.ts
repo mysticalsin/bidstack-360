@@ -113,6 +113,8 @@ export const MigrationJobPayload = z.object({
   dedupStrategy: DedupStrategyEnum.default('update'),
   // Which column name (if any) holds the source system's record ID for dedup.
   externalIdColumn: z.string().optional(),
+  // Additional provider-specific state (like tokens) to pass to the worker.
+  meta: z.record(z.unknown()).optional(),
 });
 export type MigrationJobPayload = z.infer<typeof MigrationJobPayload>;
 

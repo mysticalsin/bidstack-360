@@ -31,9 +31,13 @@ export function Navbar() {
       aria-label="Site navigation"
       className="flex items-center justify-between py-6 px-6 md:px-10 w-full relative z-10"
     >
-      {/* Left Side (hidden spacer for centering, display creator) */}
-      <div className="flex-1 hidden md:block">
-        <span className="text-[12px] font-normal text-[rgba(30,50,90,0.75)]">Created by Tony</span>
+      {/* Left Side (logo) */}
+      <div className="flex-1 hidden md:flex flex-col items-start justify-center">
+        <img 
+          src="/logo-clear.png" 
+          alt="BidStack360" 
+          className="h-16 md:h-20 lg:h-24 w-auto object-contain -ml-2" 
+        />
       </div>
 
       {/* Center Menu */}
@@ -42,7 +46,7 @@ export function Navbar() {
           <button
             key={item.label}
             type="button"
-            className="cursor-pointer hover:opacity-70 transition-opacity flex items-center gap-1 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(30,50,90,0.3)] rounded-sm bg-transparent border-none"
+            className="cursor-pointer hover:opacity-70 transition-opacity flex items-center gap-1 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98] rounded-sm bg-transparent border-none"
           >
             {item.label}
             {item.hasDropdown && (
@@ -53,13 +57,12 @@ export function Navbar() {
       </div>
 
       {/* Mobile Logo */}
-      <div className="md:hidden flex flex-col items-start leading-none">
-        <span className="font-regular tracking-tighter text-xl text-[rgba(30,50,90,0.9)]">
-          BidStack
-        </span>
-        <span className="text-[9px] text-[rgba(30,50,90,0.5)] font-normal mt-0.5">
-          Created by Tony
-        </span>
+      <div className="md:hidden flex flex-col items-start justify-center">
+        <img 
+          src="/logo-clear.png" 
+          alt="BidStack360" 
+          className="h-12 w-auto object-contain -ml-1" 
+        />
       </div>
 
       {/* Right Side — Auth Buttons */}

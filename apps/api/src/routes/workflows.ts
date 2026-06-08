@@ -134,22 +134,44 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
         }
       }
 
-      const updateResult = await prisma.workflow.updateMany({
-        where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
-        data: {
-          ...(req.body.name !== undefined ? { name: req.body.name } : {}),
-          ...(req.body.description !== undefined ? { description: req.body.description } : {}),
-          ...(req.body.active !== undefined ? { active: req.body.active } : {}),
-          ...(req.body.triggerKind ? { triggerKind: req.body.triggerKind } : {}),
-          ...(req.body.triggerConfig
-            ? { triggerConfig: req.body.triggerConfig as Prisma.InputJsonValue }
-            : {}),
-        },
-      });
+      await prisma.$transaction(async (tx) => {
+        const updateResult = await tx.workflow.updateMany({
+          where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
+          data: {
+            ...(req.body.name !== undefined ? { name: req.body.name } : {}),
+            ...(req.body.description !== undefined ? { description: req.body.description } : {}),
+            ...(req.body.active !== undefined ? { active: req.body.active } : {}),
+            ...(req.body.triggerKind ? { triggerKind: req.body.triggerKind } : {}),
+            ...(req.body.triggerConfig
+              ? { triggerConfig: req.body.triggerConfig as Prisma.InputJsonValue }
+              : {}),
+          },
+        });
 
-      if (updateResult.count === 0) {
-        throw server.httpErrors.notFound('Workflow not found');
-      }
+        if (updateResult.count === 0) {
+          throw server.httpErrors.notFound('Workflow not found');
+        }
+
+        // Persist action edits — when `actions` is provided, replace the full set.
+        // Previously the actions were validated above but never written, so edits
+        // were silently dropped. (Review finding, 2026-06-04.)
+        if (req.body.actions !== undefined) {
+          await tx.workflowAction.deleteMany({
+            where: { workflowId: existing.id, orgId: req.auth.orgId },
+          });
+          if (req.body.actions.length > 0) {
+            await tx.workflowAction.createMany({
+              data: req.body.actions.map((a) => ({
+                workflowId: existing.id,
+                orgId: req.auth.orgId,
+                kind: a.kind,
+                config: a.config as Prisma.InputJsonValue,
+                sortOrder: a.sortOrder,
+              })),
+            });
+          }
+        }
+      });
 
       const updated = await prisma.workflow.findFirstOrThrow({
         where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },

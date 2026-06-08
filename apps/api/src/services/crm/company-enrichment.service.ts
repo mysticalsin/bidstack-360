@@ -26,6 +26,8 @@ import {
   stringUrl,
 } from './dashboard.utils.js';
 
+const COMPANY_STRATEGIC_INTEL_STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
+
 // ─── Domain / website lookup ──────────────────────────────────────────────────
 
 export function domainFor(name: string) {
@@ -147,7 +149,9 @@ function parseStrategicIntel({
   if (!Object.keys(apollo).length) return undefined;
 
   const parsed = CompanyStrategicIntel.safeParse(apollo.strategicIntel);
-  if (parsed.success) return parsed.data;
+  if (parsed.success) {
+    return { ...parsed.data, freshness: freshnessFor(parsed.data.lastSyncedAt) };
+  }
 
   const lastSyncedAt = stringDate(apollo.lastSyncedAt) ?? latestSourceDate(sourceAttribution);
   const freshness = freshnessFor(lastSyncedAt);
@@ -181,6 +185,7 @@ function parseStrategicIntel({
     hiringSignals: [],
     leadershipSignals: [],
     revenueSignals: [],
+    newsSignals: [],
     summary:
       lastSyncedAt === null
         ? 'Apollo has not synced this account yet.'
@@ -210,7 +215,7 @@ function freshnessFor(
 ): z.infer<typeof CompanyStrategicIntel>['freshness'] {
   if (!lastSyncedAt) return 'never';
   const ageMs = Date.now() - new Date(lastSyncedAt).getTime();
-  return ageMs > 30 * 24 * 60 * 60 * 1000 ? 'stale' : 'fresh';
+  return ageMs > COMPANY_STRATEGIC_INTEL_STALE_AFTER_MS ? 'stale' : 'fresh';
 }
 
 // ─── Fallback company ─────────────────────────────────────────────────────────

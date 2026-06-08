@@ -66,6 +66,11 @@ export const AutofillBody = z.object({
 export const ApproveParams = z.object({ proposalId: z.string().uuid() });
 export const ApproveBody = z.object({ notes: z.string().max(2000).optional() });
 
+export const ResumeDraftingParams = z.object({
+  workspaceId: z.string().uuid(),
+  orchestrationId: z.string().uuid(),
+});
+
 export const UploadResponse = z.object({
   orchestrationId: z.string().uuid(),
   // WHY bidWorkspaceId: the web client seeds its pipeline store from this field
@@ -85,6 +90,15 @@ export const AutofillResponse = z.object({
 export const ApproveResponse = z.object({
   approvedAt: z.string().datetime(),
   approvedByUserId: z.string().uuid(),
+  // RFP-GATE-001 — surface that the linked orchestration advanced so the client
+  // can refresh the pipeline view. Always 'approved' on a successful gate pass.
+  orchestrationId: z.string().uuid(),
+  orchestrationState: z.literal('approved'),
+});
+
+export const ResumeDraftingResponse = z.object({
+  status: z.literal('running'),
+  jobsDispatched: z.number().int(),
 });
 
 // ─── Rate-limit helper ────────────────────────────────────────────────────────

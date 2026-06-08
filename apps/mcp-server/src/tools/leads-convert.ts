@@ -9,9 +9,18 @@ const Input = z.object({
   opportunityName: z.string().min(1).max(255).optional(),
   opportunityValueMicros: z.number().min(0).optional(),
   stage: z
-    .enum(['discovery', 'qualified', 'proposal', 'negotiation', 'closed_won', 'closed_lost'])
+    .enum([
+      's1_lead',
+      's1_ongoing',
+      's2_sent',
+      's3_technical_iteration',
+      's4_negotiation',
+      'closed_won',
+      'closed_lost',
+    ])
     .optional(),
 });
+const STAGE_OPTIONS = Input.shape.stage.unwrap().options;
 
 export const leadsConvert: Tool<typeof Input> = {
   description: 'Convert a qualified lead into an opportunity and a contact. Writes audit_log.',
@@ -25,14 +34,14 @@ export const leadsConvert: Tool<typeof Input> = {
       opportunityValueMicros: { type: 'number', minimum: 0 },
       stage: {
         type: 'string',
-        enum: ['discovery', 'qualified', 'proposal', 'negotiation', 'closed_won', 'closed_lost'],
+        enum: STAGE_OPTIONS,
       },
     },
     additionalProperties: false,
   },
   handler: async (args, ctx) => {
     const lead = await prisma.lead.findFirst({
-      where: { id: args.id, orgId: ctx.orgId },
+      where: { id: args.id, orgId: ctx.orgId, deletedAt: null }, // skip soft-deleted (Review)
     });
     if (!lead) throw new Error('Lead not found');
     if (lead.convertedToOpportunityId) throw new Error('Lead already converted');
@@ -53,7 +62,7 @@ export const leadsConvert: Tool<typeof Input> = {
           code,
           customer: lead.companyName,
           name: args.opportunityName ?? `${lead.companyName} — ${lead.firstName} ${lead.lastName}`,
-          stage: (args.stage ?? 'discovery') as PrismaStage,
+          stage: (args.stage ?? 's1_lead') as PrismaStage,
           valueMicros: BigInt(Math.round(args.opportunityValueMicros ?? 0)),
           probability: 25,
           industry: null,

@@ -81,6 +81,40 @@ describe('Note schemas', () => {
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 
+async function cleanupMeetingImportArtifacts(): Promise<void> {
+  const now = new Date();
+  await prisma.$transaction([
+    prisma.contact.updateMany({
+      where: {
+        deletedAt: null,
+        OR: [
+          { name: 'E2E Buyer' },
+          { name: { startsWith: 'Attendees:' } },
+          { name: { startsWith: 'Risk:' } },
+          { customer: { startsWith: 'Meeting Import' } },
+        ],
+      },
+      data: { deletedAt: now },
+    }),
+    prisma.note.updateMany({
+      where: { deletedAt: null, accountId: { startsWith: 'meeting import ' } },
+      data: { deletedAt: now },
+    }),
+    prisma.riskRegisterItem.updateMany({
+      where: { deletedAt: null, companyName: { startsWith: 'Meeting Import' } },
+      data: { deletedAt: now },
+    }),
+    prisma.task.updateMany({
+      where: { deletedAt: null, title: { startsWith: 'Send Jamf deployment plan' } },
+      data: { deletedAt: now },
+    }),
+    prisma.companyEnrichment.updateMany({
+      where: { deletedAt: null, normalizedName: { startsWith: 'meeting-import-' } },
+      data: { deletedAt: now },
+    }),
+  ]);
+}
+
 beforeAll(async () => {
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -89,13 +123,17 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
+  await cleanupMeetingImportArtifacts();
   server = await buildServer();
   await server.ready();
 });
 
 afterAll(async () => {
   if (server) await server.close();
-  if (dbReachable) await prisma.$disconnect();
+  if (dbReachable) {
+    await cleanupMeetingImportArtifacts();
+    await prisma.$disconnect();
+  }
 });
 
 const skipIfNoDb = (name: string, fn: () => Promise<void> | void) =>

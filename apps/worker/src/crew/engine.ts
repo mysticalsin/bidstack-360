@@ -17,6 +17,17 @@ import type {
   TaskResult,
 } from './types.js';
 
+export interface KickoffOptions {
+  signal?: AbortSignal;
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (!signal?.aborted) return;
+  const err = new Error('crew run cancelled');
+  err.name = 'AbortError';
+  throw err;
+}
+
 /** Replace {{ var }} placeholders from the inputs map (CrewAI-style). Unknown
  *  vars collapse to empty string so a missing input never leaks "{{x}}" to the
  *  LLM. Only flat [A-Za-z0-9_] keys are supported — dotted/nested keys such as
@@ -138,10 +149,13 @@ async function runTask(
   completed: TaskResult[],
   inputs: Record<string, string>,
   executor: AgentExecutor,
+  signal?: AbortSignal,
 ): Promise<TaskResult> {
+  throwIfAborted(signal);
   const agent = agentById(crew, task.agentId);
   const prompt = buildTaskPrompt(agent, task, contextFor(task, completed), inputs);
-  const res = await executor.run({ agent, task, prompt, inputs });
+  const res = await executor.run({ agent, task, prompt, inputs, signal });
+  throwIfAborted(signal);
   return { taskId: task.id, agentId: agent.id, output: res.output, ok: res.ok, error: res.error };
 }
 
@@ -149,11 +163,12 @@ async function kickoffSequential(
   crew: CrewDef,
   inputs: Record<string, string>,
   executor: AgentExecutor,
+  options: KickoffOptions = {},
 ): Promise<KickoffResult> {
   const results: TaskResult[] = [];
   for (const task of crew.tasks) {
     // Sequential by design: each task's output feeds the next.
-    results.push(await runTask(crew, task, results, inputs, executor));
+    results.push(await runTask(crew, task, results, inputs, executor, options.signal));
   }
   return {
     process: 'sequential',
@@ -175,6 +190,7 @@ async function kickoffHierarchical(
   crew: CrewDef,
   inputs: Record<string, string>,
   executor: AgentExecutor,
+  options: KickoffOptions = {},
 ): Promise<KickoffResult> {
   // v1 hierarchical models the process as "sequential workers, then a manager
   // consolidation" — which is NOT how CrewAI delegates. Two deliberate
@@ -186,7 +202,7 @@ async function kickoffHierarchical(
   const results: TaskResult[] = [];
   for (const task of crew.tasks) {
     // Ordered so the manager later sees a stable, complete record.
-    results.push(await runTask(crew, task, results, inputs, executor));
+    results.push(await runTask(crew, task, results, inputs, executor, options.signal));
   }
 
   const manager = crew.managerAgentId ? agentById(crew, crew.managerAgentId) : SYNTHESIZED_MANAGER;
@@ -204,7 +220,9 @@ async function kickoffHierarchical(
     task: consolidationTask,
     prompt: managerPrompt,
     inputs,
+    signal: options.signal,
   });
+  throwIfAborted(options.signal);
   const managerResult: TaskResult = {
     taskId: consolidationTask.id,
     agentId: manager.id,
@@ -237,9 +255,11 @@ export async function kickoff(
   crew: CrewDef,
   inputs: Record<string, string>,
   executor: AgentExecutor,
+  options: KickoffOptions = {},
 ): Promise<KickoffResult> {
   validateCrew(crew);
+  throwIfAborted(options.signal);
   return crew.process === 'hierarchical'
-    ? kickoffHierarchical(crew, inputs, executor)
-    : kickoffSequential(crew, inputs, executor);
+    ? kickoffHierarchical(crew, inputs, executor, options)
+    : kickoffSequential(crew, inputs, executor, options);
 }

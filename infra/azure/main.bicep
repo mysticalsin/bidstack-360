@@ -17,7 +17,7 @@
 //      ├─ App  : api        (external ingress :4000)
 //      ├─ App  : web        (external ingress :80)
 //      ├─ App  : worker     (no ingress)
-//      └─ App  : mcp-server (internal ingress :4003)
+//      └─ App  : mcp-server (internal ingress :4001, health :4003)
 //
 //  Zero-touch deploy contract: the pipeline runs the `migrate` JOB to a
 //  successful completion, THEN updates the app revisions. Apps never boot on an
@@ -66,14 +66,29 @@ param publicBaseUrl string
 param publicApiUrl string
 
 @secure()
-@description('S3/Blob storage credentials JSON or connection — supply per your storage driver.')
-param storageSecret string
+@description('S3-compatible access key ID for document storage. Current app code reads AWS_ACCESS_KEY_ID via the AWS SDK.')
+param s3AccessKeyId string
+
+@secure()
+@description('S3-compatible secret key for document storage. Current app code reads AWS_SECRET_ACCESS_KEY via the AWS SDK.')
+param s3SecretAccessKey string
 
 @description('S3 bucket name for document storage.')
 param s3Bucket string
 
 @description('S3 region.')
 param s3Region string
+
+@description('Optional S3-compatible endpoint, for example a private MinIO/R2 endpoint. Leave empty for AWS S3.')
+param s3Endpoint string = ''
+
+@description('Use path-style addressing for S3-compatible providers such as MinIO.')
+@allowed(['true', 'false'])
+param s3ForcePathStyle string = 'false'
+
+@description('Postgres HA mode. Use ZoneRedundant for production regions that support it; use Disabled only for dev/demo.')
+@allowed(['Disabled', 'SameZone', 'ZoneRedundant'])
+param postgresHighAvailabilityMode string = 'ZoneRedundant'
 
 // ── Derived names ───────────────────────────────────────────────────────────
 var pgServerName = '${namePrefix}-pg'
@@ -103,8 +118,8 @@ resource pg 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
     administratorLogin: pgAdminLogin
     administratorLoginPassword: pgAdminPassword
     storage: { storageSizeGB: 64 }
-    backup: { backupRetentionDays: 14, geoRedundantBackup: 'Disabled' }
-    highAvailability: { mode: 'Disabled' } // flip to ZoneRedundant for prod HA
+    backup: { backupRetentionDays: 35, geoRedundantBackup: 'Enabled' }
+    highAvailability: { mode: postgresHighAvailabilityMode }
   }
 }
 
@@ -163,7 +178,8 @@ var secretMap = {
   'redis-url': redisUrl
   'integration-token-key': integrationTokenKey
   'clerk-secret-key': clerkSecretKey
-  'storage-secret': storageSecret
+  's3-access-key-id': s3AccessKeyId
+  's3-secret-access-key': s3SecretAccessKey
 }
 
 resource kvSecrets 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = [
@@ -197,7 +213,8 @@ var commonSecrets = [
   { name: 'redis-url', keyVaultUrl: '${kvUri}secrets/redis-url', identity: managedIdentityId }
   { name: 'integration-token-key', keyVaultUrl: '${kvUri}secrets/integration-token-key', identity: managedIdentityId }
   { name: 'clerk-secret-key', keyVaultUrl: '${kvUri}secrets/clerk-secret-key', identity: managedIdentityId }
-  { name: 'storage-secret', keyVaultUrl: '${kvUri}secrets/storage-secret', identity: managedIdentityId }
+  { name: 's3-access-key-id', keyVaultUrl: '${kvUri}secrets/s3-access-key-id', identity: managedIdentityId }
+  { name: 's3-secret-access-key', keyVaultUrl: '${kvUri}secrets/s3-secret-access-key', identity: managedIdentityId }
 ]
 var registries = [{ server: acrLoginServer, identity: managedIdentityId }]
 var identityBlock = { type: 'UserAssigned', userAssignedIdentities: { '${managedIdentityId}': {} } }
@@ -211,8 +228,11 @@ var sharedEnv = [
   { name: 'STORAGE_DRIVER', value: 's3' }
   { name: 'S3_BUCKET', value: s3Bucket }
   { name: 'S3_REGION', value: s3Region }
+  { name: 'S3_ENDPOINT', value: s3Endpoint }
+  { name: 'S3_FORCE_PATH_STYLE', value: s3ForcePathStyle }
+  { name: 'AWS_ACCESS_KEY_ID', secretRef: 's3-access-key-id' }
+  { name: 'AWS_SECRET_ACCESS_KEY', secretRef: 's3-secret-access-key' }
   { name: 'STORAGE_SCAN_REQUIRED', value: 'true' }
-  { name: 'STORAGE_SECRET', secretRef: 'storage-secret' }
 ]
 
 // ── Migrate Job (one-shot; the pipeline runs this to completion before apps) ──
@@ -273,7 +293,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
           ])
           probes: [
             { type: 'Readiness', httpGet: { path: '/readyz', port: 4000 }, periodSeconds: 10 }
-            { type: 'Liveness', httpGet: { path: '/healthz', port: 4000 }, periodSeconds: 30 }
+            { type: 'Liveness', httpGet: { path: '/livez', port: 4000 }, periodSeconds: 30 }
           ]
         }
       ]
@@ -320,7 +340,7 @@ resource mcpApp 'Microsoft.App/containerApps@2024-03-01' = {
     environmentId: env.id
     configuration: {
       activeRevisionsMode: 'Single'
-      ingress: { external: false, targetPort: 4003, transport: 'auto' }
+      ingress: { external: false, targetPort: 4001, transport: 'auto' }
       secrets: commonSecrets
       registries: registries
     }
@@ -334,6 +354,8 @@ resource mcpApp 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'NODE_ENV', value: 'production' }
             { name: 'DATABASE_URL', secretRef: 'database-url' }
             { name: 'REDIS_URL', secretRef: 'redis-url' }
+            { name: 'PORT_MCP', value: '4001' }
+            { name: 'MCP_HEALTH_PORT', value: '4003' }
           ]
           probes: [{ type: 'Liveness', httpGet: { path: '/health', port: 4003 }, periodSeconds: 30 }]
         }

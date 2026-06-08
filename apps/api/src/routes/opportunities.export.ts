@@ -20,10 +20,14 @@ import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 
 const BATCH_SIZE = 250;
 
-// RFC 4180: wrap in quotes if value contains a comma, double-quote, or newline.
+// RFC 4180 quoting + spreadsheet formula-injection neutralization. A leading
+// =, +, -, @, tab, or CR is prefixed with ' so Excel/Sheets won't execute it as
+// a formula on attacker-controlled free-text (name/customer). Mirrors
+// invoices.export.ts. (Review finding, 2026-06-04.)
 function csvCell(value: string): string {
-  if (/[,"\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
+  const sanitized = value.replace(/^([=+\-@\t\r])/, "'$1");
+  if (/[,"\n\r]/.test(sanitized)) return `"${sanitized.replace(/"/g, '""')}"`;
+  return sanitized;
 }
 
 function csvRow(cells: string[]): string {

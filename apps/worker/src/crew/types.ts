@@ -83,5 +83,7 @@ export interface AgentExecutor {
     /** Fully-rendered prompt (persona + task + context). */
     prompt: string;
     inputs: Record<string, string>;
+    /** Cooperative cancellation signal for queue-backed runs. */
+    signal?: AbortSignal;
   }): Promise<{ output: string; ok: boolean; error?: string }>;
 }

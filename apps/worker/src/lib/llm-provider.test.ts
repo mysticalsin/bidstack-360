@@ -49,6 +49,51 @@ describe('resolveLlmFromEnv', () => {
     });
   });
 
+  it('resolves NVIDIA NIM with the hosted OpenAI-compatible endpoint', () => {
+    expect(resolveLlmFromEnv({ RFP_LLM_PROVIDER: 'nim', NVIDIA_NIM_API_KEY: 'nv-k' })).toMatchObject(
+      {
+        kind: 'nim',
+        apiKey: 'nv-k',
+        model: 'deepseek-ai/deepseek-v4-pro',
+        baseUrl: 'https://integrate.api.nvidia.com/v1',
+        extraBody: { chat_template_kwargs: { thinking: false } },
+      },
+    );
+  });
+
+  it('supports NVIDIA NIM aliases, model override, base URL trimming, and thinking opt-in', () => {
+    expect(
+      resolveLlmFromEnv({
+        RFP_LLM_PROVIDER: 'nvidia-nim',
+        NVIDIA_NIM_API_KEY: 'nv-k',
+        NVIDIA_NIM_MODEL: 'nvidia/nemotron-x',
+        NVIDIA_NIM_BASE_URL: 'https://example.test/v1/',
+        NVIDIA_NIM_ALLOW_CUSTOM_BASE_URL: 'true',
+        NVIDIA_NIM_THINKING: 'true',
+      }),
+    ).toMatchObject({
+      kind: 'nim',
+      model: 'nvidia/nemotron-x',
+      baseUrl: 'https://example.test/v1',
+      extraBody: { chat_template_kwargs: { thinking: true } },
+    });
+  });
+
+  it('does not resolve NVIDIA NIM without an API key', () => {
+    expect(resolveLlmFromEnv({ RFP_LLM_PROVIDER: 'nim' })).toBeNull();
+  });
+
+  it('rejects unsafe NVIDIA NIM custom base URLs', () => {
+    expect(() =>
+      resolveLlmFromEnv({
+        RFP_LLM_PROVIDER: 'nim',
+        NVIDIA_NIM_API_KEY: 'nv-k',
+        NVIDIA_NIM_BASE_URL: 'http://127.0.0.1:8080/v1',
+        NVIDIA_NIM_ALLOW_CUSTOM_BASE_URL: 'true',
+      }),
+    ).toThrow(/custom base URL must use https/);
+  });
+
   it('resolves gemma LOCALLY and keyless by default (open weights via Ollama)', () => {
     expect(resolveLlmFromEnv({ RFP_LLM_PROVIDER: 'gemma' })).toMatchObject({
       kind: 'gemma',
@@ -87,6 +132,7 @@ describe('completeChat', () => {
   it('posts to the OpenAI-compatible endpoint with bearer auth + system/user messages', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
+      status: 200,
       json: async () => ({ choices: [{ message: { content: '{"requirements":[]}' } }] }),
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -138,6 +184,7 @@ describe('completeChat', () => {
   it('uses the Moonshot base url for kimi', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
+      status: 200,
       json: async () => ({ choices: [{ message: { content: 'x' } }] }),
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -157,9 +204,40 @@ describe('completeChat', () => {
     );
   });
 
+  it('uses the NVIDIA NIM base URL and provider extra body', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: 'nim-ok' } }] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await completeChat(
+      {
+        kind: 'nim',
+        apiKey: 'nv-k',
+        model: 'deepseek-ai/deepseek-v4-pro',
+        baseUrl: 'https://integrate.api.nvidia.com/v1',
+        extraBody: { chat_template_kwargs: { thinking: false } },
+      },
+      { user: 'hi' },
+    );
+
+    const [url, opts] = fetchMock.mock.calls[0] as [
+      string,
+      RequestInit & { headers: Record<string, string> },
+    ];
+    expect(url).toBe('https://integrate.api.nvidia.com/v1/chat/completions');
+    expect(opts.headers.authorization).toBe('Bearer nv-k');
+    const body = JSON.parse(opts.body as string);
+    expect(body.model).toBe('deepseek-ai/deepseek-v4-pro');
+    expect(body.chat_template_kwargs).toEqual({ thinking: false });
+  });
+
   it('sets response_format ONLY when responseFormat is json_object (Markdown steps stay free)', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
+      status: 200,
       json: async () => ({ choices: [{ message: { content: '{}' } }] }),
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -179,6 +257,29 @@ describe('completeChat', () => {
     expect(body1.response_format).toEqual({ type: 'json_object' });
   });
 
+  it('passes an already-aborted external signal into provider fetch', async () => {
+    const ctl = new AbortController();
+    ctl.abort();
+    const fetchMock = vi.fn((_url: string, opts: RequestInit) => {
+      expect(opts.signal?.aborted).toBe(true);
+      throw new DOMException('Aborted', 'AbortError');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      completeChat(
+        {
+          kind: 'openai',
+          apiKey: 'secret-key',
+          model: 'm',
+          baseUrl: 'https://api.openai.com/v1',
+        },
+        { user: 'hi', signal: ctl.signal },
+      ),
+    ).rejects.toThrow(/Aborted/);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it('throws an HTTP error without leaking the API key', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({}) });
     vi.stubGlobal('fetch', fetchMock);
@@ -189,5 +290,43 @@ describe('completeChat', () => {
         { user: 'hi' },
       ),
     ).rejects.toThrow(/HTTP 401/);
+  });
+
+  it('treats NVIDIA NIM pending responses as incomplete instead of success', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 202, json: async () => ({}) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      completeChat(
+        {
+          kind: 'nim',
+          apiKey: 'nv-secret',
+          model: 'deepseek-ai/deepseek-v4-pro',
+          baseUrl: 'https://integrate.api.nvidia.com/v1',
+        },
+        { user: 'hi' },
+      ),
+    ).rejects.toThrow(/HTTP 202/);
+  });
+
+  it('treats empty OpenAI-compatible completions as failed output', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: '' } }] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      completeChat(
+        {
+          kind: 'openai',
+          apiKey: 'secret-key',
+          model: 'm',
+          baseUrl: 'https://api.openai.com/v1',
+        },
+        { user: 'hi' },
+      ),
+    ).rejects.toThrow(/empty content/);
   });
 });

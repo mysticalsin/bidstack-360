@@ -77,8 +77,8 @@ const redisCachePluginImpl: FastifyPluginAsync<RedisCachePluginOptions> = async 
     // WHY: public routes (health, webhooks) do not always have auth. Protected
     // routes do, but hook code still reads defensively because it also runs for
     // unauthenticated responses.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const orgId = (req as any).auth?.orgId as string | undefined;
+    const requestWithAuth = req as FastifyRequest & { auth?: { orgId?: string } };
+    const orgId = requestWithAuth.auth?.orgId;
     if (!orgId) return payload;
 
     const method = req.method;

@@ -9,6 +9,8 @@ import {
 
 const now = new Date('2026-05-11T00:00:00.000Z');
 const apolloKey = process.env.APOLLO_API_KEY;
+const apolloMcpUrl = process.env.APOLLO_MCP_URL;
+const apolloMcpBearerToken = process.env.APOLLO_MCP_BEARER_TOKEN;
 
 afterEach(() => {
   if (apolloKey === undefined) {
@@ -16,11 +18,23 @@ afterEach(() => {
   } else {
     process.env.APOLLO_API_KEY = apolloKey;
   }
+  if (apolloMcpUrl === undefined) {
+    delete process.env.APOLLO_MCP_URL;
+  } else {
+    process.env.APOLLO_MCP_URL = apolloMcpUrl;
+  }
+  if (apolloMcpBearerToken === undefined) {
+    delete process.env.APOLLO_MCP_BEARER_TOKEN;
+  } else {
+    process.env.APOLLO_MCP_BEARER_TOKEN = apolloMcpBearerToken;
+  }
 });
 
 describe('open data connectors', () => {
   it('marks open, credentialed, and widget-only providers honestly', () => {
     delete process.env.APOLLO_API_KEY;
+    delete process.env.APOLLO_MCP_URL;
+    delete process.env.APOLLO_MCP_BEARER_TOKEN;
 
     const connectors = buildConnectorCatalog(now);
 
@@ -43,6 +57,24 @@ describe('open data connectors', () => {
       kind: 'credentialed_api',
       status: 'disabled',
       requiresCredential: true,
+    });
+  });
+
+  it('shows Apollo MCP as degraded until both endpoint and bearer token exist', () => {
+    delete process.env.APOLLO_API_KEY;
+    process.env.APOLLO_MCP_URL = 'https://mcp.apollo.io/mcp';
+    delete process.env.APOLLO_MCP_BEARER_TOKEN;
+
+    expect(connectorsById(buildConnectorCatalog(now)).get('apollo-organizations')).toMatchObject({
+      status: 'degraded',
+      message: expect.stringContaining('partially configured'),
+    });
+
+    process.env.APOLLO_MCP_BEARER_TOKEN = 'oauth-token';
+
+    expect(connectorsById(buildConnectorCatalog(now)).get('apollo-organizations')).toMatchObject({
+      status: 'healthy',
+      message: expect.stringContaining('MCP company search enabled'),
     });
   });
 
@@ -126,3 +158,7 @@ describe('open data connectors', () => {
     ]);
   });
 });
+
+function connectorsById(connectors: ReturnType<typeof buildConnectorCatalog>) {
+  return new Map(connectors.map((connector) => [connector.id, connector]));
+}

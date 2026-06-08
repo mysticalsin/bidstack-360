@@ -14,6 +14,7 @@ import { authPlugin } from './plugins/auth.js';
 import { cacheHeadersPlugin } from './plugins/cache-headers.js';
 import { errorHandlerPlugin } from './plugins/error-handler.js';
 import { idempotencyPlugin } from './plugins/idempotency.js';
+import { mutationAuditPlugin } from './plugins/mutation-audit.js';
 import { openapiPlugin } from './plugins/openapi.js';
 import { queryGuardPlugin } from './plugins/query-guard.js';
 import { redisCachePlugin } from './plugins/redis-cache.js';
@@ -22,7 +23,7 @@ import { securityHeadersPlugin } from './plugins/security-headers.js';
 import { realtimePlugin } from './plugins/realtime.js';
 // Wave 8 — Y.js CRDT collaborative text editing
 import { yjsCollabPlugin } from './plugins/yjs-collab.js';
-import { config } from './config.js';
+import { config } from './env.js';
 import { rbacPlugin } from './plugins/rbac.js';
 import { redis } from './redis.js';
 import { healthRoute } from './routes/health.js';
@@ -178,6 +179,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(rbacPlugin);
   await server.register(securityHeadersPlugin);
   await server.register(idempotencyPlugin);
+  await server.register(mutationAuditPlugin);
   await server.register(cacheHeadersPlugin);
   await server.register(queryGuardPlugin);
   await server.register(redisCachePlugin);
@@ -186,19 +188,21 @@ export async function buildServer(): Promise<FastifyInstance> {
   // Wave 8 — Y.js CRDT WebSocket plugin (depends on realtime for @fastify/websocket)
   await server.register(yjsCollabPlugin);
   await server.register(healthRoute);
-  if (config.NODE_ENV !== 'test') {
-    await server.register(rateLimit, {
-      max: config.NODE_ENV === 'development' ? 10_000 : config.API_RATE_LIMIT_MAX,
-      timeWindow: '1 minute',
-      redis: redis.status === 'ready' || redis.status === 'connect' ? redis : undefined,
-      keyGenerator: (req) => {
-        // Registered after auth so authenticated routes get per-user buckets.
-        // Public routes (health, webhooks) intentionally fall back to IP.
-        const auth = (req as unknown as { auth?: { userId?: string } }).auth;
-        return auth?.userId ?? req.ip;
-      },
-    });
-  }
+
+  await server.register(rateLimit, {
+    max: (config.NODE_ENV === 'development' || config.NODE_ENV === 'test') ? 10_000 : config.API_RATE_LIMIT_MAX,
+    timeWindow: '1 minute',
+    redis:
+      config.NODE_ENV !== 'test' && (redis.status === 'ready' || redis.status === 'connect')
+        ? redis
+        : undefined,
+    keyGenerator: (req) => {
+      // Registered after auth so authenticated routes get per-user buckets.
+      // Public routes (health, webhooks) intentionally fall back to IP.
+      const auth = (req as unknown as { auth?: { userId?: string } }).auth;
+      return auth?.userId ?? req.ip;
+    },
+  });
 
   await registerRoutes(server);
 

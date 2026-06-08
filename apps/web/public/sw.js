@@ -4,6 +4,11 @@ const CACHE_NAME = 'bidstack-v1';
 const STATIC_ASSETS = ['/', '/index.html', '/manifest.json'];
 const STATIC_CACHE_MATCH_OPTIONS = { ignoreVary: true };
 const CRITICAL_MANIFEST_KEYS = ['index.html', 'src/pages/DashboardPage.tsx'];
+const SENSITIVE_DATA_PATHS = ['/api/', '/trpc/'];
+
+function isSensitiveDataUrl(url) {
+  return SENSITIVE_DATA_PATHS.some((path) => url.pathname.startsWith(path));
+}
 
 function fetchAndCache(request, cache) {
   return fetch(request).then((networkResponse) => {
@@ -19,6 +24,22 @@ async function cacheUrl(cache, url) {
   if (response && response.status === 200) {
     await cache.put(url, response.clone());
   }
+}
+
+async function purgeSensitiveCacheEntries() {
+  const keys = await caches.keys();
+  await Promise.all(
+    keys.map(async (cacheName) => {
+      const cache = await caches.open(cacheName);
+      const requests = await cache.keys();
+      await Promise.all(
+        requests.map((request) => {
+          const url = new URL(request.url);
+          return isSensitiveDataUrl(url) ? cache.delete(request) : Promise.resolve(false);
+        }),
+      );
+    }),
+  );
 }
 
 function addManifestAsset(urls, value) {
@@ -119,6 +140,7 @@ self.addEventListener('activate', (event) => {
       .then((keys) =>
         Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))),
       )
+      .then(() => purgeSensitiveCacheEntries())
       .then(() => self.clients.claim()),
   );
 });
@@ -149,21 +171,19 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // API calls: network-first. Stale CRM data can show unavailable booking
-  // slots, wrong permissions, or outdated financial state.
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/trpc/')) {
+  // Authenticated data must never be stored or replayed from Cache Storage:
+  // stale CRM JSON can cross org/user boundaries after logout or account switch.
+  if (isSensitiveDataUrl(url)) {
     event.respondWith(
-      caches.open(CACHE_NAME).then((cache) =>
-        fetchAndCache(request, cache).catch(() =>
-          cache.match(request).then(
-            (cached) =>
-              cached ||
-              new Response(JSON.stringify({ error: 'Offline', message: 'Network unavailable' }), {
-                status: 503,
-                headers: { 'Content-Type': 'application/json' },
-              }),
-          ),
-        ),
+      fetch(request).catch(
+        () =>
+          new Response(JSON.stringify({ error: 'Offline', message: 'Network unavailable' }), {
+            status: 503,
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-store',
+            },
+          }),
       ),
     );
     return;

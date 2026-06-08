@@ -49,6 +49,7 @@ export const tagRoutes: FastifyPluginAsyncZod = async (server) => {
             : {}),
         },
         orderBy: { name: 'asc' },
+        take: 250,
       });
 
       const usage = await prisma.entityTag.groupBy({

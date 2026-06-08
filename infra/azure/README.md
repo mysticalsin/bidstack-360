@@ -12,6 +12,9 @@ root — it provisions Postgres (pgvector) + Redis, runs the one-shot `migrate`
 service, then boots api/worker/web/mcp with no hand-run prisma. This Azure draft
 ports that same contract to Container Apps.
 
+For the production Azure baseline and service decisions, read
+`docs/AZURE_FOUNDATION.md` before changing this Bicep.
+
 ---
 
 ## Topology
@@ -23,9 +26,9 @@ ports that same contract to Container Apps.
 | Postgres Flexible Server 16    | `azure.extensions=VECTOR,PGCRYPTO,PG_TRGM,CITEXT` (the migrations `CREATE EXTENSION` these)                                 |
 | Azure Cache for Redis          | BullMQ queues, rate-limit + cache                                                                                           |
 | Container Apps Job `…-migrate` | one-shot `prisma migrate deploy`; **runs to completion before apps roll**                                                   |
-| Container App `…-api`          | Fastify API, external ingress :4000, `/readyz` + `/healthz` probes                                                          |
+| Container App `…-api`          | Fastify API, external ingress :4000, `/readyz` + `/livez` probes                                                           |
 | Container App `…-worker`       | BullMQ workers (OCR + python sidecar → 2Gi), no ingress                                                                     |
-| Container App `…-mcp`          | MCP server, internal ingress :4003                                                                                          |
+| Container App `…-mcp`          | MCP server, internal ingress :4001, health server :4003                                                                      |
 | Container App `…-web`          | static nginx, external ingress :80                                                                                          |
 
 The **zero-touch contract**: the deploy pipeline starts the migrate Job and
@@ -51,7 +54,8 @@ az deployment group what-if -g <rg> -f infra/azure/main.bicep \
      managedIdentityId=<mi-resource-id> pgAdminLogin=<u> \
      pgAdminPassword=<***> integrationTokenKey=<***> clerkSecretKey=<***> \
      clerkPublishableKey=<pk> publicBaseUrl=https://app... publicApiUrl=https://api... \
-     storageSecret=<***> s3Bucket=<b> s3Region=<r>
+     s3AccessKeyId=<***> s3SecretAccessKey=<***> s3Bucket=<b> s3Region=<r> \
+     s3Endpoint=<optional> s3ForcePathStyle=false
 # review what-if, then drop --what-if equivalent: `az deployment group create ...`
 ```
 
@@ -65,7 +69,8 @@ Then move `deploy.workflow.yml.draft` → `.github/workflows/deploy.yml` (mainta
 - [ ] `redis.listKeys()` / `law.listKeys()` at deploy-time vs a dedicated `listKeys` resource function — confirm they resolve under the current Bicep linter.
 - [ ] Networking: replace the `0.0.0.0` "allow all Azure" Postgres firewall rule with VNet integration + private endpoint for production.
 - [ ] Confirm `DATABASE_URL` `sslmode=require` works with the Flexible Server cert chain from inside Container Apps.
-- [ ] Health probe paths: API exposes `/readyz` + `/healthz`? worker `/health` on 4002? mcp `/health` on 4003? (cross-check the app code).
+- [ ] Health probe paths: API exposes `/readyz` + `/livez`; worker exposes `/health` on 4002; MCP serves traffic on 4001 and `/health` on 4003.
+- [ ] Object storage: current code requires S3-compatible storage variables (`S3_*`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) or a new Azure Blob adapter.
 - [ ] Job→apps ordering is enforced by the **pipeline** (migrate job gates roll-apps), not by bicep `dependsOn` (which only orders creation). Confirm the pipeline poll loop's terminal states match `az containerapp job execution` output.
 - [ ] Cost/scale: SKUs (`Standard_D2ds_v5`, Redis C1) and min/max replicas are placeholders — right-size them.
 

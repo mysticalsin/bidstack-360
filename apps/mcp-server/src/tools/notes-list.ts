@@ -23,7 +23,7 @@ export const notesList: Tool<typeof Input> = {
   },
   handler: async (args, ctx) => {
     const items = await prisma.note.findMany({
-      where: { orgId: ctx.orgId, accountId: args.accountId },
+      where: { orgId: ctx.orgId, accountId: args.accountId, deletedAt: null }, // skip soft-deleted (Review)
       include: { author: true },
       orderBy: { createdAt: 'desc' },
       take: args.limit,

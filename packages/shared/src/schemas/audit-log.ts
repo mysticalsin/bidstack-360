@@ -30,10 +30,17 @@ export const AuditLogFilter = z.object({
   // string. Restricting to digits stops garbage input from reaching the
   // BigInt(cursor) cast in the route handler — a non-numeric value would
   // raise SyntaxError and surface as an opaque 500.
-  cursor: z.string().regex(/^\d+$/, 'cursor must be a positive integer string').optional(),
+  cursor: z.string().regex(/^[1-9]\d*$/, 'cursor must be a positive integer string').optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 export type AuditLogFilter = z.infer<typeof AuditLogFilter>;
+
+export const AuditLogExportFilter = AuditLogFilter.omit({ cursor: true, limit: true }).extend({
+  q: z.string().trim().max(160).optional(),
+  category: z.enum(['all', 'security', 'destructive', 'crm', 'system']).default('all'),
+  limit: z.coerce.number().int().min(1).max(10_000).default(5_000),
+});
+export type AuditLogExportFilter = z.infer<typeof AuditLogExportFilter>;
 
 export const AuditLogPage = z.object({
   items: z.array(AuditLogEntry),

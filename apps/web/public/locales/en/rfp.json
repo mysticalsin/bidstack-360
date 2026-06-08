@@ -109,5 +109,21 @@
     "dropHere": "Drop an agent here",
     "closeBrief": "Close role brief",
     "responsibilities": "Responsibilities"
+  },
+  "competitor": {
+    "heading": "Competitor intelligence",
+    "subtitle": "Grounded in public sources — every finding links to where it came from. Nothing is invented.",
+    "selectLabel": "Competitor to research",
+    "selectPlaceholder": "Choose a competitor",
+    "research": "Research",
+    "researching": "Researching…",
+    "addPlaceholder": "Add a competitor by name",
+    "add": "Add",
+    "queued": "Research queued — cited findings will appear here shortly.",
+    "listLabel": "Cited competitor findings",
+    "sourceNewTab": "(opens in a new tab)",
+    "emptyTitle": "No competitor findings yet",
+    "emptyMessage": "Pick a competitor and run research. We only surface claims we can link to a public source — including real federal award pricing from USASpending.",
+    "error": "Couldn't load competitor findings."
   }
 }

@@ -1,6 +1,5 @@
-// EmailTemplate management routes — CRUD + render-with-context preview +
-// a stub draft-from-wins endpoint that will be replaced by a Dust agent
-// call in Sprint 2.
+// EmailTemplate management routes: CRUD, render-with-context preview, and
+// usage tracking for the compose workflow.
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -41,6 +40,7 @@ export const emailTemplateRoutes: FastifyPluginAsyncZod = async (server) => {
           ...(req.query.category ? { category: req.query.category } : {}),
         },
         orderBy: [{ lastUsedAt: { sort: 'desc', nulls: 'last' } }, { name: 'asc' }],
+        take: 200,
       });
       return { items: items.map(serialize) };
     },

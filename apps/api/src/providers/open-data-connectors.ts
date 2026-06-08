@@ -70,6 +70,23 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
     process.env[envName] ? 'healthy' : 'disabled';
   const credentialMessage = (envName: string, enabled: string, disabled: string) =>
     process.env[envName] ? enabled : `${disabled} (${envName} not set)`;
+  const apolloMcpConfigured = Boolean(process.env.APOLLO_MCP_URL && process.env.APOLLO_MCP_BEARER_TOKEN);
+  const apolloMcpPartial = Boolean(process.env.APOLLO_MCP_URL || process.env.APOLLO_MCP_BEARER_TOKEN);
+  const apolloStatus: CrmConnector['status'] =
+    apolloMcpConfigured || process.env.APOLLO_API_KEY
+      ? 'healthy'
+      : apolloMcpPartial
+        ? 'degraded'
+        : 'disabled';
+  const apolloMessage = apolloMcpConfigured
+    ? 'Apollo MCP company search enabled; enrichment credit tools remain opt-in.'
+    : apolloMcpPartial
+      ? 'Apollo MCP is partially configured; set both APOLLO_MCP_URL and APOLLO_MCP_BEARER_TOKEN.'
+      : credentialMessage(
+          'APOLLO_API_KEY',
+          'Apollo REST organization enrichment enabled; this can consume credits.',
+          'Ready for Apollo MCP or REST credentials',
+        );
 
   return [
     {
@@ -127,26 +144,21 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
     {
       id: 'apollo-organizations',
       name: 'Apollo Organizations',
-      category: 'people',
+      category: 'company',
       kind: 'credentialed_api',
-      status: process.env.APOLLO_MCP_URL || process.env.APOLLO_API_KEY ? 'healthy' : 'disabled',
+      status: apolloStatus,
       requiresCredential: true,
       sourceUrl: 'https://api.apollo.io/',
-      docsUrl: 'https://docs.apollo.io/docs/apollo-mcp-server-documentation',
+      docsUrl: 'https://docs.apollo.io/docs/apollo-mcp',
       lastCheckedAt,
-      message: process.env.APOLLO_MCP_URL
-        ? 'Apollo MCP company search enabled; enrichment credit tools remain opt-in.'
-        : credentialMessage(
-            'APOLLO_API_KEY',
-            'Apollo REST organization enrichment enabled; this can consume credits.',
-            'Ready for Apollo MCP or REST credentials',
-          ),
+      message: apolloMessage,
       capabilities: [
         'company search',
         'firmographics',
         'buying intent',
         'hiring signals',
-        'leadership signals without emails or phone numbers',
+        'news and funding signals with public-news cross-check',
+        'opt-in leadership title signals without emails or phone numbers',
       ],
     },
     {

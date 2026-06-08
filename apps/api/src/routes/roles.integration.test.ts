@@ -1,5 +1,7 @@
 // Integration tests for /api/roles and /api/permissions.
 
+import { randomUUID } from 'node:crypto';
+
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { prisma } from '@bidstack/db';
@@ -9,6 +11,7 @@ import { buildServer } from '../server.js';
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
 const createdRoleIds: string[] = [];
+const createdAuditIds: bigint[] = [];
 
 beforeAll(async () => {
   try {
@@ -25,6 +28,9 @@ beforeAll(async () => {
 afterAll(async () => {
   if (server) await server.close();
   if (dbReachable) {
+    if (createdAuditIds.length > 0) {
+      await prisma.auditLog.deleteMany({ where: { id: { in: createdAuditIds } } });
+    }
     for (const id of createdRoleIds) {
       try {
         await prisma.role.deleteMany({ where: { id } });
@@ -77,6 +83,19 @@ describe('roles routes', () => {
     expect(body.id).toBeDefined();
     expect(body.name).toBe('Audit Test Role');
     createdRoleIds.push(body.id);
+  });
+
+  skipIfNoDb('POST /api/roles rejects unknown permissionIds (BS-33 create)', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/roles',
+      payload: {
+        name: `Bad Permission Role ${randomUUID().slice(0, 8)}`,
+        permissionIds: ['00000000-0000-0000-0000-000000000001'],
+      },
+    });
+    expect(res.statusCode).toBe(400);
+    expect((res.json() as { message: string }).message).toMatch(/Unknown permissionId/);
   });
 
   skipIfNoDb('PATCH /api/roles/:id updates a role', async () => {
@@ -143,4 +162,81 @@ describe('roles routes', () => {
     const body = res.json() as { message: string };
     expect(body.message).toMatch(/Unknown permissionId/);
   });
+
+  skipIfNoDb(
+    'writes rich audit rows for role create/update/delete without duplicate request rows',
+    async () => {
+      const permissionsRes = await server.inject({ method: 'GET', url: '/api/permissions' });
+      expect(permissionsRes.statusCode).toBe(200);
+      const permission = (permissionsRes.json() as { items: Array<{ id: string; key: string }> })
+        .items[0];
+      expect(permission).toBeDefined();
+
+      const suffix = randomUUID().slice(0, 8);
+      const roleName = `Audited Role ${suffix}`;
+      const patchedName = `Audited Role Updated ${suffix}`;
+      const startedAt = new Date();
+
+      const createRes = await server.inject({
+        method: 'POST',
+        url: '/api/roles',
+        payload: {
+          name: roleName,
+          description: 'Requires audit trail',
+          permissionIds: [permission.id],
+        },
+      });
+      expect(createRes.statusCode).toBe(201);
+      const id = createRes.json().id as string;
+      createdRoleIds.push(id);
+
+      const patchRes = await server.inject({
+        method: 'PATCH',
+        url: `/api/roles/${id}`,
+        payload: { name: patchedName, permissionIds: [] },
+      });
+      expect(patchRes.statusCode).toBe(200);
+
+      const deleteRes = await server.inject({ method: 'DELETE', url: `/api/roles/${id}` });
+      expect(deleteRes.statusCode).toBe(204);
+
+      const auditRows = await prisma.auditLog.findMany({
+        where: { targetType: 'role', targetId: id },
+        orderBy: { at: 'asc' },
+      });
+      createdAuditIds.push(...auditRows.map((row) => row.id));
+      expect(auditRows.map((row) => row.action)).toEqual([
+        'role.create',
+        'role.update',
+        'role.delete',
+      ]);
+
+      const createDiff = auditRows[0]!.diff as Record<string, unknown>;
+      expect(createDiff).toMatchObject({ actorKind: 'user', name: roleName });
+      expect(createDiff.permissionKeys).toEqual(expect.arrayContaining([permission.key]));
+
+      const updateDiff = auditRows[1]!.diff as Record<string, unknown>;
+      const updateChanges = updateDiff.changes as Record<string, Record<string, unknown>>;
+      expect(updateDiff).toMatchObject({ actorKind: 'user' });
+      expect(updateChanges.name).toMatchObject({ from: roleName, to: patchedName });
+      expect(updateChanges.permissions.fromKeys).toEqual(expect.arrayContaining([permission.key]));
+      expect(updateChanges.permissions.toKeys).toEqual([]);
+
+      const deleteDiff = auditRows[2]!.diff as Record<string, unknown>;
+      expect(deleteDiff).toMatchObject({ actorKind: 'user', name: patchedName });
+      expect(deleteDiff.permissionKeys).toEqual([]);
+
+      const detailPath = `/api/v1/roles/${id}`;
+      const genericRows = await prisma.$queryRaw<Array<{ id: bigint }>>`
+      SELECT id
+      FROM audit_log
+      WHERE action = 'http.mutation.success'
+        AND target_type = 'http_request'
+        AND at >= ${startedAt}
+        AND ((diff->>'path') = '/api/v1/roles' OR (diff->>'path') = ${detailPath})
+    `;
+      createdAuditIds.push(...genericRows.map((row) => row.id));
+      expect(genericRows).toHaveLength(0);
+    },
+  );
 });

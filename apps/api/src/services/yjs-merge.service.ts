@@ -123,16 +123,17 @@ async function compactSingleDoc(ydocId: string): Promise<number> {
   const mergedUpdate = Y.encodeStateAsUpdate(doc);
   const updateIds = existing.updates.map((u) => u.id);
 
-  await prisma.$transaction([
-    prisma.yjsDocument.update({
-      where: { id: ydocId },
-      data: { ydocBinary: encrypt(Buffer.from(mergedUpdate)) },
-    }),
-    prisma.yjsUpdate.deleteMany({
-      where: { id: { in: updateIds } },
-    }),
-  ]);
-
-  logger.debug({ ydocId, mergedCount: updateIds.length }, 'doc compacted');
-  return updateIds.length;
+  return prisma.$transaction(async (tx) => {
+    // Compare-and-swap on version (matches yjs-compaction.ts + yjs-persistence):
+    // a third compaction path here must not blind-overwrite the snapshot. Abort
+    // without deleting the update rows if another pass wrote it first. (Review.)
+    const swapped = await tx.yjsDocument.updateMany({
+      where: { id: ydocId, version: existing.version },
+      data: { ydocBinary: encrypt(Buffer.from(mergedUpdate)), version: { increment: 1 } },
+    });
+    if (swapped.count !== 1) return 0;
+    await tx.yjsUpdate.deleteMany({ where: { id: { in: updateIds } } });
+    logger.debug({ ydocId, mergedCount: updateIds.length }, 'doc compacted');
+    return updateIds.length;
+  });
 }

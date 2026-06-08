@@ -9,12 +9,20 @@ vi.mock('./llm-provider.js', () => ({ resolveLlmFromEnv: vi.fn(), completeChat: 
 
 import { runRfpCompletion } from './rfp-llm.js';
 import { resolveLlmFromEnv, completeChat } from './llm-provider.js';
+import { logAiInvocation } from './ai-audit-worker.js';
 
 const mockResolve = vi.mocked(resolveLlmFromEnv);
 const mockComplete = vi.mocked(completeChat);
+const mockLogAiInvocation = vi.mocked(logAiInvocation);
 const log = { warn: vi.fn(), info: vi.fn(), error: vi.fn() } as unknown as pino.Logger;
 
-const base = { orgId: 'o', log, agentId: 'agent-1', userMessage: 'prompt', agentType: 'rfp-test' };
+const base = {
+  orgId: '11111111-1111-4111-8111-111111111111',
+  log,
+  agentId: 'agent-1',
+  userMessage: 'prompt',
+  agentType: 'rfp-test',
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -42,7 +50,7 @@ describe('runRfpCompletion tiering', () => {
 
   it('tier 2: falls through to the Dust agent when no direct provider is set', async () => {
     mockResolve.mockReturnValue(null);
-    const runAgent = vi.fn().mockResolvedValue({ output: 'draft', run_id: 'r1' });
+    const runAgent = vi.fn().mockResolvedValue({ status: 'succeeded', output: 'draft', run_id: 'r1' });
     const dust = { runAgent } as unknown as DustClient;
 
     const r = await runRfpCompletion({ ...base, dust });
@@ -57,16 +65,62 @@ describe('runRfpCompletion tiering', () => {
     expect(r).toBeNull();
   });
 
-  it('returns null on direct-provider error and does NOT silently fall through to Dust', async () => {
+  it('falls through to Dust when the direct provider fails', async () => {
     mockResolve.mockReturnValue({ kind: 'openai', apiKey: 'k', model: 'm', baseUrl: 'b' });
     mockComplete.mockRejectedValue(new Error('boom'));
-    const runAgent = vi.fn();
+    const runAgent = vi.fn().mockResolvedValue({ status: 'succeeded', output: 'dust draft', run_id: 'r2' });
     const dust = { runAgent } as unknown as DustClient;
 
     const r = await runRfpCompletion({ ...base, dust });
 
-    expect(r).toBeNull();
+    expect(r).toEqual({ text: 'dust draft', provider: 'dust', runId: 'r2' });
+    expect(runAgent).toHaveBeenCalledOnce();
+  });
+
+  it('does not fall through to Dust when cancellation aborts the direct provider', async () => {
+    const ctl = new AbortController();
+    ctl.abort();
+    mockResolve.mockReturnValue({ kind: 'openai', apiKey: 'k', model: 'm', baseUrl: 'b' });
+    const err = new Error('aborted');
+    err.name = 'AbortError';
+    mockComplete.mockRejectedValue(err);
+    const runAgent = vi.fn().mockResolvedValue({ status: 'succeeded', output: 'dust draft', run_id: 'r2' });
+    const dust = { runAgent } as unknown as DustClient;
+
+    await expect(runRfpCompletion({ ...base, dust, signal: ctl.signal })).rejects.toMatchObject({
+      name: 'AbortError',
+    });
     expect(runAgent).not.toHaveBeenCalled();
+    expect(log.warn).not.toHaveBeenCalled();
+    expect(mockLogAiInvocation).not.toHaveBeenCalled();
+  });
+
+  it('does not record an AI failure when cancellation aborts the Dust tier', async () => {
+    const ctl = new AbortController();
+    ctl.abort();
+    mockResolve.mockReturnValue(null);
+    const err = new Error('aborted');
+    err.name = 'AbortError';
+    const dust = {
+      runAgent: vi.fn().mockRejectedValue(err),
+    } as unknown as DustClient;
+
+    await expect(runRfpCompletion({ ...base, dust, signal: ctl.signal })).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+    expect(log.warn).not.toHaveBeenCalled();
+    expect(mockLogAiInvocation).not.toHaveBeenCalled();
+  });
+
+  it('returns null when Dust does not succeed with output', async () => {
+    mockResolve.mockReturnValue(null);
+    const dust = {
+      runAgent: vi.fn().mockResolvedValue({ status: 'running', output: 'not ready', run_id: 'r3' }),
+    } as unknown as DustClient;
+
+    const r = await runRfpCompletion({ ...base, dust });
+
+    expect(r).toBeNull();
   });
 
   it('returns null when the Dust call throws', async () => {

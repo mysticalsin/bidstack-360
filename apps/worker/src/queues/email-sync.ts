@@ -19,7 +19,7 @@ import { Queue, Worker } from 'bullmq';
 import type IORedis from 'ioredis';
 import type pino from 'pino';
 
-import { prisma } from '@bidstack/db';
+import { prisma, IntegrationProvider } from '@bidstack/db';
 import {
   OUTLOOK_PULL_HISTORICAL,
   OUTLOOK_PULL_INCREMENTAL,
@@ -59,8 +59,7 @@ export function startEmailSync(
         // Fan-out: enqueue one pull job per active Outlook token
         const tokens = await prisma.integrationToken.findMany({
           where: {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            provider: 'microsoft_graph' as any,
+            provider: IntegrationProvider.microsoft_graph,
             status: 'active',
             deletedAt: null,
           },

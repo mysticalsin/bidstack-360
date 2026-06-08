@@ -4,10 +4,18 @@ import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 
 import type { Tool } from './index.js';
 
+const Stage = z.enum([
+  's1_lead',
+  's1_ongoing',
+  's2_sent',
+  's3_technical_iteration',
+  's4_negotiation',
+  'closed_won',
+  'closed_lost',
+]);
+
 const Input = z.object({
-  stage: z
-    .enum(['discovery', 'qualified', 'proposal', 'negotiation', 'closed_won', 'closed_lost'])
-    .optional(),
+  stage: Stage.optional(),
   owner: z.string().email().optional(),
   industry: z.string().optional(),
   search: z.string().optional(),
@@ -22,7 +30,7 @@ export const opportunitiesList: Tool<typeof Input> = {
     properties: {
       stage: {
         type: 'string',
-        enum: ['discovery', 'qualified', 'proposal', 'negotiation', 'closed_won', 'closed_lost'],
+        enum: Stage.options,
       },
       owner: { type: 'string', format: 'email' },
       industry: { type: 'string' },
@@ -35,6 +43,7 @@ export const opportunitiesList: Tool<typeof Input> = {
     const items = await prisma.opportunity.findMany({
       where: {
         orgId: ctx.orgId,
+        deletedAt: null, // skip soft-deleted (Review)
         ...(args.stage ? { stage: args.stage as PrismaStage } : {}),
         ...(args.industry ? { industry: args.industry } : {}),
         ...(args.owner ? { owner: { email: args.owner } } : {}),

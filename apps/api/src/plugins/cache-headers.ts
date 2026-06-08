@@ -1,4 +1,4 @@
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyReply } from 'fastify';
 import fp from 'fastify-plugin';
 import { createHash } from 'crypto';
 
@@ -13,6 +13,21 @@ const READ_ROUTE_PATTERNS: Array<{ pattern: RegExp; directive: string; etag: boo
   { pattern: /^GET \/api\/v1\/integrations\/[^/]+\/status/, directive: 'max-age=15, stale-while-revalidate=60', etag: true },
   { pattern: /^GET \/api\/v1\/health/, directive: 'max-age=5', etag: false },
 ];
+
+function appendVary(reply: FastifyReply, values: string[]): void {
+  const existing = reply.getHeader('Vary');
+  const parts = new Set<string>();
+  const add = (value: string) => {
+    for (const part of value.split(',')) {
+      const trimmed = part.trim();
+      if (trimmed) parts.add(trimmed);
+    }
+  };
+  if (typeof existing === 'string') add(existing);
+  else if (Array.isArray(existing)) existing.forEach(add);
+  values.forEach(add);
+  reply.header('Vary', [...parts].join(', '));
+}
 
 function etagFor(body: unknown): string {
   const raw = typeof body === 'string' ? body : JSON.stringify(body);
@@ -33,7 +48,9 @@ export const cacheHeadersPlugin: FastifyPluginAsync = fp(async (server) => {
 
     for (const { pattern, directive, etag } of READ_ROUTE_PATTERNS) {
       if (pattern.test(routeKey)) {
-        reply.header('Cache-Control', directive);
+        const isHealthRoute = /^GET \/api\/v1\/health/.test(routeKey);
+        reply.header('Cache-Control', isHealthRoute ? directive : `private, ${directive}`);
+        if (!isHealthRoute) appendVary(reply, ['Authorization', 'Cookie']);
         if (etag && payload) {
           const tag = etagFor(payload);
           reply.header('ETag', tag);

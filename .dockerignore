@@ -4,13 +4,19 @@
 
 # Node
 node_modules
+**/node_modules
 .pnpm-store
+**/.pnpm-store
 
 # Build outputs
 dist
+**/dist
 build
+**/build
 .turbo
+**/.turbo
 .vite
+**/.vite
 
 # Env & secrets
 .env
@@ -19,10 +25,15 @@ build
 
 # Logs
 *.log
+**/*.log
 .tmp
+**/.tmp
 .tmp-screens
+**/.tmp-screens
 .audit-screens
+**/.audit-screens
 .playwright-mcp
+**/.playwright-mcp
 
 # IDE
 .vscode
@@ -34,7 +45,9 @@ Thumbs.db
 
 # Tests
 coverage
+**/coverage
 playwright-report
+**/playwright-report
 
 # Docs (not needed in containers)
 docs
@@ -44,3 +57,31 @@ docs
 
 # Misc
 CRM*.zip
+.audit-screens
+.audit-screens/**
+.claire
+.claire/**
+.claude
+.claude/**
+.clone
+.clone/**
+.codex
+.codex/**
+.conductor
+.conductor/**
+.swarm_state
+.swarm_state/**
+BIDCRM-design
+BIDCRM-design/**
+scratch_skills
+scratch_skills/**
+integrations
+integrations/**
+handoff
+handoff/**
+infra
+infra/**
+load-tests
+load-tests/**
+packages/twenty-bidstack
+packages/twenty-bidstack/**

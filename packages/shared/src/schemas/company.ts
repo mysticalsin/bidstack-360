@@ -41,17 +41,21 @@ export type CompanyCreate = z.infer<typeof CompanyCreate>;
 
 export const CompanyPatch = z
   .object({
-    name: z.string().min(1).optional(),
-    legalName: z.string().nullable().optional(),
-    domain: z.string().nullable().optional(),
-    industry: z.string().nullable().optional(),
-    employeeCount: z.number().int().nullable().optional(),
+    // Mirror the bounds + URL validation from the base Company schema — the PATCH
+    // path must not be a backdoor for non-URL / unbounded values that corrupt the
+    // row and then 500 on read (response is validated against Company). (Review
+    // finding, 2026-06-04.)
+    name: z.string().min(1).max(255).optional(),
+    legalName: z.string().max(255).nullable().optional(),
+    domain: z.string().max(255).nullable().optional(),
+    industry: z.string().max(100).nullable().optional(),
+    employeeCount: z.number().int().min(0).max(999999).nullable().optional(),
     countryCode: z.string().length(2).nullable().optional(),
     address: z.record(z.unknown()).nullable().optional(),
-    billingEmail: z.string().email().nullable().optional(),
-    taxId: z.string().nullable().optional(),
-    logoUrl: z.string().nullable().optional(),
-    website: z.string().nullable().optional(),
+    billingEmail: z.string().email().max(255).nullable().optional(),
+    taxId: z.string().max(100).nullable().optional(),
+    logoUrl: z.string().url().max(500).nullable().optional(),
+    website: z.string().url().max(500).nullable().optional(),
     tier: z.enum(['key', 'top', 'standard']).nullable().optional(),
     parentId: z.string().uuid().nullable().optional(),
     customFieldValues: z.array(CustomFieldValueInput).optional(),

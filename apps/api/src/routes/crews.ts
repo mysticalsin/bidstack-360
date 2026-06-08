@@ -10,7 +10,7 @@ import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, type Prisma } from '@bidstack/db';
 
-import { enqueueCrewRun } from '../queues/crew-run.js';
+import { cancelQueuedCrewRun, enqueueCrewRun } from '../queues/crew-run.js';
 import { seedStandardCrew } from '../lib/crew-standard.js';
 
 // ─── Row shapes + serializers ───────────────────────────────────────────────
@@ -37,6 +37,7 @@ interface RunRow {
   crew_id: string;
   started_by_user_id: string | null;
   status: string;
+  inputs: unknown;
   final_output: string | null;
   results: unknown;
   error: string | null;
@@ -66,12 +67,20 @@ function serializeCrew(c: CrewRow, tasks: TaskRow[]) {
   };
 }
 
+function asRunInputs(inputs: unknown): Record<string, string> {
+  if (typeof inputs !== 'object' || inputs === null || Array.isArray(inputs)) return {};
+  return Object.fromEntries(
+    Object.entries(inputs).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+  );
+}
+
 function serializeRun(r: RunRow, isAdmin: boolean) {
   return {
     id: r.id,
     crewId: r.crew_id,
     startedByUserId: r.started_by_user_id,
     status: r.status,
+    inputs: asRunInputs(r.inputs),
     finalOutput: r.final_output,
     results: r.results ?? null,
     // Raw error text can carry LLM/internal detail. Only admins see it; members
@@ -88,6 +97,8 @@ function serializeRun(r: RunRow, isAdmin: boolean) {
 const MAX_INPUT_KEYS = 20;
 const MAX_INPUT_VALUE_CHARS = 20_000;
 const MAX_INPUT_TOTAL_CHARS = 100_000;
+const ACTIVE_RUN_STATUSES = ['queued', 'running'] as const;
+const RETRYABLE_RUN_STATUSES = ['failed', 'cancelled', 'partial'] as const;
 const RunInputs = z
   .record(
     z.string().max(MAX_INPUT_VALUE_CHARS, `Each value must be ≤ ${MAX_INPUT_VALUE_CHARS} chars`),
@@ -165,6 +176,49 @@ const CrewBody = z
     });
   });
 
+const CrewResponse = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  process: z.string(),
+  managerAgentKey: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  tasks: z.array(
+    z.object({
+      taskKey: z.string(),
+      description: z.string(),
+      expectedOutput: z.string(),
+      agentKey: z.string(),
+      contextKeys: z.array(z.string()),
+    })
+  ),
+});
+
+const CrewListResponse = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  process: z.string(),
+  managerAgentKey: z.string().nullable(),
+  taskCount: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const RunResponse = z.object({
+  id: z.string().uuid(),
+  crewId: z.string().uuid(),
+  startedByUserId: z.string().uuid().nullable(),
+  status: z.string(),
+  inputs: z.record(z.string()),
+  finalOutput: z.string().nullable(),
+  results: z.unknown().nullable(),
+  error: z.string().nullable(),
+  createdAt: z.string(),
+  completedAt: z.string().nullable(),
+});
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 async function insertTasks(
@@ -209,6 +263,42 @@ function uuidOrNull(v: string | null | undefined): string | null {
   return v && UUID_RE.test(v) ? v : null;
 }
 
+async function loadRunForAction(
+  orgId: string,
+  userId: string | null | undefined,
+  isAdmin: boolean,
+  runId: string,
+): Promise<RunRow | null> {
+  const callerId = uuidOrNull(userId);
+  const rows = await prisma.$queryRaw<RunRow[]>`
+    SELECT id, crew_id, started_by_user_id, status, inputs, final_output, results, error, created_at, completed_at
+    FROM crew_runs
+    WHERE id = ${runId}::uuid AND org_id = ${orgId}::uuid
+      AND (${isAdmin} OR started_by_user_id = ${callerId}::uuid)
+    LIMIT 1
+  `;
+  return rows[0] ?? null;
+}
+
+async function writeCrewRunAudit(
+  orgId: string,
+  userId: string | null | undefined,
+  action: 'crew.run.cancel' | 'crew.run.retry',
+  runId: string,
+  diff: Prisma.InputJsonObject,
+): Promise<void> {
+  await prisma.auditLog.create({
+    data: {
+      orgId,
+      userId: uuidOrNull(userId),
+      action,
+      targetType: 'crew_run',
+      targetId: runId,
+      diff,
+    },
+  });
+}
+
 /** Agent keys referenced by a crew body that don't exist (active) in the org —
  *  so the handler can 400 at authoring time instead of failing the run at kickoff. */
 async function missingAgentKeys(orgId: string, body: z.infer<typeof CrewBody>): Promise<string[]> {
@@ -229,7 +319,10 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
   const admin = server.requireRole('admin');
 
   // GET /crews — list crews with task counts (any member).
-  app.get('/crews', async (req) => {
+  app.get(
+    '/crews',
+    { schema: { response: { 200: z.object({ items: z.array(CrewListResponse) }) } } },
+    async (req) => {
     const rows = await prisma.$queryRaw<(CrewRow & { task_count: bigint })[]>`
       SELECT c.id, c.name, c.description, c.process, c.manager_agent_key, c.created_at, c.updated_at,
              (SELECT count(*) FROM crew_tasks t WHERE t.crew_id = c.id) AS task_count
@@ -254,7 +347,12 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
   // GET /crews/:id — crew + ordered tasks (any member).
   app.get(
     '/crews/:id',
-    { schema: { params: z.object({ id: z.string().uuid() }) } },
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: { 200: CrewResponse },
+      },
+    },
     async (req) => {
       const crew = await loadCrew(req.auth.orgId, req.params.id);
       if (!crew) throw server.httpErrors.notFound('Crew not found');
@@ -263,7 +361,10 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
   );
 
   // POST /crews — create crew + tasks (admin only).
-  app.post('/crews', { preHandler: admin, schema: { body: CrewBody } }, async (req, reply) => {
+  app.post(
+    '/crews',
+    { preHandler: admin, schema: { body: CrewBody, response: { 201: CrewResponse } } },
+    async (req, reply) => {
     const { orgId, userId } = req.auth;
     const b = req.body;
     const missing = await missingAgentKeys(orgId, b);
@@ -285,14 +386,23 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
       await insertTasks(tx, orgId, id, b.tasks);
       return id;
     });
+    const crew = await loadCrew(orgId, crewId);
+    if (!crew) throw server.httpErrors.internalServerError('Failed to load created crew');
     reply.status(201);
-    return loadCrew(orgId, crewId);
+    return crew;
   });
 
   // PATCH /crews/:id — update crew + replace its tasks (admin only).
   app.patch(
     '/crews/:id',
-    { preHandler: admin, schema: { params: z.object({ id: z.string().uuid() }), body: CrewBody } },
+    {
+      preHandler: admin,
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        body: CrewBody,
+        response: { 200: CrewResponse },
+      },
+    },
     async (req) => {
       const { orgId } = req.auth;
       const { id } = req.params;
@@ -316,14 +426,19 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
         return true;
       });
       if (!ok) throw server.httpErrors.notFound('Crew not found');
-      return loadCrew(orgId, id);
+      const crew = await loadCrew(orgId, id);
+      if (!crew) throw server.httpErrors.internalServerError('Failed to load updated crew');
+      return crew;
     },
   );
 
   // DELETE /crews/:id — soft-delete (admin only).
   app.delete(
     '/crews/:id',
-    { preHandler: admin, schema: { params: z.object({ id: z.string().uuid() }) } },
+    {
+      preHandler: admin,
+      schema: { params: z.object({ id: z.string().uuid() }), response: { 204: z.null() } },
+    },
     async (req, reply) => {
       const affected = await prisma.$executeRaw`
         UPDATE crews SET deleted_at = now()
@@ -337,10 +452,15 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
 
   // POST /crews/seed-standard — load the out-of-the-box standard agents + the
   // default RFP-response crew for this org (admin only). Idempotent.
-  app.post('/crews/seed-standard', { preHandler: admin }, async (req, reply) => {
+  app.post(
+    '/crews/seed-standard',
+    { preHandler: admin, schema: { response: { 201: CrewResponse } } },
+    async (req, reply) => {
     const crewId = await seedStandardCrew(req.auth.orgId, req.auth.userId);
+    const crew = await loadCrew(req.auth.orgId, crewId);
+    if (!crew) throw server.httpErrors.internalServerError('Failed to load seeded crew');
     reply.status(201);
-    return loadCrew(req.auth.orgId, crewId);
+    return crew;
   });
 
   // POST /crews/:id/run — run a crew (any member). Creates a CrewRun + enqueues.
@@ -351,6 +471,7 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: z.object({ inputs: RunInputs }),
+        response: { 202: z.object({ runId: z.string().uuid(), status: z.string() }) },
       },
     },
     async (req, reply) => {
@@ -388,15 +509,119 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
     },
   );
 
+  // POST /crew-runs/:id/cancel — transition queued/running runs to cancelled.
+  app.post(
+    '/crew-runs/:id/cancel',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: { 200: RunResponse },
+      },
+    },
+    async (req) => {
+      const isAdmin = req.auth.role === 'admin';
+      const run = await loadRunForAction(req.auth.orgId, req.auth.userId, isAdmin, req.params.id);
+      if (!run) throw server.httpErrors.notFound('Run not found');
+      if (!ACTIVE_RUN_STATUSES.includes(run.status as (typeof ACTIVE_RUN_STATUSES)[number])) {
+        throw server.httpErrors.conflict(`Crew run cannot be cancelled from ${run.status}`);
+      }
+
+      if (run.status === 'queued') {
+        const removed = await cancelQueuedCrewRun(run.id);
+        if (!removed) {
+          throw server.httpErrors.conflict('Queued crew run is already active; retry status refresh');
+        }
+      }
+
+      const rows = await prisma.$queryRaw<RunRow[]>`
+        UPDATE crew_runs
+        SET status = 'cancelled', error = 'Cancelled by user', completed_at = now()
+        WHERE id = ${run.id}::uuid AND org_id = ${req.auth.orgId}::uuid
+          AND status IN ('queued', 'running')
+        RETURNING id, crew_id, started_by_user_id, status, inputs, final_output, results, error, created_at, completed_at
+      `;
+      const updated = rows[0];
+      if (!updated) throw server.httpErrors.conflict('Crew run changed state; refresh before cancelling');
+
+      await writeCrewRunAudit(req.auth.orgId, req.auth.userId, 'crew.run.cancel', run.id, {
+        crewId: run.crew_id,
+        previousStatus: run.status,
+        status: 'cancelled',
+      });
+      return serializeRun(updated, isAdmin);
+    },
+  );
+
+  // POST /crew-runs/:id/retry — enqueue a new run with the original bounded inputs.
+  app.post(
+    '/crew-runs/:id/retry',
+    {
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: { 202: z.object({ runId: z.string().uuid(), status: z.string() }) },
+      },
+    },
+    async (req, reply) => {
+      const isAdmin = req.auth.role === 'admin';
+      const run = await loadRunForAction(req.auth.orgId, req.auth.userId, isAdmin, req.params.id);
+      if (!run) throw server.httpErrors.notFound('Run not found');
+      if (!RETRYABLE_RUN_STATUSES.includes(run.status as (typeof RETRYABLE_RUN_STATUSES)[number])) {
+        throw server.httpErrors.conflict(`Crew run cannot be retried from ${run.status}`);
+      }
+      const crew = await loadCrew(req.auth.orgId, run.crew_id);
+      if (!crew) throw server.httpErrors.notFound('Crew not found');
+
+      const inputs = asRunInputs(run.inputs);
+      const startedBy = uuidOrNull(req.auth.userId);
+      const rows = await prisma.$queryRaw<{ id: string }[]>`
+        INSERT INTO crew_runs (id, org_id, crew_id, started_by_user_id, status, inputs, created_at)
+        VALUES (gen_random_uuid(), ${req.auth.orgId}::uuid, ${run.crew_id}::uuid, ${startedBy}::uuid,
+                'queued', ${JSON.stringify(inputs)}::jsonb, now())
+        RETURNING id
+      `;
+      const newRunId = rows[0]?.id;
+      if (!newRunId) throw server.httpErrors.internalServerError('Run insert returned no row');
+
+      const jobId = await enqueueCrewRun({
+        orgId: req.auth.orgId,
+        crewId: run.crew_id,
+        runId: newRunId,
+        inputs,
+      });
+      if (!jobId) {
+        await prisma.$executeRaw`
+          UPDATE crew_runs SET status = 'failed', error = 'Run queue unavailable — please retry', completed_at = now()
+          WHERE id = ${newRunId}::uuid AND org_id = ${req.auth.orgId}::uuid
+        `;
+        throw server.httpErrors.serviceUnavailable('Run queue unavailable — please retry');
+      }
+
+      await writeCrewRunAudit(req.auth.orgId, req.auth.userId, 'crew.run.retry', run.id, {
+        crewId: run.crew_id,
+        previousRunId: run.id,
+        newRunId,
+        previousStatus: run.status,
+      });
+      reply.status(202);
+      return { runId: newRunId, status: 'queued' as const };
+    },
+  );
+
   // GET /crew-runs/:id — a single run (owner-or-admin).
   app.get(
     '/crew-runs/:id',
-    { schema: { params: z.object({ id: z.string().uuid() }) } },
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: { 200: RunResponse },
+      },
+    },
     async (req) => {
       const isAdmin = req.auth.role === 'admin';
       const callerId = uuidOrNull(req.auth.userId);
       const rows = await prisma.$queryRaw<RunRow[]>`
-        SELECT id, crew_id, started_by_user_id, status, final_output, results, error, created_at, completed_at
+        SELECT id, crew_id, started_by_user_id, status, inputs, final_output, results, error, created_at, completed_at
         FROM crew_runs
         WHERE id = ${req.params.id}::uuid AND org_id = ${req.auth.orgId}::uuid
           AND (${isAdmin} OR started_by_user_id = ${callerId}::uuid)
@@ -411,13 +636,18 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
   // GET /crew-runs?crewId= — list runs (owner-or-admin scoped).
   app.get(
     '/crew-runs',
-    { schema: { querystring: z.object({ crewId: z.string().uuid().optional() }) } },
+    {
+      schema: {
+        querystring: z.object({ crewId: z.string().uuid().optional() }),
+        response: { 200: z.object({ items: z.array(RunResponse) }) },
+      },
+    },
     async (req) => {
       const isAdmin = req.auth.role === 'admin';
       const callerId = uuidOrNull(req.auth.userId);
       const { crewId } = req.query;
       const rows = await prisma.$queryRaw<RunRow[]>`
-        SELECT id, crew_id, started_by_user_id, status, final_output, results, error, created_at, completed_at
+        SELECT id, crew_id, started_by_user_id, status, inputs, final_output, results, error, created_at, completed_at
         FROM crew_runs
         WHERE org_id = ${req.auth.orgId}::uuid
           AND (${isAdmin} OR started_by_user_id = ${callerId}::uuid)

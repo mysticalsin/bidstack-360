@@ -1,82 +1,110 @@
-# Crew — CrewAI-style multi-agent infrastructure (Wave 10)
+# Crew - CrewAI-Style Multi-Agent Infrastructure
 
 A TypeScript port of CrewAI's structure, integrated into the RFP section so the
-team can build role-based AI agents that answer each step of a bid response
-(legal, finance, marketing, sales, technical, compliance, …).
+team can build role-based AI agents that answer each step of a bid response:
+legal, finance, marketing, presales, delivery, compliance, red-team QA, and bid
+management.
 
-> It's a port of the **structure**, not the Python code — CrewAI is Python,
-> BidStack is Node/TS. The downloaded CrewAI repo was the semantic reference.
+> This is a port of the structure, not the Python code. CrewAI is Python;
+> BidStack is Node/TypeScript. The downloaded CrewAI and Amaris orchestrator
+> references are semantic references, not code copied into production.
 
-## Why infrastructure, not a tool
+## Why Infrastructure, Not A Tool
 
-Admins **manage** the infrastructure; members **use** it:
+Admins manage the infrastructure; members use it.
 
 | Capability                    | Admin | Member                        |
 | ----------------------------- | ----- | ----------------------------- |
-| Create / edit / delete agents | ✅    | ❌                            |
-| Create / edit / delete crews  | ✅    | ❌                            |
-| Load standard agents          | ✅    | ❌                            |
-| Run a crew on an RFP          | ✅    | ✅                            |
-| View a crew + run results     | ✅    | ✅ (own runs; admins see all) |
+| Create / edit / delete agents | Yes   | No                            |
+| Create / edit / delete crews  | Yes   | No                            |
+| Load standard agents          | Yes   | No                            |
+| Run a crew on an RFP          | Yes   | Yes                           |
+| View a crew + run results     | Yes   | Yes, own runs; admins see all |
 
-Enforced server-side on **every** mutation (`requireRole('admin')`); run reads
-are owner-scoped (members see only their own runs). The Agent Studio UI hides
-admin controls from members as defense-in-depth.
+Enforced server-side on every mutation with `requireRole('admin')`; run reads
+are owner-scoped. The Agent Studio UI hides admin controls from members as
+defense-in-depth.
 
 ## Architecture
 
-| Layer        | Where                                                             | What                                                                                                                                                                       |
-| ------------ | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Kit (engine) | `apps/worker/src/crew/`                                           | `Agent` / `Task` / `Crew` / `Process` types + `kickoff()` (sequential context-chaining + hierarchical manager consolidation). Executor-injected, fail-open, 15 unit tests. |
-| Execution    | `apps/worker/src/crew/dust-executor.ts`                           | Realises an agent persona through one Dust agent; fail-open on missing key / failure.                                                                                      |
-| Data         | `packages/db` (`crew_agents`, `crews`, `crew_tasks`, `crew_runs`) | Org-scoped; raw SQL (Wave-9 Windows-DLL-lock pattern). Migration `20260530010000_crew_infrastructure`.                                                                     |
-| Queue        | `crew-run` (`apps/worker/src/queues/crew-run.ts`)                 | Loads a crew → `kickoff` → persists status + per-task results + final output.                                                                                              |
-| API          | `apps/api/src/routes/crew-agents.ts`, `crews.ts`                  | Admin-gated CRUD + `POST /crews/:id/run` (member) + owner-scoped run reads.                                                                                                |
-| Seed         | `apps/api/src/lib/crew-standard.ts`                               | 7 standard agents + a default hierarchical "RFP Response Crew". `POST /crews/seed-standard` (admin).                                                                       |
-| UI           | `apps/web/src/pages/AgentStudioPage.tsx` (`/agent-studio`)        | Agent Studio — author agents (admin), run a crew + watch the result (member).                                                                                              |
+| Layer        | Where                                                             | What |
+| ------------ | ----------------------------------------------------------------- | ---- |
+| Kit          | `apps/worker/src/crew/`                                           | `Agent` / `Task` / `Crew` / `Process` types plus `kickoff()` with sequential context chaining and hierarchical manager consolidation. |
+| Execution    | `apps/worker/src/crew/dust-executor.ts`                           | Shared RFP provider wrapper: direct LLM first, then Dust. Supports NVIDIA NIM, OpenAI, Claude, Kimi, Gemma, and Dust. |
+| Data         | `packages/db` (`crew_agents`, `crews`, `crew_tasks`, `crew_runs`) | Org-scoped raw SQL tables from migration `20260530010000_crew_infrastructure`. |
+| Queue        | `apps/worker/src/queues/crew-run.ts`                              | Loads a crew, calls `kickoff`, then persists status, task results, and final output. |
+| API          | `apps/api/src/routes/crew-agents.ts`, `crews.ts`                  | Admin-gated CRUD, member crew runs, and scoped run reads. |
+| Seed         | `apps/api/src/lib/crew-standard.ts`                               | Amaris-style standard agents plus the default hierarchical RFP Response Crew. |
+| UI           | `apps/web/src/pages/AgentStudioPage.tsx`                          | Agent Studio for authoring agents and running crews. |
 
-## Standard agents
+## Standard Agents
 
-`Solution Architect` · `Compliance Officer` · `Legal Counsel` · `Finance Lead`
-· `Marketing Strategist` · `Bid Manager` (the hierarchical manager). The default
-**RFP Response Crew** runs requirements → compliance → legal → pricing →
-win-themes, then the Bid Manager consolidates.
+The default set now follows the Amaris-style RFP/P&L orchestration:
 
-## How to use
+- `Document Intelligence Engine`
+- `Tender Strategy Analyst`
+- `Compliance Officer`
+- `Legal Counsel`
+- `Finance Lead`
+- `Presales Lead`
+- `Marketing and Competitive Strategist`
+- `Delivery and Operations Director`
+- `Red Team QA Reviewer`
+- `Bid Manager`
 
-1. **Admin** opens Agent Studio → **Load standard agents** (seeds the agents +
-   the RFP Response Crew). Then edit any agent or add your own.
-2. **Anyone** picks a crew → **Run**, pastes the RFP text, and watches each
-   agent's step + the final consolidated response.
+The default **RFP Response Crew** runs:
 
-## Operational notes
+1. Ingestion and parsing.
+2. Market intelligence.
+3. Go/no-go governance.
+4. Compliance and legal review.
+5. Solution engineering.
+6. Commercial and P&L modeling.
+7. Win-theme synthesis.
+8. Red-team QA.
+9. Executive finalization.
+10. Bid Manager consolidation.
 
-- **LLM key:** with `DUST_API_KEY` + `DUST_WORKSPACE_ID` set (and an agent id via
-  `DUST_CREW_AGENT_ID`), agents return real content. Without them they return
-  labeled fail-open placeholders — the pipeline still runs end-to-end. Proven
-  e2e against a real RFP excerpt.
-- **Prisma on Windows:** the crew tables are accessed via raw SQL because the
-  Prisma client can't be regenerated while the dev API holds the engine DLL.
-  Apply the migration with `pnpm db:migrate`; regenerate the typed client
-  between sessions to (optionally) move off raw SQL later.
-- **NDA-D:** `kickoff()` documents the caller obligation — never feed Tier-D
-  ("never-in-AI") content into crew inputs (mirror `isDocumentAiSafe`).
+## How To Use
 
-## Historical note
+1. Admin opens Agent Studio, then clicks **Load standard agents**. This seeds or
+   refreshes the standard agents, standard crew, and standard task prompts.
+2. Anyone with run access picks a crew, runs it on an RFP, and reviews each
+   specialist output plus the final consolidated result.
 
-Auto-trigger the RFP Response Crew from document upload so it runs as part of
-the existing BullMQ RFP orchestration (alongside / instead of the
-requirement-extract → … → qa-review stages). Today the crew runs standalone
-from the Agent Studio, which fully covers "build agents that answer each step."
+## Provider Configuration
 
-## RFP pipeline auto-run
+Set one direct provider for worker-based RFP and crew calls:
 
-The BullMQ RFP orchestration now runs the CrewAI-style specialist pattern inside
-the `legal_scan` gate before proposal compilation:
+```env
+RFP_LLM_PROVIDER=nim
+NVIDIA_NIM_API_KEY=
+NVIDIA_NIM_MODEL=deepseek-ai/deepseek-v4-pro
+NVIDIA_NIM_BASE_URL=https://integrate.api.nvidia.com/v1
+NVIDIA_NIM_ALLOW_CUSTOM_BASE_URL=false
+NVIDIA_NIM_THINKING=false
+```
 
-`Legal Counsel -> Finance Lead -> Marketing Strategist -> Presales Lead -> Bid Manager`
+Direct provider order is controlled by `RFP_LLM_PROVIDER`. If no direct provider
+is configured, or if the direct provider fails, the executor falls back to Dust
+when `DUST_API_KEY` and `DUST_WORKSPACE_ID` are configured. If neither direct
+provider nor Dust is configured, agents return explicit fail-open placeholders
+so the workflow continues but cannot be mistaken for real AI review.
 
-Each specialist receives the extracted RFP source plus the current proposal
-draft. Their outputs are written to `rfp_orchestrations.config.reviewCrew` and
-to the AI audit log, then the workflow continues to proposal compilation and QA
-review. Agent Studio still lets admins seed, edit, and manually run crews.
+`NVIDIA_NIM_BASE_URL` defaults to the official hosted endpoint. Custom NIM
+base URLs are rejected unless `NVIDIA_NIM_ALLOW_CUSTOM_BASE_URL=true`, and must
+be public HTTPS endpoints.
+
+Secrets must live in `.env` or the deployment secret manager. Only placeholders
+belong in `.env.example` and docs.
+
+## Operational Notes
+
+- **NDA-D:** never feed "never-in-AI" content into crew inputs. Mirror the
+  `isDocumentAiSafe` gate from the RFP extraction worker.
+- **Windows Prisma:** crew tables are available through raw SQL because the
+  generated Prisma client can be locked by a running API process on Windows.
+- **RFP pipeline auto-run:** the BullMQ RFP pipeline runs the specialist review
+  crew inside the `legal_scan` gate before proposal compilation:
+  `Legal Counsel -> Finance Lead -> Marketing Strategist -> Presales Lead -> Bid Manager`.
+  The outputs are stored in `rfp_orchestrations.config.reviewCrew` and AI audit logs.

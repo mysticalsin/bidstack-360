@@ -11,7 +11,11 @@ import {
   safeErrorMessage,
   attribution,
 } from './dashboard.service.js';
-import { upsertVerifiedCompanyEnrichment, type RouteLog } from './enrichment.service.js';
+import {
+  queueApolloEnrichment,
+  upsertVerifiedCompanyEnrichment,
+  type RouteLog,
+} from './enrichment.service.js';
 
 type SalesCompanyCandidate = {
   name: string;
@@ -190,6 +194,12 @@ export async function autopopulateCompanies({
         auditAction: 'crm.company.autopopulate_from_sales',
         log,
         prisma,
+      });
+      await queueApolloEnrichment({
+        orgId,
+        companyName: candidate.name,
+        domain: result.domain,
+        log,
       });
       items.push({ company: result.company, action: 'enriched', reason: candidate.reason });
     } catch (err) {

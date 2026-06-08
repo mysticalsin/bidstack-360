@@ -62,7 +62,7 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
     '/users/:id/role',
     {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
-      preHandler: [server.requirePermission('users:write'), server.requireRole('admin')],
+      preHandler: server.requirePermission('users:write'),
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: z.object({ role: z.enum(['member', 'admin']) }),

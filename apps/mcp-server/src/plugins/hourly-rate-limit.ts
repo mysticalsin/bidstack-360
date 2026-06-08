@@ -13,13 +13,10 @@
 //   storage cost:    60 ints per active API key. TTL self-cleans expired
 //                    buckets, so no manual sweep is needed.
 //
-// Failure mode: if Redis is unreachable, we fail OPEN (allow the request)
-// rather than block all MCP traffic. This matches @fastify/rate-limit's
-// `skipOnError: true` default elsewhere in the stack. Tradeoff: a Redis
-// outage temporarily disables the long-window guard, but the 60/min
-// @fastify/rate-limit (also Redis-backed) still caps the short-window
-// budget, and the immediate availability hit of failing closed is worse
-// than the brief enforcement gap. Document this in operations runbook.
+// Failure mode: production fails CLOSED by default when Redis is unreachable
+// because MCP tools can mutate CRM data and must keep their shared budget
+// enforcement. Development/test fail open unless MCP_RATE_LIMIT_FAIL_CLOSED
+// is explicitly enabled, so local Redis outages do not block ordinary work.
 
 import { createHash } from 'node:crypto';
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
@@ -39,6 +36,20 @@ interface PluginOptions {
    *  replica's perspective by passing the same client to two server
    *  instances. */
   redis?: Redis;
+  /** When true, Redis errors deny MCP traffic instead of bypassing the limiter. */
+  failClosedOnRedisError?: boolean;
+}
+
+interface RateLimitEnv {
+  NODE_ENV?: string;
+  MCP_RATE_LIMIT_FAIL_CLOSED?: string;
+}
+
+export function mcpRateLimitFailsClosed(env: RateLimitEnv = process.env): boolean {
+  const explicit = env.MCP_RATE_LIMIT_FAIL_CLOSED?.trim().toLowerCase();
+  if (explicit === 'true' || explicit === '1') return true;
+  if (explicit === 'false' || explicit === '0') return false;
+  return env.NODE_ENV === 'production';
 }
 
 function hashedKeyFor(req: FastifyRequest): string {
@@ -127,6 +138,7 @@ async function tickAndRead(
 
 const pluginImpl: FastifyPluginAsync<PluginOptions> = async (server, opts) => {
   const redis = opts.redis ?? defaultRedis;
+  const failClosedOnRedisError = opts.failClosedOnRedisError ?? mcpRateLimitFailsClosed();
 
   server.addHook('onRequest', async (req: FastifyRequest, reply: FastifyReply) => {
     const path = req.url.split('?')[0];
@@ -138,7 +150,10 @@ const pluginImpl: FastifyPluginAsync<PluginOptions> = async (server, opts) => {
     try {
       state = await tickAndRead(redis, hashedKey);
     } catch (err) {
-      // Fail open — see header comment for rationale.
+      if (failClosedOnRedisError) {
+        req.log.error({ err }, 'mcp hourly rate-limit: Redis unreachable, denying request');
+        throw reply.server.httpErrors.serviceUnavailable('MCP rate limiter unavailable');
+      }
       req.log.warn({ err }, 'mcp hourly rate-limit: Redis unreachable, allowing request');
       return;
     }

@@ -1,7 +1,16 @@
 import { test, expect } from './fixtures.js';
 import type { Page, Locator } from '@playwright/test';
+import { cleanupMeetingImportContacts } from './fixtures/test-data-cleanup.js';
 
 const SMART_LOOKUP_TIMEOUT_MS = 30_000;
+
+test.beforeEach(async ({ request }) => {
+  await cleanupMeetingImportContacts(request);
+});
+
+test.afterEach(async ({ request }) => {
+  await cleanupMeetingImportContacts(request);
+});
 
 /**
  * Resolve the first account card on the /accounts grid.

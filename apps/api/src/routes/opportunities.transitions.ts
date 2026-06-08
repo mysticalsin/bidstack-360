@@ -1,13 +1,9 @@
 /**
- * opportunities.transitions.ts — Stage transition and AI brief sub-plugin.
+ * opportunities.transitions.ts - Stage transition and account brief sub-plugin.
  *
- * WHY separate: POST /opportunities/:id/stage and POST /opportunities/:id/brief
- * are workflow-action routes that mutate existing opportunities through state
- * transitions, not CRUD operations. They share pushOpportunityToDust /
- * fanOutWebhookEvent but have no overlap with the create/import or read/patch
- * handlers. Isolating them here keeps every file under the 400-line cap.
- *
- * Import DAG: no local sibling imports — leaf node relative to helpers.
+ * POST /opportunities/:id/stage and POST /opportunities/:id/brief are
+ * workflow-action routes around an existing opportunity. They share Dust and
+ * webhook fan-out but have no overlap with create/import/read/patch handlers.
  */
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -15,6 +11,7 @@ import { z } from 'zod';
 import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 import { pushOpportunityToDust } from '../lib/dust-push.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
+import { buildOpportunityBrief, estimateBriefTokens } from './opportunities.brief.js';
 
 export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server) => {
   // POST /api/opportunities/:id/stage  (kanban move)
@@ -46,6 +43,16 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
             id: z.string().uuid(),
             pipelineStageId: z.string().uuid().nullable(),
             stage: z.string(),
+            pipelineStage: z
+              .object({
+                id: z.string().uuid(),
+                name: z.string(),
+                probability: z.number(),
+                color: z.string().nullable(),
+                isWon: z.boolean(),
+                isLost: z.boolean(),
+              })
+              .nullable(),
           }),
         },
       },
@@ -60,7 +67,16 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
       const toStage = await prisma.pipelineStage.findFirst({
         where: {
           orgId: req.auth.orgId,
+          archived: false,
           deletedAt: null,
+          pipeline: {
+            is: {
+              orgId: req.auth.orgId,
+              archived: false,
+              deletedAt: null,
+              ...(req.body.pipelineStageId ? {} : { isDefault: true }),
+            },
+          },
           ...(req.body.pipelineStageId
             ? { id: req.body.pipelineStageId }
             : { key: requestedStage }),
@@ -72,11 +88,22 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
       const nextStage = (toStage?.key ?? requestedStage) as PrismaStage | undefined;
       if (!nextStage) throw server.httpErrors.badRequest('Invalid pipeline stage');
 
-      // Any stage can move to any stage within the same pipeline for now.
       const [updated] = await prisma.$transaction([
         prisma.opportunity.update({
           where: { id: opp.id },
           data: { pipelineStageId: toStage?.id ?? null, stage: nextStage },
+          include: {
+            pipelineStage: {
+              select: {
+                id: true,
+                name: true,
+                probability: true,
+                color: true,
+                isWon: true,
+                isLost: true,
+              },
+            },
+          },
         }),
         prisma.auditLog.create({
           data: {
@@ -94,26 +121,30 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
           },
         }),
       ]);
-      // Fire-and-forget push to Dust on stage change.
+
       void pushOpportunityToDust(updated.id, req.auth.orgId);
-      // Fan-out webhook event for stage change.
       void fanOutWebhookEvent(req.auth.orgId, 'opportunity.stage_changed', {
         id: updated.id,
         pipelineStageId: updated.pipelineStageId,
         stage: nextStage,
         stageName: toStage?.name ?? nextStage,
       });
+
       return {
         id: updated.id,
         pipelineStageId: updated.pipelineStageId,
         stage: nextStage,
+        pipelineStage: updated.pipelineStage
+          ? {
+              ...updated.pipelineStage,
+              probability: Number(updated.pipelineStage.probability),
+            }
+          : null,
       };
     },
   );
 
   // POST /api/opportunities/:id/brief
-  // Stubbed: returns a deterministic markdown brief in dev.
-  // Production will call Dust agent then Anthropic fallback per openapi.yaml.
   server.post(
     '/opportunities/:id/brief',
     {
@@ -135,14 +166,60 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
 
-      const brief = `# Exec brief — ${opp.customer}
+      const contactFilters = [
+        { customer: opp.customer },
+        ...(opp.companyId ? [{ companyId: opp.companyId }] : []),
+      ];
+      const noteFilters = [
+        { accountId: opp.customer },
+        ...(opp.companyId ? [{ companyId: opp.companyId }] : []),
+      ];
+      const [tasks, contacts, notes] = await Promise.all([
+        prisma.task.findMany({
+          where: { orgId: req.auth.orgId, oppId: opp.id, deletedAt: null },
+          orderBy: [{ status: 'asc' }, { dueDate: 'asc' }, { createdAt: 'desc' }],
+          take: 8,
+          select: { title: true, status: true, dueDate: true },
+        }),
+        prisma.contact.findMany({
+          where: { orgId: req.auth.orgId, deletedAt: null, OR: contactFilters },
+          orderBy: { createdAt: 'desc' },
+          take: 8,
+          select: {
+            name: true,
+            role: true,
+            influence: true,
+            sentiment: true,
+            aiOptOut: true,
+          },
+        }),
+        prisma.note.findMany({
+          where: { orgId: req.auth.orgId, deletedAt: null, OR: noteFilters },
+          orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
+          take: 5,
+          select: { title: true, bodyMd: true, pinned: true, updatedAt: true },
+        }),
+      ]);
 
-**Opportunity:** ${opp.name} (${opp.code})
-**Stage:** ${opp.pipelineStage?.name ?? opp.stage}  ·  **Value:** €${(Number(opp.valueMicros) / 1_000_000).toString()}  ·  **Probability:** ${opp.probability}%
+      const brief = buildOpportunityBrief({
+        opportunity: {
+          code: opp.code,
+          customer: opp.customer,
+          name: opp.name,
+          stage: opp.stage,
+          pipelineStageName: opp.pipelineStage?.name ?? null,
+          valueMicros: opp.valueMicros,
+          probability: opp.probability,
+          dueDate: opp.dueDate,
+          industry: opp.industry,
+          updatedAt: opp.updatedAt,
+        },
+        tasks,
+        contacts,
+        notes,
+      });
 
-> Stub brief generated locally. Set \`DUST_API_KEY\` and \`DUST_AGENT_EXEC_BRIEF\` to enable the live agent path.
-`;
-      return { brief, model: 'stub-local', tokens: brief.length };
+      return { brief, model: 'crm-grounded-v1', tokens: estimateBriefTokens(brief) };
     },
   );
 };

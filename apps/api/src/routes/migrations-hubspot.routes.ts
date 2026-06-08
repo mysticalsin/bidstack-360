@@ -282,13 +282,12 @@ export const hubspotMigrationRoutes: FastifyPluginAsyncZod = async (server) => {
           mappings: entityMappings[entity] ?? {},
           dedupStrategy: req.body.dedupStrategy,
           externalIdColumn: 'hs_object_id',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- HubSpot token metadata not in shared type
-        } as any;
-        // Token forwarded in meta; worker refreshes if near expiry.
-        (payload as Record<string, unknown>).meta = {
-          accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken,
-          expiresAt: tokens.expiresAt,
+          // Token forwarded in meta; worker refreshes if near expiry.
+          meta: {
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
+            expiresAt: tokens.expiresAt,
+          },
         };
 
         await queue.add(`${job.id}-chunk-0`, payload, {

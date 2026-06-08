@@ -27,6 +27,176 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 <!-- New entries appended at the top of this section. -->
 
+### 2026-06-07 BACKEND: Assumed a named integration config constraint existed
+
+- **What went wrong:** The first provider credential live smoke returned `500`
+  because the route used `ON CONFLICT ON CONSTRAINT
+  integration_configs_org_type_name_key`, but the live local DB does not have
+  that named constraint. The existing Dust credential route had the same
+  fragile assumption.
+- **Root cause:** I trusted schema-intent naming without verifying the live
+  database constraint inventory before using a named constraint in raw SQL.
+- **Prevention rule:** Before using `ON CONFLICT ON CONSTRAINT`, inspect the
+  live DB for the constraint or add an additive migration. For compatibility
+  credential writes, use transaction-scoped advisory locks plus update-or-insert
+  and keep audit writes in the same transaction.
+- **Files affected:** `apps/api/src/routes/agent-provider-credentials.routes.ts`,
+  `apps/api/src/routes/dust-credentials.routes.ts`.
+
+### 2026-06-07 TESTING: API consumer test ran before shared dist was rebuilt
+
+- **What went wrong:** A focused API helper test failed with an undefined shared schema after `packages/shared` was changed.
+- **Root cause:** The API imports shared schemas from the workspace package dist. Running the API consumer test while the shared package build was still in progress meant the consumer saw stale compiled output.
+- **Prevention rule:** When shared schemas/types change, complete `pnpm --filter @bidstack/shared build` before running API or web consumer tests.
+- **Files affected:** `packages/shared/src/schemas/rfp-agent.schemas.ts`, `apps/api/src/services/agents/agents.helpers.test.ts`.
+
+### 2026-06-07 TESTING: Provider-readiness test assumed Dust env was absent
+
+- **What went wrong:** A provider-readiness test expected Dust to report both missing env keys, but the local machine already had a Dust workspace env value.
+- **Root cause:** The test did not own its environment. It relied on developer-machine absence rather than explicitly clearing the env keys relevant to the assertion.
+- **Prevention rule:** Tests that assert missing or present env contracts must explicitly set and restore every env key they own.
+- **Files affected:** `apps/api/src/services/agents/agents.helpers.test.ts`.
+
+### 2026-06-07 SECURITY: High-only audit gate hid moderate dependency advisories
+
+- **What went wrong:** The high-severity audit gate passed while the dependency graph still contained three moderate advisories: `i18next-http-backend`, `react-router`/`react-router-dom`, and transitive `ws`.
+- **Root cause:** The release hygiene check stopped at `--audit-level high`, and the repo's already-dirty manifests/lockfile meant a later `pnpm install` refreshed more lockfile state than the narrow advisory patch alone.
+- **Prevention rule:** Enterprise dependency remediation must inspect full `pnpm audit --json`, patch direct deps or compatible overrides surgically, and document any pre-existing lockfile drift before claiming the diff scope.
+- **Files affected:** `package.json`, `apps/web/package.json`, `apps/marketing/package.json`, `pnpm-lock.yaml`, `docs/solutions/dependency-audit-zero-advisory-remediation.md`.
+
+### 2026-06-07 TESTING: Opportunity list test assumed first row was a seed fixture
+
+- **What went wrong:** Root `pnpm test` failed because `opportunities.integration.test.ts` expected the first `/api/opportunities?limit=20` item to have an `OP-NNNN` code, but parallel RFP approval tests can create valid `RFP-*` opportunities that sort ahead of seeded records.
+- **Root cause:** The test mixed two contracts: tolerant persisted list reads and canonical seed-fixture identity. It relied on `updatedAt` order in a shared test org while API integration files run in parallel.
+- **Prevention rule:** List tests in shared test tenants must not infer fixture identity from sorted position. Assert the page item shape separately, then locate the intended fixture by stable DB identity or a scoped search.
+- **Files affected:** `apps/api/src/routes/opportunities.integration.test.ts`, `docs/solutions/opportunity-list-tests-must-not-assume-order.md`.
+
+### 2026-06-07 TESTING: Meeting-import tests polluted shared contact baselines
+
+- **What went wrong:** Full web E2E showed contact and responsive visual regressions after earlier meeting-import flows created test contacts in the shared seed organization and left them visible to later screenshots.
+- **Root cause:** The account/notes import paths used production-like API flows in tests but did not clean up the generated contacts, notes, tasks, risks, and enrichment rows. Later tests assumed curated seed data but were reading a polluted shared org.
+- **Prevention rule:** Any E2E or API test that writes into the shared seed org must clean up its own explicit fingerprints before and after the test. Do not update visual snapshots until shared test-data pollution is ruled out.
+- **Files affected:** `apps/web/e2e/fixtures/test-data-cleanup.ts`, `apps/web/e2e/accounts.spec.ts`, `apps/web/e2e/contacts.spec.ts`, `apps/web/e2e/responsive/mobile-iphone-se.spec.ts`, `apps/web/e2e/responsive/mobile-pixel-7.spec.ts`, `apps/web/e2e/responsive/tablet-ipad.spec.ts`, `apps/api/src/routes/notes.test.ts`, `docs/solutions/e2e-meeting-import-test-artifacts.md`.
+
+### 2026-06-07 BUG: Idle cockpit fix missed tab-discard reloads
+
+- **What went wrong:** The account cockpit could still show the fatal "Couldn't load the CRM cockpit" state after a long idle if the browser discarded/reloaded the tab and the next live dashboard request returned a transient 5xx.
+- **Root cause:** The first stale-refresh fix protected only React Query's in-memory `data`. A tab discard/reload loses that memory, so the page had no last verified snapshot to render during a transient API/proxy failure.
+- **Prevention rule:** Long-lived CRM work surfaces need a tab-scoped, schema-validated fallback for the last verified entity snapshot. Use it only for transient 5xx/network failures, never for 4xx authorization or not-found failures, and clear it on auth cache cleanup.
+- **Files affected:** `apps/web/src/pages/DashboardPage.tsx`, `apps/web/src/pages/DashboardPage.test.tsx`, `apps/web/src/lib/queryCache.ts`, `apps/web/src/lib/queryCache.test.ts`, `docs/solutions/account-cockpit-tab-discard-fallback.md`.
+
+### 2026-06-07 BUG: Opportunity reads rejected legacy persisted codes
+
+- **What went wrong:** The full API gate found `GET /api/v1/opportunities?limit=20` could return `500` because response serialization rejected persisted opportunity codes that did not match `OP-NNNN`.
+- **Root cause:** The shared read schema reused the write-time canonical code regex, so historical/RFP/test/imported identifiers were treated as invalid at the response boundary.
+- **Prevention rule:** Split read and write contracts for identifiers. Reads must tolerate bounded persisted legacy values; writes/imports can enforce the current canonical format.
+- **Files affected:** `packages/shared/src/schemas/opportunity.ts`, `packages/shared/src/schemas/opportunity.test.ts`, `docs/solutions/opportunity-code-read-write-contract.md`.
+
+### 2026-06-07 INFRA: Redis health client could stay unhealthy after a transient disconnect
+
+- **What went wrong:** `/readyz` reported `redis:false` and stayed `503` even though Redis was reachable on the configured local port, leaving the API in a degraded state after an idle/startup blip.
+- **Root cause:** The shared API Redis client disabled retries/offline queueing for fail-fast commands but had no deliberate reconnect path from ended or closed ioredis states.
+- **Prevention rule:** Fail-fast Redis clients still need an explicit readiness/cache reconnect helper. Health checks should call that helper and cache code should reconnect once before falling back to memory.
+- **Files affected:** `apps/api/src/redis.ts`, `apps/api/src/lib/redis-cache.ts`, `apps/api/src/routes/health.ts`, `apps/api/src/redis.test.ts`, `docs/solutions/redis-readiness-reconnect.md`.
+
+### 2026-06-07 TESTING: DB probe skipped the app env bootstrap
+
+- **What went wrong:** A direct Prisma/tsx probe failed because `DATABASE_URL` was not loaded in that standalone shell context.
+- **Root cause:** I used an ad hoc eval context instead of the package/API test bootstrap that loads the repo's environment configuration.
+- **Prevention rule:** When probing database-backed app behavior, use the API route, package tests, or explicitly load the same env bootstrap as the app; do not assume standalone `tsx -` has database config.
+### 2026-06-07 BACKEND: Used `$queryRaw` for a void advisory-lock call
+
+- **What went wrong:** The first duplicate-run lock used `tx.$queryRaw` for `SELECT pg_advisory_xact_lock(...)`, and the focused integration test returned a `500` because Prisma could not deserialize the `void` result.
+- **Root cause:** I treated every `SELECT` as row-returning instead of matching the raw Prisma method to whether the statement produces data that the application needs.
+- **Prevention rule:** Use `$executeRaw` for advisory locks and other side-effect SQL where the result is not consumed; use `$queryRaw` only when the application needs returned rows.
+- **Files affected:** `apps/api/src/services/agents/agents.service.ts`, `apps/api/src/routes/agents.integration.test.ts`.
+
+- **Files affected:** none.
+
+### 2026-06-07 TESTING: i18n interpolation was missing in a component test
+
+- **What went wrong:** The full web test gate failed because `CurrencySelector.test.tsx` rendered translated labels without app i18n initialization.
+- **Root cause:** The focused test did not import the runtime i18n bootstrap, so interpolation placeholders appeared in assertions.
+- **Prevention rule:** Tests that inspect translated/interpolated UI must import `@/i18n` or mock translation with equivalent interpolation behavior.
+- **Files affected:** `apps/web/src/components/layout/CurrencySelector.test.tsx`.
+
+### 2026-06-07 TESTING: Full API test gate used too-short timeout
+
+- **What went wrong:** A full API package test run timed out before completion on this machine, then passed with a longer timeout.
+- **Root cause:** The command timeout was too low for the current API integration suite size and local database setup.
+- **Prevention rule:** Use at least 300 seconds for full API package tests and at least 600 seconds for root `pnpm test`.
+- **Files affected:** none.
+
+### 2026-06-06 TOOLING: Forked subagent spawn repeated role-override mistake
+
+- **What went wrong:** I tried to spawn a full-history forked subagent with an explicit `agent_type`, which this tool rejects because forked agents inherit the parent role/model.
+- **Root cause:** I repeated an already logged tool constraint instead of using either a non-forked role-specific agent or a forked agent without role overrides.
+- **Prevention rule:** For `fork_context: true`, omit `agent_type`, `model`, and `reasoning_effort`; if a specific role is needed, spawn without full-history fork context.
+- **Files affected:** none.
+
+### 2026-06-06 TESTING: Root test gate used too-short shell timeout
+
+- **What went wrong:** The first root `pnpm test` run timed out and produced an `EPIPE` artifact even though the later longer run passed.
+- **Root cause:** A 240-second command timeout was too short for the full root test gate on this machine.
+- **Prevention rule:** Use at least a 600-second timeout for root `pnpm test`, or run targeted package tests before the full gate when iterating.
+- **Files affected:** none.
+
+### 2026-06-05 UX: Shared CRM surfaces used automatic glow and shimmer loops
+
+- **What went wrong:** Shared buttons/cards still applied dark-mode pulsing glow or shimmer effects, so routine CRM screens could feel flashy and purple-tinted even after the cursor spotlight animation was removed.
+- **Root cause:** The visual system mixed marketing-style ambient motion with enterprise app interaction feedback; shared primitives amplified that pattern across many pages.
+- **Prevention rule:** Shared CRM primitives may use tactile hover/press/reveal motion, but must not ship automatic ambient pulse, shimmer, orb, or neon glow loops unless the user explicitly asks for a hero/marketing surface.
+- **Files affected:** `apps/web/src/components/ui/Button.tsx`, `apps/web/src/components/ui/Card.tsx`, `apps/web/src/components/ui/GlassCard.tsx`, `apps/web/src/components/layout/RouteProgress.tsx`, `apps/web/src/index.css`.
+
+### 2026-06-05 BUG: Settings admin panels called unbounded backend reads
+
+- **What went wrong:** The Settings page rendered but background requests for lead rot config, email templates, and tags returned 400s from the development query guard.
+- **Root cause:** The route handlers used tenant-scoped `findMany` calls without explicit `take` limits. Lead rot then exposed a second bug: synthetic fallback ids were deterministic strings but not valid UUIDs, causing response serialization to return 500.
+- **Prevention rule:** Admin/settings reads must be explicitly bounded and must pass the same response schemas as persisted rows; deterministic client placeholders still need valid wire-format ids.
+- **Files affected:** `apps/api/src/routes/lead-rot.ts`, `apps/api/src/routes/email-templates.ts`, `apps/api/src/routes/tags.ts`, `apps/api/src/routes/settings-support.integration.test.ts`.
+
+### 2026-06-05 TESTING: Prisma generate raced with API integration tests
+
+- **What went wrong:** I launched Prisma client generation in parallel with an API integration test, so Vitest tried to use the Windows query-engine DLL while generation was replacing it.
+- **Root cause:** The generated Prisma client on Windows uses a DLL that can be renamed/replaced during `prisma generate`; tests that import the client must not run at the same time.
+- **Prevention rule:** Run `pnpm db:generate` as a sequential preflight before API tests, never in parallel with tests or a live API process that is being verified.
+- **Files affected:** generated Prisma client state only.
+
+### 2026-06-05 INFRA: Vite proxy returned API 500s when the API dev server was down
+
+- **What went wrong:** Browser smoke showed the CRM workspace shell but repeated 500s for `/api/v1/...` calls through the Vite dev server.
+- **Root cause:** The web dev server was alive on port 5173, but the API process had fallen off port 4000; the Vite proxy surfaced the missing upstream as 500s.
+- **Prevention rule:** Local CRM smoke must verify both `/readyz` on the API and page-level network responses; a rendered shell is not enough.
+- **Files affected:** runtime dev process state only.
+
+### 2026-06-05 PERFORMANCE: Opportunities list queries timed out without list-view indexes
+
+- **What went wrong:** The opportunities integration test timed out on list and stage-move flows, and logs showed slow `Opportunity.findMany` and `Comment.groupBy` queries.
+- **Root cause:** The list route filters by org/deleted status and sorts by updated date, but the database lacked that composite index. Comment count aggregation also filtered deleted comments without a matching composite index.
+- **Prevention rule:** Enterprise list views need indexes for the exact filter/order shape used by the API, including soft-delete columns and batch aggregation filters.
+- **Files affected:** `packages/db/prisma/schema.prisma`, `packages/db/prisma/migrations/20260605190000_opportunity_list_indexes/migration.sql`.
+
+### 2026-06-05 UX: Dashboard KPI cards overlapped at standard workspace widths
+
+- **What went wrong:** The dashboard KPI cards looked fake and cramped because label, value, and mini-signal content collided at a 1440px workspace viewport.
+- **Root cause:** The six-card grid used fixed equal columns, and the compact three-column KPI layout activated too early while the persistent sidebar reduced available content width.
+- **Prevention rule:** Dashboard cards with embedded visual signals must use minimum track widths and only switch to inline signal layouts after measuring the real content area, not the raw browser width.
+- **Files affected:** `apps/web/src/index.css`, `apps/web/src/styles/org-dashboard.css`.
+
+### 2026-06-05 BUG: Pipeline stage moves confirmed but appeared to snap back
+
+- **What went wrong:** Dragging an opportunity to another pipeline section could show a successful move while the card stayed in the old section or rendered with stale stage data.
+- **Root cause:** The frontend optimistic update changed `pipelineStageId` without keeping the human `stage` and populated `pipelineStage` object coherent, so grouped views could still classify the record by stale fields.
+- **Prevention rule:** Cache updates for relational status changes must update every field used by grouping, display, and detail views, then reconcile with the server-confirmed response.
+- **Files affected:** `apps/web/src/hooks/useStageMutation.ts`, `apps/web/src/hooks/useStageMutation.test.tsx`.
+
+### 2026-06-05 BUG: Direct CRM routes opened the marketing shell in local stub auth
+
+- **What went wrong:** Visiting `/dashboard` or `/pipeline` directly in local dev could show the public landing experience instead of the authenticated CRM workspace.
+- **Root cause:** Stub auth initialized as signed out unless a local session key already existed, even though the local API and dev workspace assume a signed-in stub user.
+- **Prevention rule:** Local stub auth should default to the authenticated development user and only stay signed out after an explicit stub sign-out flag.
+- **Files affected:** `apps/web/src/lib/auth.tsx`, `apps/web/src/lib/auth.test.tsx`.
+
 ### 2026-05-31 TESTING: Full E2E timeout produced misleading connection-refused artifacts
 
 - **What went wrong:** I ran the full Playwright suite with a 10-minute shell timeout, which killed the Playwright web server near the end and left failure artifacts showing `ERR_CONNECTION_REFUSED` instead of the real state.
@@ -1209,3 +1379,185 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 - **Root cause:** I treated the audit as an app-only gate at first instead of the root workspace dependency graph.
 - **Prevention rule:** For root audit failures in transitive packages, prefer targeted `pnpm.overrides` plus a lockfile refresh, then rerun the root audit gate.
 - **Files affected:** `package.json`, `pnpm-lock.yaml`.
+
+### 2026-06-06 TESTING: Root tests used stale DB dist
+
+- **What went wrong:** API tests still failed with compound Prisma selector errors after the source middleware fix because `@bidstack/db` resolves through `packages/db/dist`, and the root test script did not rebuild the DB package.
+- **Root cause:** I patched DB source and immediately ran consumer tests without refreshing the exported workspace package output.
+- **Prevention rule:** When changing any package consumed through `dist`, rebuild that package before downstream tests. The root `pnpm test` gate now builds `@bidstack/db` before running worker/API/MCP/web tests.
+- **Files affected:** `package.json`, `packages/db/src/middleware/soft-delete.ts`.
+
+### 2026-06-06 BACKEND: Soft-delete middleware broke compound unique lookups
+
+- **What went wrong:** The middleware converted `findUnique({ where: { orgId_kind: ... } })` to `findFirst` but kept the compound unique alias, causing Prisma validation errors in dashboard widgets, company enrichment, and meeting-notes import.
+- **Root cause:** The action rewrite changed the required Prisma argument shape, but the middleware did not normalize compound unique selectors into field filters.
+- **Prevention rule:** Any Prisma middleware that rewrites actions must include argument-shape regression tests for scalar unique and compound unique selectors.
+- **Files affected:** `packages/db/src/middleware/soft-delete.ts`, `packages/db/src/middleware/soft-delete.test.ts`.
+
+### 2026-06-06 SHELL: Used `&&` in PowerShell verification
+
+- **What went wrong:** I tried to chain two verification commands with `&&`, which this PowerShell runtime rejected before any tests ran.
+- **Root cause:** I assumed a newer shell separator behavior instead of using one PowerShell command per verification.
+- **Prevention rule:** Run verification commands separately in PowerShell unless the separator is already known to work in this environment.
+- **Files affected:** none.
+
+### 2026-06-06 TESTING: Generic signal row extractor missed article payloads
+
+- **What went wrong:** The first Apollo public-news cross-check test failed because `rowsFromUnknown()` did not recognize `articles` as a collection key, so GDELT article results were ignored.
+- **Root cause:** I reused a generic row extractor built around CRM/provider list names without adding the new public-news response shape.
+- **Prevention rule:** When adding a provider response source, add a focused mapping test for its exact list key before assuming the shared extractor covers it.
+- **Files affected:** `apps/worker/src/queues/company-enrich-apollo.ts`, `apps/worker/src/queues/company-enrich-apollo.test.ts`.
+
+### 2026-06-06 SHELL: Reused reserved `$PID` while restarting local servers
+
+- **What went wrong:** I used `$pid` as a loop variable while stopping the local API/Vite listeners. PowerShell treats `$PID` as a read-only automatic variable, so the cleanup did not stop the old listeners and new starts collided with them.
+- **Root cause:** I repeated a known PowerShell variable-name trap.
+- **Prevention rule:** Use `$procId`, `$ownerPid`, or `$processIdValue` for process loops. Never use `$pid` or `$PID`.
+- **Files affected:** none.
+
+### 2026-06-06 FRONTEND: Pipeline cards regressed to draggable anchors
+
+- **What went wrong:** The pipeline card was rendered as a draggable React Router `Link`, reintroducing a previously documented bug where browser link-drag behavior can override the intended opportunity-id payload and make moves appear successful while the card stays put.
+- **Root cause:** The split `PipelineCard` component drifted from `docs/solutions/drag-drop-not-on-anchor.md`, and the existing E2E only checked that drag did not throw instead of verifying board placement plus persisted API state.
+- **Prevention rule:** Draggable CRM records must not be anchors. Add stable `data-testid`/stage attributes and reversible E2E that verifies both UI placement and backend persistence after a move.
+- **Files affected:** `apps/web/src/pages/pipelineBoard/PipelineCard.tsx`, `StageColumn.tsx`, `apps/web/e2e/flows/pipeline.spec.ts`.
+
+### 2026-06-06 TESTING: Page tests leaked exchange-rate fetches
+
+- **What went wrong:** Web tests passed but printed happy-dom `AbortError` stacks after teardown.
+- **Root cause:** Page tests for Territories and Opportunities mocked CRM data hooks but rendered `useFormatMoney`, which starts `fetchRates()` on mount. Because the tests did not stub that exchange-rate fetch, happy-dom aborted pending real fetch tasks during teardown.
+- **Prevention rule:** Any test rendering a component that calls `useFormatMoney` or `useDisplayMoney` must either preload cached rates or stub `/api/v1/exchange-rates` with a settled response.
+- **Files affected:** `apps/web/src/pages/TerritoriesPage.test.tsx`, `apps/web/src/pages/OpportunitiesPage.test.tsx`.
+
+### 2026-06-06 TYPESCRIPT: Env helper used an overly strict ProcessEnv Pick
+
+- **What went wrong:** The first MCP fail-closed rate-limit patch failed typecheck because the helper accepted `Pick<NodeJS.ProcessEnv, ...>`, which required optional process env keys to be present.
+- **Root cause:** I used a narrow mapped type against `ProcessEnv` instead of a purpose-built object shape with optional keys.
+- **Prevention rule:** Env helper seams should accept a small explicit interface such as `{ NODE_ENV?: string }`, not `Pick<ProcessEnv, ...>`.
+- **Files affected:** `apps/mcp-server/src/plugins/hourly-rate-limit.ts`.
+
+### 2026-06-06 SHELL: Assumed a test helper file existed
+
+- **What went wrong:** I tried to read `apps/api/src/routes/opportunities.test-helpers.ts`, which does not exist.
+- **Root cause:** I guessed the helper filename instead of listing matching route test files first.
+- **Prevention rule:** When looking for test helpers, run `rg --files` or `Get-ChildItem` for the pattern before reading a specific path.
+- **Files affected:** none.
+
+### 2026-06-06 BACKEND: Reused contact filters for notes
+
+- **What went wrong:** The first grounded opportunity-brief route returned 400 because it queried `Note` with `{ customer: ... }`, but notes use legacy `accountId`.
+- **Root cause:** I reused an OR filter across models with different account field names, and TypeScript did not catch the loose Prisma filter shape.
+- **Prevention rule:** Keep per-model account filters separate (`Contact.customer`, `Note.accountId`, optional shared `companyId`) and add route tests for generated brief endpoints, not just pure builder tests.
+- **Files affected:** `apps/api/src/routes/opportunities.transitions.ts`, `apps/api/src/routes/opportunities.integration.test.ts`.
+
+### 2026-06-06 SHELL: Passed ESLint flags through pnpm incorrectly
+
+- **What went wrong:** I ran `pnpm --filter <pkg> lint -- --quiet`, which caused the package script `eslint .` to receive `--` and `--quiet` as file patterns instead of a flag.
+- **Root cause:** I treated `pnpm run` argument forwarding like direct `eslint` execution.
+- **Prevention rule:** For package lint flags, use `pnpm --filter <pkg> exec eslint . --quiet` or run the package lint script without extra flags.
+- **Files affected:** none.
+
+### 2026-06-06 TESTING: Parallel verification raced Prisma engine availability
+
+- **What went wrong:** A worker Vitest run passed all tests but ended with an unhandled Prisma query-engine initialization error after Prisma client regeneration.
+- **Root cause:** I ran multiple verification commands in parallel immediately after regenerating the Prisma client on Windows, where the query engine DLL is frequently renamed/recreated by the local workaround.
+- **Prevention rule:** After `pnpm db:generate` on Windows, confirm `packages/db/generated/client/query_engine-windows.dll.node` exists and run Prisma-dependent tests serially before parallelizing other gates.
+- **Files affected:** none.
+
+### 2026-06-06 TESTING: Root API tests ran against an unmigrated local DB
+
+- **What went wrong:** Root `pnpm test` reached API integration tests but failed with missing-column errors for `crews.standard_key` and `review_issues.proposal_id`.
+- **Root cause:** The Prisma schema/client and migration files had the new additive columns, but the local `DATABASE_URL` database was still behind those migrations.
+- **Prevention rule:** When a root test failure is a missing DB column/table, check the masked `DATABASE_URL` target, apply non-destructive pending migrations with `pnpm db:migrate:deploy`, then rerun the focused suites before broad gates.
+- **Files affected:** local database only.
+
+### 2026-06-06 SHELL: Probed workspace env with the wrong package context
+
+- **What went wrong:** I tried to import `dotenv-flow` from root-level `node`/`pnpm exec node`, but `dotenv-flow` is installed in workspace packages, not at the root.
+- **Root cause:** I ignored pnpm's package-scoped dependency boundary for a one-off diagnostic command.
+- **Prevention rule:** For package-owned dependencies, run one-off diagnostics through `pnpm --filter <package> exec ...` from that package context.
+- **Files affected:** none.
+
+### 2026-06-06 TESTING: Nested worker-thread tests crashed Vitest on Windows
+
+- **What went wrong:** The worker preflight exited with native code `3221225477` after `extract-text-sandbox.test.ts` assertions passed.
+- **Root cause:** The sandbox worker's pdf-parse v2 path did not call `PDFParse.destroy()`, and the parent also terminated the worker immediately after a normal message. Even after cleanup, pdf-parse in `worker_threads` remained unstable on Windows; the same parser in a plain child process exited cleanly.
+- **Prevention rule:** Run the worker suite through the repo wrapper with `--pool=forks`, call parser cleanup methods in `finally`, reserve `worker.terminate()` for timeout/crash paths, and route PDFs through a process sandbox rather than a thread sandbox.
+- **Files affected:** `scripts/run-worker-tests.mjs`, `apps/worker/src/lib/extract-text-process-worker.ts`, `apps/worker/src/lib/extract-text-worker.ts`, `apps/worker/src/lib/extract-text-sandbox.ts`, `docs/solutions/worker-vitest-wrapper-windows.md`.
+
+### 2026-06-07 TESTING: Assumed a shared audit-log schema test existed
+
+- **What went wrong:** I ran `pnpm --filter @bidstack/shared test -- --run src/schemas/audit-log.test.ts`, which failed because no such test file exists.
+- **Root cause:** I assumed schema tests existed before checking the package's test files.
+- **Prevention rule:** Before focused test commands, verify the test path with `rg --files`; for schema-only export changes, prefer `pnpm --filter @bidstack/shared build` and `typecheck` unless a real test file exists.
+- **Files affected:** none.
+
+### 2026-06-07 SHELL: Parsed API-owned XLSX from the wrong package context
+
+- **What went wrong:** A live audit XLSX smoke downloaded the file successfully but the parsing command failed because root-level `node` could not resolve `@e965/xlsx`.
+- **Root cause:** `@e965/xlsx` is owned by the API package, not the root workspace context.
+- **Prevention rule:** One-off diagnostics that import package-owned dependencies must run through `pnpm --filter <package> exec ...`.
+- **Files affected:** none.
+
+### 2026-06-07 SHELL: Over-escaped a simple rg search in PowerShell
+
+- **What went wrong:** I tried to count `lucide-react` imports with a quote-heavy escaped command and PowerShell rejected it before `rg` ran.
+- **Root cause:** I used shell-escaped regex syntax for a simple literal search.
+- **Prevention rule:** For simple literal searches in PowerShell, use `rg -n 'literal' path` and avoid quote-heavy regexes unless they are actually needed.
+- **Files affected:** none.
+
+### 2026-06-07 BACKEND: Generic mutation audit was too broad at first
+
+- **What went wrong:** The first mutation-audit safety-net version wrote a generic audit row for every authenticated successful mutation, including routes that already create rich domain audit rows.
+- **Root cause:** I optimized for "everything is tracked" without first separating unaudited route families from already-audited hot paths.
+- **Prevention rule:** Request-level mutation audit must be a safety net for unaudited route families, not a duplicate audit row on rich domain routes. Verify with full API tests, not only focused plugin tests.
+- **Files affected:** `apps/api/src/plugins/mutation-audit.ts`, `apps/api/src/plugins/mutation-audit.test.ts`, `docs/solutions/mutation-audit-safety-net.md`.
+
+### 2026-06-07 SHELL: Fumbled one-off API route inventory commands
+
+- **What went wrong:** The first Fastify route inventory probes failed because I mixed top-level await in `tsx -e`, missed `dotenv-flow` loading, used the wrong import context, and waited on server shutdown handles longer than needed.
+- **Root cause:** I treated a package-scoped diagnostic like a generic root shell snippet instead of constructing the command around the API package runtime.
+- **Prevention rule:** For API route inventory diagnostics, run through `pnpm --filter @bidstack/api exec tsx`, import `dotenv-flow/config`, use an async IIFE or explicit `process.exit(0)` after printing, and keep the import path rooted to the current command context.
+- **Files affected:** none.
+
+### 2026-06-07 TESTING: Let Redis-backed rate limits leak between API test runs
+
+- **What went wrong:** Full API tests started returning 429 for CRM company enrichment routes after repeated runs.
+- **Root cause:** The API registered `@fastify/rate-limit` with Redis in `NODE_ENV=test`, so route-specific counters persisted across independent Vitest invocations.
+- **Prevention rule:** Test-mode API servers should keep rate-limit counters process-local unless a test explicitly verifies Redis-backed limiting. Production/dev may use Redis; tests need isolation.
+- **Files affected:** `apps/api/src/server.ts`.
+
+### 2026-06-07 TESTING: Used random four-digit opportunity codes in persistent DB fixtures
+
+- **What went wrong:** Penetration tests failed on rerun with a unique constraint collision on `(org_id, code)`.
+- **Root cause:** The fixture used `OP-1000..9999`, which is not collision-proof when old test rows survive or tests run repeatedly.
+- **Prevention rule:** Persistent DB fixtures with unique constraints need UUID-backed values, not small random ranges.
+- **Files affected:** `apps/api/src/security/penetration.test-helpers.ts`.
+
+### 2026-06-07 BACKEND: Audit export limit could under-report truncation
+
+- **What went wrong:** XLSX export metadata could say `Truncated by limit: no` when the export hit its row limit inside an already-fetched batch.
+- **Root cause:** The truncation check only looked for another database page after the batch cursor and did not remember that unprocessed matching rows could still exist later in the current batch.
+- **Prevention rule:** Export collectors must set truncation as soon as the limit is reached before the fetched batch is fully inspected, then preserve that flag through later checks.
+- **Files affected:** `apps/api/src/routes/audit-logs.ts`, `apps/api/src/routes/audit-logs.test.ts`, `docs/solutions/audit-log-server-side-xlsx-export.md`.
+
+### 2026-06-07 SHELL: Used a malformed regex while checking the Prisma schema
+
+- **What went wrong:** A schema search command failed with an unopened-regex-group error.
+- **Root cause:** I tried to combine two patterns and a path in one `rg` expression instead of using a simple literal search or separate `rg` calls.
+- **Prevention rule:** For schema location checks, prefer `rg -n 'model Name' path` and then read nearby lines; avoid compound regexes unless they are tested.
+- **Files affected:** none.
+
+### 2026-06-07 TESTING: Sent nullable parentId to a non-nullable create contract
+
+- **What went wrong:** The new company CRUD audit integration test failed with `400` on create because the payload sent `parentId: null`.
+- **Root cause:** `CompanyCreate` makes `parentId` optional, not nullable, while `CompanyPatch` allows nullable parent clearing.
+- **Prevention rule:** Before writing route tests, inspect the exact shared create/patch schemas and match their optional-vs-nullable contract.
+- **Files affected:** `apps/api/src/routes/companies.test.ts`.
+
+### 2026-06-07 BROWSER: Used DOM constructors in the in-app browser read-only scope
+
+- **What went wrong:** A browser inspection script used `instanceof HTMLAnchorElement` and failed because the in-app browser's restricted evaluate scope did not expose that constructor.
+- **Root cause:** I assumed normal browser globals were available inside the Codex browser runtime's read-only evaluation wrapper.
+- **Prevention rule:** In in-app browser `evaluate` checks, prefer plain `tagName` and attribute reads instead of `instanceof` or constructor-based DOM checks.
+- **Files affected:** none.

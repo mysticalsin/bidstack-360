@@ -86,7 +86,7 @@ describe('dust integration routes', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.mcp.publicUrl).toMatch(/\/mcp$/);
-    expect(body.rest.authHeader).toBe('Authorization: Bearer <BIDSTACK_API_KEY>');
+    expect(body.rest.authHeader).toBe('x-api-key: <BIDSTACK_API_KEY>');
     expect(body.webhooks.receiverUrl).toMatch(/\/api\/webhooks\/dust$/);
     expect(body.mcp.readScopes).toEqual(['mcp', 'read']);
     expect(body.mcp.writeScopes).toEqual(['mcp', 'write']);

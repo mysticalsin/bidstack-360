@@ -9,6 +9,12 @@ import { test, expect } from '@playwright/test';
 import { PipelinePage } from '../pages/PipelinePage.js';
 import { DealDetailPage } from '../pages/DealDetailPage.js';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function stagePayload(stageId: string): { pipelineStageId: string } | { stage: string } {
+  return UUID_RE.test(stageId) ? { pipelineStageId: stageId } : { stage: stageId };
+}
+
 test.describe('Pipeline kanban board', () => {
   test('pipeline page heading is visible', async ({ page }) => {
     const pipeline = new PipelinePage(page);
@@ -37,9 +43,9 @@ test.describe('Pipeline kanban board', () => {
     await pipeline.navigate();
     await pipeline.assertColumnsVisible();
 
-    const link = page.locator('a[href^="/opportunities/"]').first();
-    const hasLink = await link.isVisible({ timeout: 5_000 }).catch(() => false);
-    test.skip(!hasLink, 'No deal cards in pipeline — seeded data absent');
+    const card = page.locator('[data-testid="pipeline-card"]').first();
+    const hasCard = await card.isVisible({ timeout: 5_000 }).catch(() => false);
+    test.skip(!hasCard, 'No deal cards in pipeline — seeded data absent');
 
     await pipeline.openFirstCard();
     await expect(page).toHaveURL(/\/opportunities\//);
@@ -50,7 +56,7 @@ test.describe('Pipeline kanban board', () => {
     await pipeline.navigate();
     await pipeline.assertColumnsVisible();
 
-    const hasCard = await page.locator('a[href^="/opportunities/"]').count() > 0;
+    const hasCard = (await page.locator('[data-testid="pipeline-card"]').count()) > 0;
     test.skip(!hasCard, 'No deal cards — cannot test win flow');
 
     await pipeline.openFirstCard();
@@ -69,17 +75,68 @@ test.describe('Pipeline kanban board', () => {
     }
   });
 
-  test('drag-to-stage fires when source card exists', async ({ page }) => {
+  test('keyboard stage move updates the board and persists through the API', async ({ page }) => {
     const pipeline = new PipelinePage(page);
     await pipeline.navigate();
     await pipeline.assertColumnsVisible();
 
-    // Drag is best-effort in CI headless — test only verifies the action completes
-    // without throwing, not that the DOM reflects the move (needs WS confirmation).
-    const dragged = await pipeline.dragCardToColumn(/.+/, 'S1 Ongoing');
-    // If no card was found, skip rather than fail — seeded data may be absent.
-    test.skip(!dragged, 'No pipeline cards to drag — seeded data absent');
-    // If drag completed, the board must not be broken.
-    await expect(pipeline.heading).toBeVisible({ timeout: 5_000 });
+    const columns = page.locator('[data-testid="pipeline-column"]');
+    const columnCount = await columns.count();
+    let chosen:
+      | {
+          id: string;
+          sourceStageId: string;
+          targetStageId: string;
+          targetStageName: string;
+        }
+      | null = null;
+
+    for (let i = 0; i < columnCount - 1; i += 1) {
+      const source = columns.nth(i);
+      const card = source.locator('[data-testid="pipeline-card"]').first();
+      if ((await card.count()) === 0) continue;
+
+      const id = await card.getAttribute('data-opportunity-id');
+      const sourceStageId = await source.getAttribute('data-stage-id');
+      const targetStageId = await columns.nth(i + 1).getAttribute('data-stage-id');
+      const targetStageName = await columns.nth(i + 1).getAttribute('data-stage-name');
+      if (id && sourceStageId && targetStageId && targetStageName) {
+        chosen = { id, sourceStageId, targetStageId, targetStageName };
+        break;
+      }
+    }
+
+    test.skip(!chosen, 'No movable pipeline cards in seeded data');
+    const { id, sourceStageId, targetStageId, targetStageName } = chosen;
+    const sourceCard = page.locator(`[data-testid="pipeline-card"][data-opportunity-id="${id}"]`);
+
+    try {
+      await sourceCard.focus();
+
+      await sourceCard.press('ArrowRight');
+      const targetColumn = page.locator(
+        `[data-testid="pipeline-column"][data-stage-id="${targetStageId}"]`,
+      );
+      await expect(
+        targetColumn.locator(`[data-testid="pipeline-card"][data-opportunity-id="${id}"]`),
+      ).toBeVisible({ timeout: 10_000 });
+
+      await expect
+        .poll(
+          async () => {
+            const detail = await page.request.get(`/api/opportunities/${id}`, { timeout: 5_000 });
+            if (!detail.ok()) return `http:${detail.status()}`;
+            const body = (await detail.json()) as { pipelineStageId: string | null; stage: string };
+            return body.pipelineStageId ?? body.stage;
+          },
+          { message: `opportunity ${id} should persist in ${targetStageName}`, timeout: 15_000 },
+        )
+        .toBe(targetStageId);
+    } finally {
+      await page.request.post(`/api/opportunities/${id}/stage`, {
+        data: stagePayload(sourceStageId),
+        timeout: 10_000,
+      });
+    }
   });
 });

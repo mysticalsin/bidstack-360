@@ -47,6 +47,8 @@ import { normalizeName, parseAttribution } from './dashboard.utils.js';
 
 // ─── Logger type ───────────────────────────────────────────────────────────────
 
+const DASHBOARD_ACTIVITY_LIMIT = 12;
+
 export type LoggerLike = {
   warn: (obj: unknown, msg?: string) => void;
 };
@@ -279,7 +281,7 @@ export async function buildDashboardSnapshot(
 
   const companies = buildCompanies(opportunities, enrichments);
   const deals = opportunities.map((opportunity) => serializeDeal(opportunity));
-  const activities = buildActivities(tasks);
+  const activities = buildActivities(tasks).slice(0, DASHBOARD_ACTIVITY_LIMIT);
   const insights = persistedInsights.length
     ? persistedInsights.map((insight) => ({
         id: insight.id,

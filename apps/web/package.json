@@ -38,7 +38,7 @@
     "framer-motion": "^12.38.0",
     "i18next": "^23.16.4",
     "i18next-browser-languagedetector": "^8.0.0",
-    "i18next-http-backend": "^2.6.2",
+    "i18next-http-backend": "^3.0.5",
     "js-base64": "^3.7.8",
     "lib0": "^0.2.117",
     "lucide-react": "^1.16.0",
@@ -46,12 +46,13 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-i18next": "^15.1.1",
-    "react-router-dom": "^6.28.0",
+    "react-router-dom": "^6.30.4",
     "react-simple-maps": "^3.0.0",
     "recharts": "^3.8.1",
     "tailwind-merge": "^2.5.5",
     "y-indexeddb": "^9.0.12",
     "yjs": "^13.6.30",
+    "zod": "^3.24.1",
     "zustand": "^5.0.2"
   },
   "devDependencies": {
@@ -74,6 +75,6 @@
     "typescript": "^5.7.2",
     "vite": "^6.4.2",
     "vite-bundle-visualizer": "^1.2.1",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.8"
   }
 }

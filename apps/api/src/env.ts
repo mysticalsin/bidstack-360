@@ -8,10 +8,12 @@ import { z } from 'zod';
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT_API: z.coerce.number().int().min(1).max(65535).default(4000),
+  PORT: z.coerce.number().int().min(1).max(65535).default(4000), // kept for backwards compat with config.ts PORT logic
   HOST: z.string().min(1).default('0.0.0.0'),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
 
   DATABASE_URL: z.string().min(1),
+  SHADOW_DATABASE_URL: z.string().optional(),
   REDIS_URL: z.string().min(1).default('redis://localhost:6380'),
 
   PUBLIC_BASE_URL: z.string().url().default('http://localhost:5173'),
@@ -22,6 +24,10 @@ export const envSchema = z.object({
   CLERK_WEBHOOK_SECRET: z.string().min(1).optional().or(z.literal('')),
 
   SSO_ALLOWED_EMAIL_DOMAINS: z.string().optional().or(z.literal('')),
+
+  // Microsoft SSO
+  VITE_SSO_MICROSOFT_ENABLED: z.enum(['true', 'false']).default('false'),
+  VITE_SSO_MICROSOFT_LABEL: z.string().optional(),
 
   // ─── Demo mode (public passwordless "try the demo" door) ──────────────
   // DEMO_MODE=true arms a PUBLIC sign-in: any email → its own freshly-seeded
@@ -40,6 +46,7 @@ export const envSchema = z.object({
   DUST_API_KEY: z.string().min(1).optional().or(z.literal('')),
   DUST_WORKSPACE_ID: z.string().min(1).optional().or(z.literal('')),
   DUST_DATA_SOURCE_ID: z.string().min(1).optional().or(z.literal('')),
+  DUST_AGENT_EXEC_BRIEF: z.string().optional(),
   DUST_WEBHOOK_SECRET: z.string().min(1).optional().or(z.literal('')),
   DUST_BASE_URL: z.string().url().optional().or(z.literal('')),
   DUST_MCP_PUBLIC_URL: z.string().url().optional().or(z.literal('')),
@@ -76,6 +83,25 @@ export const envSchema = z.object({
   TRUSTED_PROXIES: z.string().optional().or(z.literal('')),
   BIDSTACK_JOB_SIGNING_SECRET: z.string().min(1).optional().or(z.literal('')),
   JOB_SIGNING_SECRET: z.string().min(1).optional().or(z.literal('')),
+
+  API_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(120),
+
+  // OCR
+  BIDSTACK_OCR_ENABLED: z.enum(['true', 'false']).default('false'),
+  BIDSTACK_OCRMYPDF_BIN: z.string().default('ocrmypdf'),
+  BIDSTACK_TESSERACT_BIN: z.string().default('tesseract'),
+  BIDSTACK_OCR_TIMEOUT_MS: z.coerce.number().default(120_000),
+  BIDSTACK_OCR_LANGUAGES: z.string().default('eng'),
+
+  // OpenAPI / Swagger UI — enable with OPENAPI_DOCS_ENABLED=true (admin only)
+  OPENAPI_DOCS_ENABLED: z.enum(['true', 'false']).default('false'),
+
+  // Observability
+  SENTRY_DSN: z.string().optional(),
+  SENTRY_ENVIRONMENT: z.string().optional(),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
+  OTEL_SERVICE_NAME: z.string().default('bidstack-api'),
+  OTEL_SERVICE_VERSION: z.string().default('0.1.0'),
 
   // ─── Migration connectors (Wave 3) ────────────────────────────────────
   // HubSpot OAuth — create app at https://app.hubspot.com/developer
@@ -120,6 +146,13 @@ export function getEnv(): Env {
   }
   const env = parsed.data;
   const semanticErrors: string[] = [];
+
+  // Production must set a real public origin; the localhost default would make
+  // the CORS allowlist reject every browser request from the deployed frontend.
+  if (env.NODE_ENV === 'production' && env.PUBLIC_BASE_URL.includes('localhost')) {
+    semanticErrors.push('PUBLIC_BASE_URL must be set to the public web origin in production (cannot contain localhost)');
+  }
+
   // Production normally requires S3 object storage. The public demo runs without
   // an S3 bucket and its data is ephemeral by design, so demo mode may use local
   // disk storage (lost on restart — acceptable for a throwaway demo).
@@ -154,3 +187,5 @@ export function getEnv(): Env {
   _env = env;
   return _env;
 }
+
+export const config = getEnv();

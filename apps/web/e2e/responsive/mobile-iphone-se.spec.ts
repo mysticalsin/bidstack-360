@@ -7,6 +7,7 @@
  * Screenshots captured here form the visual-regression baseline.
  */
 import { test, expect, devices } from '@playwright/test';
+import { cleanupMeetingImportContacts } from '../fixtures/test-data-cleanup.js';
 
 const IPHONE_SE = devices['iPhone SE'];
 
@@ -46,7 +47,10 @@ for (const route of KEY_ROUTES) {
     await expect(page.getByRole('main')).toBeVisible({ timeout: 15_000 });
   });
 
-  test(`${route.name}: screenshot baseline (iPhone SE)`, async ({ page }) => {
+  test(`${route.name}: screenshot baseline (iPhone SE)`, async ({ page, request }) => {
+    if (route.name === 'contacts') {
+      await cleanupMeetingImportContacts(request);
+    }
     await page.goto(route.path, { waitUntil: 'load' });
     await page.getByRole('main').waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
     await page.waitForTimeout(500); // Let animations settle

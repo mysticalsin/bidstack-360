@@ -14,6 +14,14 @@ import { createTeamsMeeting } from '../services/calls/teams.service.js';
 import { createGoogleMeetEvent } from '../services/calls/google-meet.service.js';
 import { initiateVoiceCall } from '../services/calls/twilio-voice.service.js';
 import { EntityTypeEnum, ProviderEnum, getAuth } from './calls.helpers.js';
+import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
+
+/** Verify the target CRM entity belongs to the caller's org before spending on a
+ *  provider call. DEAL is the opportunity alias. (Review finding, 2026-06-04.) */
+async function assertEntityOwned(entityType: string, entityId: string, orgId: string): Promise<boolean> {
+  const ownershipType = entityType === 'DEAL' ? 'opportunity' : entityType;
+  return tenantEntityBelongsToOrg(ownershipType, entityId, orgId);
+}
 
 export const callsWriteRoutes: FastifyPluginAsync = async (fastify) => {
   const app = fastify.withTypeProvider<ZodTypeProvider>();
@@ -53,6 +61,10 @@ export const callsWriteRoutes: FastifyPluginAsync = async (fastify) => {
     async (req, reply) => {
       const auth = getAuth(req);
       const { entityType, entityId, provider, topic, toPhoneNumber } = req.body;
+
+      if (!(await assertEntityOwned(entityType, entityId, auth.orgId))) {
+        return reply.code(400).send({ error: 'Entity not found in your organization' });
+      }
 
       const title = topic ?? `${entityType} call`;
 
@@ -152,6 +164,7 @@ export const callsWriteRoutes: FastifyPluginAsync = async (fastify) => {
             joinUrl: z.string().url().nullable(),
             provider: z.string(),
           }),
+          400: z.object({ error: z.string() }),
           503: z.object({ error: z.string() }),
         },
       },
@@ -160,6 +173,10 @@ export const callsWriteRoutes: FastifyPluginAsync = async (fastify) => {
       const auth = getAuth(req);
       const { entityType, entityId, provider, startsAt, durationMinutes, attendeeEmails, topic } =
         req.body;
+
+      if (!(await assertEntityOwned(entityType, entityId, auth.orgId))) {
+        return reply.code(400).send({ error: 'Entity not found in your organization' });
+      }
 
       const title = topic ?? `${entityType} call`;
 

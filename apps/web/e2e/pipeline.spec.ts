@@ -38,14 +38,16 @@ test.describe('Pipeline page', () => {
     await expect(main.getByText('Active deals')).toBeVisible();
   });
 
-  test('at least one opportunity card links to detail page', async ({ page, gotoAndWait }) => {
+  test('at least one opportunity card opens the detail page', async ({ page, gotoAndWait }) => {
     await gotoAndWait('/pipeline');
     const main = await expectPipelineMain(page);
     await expectPipelineBoard(main);
-    const opportunityLinks = main.locator('a[href^="/opportunities/"]');
-    const hasLinks = (await opportunityLinks.count()) > 0;
-    if (hasLinks) {
-      await expect(opportunityLinks.first()).toBeVisible({ timeout: 15_000 });
+    const opportunityCards = main.locator('[data-testid="pipeline-card"]');
+    const hasCards = (await opportunityCards.count()) > 0;
+    if (hasCards) {
+      await expect(opportunityCards.first()).toBeVisible({ timeout: 15_000 });
+      await opportunityCards.first().click();
+      await expect(page).toHaveURL(/\/opportunities\//);
     } else {
       await expect(main.getByRole('region', { name: /column/i }).first()).toBeVisible({
         timeout: 15_000,

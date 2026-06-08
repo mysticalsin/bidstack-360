@@ -17,6 +17,14 @@ import {
 
 const IdParam = z.object({ id: z.string().uuid() });
 const STATUS_VALUES = LeadStatus.options;
+const FALLBACK_CONFIG_IDS: Record<z.infer<typeof LeadStatus>, string> = {
+  new: '00000000-0000-4000-8000-000000000001',
+  contacted: '00000000-0000-4000-8000-000000000002',
+  qualified: '00000000-0000-4000-8000-000000000003',
+  nurture: '00000000-0000-4000-8000-000000000004',
+  disqualified: '00000000-0000-4000-8000-000000000005',
+  converted: '00000000-0000-4000-8000-000000000006',
+};
 
 export const leadRotRoutes: FastifyPluginAsyncZod = async (server) => {
   // ─── GET /api/v1/lead-rot/config ──────────────────────────────────────
@@ -30,6 +38,7 @@ export const leadRotRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const rows = await prisma.leadStageRotConfig.findMany({
         where: { orgId: req.auth.orgId },
+        take: STATUS_VALUES.length,
       });
       const byStatus = new Map(rows.map((r) => [r.status, r]));
 
@@ -49,11 +58,11 @@ export const leadRotRoutes: FastifyPluginAsyncZod = async (server) => {
         }
         const fallback = LEAD_ROT_DEFAULTS[status];
         if (fallback === null) return [];
-        // Use a deterministic placeholder id for unset rows so client-side
-        // caching doesn't churn. We never round-trip this id to the DB.
+        // Use deterministic UUID placeholders for unset rows so client-side
+        // caching does not churn. These ids are never round-tripped to the DB.
         return [
           {
-            id: `00000000-0000-0000-0000-${status.padStart(12, '0').slice(0, 12)}`,
+            id: FALLBACK_CONFIG_IDS[status],
             orgId: req.auth.orgId,
             status,
             rottenDays: fallback,

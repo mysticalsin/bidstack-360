@@ -44,6 +44,7 @@ export const leadsList: Tool<typeof Input> = {
     const items = await prisma.lead.findMany({
       where: {
         orgId: ctx.orgId,
+        deletedAt: null, // skip soft-deleted (Review)
         ...(args.status ? { status: args.status as PrismaLeadStatus } : {}),
         ...(args.priority ? { priority: args.priority as PrismaLeadPriority } : {}),
         ...(args.source ? { source: args.source } : {}),

@@ -6,11 +6,15 @@
 // pdf-parse in particular has a CVE history (DoS via crafted streams,
 // OOM via decompression bombs). The 2026-05-24 audit rated this HIGH-2.
 //
-// Mitigation: run the parser inside a `worker_threads.Worker` with
+// Mitigation: run the parser inside a sandbox:
+//   - PDFs use a child-process boundary. pdf-parse@2.x can crash Node on
+//     Windows when it runs inside worker_threads, so process isolation is the
+//     safer boundary for the highest-risk format.
+//   - Other formats use a `worker_threads.Worker` with
 //   - `resourceLimits.maxOldGenerationSizeMb: 256` — bounds heap so a
 //     decompression bomb cannot exhaust the parent process memory.
-//   - A 90-second hard timeout via `worker.terminate()` — bounds CPU so
-//     a pathological input cannot pin the event loop forever.
+//   - A 90-second hard timeout via sandbox termination — bounds CPU so a
+//     pathological input cannot pin the event loop forever.
 //   - Structured `{ok, text, error}` message passing — every parser
 //     exception is surfaced to the caller as a normal rejection rather
 //     than an uncaught exception that would crash the worker process.
@@ -18,6 +22,7 @@
 // Replacing pdf-parse with `unpdf` or `pdf2json` is tracked separately
 // and is out of scope here; this PR contains the blast-radius reduction.
 
+import { spawn } from 'node:child_process';
 import { Worker } from 'node:worker_threads';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -64,10 +69,132 @@ function resolveWorkerEntry(): { entry: string; execArgv?: string[] } {
   return { entry: path.join(__dirname, 'extract-text-worker.js') };
 }
 
+function resolveProcessEntry(): { entry: string; execArgv: string[] } {
+  const meUrl = import.meta.url;
+  if (meUrl.endsWith('.ts')) {
+    return {
+      entry: path.join(__dirname, 'extract-text-process-worker.ts'),
+      execArgv: ['--import', 'tsx'],
+    };
+  }
+  return { entry: path.join(__dirname, 'extract-text-process-worker.js'), execArgv: [] };
+}
+
+function shouldUseProcessSandbox(opts: ExtractOptions): boolean {
+  const ct = (opts.contentType.toLowerCase().split(';')[0] ?? '').trim();
+  const ext = opts.name ? path.extname(opts.name).toLowerCase() : '';
+  return ct === 'application/pdf' || ext === '.pdf';
+}
+
+function extractTextFromBufferProcessSandboxed(
+  opts: ExtractOptions,
+  sandboxOpts: SandboxOptions,
+): Promise<string> {
+  const timeoutMs = sandboxOpts.timeoutMs ?? EXTRACT_TIMEOUT_MS;
+  const maxHeapMb = sandboxOpts.maxOldGenerationSizeMb ?? EXTRACT_MAX_HEAP_MB;
+  const { entry, execArgv } = resolveProcessEntry();
+
+  return new Promise<string>((resolve, reject) => {
+    const child = spawn(
+      process.execPath,
+      [`--max-old-space-size=${maxHeapMb}`, ...execArgv, entry],
+      {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
+      },
+    );
+
+    let settled = false;
+    let stdout = '';
+    let stderr = '';
+    const maxOutputBytes = Math.max(opts.buffer.byteLength * 4, 20 * 1024 * 1024);
+
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      child.kill();
+      reject(
+        new Error(
+          `Document extraction exceeded the ${timeoutMs}ms process sandbox timeout. ` +
+            `The parser was terminated to protect the worker process.`,
+        ),
+      );
+    }, timeoutMs);
+
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => {
+      stdout += chunk;
+      if (stdout.length > maxOutputBytes && !settled) {
+        settled = true;
+        clearTimeout(timer);
+        child.kill();
+        reject(new Error('Document extraction process exceeded the maximum output size'));
+      }
+    });
+
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (chunk: string) => {
+      stderr += chunk;
+    });
+
+    child.once('error', (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(new Error(`Document extraction process crashed: ${err.message}`));
+    });
+
+    child.once('exit', (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (code !== 0) {
+        reject(
+          new Error(
+            `Document extraction process exited with code ${code}. ` +
+              `${stderr.trim() ? `stderr: ${stderr.trim()}` : 'No stderr returned.'}`,
+          ),
+        );
+        return;
+      }
+
+      try {
+        const msg = JSON.parse(stdout) as SandboxMessage;
+        if (msg.ok) {
+          resolve(msg.text);
+        } else {
+          reject(new Error(`Document extraction failed in process sandbox: ${msg.error}`));
+        }
+      } catch (err) {
+        reject(
+          new Error(
+            `Document extraction process returned invalid output: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          ),
+        );
+      }
+    });
+
+    child.stdin.end(
+      JSON.stringify({
+        bufferBase64: opts.buffer.toString('base64'),
+        contentType: opts.contentType,
+        name: opts.name,
+        sourcePath: opts.sourcePath,
+      }),
+    );
+  });
+}
+
 export async function extractTextFromBufferSandboxed(
   opts: ExtractOptions,
   sandboxOpts: SandboxOptions = {},
 ): Promise<string> {
+  if (shouldUseProcessSandbox(opts)) {
+    return extractTextFromBufferProcessSandboxed(opts, sandboxOpts);
+  }
+
   const timeoutMs = sandboxOpts.timeoutMs ?? EXTRACT_TIMEOUT_MS;
   const maxHeapMb = sandboxOpts.maxOldGenerationSizeMb ?? EXTRACT_MAX_HEAP_MB;
 
@@ -117,7 +244,6 @@ export async function extractTextFromBufferSandboxed(
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      void worker.terminate();
       if (msg.ok) {
         resolve(msg.text);
       } else {

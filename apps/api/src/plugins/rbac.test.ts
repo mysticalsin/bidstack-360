@@ -40,6 +40,11 @@ async function buildRbacTestServer(auth: {
     { preHandler: server.requirePermission('settings:write') },
     async () => ({ ok: true }),
   );
+  server.get(
+    '/read-permission',
+    { preHandler: server.requirePermission('settings:read') },
+    async () => ({ ok: true }),
+  );
 
   await server.ready();
   return server;
@@ -179,6 +184,36 @@ describe('rbac plugin', () => {
     const res = await server.inject({ method: 'GET', url: '/permission' });
 
     expect(res.statusCode).toBe(403);
+    await server.close();
+  });
+
+  it('allows API keys through read gates when they have read scope', async () => {
+    const server = await buildRbacTestServer({
+      orgId: 'org-1',
+      userId: 'apikey:key-1',
+      role: 'api',
+      scopes: ['read'],
+    });
+
+    const res = await server.inject({ method: 'GET', url: '/read-permission' });
+
+    expect(res.statusCode).toBe(200);
+    expect(userRoleCount).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it('rejects read-only API keys at write permission gates', async () => {
+    const server = await buildRbacTestServer({
+      orgId: 'org-1',
+      userId: 'apikey:key-1',
+      role: 'api',
+      scopes: ['read'],
+    });
+
+    const res = await server.inject({ method: 'GET', url: '/permission' });
+
+    expect(res.statusCode).toBe(403);
+    expect(userRoleCount).not.toHaveBeenCalled();
     await server.close();
   });
 });

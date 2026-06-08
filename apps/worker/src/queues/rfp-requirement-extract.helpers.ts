@@ -273,7 +273,6 @@ export async function isDocumentAiSafe(documentVersionId: string, orgId: string)
   // safe and ship potentially Tier-D content to an external model.
   if (!bidDoc) return false;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- metadata is untyped Json
-  const meta = bidDoc.metadata as any;
+  const meta = bidDoc.metadata as Record<string, unknown>;
   return !(meta && meta.ndaTier === 'D');
 }

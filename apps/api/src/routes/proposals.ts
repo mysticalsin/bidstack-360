@@ -201,6 +201,7 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
     '/proposals',
     {
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      preHandler: [server.requirePermission('proposals:write')],
       schema: {
         body: ProposalCreate,
         response: { 201: Proposal },
@@ -258,6 +259,7 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
   server.patch(
     '/proposals/:id',
     {
+      preHandler: [server.requirePermission('proposals:write')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: ProposalPatch,
@@ -336,6 +338,7 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
   server.patch(
     '/proposals/:id/sections/:sectionId',
     {
+      preHandler: [server.requirePermission('proposals:write')],
       schema: {
         params: z.object({ id: z.string().uuid(), sectionId: z.string().uuid() }),
         body: ProposalSectionPatch,
@@ -383,6 +386,7 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
     '/proposals/:id/draft',
     {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      preHandler: [server.requirePermission('proposals:write')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: ProposalDraftRequest,
@@ -472,6 +476,7 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/proposals/:id',
     {
+      preHandler: [server.requirePermission('proposals:write')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 204: z.null() },

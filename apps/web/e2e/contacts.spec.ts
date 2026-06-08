@@ -1,4 +1,9 @@
 import { test, expect } from './fixtures.js';
+import { cleanupMeetingImportContacts } from './fixtures/test-data-cleanup.js';
+
+test.beforeEach(async ({ request }) => {
+  await cleanupMeetingImportContacts(request);
+});
 
 test('contacts list renders with seeded data', async ({ page, gotoAndWait }) => {
   await gotoAndWait('/contacts');

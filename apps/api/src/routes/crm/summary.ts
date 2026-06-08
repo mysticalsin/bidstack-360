@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 
@@ -225,24 +226,50 @@ async function cachedCrmSummary(orgId: string, limit: number): Promise<CrmSummar
   }
 }
 
-export async function crmSummaryRoutes(app: FastifyInstance) {
-  app.get('/crm/summary', async (req, reply) => {
-    // req.auth is decorated globally by the auth plugin (fastify-plugin, so
-    // non-encapsulating). The onRequest hook guarantees it is set on every
-    // non-public route before we reach this handler.
-    const orgId = req.auth?.orgId;
-    if (!orgId) return reply.code(401).send({ error: 'Unauthorized' });
+export async function crmSummaryRoutes(server: FastifyInstance) {
+  const app = server.withTypeProvider<ZodTypeProvider>();
 
-    const queryResult = QuerySchema.safeParse(req.query);
-    if (!queryResult.success) {
-      return reply
-        .code(400)
-        .send({ error: 'Invalid query parameters', issues: queryResult.error.issues });
-    }
+  app.get(
+    '/crm/summary',
+    {
+      schema: {
+        querystring: QuerySchema,
+        response: {
+          200: z.object({
+            companies: z.number(),
+            contacts: z.number(),
+            leads: z.number(),
+            opportunities: z.number(),
+            openOpportunities: z.number(),
+            pipelineValue: z.number(),
+            tasks: z.number(),
+            overdueTasks: z.number(),
+            serviceCases: z.number(),
+            openServiceCases: z.number(),
+            recentActivity: z.array(
+              z.object({
+                type: z.enum(['opportunity', 'lead', 'task', 'case']),
+                title: z.string(),
+                subtitle: z.string().nullable(),
+                date: z.string(),
+                url: z.string(),
+              }),
+            ),
+          }),
+        },
+      },
+    },
+    async (req, reply) => {
+      // req.auth is decorated globally by the auth plugin (fastify-plugin, so
+      // non-encapsulating). The onRequest hook guarantees it is set on every
+      // non-public route before we reach this handler.
+      const orgId = req.auth?.orgId;
+      if (!orgId) throw req.server.httpErrors.unauthorized();
 
-    return req.cache(() => cachedCrmSummary(orgId, queryResult.data.limit), {
-      ttlSeconds: 30,
-      tags: ['crm-summary'],
-    });
-  });
+      return req.cache(() => cachedCrmSummary(orgId, req.query.limit), {
+        ttlSeconds: 30,
+        tags: ['crm-summary'],
+      });
+    },
+  );
 }

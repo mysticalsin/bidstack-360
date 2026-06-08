@@ -35,11 +35,13 @@ export interface RfpCompletionOpts {
   responseFormat?: 'json_object' | 'text';
   /** Max output tokens for direct chat providers (Markdown drafts need more than the default). */
   maxTokens?: number;
+  /** Cooperative cancellation from queue-backed jobs. */
+  signal?: AbortSignal;
 }
 
 export interface RfpCompletionResult {
   text: string;
-  /** 'openai' | 'anthropic' | 'moonshot' | 'gemma' | 'dust' */
+  /** 'openai' | 'anthropic' | 'moonshot' | 'nim' | 'gemma' | 'dust' */
   provider: string;
   /** Dust run id when the Dust tier answered; undefined otherwise. */
   runId?: string;
@@ -64,6 +66,7 @@ export async function runRfpCompletion(
     traceId,
     responseFormat,
     maxTokens,
+    signal,
   } = opts;
   const envLlm = resolveLlmFromEnv();
 
@@ -76,6 +79,7 @@ export async function runRfpCompletion(
         user: userMessage,
         responseFormat,
         maxTokens,
+        signal,
       });
       await logAiInvocation(
         {
@@ -93,6 +97,7 @@ export async function runRfpCompletion(
       );
       return { text, provider: envLlm.kind };
     } catch (err) {
+      if (signal?.aborted) throw err;
       log.warn(
         { err, provider: envLlm.kind, agentType },
         'rfp-llm: provider call failed, falling back',
@@ -112,7 +117,8 @@ export async function runRfpCompletion(
         },
         log,
       );
-      return null;
+      // Continue to Dust when available. A transient hosted-model failure should
+      // not skip an org-scoped Dust workspace that is already configured.
     }
   }
 
@@ -120,8 +126,11 @@ export async function runRfpCompletion(
   if (dust) {
     const t0 = Date.now();
     try {
-      const run = await dust.runAgent(agentId, userMessage);
-      const text = run.output ?? '';
+      const run = await dust.runAgent(agentId, userMessage, { signal });
+      const text = run.output?.trim() ?? '';
+      if (run.status !== 'succeeded' || !text) {
+        throw new Error(`Dust agent run failed: ${run.status}`);
+      }
       await logAiInvocation(
         {
           orgId,
@@ -138,6 +147,7 @@ export async function runRfpCompletion(
       );
       return { text, provider: 'dust', runId: run.run_id };
     } catch (err) {
+      if (signal?.aborted) throw err;
       log.warn({ err, agentType }, 'rfp-llm: Dust call failed, falling back');
       await logAiInvocation(
         {

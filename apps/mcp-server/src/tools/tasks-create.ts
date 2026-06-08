@@ -27,7 +27,7 @@ export const tasksCreate: Tool<typeof Input> = {
   },
   handler: async (args, ctx) => {
     const opp = await prisma.opportunity.findFirst({
-      where: { id: args.oppId, orgId: ctx.orgId },
+      where: { id: args.oppId, orgId: ctx.orgId, deletedAt: null }, // skip soft-deleted (Review)
     });
     if (!opp) throw new Error('Opportunity not found');
 

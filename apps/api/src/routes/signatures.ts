@@ -166,6 +166,11 @@ export const signaturesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/signatures/requests',
     {
+      // Sending a DocuSign envelope is an external, irreversible action (email +
+      // provider spend) — gate it like other document mutations, not just org
+      // membership. (RFP review finding, 2026-06-04.)
+      config: { permission: 'documents:write' },
+      preHandler: server.requirePermission('documents:write'),
       schema: {
         body: SignatureRequestCreate,
         response: {
@@ -236,6 +241,8 @@ export const signaturesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/signatures/requests/:id/void',
     {
+      config: { permission: 'documents:write' },
+      preHandler: server.requirePermission('documents:write'),
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: SignatureRequestVoid,
@@ -258,7 +265,7 @@ export const signaturesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/signatures/webhook/docusign',
     {
-      config: { rawBody: true },
+      config: { public: true, rawBody: true },
       schema: {
         response: { 200: z.object({ ok: z.boolean() }) },
       },

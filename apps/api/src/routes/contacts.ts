@@ -62,6 +62,17 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
               }
             : {}),
         },
+        select: {
+          id: true,
+          customer: true,
+          name: true,
+          role: true,
+          email: true,
+          phone: true,
+          influence: true,
+          sentiment: true,
+          createdAt: true,
+        },
         orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         take: limit + 1,
         ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
@@ -98,6 +109,7 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/contacts',
     {
+      preHandler: [server.requirePermission('contacts:write')],
       schema: {
         body: ContactCreate,
         response: { 201: Contact },
@@ -142,6 +154,7 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.patch(
     '/contacts/:id',
     {
+      preHandler: [server.requirePermission('contacts:write')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: ContactPatch,
@@ -186,26 +199,28 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
         // CF upserts inside the transaction so a CF failure rolls back the
         // contact update — prevents partial-update / data corruption (P0 #5).
         if (req.body.customFieldValues !== undefined) {
-          for (const { definitionId, value } of req.body.customFieldValues) {
-            await tx.customFieldValue.upsert({
-              where: {
-                orgId_entityType_entityId_definitionId: {
+          await Promise.all(
+            req.body.customFieldValues.map(({ definitionId, value }) =>
+              tx.customFieldValue.upsert({
+                where: {
+                  orgId_entityType_entityId_definitionId: {
+                    orgId: req.auth.orgId,
+                    entityType: 'contact',
+                    entityId: existing.id,
+                    definitionId,
+                  },
+                },
+                update: { value: value as Prisma.InputJsonValue },
+                create: {
                   orgId: req.auth.orgId,
+                  definitionId,
                   entityType: 'contact',
                   entityId: existing.id,
-                  definitionId,
+                  value: value as Prisma.InputJsonValue,
                 },
-              },
-              update: { value: value as Prisma.InputJsonValue },
-              create: {
-                orgId: req.auth.orgId,
-                definitionId,
-                entityType: 'contact',
-                entityId: existing.id,
-                value: value as Prisma.InputJsonValue,
-              },
-            });
-          }
+              })
+            )
+          );
         }
         return contact;
       });
@@ -217,6 +232,7 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/contacts/:id',
     {
+      preHandler: [server.requirePermission('contacts:write')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 204: z.null() },

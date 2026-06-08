@@ -27,6 +27,7 @@ import { startCsWorkers } from './queues/cs.js';
 import { startCallWorkers } from './queues/calls.js';
 // Wave 8 — Predictive ML scoring retrain worker
 import { startPredictiveRetrainWorker } from './queues/predictive-retrain.js';
+import { startCompetitorResearch } from './queues/competitor-research.js';
 // Wave 9 — RFP Automation Engine workers
 import { startRfpOrchestrator, startRfpOrchestrationReaper } from './queues/rfp-orchestrator.js';
 import { startRfpRequirementExtract } from './queues/rfp-requirement-extract.js';
@@ -99,6 +100,7 @@ await Promise.all([
   startYjsCompaction(connection, log, workers, queues),
   startCsWorkers(connection, log, workers, queues),
   startPredictiveRetrainWorker(connection, log, workers, queues),
+  startCompetitorResearch(connection, log, workers, queues),
   // Wave 9 — RFP Automation Engine
   startRfpOrchestrator(connection, log, workers, queues),
   startRfpOrchestrationReaper(connection, log, workers, queues),
@@ -200,3 +202,12 @@ const shutdown = async (signal: string) => {
 };
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+process.on('unhandledRejection', (reason, _promise) => {
+  log.fatal({ reason }, 'unhandledRejection');
+  process.exit(1);
+});
+process.on('uncaughtException', (err) => {
+  log.fatal({ err }, 'uncaughtException');
+  process.exit(1);
+});

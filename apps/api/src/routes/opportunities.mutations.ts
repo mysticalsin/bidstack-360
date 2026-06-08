@@ -318,8 +318,10 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
               const needsMinting = validRows.filter((vr) => !vr.row.code);
               const mintedCodes = new Map<number, string>(); // row index → assigned code
               if (needsMinting.length > 0) {
+                // No deletedAt filter — soft-deleted rows still own their code under
+                // the (orgId, code) unique key; see mintNextCode. (Review finding.)
                 const last = await tx.opportunity.findFirst({
-                  where: { orgId: req.auth.orgId, code: { startsWith: 'OP-' }, deletedAt: null },
+                  where: { orgId: req.auth.orgId, code: { startsWith: 'OP-' } },
                   orderBy: { code: 'desc' },
                   select: { code: true },
                 });

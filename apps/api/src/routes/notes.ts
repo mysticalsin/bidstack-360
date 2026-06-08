@@ -101,6 +101,7 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/notes',
     {
+      preHandler: [server.requirePermission('activities:write')],
       schema: {
         body: NoteCreate,
         response: { 201: Note },
@@ -131,6 +132,7 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
     '/notes/import-meeting',
     {
       config: { rateLimit: { max: 15, timeWindow: '1 minute' } },
+      preHandler: [server.requirePermission('activities:write')],
       schema: {
         body: MeetingNotesImportRequest,
         response: { 201: MeetingNotesImportResponse },
@@ -238,6 +240,7 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.patch(
     '/notes/:id',
     {
+      preHandler: [server.requirePermission('activities:write')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: NotePatch,
@@ -301,6 +304,7 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/notes/:id',
     {
+      preHandler: [server.requirePermission('activities:write')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 204: z.null() },

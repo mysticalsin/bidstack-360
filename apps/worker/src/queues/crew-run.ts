@@ -45,6 +45,9 @@ interface TaskRow {
   agent_key: string;
   context_keys: unknown;
 }
+interface RunStatusRow {
+  status: string;
+}
 
 function asStringArray(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
@@ -109,8 +112,37 @@ async function markFailed(orgId: string, runId: string, message: string): Promis
   await prisma.$executeRaw`
     UPDATE crew_runs
     SET status = 'failed', error = ${message.slice(0, 2000)}, completed_at = now()
-    WHERE id = ${runId}::uuid AND org_id = ${orgId}::uuid
+    WHERE id = ${runId}::uuid AND org_id = ${orgId}::uuid AND status IN ('queued', 'running')
   `;
+}
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && err.name === 'AbortError';
+}
+
+function startCancellationWatcher(
+  orgId: string,
+  runId: string,
+  controller: AbortController,
+  log: pino.Logger,
+): NodeJS.Timeout {
+  return setInterval(() => {
+    if (controller.signal.aborted) return;
+    void (async () => {
+      const rows = await prisma.$queryRaw<RunStatusRow[]>`
+        SELECT status FROM crew_runs
+        WHERE id = ${runId}::uuid AND org_id = ${orgId}::uuid
+        LIMIT 1
+      `;
+      const status = rows[0]?.status;
+      if (status && status !== 'running') {
+        log.info({ orgId, runId, status }, 'crew-run: aborting active provider call');
+        controller.abort();
+      }
+    })().catch((err) => {
+      log.warn({ err, orgId, runId }, 'crew-run: cancellation watcher failed');
+    });
+  }, 1000);
 }
 
 async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
@@ -118,10 +150,14 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
   if (!parsed.success) throw new Error(`crew-run: invalid job data: ${parsed.error.message}`);
   const { orgId, crewId, runId, inputs } = parsed.data;
 
-  await prisma.$executeRaw`
+  const claimed = await prisma.$executeRaw`
     UPDATE crew_runs SET status = 'running'
-    WHERE id = ${runId}::uuid AND org_id = ${orgId}::uuid
+    WHERE id = ${runId}::uuid AND org_id = ${orgId}::uuid AND status = 'queued'
   `;
+  if (claimed === 0) {
+    log.info({ orgId, crewId, runId }, 'crew-run: skipped because run is no longer queued');
+    return;
+  }
 
   const crew = await loadCrew(orgId, crewId);
   if (!crew) {
@@ -131,27 +167,41 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
     throw err;
   }
 
+  const abortController = new AbortController();
+  const cancelWatcher = startCancellationWatcher(orgId, runId, abortController, log);
   try {
-    const result = await kickoff(crew, inputs, await createDustExecutor(log, orgId));
-    await prisma.$executeRaw`
+    const result = await kickoff(crew, inputs, await createDustExecutor(log, orgId), {
+      signal: abortController.signal,
+    });
+    const persisted = await prisma.$executeRaw`
       UPDATE crew_runs SET
         status = ${result.ok ? 'completed' : 'partial'},
         final_output = ${result.finalOutput},
         results = ${JSON.stringify(result.results)}::jsonb,
         completed_at = now()
-      WHERE id = ${runId}::uuid AND org_id = ${orgId}::uuid
+      WHERE id = ${runId}::uuid AND org_id = ${orgId}::uuid AND status = 'running'
     `;
+    if (persisted === 0) {
+      log.info({ orgId, crewId, runId }, 'crew-run: result ignored because run changed state');
+      return;
+    }
     log.info(
       { orgId, crewId, runId, ok: result.ok, tasks: result.results.length },
       'crew-run: complete',
     );
   } catch (err) {
+    if (abortController.signal.aborted || isAbortError(err)) {
+      log.info({ orgId, crewId, runId }, 'crew-run: cancelled');
+      return;
+    }
     // kickoff throws only on a bad DEFINITION (validateCrew) — terminal, don't retry.
     const msg = err instanceof Error ? err.message : 'crew run error';
     await markFailed(orgId, runId, msg);
     const e = new Error(`crew-run failed: ${msg}`);
     (e as Error & { doNotRetry?: boolean }).doNotRetry = true;
     throw e;
+  } finally {
+    clearInterval(cancelWatcher);
   }
 }
 

@@ -11,6 +11,7 @@
 
 import { PrismaClient } from '../generated/client/index.js';
 import { isPiiEncryptionEnabled, makePiiMiddleware } from './middleware/pii-encryption.js';
+import { makeSoftDeleteMiddleware } from './middleware/soft-delete.js';
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
@@ -28,9 +29,12 @@ function buildPrismaClient(): PrismaClient {
     // The alternative ($extends query) does not have the same hook surface for
     // post-read decryption across all operations, so we keep $use until
     // Prisma ships native $extends middleware equivalents.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma $use types require any-typed params
-    (client as any).$use(makePiiMiddleware());
+    client.$use(makePiiMiddleware());
   }
+
+  // Soft delete middleware automatically filters out records where deletedAt is not null.
+  // We apply this globally so developers don't have to constantly append `deletedAt: null`.
+  client.$use(makeSoftDeleteMiddleware());
 
   return client;
 }

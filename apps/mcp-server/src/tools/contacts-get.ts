@@ -21,7 +21,7 @@ export const contactsGet: Tool<typeof Input> = {
   },
   handler: async (args, ctx) => {
     const contact = await prisma.contact.findFirst({
-      where: { id: args.id, orgId: ctx.orgId },
+      where: { id: args.id, orgId: ctx.orgId, deletedAt: null },
     });
     if (!contact) throw new Error('Contact not found');
     return {
@@ -29,8 +29,9 @@ export const contactsGet: Tool<typeof Input> = {
       customer: contact.customer,
       name: contact.name,
       role: contact.role,
-      email: contact.email,
-      phone: contact.phone,
+      // Honor the per-contact AI opt-out — PII must not reach AI agents. (Review.)
+      email: contact.aiOptOut ? null : contact.email,
+      phone: contact.aiOptOut ? null : contact.phone,
       influence: contact.influence,
       sentiment: contact.sentiment,
       createdAt: contact.createdAt.toISOString(),

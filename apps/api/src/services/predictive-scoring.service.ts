@@ -283,7 +283,10 @@ export async function scoreOpportunity(
     select: { score: true },
   });
 
-  const recentDropPercent = previousScore ? previousScore.score / 100 - winProbability : 0;
+  // Both operands are 0–100 point values (scoreOpportunity writes score: winProbability),
+  // so subtract directly. The previous `/100` mixed 0–1 with 0–100 and the >=20 drop
+  // guard could never fire, silently killing the degradation notification. (Review.)
+  const recentDropPercent = previousScore ? previousScore.score - winProbability : 0;
 
   // Predict close date using current velocity (linear extrapolation)
   const opp = await prisma.opportunity.findFirst({

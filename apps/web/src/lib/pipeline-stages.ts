@@ -47,23 +47,43 @@ export function resolvePipelineStage(opp: Opportunity): PipelineStage {
   };
 }
 
+export function getPipelineStageBusinessKey(stage: PipelineStage): string {
+  if (isPipelineStageIdUuid(stage.id)) {
+    const legacy = LEGACY_PIPELINE_STAGES.find((s) => s.name.toLowerCase() === stage.name.toLowerCase());
+    return legacy ? legacy.id : stage.id;
+  }
+  return stage.id;
+}
+
+export function getOpportunityStageBusinessKey(opp: Opportunity): string {
+  if (opp.pipelineStage) return getPipelineStageBusinessKey(opp.pipelineStage);
+  return opp.stage ?? 'unknown';
+}
+
 export function getPipelineStages(items: Opportunity[]): PipelineStage[] {
   const hasCanonicalStages = items.some((opp) => opp.pipelineStage);
   const map = new Map<string, PipelineStage>();
 
   if (!hasCanonicalStages) {
-    for (const stage of LEGACY_PIPELINE_STAGES) map.set(stage.id, stage);
+    for (const stage of LEGACY_PIPELINE_STAGES) map.set(getPipelineStageBusinessKey(stage), stage);
   }
 
   for (const opp of items) {
     const stage = resolvePipelineStage(opp);
-    if (stage.id !== 'unknown') map.set(stage.id, stage);
+    if (stage.id !== 'unknown') {
+      const bkey = getPipelineStageBusinessKey(stage);
+      if (!map.has(bkey) || isPipelineStageIdUuid(stage.id)) {
+        map.set(bkey, stage);
+      }
+    }
   }
 
   const legacyOrder = new Map(LEGACY_PIPELINE_STAGES.map((stage, index) => [stage.id, index]));
   return [...map.values()].sort((a, b) => {
-    const ao = legacyOrder.get(a.id);
-    const bo = legacyOrder.get(b.id);
+    const aKey = getPipelineStageBusinessKey(a);
+    const bKey = getPipelineStageBusinessKey(b);
+    const ao = legacyOrder.get(aKey);
+    const bo = legacyOrder.get(bKey);
     if (ao !== undefined && bo !== undefined) return ao - bo;
     if (ao !== undefined) return -1;
     if (bo !== undefined) return 1;

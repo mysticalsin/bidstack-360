@@ -4,8 +4,8 @@
  * Two tiers:
  * - Heuristic judge (default, CI-safe): no API calls; uses hallucination-detector
  *   for metric grounding and simple structural checks for relevance/completeness.
- * - LLM judge (EVAL_MODE=full): calls Claude to score quality axes in a
- *   structured JSON response. Requires ANTHROPIC_API_KEY in env.
+ * - LLM judge (EVAL_MODE=full): calls Anthropic or NVIDIA NIM to score quality
+ *   axes in a structured JSON response.
  *
  * WHY two tiers: LLM evaluation costs ~$0.01 per section call. Running this
  * in every CI push would add significant cost and latency. The heuristic judge
@@ -13,6 +13,8 @@
  * metrics) without API overhead. The full LLM judge is reserved for periodic
  * evaluation or pre-release quality gates.
  */
+
+import { z } from 'zod';
 
 import { detectPhantomMetrics } from './hallucination-detector.js';
 import type { GoldenFixture } from './types.js';
@@ -110,12 +112,69 @@ Evaluate along three axes (0-1 each):
 Respond ONLY with valid JSON in this exact format:
 {"hallucination_score": 0.0, "relevance_score": 0.0, "completeness_score": 0.0, "phantom_examples": [], "reasoning": ""}`;
 
+const EvalProvider = z.enum(['anthropic', 'nim', 'nvidia', 'nvidia-nim']);
+
+const JudgeResponse = z.object({
+  hallucination_score: z.coerce.number().min(0).max(1),
+  relevance_score: z.coerce.number().min(0).max(1),
+  completeness_score: z.coerce.number().min(0).max(1),
+  phantom_examples: z.array(z.string()).default([]),
+});
+
+function coerceJsonObject(raw: string): string {
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const body = (fenced?.[1] ?? raw).trim();
+  const start = body.indexOf('{');
+  const end = body.lastIndexOf('}');
+  return start >= 0 && end > start ? body.slice(start, end + 1) : body;
+}
+
+function resolveEvalProvider(): z.infer<typeof EvalProvider> {
+  const raw = (process.env.EVAL_LLM_PROVIDER ?? 'anthropic').trim().toLowerCase();
+  const parsed = EvalProvider.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error(`Unsupported EVAL_LLM_PROVIDER: ${raw || '(empty)'}`);
+  }
+  return parsed.data;
+}
+
+function resolveNimEvalBaseUrl(): string {
+  const candidate = (process.env.NVIDIA_NIM_BASE_URL ?? 'https://integrate.api.nvidia.com/v1')
+    .replace(/\/$/, '');
+  const url = new URL(candidate);
+  if (url.protocol !== 'https:' || url.hostname.toLowerCase() !== 'integrate.api.nvidia.com') {
+    throw new Error('NVIDIA NIM eval judge base URL must be https://integrate.api.nvidia.com/v1');
+  }
+  return candidate;
+}
+
 async function judgeWithLLM(fixture: GoldenFixture): Promise<JudgeScore> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const provider = resolveEvalProvider();
+  const isNim = provider === 'nim' || provider === 'nvidia' || provider === 'nvidia-nim';
+  const apiKey = isNim ? process.env.NVIDIA_NIM_API_KEY : process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    throw new Error('EVAL_MODE=full requires ANTHROPIC_API_KEY in env');
+    throw new Error(
+      isNim
+        ? 'EVAL_MODE=full with EVAL_LLM_PROVIDER=nim requires NVIDIA_NIM_API_KEY in env'
+        : 'EVAL_MODE=full requires ANTHROPIC_API_KEY in env',
+    );
   }
 
+  if (isNim) {
+    return judgeWithOpenAiCompatible(fixture, {
+      apiKey,
+      baseUrl: resolveNimEvalBaseUrl(),
+      model: process.env.NVIDIA_NIM_MODEL ?? 'deepseek-ai/deepseek-v4-pro',
+      extraBody: {
+        chatTemplateKwargs: { thinking: process.env.NVIDIA_NIM_THINKING === 'true' },
+      },
+    });
+  }
+
+  return judgeWithAnthropic(fixture, apiKey);
+}
+
+async function judgeWithAnthropic(fixture: GoldenFixture, apiKey: string): Promise<JudgeScore> {
   const body = JSON.stringify({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 512,
@@ -150,13 +209,62 @@ async function judgeWithLLM(fixture: GoldenFixture): Promise<JudgeScore> {
     content: Array<{ type: string; text: string }>;
   };
 
-  const text = data.content.find((c) => c.type === 'text')?.text ?? '{}';
-  const parsed = JSON.parse(text) as {
-    hallucination_score?: number;
-    relevance_score?: number;
-    completeness_score?: number;
-    phantom_examples?: string[];
+  return scoreParsedLLMJson(data.content.find((c) => c.type === 'text')?.text ?? '{}');
+}
+
+async function judgeWithOpenAiCompatible(
+  fixture: GoldenFixture,
+  llm: {
+    apiKey: string;
+    baseUrl: string;
+    model: string;
+    extraBody?: { chatTemplateKwargs?: { thinking: boolean } };
+  },
+): Promise<JudgeScore> {
+  const response = await fetch(`${llm.baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${llm.apiKey}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: llm.model,
+      messages: [
+        { role: 'system', content: LLM_JUDGE_SYSTEM },
+        {
+          role: 'user',
+          content: JSON.stringify({
+            sectionTitle: fixture.sectionTitle,
+            storyContext: fixture.storyContext,
+            draft: fixture.draft,
+          }),
+        },
+      ],
+      max_tokens: 512,
+      temperature: 0,
+      response_format: { type: 'json_object' },
+      ...(llm.extraBody?.chatTemplateKwargs
+        ? { chat_template_kwargs: llm.extraBody.chatTemplateKwargs }
+        : {}),
+    }),
+  });
+
+  if (response.status !== 200) {
+    throw new Error(`NVIDIA NIM eval judge error: ${response.status}`);
+  }
+
+  const data = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
   };
+  const content = data.choices?.[0]?.message?.content ?? '';
+  if (!content.trim()) {
+    throw new Error('NVIDIA NIM eval judge returned empty content');
+  }
+  return scoreParsedLLMJson(content);
+}
+
+function scoreParsedLLMJson(text: string): JudgeScore {
+  const parsed = JudgeResponse.parse(JSON.parse(coerceJsonObject(text)));
 
   const hallucinationScore = parsed.hallucination_score ?? 0;
   const relevanceScore = parsed.relevance_score ?? 0;
@@ -179,7 +287,8 @@ async function judgeWithLLM(fixture: GoldenFixture): Promise<JudgeScore> {
 /**
  * Judge a single golden fixture.
  * - Uses heuristic judge by default (CI-safe, no API cost).
- * - Set EVAL_MODE=full to use the LLM judge (requires ANTHROPIC_API_KEY).
+ * - Set EVAL_MODE=full to use the LLM judge. Default is Anthropic; set
+ *   EVAL_LLM_PROVIDER=nim to judge through NVIDIA NIM.
  */
 export async function judgeFixture(fixture: GoldenFixture): Promise<JudgeScore> {
   if (process.env.EVAL_MODE === 'full') {

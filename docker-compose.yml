@@ -27,6 +27,19 @@ services:
       timeout: 3s
       retries: 10
 
+  migrate:
+    build:
+      context: .
+      target: migrate
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgres://bidstack:bidstack@postgres:5432/bidstack
+    command: ["sh", "-c", "pnpm --filter @bidstack/db migrate:deploy && pnpm --filter @bidstack/db seed"]
+
   api:
     build:
       context: .
@@ -37,6 +50,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       DATABASE_URL: postgres://bidstack:bidstack@postgres:5432/bidstack
@@ -74,6 +89,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       NODE_ENV: development
       DATABASE_URL: postgres://bidstack:bidstack@postgres:5432/bidstack
@@ -85,6 +102,10 @@ services:
       DUST_RFP_REVIEW_MARKETING_AGENT_ID: ${DUST_RFP_REVIEW_MARKETING_AGENT_ID:-}
       DUST_RFP_REVIEW_PRESALES_AGENT_ID: ${DUST_RFP_REVIEW_PRESALES_AGENT_ID:-}
       DUST_RFP_REVIEW_BID_AGENT_ID: ${DUST_RFP_REVIEW_BID_AGENT_ID:-}
+      RFP_LLM_PROVIDER: ${RFP_LLM_PROVIDER:-}
+      NVIDIA_NIM_API_KEY: ${NVIDIA_NIM_API_KEY:-}
+      NVIDIA_NIM_MODEL: ${NVIDIA_NIM_MODEL:-}
+      NVIDIA_NIM_BASE_URL: ${NVIDIA_NIM_BASE_URL:-}
       LOG_LEVEL: info
 
   mcp-server:
@@ -97,6 +118,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       NODE_ENV: development
       DATABASE_URL: postgres://bidstack:bidstack@postgres:5432/bidstack

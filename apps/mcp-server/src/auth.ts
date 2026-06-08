@@ -79,9 +79,14 @@ export async function mcpAuth(req: FastifyRequest, prisma: PrismaClient): Promis
 
   const hashedKey = createHash('sha256').update(token).digest('hex');
   const key = await prisma.apiKey.findFirst({
-    where: { hashedKey, revokedAt: null },
+    // Mirror the REST auth gate (apps/api auth.ts): reject revoked AND soft-deleted
+    // keys, and enforce expiry below — otherwise the MCP surface is a bypass.
+    where: { hashedKey, revokedAt: null, deletedAt: null },
   });
   if (!key) throw req.server.httpErrors.unauthorized('Invalid API key');
+  if (key.expiresAt && key.expiresAt < new Date()) {
+    throw req.server.httpErrors.unauthorized('API key expired');
+  }
   if (!key.scopes.includes('mcp')) {
     throw req.server.httpErrors.forbidden('API key lacks `mcp` scope');
   }

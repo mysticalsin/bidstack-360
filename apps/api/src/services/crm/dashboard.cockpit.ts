@@ -30,6 +30,9 @@ import {
   titleCase,
 } from './dashboard.utils.js';
 
+const COCKPIT_RISK_LIMIT = 6;
+const COCKPIT_COMPLIANCE_LIMIT = 6;
+
 // ─── Activity serializer ──────────────────────────────────────────────────────
 
 export function buildActivities(
@@ -155,6 +158,41 @@ export function serializeCompliance(row: {
 
 // ─── Bid opportunity serializer ───────────────────────────────────────────────
 
+function uniqueBy<T>(items: T[], keyFor: (item: T) => string): T[] {
+  const seen = new Set<string>();
+  const unique: T[] = [];
+  for (const item of items) {
+    const key = keyFor(item);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(item);
+  }
+  return unique;
+}
+
+function riskKey(row: {
+  title: string;
+  severity: string;
+  status: string;
+  companyName: string | null;
+}) {
+  return [
+    normalizeName(row.companyName ?? 'portfolio'),
+    normalizeName(row.title),
+    row.severity,
+    row.status,
+  ].join(':');
+}
+
+function complianceKey(row: { label: string; sourceAttribution: unknown }) {
+  const companyName =
+    parseAttribution(row.sourceAttribution)
+      .map((source) => record(source.providerMetadata).companyName)
+      .find((value): value is string => typeof value === 'string' && value.trim().length > 0) ??
+    'portfolio';
+  return `${normalizeName(companyName)}:${normalizeName(row.label)}`;
+}
+
 export function serializeBidOpportunity(row: {
   id: string;
   source: string;
@@ -277,13 +315,16 @@ export function buildCockpit({
   const companyRisks = risks.filter(
     (risk) => risk.companyName && normalizeName(risk.companyName) === normalizeName(company.name),
   );
-  const visibleRisks = companyRisks.length ? companyRisks : risks;
+  const visibleRisks = uniqueBy(companyRisks, riskKey).slice(0, COCKPIT_RISK_LIMIT);
   const companyCompliance = compliance.filter((check) =>
     parseAttribution(check.sourceAttribution).some(
       (source) => record(source.providerMetadata).companyName === company.name,
     ),
   );
-  const visibleCompliance = companyCompliance.length ? companyCompliance : compliance;
+  const visibleCompliance = uniqueBy(companyCompliance, complianceKey).slice(
+    0,
+    COCKPIT_COMPLIANCE_LIMIT,
+  );
   const apolloIntel = company.strategicIntel;
   const apolloLastSyncedAt = apolloIntel?.lastSyncedAt ?? null;
   const apolloSource =

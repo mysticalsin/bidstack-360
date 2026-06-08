@@ -20,7 +20,7 @@
 
 import { createHmac, createSign, randomBytes } from 'node:crypto';
 import type { FastifyError } from 'fastify';
-import { prisma } from '@bidstack/db';
+import { prisma, type Prisma } from '@bidstack/db';
 import type { SignatureStatus } from '@bidstack/shared';
 import { htmlToPdf } from './document.service.js';
 import { getEnv } from '../../env.js';
@@ -417,17 +417,27 @@ export async function handleInternalSign(params: {
   const { getStorage } = await import('../../storage/index.js');
   const store = await getStorage();
   const s3Key = `signed-docs/${request.orgId}/${request.id}/signed.pdf`;
-  // writeLocal is available on the local adapter; for S3 we use a direct write
+  // Persist the signed PDF. Local: direct disk write. S3: PUT the bytes via a
+  // presigned URL (driver-agnostic — no direct SDK dependency here). FAIL CLOSED:
+  // never mark the request SIGNED with a key that points at bytes we did not
+  // actually write. The previous S3 branch was a no-op TODO that silently
+  // discarded every signed PDF in production while reporting success. (Review.)
   if (store.writeLocal) {
     await store.writeLocal(s3Key, pdfBuf);
   } else {
-    // For S3 we write via presigned URL (fire-and-forget — we log failure but don't block)
-    // WHY: the full S3 write path would require a separate API endpoint.
-    // For now, the key is persisted so ops can re-upload. A proper solution
-    // would use @aws-sdk/client-s3 PutObjectCommand directly here.
-    const env = getEnv();
-    if (env.STORAGE_DRIVER === 's3') {
-      // TODO: implement direct S3 PutObject for signed PDF upload
+    const upload = await store.getUploadUrl({
+      key: s3Key,
+      contentType: 'application/pdf',
+      bytes: pdfBuf.length,
+    });
+    const putRes = await fetch(upload.url, {
+      method: 'PUT',
+      headers: upload.headers,
+      body: pdfBuf,
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!putRes.ok) {
+      throw new Error(`Failed to persist signed PDF to storage (PUT returned ${putRes.status})`);
     }
   }
 
@@ -468,7 +478,6 @@ async function appendEvent(
   payload: Record<string, unknown>,
 ): Promise<void> {
   await prisma.signatureEvent.create({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     data: {
       signatureRequestId: requestId,
       type,
@@ -476,7 +485,7 @@ async function appendEvent(
       occurredAt: new Date(),
       ipAddress,
       userAgent,
-      payload: payload as any,
+      payload: payload as Prisma.InputJsonValue,
     },
   });
 }

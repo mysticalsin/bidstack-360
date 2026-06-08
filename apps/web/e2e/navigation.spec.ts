@@ -42,4 +42,24 @@ test.describe('Navigation accessibility', () => {
 
     await expect(page.getByRole('navigation', { name: 'Primary navigation' })).toBeVisible();
   });
+
+  test('desktop sidebar toggle remains anchored while scrolling long pages', async ({
+    page,
+    gotoAndWait,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 720 });
+    await gotoAndWait('/agent-studio');
+    await page.addStyleTag({ content: '#main { min-height: 2200px !important; }' });
+
+    const toggle = page.getByRole('button', { name: 'Collapse sidebar' });
+    const before = await toggle.boundingBox();
+    expect(before).not.toBeNull();
+
+    await page.evaluate(() => window.scrollTo(0, 900));
+    await expect(toggle).toBeVisible();
+    const after = await toggle.boundingBox();
+
+    expect(after).not.toBeNull();
+    expect(Math.abs((after?.y ?? 0) - (before?.y ?? 0))).toBeLessThan(2);
+  });
 });

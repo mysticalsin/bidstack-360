@@ -57,7 +57,7 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
     '/booking-pages/:slug/availability',
     {
       config: {
-        auth: 'none',
+        public: true,
         rateLimit: { max: 60, timeWindow: '1 minute' },
       },
       schema: {
@@ -175,7 +175,7 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
     '/booking-pages/:slug/bookings',
     {
       config: {
-        auth: 'none',
+        public: true,
         rateLimit: {
           max: Number.isFinite(bookingCreateRateLimitMax) ? bookingCreateRateLimitMax : 5,
           timeWindow: '1 hour',
@@ -357,7 +357,7 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
     '/bookings/:id/cancel',
     {
       config: {
-        auth: 'none',
+        public: true,
         rateLimit: { max: 20, timeWindow: '1 hour' },
       },
       schema: {

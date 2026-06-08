@@ -11,8 +11,10 @@ import {
   domainFor,
   getCompaniesOnly,
 } from '../../services/crm/dashboard.service.js';
-import { upsertVerifiedCompanyEnrichment } from '../../services/crm/enrichment.service.js';
-import { enqueueApolloEnrich } from '../../queues/company-enrich-apollo.js';
+import {
+  queueApolloEnrichment,
+  upsertVerifiedCompanyEnrichment,
+} from '../../services/crm/enrichment.service.js';
 import { autopopulateCompanies } from '../../services/crm/company.service.js';
 
 const CompanySearchQuery = z.object({
@@ -170,7 +172,7 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
     '/crm/companies/:id/enrich',
     {
       config: { rateLimit: { max: 10, timeWindow: '1 hour' } },
-      preHandler: [server.requirePermission('companies:write'), server.requireRole('admin')],
+      preHandler: server.requirePermission('companies:write'),
       schema: {
         params: z.object({ id: z.string().min(1).max(255) }),
         body: EnrichCompanyBody,
@@ -190,16 +192,12 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
         prisma,
       });
 
-      const apolloJobId = await enqueueApolloEnrich({
+      await queueApolloEnrichment({
         orgId: req.auth.orgId,
         companyName: req.body.name,
         ...(result.domain ? { domain: result.domain } : {}),
+        log: req.log,
       });
-      if (apolloJobId) {
-        req.log.info({ apolloJobId, company: req.body.name }, 'queued apollo data verification');
-      } else {
-        req.log.warn('apollo data verification enqueue skipped (redis unreachable)');
-      }
 
       return result.company;
     },
@@ -209,7 +207,7 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
     '/crm/companies/autopopulate-from-sales',
     {
       config: { rateLimit: { max: 10, timeWindow: '1 hour' } },
-      preHandler: [server.requirePermission('companies:write'), server.requireRole('admin')],
+      preHandler: server.requirePermission('companies:write'),
       schema: {
         body: AutopopulateSalesCompaniesBody,
         response: { 200: CompanyAutopopulateResponse },

@@ -50,11 +50,26 @@ const AgentFields = z.object({
 });
 const AgentCreate = AgentFields.extend({ agentKey: AgentKey });
 
+const AgentResponse = z.object({
+  id: z.string().uuid(),
+  agentKey: z.string(),
+  role: z.string(),
+  goal: z.string(),
+  backstory: z.string(),
+  tools: z.array(z.string()),
+  isStandard: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
 export const crewAgentRoutes: FastifyPluginAsync = async (server) => {
   const app = server.withTypeProvider<ZodTypeProvider>();
 
   // GET /crew-agents — list active agents (any authenticated member).
-  app.get('/crew-agents', async (req) => {
+  app.get(
+    '/crew-agents',
+    { schema: { response: { 200: z.object({ items: z.array(AgentResponse) }) } } },
+    async (req) => {
     const rows = await prisma.$queryRaw<AgentRow[]>`
       SELECT id, agent_key, role, goal, backstory, tools, is_standard, created_at, updated_at
       FROM crew_agents
@@ -67,7 +82,10 @@ export const crewAgentRoutes: FastifyPluginAsync = async (server) => {
   // POST /crew-agents — create (admin only).
   app.post(
     '/crew-agents',
-    { preHandler: server.requireRole('admin'), schema: { body: AgentCreate } },
+    {
+      preHandler: server.requireRole('admin'),
+      schema: { body: AgentCreate, response: { 201: AgentResponse } },
+    },
     async (req, reply) => {
       const { orgId, userId } = req.auth;
       const b = req.body;
@@ -102,7 +120,11 @@ export const crewAgentRoutes: FastifyPluginAsync = async (server) => {
     '/crew-agents/:id',
     {
       preHandler: server.requireRole('admin'),
-      schema: { params: z.object({ id: z.string().uuid() }), body: AgentFields },
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        body: AgentFields,
+        response: { 200: AgentResponse },
+      },
     },
     async (req) => {
       const { orgId } = req.auth;
@@ -125,7 +147,10 @@ export const crewAgentRoutes: FastifyPluginAsync = async (server) => {
     '/crew-agents/:id',
     {
       preHandler: server.requireRole('admin'),
-      schema: { params: z.object({ id: z.string().uuid() }) },
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: { 204: z.null() },
+      },
     },
     async (req, reply) => {
       const { orgId } = req.auth;

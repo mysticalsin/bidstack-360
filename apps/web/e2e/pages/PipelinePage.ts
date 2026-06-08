@@ -14,9 +14,10 @@ const COLUMN_NAMES = [
   'S1 Lead',
   'S1 Ongoing',
   'S2 Sent',
-  'S3 Negotiation',
-  'S4 Won',
-  'S4 Lost',
+  'S3 Technical Iteration',
+  'S4 Negotiation',
+  'Closed Won',
+  'Closed Lost',
 ] as const;
 
 export class PipelinePage {
@@ -36,7 +37,7 @@ export class PipelinePage {
   }
 
   column(name: (typeof COLUMN_NAMES)[number]): Locator {
-    return this.page.getByRole('region', { name: new RegExp(`${name} column`, 'i') });
+    return this.page.locator(`[data-testid="pipeline-column"][data-stage-name="${name}"]`);
   }
 
   async assertColumnsVisible(): Promise<void> {
@@ -51,7 +52,9 @@ export class PipelinePage {
    * specific column. Useful for asserting a card moved after drag.
    */
   cardInColumn(columnName: (typeof COLUMN_NAMES)[number], titlePattern: RegExp): Locator {
-    return this.column(columnName).getByText(titlePattern);
+    return this.column(columnName)
+      .locator('[data-testid="pipeline-card"]')
+      .filter({ hasText: titlePattern });
   }
 
   /**
@@ -71,14 +74,15 @@ export class PipelinePage {
     const cardVisible = await card.isVisible().catch(() => false);
     if (!cardVisible) return false;
 
-    await card.dragTo(target);
+    const dropzone = target.locator('[data-testid="pipeline-column-dropzone"]').first();
+    await card.dragTo(dropzone);
     return true;
   }
 
   async openFirstCard(): Promise<void> {
-    const link = this.page.locator('a[href^="/opportunities/"]').first();
-    await expect(link).toBeVisible({ timeout: 10_000 });
-    await link.click();
+    const card = this.page.locator('[data-testid="pipeline-card"]').first();
+    await expect(card).toBeVisible({ timeout: 10_000 });
+    await card.click();
     await expect(this.page.locator('#main')).toBeVisible({ timeout: 10_000 });
   }
 }

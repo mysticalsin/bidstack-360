@@ -211,7 +211,7 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const keys = await prisma.apiKey.findMany({
-        where: { orgId: req.auth.orgId, revokedAt: null },
+        where: { orgId: req.auth.orgId, revokedAt: null, deletedAt: null },
         orderBy: { createdAt: 'desc' },
         take: 500,
       });
@@ -237,7 +237,12 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: {
         body: z.object({
           name: z.string().min(1).max(80),
-          scopes: z.array(z.enum(['read', 'write', 'mcp'])).min(1),
+          scopes: z
+            .array(z.enum(['read', 'write', 'mcp']))
+            .min(1)
+            .refine((scopes) => !scopes.includes('mcp') || scopes.includes('read') || scopes.includes('write'), {
+              message: 'MCP keys must include read or write scope',
+            }),
         }),
         response: {
           201: ApiKeySummary.extend({ secret: z.string(), warning: z.string().optional() }),
@@ -295,7 +300,7 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const key = await prisma.apiKey.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId, revokedAt: null },
+        where: { id: req.params.id, orgId: req.auth.orgId, revokedAt: null, deletedAt: null },
       });
       if (!key) throw server.httpErrors.notFound('API key not found');
       await prisma.$transaction([

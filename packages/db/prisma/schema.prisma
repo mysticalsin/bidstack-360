@@ -35,6 +35,8 @@ model Org {
   activities             Activity[]
   opportunities          Opportunity[]
   contacts               Contact[]
+  competitorInsights     CompetitorInsight[]
+  competitorProfiles     CompetitorProfile[]
   tasks                  Task[]
   documents              Document[]
   syncEvents             SyncEvent[]
@@ -396,6 +398,7 @@ model Opportunity {
   requirements         Requirement[]
   complianceMatrixRows ComplianceMatrixRow[]
   reviewIssues         ReviewIssue[]
+  competitorInsights   CompetitorInsight[]
   approvalGates        ApprovalGate[]
   submissionPackages   SubmissionPackage[]
 
@@ -415,6 +418,59 @@ model Opportunity {
   // defined in a raw migration (Prisma can't express functional GIN indexes).
   // See packages/db/prisma/migrations/*_search_index/migration.sql.
   @@map("opportunities")
+}
+
+model CompetitorProfile {
+  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId              String              @map("org_id") @db.Uuid
+  name               String              @db.VarChar(200)
+  normalizedName     String              @map("normalized_name") @db.VarChar(200)
+  aliases            String[]            @default([])
+  domain             String?             @db.VarChar(255)
+  notes              String?
+  createdByUserId    String?             @map("created_by_user_id") @db.Uuid
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt          DateTime?           @map("deleted_at") @db.Timestamptz(6)
+  org                Org                 @relation(fields: [orgId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "competitor_profiles_org_fk")
+  competitorInsights CompetitorInsight[]
+
+  @@unique([orgId, normalizedName], map: "uniq_competitor_org_name")
+  @@index([orgId], map: "competitor_profiles_org_id_idx")
+  @@index([deletedAt], map: "competitor_profiles_deleted_at_idx")
+  @@map("competitor_profiles")
+}
+
+model CompetitorInsight {
+  id                  String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId               String                    @map("org_id") @db.Uuid
+  competitorProfileId String                    @map("competitor_profile_id") @db.Uuid
+  opportunityId       String?                   @map("opportunity_id") @db.Uuid
+  category            CompetitorInsightCategory @default(other)
+  status              CompetitorInsightStatus   @default(active)
+  title               String                    @db.VarChar(255)
+  summary             String
+  sourceUrl           String                    @map("source_url")
+  sourceTitle         String?                   @map("source_title")
+  sourceSnippet       String?                   @map("source_snippet")
+  provider            String                    @db.VarChar(50)
+  confidenceBps       Int                       @default(0) @map("confidence_bps")
+  publishedAt         DateTime?                 @map("published_at") @db.Timestamptz(6)
+  retrievedAt         DateTime                  @default(now()) @map("retrieved_at") @db.Timestamptz(6)
+  metadata            Json                      @default("{}")
+  createdAt           DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime                  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt           DateTime?                 @map("deleted_at") @db.Timestamptz(6)
+  competitorProfile   CompetitorProfile         @relation(fields: [competitorProfileId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "competitor_insights_profile_fk")
+  opportunity         Opportunity?              @relation(fields: [opportunityId], references: [id], onDelete: SetNull, map: "competitor_insights_opportunity_fk")
+  org                 Org                       @relation(fields: [orgId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "competitor_insights_org_fk")
+
+  @@index([orgId, competitorProfileId, status], map: "competitor_insights_org_profile_status_idx")
+  @@index([orgId, opportunityId, status], map: "competitor_insights_org_opp_status_idx")
+  @@index([orgId, category], map: "competitor_insights_org_id_category_idx")
+  @@index([competitorProfileId], map: "competitor_insights_competitor_profile_id_idx")
+  @@index([deletedAt], map: "competitor_insights_deleted_at_idx")
+  @@map("competitor_insights")
 }
 
 enum Sentiment {
@@ -910,6 +966,7 @@ model Proposal {
 
   org         Org               @relation(fields: [orgId], references: [id], onDelete: Cascade)
   opportunity Opportunity?      @relation(fields: [opportunityId], references: [id])
+  reviewIssues ReviewIssue[]
   sections    ProposalSection[]
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
@@ -1268,6 +1325,26 @@ enum ReviewIssueStatus {
   @@map("review_issue_status")
 }
 
+enum CompetitorInsightCategory {
+  pricing
+  win_loss
+  capability
+  positioning
+  rfp_response
+  news
+  other
+
+  @@map("competitor_insight_category")
+}
+
+enum CompetitorInsightStatus {
+  active
+  archived
+  superseded
+
+  @@map("competitor_insight_status")
+}
+
 enum ApprovalGateStatus {
   pending
   approved
@@ -1458,6 +1535,7 @@ model ReviewIssue {
   id             String            @id @default(uuid()) @db.Uuid
   orgId          String            @map("org_id") @db.Uuid
   opportunityId  String?           @map("opportunity_id") @db.Uuid
+  proposalId     String?           @map("proposal_id") @db.Uuid
   requirementId  String?           @map("requirement_id") @db.Uuid
   sourceChunkId  String?           @map("source_chunk_id") @db.Uuid
   category       String            @db.VarChar(100)
@@ -1473,12 +1551,14 @@ model ReviewIssue {
 
   org         Org          @relation(fields: [orgId], references: [id], onDelete: Cascade)
   opportunity Opportunity? @relation(fields: [opportunityId], references: [id])
+  proposal    Proposal?    @relation(fields: [proposalId], references: [id], onDelete: SetNull, map: "review_issues_proposal_fk")
   requirement Requirement? @relation(fields: [requirementId], references: [id])
   sourceChunk SourceChunk? @relation(fields: [sourceChunkId], references: [id])
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   @@index([orgId, opportunityId, status], map: "review_issues_org_opp_status_idx")
+  @@index([orgId, proposalId, severity, status], map: "review_issues_org_proposal_idx")
   @@index([orgId, severity, status], map: "review_issues_org_severity_status_idx")
   @@index([orgId, ownerId])
   @@index([requirementId])
@@ -1931,6 +2011,7 @@ model Product {
   listPriceMicros BigInt   @default(0) @map("list_price_micros")
   currency        String   @default("CAD") @db.VarChar(3)
   active          Boolean  @default(true)
+  imageUrl        String?  @map("image_url")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -4291,6 +4372,7 @@ model YjsDocument {
   fieldKey   String   @map("field_key") @db.VarChar(128)
   /// Binary-encoded Y.Doc state (Y.encodeStateAsUpdate result).
   ydocBinary Bytes    @map("ydoc_binary")
+  version    Int      @default(0)
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -4794,6 +4876,7 @@ model Crew {
   description     String?
   process         String    @default("sequential") @db.VarChar(20)
   managerAgentKey String?   @map("manager_agent_key") @db.VarChar(100)
+  standardKey     String?   @map("standard_key") @db.VarChar(100)
   createdByUserId String?   @map("created_by_user_id") @db.Uuid
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -4843,4 +4926,3 @@ model CrewRun {
   @@index([status, createdAt], map: "crew_runs_status_created_idx")
   @@map("crew_runs")
 }
-

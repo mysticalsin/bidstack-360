@@ -27,7 +27,7 @@ export const publicSignRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/sign/:token',
     {
-      config: { skipAuth: true },
+      config: { public: true },
       schema: {
         params: z.object({ token: z.string().min(8).max(200) }),
         response: {
@@ -75,7 +75,7 @@ export const publicSignRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/sign/:token',
     {
-      config: { skipAuth: true },
+      config: { public: true },
       schema: {
         params: z.object({ token: z.string().min(8).max(200) }),
         body: InternalSignSubmit,

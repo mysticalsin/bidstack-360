@@ -45,6 +45,28 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
               }
             : {}),
         },
+        select: {
+          id: true,
+          orgId: true,
+          name: true,
+          legalName: true,
+          domain: true,
+          industry: true,
+          employeeCount: true,
+          countryCode: true,
+          address: true,
+          billingEmail: true,
+          taxId: true,
+          logoUrl: true,
+          website: true,
+          source: true,
+          confidence: true,
+          enrichedAt: true,
+          tier: true,
+          parentId: true,
+          createdAt: true,
+          updatedAt: true,
+        },
         orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         take: req.query.limit + 1,
         ...(req.query.cursor ? { skip: 1, cursor: { id: req.query.cursor } } : {}),
@@ -111,6 +133,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/companies',
     {
+      config: { skipGenericAudit: true },
       preHandler: [server.requirePermission('companies:write'), server.requireRole('admin')],
       schema: {
         body: CompanyCreate,
@@ -146,6 +169,15 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           confidence: 1,
         },
       });
+      await prisma.auditLog.create({
+        data: {
+          orgId: req.auth.orgId,
+          userId: req.auth.userId,
+          action: 'company.create',
+          targetType: 'company',
+          targetId: c.id,
+        },
+      });
       reply.status(201);
       return serializeCompany(c);
     },
@@ -154,6 +186,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.patch(
     '/companies/:id',
     {
+      config: { skipGenericAudit: true },
       preHandler: [server.requirePermission('companies:write'), server.requireRole('admin')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
@@ -163,6 +196,11 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const patch = req.body;
+      const existing = await prisma.company.findFirst({
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+      });
+      if (!existing) throw server.httpErrors.notFound('Company not found');
+
       if (patch.parentId !== undefined && patch.parentId !== null) {
         const parent = await prisma.company.findFirst({
           where: { id: patch.parentId, orgId: req.auth.orgId, deletedAt: null },
@@ -229,6 +267,27 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
         ...cfOps,
       ]);
       if (updateResult.count === 0) throw server.httpErrors.notFound('Company not found');
+
+      const changedFields: string[] = [];
+      const changes: Record<string, any> = {};
+      for (const [k, patchVal] of Object.entries(patch)) {
+        if (k === 'customFieldValues') continue;
+        if (patchVal !== undefined && (existing as any)[k] !== patchVal) {
+          changedFields.push(k);
+          changes[k] = k === 'taxId' ? { changed: true } : { from: (existing as any)[k], to: patchVal };
+        }
+      }
+
+      await prisma.auditLog.create({
+        data: {
+          orgId: req.auth.orgId,
+          userId: req.auth.userId,
+          action: 'company.update',
+          targetType: 'company',
+          targetId: req.params.id,
+          diff: { actorKind: 'user', changedFields, changes },
+        },
+      });
 
       const updated = await prisma.company.findFirstOrThrow({
         where: { id: req.params.id, orgId: req.auth.orgId },
@@ -312,6 +371,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/companies/:id',
     {
+      config: { skipGenericAudit: true },
       preHandler: [server.requirePermission('companies:write'), server.requireRole('admin')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
@@ -328,6 +388,15 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       await prisma.company.updateMany({
         where: { id: existing.id, orgId: req.auth.orgId },
         data: { deletedAt: new Date() },
+      });
+      await prisma.auditLog.create({
+        data: {
+          orgId: req.auth.orgId,
+          userId: req.auth.userId,
+          action: 'company.delete',
+          targetType: 'company',
+          targetId: req.params.id,
+        },
       });
       return reply.code(204).send(null);
     },

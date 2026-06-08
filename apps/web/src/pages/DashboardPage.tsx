@@ -79,13 +79,14 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
   const companyIndustry = company?.industry;
   const companyWebsite = company?.website;
 
+  const strategicIntelFreshness = company?.strategicIntel?.freshness;
+
   useEffect(() => {
     if (
       isAdmin &&
       companyId &&
       companyName &&
-      !companyDomain &&
-      !companyIndustry &&
+      ((!companyDomain && !companyIndustry) || strategicIntelFreshness === 'stale') &&
       enrich.status === 'idle'
     ) {
       enrich.mutate({
@@ -95,7 +96,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
         ...(companyWebsite ? { website: companyWebsite } : {}),
       });
     }
-  }, [isAdmin, companyId, companyName, companyDomain, companyIndustry, companyWebsite, enrich]);
+  }, [isAdmin, companyId, companyName, companyDomain, companyIndustry, companyWebsite, enrich, strategicIntelFreshness]);
 
   // Truly overdue (daysUntil < 0) only — matches the Sidebar badge so the two
   // counts can't disagree. Tasks with no dueDate are excluded.
@@ -108,10 +109,31 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
     [tasks.data?.items],
   );
 
-  if (dashboard.isLoading) {
+  const cachedSnapshot = useMemo(() => {
+    if (!accountId) return null;
+    try {
+      const stored = sessionStorage.getItem(`bidstack:account-cockpit:${accountId}`);
+      if (stored) return JSON.parse(stored) as NonNullable<typeof dashboard.data>;
+    } catch {
+      // ignore parse errors
+    }
+    return null;
+  }, [accountId, dashboard.data]);
+
+  useEffect(() => {
+    if (dashboard.data && accountId) {
+      sessionStorage.setItem(`bidstack:account-cockpit:${accountId}`, JSON.stringify(dashboard.data));
+    }
+  }, [dashboard.data, accountId]);
+
+  const isTransientError = dashboard.isError && (dashboard.error as any)?.status !== 404;
+  const snapshot = dashboard.data ?? (isTransientError ? cachedSnapshot : null);
+
+  if (dashboard.isLoading && !snapshot) {
     return <DashboardSkeleton />;
   }
-  if (dashboard.isError || !dashboard.data) {
+
+  if (!snapshot) {
     return (
       <ErrorState
         title="Couldn't load the CRM cockpit"
@@ -134,7 +156,6 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
     );
   }
 
-  const snapshot = dashboard.data;
   const cockpit = snapshot.cockpit;
   const isAccountView = Boolean(accountId);
   const accountOpps = opps.data?.items.filter(
@@ -143,6 +164,14 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
 
   return (
     <>
+      {dashboard.isError && (
+        <div role="status" className="bg-yellow-50 text-yellow-800 px-4 py-2 text-sm text-center rounded-md mb-4 flex items-center justify-center gap-2">
+          <span>Warning: Live refresh failed, showing the last verified snapshot.</span>
+          <button type="button" onClick={() => void dashboard.refetch()} className="font-semibold underline hover:no-underline">
+            Retry
+          </button>
+        </div>
+      )}
       <PageHead cockpit={cockpit} accountView={isAccountView} />
       <KpiRow cockpit={cockpit} />
       <CommandCenter cockpit={cockpit} />

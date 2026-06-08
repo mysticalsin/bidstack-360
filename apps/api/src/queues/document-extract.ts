@@ -74,8 +74,7 @@ export async function isDocumentAiSafe(documentId: string, orgId: string): Promi
   if (!doc) return true;
 
   // WHY type assertion: metadata is Json (unknown shape); we read a single known key
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- metadata is untyped Json from Prisma
-  const meta = doc.metadata as any;
+  const meta = doc.metadata as { ndaTier?: string } | null;
   if (meta && meta.ndaTier === 'D') {
     // Do NOT log document ID or name — NDA-D existence must not be leaked to log aggregators
     return false;

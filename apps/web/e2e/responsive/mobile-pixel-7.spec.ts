@@ -7,6 +7,7 @@
  * the sm→md boundary rather than only at the xs edge.
  */
 import { test, expect, devices } from '@playwright/test';
+import { cleanupMeetingImportContacts } from '../fixtures/test-data-cleanup.js';
 
 const PIXEL_7 = devices['Pixel 7'];
 
@@ -86,7 +87,10 @@ for (const route of KEY_ROUTES) {
     expect(undersizedTargets.length).toBeLessThanOrEqual(3);
   });
 
-  test(`${route.name}: screenshot baseline (Pixel 7)`, async ({ page }) => {
+  test(`${route.name}: screenshot baseline (Pixel 7)`, async ({ page, request }) => {
+    if (route.name === 'contacts') {
+      await cleanupMeetingImportContacts(request);
+    }
     await page.goto(route.path, { waitUntil: 'load' });
     await page.getByRole('main').waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
     await page.waitForTimeout(500); // Let animations settle

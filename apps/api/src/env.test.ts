@@ -61,6 +61,7 @@ describe('boot environment validation', () => {
       S3_REGION: 'us-east-1',
       STORAGE_SCAN_REQUIRED: 'true',
       INTEGRATION_TOKEN_KEY: 'unit-test-integration-token-key',
+      PUBLIC_BASE_URL: 'https://crm.example.com',
     });
 
     expect(env.STORAGE_DRIVER).toBe('s3');

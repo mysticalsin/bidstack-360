@@ -17,7 +17,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 
 import { mcpAuth, requireMcpScope, type McpAuthCtx } from './auth.js';
-import { hourlyRateLimitPlugin } from './plugins/hourly-rate-limit.js';
+import { hourlyRateLimitPlugin, mcpRateLimitFailsClosed } from './plugins/hourly-rate-limit.js';
 import { redis } from './redis.js';
 import { requiredScopeForTool, tools, type ToolName } from './tools/index.js';
 
@@ -85,6 +85,7 @@ function sendJsonRpcError(reply: FastifyReply, statusCode: number, message: stri
 }
 
 export async function buildMcpServer(): Promise<FastifyInstance> {
+  const failClosedOnRateLimitError = mcpRateLimitFailsClosed();
   const server = Fastify({
     logger: {
       level: process.env.LOG_LEVEL ?? 'info',
@@ -99,7 +100,9 @@ export async function buildMcpServer(): Promise<FastifyInstance> {
   });
 
   await server.register(sensible);
-  await server.register(hourlyRateLimitPlugin);
+  await server.register(hourlyRateLimitPlugin, {
+    failClosedOnRedisError: failClosedOnRateLimitError,
+  });
   await server.register(rateLimit, {
     max: 60,
     timeWindow: '1 minute',
@@ -110,9 +113,9 @@ export async function buildMcpServer(): Promise<FastifyInstance> {
     // Namespace under our own prefix so it can't collide with the hourly
     // plugin's keys or with any future app reuse of the same Redis.
     nameSpace: 'bidstack:mcp:perminute:',
-    // If Redis is briefly unreachable, allow the request through rather than
-    // 503 every MCP call. The hourly window is also fail-open by design.
-    skipOnError: true,
+    // Production fails closed so all replicas keep a real shared budget.
+    // Development/test can fail open for local resilience.
+    skipOnError: !failClosedOnRateLimitError,
     keyGenerator: (req) => {
       const auth = req.headers.authorization ?? '';
       const token = auth.startsWith('Bearer ') ? auth.slice(7) : 'anon';

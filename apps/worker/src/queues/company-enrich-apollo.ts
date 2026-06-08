@@ -1,13 +1,13 @@
 // Apollo.io company enrichment worker.
 //
 // Job shape: { orgId, companyName, domain? }
-// Prefer Apollo MCP company search/get-company when APOLLO_MCP_URL is configured
-// so account research can stay in the credit-free search lane. Fall back to the
-// REST organization enrichment endpoint only when APOLLO_API_KEY is configured.
+// Prefer Apollo MCP company search/get-company when APOLLO_MCP_URL is configured.
+// Fall back to the REST organization enrichment endpoint only when APOLLO_API_KEY
+// is configured and a domain is known.
 // Maps the response
 // to the CompanyEnrichment row keyed by (orgId, normalizedName), and writes an
-// audit log entry. When APOLLO_API_KEY is unset the job is a no-op (same
-// stub-mode pattern as dust-poll).
+// audit log entry. People/contact tools are opt-in only; by default this worker
+// never calls Apollo people endpoints and never stores email/phone fields.
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
@@ -23,10 +23,11 @@ export const QUEUE_NAME = COMPANY_ENRICH_APOLLO.name;
 
 const APOLLO_ENDPOINT = 'https://api.apollo.io/api/v1/organizations/enrich';
 const APOLLO_PEOPLE_SEARCH_ENDPOINT = 'https://api.apollo.io/api/v1/mixed_people/api_search';
-const APOLLO_PEOPLE_ENRICH_ENDPOINT = 'https://api.apollo.io/api/v1/people/match';
+const GDELT_DOC_ENDPOINT = 'https://api.gdeltproject.org/api/v2/doc/doc';
 const APOLLO_CONFIDENCE_BPS = 8500;
 const APOLLO_TIMEOUT_MS = 10_000;
 const APOLLO_CONCURRENCY = 5;
+const APOLLO_COMPANY_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const APOLLO_MCP_PROTOCOL_VERSION = '2025-06-18';
 const DEFAULT_EXECUTIVE_TITLES = [
   'chief executive officer',
@@ -90,6 +91,11 @@ const ApolloOrganization = z
     funding_events: z.unknown().optional(),
     latest_funding_round_date: z.unknown().optional(),
     total_funding: z.union([z.number(), z.string()]).nullish(),
+    news: z.unknown().optional(),
+    latest_news: z.unknown().optional(),
+    press_releases: z.unknown().optional(),
+    expansion_signals: z.unknown().optional(),
+    investment_signals: z.unknown().optional(),
   })
   .passthrough();
 
@@ -108,9 +114,9 @@ const ApolloPeopleSearchResponse = z
   })
   .passthrough();
 
-const ApolloPeopleEnrichResponse = z
+const GdeltDocResponse = z
   .object({
-    person: z.unknown().optional(),
+    articles: z.array(z.unknown()).optional(),
   })
   .passthrough();
 
@@ -136,7 +142,7 @@ type ApolloSyncMode =
   | 'apollo_mcp_get_company'
   | 'apollo_api_organization_enrich';
 
-type ApolloCreditPolicy = 'free_search' | 'uses_credits' | 'mixed' | 'unknown';
+type ApolloCreditPolicy = 'uses_credits' | 'mixed' | 'unknown';
 
 interface ApolloStrategicSignal {
   id: string;
@@ -173,6 +179,7 @@ interface ApolloStrategicIntel {
   hiringSignals: ApolloStrategicSignal[];
   leadershipSignals: ApolloStrategicSignal[];
   revenueSignals: ApolloStrategicSignal[];
+  newsSignals: ApolloStrategicSignal[];
   summary: string;
   limitations: string[];
   signals: ApolloStrategicSignal[];
@@ -196,6 +203,7 @@ export function mapApolloOrganization(
     now?: Date;
     jobPostings?: unknown;
     executives?: unknown;
+    newsCrossCheck?: unknown;
   } = {},
 ): MappedEnrichment {
   const now = context.now ?? new Date();
@@ -215,6 +223,7 @@ export function mapApolloOrganization(
     creditPolicy: context.creditPolicy ?? 'uses_credits',
     jobPostings,
     executives,
+    newsCrossCheck: context.newsCrossCheck,
   });
 
   return {
@@ -251,6 +260,7 @@ function buildApolloStrategicIntel({
   creditPolicy,
   jobPostings,
   executives,
+  newsCrossCheck,
 }: {
   org: ApolloOrganization;
   now: Date;
@@ -260,12 +270,14 @@ function buildApolloStrategicIntel({
   creditPolicy: ApolloCreditPolicy;
   jobPostings: unknown;
   executives: unknown;
+  newsCrossCheck: unknown;
 }): ApolloStrategicIntel {
   const observedAt = now.toISOString();
   const intentTopics = extractIntentTopics(org);
   const hiringSignals = extractHiringSignals(jobPostings, org, observedAt);
   const leadershipSignals = extractLeadershipSignals(executives, observedAt);
   const revenueSignals = extractRevenueSignals(org, annualRevenueMicros, observedAt);
+  const newsSignals = extractNewsSignals(org, observedAt, newsCrossCheck);
   const technologySignals = extractTechnologyStack(org)
     .slice(0, 8)
     .map((tech, index) =>
@@ -294,6 +306,7 @@ function buildApolloStrategicIntel({
     ...hiringSignals,
     ...leadershipSignals,
     ...revenueSignals,
+    ...newsSignals,
     ...technologySignals,
   ];
   const employeeTrend = deriveEmployeeTrend(hiringSignals, org);
@@ -302,6 +315,7 @@ function buildApolloStrategicIntel({
     employeeCount ? `${employeeCount.toLocaleString()} employees` : null,
     hiringSignals.length ? `${hiringSignals.length} hiring signal(s)` : null,
     leadershipSignals.length ? `${leadershipSignals.length} leadership signal(s)` : null,
+    newsSignals.length ? `${newsSignals.length} news/funding signal(s)` : null,
   ].filter((item): item is string => Boolean(item));
 
   return {
@@ -317,11 +331,12 @@ function buildApolloStrategicIntel({
     hiringSignals,
     leadershipSignals,
     revenueSignals,
+    newsSignals,
     summary: summaryParts.length
       ? `Apollo synced ${summaryParts.join(', ')}.`
       : 'Apollo synced company profile; no strategic signals returned yet.',
     limitations: [
-      'Apollo MCP company search is credit-free; enrichment and job postings can consume credits depending on plan and tool.',
+      'Apollo account intelligence follows the connected Apollo plan and tool limits; credit-sensitive enrichment is opt-in in BidStack.',
       'Emails and phone numbers are intentionally excluded from BidStack Apollo account intelligence.',
     ],
     signals,
@@ -546,6 +561,78 @@ function extractRevenueSignals(
   return signals;
 }
 
+function extractNewsSignals(
+  org: ApolloOrganization,
+  observedAt: string,
+  newsCrossCheck?: unknown,
+): ApolloStrategicSignal[] {
+  const apolloRows = [
+    ...rowsFromUnknown(org.news),
+    ...rowsFromUnknown(org.latest_news),
+    ...rowsFromUnknown(org.press_releases),
+    ...rowsFromUnknown(org.expansion_signals),
+    ...rowsFromUnknown(org.investment_signals),
+    ...rowsFromUnknown(org.funding_events),
+  ];
+  const crossCheckRows = rowsFromUnknown(newsCrossCheck);
+  const rows = [
+    ...apolloRows.map((row) => ({ row, source: 'apollo_io' as const, confidence: 0.7 })),
+    ...crossCheckRows.map((row) => ({ row, source: 'gdelt_news' as const, confidence: 0.66 })),
+  ];
+
+  return rows
+    .map(({ row, source, confidence }, index) => {
+      const title = firstString(row, [
+        'title',
+        'headline',
+        'name',
+        'event',
+        'round',
+        'funding_round',
+        'description',
+      ]);
+      if (!title) return null;
+      const detail =
+        firstString(row, ['summary', 'description', 'snippet', 'details', 'amount']) ??
+        newsDetailFromTitle(title);
+      const observed =
+        stringDate(
+          firstString(row, [
+            'published_at',
+            'publishedAt',
+            'date',
+            'observed_at',
+            'created_at',
+            'seendate',
+          ]),
+        ) ?? observedAt;
+      const lowerText = `${title} ${detail ?? ''}`.toLowerCase();
+      const kind: ApolloStrategicSignal['kind'] =
+        /\b(fund|investment|series [a-z]|raise|capital|financing)\b/.test(lowerText)
+          ? 'funding'
+          : 'news';
+      return signal({
+        id: `apollo-news-${slug(title)}-${index}`,
+        kind,
+        label: title,
+        detail,
+        observedAt: observed,
+        source,
+        confidence: kind === 'funding' ? Math.max(confidence, 0.74) : confidence,
+        url: firstString(row, ['url', 'source_url', 'article_url', 'link']),
+        metadata: row,
+      });
+    })
+    .filter((item): item is ApolloStrategicSignal => item !== null)
+    .slice(0, 10);
+}
+
+function newsDetailFromTitle(title: string): string {
+  return /\b(expand|expansion|open|hire|investment|fund|raise|acquir|launch)\b/i.test(title)
+    ? 'Company news signal returned by Apollo; use as account-planning context.'
+    : 'Company news signal returned by Apollo.';
+}
+
 function deriveEmployeeTrend(
   hiringSignals: ApolloStrategicSignal[],
   org: ApolloOrganization,
@@ -570,6 +657,7 @@ function rowsFromUnknown(value: unknown): Record<string, unknown>[] {
     'contacts',
     'job_postings',
     'jobs',
+    'articles',
   ]) {
     const rows = root[key];
     if (Array.isArray(rows)) return rows.map(record).filter((row) => Object.keys(row).length);
@@ -689,14 +777,12 @@ export interface CallApolloPeopleSearchOptions {
   seniorities?: string[];
 }
 
-export interface CallApolloPeopleEnrichOptions {
-  apiKey: string;
-  domain: string;
-  personId?: string;
-  name?: string;
-  linkedinUrl?: string;
+export interface FetchCompanyNewsCrossCheckOptions {
+  companyName: string;
+  domain?: string;
   fetchImpl?: typeof fetch;
   signal?: AbortSignal;
+  maxRecords?: number;
 }
 
 export interface CallApolloMcpOptions {
@@ -791,40 +877,55 @@ export async function callApolloPeopleSearch(
   return ApolloPeopleSearchResponse.parse(await res.json());
 }
 
-export async function callApolloPeopleEnrich(
-  options: CallApolloPeopleEnrichOptions,
-): Promise<z.infer<typeof ApolloPeopleEnrichResponse>> {
+export async function fetchCompanyNewsCrossCheck(
+  options: FetchCompanyNewsCrossCheckOptions,
+): Promise<{
+  source: 'gdelt_news';
+  query: string;
+  fetchedAt: string;
+  articles: Record<string, unknown>[];
+}> {
   const fetchImpl = options.fetchImpl ?? fetch;
-  const domain = normalizeDomain(options.domain);
-  if (!domain) throw new Error('apollo people enrichment requires a company domain');
-  if (!options.personId && !options.name && !options.linkedinUrl) {
-    throw new Error('apollo people enrichment requires personId, name, or linkedinUrl');
-  }
-
-  const url = new URL(APOLLO_PEOPLE_ENRICH_ENDPOINT);
-  url.searchParams.set('domain', domain);
-  if (options.personId) url.searchParams.set('id', options.personId);
-  if (options.name) url.searchParams.set('name', options.name);
-  if (options.linkedinUrl) url.searchParams.set('linkedin_url', options.linkedinUrl);
-  // Hard guardrail: we use person enrichment only to confirm current title/
-  // employer. Do not request email, phone, or waterfall contact enrichment.
-  url.searchParams.set('reveal_personal_emails', 'false');
-  url.searchParams.set('reveal_phone_number', 'false');
-  url.searchParams.set('run_waterfall_email', 'false');
-  url.searchParams.set('run_waterfall_phone', 'false');
-
+  const companyName = options.companyName.trim();
+  if (!companyName) throw new Error('company news cross-check requires a company name');
+  const query = buildCompanyNewsQuery(companyName, options.domain);
+  const url = new URL(GDELT_DOC_ENDPOINT);
+  url.searchParams.set('query', query);
+  url.searchParams.set('mode', 'ArtList');
+  url.searchParams.set('format', 'json');
+  url.searchParams.set('sort', 'datedesc');
+  url.searchParams.set('maxrecords', String(Math.max(1, Math.min(20, options.maxRecords ?? 8))));
   const res = await fetchImpl(url, {
-    method: 'POST',
-    headers: apolloApiHeaders(options.apiKey),
+    method: 'GET',
+    headers: { Accept: 'application/json' },
     signal: options.signal ?? AbortSignal.timeout(APOLLO_TIMEOUT_MS),
   });
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`apollo /people/match ${res.status}: ${text.slice(0, 200)}`);
+    throw new Error(`gdelt news cross-check ${res.status}: ${text.slice(0, 200)}`);
   }
 
-  return ApolloPeopleEnrichResponse.parse(await res.json());
+  const parsed = GdeltDocResponse.parse(await res.json());
+  return {
+    source: 'gdelt_news',
+    query,
+    fetchedAt: new Date().toISOString(),
+    articles: (parsed.articles ?? [])
+      .map((article) => sanitizeApolloPayload(record(article)) as Record<string, unknown>)
+      .filter((article) => Object.keys(article).length > 0),
+  };
+}
+
+function buildCompanyNewsQuery(companyName: string, domain?: string): string {
+  const phrase = quoteGdeltPhrase(companyName);
+  const normalizedDomain = normalizeDomain(domain ?? null);
+  const domainClause = normalizedDomain ? ` OR "${normalizedDomain}"` : '';
+  return `(${phrase}${domainClause}) (investment OR funding OR expansion OR hiring OR layoffs OR revenue OR acquisition OR promotion OR CEO OR CFO OR CTO)`;
+}
+
+function quoteGdeltPhrase(value: string): string {
+  return `"${value.replace(/["\\]/g, ' ').replace(/\s+/g, ' ').trim()}"`;
 }
 
 function apolloApiHeaders(apiKey: string): Record<string, string> {
@@ -897,7 +998,7 @@ export async function callApolloMcpCompanyIntel(
   }
 
   let jobPostings: unknown = null;
-  let creditPolicy: ApolloCreditPolicy = 'free_search';
+  let creditPolicy: ApolloCreditPolicy = 'unknown';
   if (options.includeCreditTools && (organizationId || options.domain)) {
     try {
       jobPostings = await client.callTool(tools.getJobPostings, {
@@ -912,7 +1013,7 @@ export async function callApolloMcpCompanyIntel(
   }
 
   let executives: unknown = null;
-  if (options.includeExecutiveSearch !== false && options.domain) {
+  if (options.includeExecutiveSearch === true && options.domain) {
     try {
       executives = await client.callTool(tools.searchPeople, {
         q_organization_domains_list: [options.domain],
@@ -1108,29 +1209,6 @@ function apolloOrganizationId(org: ApolloOrganization): string | null {
   return value === null || value === undefined ? null : String(value);
 }
 
-function apolloPersonId(row: Record<string, unknown>): string | null {
-  const value = row.id ?? row.person_id ?? row.apollo_id;
-  return value === null || value === undefined ? null : String(value);
-}
-
-function mergePeoplePayloads(
-  primary: unknown,
-  enrichment: unknown,
-): { people: Record<string, unknown>[] } {
-  return {
-    people: [...rowsFromUnknown(primary), ...peopleRowsFromEnrichment(enrichment)].map(
-      (row) => sanitizeApolloPayload(row) as Record<string, unknown>,
-    ),
-  };
-}
-
-function peopleRowsFromEnrichment(value: unknown): Record<string, unknown>[] {
-  const root = record(value);
-  const person = record(root.person);
-  if (Object.keys(person).length) return [person];
-  return rowsFromUnknown(value);
-}
-
 export async function startCompanyEnrichApollo(
   connection: IORedis,
   log: pino.Logger,
@@ -1160,7 +1238,7 @@ export async function startCompanyEnrichApollo(
       let creditPolicy: ApolloCreditPolicy;
       let rawMcp: Record<string, unknown> | null = null;
       let rawPeopleSearch: unknown = null;
-      let rawPeopleEnrichment: unknown = null;
+      let rawNewsCrossCheck: unknown = null;
       let jobPostings: unknown = null;
       let executives: unknown = null;
 
@@ -1172,7 +1250,7 @@ export async function startCompanyEnrichApollo(
           ...(data.domain ? { domain: data.domain } : {}),
           timeoutMs: Number(process.env.APOLLO_MCP_TIMEOUT_MS ?? APOLLO_TIMEOUT_MS),
           includeCreditTools: process.env.APOLLO_MCP_ENABLE_CREDIT_TOOLS === 'true',
-          includeExecutiveSearch: process.env.APOLLO_MCP_ENABLE_EXECUTIVE_SEARCH !== 'false',
+          includeExecutiveSearch: process.env.APOLLO_MCP_ENABLE_EXECUTIVE_SEARCH === 'true',
           tools: {
             searchCompanies: process.env.APOLLO_MCP_SEARCH_COMPANIES_TOOL ?? 'search_companies',
             getCompany: process.env.APOLLO_MCP_GET_COMPANY_TOOL ?? 'get_company',
@@ -1200,7 +1278,7 @@ export async function startCompanyEnrichApollo(
         });
         syncMode = 'apollo_api_organization_enrich';
         creditPolicy = 'uses_credits';
-        if (process.env.APOLLO_API_ENABLE_PEOPLE_SEARCH !== 'false') {
+        if (process.env.APOLLO_API_ENABLE_PEOPLE_SEARCH === 'true') {
           try {
             const peopleSearch = await callApolloPeopleSearch({
               apiKey,
@@ -1210,39 +1288,6 @@ export async function startCompanyEnrichApollo(
             });
             rawPeopleSearch = peopleSearch;
             executives = peopleSearch;
-
-            if (process.env.APOLLO_API_ENABLE_PEOPLE_ENRICHMENT === 'true') {
-              const firstExecutive = rowsFromUnknown(peopleSearch).find((row) =>
-                isExecutiveTitle(firstString(row, ['title', 'job_title', 'headline']) ?? ''),
-              );
-              if (firstExecutive) {
-                try {
-                  const enrichInput: CallApolloPeopleEnrichOptions = {
-                    apiKey,
-                    domain: data.domain,
-                  };
-                  const personId = apolloPersonId(firstExecutive);
-                  const personName = firstString(firstExecutive, [
-                    'name',
-                    'full_name',
-                    'person_name',
-                  ]);
-                  const linkedinUrl = firstString(firstExecutive, ['linkedin_url']);
-                  if (personId) enrichInput.personId = personId;
-                  if (personName) enrichInput.name = personName;
-                  if (linkedinUrl) enrichInput.linkedinUrl = linkedinUrl;
-                  const enriched = await callApolloPeopleEnrich(enrichInput);
-                  rawPeopleEnrichment = enriched;
-                  executives = mergePeoplePayloads(peopleSearch, enriched);
-                  creditPolicy = 'mixed';
-                } catch (err) {
-                  jobLog.warn(
-                    { err, companyName: data.companyName, domain: data.domain },
-                    'Apollo people enrichment skipped; continuing with people search results',
-                  );
-                }
-              }
-            }
           } catch (err) {
             jobLog.warn(
               { err, companyName: data.companyName, domain: data.domain },
@@ -1252,11 +1297,27 @@ export async function startCompanyEnrichApollo(
         }
       }
 
+      if (process.env.APOLLO_NEWS_CROSSCHECK_ENABLED !== 'false') {
+        try {
+          const newsDomain = data.domain ?? normalizeDomain(organization.primary_domain ?? null);
+          rawNewsCrossCheck = await fetchCompanyNewsCrossCheck({
+            companyName: data.companyName,
+            ...(newsDomain ? { domain: newsDomain } : {}),
+          });
+        } catch (err) {
+          jobLog.warn(
+            { err, companyName: data.companyName },
+            'Company news cross-check skipped; continuing with Apollo company intelligence',
+          );
+        }
+      }
+
       const mapped = mapApolloOrganization(organization, {
         syncMode,
         creditPolicy,
         jobPostings,
         executives,
+        newsCrossCheck: rawNewsCrossCheck,
       });
 
       const normalizedName = normalizeName(data.companyName);
@@ -1293,7 +1354,7 @@ export async function startCompanyEnrichApollo(
         limitations: mapped.strategicIntel.limitations,
         rawMcp,
         rawPeopleSearch: sanitizeApolloPayload(rawPeopleSearch),
-        rawPeopleEnrichment: sanitizeApolloPayload(rawPeopleEnrichment),
+        rawNewsCrossCheck: sanitizeApolloPayload(rawNewsCrossCheck),
       };
 
       const enrichment = await prisma.companyEnrichment.upsert({
@@ -1322,7 +1383,7 @@ export async function startCompanyEnrichApollo(
             mappedIndustry: mapped.industry,
             ...(meetingTechStack ? { meetingTechStack } : {}),
           } as unknown as Prisma.InputJsonValue,
-          cacheExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          cacheExpiresAt: new Date(Date.now() + APOLLO_COMPANY_CACHE_TTL_MS),
         },
         update: {
           legalName: mapped.legalName ?? data.companyName,
@@ -1345,7 +1406,7 @@ export async function startCompanyEnrichApollo(
             mappedIndustry: mapped.industry,
             ...(meetingTechStack ? { meetingTechStack } : {}),
           } as unknown as Prisma.InputJsonValue,
-          cacheExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          cacheExpiresAt: new Date(Date.now() + APOLLO_COMPANY_CACHE_TTL_MS),
         },
       });
 

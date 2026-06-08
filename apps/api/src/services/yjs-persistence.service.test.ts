@@ -29,6 +29,7 @@ const mockPrisma = {
     findUnique: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
+    updateMany: vi.fn(),
   },
   yjsUpdate: {
     create: vi.fn(),
@@ -334,10 +335,12 @@ describe('Compaction', () => {
     const upd2 = Y.encodeStateAsUpdate(doc2, Y.encodeStateVector(doc1));
 
     // Mock: findUnique returns a doc with two pending updates (unencrypted for test).
+    // `version` drives the compare-and-swap added to prevent lost updates.
     mockPrisma.yjsDocument.findUnique.mockResolvedValue({
       id: 'ydoc-001',
       orgId: 'org-A',
       ydocBinary: Buffer.from(baseSnap),
+      version: 0,
       updates: [
         { id: 'upd-1', update: Buffer.from(upd1) },
         { id: 'upd-2', update: Buffer.from(upd2) },
@@ -347,20 +350,16 @@ describe('Compaction', () => {
     let capturedBinary: Buffer | null = null;
     let capturedDeleteIds: string[] | null = null;
 
+    // Interactive transaction — run the callback with the mock client as `tx`.
     mockPrisma.$transaction.mockImplementation(
-      async (ops: Array<Promise<unknown>>) => {
-        // Simulate running each transaction operation.
-        // The update op is first, delete op second.
-        for (const op of ops) {
-          await op;
-        }
-      },
+      async (fn: (tx: typeof mockPrisma) => Promise<unknown>) => fn(mockPrisma),
     );
 
-    mockPrisma.yjsDocument.update.mockImplementation(
+    // CAS update succeeds (version matched): capture the snapshot, report count 1.
+    mockPrisma.yjsDocument.updateMany.mockImplementation(
       ({ data }: { data: { ydocBinary: Buffer } }) => {
         capturedBinary = data.ydocBinary;
-        return Promise.resolve({});
+        return Promise.resolve({ count: 1 });
       },
     );
 
@@ -374,8 +373,8 @@ describe('Compaction', () => {
     const { compactDoc } = await import('./yjs-persistence.service.js');
     await compactDoc('ydoc-001');
 
-    // The snapshot was updated.
-    expect(mockPrisma.yjsDocument.update).toHaveBeenCalledOnce();
+    // The snapshot was updated via the version-gated CAS.
+    expect(mockPrisma.yjsDocument.updateMany).toHaveBeenCalledOnce();
 
     // Both update rows were marked for deletion.
     expect(capturedDeleteIds).toEqual(['upd-1', 'upd-2']);
@@ -387,5 +386,30 @@ describe('Compaction', () => {
       expect(restored.getText('notes').toString()).toContain('Update one');
       expect(restored.getText('notes').toString()).toContain('Update two');
     }
+  });
+
+  it('aborts WITHOUT deleting updates when version changed under it (lost-update guard)', async () => {
+    // WHY: a concurrent compaction (inline + worker) must not blind-overwrite. If
+    // the CAS finds the version already bumped, we abort and LEAVE the update rows
+    // so the edits are not lost — they compact on the next pass.
+    const base = new Y.Doc();
+    const baseSnap = Y.encodeStateAsUpdate(base);
+    mockPrisma.yjsDocument.findUnique.mockResolvedValue({
+      id: 'ydoc-001',
+      orgId: 'org-A',
+      ydocBinary: Buffer.from(baseSnap),
+      version: 3,
+      updates: [{ id: 'upd-1', update: Buffer.from(baseSnap) }],
+    });
+    mockPrisma.$transaction.mockImplementation(
+      async (fn: (tx: typeof mockPrisma) => Promise<unknown>) => fn(mockPrisma),
+    );
+    // Version moved (a concurrent pass won) → 0 rows match the CAS predicate.
+    mockPrisma.yjsDocument.updateMany.mockResolvedValue({ count: 0 });
+
+    const { compactDoc } = await import('./yjs-persistence.service.js');
+    await compactDoc('ydoc-001');
+
+    expect(mockPrisma.yjsUpdate.deleteMany).not.toHaveBeenCalled();
   });
 });

@@ -10,6 +10,7 @@ export const pluginRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/plugins',
     {
+      preHandler: server.requirePermission('integrations:read'),
       schema: { response: { 200: z.object({ items: z.array(Plugin) }) } },
     },
     async (req) => {

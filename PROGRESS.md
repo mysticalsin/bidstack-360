@@ -4,6 +4,615 @@ Append-only sprint log. Every sprint ends with a commit + a checkpoint here.
 
 ---
 
+## 2026-06-07 - Agent Studio Bid Workspace Evidence Handoff
+
+**Done:**
+
+- Added an Agent Studio evidence handoff inside the crew run panel. Users can
+  search opportunities, select a bid workspace, inspect its document and
+  requirement counts, open the RFP pipeline, and load persisted evidence into
+  the crew input.
+- Reused the existing bid-workspace API instead of creating a parallel upload
+  path. Crew inputs now carry `opportunityId`, `documentIds`,
+  `requirementIds`, and `evidenceSource=bid_workspace` alongside the bounded
+  RFP evidence bundle.
+- Built a dedicated evidence formatter that includes document IDs, requirement
+  IDs, source chunk IDs, priorities, confidence, and source-use instructions so
+  agents can cite evidence instead of guessing.
+- Preserved evidence bundle line breaks for agent readability while still
+  bounding document count, requirement count, requirement text, and total input
+  length.
+
+**Verified:**
+
+- `pnpm --filter @bidstack/web exec vitest run src/pages/agentStudio/evidence.test.ts --reporter=dot` - PASS, 2/2.
+- `pnpm --filter @bidstack/web exec eslint src/pages/AgentStudioPage.tsx src/pages/agentStudio/evidence.ts src/pages/agentStudio/evidence.test.ts --quiet` - PASS.
+- `pnpm --filter @bidstack/web typecheck` - PASS.
+- `pnpm --filter @bidstack/web build` - PASS.
+- In-app browser smoke on `/agent-studio` - PASS: crew run panel opens,
+  opportunity search returns live opportunities, selecting an RFP workspace
+  loads document/requirement evidence, `Use evidence as crew input` enables
+  `Run crew`, the textarea keeps structured line breaks, and no app console
+  errors appear.
+
+**Surfaced:**
+
+- This is the first real bridge from OCR/extraction output to Agent Studio.
+  The remaining production-grade RFP path is upload/import -> OCR/Omniparse
+  extraction -> source chunks/requirements -> agent run -> cited draft outputs
+  with approval gates.
+
+## 2026-06-07 - Crew Provider Cancellation Propagation
+
+**Done:**
+
+- Propagated cooperative `AbortSignal` support through the crew engine,
+  Dust-backed crew executor, shared RFP LLM wrapper, direct model provider
+  client, and Dust client.
+- Added a worker-side cancellation watcher for running crew jobs. If a run is
+  moved out of `running` while a provider call is in flight, the worker aborts
+  the active provider request and ignores late results.
+- Kept cancellation telemetry honest: a user-initiated abort no longer logs a
+  fake provider failure or AI invocation error before rethrowing.
+- Preserved provider flexibility for RFP agents across Dust, Claude, OpenAI,
+  Kimi, NVIDIA NIM, and Gemma/local OpenAI-compatible providers.
+
+**Verified:**
+
+- `pnpm --filter @bidstack/worker exec vitest run src/crew/engine.test.ts src/crew/dust-executor.test.ts src/lib/rfp-llm.test.ts src/lib/llm-provider.test.ts --reporter=dot` - PASS, 49/49.
+- `pnpm --filter @bidstack/dust-client exec vitest run src/client.test.ts --reporter=dot` - PASS, 3/3.
+- Focused worker and Dust client eslint - PASS.
+- `pnpm --filter @bidstack/dust-client build` - PASS.
+- `pnpm --filter @bidstack/dust-client typecheck` - PASS.
+- `pnpm --filter @bidstack/worker typecheck` - PASS.
+- `pnpm --filter @bidstack/web build` - PASS.
+- In-app browser smoke on `http://localhost:5173/agent-studio` - PASS:
+  Agent Studio loads, provider readiness renders as `2/6 ready`, no visible
+  request/load error remains after reload, and the sidebar/topbar remain sticky
+  after scrolling to the bottom.
+
+**Surfaced:**
+
+- The provider readiness card briefly showed a stale error from an earlier
+  query state; the proxied endpoint returned 200 and the card rendered correctly
+  after reload.
+- The next hard RFP workflow slice is evidence plumbing: Intake/OCR document
+  IDs, extracted source chunks, and citations should become first-class crew
+  inputs, not just pasted text.
+
+## 2026-06-07 - Crew Run Recovery Controls
+
+**Done:**
+
+- Added queue-aware crew run cancellation for queued/running runs, including
+  BullMQ queued-job removal when the job has not become active yet.
+- Added `POST /api/v1/crew-runs/:id/cancel` and
+  `POST /api/v1/crew-runs/:id/retry` with owner-or-admin visibility, status
+  validation, tenant scoping, and audit evidence.
+- Guarded the worker state machine so a run must move `queued -> running`
+  before work starts, and late completion/failure writes cannot overwrite a
+  user-cancelled run.
+- Added Agent Studio controls for active crew cancellation, retrying
+  failed/cancelled/partial runs from stored inputs, and running completed runs
+  again.
+- Added `crew-runs` to the mutation-audit safety-net route families.
+
+**Verified:**
+
+- `pnpm --filter @bidstack/api exec vitest run src/routes/crews.integration.test.ts src/routes/agents.integration.test.ts --reporter=dot` - PASS, 8/8.
+- `pnpm --filter @bidstack/api exec eslint src/routes/crews.ts src/routes/crews.integration.test.ts src/queues/crew-run.ts src/plugins/mutation-audit.ts --quiet` - PASS.
+- `pnpm --filter @bidstack/api exec eslint ../worker/src/queues/crew-run.ts --quiet` - PASS.
+- `pnpm --filter @bidstack/web exec eslint src/pages/AgentStudioPage.tsx --quiet` - PASS.
+- `pnpm --filter @bidstack/api typecheck` - PASS.
+- `pnpm --filter @bidstack/worker typecheck` - PASS.
+- `pnpm --filter @bidstack/web typecheck` - PASS.
+- `pnpm --filter @bidstack/web build` - PASS.
+- In-app browser smoke on `http://localhost:5173/agent-studio` - PASS:
+  Agent Studio loads with no visible request/load error, sidebar footer/topbar
+  stay anchored, the RFP crew runner opens, and Intake guidance, Run Crew, and
+  Run History render.
+
+**Surfaced:**
+
+- Superseded by the 2026-06-07 Crew Provider Cancellation Propagation slice:
+  running provider calls now receive cooperative `AbortSignal` cancellation.
+
+## 2026-06-07 - Agent Provider Readiness Status
+
+**Done:**
+
+- Added a typed provider-readiness contract for RFP agents so Agent Studio can
+  show whether Dust, Claude, OpenAI, Kimi, NVIDIA NIM, and Gemma/local providers
+  are configured without returning secret values.
+- Added `GET /api/v1/agents/provider-status`, protected by `agents:read`, with
+  per-provider setup source, model, endpoint, missing server env keys, and notes.
+- Added a reusable `AgentProviderStatusCard` and placed it in `/agent-studio`
+  and Settings -> Integrations -> AI & Agents.
+- Kept the current implementation honest: direct model provider secrets remain
+  server-side env/Azure secret concerns for now; Dust keeps the existing
+  encrypted per-org credential path.
+- Added provider-readiness tests that assert no secret values are serialized and
+  that missing env contracts are reported deterministically.
+
+**Verified:**
+
+- `pnpm --filter @bidstack/shared build` - PASS.
+- `pnpm --filter @bidstack/api exec vitest run src/services/agents/agents.helpers.test.ts --reporter=dot` - PASS, 4/4.
+- `pnpm --filter @bidstack/shared exec vitest run src/schemas/rfp-agent.test.ts --reporter=dot` - PASS, 4/4.
+- `pnpm --filter @bidstack/web exec eslint src/components/agents/AgentProviderStatusCard.tsx src/pages/AgentStudioPage.tsx src/components/settings/IntegrationsSection.tsx src/hooks/useAgents.ts --quiet` - PASS.
+- `pnpm --filter @bidstack/api exec eslint src/services/agents/agents.helpers.ts src/services/agents/agents.helpers.test.ts src/routes/agents.ts --quiet` - PASS.
+- `pnpm --filter @bidstack/api typecheck` - PASS.
+- `pnpm --filter @bidstack/web typecheck` - PASS.
+- `pnpm --filter @bidstack/web build` - PASS.
+- Direct local route check on `/api/v1/agents/provider-status` - PASS, returned
+  structured provider status and no secret values.
+- In-app browser smoke on `http://localhost:5173/agent-studio` - PASS:
+  provider readiness card rendered with no request-failed state.
+- In-app browser smoke on Settings -> Integrations -> AI & Agents - PASS:
+  Dust credentials and provider readiness cards rendered with no request-failed
+  state.
+
+**Surfaced:**
+
+- API helper tests must build `@bidstack/shared` before consumer tests because
+  the API imports shared package dist.
+- Tests asserting missing env must delete the env keys they own; local Dust env
+  can exist on a developer machine.
+
+## 2026-06-07 - Agent Studio Provider-Neutral Crew UX
+
+**Done:**
+
+- Reworked `/agent-studio` into a clearer RFP automation control tower that
+  shows the intake, OCR/parse, agent crew, and approval path before users touch
+  crew controls.
+- Added operational state cards so users can see the current agent count,
+  standard-agent count, crew count, and provider fallback posture.
+- Added run-panel guidance that sends file-based RFPs through `/intake` first
+  for OCR/extraction/cited evidence, while still allowing pasted extracted
+  RFP text for direct crew runs.
+- Fixed the desktop sidebar collapse/hamburger control so it remains sticky and
+  visible while long CRM pages scroll.
+- Extended RFP agent provider support beyond Dust/Claude to OpenAI-compatible
+  providers: OpenAI, Kimi, NVIDIA NIM, and local Gemma/Ollama-compatible
+  endpoints, with credentials read server-side only.
+- Updated the RFP agent dialog and starter templates so admins can choose the
+  provider/model family without vendor lock-in.
+- Added targeted tests for the provider schema/helper path and the sticky
+  sidebar regression.
+
+**Verified:**
+
+- `pnpm --filter @bidstack/web exec eslint src/pages/AgentStudioPage.tsx src/components/layout/Sidebar.tsx src/components/agents/AgentDialog.tsx src/pages/AgentsPage.tsx src/pages/agents/AgentsStarterGrid.tsx src/pages/agents/AgentsSquadTable.tsx e2e/navigation.spec.ts --quiet` - PASS.
+- `pnpm --filter @bidstack/web typecheck` - PASS.
+- `pnpm --filter @bidstack/web build` - PASS.
+- `pnpm --filter @bidstack/api exec vitest run src/services/agents/agents.helpers.test.ts --reporter=dot` - PASS, 2/2.
+- `pnpm --filter @bidstack/shared exec vitest run src/schemas/rfp-agent.test.ts --reporter=dot` - PASS, 4/4.
+- In-app browser smoke on `http://localhost:5173/agent-studio` - PASS:
+  control tower renders, run panel exposes Intake/OCR guidance, no fatal page
+  errors, and only a local reduced-motion warning appears in console logs.
+- `pnpm --filter @bidstack/web exec playwright test e2e/navigation.spec.ts --grep "desktop sidebar toggle remains anchored while scrolling long pages"` - PASS.
+
+**Surfaced:**
+
+- This slice improves the existing crew infrastructure and provider flexibility;
+  it does not claim full Twenty parity across the entire CRM.
+- The broad workspace remains dirty from prior CRM stabilization shifts. Do not
+  revert unrelated files.
+- Real provider keys must stay in local env/Azure secrets; no live AI provider
+  call was made in this slice.
+
+## 2026-06-07 - RBAC Role Mutation Rich Audit Coverage
+
+**Done:**
+
+- Promoted admin role create/update/delete from generic request-level evidence
+  to rich transaction-level audit rows.
+- Added `role.create`, `role.update`, and `role.delete` rows in the same
+  transactions as the business writes.
+- Captured role names, descriptions, permission IDs, permission keys, requested
+  fields, changed fields, and before/after permission changes for Excel export
+  review.
+- Validated role `POST` permission IDs before creating role-permission joins so
+  bad IDs fail loudly with a 400 instead of being skipped.
+- Scoped role-permission replacement deletes by `orgId` and de-duplicated
+  repeated permission IDs during PATCH.
+- Updated the mutation-audit safety net to skip rich-audited role CRUD paths so
+  exports do not show duplicate generic request rows.
+- Added route integration coverage proving the full create/update/delete audit
+  lifecycle and duplicate-request-row prevention.
+
+**Verified:**
+
+- `pnpm --filter @bidstack/api exec vitest run src/routes/roles.integration.test.ts src/plugins/mutation-audit.test.ts --reporter=dot` - PASS, 31/31.
+- `pnpm --filter @bidstack/api exec eslint src/routes/roles.ts src/routes/roles.integration.test.ts src/plugins/mutation-audit.ts src/plugins/mutation-audit.test.ts --quiet` - PASS.
+- `pnpm --filter @bidstack/api typecheck` - PASS.
+- `pnpm --filter @bidstack/api test` - PASS, 73 files / 522 passed / 2 skipped.
+- `pnpm --filter @bidstack/api build` - PASS.
+
+**Surfaced:**
+
+- The full API suite logged slow dashboard/widget queries during unrelated tests.
+  That is separate from this audit-log slice but should stay on the broader
+  CRM performance hardening list.
+- Remaining safety-net route families still need future review to decide which
+  require domain-specific before/after diffs.
+
+---
+
+## 2026-06-07 - Company CRUD Rich Audit Coverage
+
+**Done:**
+
+- Promoted manual company create/update/delete from generic request-level audit
+  coverage to rich transaction-level domain audit rows.
+- Added `company.create`, `company.update`, and `company.delete` audit rows in
+  the same transactions as the business writes.
+- Added before/after update diffs for normal business fields while avoiding raw
+  tax ID and arbitrary custom-field value dumps.
+- Updated the mutation-audit safety net to skip rich-audited company CRUD paths
+  so exports do not show duplicate generic request rows.
+- Added a dedicated company route integration test that proves rich audit rows
+  are written and duplicate generic rows are not.
+- Updated the mutation-audit solution note and mistake ledger.
+
+**Verified:**
+
+- `pnpm --filter @bidstack/api exec vitest run src/routes/companies.test.ts src/plugins/mutation-audit.test.ts src/routes/audit-logs.test.ts --reporter=dot` - PASS, 25/25.
+- `pnpm --filter @bidstack/api exec eslint src/routes/companies.ts src/routes/companies.test.ts src/plugins/mutation-audit.ts src/plugins/mutation-audit.test.ts --quiet` - PASS.
+- `pnpm --filter @bidstack/api typecheck` - PASS.
+- `pnpm --filter @bidstack/api test` - PASS, 73 files / 517 passed / 2 skipped.
+
+**Surfaced:**
+
+- Rich company audit now covers manual `/companies` CRUD. Other generic
+  safety-net route families still need future review to decide whether they
+  warrant domain-specific before/after diffs.
+
+---
+
+## 2026-06-07 - Audit Log Evidence Export Hardening
+
+**Done:**
+
+- Hardened the audit-log XLSX export so compliance reviewers get first-class
+  evidence columns instead of needing to decode raw JSON.
+- Added Excel columns for actor kind, related CRM ids, request id, HTTP method,
+  HTTP path, matched route, status code, source IP, and user agent.
+- Updated the mutation-audit safety net to capture source IP and user agent
+  without storing request bodies or query-string data.
+- Fixed a backend correctness edge case where export metadata could under-report
+  truncation when the row limit was reached inside an already-fetched batch.
+- Added regression coverage for the richer workbook header, formula-injection
+  protection, export provenance, and the truncation metadata edge case.
+- Updated the audit-log export solution note and mistake ledger.
+
+**Verified:**
+
+- `pnpm --filter @bidstack/api exec vitest run src/routes/audit-logs.test.ts src/plugins/mutation-audit.test.ts --reporter=dot` - PASS, 22/22.
+- `pnpm --filter @bidstack/api exec eslint src/routes/audit-logs.ts src/routes/audit-logs.test.ts src/plugins/mutation-audit.ts src/plugins/mutation-audit.test.ts --quiet` - PASS.
+- `pnpm --filter @bidstack/api typecheck` - PASS.
+- `pnpm --filter @bidstack/api test` - PASS, 72 files / 514 passed / 2 skipped.
+
+**Surfaced:**
+
+- The generic mutation-audit safety net remains request-level evidence. Rich
+  field-level audit rows should still be added inside high-value domain
+  transactions where reviewers need exact before/after business diffs.
+- Sub-agent spawning was unavailable because the thread limit was already
+  reached, so this pass was completed locally with focused tests.
+
+---
+
+## 2026-06-07 - Account Cockpit Live Recheck and Audit Hygiene
+
+**Done:**
+
+- Rechecked Tony's affected cockpit request after the tab-discard fallback and
+  dependency cleanup work.
+- Confirmed the API readiness endpoint is healthy and the exact Vite-proxied
+  dashboard request returns `200`.
+- Opened the affected account cockpit in the in-app browser and verified it
+  renders account content instead of the fatal CRM cockpit error.
+- Cleaned only the trailing whitespace lines reported by `git diff --check`.
+
+**Verified:**
+
+- Live `GET /readyz` returned `200` with DB, Redis, and storage healthy.
+- Live `GET /api/v1/crm/dashboard?account=20086dc4-4ac4-441b-9c30-b33abdcca98d`
+  through the Vite proxy returned `200`.
+- In-app browser smoke on the affected account page showed account content, no
+  `Couldn't load the CRM cockpit`, no `Request failed (500)`, and no console
+  errors.
+- `git diff --check` - PASS except expected Windows line-ending warnings.
+- `pnpm --filter @bidstack/web typecheck` - PASS.
+- `pnpm --filter @bidstack/web exec vitest run src/pages/DashboardPage.test.tsx src/lib/queryCache.test.ts --reporter=dot`
+  - PASS, 8/8.
+
+**Surfaced:**
+
+- The current branch still has many unrelated dirty files from previous CRM
+  stabilization work. This pass did not revert them.
+- Remaining non-blocking follow-ups: the ESLint peer warning from install and
+  the successful web build's oversized vendor chunk warning.
+
+---
+
+## 2026-06-07 - Dependency Audit Zero-Advisory Pass
+
+**Done:**
+
+- Continued the full CRM stabilization pass after the account cockpit idle fixes
+  and root test/build stabilization.
+- Ran the full audit payload and found three remaining moderate dependency
+  advisories after the high-severity gate was already green.
+- Upgraded the web app's `i18next-http-backend` to a patched 3.x release.
+- Upgraded web and marketing `react-router-dom` to `^6.30.4`.
+- Added a workspace `ws` override so transitive websocket users resolve to a
+  patched version.
+- Added a reusable solution note and mistake ledger entry for zero-advisory
+  remediation in a dirty workspace.
+
+**Verified:**
+
+- `pnpm audit` - PASS, no known vulnerabilities.
+- `pnpm lint` - PASS.
+- `pnpm typecheck` - PASS.
+- `pnpm test` - PASS, including API 71 files / 495 passed / 2 skipped.
+- `pnpm build` - PASS.
+- `pnpm --filter @bidstack/web typecheck` - PASS.
+- `pnpm --filter @bidstack/marketing typecheck` - PASS.
+- `pnpm --filter @bidstack/api typecheck` - PASS.
+- `pnpm --filter @bidstack/web test` - PASS, 39 files / 258 tests.
+- `pnpm --filter @bidstack/marketing test` - PASS, 1 file / 3 tests.
+
+**Surfaced:**
+
+- `pnpm install` ran in an already-dirty workspace, so `pnpm-lock.yaml` also
+  reflects pre-existing manifest drift from earlier CRM work.
+- Install still warns about an `@eslint/js` 10 / ESLint 9 peer mismatch.
+- The web production build succeeds but still warns that the vendor chunk is
+  slightly above the 700 kB warning threshold.
+
+---
+
+## 2026-06-07 - Root Gate Opportunity List Stabilization
+
+**Done:**
+
+- Continued the full CRM hardening pass from the relay baton.
+- Ran broad gates and found root `pnpm test` failing in `opportunities.integration.test.ts`.
+- Diagnosed the failure as a parallel integration-test ordering bug: RFP approval tests can create valid `RFP-*` opportunities while the opportunities list test expected the newest/first row to be a canonical `OP-NNNN` seed record.
+- Updated the opportunities integration test to assert the list page item shape with the tolerant persisted-read contract, then locate an actual canonical seed opportunity by stable DB identity and scoped search.
+- Added a reusable solution note and mistake ledger entry so future list tests do not infer fixture identity from sorted position.
+
+**Verified:**
+
+- `pnpm audit --audit-level high` - PASS, with 3 moderate advisories remaining.
+- `pnpm lint` - PASS.
+- `pnpm typecheck` - PASS.
+- `pnpm --filter @bidstack/api exec vitest run src/routes/opportunities.integration.test.ts --reporter=dot` - PASS, 12/12.
+- `pnpm --filter @bidstack/api typecheck` - PASS.
+- `pnpm --filter @bidstack/api lint` - PASS.
+- `pnpm test` - PASS, including API 71 files / 495 passed / 2 skipped.
+- `pnpm build` - PASS.
+
+**Surfaced:**
+
+- The root audit still reports 3 moderate advisories. The high-severity release gate is green, but a zero-advisory enterprise posture would need a separate dependency remediation pass.
+- API integration tests still share the seed org and run files in parallel. This fix removes one ordering assumption, but isolated test tenants remain the better long-term foundation.
+
+---
+
+## 2026-06-07 - E2E Shared Data Cleanup and Responsive Baseline Repair
+
+**Done:**
+
+- Ran the full web E2E suite after the cockpit idle fallback work; it finished green according to Playwright's `.last-run.json`.
+- Investigated earlier responsive/contact visual diffs instead of blindly accepting all snapshots.
+- Found meeting-import tests were creating contacts and related artifacts in the shared seed org, which polluted later contact list and mobile baseline tests.
+- Added a narrow E2E cleanup helper that deletes only explicit meeting-import test fingerprints.
+- Added API notes test cleanup for contacts, notes, risks, tasks, and enrichment rows created by the meeting-import integration path.
+- Wired cleanup into account, contact, and responsive baseline tests.
+- Verified the settings responsive baselines only after confirming the contacts failure was data pollution, not a design change.
+- Added a reusable solution note and mistake ledger entry for shared seed-org test pollution.
+
+**Verified:**
+
+- `pnpm --filter @bidstack/web e2e` - PASS (`apps/web/test-results/.last-run.json` reports `passed` with no failed tests).
+- `pnpm --filter @bidstack/web typecheck` - PASS.
+- `pnpm --filter @bidstack/web lint` - PASS.
+- `pnpm --filter @bidstack/api typecheck` - PASS.
+- `pnpm --filter @bidstack/api exec vitest run src/routes/notes.test.ts --reporter=dot` - PASS, 7/7.
+- Targeted account/contact/responsive Playwright checks passed before the final full E2E confirmation.
+
+**Surfaced:**
+
+- The app still relies on a shared seed org for several E2E flows. This pass contains the pollution for known meeting-import artifacts, but a future test-isolation pass should give mutating suites their own tenant or reset endpoint.
+- The worktree remains broadly dirty from prior CRM work; this pass did not revert unrelated changes.
+
+---
+
+## 2026-06-07 - Account Cockpit Tab-Discard Fallback
+
+**Done:**
+
+- Re-investigated Tony's repeated idle cockpit crash on
+  `/api/v1/crm/dashboard?account=20086dc4-4ac4-441b-9c30-b33abdcca98d`.
+- Confirmed the live endpoint is currently healthy through Vite and API, and
+  `/readyz` reports DB, Redis, and storage healthy.
+- Found the remaining edge case: the previous stale-refresh fix relied on React
+  Query's in-memory snapshot, but a long-idle browser tab can be discarded or
+  reloaded and lose that memory before the next transient 5xx.
+- Added a tab-scoped, schema-validated last-verified account cockpit snapshot.
+- The fallback is used only for transient 5xx/network failures; 404/missing
+  accounts still fail loud.
+- Wired auth cache cleanup to clear account cockpit session snapshots.
+- Added regression coverage and a reusable solution note.
+
+**Verified:**
+
+- `pnpm --filter @bidstack/web exec vitest run src/pages/DashboardPage.test.tsx src/lib/queryCache.test.ts --reporter=dot`
+  - PASS, 8/8.
+- `pnpm --filter @bidstack/web typecheck` - PASS.
+- `pnpm --filter @bidstack/web lint` - PASS.
+- `pnpm --filter @bidstack/api exec vitest run src/routes/crm/dashboard.test.ts --reporter=dot`
+  - PASS, 5/5.
+- Live `GET /readyz` returned `200` with DB, Redis, and storage healthy.
+- Live Vite-proxied dashboard request returned `200` and selected
+  `Rush University System for Health`.
+- In-app browser smoke on the affected account page showed account content, no
+  fatal cockpit error, no `Request failed (500)` copy, and no console errors.
+
+**Surfaced:**
+
+- Multiple local API/web watcher processes are still running. Only one API
+  process owns port `4000`, but duplicate dev watchers should be cleaned up in a
+  future local-ops pass.
+- Full root gates were not rerun for this narrow frontend resilience patch.
+
+---
+
+## 2026-06-07 - Redis Readiness Recovery for Idle Cockpit Stability
+
+**Done:**
+
+- Investigated Tony's repeated idle account cockpit failure on
+  `/api/v1/crm/dashboard?account=20086dc4-4ac4-441b-9c30-b33abdcca98d`.
+- Confirmed the exact dashboard endpoint returned `200`, but `/readyz` was
+  stuck at `503` because the API Redis client reported `redis:false` even while
+  Redis was reachable on port `6380`.
+- Added an explicit Redis reconnect path for ended/closed client states while
+  preserving fail-fast command behavior.
+- Routed readiness and cache get/set/delete through the reconnect helper so a
+  transient Redis blip does not keep the API unhealthy until restart.
+- Added pure status-helper coverage and codified the pattern in
+  `docs/solutions/redis-readiness-reconnect.md`.
+- Fixed a separate full-gate opportunity serialization failure by splitting
+  read-tolerant persisted opportunity codes from canonical write/import codes.
+- Added a reusable solution note for the opportunity code read/write contract.
+
+**Verified:**
+
+- `pnpm --filter @bidstack/api exec vitest run src/redis.test.ts src/routes/health.test.ts src/plugins/redis-cache.test.ts --reporter=dot`
+  - PASS, 11/11.
+- `pnpm --filter @bidstack/api exec vitest run src/routes/crm/dashboard.test.ts --reporter=dot`
+  - PASS, 5/5.
+- `pnpm --filter @bidstack/web exec vitest run src/pages/DashboardPage.test.tsx --reporter=dot`
+  - PASS, 3/3.
+- `pnpm --filter @bidstack/api typecheck` - PASS.
+- `pnpm --filter @bidstack/api lint` - PASS.
+- `pnpm --filter @bidstack/shared build` - PASS.
+- `pnpm --filter @bidstack/shared test` - PASS, 10 files / 66 tests.
+- `pnpm --filter @bidstack/api exec vitest run src/routes/opportunities.integration.test.ts --reporter=dot`
+  - PASS, 12/12.
+- `pnpm --filter @bidstack/api exec vitest run src/routes/rfp-pipeline.approve.integration.test.ts --reporter=dot`
+  - PASS, 12/12.
+- `pnpm --filter @bidstack/api test`
+  - PASS, 71 files / 495 passed / 2 skipped.
+- Live `GET /readyz` returned `200` with `{"ok":true,"db":true,"redis":true,"storage":true}`.
+- Live Vite-proxied dashboard request returned `200` and selected
+  `Rush University System for Health`.
+- Live Vite-proxied opportunities request returned `200`.
+- Playwright smoke on the affected account cockpit showed the company, no fatal
+  "Couldn't load the CRM cockpit" copy, no `Request failed (500)` copy, and no
+  console errors.
+
+**Surfaced:**
+
+- This slice fixed Redis readiness recovery plus a read-contract issue found in
+  the full API gate. It did not rerun full root gates.
+
+---
+
+## 2026-06-07 - Account Cockpit Idle Resilience + Weekly Apollo Freshness
+
+**Done:**
+
+- Fixed the account cockpit failure mode Tony saw after leaving the page idle:
+  background refresh errors no longer replace a valid cockpit snapshot with a
+  fatal "Couldn't load the CRM cockpit" screen.
+- Added an inline stale-refresh warning and Retry path when the last verified
+  dashboard snapshot remains usable.
+- Added bounded account-page refresh triggering for missing or stale Apollo
+  strategic intelligence.
+- Recomputed Apollo strategic-intel freshness from `lastSyncedAt` on read, so
+  stored vendor metadata cannot remain "fresh" forever.
+- Changed local company enrichment and Apollo worker cache expiry to seven days
+  to satisfy weekly refresh behavior.
+- Added dashboard regression coverage, Apollo freshness/cache coverage, and
+  fixed two gate issues found during verification: notes panel unused props and
+  currency selector i18n test bootstrap.
+
+**Verified:**
+
+- Direct API/proxy check for
+  `/api/v1/crm/dashboard?account=20086dc4-4ac4-441b-9c30-b33abdcca98d` returned
+  200 with cockpit data.
+- Browser smoke passed on the affected account page with no fatal cockpit error
+  and no console errors.
+- `pnpm --filter @bidstack/web exec vitest run src/pages/DashboardPage.test.tsx`
+  - PASS, 3/3.
+- `pnpm --filter @bidstack/api exec vitest run src/services/crm/company.service.test.ts src/services/crm/company-enrichment.service.test.ts`
+  - PASS, 4/4.
+- `pnpm --filter @bidstack/worker exec vitest run src/queues/company-enrich-apollo.test.ts`
+  - PASS, 22/22.
+- `pnpm --filter @bidstack/web test` - PASS, 39 files / 255 tests.
+- `pnpm --filter @bidstack/api test` - PASS, 70 files / 493 passed / 2 skipped.
+- `pnpm --filter @bidstack/worker test` - PASS, 19 files / 211 tests.
+- `pnpm lint` - PASS.
+- `pnpm typecheck` - PASS.
+- `pnpm test` - PASS.
+- `pnpm build` - PASS.
+
+**Surfaced:**
+
+- No live Apollo vendor call was made. Actual Apollo population still requires
+  server-side Apollo MCP/OAuth/API credentials and the worker runtime.
+- The current account can legitimately show "Apollo not synced" until that first
+  worker-backed sync completes.
+
+---
+
+## 2026-06-07 - Apollo MCP Company Intelligence Follow-Up
+
+**Done:**
+
+- Removed Apollo People Enrichment from account intelligence so the CRM does not
+  call contact-enrichment endpoints for this use case.
+- Kept Apollo MCP company search/get-company as the preferred source, with REST
+  organization enrichment as fallback when configured.
+- Added public-news cross-checking for investment, expansion, hiring, layoffs,
+  funding, revenue, acquisition, and C-level movement signals.
+- Closed a lifecycle gap where sales/opportunity autopopulated companies wrote a
+  local verified cache row but did not queue Apollo verification.
+- Preserved the fresh-cache skip path so valid cached account intelligence does
+  not requeue Apollo work unnecessarily.
+- Updated Apollo strategic-signal mapping, provider health, Settings copy,
+  `.env.example`, the solution note, issue register, and relay baton.
+
+**Verified:**
+
+- `pnpm --filter @bidstack/worker exec vitest run src/queues/company-enrich-apollo.test.ts --reporter=dot` - PASS, 22/22.
+- `pnpm --filter @bidstack/api exec vitest run src/providers/open-data-connectors.test.ts --reporter=dot` - PASS, 6/6.
+- `pnpm --filter @bidstack/api exec vitest run src/services/crm/company.service.test.ts --reporter=dot` - PASS, 2/2.
+- `pnpm --filter @bidstack/api test` - PASS, 69 files / 491 passed / 2 skipped.
+- `pnpm --filter @bidstack/worker test` - PASS, 19 files / 211 tests.
+- `pnpm lint` - PASS.
+- `pnpm typecheck` - PASS.
+- `pnpm test` - PASS.
+- `pnpm build` - PASS.
+- Browser smoke passed on Settings > Integrations > AI & Agents: Apollo MCP URL,
+  public-news cross-check copy, no-email/phone safety copy, no People Enrichment
+  env flag, and no console errors.
+
+**Surfaced:**
+
+- Real Apollo calls still require server-side Apollo MCP/OAuth/API credentials in
+  local env or Azure secrets. No secrets were printed or modified.
+
+---
+
 ## 2026-05-11 — Sprint AUDIT-A: Deep audit + ship-blocker remediation
 
 **Branch:** `feat/sprint-0-foundation`
@@ -1250,3 +1859,419 @@ with 3 pilot bids.
 - BS-R1 remaining 11 files: tracked in `docs/refactor/file-size-debt.md`.
 
 **Score delta:** 98/100 held (Wave 9 final audit). W10 production hardening brings the ops story up to spec; score re-audit pending after pilot bids complete.
+
+---
+
+## 2026-06-06 - CRM Runtime, API, MCP, and Gate Stabilization
+
+**Goal:** Continue the full CRM hardening pass across frontend, backend, API,
+MCP, and local runtime so the app is usable from the browser and the release
+gates reflect real code.
+
+**Done:**
+
+- Hardened the web API client so non-JSON backend/proxy failures produce endpoint-scoped `ApiError` messages instead of opaque JSON parse failures.
+- Made dashboard, integrations, and pipeline pages degrade inline when supporting requests fail instead of blanking whole CRM sections.
+- Fixed pipeline stage mutation cache invalidation and optimistic stage overrides so successful moves do not snap back to stale cached data.
+- Added `/settings/integrations` route support and proxied `/livez`/`/readyz` through Vite.
+- Aligned MCP opportunity stage enums with the canonical CRM pipeline stages.
+- Enforced REST API-key read/write scopes in `requirePermission`, and prevented MCP-only keys without read/write scope from being created.
+- Fixed the shared DB soft-delete middleware so compound unique selectors continue to work after `findUnique` is rewritten for `deletedAt` filtering.
+- Updated the root test gate to rebuild `@bidstack/db` before consumer tests so API tests cannot pass or fail against stale DB package output.
+- Restarted local API and web dev servers; verified direct and proxied health/readiness endpoints.
+- Re-fixed the pipeline drag source so opportunity cards are draggable `div` controls instead of draggable route links, with explicit click/Enter navigation and drag-click suppression.
+- Added stable pipeline column/card test hooks and updated pipeline E2E to prove a keyboard stage move updates the board and persists through the API before restoring the record.
+- Removed web test teardown noise by stubbing exchange-rate fetches in page tests that render `useFormatMoney`.
+- Hardened MCP Redis rate-limit failure behavior so production fails closed by default, while dev/test can explicitly fail open. The 600/hour custom limiter and the 60/min Fastify limiter now share the same policy.
+- Replaced the `proposal.draft` MCP stub with a deterministic source-grounded draft builder that uses opportunity context, bounded tasks, contacts, notes, references, typed citations, and `aiOptOut` redaction.
+- Replaced the `POST /opportunities/:id/brief` API stub with a deterministic `crm-grounded-v1` executive brief using opportunity context, bounded tasks, contacts, notes, risk focus, and contact opt-out redaction.
+
+**Verified:**
+
+- `pnpm test` - PASS.
+- `pnpm lint` - PASS.
+- `pnpm typecheck` - PASS.
+- `pnpm build` - PASS.
+- `pnpm audit --audit-level high` - PASS (3 moderate advisories remain).
+- Browser smoke on localhost routes: dashboard, pipeline, accounts, opportunities, settings, settings integrations, webhooks redirect, integrations redirect, intake, and RFP pipeline all rendered with no load-error phrases and no console errors.
+- Reversible pipeline transition: `MAPFRE - Identity & Access Overhaul` moved from `S1 Ongoing` to `S1 Lead`, persisted through the API, then restored to `S1 Ongoing`.
+- `pnpm --filter @bidstack/web typecheck` - PASS.
+- `pnpm --filter @bidstack/web lint` - PASS.
+- Focused Playwright: `e2e/flows/pipeline.spec.ts` - 5 pass / 1 expected skip.
+- Focused Playwright: `e2e/pipeline.spec.ts` - 4 pass.
+- In-app browser live check on `http://localhost:5173/pipeline`: 7 columns, 103 cards, no console errors.
+- `pnpm --filter @bidstack/web test` - PASS, 252/252 and no happy-dom AbortError output.
+- `pnpm --filter @bidstack/mcp-server test` - PASS, 33/33.
+- `pnpm --filter @bidstack/mcp-server typecheck` - PASS.
+- `pnpm --filter @bidstack/mcp-server lint` - PASS.
+- `pnpm --filter @bidstack/mcp-server test` - PASS, 35/35 after grounded proposal draft tests.
+- `pnpm --filter @bidstack/mcp-server typecheck` - PASS after grounded proposal draft.
+- `pnpm --filter @bidstack/mcp-server lint` - PASS after grounded proposal draft.
+- `pnpm --filter @bidstack/api exec vitest run src/routes/opportunities.brief.test.ts src/routes/opportunities.integration.test.ts` - PASS, 14/14.
+- `pnpm --filter @bidstack/api typecheck` - PASS.
+- `pnpm --filter @bidstack/api lint` - PASS.
+
+**Surfaced:**
+
+- Some app pages render sparse semantic headings despite visual content; this is an accessibility polish target.
+- HTML5 drag gesture coverage can still be expanded, but the keyboard-accessible move path now has UI + API persistence regression coverage.
+
+---
+
+## 2026-06-06 - Apollo Company Intelligence Privacy-First Pass
+
+**Goal:** Use Apollo MCP/API for account company intelligence without pulling or
+persisting emails or phone numbers, and make Apollo sync freshness visible in the
+CRM.
+
+**Assumptions:**
+
+- Apollo company intelligence should prioritize firmographics, technologies,
+  headcount, revenue/funding hints, hiring/intent/news signals, and sync
+  freshness.
+- People/contact data is not needed for this workflow. Title-only leadership
+  signals remain admin opt-in and still strip email/phone/mobile fields before
+  persistence.
+- Apollo credit behavior is plan/tool dependent. The CRM must not claim company
+  search/enrichment is free, and credit-sensitive tools must stay off by default.
+
+**Done:**
+
+- Hardened the Apollo worker queue so MCP company search/get-company is the
+  preferred path and REST organization enrichment remains a fallback.
+- Added news, funding, investment, and expansion signal extraction into
+  `CompanyStrategicIntel.newsSignals` and aggregate `signals`.
+- Changed Apollo MCP defaults to `creditPolicy: "unknown"` and disabled MCP
+  people search unless `APOLLO_MCP_ENABLE_EXECUTIVE_SEARCH=true`.
+- Changed REST People Search/Enrichment defaults to opt-in only:
+  `APOLLO_API_ENABLE_PEOPLE_SEARCH=false` and
+  `APOLLO_API_ENABLE_PEOPLE_ENRICHMENT=false`.
+- Updated Settings > Integrations > AI & Agents copy and env snippet to explain
+  company-first Apollo enrichment, safe defaults, and explicit opt-in people
+  tooling.
+- Updated the account cockpit Business Snapshot to show `News and funding`
+  status alongside Apollo sync freshness, tech stack, employee count, and revenue
+  data.
+- Codified the pattern in
+  `docs/solutions/apollo-company-intelligence-privacy-first.md`.
+
+**Verified:**
+
+- `pnpm --filter @bidstack/shared build` - PASS.
+- `pnpm --filter @bidstack/worker exec vitest run src/queues/company-enrich-apollo.test.ts` - PASS, 22/22.
+- `pnpm --filter @bidstack/shared test` - PASS, 65/65.
+- Targeted ESLint passed on the Apollo worker, Apollo tests, shared CRM schema,
+  open data connector catalog, API enrichment service, settings integration UI,
+  and account cockpit business snapshot.
+- `pnpm --filter @bidstack/api exec vitest run src/providers/open-data-connectors.test.ts` - PASS, 5/5.
+- `pnpm --filter @bidstack/web typecheck` - PASS.
+- `pnpm --filter @bidstack/web lint` - PASS.
+- In-app browser verified Settings > Integrations > AI & Agents renders the
+  Apollo card with safe defaults and no console errors.
+- In-app browser verified an account cockpit renders Business Snapshot with
+  Apollo sync, tech stack, and News/Funding rows and no console errors.
+
+**Surfaced:**
+
+- Initial full API and worker typechecks were blocked by pre-existing Prisma
+  schema/client drift unrelated to Apollo: `competitorProfile`,
+  `competitorInsight`, `ReviewIssue.proposalId`, and `YjsDocument.version` were
+  referenced by source code but missing from the generated Prisma client/schema
+  state.
+
+**Resolved in follow-up:**
+
+- Reconciled `packages/db/prisma/schema.prisma` with the existing feature code
+  and existing new migrations without editing old migrations.
+- Added Prisma `CompetitorProfile` / `CompetitorInsight` models, Apollo-adjacent
+  competitor insight enums, Org/Opportunity relations, `ReviewIssue.proposalId`
+  relation/index, and `YjsDocument.version`.
+- Regenerated Prisma and rebuilt `@bidstack/db`.
+
+**Additional verification:**
+
+- `pnpm --filter @bidstack/db exec prisma validate --schema prisma/schema.prisma`
+  with placeholder `DATABASE_URL` - PASS.
+- `pnpm --filter @bidstack/db build` - PASS.
+- `pnpm --filter @bidstack/api typecheck` - PASS.
+- `pnpm --filter @bidstack/worker typecheck` - PASS.
+- `pnpm --filter @bidstack/api exec eslint . --quiet` - PASS.
+- `pnpm --filter @bidstack/worker exec eslint . --quiet` - PASS.
+- `pnpm --filter @bidstack/worker exec vitest run src/queues/company-enrich-apollo.test.ts src/lib/safe-research-fetch.test.ts` - PASS, 25/25.
+- `pnpm --filter @bidstack/shared exec vitest run src/competitor-intel/competitor-intel.test.ts src/utils/ssrf.test.ts` - PASS, 27/27.
+- `pnpm --filter @bidstack/api exec vitest run src/providers/open-data-connectors.test.ts src/routes/opportunities.brief.test.ts` - PASS, 7/7.
+- `pnpm typecheck` - PASS across the workspace.
+
+## 2026-06-06 - Root Gate Stabilization After Apollo Slice
+
+**Done:**
+
+- Repaired local Prisma ledger/physical-schema drift without editing historical
+  migrations. Existing idempotent migration SQL was replayed for competitor
+  intelligence, proposal-scoped review issues, standard crew key, and YJS
+  document version.
+- Aligned `packages/db/prisma/schema.prisma` with the existing migration shape,
+  including `Crew.standardKey`, competitor relation maps/update behavior,
+  `ReviewIssue.proposalId`, and database defaults for competitor records.
+- Fixed worker PDF extraction instability by routing PDFs through a child-process
+  sandbox. This preserves timeout/heap/output limits while avoiding the
+  `pdf-parse@2.x` + `worker_threads` crash on Windows.
+- Updated the worker test wrapper to use Vitest forks.
+
+**Verified:**
+
+- `pnpm --filter @bidstack/worker exec vitest run src/queues/company-enrich-apollo.test.ts` - PASS, 22/22.
+- `node scripts/run-worker-tests.mjs src/lib/extract-text-sandbox.test.ts --reporter=dot` - PASS 3 consecutive runs, 5/5 each.
+- `node scripts/run-worker-tests.mjs` - PASS, 19 files / 211 tests.
+- `pnpm --filter @bidstack/worker build` - PASS.
+- `pnpm test` - PASS across workspace.
+- `pnpm lint` - PASS across workspace.
+- `pnpm typecheck` - PASS across workspace.
+- `pnpm build` - PASS across workspace.
+- `pnpm audit --audit-level high` - PASS; 3 moderate advisories remain.
+
+**Surfaced:**
+
+- `NativePushToken` still exists in the Prisma schema from the former mobile
+  direction. Removing it needs a planned migration and route/UI audit, not an
+  opportunistic delete.
+
+## 2026-06-07 - Audit Log Excel Export Hardening
+
+**Done:**
+
+- Replaced the Audit Log's primary export path with a server-side XLSX export at
+  `GET /api/v1/audit-logs/export.xlsx`.
+- Added an `Export Metadata` sheet and an `Audit Log` sheet with actor, action,
+  target, category, risk score, diff summary, and full diff JSON.
+- Wrote every export back to the audit log as `audit_log.export.xlsx`, including
+  requester, filters, exported row count, scanned row count, and truncation
+  status.
+- Kept the old current-page CSV as a secondary "Visible CSV" action.
+- Hardened export safety with tenant scoping, `deletedAt: null`, bounded rich
+  scans, `private, no-store` cache headers, and Excel formula-prefix
+  neutralization.
+
+**Verified:**
+
+- `pnpm --filter @bidstack/shared build` - PASS.
+- `pnpm --filter @bidstack/shared typecheck` - PASS.
+- `pnpm --filter @bidstack/api typecheck` - PASS.
+- `pnpm --filter @bidstack/api exec vitest run src/routes/audit-logs.test.ts --reporter=dot` - PASS, 4/4.
+- `pnpm --filter @bidstack/web typecheck` - PASS.
+- `pnpm --filter @bidstack/web exec playwright test e2e/audit-log.spec.ts --reporter=line` - PASS, 5 passed / 1 skipped.
+- Live proxy smoke: `/api/audit-logs` returned JSON, `/api/audit-logs/export.xlsx` returned a parseable workbook with `Export Metadata` and `Audit Log` sheets.
+- In-app browser smoke on `/settings?tab=audit-log` confirmed the Audit Log UI renders with `Export Excel`, `Visible CSV`, filters, stats, and no console errors.
+
+**Surfaced:**
+
+- The Codex in-app browser runtime cannot observe download events, so export
+  download verification was done through live HTTP parsing and the project's
+  Playwright suite instead.
+
+## 2026-06-07 - Web Vendor Chunk Warning Removed
+
+**Done:**
+
+- Ran a broad web CRM E2E sweep after the Audit Log hardening and confirmed the
+  core route set still passed: smoke, navigation, accounts, account detail,
+  contacts, leads, opportunities, pipeline, intake, integrations, settings,
+  service desk, tasks, invoices, and reports.
+- Removed the recurring Vite raw chunk-size warning by splitting
+  `lucide-react` into a narrow `icons` manual chunk.
+- Kept the split intentionally conservative because the existing solution note
+  warns against casual chart/editor chunk changes.
+
+**Verified:**
+
+- `pnpm --filter @bidstack/web exec playwright test e2e/smoke.spec.ts e2e/navigation.spec.ts e2e/accounts.spec.ts e2e/account-detail.spec.ts e2e/contacts.spec.ts e2e/leads.spec.ts e2e/opportunities.spec.ts e2e/pipeline.spec.ts e2e/intake.spec.ts e2e/integrations.spec.ts e2e/settings.spec.ts e2e/service-desk.spec.ts e2e/tasks.spec.ts e2e/invoices.spec.ts e2e/reports.spec.ts --reporter=line` - PASS, 58/58.
+- `pnpm --filter @bidstack/web build` - PASS with no oversized chunk warning.
+- `pnpm --filter @bidstack/web exec playwright test e2e/performance/bundle-size-budget.spec.ts --reporter=line` - PASS, 4/4.
+- `pnpm --filter @bidstack/web typecheck` - PASS.
+- `pnpm --filter @bidstack/web exec eslint vite.config.ts --quiet` - PASS.
+- `pnpm --filter @bidstack/web exec playwright test e2e/smoke.spec.ts e2e/navigation.spec.ts --reporter=line` - PASS, 9/9.
+
+**Surfaced:**
+
+- This was a focused production-noise/performance slice. The full root gate set
+  was not rerun after the chunk split.
+- `apps/web/vite.config.ts` already had unrelated dirty edits in the same file
+  for `/livez` and `/readyz` proxying; they were preserved.
+
+## 2026-06-07 - Audit Log Mutation Safety Net
+
+**Done:**
+
+- Added `mutationAuditPlugin` to create request-level audit evidence for
+  authenticated mutation route families that do not yet have rich domain audit
+  coverage.
+- The safety net records successful writes as `http.mutation.success` and
+  forbidden authenticated write attempts as `http.mutation.denied`.
+- The safety net strips query strings, never stores request bodies, and handles
+  API-key pseudo users without violating the `audit_log.user_id` UUID foreign
+  key.
+- Scoped the safety net away from rich-audited hot paths such as contacts,
+  opportunities, notes, invoices, sales orders, files, tasks, leads, products,
+  and bid-workspace requirement/document mutations.
+- Expanded the safety-net allowlist after a Fastify route inventory to cover
+  enterprise mutation surfaces that lacked rich audit rows: comments, mentions,
+  calls, signatures, forecasts, lead routing, admin actions, edit locks,
+  migration mappings, email/SMS sends, booking pages, service cases, and
+  integration connect/disconnect/resync routes.
+- Intentionally excluded `/api/v1/presence` heartbeats because they are
+  high-volume operational telemetry, not useful compliance evidence.
+- Added `docs/solutions/mutation-audit-safety-net.md` and logged the initial
+  over-broad audit design mistake plus the route-inventory shell mistake.
+
+**Verified:**
+
+- `pnpm --filter @bidstack/api exec vitest run src/plugins/mutation-audit.test.ts src/routes/audit-logs.test.ts --reporter=dot` - PASS, 19/19.
+- `pnpm --filter @bidstack/api exec eslint src/plugins/mutation-audit.ts src/plugins/mutation-audit.test.ts --quiet` - PASS.
+- `pnpm --filter @bidstack/api typecheck` - PASS.
+- `pnpm --filter @bidstack/api exec vitest run src/routes/audit-logs.test.ts src/routes/contacts.integration.test.ts src/routes/opportunities.integration.test.ts src/routes/invoices.integration.test.ts src/routes/sales-orders.integration.test.ts src/routes/notes.test.ts src/routes/bid-workspace.integration.test.ts --reporter=dot` - PASS, 56/56.
+- `pnpm --filter @bidstack/api build` - PASS.
+- `pnpm --filter @bidstack/api test` - PASS, 72 files / 511 passed / 2 skipped.
+- `pnpm --filter @bidstack/web exec playwright test e2e/audit-log.spec.ts --reporter=line` - PASS, 5 passed / 1 skipped.
+- `pnpm e2e` - PASS before the expanded safety-net allowlist patch.
+
+**Surfaced:**
+
+- The safety net is intentionally not a substitute for rich atomic audit rows.
+  New high-value mutation routes should still get domain-specific audit entries
+  inside their write transaction.
+- Full root gates were not rerun after the expanded safety-net allowlist patch;
+  focused backend, API package, and audit-log browser gates are green.
+
+## 2026-06-07 - API Test Isolation And Audit Noise Refinement
+
+**Done:**
+
+- Refined the mutation-audit safety net so `/api/v1/companies` manual
+  create/update/delete remains covered, while the rich-audited
+  `/api/v1/companies/:id/tier` route is skipped to avoid duplicate
+  `company.tier.update` request rows.
+- Added regression coverage proving ordinary company mutations are audited and
+  company tier updates are not double-logged.
+- Fixed API test isolation by keeping `@fastify/rate-limit` counters in-memory
+  for `NODE_ENV=test`; production/dev still use Redis when connected.
+- Fixed penetration-test fixture collisions by replacing four-digit random
+  opportunity codes with UUID-backed codes.
+- Updated `docs/solutions/mutation-audit-safety-net.md` and logged both
+  repeat-run test mistakes in `MISTAKES.md`.
+
+**Verified:**
+
+- `pnpm --filter @bidstack/api exec vitest run src/routes/crm/companies.test.ts src/security/penetration.access-control.test.ts src/plugins/mutation-audit.test.ts src/routes/audit-logs.test.ts --reporter=dot` - PASS, 39/39.
+- `pnpm --filter @bidstack/api exec eslint src/server.ts src/security/penetration.test-helpers.ts src/plugins/mutation-audit.ts src/plugins/mutation-audit.test.ts --quiet` - PASS.
+- `pnpm --filter @bidstack/api typecheck` - PASS.
+- `pnpm --filter @bidstack/api test` - PASS, 72 files / 513 passed / 2 skipped.
+
+**Surfaced:**
+
+- One full API run failed before the fixes, exposing stale Redis rate-limit
+  counters and opportunity-code collisions. The rerun after the fixes passed.
+- Company CRUD still only has request-level safety-net audit evidence. A later
+  product/security pass should consider richer transaction-level company audit
+  rows if field-level diffs are required.
+
+## 2026-06-07 - Org-Scoped Agent Provider Credentials
+
+**Done:**
+
+- Added encrypted, org-scoped direct model provider credentials for Claude,
+  OpenAI, Kimi, NVIDIA NIM, and Gemma/local through Settings -> Integrations ->
+  AI & Agents.
+- Added `GET/PUT/DELETE /api/v1/integrations/agent-providers/credentials`
+  routes with admin-only writes, integration read permissions for list, public
+  HTTPS endpoint validation, local-only Gemma endpoint allowance outside
+  production, secret masking, and audit rows.
+- Wired Agent Studio execution and provider-readiness checks to prefer org
+  credentials, then fall back to platform env/Azure-style runtime config.
+- Added a Settings credential card that lets admins add, edit, and remove direct
+  model keys without displaying plaintext secrets.
+- Fixed the existing Dust credential upsert path after live smoke exposed that
+  the local `integration_configs` table does not have the named unique
+  constraint the code expected.
+- Replaced fragile named-constraint upserts with transaction-scoped advisory
+  locks plus update-or-insert writes for provider credentials and Dust
+  credentials.
+
+**Verified:**
+
+- `pnpm --filter @bidstack/api exec vitest run src/services/agents/agents.helpers.test.ts --reporter=dot` - PASS, 5/5.
+- `pnpm --filter @bidstack/api exec eslint src/lib/agent-provider-credentials.ts src/routes/agent-provider-credentials.routes.ts src/routes/dust-credentials.routes.ts src/services/agents/agents.helpers.ts src/services/agents/agents.helpers.test.ts src/services/agents/agents.service.ts src/routes/agents.ts src/server.routes.ts --quiet` - PASS.
+- `pnpm --filter @bidstack/web exec eslint src/pages/integrations/AgentProviderCredentialsCard.tsx src/hooks/useAgentProviderCredentials.ts src/components/agents/AgentProviderStatusCard.tsx src/components/settings/IntegrationsSection.tsx --quiet` - PASS.
+- `pnpm --filter @bidstack/api typecheck` - PASS.
+- `pnpm --filter @bidstack/web typecheck` - PASS.
+- `pnpm --filter @bidstack/web build` - PASS.
+- Live reversible API smoke: saved a Gemma/local org credential, confirmed
+  `/api/v1/agents/provider-status` reported Gemma as `source: "org"`, then
+  soft-deleted the credential.
+- In-app browser smoke: Settings -> Integrations -> AI & Agents shows direct
+  provider keys, add provider, provider readiness, and no request/load errors.
+- In-app browser smoke: `/agent-studio` renders RFP automation controls,
+  provider readiness, no request/load errors, and the primary sidebar remains
+  pinned while scrolling.
+
+**Surfaced:**
+
+- The current implementation stores provider credentials in
+  `integration_configs` with names prefixed by `agent-provider:` because the
+  database enum does not yet have a generic AI provider config type. A later
+  schema pass should add the proper enum/type and unique `(org_id,type,name)`
+  migration instead of relying on the compatibility path.
+- Settings `?tab=integrations` opens the Integrations section; the nested
+  AI & Agents tab is selected by user interaction, not by a dedicated deep-link
+  query param yet.
+
+## 2026-06-07 - Agent Run Controls And Crew History
+
+**Done:**
+
+- Hardened agent execution so one agent cannot receive duplicate queued/running
+  runs. The API now takes a transaction-scoped advisory lock per org/agent,
+  returns `409` for active runs, and keeps cancelled runs from being overwritten
+  by late provider completions.
+- Added backend run controls:
+  `POST /api/v1/agent-runs/:id/cancel` and
+  `POST /api/v1/agent-runs/:id/retry`, with permission checks, rate limits,
+  terminal-state validation, and audit rows for cancel/retry actions.
+- Added frontend cancel/retry controls to the agents run timeline. Active runs
+  can be cancelled; failed/cancelled runs can be retried; duplicate run buttons
+  are disabled while the agent or expanded run history is active.
+- Improved Agent Studio crews with a run-history panel that lists recent crew
+  runs, reopens prior outputs, and can rerun failed/completed crew runs using
+  their stored bounded inputs.
+- Included crew run `inputs` in `GET /api/v1/crew-runs/:id` and
+  `GET /api/v1/crew-runs?crewId=...` so history and rerun UX is not a shell.
+- Fixed the long-sidebar UX issue by making the sidebar footer/status area
+  sticky at the bottom of the viewport, matching the already-sticky sidebar
+  toggle/topbar behavior.
+- Reviewed current Twenty positioning and docs: the relevant benchmark is
+  first-class objects, views, workflows, agents, API/webhooks, permissions, and
+  model-catalog-style AI flexibility. BidStack should borrow those platform
+  principles while keeping RFP-specific OCR, evidence, approval, and specialist
+  workflow depth.
+
+**Verified:**
+
+- `pnpm --filter @bidstack/api exec vitest run src/routes/agents.integration.test.ts --reporter=dot` - PASS, 4/4.
+- `pnpm --filter @bidstack/api exec eslint src/services/agents/agents.service.ts src/routes/agents.ts src/routes/agents.integration.test.ts src/routes/crews.ts --quiet` - PASS.
+- `pnpm --filter @bidstack/web exec eslint src/pages/AgentStudioPage.tsx src/hooks/useAgents.ts src/pages/agents/AgentsSquadTable.tsx --quiet` - PASS.
+- `pnpm --filter @bidstack/api typecheck` - PASS.
+- `pnpm --filter @bidstack/web typecheck` - PASS.
+- `pnpm --filter @bidstack/web build` - PASS after Agent Studio history and sticky footer CSS.
+- In-app browser smoke on `/agent-studio`: page loads with no visible request
+  error, crew runner opens, RFP text input renders, Intake handoff renders, Run
+  Crew action renders, and Run History renders.
+- In-app browser sticky check: topbar/sidebar toggle remain pinned and the
+  sidebar footer is visible at the viewport bottom after the CSS fix.
+
+**Surfaced:**
+
+- Crew runs still do not expose cancel/retry endpoints like single-agent runs.
+  The UX can rerun stored inputs, but active crew cancellation needs queue-aware
+  backend support in a later worker/API pass.
+- The integration suite revealed slow audit-log inserts on the local machine.
+  The functionality is correct, but production should keep tracking audit-log
+  write latency as part of the broader observability/performance roadmap.

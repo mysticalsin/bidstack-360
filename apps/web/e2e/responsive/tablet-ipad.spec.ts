@@ -8,6 +8,7 @@
  * prevents tablet users from seeing broken layouts.
  */
 import { test, expect, devices } from '@playwright/test';
+import { cleanupMeetingImportContacts } from '../fixtures/test-data-cleanup.js';
 
 const IPAD_MINI = devices['iPad Mini'];
 
@@ -64,7 +65,10 @@ for (const route of KEY_ROUTES) {
     expect(navVisible || hamburgerExists).toBe(true);
   });
 
-  test(`${route.name}: screenshot baseline (iPad Mini)`, async ({ page }) => {
+  test(`${route.name}: screenshot baseline (iPad Mini)`, async ({ page, request }) => {
+    if (route.name === 'contacts') {
+      await cleanupMeetingImportContacts(request);
+    }
     await page.goto(route.path, { waitUntil: 'load' });
     await page.getByRole('main').waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
     await page.waitForTimeout(500);

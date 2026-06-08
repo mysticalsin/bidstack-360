@@ -102,6 +102,7 @@ apps/api/debug-out.txt
 # Root-level screenshot dumps (from Playwright QA passes)
 *.png
 *.mjs
+!scripts/*.mjs
 
 # Web app screenshot blobs (committed by QA runs, not source)
 apps/web/*.png

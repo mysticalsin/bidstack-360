@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  AgentConfig,
   RFP_AGENT_TEMPLATES,
   RFP_RESPONSE_PHASES,
   RfpAgentTemplate,
@@ -40,6 +41,12 @@ describe('RFP response agent catalog', () => {
     expect(coveredPhases.has('red_flags')).toBe(true);
     expect(coveredPhases.has('draft_response')).toBe(true);
     expect(coveredPhases.has('submission_readiness')).toBe(true);
+  });
+
+  it('allows the RFP agent squad to use non-vendor-locked model providers', () => {
+    for (const provider of ['dust', 'claude', 'openai', 'kimi', 'nvidia_nim', 'gemma']) {
+      expect(AgentConfig.safeParse({ provider }).success).toBe(true);
+    }
   });
 });
 

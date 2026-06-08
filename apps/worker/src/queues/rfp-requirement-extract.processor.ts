@@ -44,13 +44,7 @@ export async function processJob(
 
   const { orgId, documentVersionId, orchestrationId, chunkIndex, totalChunks } = parsed.data;
 
-  // Ensure the source text exists — parse the uploaded file on first run, then
-  // reuse it on retries. WHY here: requirement-extract is the sole consumer of
-  // extractedText and owns the retry/backoff, so extraction belongs at its
-  // doorstep rather than in the concurrency-1 orchestrator. See ensureExtractedText.
-  const rawText = await ensureExtractedText(documentVersionId, orgId, log);
-
-  // §NDA-D gate — must pass before any AI call.
+  // §NDA-D gate — must pass before source extraction or any AI call.
   // WHY orchestrationId in log (not documentVersionId): orchestrationId is already
   // public context for monitoring; documentVersionId must not appear on a blocked-D record.
   const aiSafe = await isDocumentAiSafe(documentVersionId, orgId);
@@ -62,8 +56,14 @@ export async function processJob(
       'rfp-requirement-extract: NDA-D gate blocked AI call — document ID omitted',
     );
     await markOrchestrationFailed(orchestrationId, orgId, 'requirement_extract', 'NDA-D gate');
-    return; // graceful exit — no AI call, no requirement extraction
+    return; // graceful exit — no source extraction, no AI call, no requirement extraction
   }
+
+  // Ensure the source text exists — parse the uploaded file on first run, then
+  // reuse it on retries. WHY here: requirement-extract is the sole consumer of
+  // extractedText and owns the retry/backoff, so extraction belongs at its
+  // doorstep rather than in the concurrency-1 orchestrator. See ensureExtractedText.
+  const rawText = await ensureExtractedText(documentVersionId, orgId, log);
 
   const { client: dust, creds } = await getOrgDust(orgId, log);
   const extractAgentId =

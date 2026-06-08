@@ -19,6 +19,7 @@ export const ProductCreate = z.object({
   listPriceMicros: z.number().int().min(0).max(1_000_000_000_000_000),
   currency: z.string().length(3).default('CAD'),
   active: z.boolean().default(true),
+  imageUrl: z.string().nullable().optional(),
 });
 
 export const ProductUpdate = z.object({
@@ -28,6 +29,7 @@ export const ProductUpdate = z.object({
   listPriceMicros: z.number().int().min(0).max(1_000_000_000_000_000).optional(),
   currency: z.string().length(3).optional(),
   active: z.boolean().optional(),
+  imageUrl: z.string().nullable().optional(),
 });
 
 export const Product = z.object({
@@ -39,6 +41,7 @@ export const Product = z.object({
   listPriceMicros: z.string(),
   currency: z.string(),
   active: z.boolean(),
+  imageUrl: z.string().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });

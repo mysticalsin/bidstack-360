@@ -47,6 +47,12 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
   server.decorate(
     'requirePermission',
     (permission: PermissionKey) => async (req: FastifyRequest) => {
+      if (req.auth.role === 'api') {
+        const requiredScope = permission.endsWith(':write') ? 'write' : 'read';
+        if (req.auth.scopes.includes(requiredScope)) return;
+        throw req.server.httpErrors.forbidden(`Requires API key scope: ${requiredScope}`);
+      }
+
       const assignedPermissionCount = await prisma.userRole.count({
         where: {
           userId: req.auth.userId,

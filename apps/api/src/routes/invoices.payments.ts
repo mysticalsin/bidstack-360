@@ -146,6 +146,13 @@ export const invoicePaymentsPlugin: FastifyPluginAsyncZod = async (server) => {
       }
 
       const { amountMicros, currency, method, reference, receivedAt } = req.body;
+      // Reject cross-currency payments — auto-pay compares raw micros, so a 100 USD
+      // payment must not settle a 100 CAD invoice. (Review finding, 2026-06-04.)
+      if (currency.toUpperCase() !== invoice.currency.toUpperCase()) {
+        throw server.httpErrors.conflict(
+          `Payment currency ${currency} does not match invoice currency ${invoice.currency}`,
+        );
+      }
       const amount = BigInt(amountMicros);
       const paidState = toPrismaState('paid');
 

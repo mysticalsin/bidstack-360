@@ -159,8 +159,9 @@ export async function getUpdatesSince(
 
 /**
  * Merge all pending YjsUpdate rows into the parent YjsDocument snapshot.
- * This is the compaction operation — safe to call concurrently because
- * Prisma transactions provide serialisability per-row.
+ * Safe to call concurrently with the worker sweep: the snapshot write is a
+ * compare-and-swap on YjsDocument.version, so a stale merge aborts instead of
+ * blind-overwriting (which could lose a collaborative edit). (Review finding.)
  */
 export async function compactDoc(ydocId: string): Promise<void> {
   await compactDocInline(ydocId);
@@ -191,16 +192,22 @@ async function compactDocInline(ydocId: string): Promise<void> {
   const mergedUpdate = Y.encodeStateAsUpdate(doc);
   const updateIds = existing.updates.map((u) => u.id);
 
-  await prisma.$transaction([
-    prisma.yjsDocument.update({
-      where: { id: ydocId },
-      data: { ydocBinary: encrypt(Buffer.from(mergedUpdate)) },
-    }),
+  const merged = await prisma.$transaction(async (tx) => {
+    // Compare-and-swap on version — abort (don't delete the updates) if another
+    // compaction wrote the snapshot since our read, so no edit is lost.
+    const swapped = await tx.yjsDocument.updateMany({
+      where: { id: ydocId, version: existing.version },
+      data: { ydocBinary: encrypt(Buffer.from(mergedUpdate)), version: { increment: 1 } },
+    });
+    if (swapped.count !== 1) return 0;
     // Delete only the rows we merged — not any that arrived concurrently.
-    prisma.yjsUpdate.deleteMany({
-      where: { id: { in: updateIds } },
-    }),
-  ]);
+    await tx.yjsUpdate.deleteMany({ where: { id: { in: updateIds } } });
+    return updateIds.length;
+  });
 
-  logger.info({ ydocId, mergedCount: updateIds.length }, 'yjs doc compacted');
+  if (merged === 0) {
+    logger.debug({ ydocId }, 'yjs compaction skipped — version changed (concurrent pass won)');
+    return;
+  }
+  logger.info({ ydocId, mergedCount: merged }, 'yjs doc compacted');
 }

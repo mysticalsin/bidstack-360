@@ -10,10 +10,15 @@
 
 import { z } from 'zod';
 import type { DustClient } from '@bidstack/dust-client';
-import { AgentConfig } from '@bidstack/shared';
+import { AgentConfig, AgentProviderStatusResult } from '@bidstack/shared';
 import type { Agent, AgentRun, AgentProvider } from '@bidstack/shared';
 
-import { getOrgDustClient } from '../../lib/dust-credentials.js';
+import { getOrgDustClient, resolveOrgDustCredentials } from '../../lib/dust-credentials.js';
+import {
+  listOrgAgentProviderCredentials,
+  resolveOrgAgentProviderCredential,
+  type DirectAgentProvider,
+} from '../../lib/agent-provider-credentials.js';
 import { createLogger } from '../../lib/logger.js';
 
 const dustLog = createLogger({ name: 'agents-dust' });
@@ -109,6 +114,23 @@ const ClaudeMessagesResponse = z.object({
   usage: z.record(z.unknown()).optional(),
 });
 
+const ChatCompletionResponse = z.object({
+  choices: z
+    .array(
+      z
+        .object({
+          message: z
+            .object({
+              content: z.string().optional().nullable(),
+            })
+            .optional(),
+        })
+        .passthrough(),
+    )
+    .default([]),
+  usage: z.record(z.unknown()).optional(),
+});
+
 type AgentRunProviderResult = {
   text: string;
   provider: AgentProvider;
@@ -117,12 +139,169 @@ type AgentRunProviderResult = {
   usage?: Record<string, unknown>;
 };
 
+type OpenAiCompatibleProvider = Exclude<AgentProvider, 'dust' | 'claude'>;
+
+type OpenAiCompatibleProviderSpec = {
+  label: string;
+  apiKeyEnv: string;
+  modelEnv: string;
+  defaultModel: string;
+  baseUrlEnv: string;
+  defaultBaseUrl: string;
+  apiKeyOptional?: boolean;
+  extraBody?: () => Record<string, unknown>;
+};
+
+const OPENAI_COMPATIBLE_SPECS: Record<OpenAiCompatibleProvider, OpenAiCompatibleProviderSpec> = {
+  openai: {
+    label: 'OpenAI',
+    apiKeyEnv: 'OPENAI_API_KEY',
+    modelEnv: 'OPENAI_MODEL',
+    defaultModel: 'gpt-4o-mini',
+    baseUrlEnv: 'OPENAI_BASE_URL',
+    defaultBaseUrl: 'https://api.openai.com/v1',
+  },
+  kimi: {
+    label: 'Kimi',
+    apiKeyEnv: 'MOONSHOT_API_KEY',
+    modelEnv: 'MOONSHOT_MODEL',
+    defaultModel: 'moonshot-v1-32k',
+    baseUrlEnv: 'MOONSHOT_BASE_URL',
+    defaultBaseUrl: 'https://api.moonshot.ai/v1',
+  },
+  nvidia_nim: {
+    label: 'NVIDIA NIM',
+    apiKeyEnv: 'NVIDIA_NIM_API_KEY',
+    modelEnv: 'NVIDIA_NIM_MODEL',
+    defaultModel: 'deepseek-ai/deepseek-v4-pro',
+    baseUrlEnv: 'NVIDIA_NIM_BASE_URL',
+    defaultBaseUrl: 'https://integrate.api.nvidia.com/v1',
+    extraBody: () => ({
+      chat_template_kwargs: { thinking: process.env.NVIDIA_NIM_THINKING === 'true' },
+    }),
+  },
+  gemma: {
+    label: 'Gemma',
+    apiKeyEnv: 'GEMMA_API_KEY',
+    modelEnv: 'GEMMA_MODEL',
+    defaultModel: 'gemma3',
+    baseUrlEnv: 'GEMMA_BASE_URL',
+    defaultBaseUrl: 'http://localhost:11434/v1',
+    apiKeyOptional: true,
+  },
+};
+
 // ─── Config utilities ─────────────────────────────────────────────────────────
 
 export function readAgentConfig(config: unknown): z.infer<typeof AgentConfig> {
   const parsed = AgentConfig.safeParse(config);
   if (parsed.success) return parsed.data;
   return AgentConfig.parse({});
+}
+
+function missingEnv(keys: string[]): string[] {
+  return keys.filter((key) => !envValue(key));
+}
+
+export async function getAgentProviderStatus(
+  orgId: string,
+): Promise<z.infer<typeof AgentProviderStatusResult>> {
+  const generatedAt = new Date().toISOString();
+  const dustCredentials = await resolveOrgDustCredentials(orgId);
+  const orgProviderCredentials = await listOrgAgentProviderCredentials(orgId);
+  const orgProviderByProvider = new Map(
+    orgProviderCredentials.map((credential) => [credential.provider, credential]),
+  );
+  const dustMissing = dustCredentials ? [] : missingEnv(['DUST_API_KEY', 'DUST_WORKSPACE_ID']);
+  const openAiStatuses = Object.entries(OPENAI_COMPATIBLE_SPECS).map(
+    ([provider, spec]) => {
+      const orgCredential = orgProviderByProvider.get(provider as OpenAiCompatibleProvider);
+      const requiredEnv = spec.apiKeyOptional ? [] : [spec.apiKeyEnv];
+      const envMissing = missingEnv(requiredEnv);
+      const source = orgCredential
+        ? 'org'
+        : spec.apiKeyOptional && !envValue(spec.apiKeyEnv)
+          ? 'local'
+          : 'env';
+      const configured = Boolean(orgCredential) || envMissing.length === 0;
+
+      return {
+        provider: provider as OpenAiCompatibleProvider,
+        label: spec.label,
+        configured,
+        source: configured ? source : null,
+        model: orgCredential?.model ?? envValue(spec.modelEnv) ?? spec.defaultModel,
+        baseUrl: normalizeBaseUrl(
+          orgCredential?.baseUrl ?? envValue(spec.baseUrlEnv) ?? spec.defaultBaseUrl,
+        ),
+        requiredEnv,
+        missingEnv: orgCredential ? [] : envMissing,
+        notes: [
+          ...(orgCredential ? ['Org credentials are encrypted at rest.'] : []),
+          ...(spec.apiKeyOptional
+            ? ['API key is optional for local OpenAI-compatible runtimes.']
+            : []),
+          ...(spec.extraBody ? ['Provider adds required provider-specific request options.'] : []),
+        ],
+      };
+    },
+  );
+
+  const claudeCredential = orgProviderByProvider.get('claude');
+  const claudeEnvMissing = missingEnv(['ANTHROPIC_API_KEY', 'ANTHROPIC_MODEL']);
+  const claudeMissing = claudeCredential
+    ? claudeCredential.model || envValue('ANTHROPIC_MODEL')
+      ? []
+      : ['ANTHROPIC_MODEL']
+    : claudeEnvMissing;
+  const claudeConfigured = Boolean(claudeCredential) && claudeMissing.length === 0
+    ? true
+    : claudeEnvMissing.length === 0;
+
+  const items = AgentProviderStatusResult.shape.items.parse([
+    {
+      provider: 'dust',
+      label: 'Dust',
+      configured: Boolean(dustCredentials),
+      source: dustCredentials?.source ?? null,
+      model: null,
+      baseUrl: dustCredentials?.baseUrl ?? process.env.DUST_BASE_URL ?? 'https://dust.tt/api',
+      requiredEnv: ['DUST_API_KEY', 'DUST_WORKSPACE_ID'],
+      missingEnv: dustMissing,
+      notes: dustCredentials?.source === 'org'
+        ? ['Org credentials are encrypted at rest and take precedence over env fallback.']
+        : ['Dust supports per-org encrypted credentials or platform env fallback.'],
+    },
+    {
+      provider: 'claude',
+      label: 'Claude',
+      configured: claudeConfigured,
+      source: claudeCredential
+        ? 'org'
+        : claudeEnvMissing.length === 0
+          ? 'env'
+          : null,
+      model: claudeCredential?.model ?? envValue('ANTHROPIC_MODEL') ?? null,
+      baseUrl:
+        claudeCredential?.baseUrl ??
+        process.env.ANTHROPIC_BASE_URL ??
+        'https://api.anthropic.com/v1/messages',
+      requiredEnv: ['ANTHROPIC_API_KEY', 'ANTHROPIC_MODEL'],
+      missingEnv: claudeCredential ? claudeMissing : claudeEnvMissing,
+      notes: [
+        ...(claudeCredential ? ['Org credentials are encrypted at rest.'] : []),
+        'Claude agents use the Anthropic Messages API directly.',
+      ],
+    },
+    ...openAiStatuses,
+  ]);
+
+  return {
+    items,
+    readyCount: items.filter((item) => item.configured).length,
+    totalCount: items.length,
+    generatedAt,
+  };
 }
 
 function getRequestedMessage(input: Record<string, unknown>): string {
@@ -159,6 +338,59 @@ function buildAgentUserMessage(
 }
 
 // ─── Dust helpers ─────────────────────────────────────────────────────────────
+
+function requireOpenAiCompatibleSpec(provider: AgentProvider): {
+  provider: OpenAiCompatibleProvider;
+  spec: OpenAiCompatibleProviderSpec;
+} {
+  if (provider === 'dust' || provider === 'claude') {
+    throw new Error(`Provider ${provider} is not OpenAI-compatible`);
+  }
+  return { provider, spec: OPENAI_COMPATIBLE_SPECS[provider] };
+}
+
+function envValue(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value || undefined;
+}
+
+function normalizeBaseUrl(value: string): string {
+  return value.replace(/\/$/, '');
+}
+
+async function resolveOpenAiCompatibleProvider(
+  orgId: string,
+  config: z.infer<typeof AgentConfig>,
+): Promise<{
+  provider: OpenAiCompatibleProvider;
+  label: string;
+  apiKey: string;
+  model: string;
+  baseUrl: string;
+  extraBody?: Record<string, unknown>;
+}> {
+  const { provider, spec } = requireOpenAiCompatibleSpec(config.provider);
+  const orgCredential = await resolveOrgAgentProviderCredential(
+    orgId,
+    provider as DirectAgentProvider,
+  );
+  const apiKey =
+    orgCredential?.apiKey ?? envValue(spec.apiKeyEnv) ?? (spec.apiKeyOptional ? 'local' : undefined);
+  if (!apiKey) {
+    throw new Error(`${spec.label} provider credentials are not configured on the server.`);
+  }
+
+  return {
+    provider,
+    label: spec.label,
+    apiKey,
+    model: config.model ?? orgCredential?.model ?? envValue(spec.modelEnv) ?? spec.defaultModel,
+    baseUrl: normalizeBaseUrl(
+      orgCredential?.baseUrl ?? envValue(spec.baseUrlEnv) ?? spec.defaultBaseUrl,
+    ),
+    extraBody: spec.extraBody?.(),
+  };
+}
 
 function getAllowedDustAgentIds(): Set<string> | null {
   const raw = process.env.DUST_ALLOWED_AGENT_IDS;
@@ -215,23 +447,91 @@ export async function runDustAgent(
   };
 }
 
-export async function runClaudeAgent(
+export async function runOpenAiCompatibleAgent(
+  orgId: string,
   systemPrompt: string,
   input: Record<string, unknown>,
   config: z.infer<typeof AgentConfig>,
 ): Promise<AgentRunProviderResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  const model = config.model ?? process.env.ANTHROPIC_MODEL;
+  const resolved = await resolveOpenAiCompatibleProvider(orgId, config);
+  const response = await fetch(`${resolved.baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${resolved.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: resolved.model,
+      messages: [
+        ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
+        {
+          role: 'user',
+          content: buildAgentUserMessage(input, config),
+        },
+      ],
+      max_tokens: config.maxTokens ?? 4000,
+      temperature: config.temperature ?? 0.2,
+      ...(resolved.extraBody ?? {}),
+    }),
+  });
+
+  const bodyText = await response.text();
+  let body: unknown;
+  try {
+    body = bodyText ? JSON.parse(bodyText) : null;
+  } catch (err) {
+    throw new Error(`${resolved.label} API returned invalid JSON`, { cause: err });
+  }
+
+  if (!response.ok) {
+    const message =
+      body !== null &&
+      typeof body === 'object' &&
+      'error' in body &&
+      typeof (body as { error?: { message?: unknown } }).error?.message === 'string'
+        ? (body as { error: { message: string } }).error.message
+        : `${resolved.label} API request failed (${response.status})`;
+    throw new Error(message);
+  }
+
+  const parsed = ChatCompletionResponse.parse(body);
+  const text = parsed.choices
+    .map((choice) => choice.message?.content)
+    .filter((part): part is string => typeof part === 'string')
+    .join('\n')
+    .trim();
+
+  if (!text) {
+    throw new Error(`${resolved.label} API returned no text content`);
+  }
+
+  return {
+    text,
+    provider: resolved.provider,
+    model: resolved.model,
+    usage: parsed.usage,
+  };
+}
+
+export async function runClaudeAgent(
+  orgId: string,
+  systemPrompt: string,
+  input: Record<string, unknown>,
+  config: z.infer<typeof AgentConfig>,
+): Promise<AgentRunProviderResult> {
+  const orgCredential = await resolveOrgAgentProviderCredential(orgId, 'claude');
+  const apiKey = orgCredential?.apiKey ?? process.env.ANTHROPIC_API_KEY;
+  const model = config.model ?? orgCredential?.model ?? process.env.ANTHROPIC_MODEL;
 
   if (!apiKey) {
-    throw new Error('Claude integration not configured (ANTHROPIC_API_KEY missing)');
+    throw new Error('Claude provider credentials are not configured on the server.');
   }
   if (!model) {
-    throw new Error('Claude model not configured (set ANTHROPIC_MODEL or agent config.model)');
+    throw new Error('Claude model is not configured for this agent.');
   }
 
   const response = await fetch(
-    process.env.ANTHROPIC_BASE_URL ?? 'https://api.anthropic.com/v1/messages',
+    orgCredential?.baseUrl ?? process.env.ANTHROPIC_BASE_URL ?? 'https://api.anthropic.com/v1/messages',
     {
       method: 'POST',
       headers: {

@@ -5,6 +5,7 @@
 //   GET    /presence/entity/:type/:id  — users viewing a specific entity
 
 import type { FastifyPluginAsync } from 'fastify';
+import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { getOrgPresence, getEntityPresence } from '../services/presence.service.js';
@@ -22,19 +23,36 @@ const lockBodySchema = z.object({
 });
 
 export const realtimeRoutes: FastifyPluginAsync = async (server) => {
+  const app = server.withTypeProvider<ZodTypeProvider>();
+
   // ─── POST /entities/:type/:id/lock ──────────────────────────────────────
-  server.post(
+  app.post(
     '/entities/:type/:id/lock',
     {
       schema: {
         params: entityParamsSchema,
         body: lockBodySchema,
+        response: {
+          200: z.object({
+            entityType: z.string(),
+            entityId: z.string().uuid(),
+            userId: z.string(),
+            sessionId: z.string(),
+            acquiredAt: z.string(),
+            expiresAt: z.string(),
+          }),
+          409: z.object({
+            error: z.literal('EDIT_LOCKED'),
+            lockedBy: z.string(),
+            expiresAt: z.string(),
+          }),
+        },
       },
     },
     async (req, reply) => {
       const { orgId, userId } = req.auth;
-      const { type: entityType, id: entityId } = entityParamsSchema.parse(req.params);
-      const { sessionId } = lockBodySchema.parse(req.body);
+      const { type: entityType, id: entityId } = req.params;
+      const { sessionId } = req.body;
 
       const expiresAt = new Date(Date.now() + LOCK_TTL_MINUTES * 60 * 1_000);
 
@@ -89,14 +107,14 @@ export const realtimeRoutes: FastifyPluginAsync = async (server) => {
   );
 
   // ─── DELETE /entities/:type/:id/lock ────────────────────────────────────
-  server.delete(
+  app.delete(
     '/entities/:type/:id/lock',
     {
-      schema: { params: entityParamsSchema },
+      schema: { params: entityParamsSchema, response: { 204: z.null(), 403: z.object({ error: z.string() }) } },
     },
     async (req, reply) => {
       const { orgId, userId } = req.auth;
-      const { type: entityType, id: entityId } = entityParamsSchema.parse(req.params);
+      const { type: entityType, id: entityId } = req.params;
 
       const existing = await prisma.entityEditLock.findFirst({
         where: { orgId, entityType, entityId },
@@ -104,7 +122,7 @@ export const realtimeRoutes: FastifyPluginAsync = async (server) => {
 
       if (!existing) {
         // Already released — idempotent success.
-        return reply.code(204).send();
+        return reply.code(204).send(null);
       }
 
       // Only the lock owner or an admin can release.
@@ -124,28 +142,57 @@ export const realtimeRoutes: FastifyPluginAsync = async (server) => {
         orgId,
       });
 
-      return reply.code(204).send();
+      return reply.code(204).send(null);
     },
   );
 
   // ─── GET /presence/org ─────────────────────────────────────────────────
   // Polling fallback when WebSocket is unavailable. Rate-limit callers in
   // the API rate-limit middleware (general 10k/min dev cap applies).
-  server.get('/presence/org', async (req) => {
-    const { orgId } = req.auth;
-    const entries = await getOrgPresence(orgId);
-    return { users: entries };
-  });
-
-  // ─── GET /presence/entity/:type/:id ────────────────────────────────────
-  server.get(
-    '/presence/entity/:type/:id',
+  app.get(
+    '/presence/org',
     {
-      schema: { params: entityParamsSchema },
+      schema: {
+        response: {
+          200: z.object({
+            users: z.array(
+              z.object({
+                userId: z.string(),
+                presence: z.unknown(), // Using unknown or precise type if available
+              }),
+            ),
+          }),
+        },
+      },
     },
     async (req) => {
       const { orgId } = req.auth;
-      const { type: entityType, id: entityId } = entityParamsSchema.parse(req.params);
+      const entries = await getOrgPresence(orgId);
+      return { users: entries };
+    },
+  );
+
+  // ─── GET /presence/entity/:type/:id ────────────────────────────────────
+  app.get(
+    '/presence/entity/:type/:id',
+    {
+      schema: {
+        params: entityParamsSchema,
+        response: {
+          200: z.object({
+            users: z.array(
+              z.object({
+                userId: z.string(),
+                presence: z.unknown(),
+              }),
+            ),
+          }),
+        },
+      },
+    },
+    async (req) => {
+      const { orgId } = req.auth;
+      const { type: entityType, id: entityId } = req.params;
       const entries = await getEntityPresence(orgId, entityType, entityId);
       return { users: entries };
     },

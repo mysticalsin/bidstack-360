@@ -23,10 +23,11 @@
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { prisma } from '@bidstack/db';
+import { prisma, type Prisma } from '@bidstack/db';
 import { logAiInvocation } from '../lib/ai-audit.js';
 import { enqueueRfpOrchestrate, type RfpOrchestrateJob } from '../queues/rfp-orchestrator.js';
 import { enqueueRfpComplianceFill } from '../queues/rfp-compliance-fill.js';
+import { enqueueRfpSectionDraft } from '../queues/rfp-section-draft.js';
 import { createLogger } from '../lib/logger.js';
 import {
   ALLOWED_MIME_TYPES,
@@ -40,6 +41,8 @@ import {
   UploadResponse,
   AutofillResponse,
   ApproveResponse,
+  ResumeDraftingParams,
+  ResumeDraftingResponse,
   checkRfpUploadRateLimit,
 } from './rfp-pipeline.helpers.js';
 import { rfpPipelineStreamRoutes } from './rfp-pipeline-stream.js';
@@ -333,6 +336,7 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
           humanReviewRequired: true,
           approvedAt: true,
           name: true,
+          opportunityId: true,
         },
       });
       if (!proposal) throw server.httpErrors.notFound('Proposal not found');
@@ -350,17 +354,103 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
         throw server.httpErrors.conflict('Proposal has already been approved');
       }
 
+      // ── RFP-GATE-001 — approval must gate the linked orchestration ──────────
+      // WHY: this endpoint is the EU AI Act Art. 50 human-in-the-loop gate for
+      // the whole RFP pipeline. Approving the proposal row alone used to leave
+      // the orchestration stranded in 'awaiting_approval' — so downstream
+      // compliance autofill (which requires state='approved') was unreachable —
+      // and let a bid be approved while high/critical review issues were open.
+      const orchestration = await prisma.rfpOrchestration.findFirst({
+        where: { proposalId: proposal.id, orgId, deletedAt: null },
+        select: { id: true, state: true, opportunityId: true, completedPhases: true },
+      });
+      if (!orchestration) {
+        // No pipeline run is linked to this proposal — the RFP gate does not
+        // apply. Fail loud rather than silently approving an unmanaged proposal.
+        throw server.httpErrors.conflict(
+          'No RFP orchestration is linked to this proposal; it cannot be approved through the RFP gate',
+        );
+      }
+      // The pipeline reaches this gate only after qa_review (see
+      // markOrchestrationAwaitingApproval). Requiring state='awaiting_approval'
+      // AND qa_review completed distinguishes the final proposal gate from the
+      // earlier drafting gate and blocks premature / double approval.
+      const atFinalGate =
+        orchestration.state === 'awaiting_approval' &&
+        orchestration.completedPhases.includes('qa_review');
+      if (!atFinalGate) {
+        throw server.httpErrors.conflict(
+          `RFP orchestration is not awaiting final approval (state: '${orchestration.state}')`,
+        );
+      }
+
+      // Block approval while any high/critical review issue for THIS proposal's
+      // run is unresolved. Scoped by proposalId (not the opportunity) so a
+      // sibling re-run's findings never bleed in and a re-scan cannot retire
+      // another run's blockers (RFP-REVIEW-001). Resolved and waived issues do
+      // not block — a waiver is an explicit, audited human decision.
+      const blockerWhere: Prisma.ReviewIssueWhereInput = {
+        orgId,
+        proposalId: proposal.id,
+        severity: { in: ['high', 'critical'] },
+        status: { in: ['open', 'acknowledged', 'in_progress'] },
+        deletedAt: null,
+      };
+
+      // Fast-fail before opening the transaction (the common case).
+      const preBlockers = await prisma.reviewIssue.count({ where: blockerWhere });
+      if (preBlockers > 0) {
+        throw server.httpErrors.conflict(
+          `Cannot approve: ${preBlockers} unresolved high/critical review ` +
+            `${preBlockers === 1 ? 'issue' : 'issues'} must be resolved or waived first`,
+        );
+      }
+
       const approvedAt = new Date();
 
       await prisma.$transaction(async (tx) => {
-        await tx.proposal.update({
-          where: { id: proposal.id },
+        // Atomic approval guard: updateMany with approvedAt IS NULL means a
+        // concurrent double-approval loses the race (the second write sees
+        // count 0) without a separate row lock.
+        const approved = await tx.proposal.updateMany({
+          where: { id: proposal.id, orgId, approvedAt: null },
           data: {
             approvedAt,
             approvedByUserId: userId,
             status: 'approved',
           },
         });
+        if (approved.count !== 1) {
+          throw server.httpErrors.conflict('Proposal has already been approved');
+        }
+
+        // Advance the orchestration to 'approved' so compliance autofill (which
+        // requires state='approved') becomes reachable. Conditional on the
+        // current state so a concurrent transition is not clobbered; assert
+        // exactly one row moved or roll the whole approval back.
+        const moved = await tx.$executeRaw`
+          UPDATE rfp_orchestrations
+          SET state = 'approved', updated_at = now()
+          WHERE id = ${orchestration.id}::uuid
+            AND org_id = ${orgId}::uuid
+            AND state = 'awaiting_approval'
+        `;
+        if (moved !== 1) {
+          throw server.httpErrors.conflict(
+            'RFP orchestration changed state during approval; please retry',
+          );
+        }
+
+        // TOCTOU guard: re-check blockers INSIDE the transaction. A worker that
+        // inserts a high/critical finding for this run between the fast-fail and
+        // here is caught, rolling the whole approval back.
+        const liveBlockers = await tx.reviewIssue.count({ where: blockerWhere });
+        if (liveBlockers > 0) {
+          throw server.httpErrors.conflict(
+            `Cannot approve: ${liveBlockers} unresolved high/critical review ` +
+              `${liveBlockers === 1 ? 'issue' : 'issues'} must be resolved or waived first`,
+          );
+        }
 
         await tx.auditLog.create({
           data: {
@@ -372,6 +462,9 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
             diff: {
               approvedAt: approvedAt.toISOString(),
               approvedByUserId: userId,
+              orchestrationId: orchestration.id,
+              orchestrationState: 'approved',
+              blockersChecked: liveBlockers,
               notes: req.body.notes ?? null,
             },
           },
@@ -393,12 +486,102 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
         status: 'success',
       });
 
-      log.info({ proposalId: proposal.id, userId, orgId }, 'Proposal approved by human reviewer');
+      log.info(
+        { proposalId: proposal.id, orchestrationId: orchestration.id, userId, orgId },
+        'Proposal approved by human reviewer; orchestration advanced to approved',
+      );
 
       return {
         approvedAt: approvedAt.toISOString(),
         approvedByUserId: userId,
+        orchestrationId: orchestration.id,
+        orchestrationState: 'approved' as const,
       };
+    },
+  );
+
+  // ── 5. Human approval gate to resume AI section drafting ──────────────────
+  server.post(
+    '/bid-workspaces/:workspaceId/rfp/:orchestrationId/approve-drafting',
+    {
+      config: { permission: 'proposals:write' },
+      preHandler: server.requirePermission('proposals:write'),
+      schema: {
+        params: ResumeDraftingParams,
+        response: { 200: ResumeDraftingResponse },
+      },
+    },
+    async (req, _reply) => {
+      const { orgId, userId } = req.auth;
+      const { orchestrationId } = req.params;
+
+      const orchestration = await prisma.rfpOrchestration.findFirst({
+        where: { id: orchestrationId, orgId, deletedAt: null },
+        select: { id: true, state: true, proposalId: true, documentVersionId: true },
+      });
+      if (!orchestration) throw server.httpErrors.notFound('RFP orchestration not found');
+
+      if (orchestration.state !== 'awaiting_approval') {
+        throw server.httpErrors.conflict(
+          `Pipeline is not awaiting drafting approval. Current state: '${orchestration.state}'`,
+        );
+      }
+
+      if (!orchestration.proposalId) {
+        throw server.httpErrors.conflict('Pipeline is missing a proposal to draft.');
+      }
+
+      const sections = await prisma.proposalSection.findMany({
+        where: { proposalId: orchestration.proposalId, orgId, deletedAt: null },
+        select: { id: true, title: true },
+      });
+
+      const requirements = orchestration.documentVersionId
+        ? await prisma.requirement.findMany({
+            where: { documentVersionId: orchestration.documentVersionId, orgId, deletedAt: null },
+            select: { id: true },
+          })
+        : [];
+      const requirementIds = requirements.map((req) => req.id);
+
+      // Resume pipeline state to 'running'
+      await prisma.$executeRaw`
+        UPDATE rfp_orchestrations
+        SET state = 'running',
+            updated_at = now()
+        WHERE id = ${orchestration.id}::uuid AND org_id = ${orgId}::uuid
+      `;
+
+      let jobsDispatched = 0;
+      for (const section of sections) {
+        const jobId = await enqueueRfpSectionDraft({
+          orgId,
+          orchestrationId: orchestration.id,
+          proposalId: orchestration.proposalId,
+          sectionId: section.id,
+          sectionTitle: section.title,
+          requirementIds,
+        });
+        if (jobId) jobsDispatched++;
+      }
+
+      await prisma.auditLog.create({
+        data: {
+          orgId,
+          userId,
+          action: 'rfp_orchestration.approve_drafting',
+          targetType: 'rfp_orchestration',
+          targetId: orchestration.id,
+          diff: { approvedByUserId: userId, jobsDispatched },
+        },
+      });
+
+      log.info(
+        { orchestrationId: orchestration.id, userId, orgId, jobsDispatched },
+        'Drafting phase resumed by human reviewer',
+      );
+
+      return { status: 'running' as const, jobsDispatched };
     },
   );
 };
