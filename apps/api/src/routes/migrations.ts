@@ -294,13 +294,45 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         throw server.httpErrors.gone('Undo window has expired (24h limit)');
       }
 
-      // Delete by source tag in order to respect FK constraints.
+      // Two undo mechanisms, both org-scoped:
+      // 1. source tag — Company/Lead carry source='migration:<jobId>'.
+      // 2. audit trail — the worker logs every created id per chunk
+      //    ('migration.chunk.imported'), which is the only way to find
+      //    imported Contacts/Opportunities (no source column on those models).
       const sourceTag = `migration:${job.id}`;
-      const [companies, leads] = await Promise.all([
-        prisma.company.deleteMany({ where: { orgId, source: sourceTag } }),
-        prisma.lead.deleteMany({ where: { orgId, source: sourceTag } }),
+      const chunkLogs = await prisma.auditLog.findMany({
+        where: { orgId, action: 'migration.chunk.imported', targetId: job.id },
+        select: { diff: true },
+      });
+      const idsByEntity: Record<string, string[]> = {};
+      for (const log of chunkLogs) {
+        const diff = log.diff as { entity?: string; createdIds?: string[] } | null;
+        if (!diff?.entity || !Array.isArray(diff.createdIds)) continue;
+        (idsByEntity[diff.entity] ??= []).push(...diff.createdIds);
+      }
+
+      // Children first (FK order): opportunities/contacts reference companies.
+      const [opportunities, contacts] = await Promise.all([
+        prisma.opportunity.deleteMany({
+          where: { orgId, id: { in: idsByEntity['opportunity'] ?? [] } },
+        }),
+        prisma.contact.deleteMany({ where: { orgId, id: { in: idsByEntity['contact'] ?? [] } } }),
       ]);
-      const deletedCount = companies.count + leads.count;
+      const [companies, leads] = await Promise.all([
+        prisma.company.deleteMany({
+          where: {
+            orgId,
+            OR: [{ source: sourceTag }, { id: { in: idsByEntity['company'] ?? [] } }],
+          },
+        }),
+        prisma.lead.deleteMany({
+          where: {
+            orgId,
+            OR: [{ source: sourceTag }, { id: { in: idsByEntity['lead'] ?? [] } }],
+          },
+        }),
+      ]);
+      const deletedCount = companies.count + leads.count + contacts.count + opportunities.count;
 
       await prisma.migrationJob.update({
         where: { id: req.params.id },

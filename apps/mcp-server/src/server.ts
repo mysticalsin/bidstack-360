@@ -18,7 +18,7 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 
 import { mcpAuth, requireMcpScope, type McpAuthCtx } from './auth.js';
 import { hourlyRateLimitPlugin, mcpRateLimitFailsClosed } from './plugins/hourly-rate-limit.js';
-import { redis } from './redis.js';
+import { pingRedis, redis } from './redis.js';
 import { requiredScopeForTool, tools, type ToolName } from './tools/index.js';
 
 type LooseTool = {
@@ -123,14 +123,26 @@ export async function buildMcpServer(): Promise<FastifyInstance> {
     },
   });
 
-  // Public readiness endpoint — probes the DB, since every MCP tool hits Prisma.
+  // Public readiness endpoint — probes the DB (every MCP tool hits Prisma) AND
+  // Redis. pingRedis() also reconnects the never-auto-retrying client, and in
+  // fail-closed mode a dead Redis means every /mcp call 503s — health must not
+  // stay green while the service is effectively down.
   server.get('/health', async (_req, reply) => {
+    let dbOk = true;
     try {
       await prisma.$queryRaw`SELECT 1`;
-      return { ok: true, name: 'bidstack-mcp' };
     } catch {
-      return reply.code(503).send({ ok: false, name: 'bidstack-mcp', db: 'down' });
+      dbOk = false;
     }
+    const redisOk = await pingRedis();
+    const ok = dbOk && (redisOk || !mcpRateLimitFailsClosed());
+    const body = {
+      ok,
+      name: 'bidstack-mcp',
+      db: dbOk ? 'up' : 'down',
+      redis: redisOk ? 'up' : 'down',
+    };
+    return ok ? body : reply.code(503).send(body);
   });
 
   server.get('/.well-known/mcp', async () => ({

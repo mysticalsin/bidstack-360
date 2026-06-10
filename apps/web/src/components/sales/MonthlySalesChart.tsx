@@ -29,7 +29,7 @@ const CHART_HEIGHT_DEFAULT = 300;
 export function MonthlySalesChart({
   points,
   height = CHART_HEIGHT_DEFAULT,
-  sourceCurrency = 'CAD',
+  sourceCurrency = 'EUR',
 }: Props) {
   const [hover, setHover] = useState<number | null>(null);
   const reducedMotion = useReducedMotion();

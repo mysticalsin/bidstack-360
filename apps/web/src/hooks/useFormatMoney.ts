@@ -21,7 +21,9 @@ export function useFormatMoney() {
       formatMoney(convert(value, sourceCurrency), currency),
     formatMoneyMicros: (
       micros: string | number | bigint,
-      sourceCurrency = 'CAD',
+      // Micros are EUR-denominated at rest (CLAUDE.md money convention) — the
+      // default source must match or every dashboard figure gets FX-skewed.
+      sourceCurrency = 'EUR',
       options?: { compact?: boolean },
     ) => {
       const asBigInt =

@@ -39,7 +39,7 @@ export function usePatchPipelineStage() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['pipeline-stages', 'default'] });
       void qc.invalidateQueries({ queryKey: ['opportunities'] });
-      void qc.invalidateQueries({ queryKey: ['pipeline-report'] });
+      void qc.invalidateQueries({ queryKey: ['report:pipeline'] });
     },
   });
 }

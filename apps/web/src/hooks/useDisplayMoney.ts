@@ -19,7 +19,8 @@ export function useDisplayMoney(value: number, sourceCurrency = 'EUR'): string {
 /** Convert and format micros (string/number/bigint) for the display currency. */
 export function useDisplayMoneyMicros(
   micros: string | number | bigint,
-  sourceCurrency = 'CAD',
+  // Micros are EUR-denominated at rest — keep in sync with useDisplayMoney.
+  sourceCurrency = 'EUR',
   options?: { compact?: boolean },
 ): string {
   const { currency, convert, fetchRates } = useCurrencyStore();
@@ -46,7 +47,7 @@ export function useDisplayMoneyMicros(
 /** Same as useDisplayMoneyMicros but always full precision. */
 export function useDisplayMoneyMicrosFull(
   micros: string | number | bigint,
-  sourceCurrency = 'CAD',
+  sourceCurrency = 'EUR',
 ): string {
   return useDisplayMoneyMicros(micros, sourceCurrency, { compact: false });
 }

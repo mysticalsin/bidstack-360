@@ -106,7 +106,10 @@ export function usePatchOpportunity() {
       qc.getQueriesData<OpportunityPage>({ queryKey: ['opportunities'] }).forEach(
         ([key, value]) => {
           listSnapshots.push([key, value]);
-          if (!value) return;
+          // The ['opportunities'] prefix also matches ['opportunities','count']
+          // whose data is { count } with no items array — skip non-page entries
+          // or this throws and the PATCH never reaches the server.
+          if (!value || !Array.isArray(value.items)) return;
           qc.setQueryData<OpportunityPage>(key, {
             ...value,
             items: value.items.map((o) => (o.id === id ? { ...o, ...rest } : o)),
@@ -132,7 +135,7 @@ export function usePatchOpportunity() {
       void qc.invalidateQueries({ queryKey: ['opportunity', vars.id] });
       void qc.invalidateQueries({ queryKey: ['opportunities'] });
       // Pipeline reports aggregate over opportunities; refresh.
-      void qc.invalidateQueries({ queryKey: ['pipeline-report'] });
+      void qc.invalidateQueries({ queryKey: ['report:pipeline'] });
     },
   });
 }

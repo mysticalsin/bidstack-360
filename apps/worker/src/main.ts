@@ -41,6 +41,7 @@ import { startRfpProposalCompile } from './queues/rfp-proposal-compile.js';
 import { startRfpQaReview } from './queues/rfp-qa-review.js';
 import { startCrewRun, startCrewRunReaper } from './queues/crew-run.js';
 import { startSignatureWorkers } from './queues/signatures.js';
+import { startMigrationWorker } from './queues/migration.js';
 
 const log = pino({
   level: process.env.LOG_LEVEL ?? 'info',
@@ -119,6 +120,8 @@ await Promise.all([
   // Wave 10 — Crew (CrewAI-style multi-agent) execution
   startCrewRun(connection, log, workers, queues),
   startCrewRunReaper(connection, log, workers, queues),
+  // Migration connector (CSV / Salesforce CSV / HubSpot) import consumer
+  startMigrationWorker(connection, log, workers, queues),
 ]);
 
 log.info(

@@ -22,10 +22,23 @@ interface Props {
   trigger?: React.ReactNode;
   /** Default customer to pre-fill (e.g. when launched from an account page). */
   defaultCustomer?: string;
+  /**
+   * Controlled open state. When provided, the caller owns open/close.
+   * Used by the quick-add menu (same Twenty pattern A3 as CreateTaskDialog).
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function CreateOpportunityDialog({ trigger, defaultCustomer }: Props = {}) {
-  const [open, setOpen] = useState(false);
+export function CreateOpportunityDialog({
+  trigger,
+  defaultCustomer,
+  open: controlledOpen,
+  onOpenChange,
+}: Props = {}) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = onOpenChange !== undefined ? onOpenChange : setInternalOpen;
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   // Force form remount on every open so uncontrolled inputs clear stale DOM values.

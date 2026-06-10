@@ -23,7 +23,7 @@ import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import fp from 'fastify-plugin';
 import type Redis from 'ioredis';
 
-import { redis as defaultRedis } from '../redis.js';
+import { redis as defaultRedis, ensureRedisReady } from '../redis.js';
 
 export const MAX_HOURLY = 600;
 const WINDOW_SECONDS = 60 * 60;
@@ -148,6 +148,12 @@ const pluginImpl: FastifyPluginAsync<PluginOptions> = async (server, opts) => {
 
     let state: RateState;
     try {
+      // The shared client never auto-reconnects (retryStrategy: null) — heal
+      // it here so one Redis blip cannot permanently 503 all MCP traffic.
+      // Injected test clients (opts.redis) manage their own lifecycle.
+      if (redis === defaultRedis && !(await ensureRedisReady())) {
+        throw new Error('Redis unreachable after reconnect attempt');
+      }
       state = await tickAndRead(redis, hashedKey);
     } catch (err) {
       if (failClosedOnRedisError) {

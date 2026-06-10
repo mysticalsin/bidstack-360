@@ -78,7 +78,7 @@ export function useConvertLead(id: string) {
       // P1 #10: count badge, dashboard, and pipeline report must reflect the new opportunity
       void qc.invalidateQueries({ queryKey: ['opportunities', 'count'] });
       void qc.invalidateQueries({ queryKey: ['crm-dashboard'] });
-      void qc.invalidateQueries({ queryKey: ['pipeline-report'] });
+      void qc.invalidateQueries({ queryKey: ['report:pipeline'] });
     },
   });
 }

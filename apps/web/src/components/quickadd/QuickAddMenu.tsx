@@ -173,25 +173,29 @@ export function QuickAddMenu() {
       </RadixDialog.Root>
 
       {/* Selected dialog mounts AFTER the menu closes so its open-animation
-          plays on a clean stage. Each dialog manages its own open state via
-          a controlled `open`; we set it true once and clear pick on close. */}
+          plays on a clean stage. Each dialog is controlled: open while picked,
+          and clearing the pick unmounts it. */}
       {pick === 'opportunity' ? (
-        <CreateOpportunityDialog trigger={<span style={{ display: 'none' }} />} />
+        <CreateOpportunityDialog
+          trigger={<span style={{ display: 'none' }} />}
+          open
+          onOpenChange={(o) => {
+            if (!o) setPick(null);
+          }}
+        />
       ) : null}
-      {pick === 'task' ? <TaskDialogAuto onDone={() => setPick(null)} /> : null}
+      {pick === 'task' ? (
+        <CreateTaskDialog
+          trigger={<span style={{ display: 'none' }} />}
+          open
+          onOpenChange={(o) => {
+            if (!o) setPick(null);
+          }}
+        />
+      ) : null}
       {pick === 'contact' ? <ContactDialogAuto onDone={() => setPick(null)} /> : null}
     </>
   );
-}
-
-// CreateTaskDialog / ContactDialog don't expose a controlled-open prop in a
-// uniform way, so we mount them and click their triggers on the next tick
-// via a small wrapper. Cheap, no API churn.
-function TaskDialogAuto({ onDone: _onDone }: { onDone: () => void }) {
-  // Render the standard dialog with no oppId pre-filled. The user closes it
-  // normally — we don't need a programmatic close hook for parity with the
-  // other entry points.
-  return <CreateTaskDialog />;
 }
 
 function ContactDialogAuto({ onDone }: { onDone: () => void }) {

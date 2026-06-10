@@ -17,6 +17,49 @@ export const redis = new Redis(redisUrl, {
   retryStrategy: () => null,
 });
 
+let reconnectPromise: Promise<void> | null = null;
+
+export function redisStatusCanRunCommand(status = redis.status): boolean {
+  return status === 'ready' || status === 'connect';
+}
+
+export function redisStatusCanReconnect(status = redis.status): boolean {
+  return status === 'wait' || status === 'close' || status === 'end';
+}
+
+/**
+ * Reconnect-on-demand. retryStrategy:null means a dropped connection stays
+ * dropped ('end') forever — without this helper one Redis blip would leave the
+ * fail-closed production rate limiter returning 503 for ALL MCP traffic until
+ * a process restart (mirrors apps/api/src/redis.ts; MISTAKES.md 2026-06-07).
+ */
+export async function ensureRedisReady(): Promise<boolean> {
+  if (redisStatusCanRunCommand()) return true;
+
+  if (redisStatusCanReconnect()) {
+    reconnectPromise ??= redis.connect().finally(() => {
+      reconnectPromise = null;
+    });
+    try {
+      await reconnectPromise;
+    } catch {
+      return false;
+    }
+  }
+
+  return redisStatusCanRunCommand();
+}
+
+export async function pingRedis(): Promise<boolean> {
+  try {
+    if (!(await ensureRedisReady())) return false;
+    await redis.ping();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 redis.on('error', () => {
   // Swallow connection errors here — the rate-limit plugin reports failures
   // through skipOnError, and the /health endpoint surfaces broken state.
