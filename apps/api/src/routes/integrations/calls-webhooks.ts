@@ -48,7 +48,8 @@ export const zoomCallWebhookRoutes: FastifyPluginAsync = async (fastify) => {
   app.post(
     '/zoom/webhook',
     {
-      config: { rawBody: true },
+      // Zoom sends no Clerk JWT — the handler self-verifies the Zoom signature.
+      config: { rawBody: true, public: true },
       schema: {
         description: 'Zoom webhook receiver for call events',
         tags: ['webhooks', 'calls'],
@@ -159,6 +160,9 @@ export const teamsCallWebhookRoutes: FastifyPluginAsync = async (fastify) => {
   app.post(
     '/teams/webhook',
     {
+      // Graph sends no Clerk JWT — per-notification clientState is verified
+      // against the stored subscription in the handler.
+      config: { public: true },
       schema: {
         description: 'Microsoft Graph webhook for Teams call events',
         tags: ['webhooks', 'calls'],
@@ -242,6 +246,8 @@ export const twilioVoiceWebhookRoutes: FastifyPluginAsync = async (fastify) => {
   app.post(
     '/twilio-voice/webhook',
     {
+      // Twilio sends no Clerk JWT — X-Twilio-Signature is verified below.
+      config: { public: true },
       schema: {
         description: 'Twilio voice call status and recording status callback',
         tags: ['webhooks', 'calls'],
@@ -338,6 +344,8 @@ export const twilioVoiceWebhookRoutes: FastifyPluginAsync = async (fastify) => {
   app.post(
     '/twilio-voice/twiml/:callSessionId',
     {
+      // Twilio fetches TwiML mid-call without a Clerk JWT; signature check below.
+      config: { public: true },
       schema: {
         description: 'TwiML generator for outbound voice calls',
         tags: ['webhooks', 'calls'],

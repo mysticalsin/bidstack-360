@@ -62,6 +62,7 @@ export function useConvertLead(id: string) {
       opportunityName?: string;
       opportunityValueMicros?: number;
       pipelineStageId?: string;
+      stage?: string;
     }) =>
       api<{ leadId: string; opportunityId: string; contactId: string }>(
         `/api/leads/${id}/convert`,

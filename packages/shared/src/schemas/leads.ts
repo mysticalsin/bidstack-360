@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { CustomFieldValueLite, CustomFieldValueInput } from './custom-fields.js';
+import { OpportunityStage } from './opportunity.js';
 
 export const LeadStatus = z.enum([
   'new',
@@ -122,8 +123,14 @@ export type LeadPatch = z.infer<typeof LeadPatch>;
 
 export const LeadConvertBody = z.object({
   opportunityName: z.string().min(1).max(255).optional(),
-  opportunityValueMicros: z.number().min(0).max(1_000_000_000_000).optional(),
+  // Micros scale: 1e12 micros is only €1M — the old bound was copied from a
+  // units-based schema and rejected any real enterprise deal. 9e15 stays
+  // within Number.MAX_SAFE_INTEGER (≈9.007e15) and allows up to €9B.
+  opportunityValueMicros: z.number().min(0).max(9_000_000_000_000_000).optional(),
   pipelineStageId: z.string().uuid().optional(),
+  // Legacy stage key fallback for callers without pipeline-stage UUIDs
+  // (ConvertLeadDialog) — the route resolves it to the org's matching stage.
+  stage: OpportunityStage.optional(),
 });
 export type LeadConvertBody = z.infer<typeof LeadConvertBody>;
 

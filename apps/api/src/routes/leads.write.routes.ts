@@ -9,6 +9,7 @@ import { z } from 'zod';
 
 import { prisma, type Prisma, type LeadPriority, type LeadStatus } from '@bidstack/db';
 import { pushLeadToDust } from '../lib/dust-push.js';
+import { isUniqueViolation, mintNextCode } from './opportunities.helpers.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import {
   LeadConvertBody,
@@ -261,7 +262,11 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
       }
 
       const body = req.body;
-      const result = await prisma.$transaction(async (tx) => {
+      // Bounded retry on (orgId, code) collisions — mintNextCode reads inside
+      // the transaction, so a concurrent convert/create can race it; the whole
+      // transaction (contact + opportunity + lead flip) rolls back and re-runs.
+      const runConvert = () =>
+        prisma.$transaction(async (tx) => {
         // 1. Create Contact
         const contact = await tx.contact.create({
           data: {
@@ -275,7 +280,7 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
         });
 
         // 2. Create Opportunity
-        const code = `OP-${Date.now().toString().slice(-4)}`;
+        const code = await mintNextCode(tx, req.auth.orgId);
         let pipelineStageId: string | undefined;
         let stageKey = 's1_lead';
         if (body.pipelineStageId) {
@@ -287,6 +292,15 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
             pipelineStageId = body.pipelineStageId;
             stageKey = ps.key;
           }
+        } else if (body.stage) {
+          // ConvertLeadDialog sends the legacy stage key — resolve it to the
+          // org's pipeline stage so the chosen stage is actually persisted.
+          stageKey = body.stage;
+          const ps = await tx.pipelineStage.findFirst({
+            where: { key: body.stage, orgId: req.auth.orgId, deletedAt: null },
+            select: { id: true },
+          });
+          if (ps) pipelineStageId = ps.id;
         } else {
           const defaultStage = await tx.pipelineStage.findFirst({
             where: { orgId: req.auth.orgId, deletedAt: null },
@@ -337,10 +351,16 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
           },
         });
 
-        return { leadId: lead.id, opportunityId: opp.id, contactId: contact.id };
-      });
+          return { leadId: lead.id, opportunityId: opp.id, contactId: contact.id };
+        });
 
-      return result;
+      for (let attempt = 0; ; attempt++) {
+        try {
+          return await runConvert();
+        } catch (err) {
+          if (!isUniqueViolation(err) || attempt >= 4) throw err;
+        }
+      }
     },
   );
 

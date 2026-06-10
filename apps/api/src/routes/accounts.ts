@@ -253,8 +253,10 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
       params: z.object({ id: z.string().uuid() }),
       body: z.object({
         tier: z.enum(['key', 'top', 'standard']),
-        keyAccountOwnerId: z.string().uuid().optional(),
-        keyAccountNotes: z.string().max(2000).optional(),
+        // Optional = "leave unchanged"; explicit null = "clear". A tier-only
+        // PATCH must never wipe the key-account owner/notes.
+        keyAccountOwnerId: z.string().uuid().nullable().optional(),
+        keyAccountNotes: z.string().max(2000).nullable().optional(),
       }),
       response: {
         200: z.object({
@@ -289,11 +291,9 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
         }
       }
 
-      const updateData: Prisma.CompanyUpdateManyMutationInput = {
-        tier,
-        keyAccountOwnerId: keyAccountOwnerId ?? null,
-        keyAccountNotes: keyAccountNotes ?? null,
-      };
+      const updateData: Prisma.CompanyUpdateManyMutationInput = { tier };
+      if (keyAccountOwnerId !== undefined) updateData.keyAccountOwnerId = keyAccountOwnerId;
+      if (keyAccountNotes !== undefined) updateData.keyAccountNotes = keyAccountNotes;
 
       if (tier === 'key' && company.tier !== 'key') {
         updateData.keyAccountSince = new Date();

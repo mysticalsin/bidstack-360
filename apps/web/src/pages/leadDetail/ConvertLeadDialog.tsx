@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 
 interface ConvertForm {
-  opportunityName: string;
+  opportunityName?: string;
   opportunityValueMicros: number;
   stage: OpportunityStage;
 }
@@ -29,7 +29,7 @@ export function ConvertLeadDialog({
   onClose: () => void;
   onConvert: (form: ConvertForm) => void;
 }) {
-  const [form, setForm] = useState<ConvertForm>({
+  const [form, setForm] = useState<Required<ConvertForm>>({
     opportunityName: '',
     opportunityValueMicros: 0,
     stage: 's1_ongoing',
@@ -92,7 +92,17 @@ export function ConvertLeadDialog({
           </div>
         </div>
         <div className="mt-4 flex items-center gap-2">
-          <Button onClick={() => onConvert(form)} disabled={isPending}>
+          <Button
+            onClick={() =>
+              // Empty name must be OMITTED — the API schema requires min(1)
+              // when present, so sending '' fails the whole conversion.
+              onConvert({
+                ...form,
+                opportunityName: form.opportunityName.trim() || undefined,
+              })
+            }
+            disabled={isPending}
+          >
             {isPending ? 'Converting…' : 'Convert lead'}
           </Button>
           <Button variant="ghost" onClick={onClose}>

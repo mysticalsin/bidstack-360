@@ -54,6 +54,9 @@ export const microsoftWebhookRoutes: FastifyPluginAsync = async (server) => {
   app.get(
     '/integrations/microsoft/webhook',
     {
+      // Graph's validation handshake carries no Clerk JWT; the POST below
+      // self-verifies via clientState per notification.
+      config: { public: true },
       schema: {
         querystring: z.object({ validationToken: z.string().optional() }),
       },
@@ -75,6 +78,9 @@ export const microsoftWebhookRoutes: FastifyPluginAsync = async (server) => {
   app.post(
     '/integrations/microsoft/webhook',
     {
+      // Graph sends no Clerk JWT — notifications are authenticated by the
+      // per-subscription clientState check in the handler.
+      config: { public: true },
       schema: {
         body: NotificationBody,
         response: {

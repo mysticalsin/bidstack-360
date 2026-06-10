@@ -124,23 +124,29 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
           include: { author: { select: { name: true } } },
         });
 
-        // Extract @mentions and create notifications
-        const mentions = extractMentions(req.body.bodyMd);
-        if (mentions.length) {
+        // Extract @mentions and create notifications. Candidates are the text
+        // after each '@'; users match by the longest name-prefix so
+        // "@John Smith please review" notifies the user named "John Smith".
+        const candidates = extractMentionCandidates(req.body.bodyMd);
+        if (candidates.length) {
+          const prefixes = [...new Set(candidates.flatMap(mentionPrefixes))].slice(0, 50);
           const users = await tx.user.findMany({
-            where: { orgId: req.auth.orgId, name: { in: mentions } },
-            select: { id: true },
+            where: { orgId: req.auth.orgId, name: { in: prefixes, mode: 'insensitive' } },
+            select: { id: true, name: true },
             // Cap so a 10k-char body with many @names can't cause a huge IN list
             take: 50,
           });
-          await tx.mention.createMany({
-            data: users.map((u) => ({
-              orgId: req.auth.orgId,
-              commentId: comment.id,
-              userId: u.id,
-            })),
-            skipDuplicates: true,
-          });
+          const mentionedIds = resolveMentionedUserIds(candidates, users);
+          if (mentionedIds.length) {
+            await tx.mention.createMany({
+              data: mentionedIds.map((userId) => ({
+                orgId: req.auth.orgId,
+                commentId: comment.id,
+                userId,
+              })),
+              skipDuplicates: true,
+            });
+          }
         }
 
         return comment;
@@ -349,7 +355,43 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
   );
 };
 
-function extractMentions(body: string): string[] {
-  const matches = body.match(/@([\w\s]+?)(?=\s|$|@)/g) ?? [];
-  return matches.map((m) => m.slice(1).trim());
+/** Text following each '@' (≤60 chars, stops at the next '@' or newline). */
+function extractMentionCandidates(body: string): string[] {
+  const out: string[] = [];
+  const re = /@([^\s@][^@\n]{0,59})/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(body)) !== null && out.length < 20) out.push(m[1]!);
+  return out;
+}
+
+/** 1..4-word prefixes of a candidate, trailing punctuation stripped — these
+ * are the only strings a user's full name could equal. */
+function mentionPrefixes(candidate: string): string[] {
+  const words = candidate
+    .trim()
+    .split(/\s+/)
+    .slice(0, 4)
+    .map((w) => w.replace(/[.,!?;:]+$/, ''));
+  const prefixes: string[] = [];
+  for (let i = 1; i <= words.length; i++) prefixes.push(words.slice(0, i).join(' '));
+  return prefixes;
+}
+
+/** Longest-name-wins per candidate: "@John Smith" mentions the user named
+ * "John Smith", not a different user named "John". */
+function resolveMentionedUserIds(
+  candidates: string[],
+  users: Array<{ id: string; name: string | null }>,
+): string[] {
+  const ids = new Set<string>();
+  for (const candidate of candidates) {
+    const prefixSet = new Set(mentionPrefixes(candidate).map((p) => p.toLowerCase()));
+    let best: { id: string; name: string } | null = null;
+    for (const u of users) {
+      if (!u.name || !prefixSet.has(u.name.toLowerCase())) continue;
+      if (!best || u.name.length > best.name.length) best = { id: u.id, name: u.name };
+    }
+    if (best) ids.add(best.id);
+  }
+  return [...ids];
 }

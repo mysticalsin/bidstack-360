@@ -274,19 +274,40 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
         throw server.httpErrors.conflict('The requested time slot is no longer available');
       }
 
-      const booking = await prisma.booking.create({
-        data: {
-          orgId: page.user.orgId,
-          bookingPageId: page.id,
-          attendeeName,
-          attendeeEmail,
-          attendeePhone: attendeePhone ?? null,
-          startAt,
-          endAt,
-          answers: (answers ?? {}) as Prisma.InputJsonValue,
-          status: 'CONFIRMED',
-        },
-        select: { id: true, startAt: true, endAt: true, cancelToken: true },
+      // TOCTOU guard: the availability check above runs outside any lock, so two
+      // concurrent requests for the same slot can both pass it. Serialize per
+      // booking page with a pg advisory xact lock and re-check for an
+      // overlapping CONFIRMED booking before creating ($executeRaw per
+      // MISTAKES.md 2026-06-07 — the lock result is never consumed).
+      const booking = await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`booking:${page.id}`}))`;
+        const clash = await tx.booking.findFirst({
+          where: {
+            bookingPageId: page.id,
+            status: 'CONFIRMED',
+            deletedAt: null,
+            startAt: { lt: endAt },
+            endAt: { gt: startAt },
+          },
+          select: { id: true },
+        });
+        if (clash) {
+          throw server.httpErrors.conflict('The requested time slot is no longer available');
+        }
+        return tx.booking.create({
+          data: {
+            orgId: page.user.orgId,
+            bookingPageId: page.id,
+            attendeeName,
+            attendeeEmail,
+            attendeePhone: attendeePhone ?? null,
+            startAt,
+            endAt,
+            answers: (answers ?? {}) as Prisma.InputJsonValue,
+            status: 'CONFIRMED',
+          },
+          select: { id: true, startAt: true, endAt: true, cancelToken: true },
+        });
       });
 
       const calEvent = await prisma.calendarEvent.create({

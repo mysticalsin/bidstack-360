@@ -46,15 +46,19 @@ export const callsReadRoutes: FastifyPluginAsync = async (fastify) => {
       const auth = getAuth(req);
       const { entityType, entityId, provider, limit, cursor } = req.query;
 
+      // Keyset pagination must follow the sort order. Filtering `id < cursor`
+      // while sorting by scheduledAt walked random UUID order — pages skipped
+      // and duplicated rows. Prisma's cursor+skip resumes AT the cursor row in
+      // the declared (stable, id-tiebroken) order instead.
       const sessions = await prisma.callSession.findMany({
         where: {
           orgId: auth.orgId,
           ...(entityType ? { entityType } : {}),
           ...(entityId ? { entityId } : {}),
           ...(provider ? { provider } : {}),
-          ...(cursor ? { id: { lt: cursor } } : {}),
         },
-        orderBy: { scheduledAt: 'desc' },
+        orderBy: [{ scheduledAt: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
         take: limit + 1,
         select: {
           id: true,

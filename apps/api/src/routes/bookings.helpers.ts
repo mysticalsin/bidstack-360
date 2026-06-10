@@ -77,7 +77,10 @@ export async function sendBookingConfirmationEmail(
   log: BookingLogger,
 ): Promise<void> {
   const appBaseUrl = process.env['APP_BASE_URL'] ?? 'https://app.bidstack.com';
-  const cancelUrl = `${appBaseUrl}/api/v1/public/bookings/${params.bookingId}/cancel?token=${params.cancelToken}`;
+  // Must match the registered route: bookings-public.ts '/bookings/:id/cancel'
+  // under the '/api/v1' prefix — there is no '/public' segment. The cancel
+  // token is delivered ONLY in this email, so a wrong URL kills self-cancel.
+  const cancelUrl = `${appBaseUrl}/api/v1/bookings/${params.bookingId}/cancel?token=${params.cancelToken}`;
   const firstName = params.attendeeName.split(' ')[0] ?? params.attendeeName;
   const greeting = `Hi ${firstName},`;
   const organizer = params.ownerName ?? 'your host';

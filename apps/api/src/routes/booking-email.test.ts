@@ -30,8 +30,10 @@ const BASE_PARAMS = {
   cancelToken: 'cancel-token-abc',
   greeting: 'Hi Alice,',
   organizer: 'Bob Jones',
+  // Asserts the REAL registered route (bookings-public.ts '/bookings/:id/cancel'
+  // under '/api/v1') — a '/public' segment here once locked in a 404 link.
   cancelUrl:
-    'https://app.bidstack.com/api/v1/public/bookings/booking-uuid-123/cancel?token=cancel-token-abc',
+    'https://app.bidstack.com/api/v1/bookings/booking-uuid-123/cancel?token=cancel-token-abc',
 };
 
 // ─── HTML builder ─────────────────────────────────────────────────────────────

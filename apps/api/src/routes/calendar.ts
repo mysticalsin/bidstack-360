@@ -77,8 +77,11 @@ export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
           ownerId: req.auth.userId,
           deletedAt: null,
           syncState: { not: 'DELETED_REMOTE' },
-          ...(from ? { startAt: { gte: new Date(from) } } : {}),
-          ...(to ? { endAt: { lte: new Date(to) } } : {}),
+          // Overlap predicate, not containment — an event that starts before
+          // `from` or ends after `to` still belongs on screen for that range
+          // (multi-day events, week-boundary meetings).
+          ...(to ? { startAt: { lt: new Date(to) } } : {}),
+          ...(from ? { endAt: { gt: new Date(from) } } : {}),
         },
         orderBy: { startAt: 'asc' },
         take: limit,

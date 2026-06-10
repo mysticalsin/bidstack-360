@@ -42,6 +42,9 @@ export const twilioWebhookRoutes: FastifyPluginAsync = async (fastify) => {
   app.post(
     '/twilio/webhook/status',
     {
+      // Twilio sends no Clerk JWT — the route self-protects via
+      // X-Twilio-Signature validation below (same pattern as /webhooks/dust).
+      config: { public: true },
       schema: {
         description: 'Twilio delivery status webhook',
         tags: ['twilio'],
@@ -121,6 +124,8 @@ export const twilioWebhookRoutes: FastifyPluginAsync = async (fastify) => {
   app.post(
     '/twilio/webhook/inbound',
     {
+      // Public for the same reason as /twilio/webhook/status above.
+      config: { public: true },
       schema: {
         description: 'Twilio inbound SMS webhook',
         tags: ['twilio'],

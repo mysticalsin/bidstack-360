@@ -325,8 +325,8 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
         if (opp.probability && opp.probability > 70) {
           calibratedCriteria.relationship = Math.min(5, (calibratedCriteria.relationship ?? 3) + 1);
         }
-        if (opp.valueMicros > 10_000_000_000) {
-          // > 10M EUR in micros
+        if (opp.valueMicros > 10_000_000_000_000) {
+          // > 10M EUR in micros (10M × 1e6 — the old 1e10 bound fired at €10k)
           calibratedCriteria.deal_size = 5;
         }
       }
