@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
-import { isPipelineStageIdUuid, getPipelineStageBusinessKey } from '@/lib/pipeline-stages';
+import { isPipelineStageIdUuid } from '@/lib/pipeline-stages';
 import type { Opportunity, OpportunityPage, PipelineStage } from '@bidstack/shared';
 
 interface MoveArgs {
@@ -30,7 +30,7 @@ export function useStageMutation() {
       qc.getQueriesData<OpportunityPage>({ queryKey: ['opportunities'] }).forEach(
         ([key, value]) => {
           snapshots.push([key, value]);
-          if (!value || !Array.isArray((value as any).items)) return;
+          if (!value || !Array.isArray(value.items)) return;
           qc.setQueryData<OpportunityPage>(key, {
             ...value,
             items: value.items.map((o) =>
@@ -62,7 +62,7 @@ export function useStageMutation() {
     },
     onSuccess: (data, { id }) => {
       qc.setQueriesData<OpportunityPage>({ queryKey: ['opportunities'] }, (cur) => {
-        if (!cur || !Array.isArray((cur as any).items)) return cur;
+        if (!cur || !Array.isArray(cur.items)) return cur;
         return {
           ...cur,
           items: cur.items.map((o) => (o.id === id ? { ...o, ...data } : o)),

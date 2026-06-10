@@ -80,6 +80,8 @@ export default tseslint.config(
       '.claude/worktrees/**', // ephemeral agent worktrees, not source
       'BIDCRM-design/**', // nested sibling project — not part of this repo
       'scratch_skills/**', // exploratory scratch directory
+      'scratch_img/**', // exploratory scratch directory
+      '.corepack/**', // vendored pnpm runtime, not source
       '.planning/**',
       'apps/chrome-extension/**', // vanilla JS Chrome extension — not part of TS monorepo
       'apps/mobile/**', // React Native — has its own Babel/Metro config

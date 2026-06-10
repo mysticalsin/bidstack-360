@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -70,7 +70,7 @@ export function AgentProviderCredentialsCard() {
   const [error, setError] = useState<string | null>(null);
 
   const items = credentials.data?.items ?? [];
-  const configuredCount = useMemo(() => items.filter((item) => item.configured).length, [items]);
+  const configuredCount = items.filter((item) => item.configured).length;
 
   const openNew = () => {
     setError(null);

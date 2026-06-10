@@ -35,8 +35,10 @@ import { useSalesIntelligence } from '@/hooks/useSalesIntelligence';
 import { useTasks } from '@/hooks/useTasks';
 import { daysUntil } from '@/lib/format';
 import { useAccountHistory } from '@/stores/accountHistory';
+import { ApiError } from '@/lib/api';
 import { useIsAdmin } from '@/lib/auth';
 import { useEnrichCompany } from '@/hooks/useEnrichCompany';
+import type { CrmDashboardSnapshot } from '@bidstack/shared';
 
 // DashboardPage doubles as both the org-wide /dashboard view (no
 // accountId) and the per-customer /accounts/:accountId cockpit. The
@@ -113,12 +115,12 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
     if (!accountId) return null;
     try {
       const stored = sessionStorage.getItem(`bidstack:account-cockpit:${accountId}`);
-      if (stored) return JSON.parse(stored) as NonNullable<typeof dashboard.data>;
+      if (stored) return JSON.parse(stored) as CrmDashboardSnapshot;
     } catch {
       // ignore parse errors
     }
     return null;
-  }, [accountId, dashboard.data]);
+  }, [accountId]);
 
   useEffect(() => {
     if (dashboard.data && accountId) {
@@ -126,7 +128,8 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
     }
   }, [dashboard.data, accountId]);
 
-  const isTransientError = dashboard.isError && (dashboard.error as any)?.status !== 404;
+  const isTransientError =
+    dashboard.isError && !(dashboard.error instanceof ApiError && dashboard.error.status === 404);
   const snapshot = dashboard.data ?? (isTransientError ? cachedSnapshot : null);
 
   if (dashboard.isLoading && !snapshot) {

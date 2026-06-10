@@ -9,6 +9,9 @@
     "pnpm": ">=10.0.0 <11"
   },
   "packageManager": "pnpm@10.0.0",
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": "eslint --quiet --no-warn-ignored"
+  },
   "scripts": {
     "dev": "pnpm -r --parallel --stream dev",
     "dev:web": "pnpm --filter @bidstack/web dev",

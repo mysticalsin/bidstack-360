@@ -259,7 +259,7 @@ export async function crmSummaryRoutes(server: FastifyInstance) {
         },
       },
     },
-    async (req, reply) => {
+    async (req) => {
       // req.auth is decorated globally by the auth plugin (fastify-plugin, so
       // non-encapsulating). The onRequest hook guarantees it is set on every
       // non-public route before we reach this handler.

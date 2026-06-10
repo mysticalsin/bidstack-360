@@ -133,7 +133,6 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/companies',
     {
-      config: { skipGenericAudit: true },
       preHandler: [server.requirePermission('companies:write'), server.requireRole('admin')],
       schema: {
         body: CompanyCreate,
@@ -186,7 +185,6 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.patch(
     '/companies/:id',
     {
-      config: { skipGenericAudit: true },
       preHandler: [server.requirePermission('companies:write'), server.requireRole('admin')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
@@ -269,12 +267,13 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       if (updateResult.count === 0) throw server.httpErrors.notFound('Company not found');
 
       const changedFields: string[] = [];
-      const changes: Record<string, any> = {};
+      const changes: Record<string, unknown> = {};
+      const existingRec = existing as Record<string, unknown>;
       for (const [k, patchVal] of Object.entries(patch)) {
         if (k === 'customFieldValues') continue;
-        if (patchVal !== undefined && (existing as any)[k] !== patchVal) {
+        if (patchVal !== undefined && existingRec[k] !== patchVal) {
           changedFields.push(k);
-          changes[k] = k === 'taxId' ? { changed: true } : { from: (existing as any)[k], to: patchVal };
+          changes[k] = k === 'taxId' ? { changed: true } : { from: existingRec[k], to: patchVal };
         }
       }
 
@@ -285,7 +284,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           action: 'company.update',
           targetType: 'company',
           targetId: req.params.id,
-          diff: { actorKind: 'user', changedFields, changes },
+          diff: { actorKind: 'user', changedFields, changes } as unknown as Prisma.InputJsonValue,
         },
       });
 
@@ -371,7 +370,6 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/companies/:id',
     {
-      config: { skipGenericAudit: true },
       preHandler: [server.requirePermission('companies:write'), server.requireRole('admin')],
       schema: {
         params: z.object({ id: z.string().uuid() }),

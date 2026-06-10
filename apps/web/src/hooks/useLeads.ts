@@ -93,9 +93,9 @@ export function useUpdateLeadById() {
       api<LeadDetail>(`/api/leads/${id}`, { method: 'PATCH', body: patch }),
     onMutate: async ({ id, patch }) => {
       await qc.cancelQueries({ queryKey: [LEADS_KEY] });
-      const snapshots: Array<readonly [readonly unknown[], LeadPage | undefined]> = [];
+      const snapshots: Array<readonly [readonly unknown[], LeadPage | LeadDetail | undefined]> = [];
       qc.getQueriesData<LeadPage | LeadDetail>({ queryKey: [LEADS_KEY] }).forEach(([key, value]) => {
-        snapshots.push([key, value] as any);
+        snapshots.push([key, value]);
         if (!value) return;
         if ('items' in value && Array.isArray(value.items)) {
           qc.setQueryData<LeadPage>(key, {
@@ -103,7 +103,7 @@ export function useUpdateLeadById() {
             items: value.items.map((l) => (l.id === id ? { ...l, ...patch } : l)),
           });
         } else if ('id' in value && value.id === id) {
-          qc.setQueryData<LeadDetail>(key, { ...value, ...patch } as any);
+          qc.setQueryData<LeadDetail>(key, { ...value, ...patch } as LeadDetail);
         }
       });
       return { snapshots };
