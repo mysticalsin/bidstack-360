@@ -127,15 +127,25 @@ export function AgentsPage() {
     },
   ];
 
+  // Keep the dialog OPEN on failure and surface the error — previously the
+  // awaited rejection was void-ed and the failure was completely silent.
   const handleCreate = async (body: Parameters<typeof createAgent.mutateAsync>[0]) => {
-    await createAgent.mutateAsync(body);
-    setDialogOpen(false);
+    try {
+      await createAgent.mutateAsync(body);
+      setDialogOpen(false);
+    } catch {
+      /* error surfaced via createAgent.isError in the dialog */
+    }
   };
 
   const handleUpdate = async (body: Parameters<typeof updateAgent.mutateAsync>[0]) => {
-    await updateAgent.mutateAsync(body);
-    setDialogOpen(false);
-    setEditingAgent(null);
+    try {
+      await updateAgent.mutateAsync(body);
+      setDialogOpen(false);
+      setEditingAgent(null);
+    } catch {
+      /* error surfaced via updateAgent.isError in the dialog */
+    }
   };
 
   return (
@@ -219,6 +229,11 @@ export function AgentsPage() {
           }
         }}
         isPending={createAgent.isPending || updateAgent.isPending}
+        error={
+          (editingAgent ? updateAgent.isError : createAgent.isError)
+            ? `Could not ${editingAgent ? 'update' : 'create'} the agent. Check the details and try again.`
+            : null
+        }
       />
 
       <Dialog

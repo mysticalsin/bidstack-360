@@ -18,6 +18,8 @@ interface AgentDialogProps {
     config: AgentConfig;
   }) => void;
   isPending?: boolean;
+  /** Submit error to surface in the footer (create/update mutation failure). */
+  error?: string | null;
 }
 
 const PHASE_OPTIONS: { value: RfpResponsePhase; label: string }[] = [
@@ -36,7 +38,14 @@ const PHASE_OPTIONS: { value: RfpResponsePhase; label: string }[] = [
   { value: 'post_submission', label: 'Post-submission' },
 ];
 
-export function AgentDialog({ agent, open, onClose, onSubmit, isPending }: AgentDialogProps) {
+export function AgentDialog({
+  agent,
+  open,
+  onClose,
+  onSubmit,
+  isPending,
+  error,
+}: AgentDialogProps) {
   const [name, setName] = useState(agent?.name ?? '');
   const [description, setDescription] = useState(agent?.description ?? '');
   const [systemPrompt, setSystemPrompt] = useState(agent?.systemPrompt ?? '');
@@ -327,6 +336,15 @@ export function AgentDialog({ agent, open, onClose, onSubmit, isPending }: Agent
               </div>
             </div>
           )}
+
+          {error ? (
+            <p
+              role="alert"
+              className="rounded-lg border border-[var(--color-danger,#dc2626)] bg-[color-mix(in_srgb,var(--color-danger,#dc2626)_10%,transparent)] px-3 py-2 text-sm text-[var(--color-danger,#dc2626)]"
+            >
+              {error}
+            </p>
+          ) : null}
 
           <div className="flex justify-between items-center pt-4 border-t border-[var(--border-subtle)] mt-6">
             <div>

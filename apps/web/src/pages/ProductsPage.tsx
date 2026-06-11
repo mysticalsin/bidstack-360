@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { Card } from '@/components/ui/Card';
+import { Modal } from '@/components/ui/Modal';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
@@ -254,16 +255,10 @@ function NewProductDialog({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') onClose();
-      }}
-    >
+    // Modal (Radix) provides the focus trap, initial focus, Escape-to-close,
+    // and return-focus the hand-rolled overlay lacked.
+    <Modal open onClose={onClose} labelId="np-title">
       <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="np-title"
         className="w-full max-w-lg rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] p-6 shadow-lg"
       >
         <div className="mb-4 flex items-center justify-between">
@@ -385,6 +380,6 @@ function NewProductDialog({
           </div>
         </form>
       </div>
-    </div>
+    </Modal>
   );
 }

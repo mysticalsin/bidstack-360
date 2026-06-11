@@ -39,7 +39,10 @@ export const NAV_SECTIONS: NavSection[] = [
     key: 'home',
     title: 'Home',
     icon: 'dashboard',
-    items: [{ to: '/dashboard', label: 'Dashboard', icon: 'dashboard' }],
+    items: [
+      { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
+      { to: '/quick-start', label: 'Quick Start', icon: 'help' },
+    ],
   },
   {
     key: 'sales',
@@ -94,9 +97,12 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: 'tasks',
     items: [
       { to: '/tasks', label: 'Tasks', icon: 'tasks', badgeKey: 'overdueTasks' },
+      { to: '/calendar', label: 'Calendar', icon: 'clock' },
+      { to: '/calls', label: 'Calls', icon: 'phone' },
       { to: '/service-desk', label: 'Service Desk', icon: 'messageCircle' },
       { to: '/workflows', label: 'Workflows', icon: 'git-branch' },
       { to: '/agents', label: 'Dust Agents', icon: 'sparkle' },
+      { to: '/custom-objects', label: 'Custom Objects', icon: 'sliders' },
       { to: '/intake', label: 'Document Intake', icon: 'download' },
       { to: '/reports', label: 'Reports', icon: 'reports' },
     ],

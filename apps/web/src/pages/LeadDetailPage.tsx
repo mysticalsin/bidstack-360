@@ -11,6 +11,7 @@ import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { toast } from '@/components/ui/Toast';
 import { useConvertLead, useDeleteLead, useLead, useUpdateLead } from '@/hooks/useLeads';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
+import { DraftInput, DraftTextarea } from '@/components/ui/DraftInput';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';
 import { formatDate } from '@/lib/format';
@@ -275,29 +276,29 @@ export function LeadDetailPage() {
             <div className="mt-4 grid grid-cols-2 gap-4">
               <div>
                 <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">Budget</label>
-                <input
+                <DraftInput
                   type="text"
-                  value={l.budget ?? ''}
-                  onChange={(e) => debouncedUpdate({ budget: e.target.value || null })}
+                  serverValue={l.budget ?? ''}
+                  commit={(v) => update.mutate({ budget: v || null })}
                   placeholder="e.g. €500K"
                   className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
                 />
               </div>
               <div>
                 <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">Authority</label>
-                <input
+                <DraftInput
                   type="text"
-                  value={l.authority ?? ''}
-                  onChange={(e) => debouncedUpdate({ authority: e.target.value || null })}
+                  serverValue={l.authority ?? ''}
+                  commit={(v) => update.mutate({ authority: v || null })}
                   placeholder="Decision maker"
                   className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
                 />
               </div>
               <div className="col-span-2">
                 <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">Need</label>
-                <textarea
-                  value={l.need ?? ''}
-                  onChange={(e) => debouncedUpdate({ need: e.target.value || null })}
+                <DraftTextarea
+                  serverValue={l.need ?? ''}
+                  commit={(v) => update.mutate({ need: v || null })}
                   placeholder="What problem are they trying to solve?"
                   rows={2}
                   className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
@@ -305,10 +306,10 @@ export function LeadDetailPage() {
               </div>
               <div>
                 <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">Timeline</label>
-                <input
+                <DraftInput
                   type="text"
-                  value={l.timeline ?? ''}
-                  onChange={(e) => debouncedUpdate({ timeline: e.target.value || null })}
+                  serverValue={l.timeline ?? ''}
+                  commit={(v) => update.mutate({ timeline: v || null })}
                   placeholder="e.g. Q2 2026"
                   className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
                 />
@@ -323,10 +324,10 @@ export function LeadDetailPage() {
             <label className="text-sm font-semibold text-[var(--fg-primary)]" htmlFor="lead-notes">
               Notes
             </label>
-            <textarea
+            <DraftTextarea
               id="lead-notes"
-              value={l.notes ?? ''}
-              onChange={(e) => debouncedUpdate({ notes: e.target.value || null })}
+              serverValue={l.notes ?? ''}
+              commit={(v) => update.mutate({ notes: v || null })}
               placeholder="Add notes about this lead…"
               rows={4}
               className="mt-3 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"

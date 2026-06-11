@@ -19,6 +19,7 @@ import { KanbanSkeleton } from '@/components/skeletons/PageSkeletons';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useOpportunities } from '@/hooks/useOpportunities';
+import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { useStageMutation } from '@/hooks/useStageMutation';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { getPipelineStages } from '@/lib/pipeline-stages';
@@ -32,6 +33,10 @@ export function PipelinePage() {
   const navigate = useNavigate();
   const { formatMoney } = useFormatMoney();
   const { data, isLoading, isError, error } = useOpportunities({ limit: 50 });
+  // KPI bar reads the server-side aggregate over the WHOLE pipeline — the
+  // board itself only loads the first 50 cards, so totals/win-rate computed
+  // from `data.items` were silently truncated for any org past 50 deals.
+  const report = usePipelineReport();
   const move = useStageMutation();
 
   // Stage filter via the URL. `?pipelineStageId=...` collapses the board to a
@@ -171,29 +176,34 @@ export function PipelinePage() {
       {!isLoading && data && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-tour="pipeline-kanban">
           {(() => {
-            const opps = data.items;
-            const totalValue = opps.reduce((acc, o) => acc + o.value, 0);
-            const openOpps = opps.filter(
-              (o) =>
-                o.pipelineStage?.name !== 'Closed Won' && o.pipelineStage?.name !== 'Closed Lost',
-            );
-            const openValue = openOpps.reduce((acc, o) => acc + o.value, 0);
-            const closedWon = opps.filter((o) => o.pipelineStage?.name === 'Closed Won').length;
-            const closedLost = opps.filter((o) => o.pipelineStage?.name === 'Closed Lost').length;
+            const rep = report.data;
+            const byStage = rep?.byStage ?? [];
+            const totalValue = byStage.reduce((acc, s) => acc + s.valueSum, 0);
+            const closedWon = byStage.find((s) => s.stage === 'closed_won')?.count ?? 0;
+            const closedLost = byStage.find((s) => s.stage === 'closed_lost')?.count ?? 0;
             const closedTotal = closedWon + closedLost;
             const winRate =
               closedTotal > 0
                 ? `${Math.round((closedWon / closedTotal) * 100)}%`
                 : 'No closed bids';
+            const loading = report.isLoading;
             return [
               {
                 label: 'Total pipeline',
-                value: formatMoney(totalValue, 'EUR'),
+                value: loading ? '…' : formatMoney(totalValue, 'EUR'),
                 tone: 'blue' as const,
               },
-              { label: 'Open value', value: formatMoney(openValue, 'EUR'), tone: 'jade' as const },
-              { label: 'Win rate', value: winRate, tone: 'amber' as const },
-              { label: 'Active deals', value: String(openOpps.length), tone: 'purple' as const },
+              {
+                label: 'Open value',
+                value: loading ? '…' : formatMoney(rep?.totalValueOpen ?? 0, 'EUR'),
+                tone: 'jade' as const,
+              },
+              { label: 'Win rate', value: loading ? '…' : winRate, tone: 'amber' as const },
+              {
+                label: 'Active deals',
+                value: loading ? '…' : String(rep?.totalOpen ?? 0),
+                tone: 'purple' as const,
+              },
             ];
           })().map((kpi) => (
             <div

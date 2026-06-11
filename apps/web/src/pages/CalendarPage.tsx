@@ -71,6 +71,7 @@ const PROVIDER_COLORS: Record<string, string> = {
 export function CalendarPage() {
   const [anchor, setAnchor] = useState<Date>(() => new Date());
   const [showModal, setShowModal] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [providerFilter, setProviderFilter] = useState<
     'all' | 'google_workspace' | 'microsoft_graph'
@@ -223,22 +224,33 @@ export function CalendarPage() {
                 </div>
                 {weekDays.map((day) => {
                   const dayHourEvents = getEventsForDayHour(day, hour);
+                  const openSlot = () => {
+                    const d = new Date(day);
+                    d.setUTCHours(hour);
+                    setSelectedDate(d);
+                    setShowModal(true);
+                  };
+                  const slotLabel = `New event ${day.toLocaleDateString(undefined, {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                  })} at ${String(hour).padStart(2, '0')}:00`;
                   return (
-                    <div
+                    // Keyboard-reachable slot: a real button so Tab focuses it
+                    // and Enter/Space activate it — the old click-only div was
+                    // invisible to keyboard and screen-reader users.
+                    <button
+                      type="button"
                       key={`${toIso(day)}-${hour}`}
-                      className="border-t border-l border-(--color-border) h-16 relative cursor-pointer hover:bg-(--color-surface-hover)/30"
-                      onClick={() => {
-                        const d = new Date(day);
-                        d.setUTCHours(hour);
-                        setSelectedDate(d);
-                        setShowModal(true);
-                      }}
+                      aria-label={slotLabel}
+                      className="border-t border-l border-(--color-border) h-16 relative cursor-pointer text-left w-full hover:bg-(--color-surface-hover)/30 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-(--color-accent)"
+                      onClick={openSlot}
                     >
                       {dayHourEvents.map((ev) => (
-                        <div
+                        <span
                           key={ev.id}
                           title={ev.subject}
-                          className={`absolute inset-x-0.5 top-0.5 rounded px-1 py-0.5 text-xs text-white truncate
+                          className={`absolute inset-x-0.5 top-0.5 rounded px-1 py-0.5 text-xs text-white truncate block
                             ${PROVIDER_COLORS[ev.provider] ?? 'bg-gray-400'}
                             ${ev.syncState === 'CONFLICT' ? 'ring-2 ring-yellow-400' : ''}
                             ${ev.syncState === 'PENDING_PUSH' ? 'opacity-70 italic' : ''}`}
@@ -249,9 +261,9 @@ export function CalendarPage() {
                             </span>
                           )}
                           {ev.subject}
-                        </div>
+                        </span>
                       ))}
-                    </div>
+                    </button>
                   );
                 })}
               </Fragment>
@@ -263,11 +275,24 @@ export function CalendarPage() {
       {showModal && (
         <CreateEventModal
           initialDate={selectedDate}
-          onClose={() => setShowModal(false)}
-          loading={createEvent.isPending}
-          onSave={async (body) => {
-            await createEvent.mutateAsync(body);
+          onClose={() => {
             setShowModal(false);
+            setCreateError(null);
+          }}
+          loading={createEvent.isPending}
+          error={createError}
+          onSave={async (body) => {
+            // Without this catch the rejection was unhandled and the failure
+            // was completely invisible to the user.
+            setCreateError(null);
+            try {
+              await createEvent.mutateAsync(body);
+              setShowModal(false);
+            } catch (err) {
+              setCreateError(
+                err instanceof Error ? err.message : 'Could not create the event. Try again.',
+              );
+            }
           }}
         />
       )}

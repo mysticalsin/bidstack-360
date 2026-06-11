@@ -34,7 +34,7 @@ export function BidNoBidPage() {
   const createScore = useCreateBidScore();
   const aiCalibrate = useAICalibrate();
   const defendScore = useBidScoreDefend();
-  const { data: opps } = useOpportunities({ limit: 50 });
+  const { data: opps, isLoading: oppsLoading, isError: oppsError } = useOpportunities({ limit: 50 });
 
   /* eslint-disable react-hooks/set-state-in-effect */
   // Synchronize editable form state when the fetched score changes.
@@ -112,6 +112,14 @@ export function BidNoBidPage() {
 
   const recommendation = getRecommendation(totalScore);
 
+  // Surface mutation failures — previously Save Score / AI Calibrate / Defend
+  // rejected silently, so a failed save looked identical to a successful one.
+  const actionError =
+    (createScore.isError && 'Could not save the score. Try again.') ||
+    (aiCalibrate.isError && 'AI calibration failed. Try again.') ||
+    (defendScore.isError && 'Could not generate the score defense. Try again.') ||
+    null;
+
   return (
     <>
       <div className="motion-page-head page-head">
@@ -159,6 +167,15 @@ export function BidNoBidPage() {
         </div>
       </div>
 
+      {actionError ? (
+        <div
+          role="alert"
+          className="mb-4 rounded-lg border border-[var(--color-danger,#dc2626)] bg-[color-mix(in_srgb,var(--color-danger,#dc2626)_10%,transparent)] px-4 py-3 text-sm text-[var(--color-danger,#dc2626)]"
+        >
+          {actionError}
+        </div>
+      ) : null}
+
       {/* Opportunity Selector */}
       <GlassCard className="mb-4">
         <label className="text-sm font-medium text-fg-secondary block mb-2">Opportunity</label>
@@ -174,19 +191,30 @@ export function BidNoBidPage() {
             }
           }}
           aria-label="Select opportunity"
+          disabled={oppsLoading || oppsError}
         >
-          <option value="">— Select an opportunity —</option>
+          <option value="">
+            {oppsLoading
+              ? 'Loading opportunities…'
+              : oppsError
+                ? 'Could not load opportunities'
+                : '— Select an opportunity —'}
+          </option>
           {opps?.items.map((o) => (
             <option key={o.id} value={o.id}>
               {o.customer} — {o.name} ({o.stage})
             </option>
           ))}
         </select>
-        {!opportunityId && (
+        {oppsError ? (
+          <p className="text-xs text-[var(--color-danger,#dc2626)] mt-2" role="alert">
+            Opportunities failed to load. Refresh to try again.
+          </p>
+        ) : !opportunityId ? (
           <p className="text-xs text-fg-tertiary mt-2">
             Select an opportunity to enable saving and AI calibration.
           </p>
-        )}
+        ) : null}
       </GlassCard>
 
       <ScoreSummaryStrip

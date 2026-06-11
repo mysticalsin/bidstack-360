@@ -9,9 +9,16 @@ interface CreateEventModalProps {
   onClose: () => void;
   onSave: (body: CreateEventBody) => void;
   loading: boolean;
+  error?: string | null;
 }
 
-export function CreateEventModal({ initialDate, onClose, onSave, loading }: CreateEventModalProps) {
+export function CreateEventModal({
+  initialDate,
+  onClose,
+  onSave,
+  loading,
+  error,
+}: CreateEventModalProps) {
   // WHY: derive baseDateStr inline — avoids importing toIso from the parent module
   const baseDateStr = (initialDate ?? new Date()).toISOString().slice(0, 10);
   const [subject, setSubject] = useState('');
@@ -39,6 +46,14 @@ export function CreateEventModal({ initialDate, onClose, onSave, loading }: Crea
       <div className="bg-(--color-surface) rounded-2xl p-6 shadow-xl w-full max-w-md mx-4 focus:outline-none">
         <h2 className="text-lg font-semibold mb-4 text-(--color-text-primary)">New event</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error ? (
+            <p
+              role="alert"
+              className="rounded-lg border border-(--color-danger) bg-(--color-danger)/10 px-3 py-2 text-sm text-(--color-danger)"
+            >
+              {error}
+            </p>
+          ) : null}
           <div>
             <label
               htmlFor="evt-subject"

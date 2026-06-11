@@ -59,7 +59,13 @@ export function RfpPipelinePage() {
   const proposalId = draftQuery?.data?.proposalId ?? null;
 
   // Latest orchestration for this opportunity — used to resume a run on refresh.
-  const { data: latest } = useRfpLatestOrchestration(opportunityId);
+  const { data: latest, isLoading: latestLoading } = useRfpLatestOrchestration(opportunityId);
+
+  // While we're still fetching the latest orchestration on a fresh load, we
+  // don't yet know whether to resume a run or show the upload zone. Treat that
+  // window as "resolving" so the upload zone doesn't flash before a resumable
+  // run takes over. A fresh upload already in flight is never blocked.
+  const resolvingResume = latestLoading && !orchestrationId && !isUploading && stage === 'idle';
 
   useDocumentTitle();
 
@@ -136,8 +142,18 @@ export function RfpPipelinePage() {
 
       {/* Stage-conditional panels */}
 
+      {/* 0. Resolving resume — avoid flashing the upload zone before we know
+          whether a prior run should be resumed. */}
+      {resolvingResume && (
+        <div
+          className="h-48 animate-pulse rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)]"
+          aria-busy="true"
+          aria-label={t('pipeline.title')}
+        />
+      )}
+
       {/* 1. Idle — show upload zone */}
-      {stage === 'idle' && <RfpUploadZone />}
+      {stage === 'idle' && !resolvingResume && <RfpUploadZone />}
 
       {/* 2. Uploading — show progress bar */}
       {stage === 'queued' && <RfpUploadProgress />}
