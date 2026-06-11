@@ -11,8 +11,18 @@
 //   Both coexist: this component is the "scratch pad" surface; the notes
 //   sidebar remains for structured threaded notes.
 
+import { lazy, Suspense } from 'react';
+
 import { useUser } from '@/lib/auth';
-import { CollaborativeRichTextEditor } from './CollaborativeRichTextEditor';
+
+// Tiptap + Y.js are heavy (~hundreds of KB) and only mount on the three detail
+// pages, below the fold. Lazy-loading splits them into their own async chunk so
+// they no longer inflate the initial detail-page bundle.
+const CollaborativeRichTextEditor = lazy(() =>
+  import('./CollaborativeRichTextEditor').then((m) => ({
+    default: m.CollaborativeRichTextEditor,
+  })),
+);
 
 interface Props {
   entityType: 'opportunity' | 'contact' | 'lead';
@@ -44,19 +54,29 @@ export function CollaborativeNotesSection({
         </span>
       </h2>
 
-      <CollaborativeRichTextEditor
-        yjsOptions={{
-          entityType,
-          entityId,
-          fieldKey,
-          enabled: Boolean(entityId),
-        }}
-        userName={user?.fullName ?? undefined}
-        userId={user?.id ?? undefined}
-        placeholder="Start writing collaborative notes…"
-        readOnly={readOnly || !entityId}
-        className="min-h-[8rem]"
-      />
+      <Suspense
+        fallback={
+          <div
+            className="min-h-[8rem] animate-pulse rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)]"
+            aria-busy="true"
+            aria-label="Loading editor"
+          />
+        }
+      >
+        <CollaborativeRichTextEditor
+          yjsOptions={{
+            entityType,
+            entityId,
+            fieldKey,
+            enabled: Boolean(entityId),
+          }}
+          userName={user?.fullName ?? undefined}
+          userId={user?.id ?? undefined}
+          placeholder="Start writing collaborative notes…"
+          readOnly={readOnly || !entityId}
+          className="min-h-[8rem]"
+        />
+      </Suspense>
     </section>
   );
 }

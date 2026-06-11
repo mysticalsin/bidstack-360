@@ -31,13 +31,14 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
         : [...VALID_TYPES];
 
       const totalCap = 30;
-      const results: Array<z.infer<typeof SearchResponse>['items'][number]> = [];
-
-      const addResults = (items: typeof results) => {
-        const remaining = totalCap - results.length;
-        if (remaining > 0) {
-          results.push(...items.slice(0, remaining));
-        }
+      type SearchItem = z.infer<typeof SearchResponse>['items'][number];
+      const buckets: SearchItem[][] = [];
+      // Each type pushes its mapped rows into its own bucket; buckets are
+      // concatenated, score-sorted, and capped AFTER all queries resolve — so
+      // the global cap keeps the highest-scoring matches regardless of type
+      // order (the old running cap could drop a better match from a later type).
+      const addResults = (items: SearchItem[]) => {
+        buckets.push(items);
       };
 
       const like = `%${q}%`;
@@ -52,7 +53,10 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
         return 0;
       }
 
+      const queries: Array<Promise<unknown>> = [];
+
       if (requestedTypes.includes('opportunity')) {
+        queries.push((async () => {
         // Leverage the GIN trigram index on (customer || ' ' || name || ' ' || code).
         const opps = await prisma.$queryRaw<
           Array<{ id: string; code: string; customer: string; name: string }>
@@ -75,9 +79,11 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
             score: score(o.code, o.name, o.customer),
           })),
         );
+        })());
       }
 
       if (requestedTypes.includes('contact')) {
+        queries.push((async () => {
         const contacts = await prisma.contact.findMany({
           where: {
             orgId: req.auth.orgId,
@@ -100,9 +106,11 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
             score: score(c.name, c.email, c.role, c.customer),
           })),
         );
+        })());
       }
 
       if (requestedTypes.includes('company')) {
+        queries.push((async () => {
         const companies = await prisma.companyEnrichment.findMany({
           where: {
             orgId: req.auth.orgId,
@@ -125,9 +133,11 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
             score: score(c.normalizedName, c.domain, c.tradeName),
           })),
         );
+        })());
       }
 
       if (requestedTypes.includes('task')) {
+        queries.push((async () => {
         const tasks = await prisma.task.findMany({
           where: {
             orgId: req.auth.orgId,
@@ -146,9 +156,11 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
             score: score(t.title),
           })),
         );
+        })());
       }
 
       if (requestedTypes.includes('note')) {
+        queries.push((async () => {
         const notes = await prisma.note.findMany({
           where: {
             orgId: req.auth.orgId,
@@ -170,9 +182,11 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
             score: score(n.title) + (n.bodyMd.toLowerCase().includes(lowerQ) ? 5 : 0),
           })),
         );
+        })());
       }
 
       if (requestedTypes.includes('sales_order')) {
+        queries.push((async () => {
         const orders = await prisma.salesOrder.findMany({
           where: {
             orgId: req.auth.orgId,
@@ -194,10 +208,18 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
             score: score(o.number, o.customerName),
           })),
         );
+        })());
       }
 
-      // Sort by relevance descending so the highest-quality matches surface first.
-      results.sort((a, b) => b.score - a.score);
+      // All per-type queries run concurrently (was strictly sequential).
+      await Promise.all(queries);
+
+      // Sort by relevance descending so the highest-quality matches surface
+      // first, then apply the global cap so it keeps the best across all types.
+      const results = buckets
+        .flat()
+        .sort((a, b) => b.score - a.score)
+        .slice(0, totalCap);
 
       return { items: results };
     },

@@ -54,7 +54,25 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
                   }
                 : {}),
             },
-            include: {
+            // Explicit select (not include) so the large `intel` JSONB column
+            // is NOT fetched for every list row — the list serializer never
+            // returns it (only the detail endpoint does).
+            select: {
+              id: true,
+              code: true,
+              customer: true,
+              name: true,
+              stage: true,
+              pipelineStageId: true,
+              valueMicros: true,
+              probability: true,
+              dueDate: true,
+              industry: true,
+              logoUrl: true,
+              country: true,
+              territoryId: true,
+              updatedAt: true,
+              viewCount: true,
               owner: { select: { id: true, name: true, email: true } },
               territory: { select: { name: true } },
               pipelineStage: {

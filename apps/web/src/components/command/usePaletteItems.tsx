@@ -16,6 +16,7 @@ import { CompanyLogo } from '@/components/company/CompanyLogo';
 import { useCommandContextStore } from '@/hooks/useCommandContext';
 import { useContacts } from '@/hooks/useContacts';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useGlobalSearch } from '@/hooks/useGlobalSearch';
 import { useTasks } from '@/hooks/useTasks';
 import { useAgents } from '@/hooks/useAgents';
@@ -58,16 +59,23 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
   const allRecents = useAccountHistory((s) => s.recents);
   const accountRecents = useMemo(() => allRecents.slice(0, 3), [allRecents]);
 
+  // Debounce the query feeding the two SERVER searches so they fire once the
+  // user pauses, not on every keystroke (was 2 network calls per character).
+  // Local/in-memory filtering below keeps using the live `query` for instant
+  // feedback.
+  const debouncedQuery = useDebouncedValue(query, 200);
+
   const oppSearch = useQuery({
-    enabled: query.trim().length >= 2,
-    queryKey: ['palette:opps', query],
+    enabled: debouncedQuery.trim().length >= 2,
+    queryKey: ['palette:opps', debouncedQuery],
     queryFn: ({ signal }) =>
-      api<OpportunityPage>(`/api/opportunities?search=${encodeURIComponent(query)}&limit=8`, {
-        signal,
-      }),
+      api<OpportunityPage>(
+        `/api/opportunities?search=${encodeURIComponent(debouncedQuery)}&limit=8`,
+        { signal },
+      ),
   });
 
-  const globalSearch = useGlobalSearch(query);
+  const globalSearch = useGlobalSearch(debouncedQuery);
 
   // Dashboard snapshot is already in React Query cache once the user has
   // visited the dashboard — effectively free here.

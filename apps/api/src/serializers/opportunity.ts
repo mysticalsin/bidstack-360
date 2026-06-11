@@ -33,7 +33,9 @@ type SerializedOpportunity = {
   territoryId: string | null;
   updatedAt: Date;
   viewCount: number | null;
-  intel: unknown;
+  // Only the detail/full path reads intel; the list query omits the column to
+  // avoid fetching the large JSONB per row, so this is optional here.
+  intel?: unknown;
 };
 type WithOwner = SerializedOpportunity & { owner: SerializedOwner | null };
 type Full = WithOwner & {
