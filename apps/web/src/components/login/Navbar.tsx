@@ -33,10 +33,10 @@ export function Navbar() {
     >
       {/* Left Side (logo) */}
       <div className="flex-1 hidden md:flex flex-col items-start justify-center">
-        <img 
-          src="/logo-clear.png" 
-          alt="BidStack360" 
-          className="h-16 md:h-20 lg:h-24 w-auto object-contain -ml-2" 
+        <img
+          src="/logo-clear.png"
+          alt="BidStack360"
+          className="h-24 md:h-32 lg:h-40 w-auto object-contain -ml-2"
         />
       </div>
 
@@ -58,10 +58,10 @@ export function Navbar() {
 
       {/* Mobile Logo */}
       <div className="md:hidden flex flex-col items-start justify-center">
-        <img 
-          src="/logo-clear.png" 
-          alt="BidStack360" 
-          className="h-12 w-auto object-contain -ml-1" 
+        <img
+          src="/logo-clear.png"
+          alt="BidStack360"
+          className="h-16 w-auto object-contain -ml-1"
         />
       </div>
 

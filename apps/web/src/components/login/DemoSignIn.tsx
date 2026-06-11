@@ -87,7 +87,7 @@ export function DemoSignIn() {
             <img
               src="/brand/bidstack360-logo.png"
               alt="BidStack 360"
-              className="h-8 w-auto drop-shadow-sm sm:h-9 md:h-10"
+              className="h-12 w-auto drop-shadow-sm sm:h-14 md:h-16 lg:h-20"
               width={1170}
               height={315}
             />

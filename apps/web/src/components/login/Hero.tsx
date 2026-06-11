@@ -49,22 +49,21 @@ export function Hero() {
               Win More Bids
             </motion.h1>
 
-            <motion.p
-              className="text-sm sm:text-base md:text-lg text-[#3A404D] drop-shadow-sm opacity-90 leading-relaxed max-w-xl font-normal"
+            <motion.div
+              className="mt-6 flex flex-col items-center bg-white/50 backdrop-blur-xl border border-white/40 shadow-[0_8px_32px_rgba(0,0,0,0.1)] rounded-[2rem] px-6 py-5 sm:px-10 sm:py-6 max-w-2xl"
               {...pAnim}
               transition={{ duration: 0.8, delay: 0.4 }}
             >
-              The complete operating system for enterprise presales. Manage RFPs, generate proposals, and track compliance in one workspace.
-            </motion.p>
+              <p className="text-sm sm:text-base md:text-lg text-[#1e232e] font-medium leading-relaxed mb-4">
+                The complete operating system for enterprise presales. Manage RFPs, generate
+                proposals, and track compliance in one workspace.
+              </p>
 
-            <motion.div
-              className="mt-4"
-              {...pAnim}
-              transition={{ duration: 0.8, delay: 0.5 }}
-            >
-              <a 
-                href="https://github.com/tonywalteur" 
-                className="text-sm font-medium text-[#2d323c] drop-shadow-sm hover:text-black underline underline-offset-4 transition-colors"
+              <div className="w-12 h-[2px] bg-[rgba(30,50,90,0.15)] mb-4 rounded-full" />
+
+              <a
+                href="https://github.com/tonywalteur"
+                className="text-xs sm:text-sm font-bold tracking-wider text-[rgba(30,50,90,0.9)] hover:text-black uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
               >
                 Built by Tony Walteur
               </a>
