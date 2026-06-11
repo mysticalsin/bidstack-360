@@ -300,9 +300,13 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       //    ('migration.chunk.imported'), which is the only way to find
       //    imported Contacts/Opportunities (no source column on those models).
       const sourceTag = `migration:${job.id}`;
+      // Bounded: one import fans out to many chunks, but the cap keeps the
+      // query within the query-guard's unbounded-findMany limit. A 10k-row
+      // import is 100 chunks at chunkSize 100, well under this.
       const chunkLogs = await prisma.auditLog.findMany({
         where: { orgId, action: 'migration.chunk.imported', targetId: job.id },
         select: { diff: true },
+        take: 1000,
       });
       const idsByEntity: Record<string, string[]> = {};
       for (const log of chunkLogs) {
@@ -311,24 +315,37 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         (idsByEntity[diff.entity] ??= []).push(...diff.createdIds);
       }
 
+      const oppIds = idsByEntity['opportunity'] ?? [];
+      const contactIds = idsByEntity['contact'] ?? [];
+      const companyIds = idsByEntity['company'] ?? [];
+      const leadIds = idsByEntity['lead'] ?? [];
+
       // Children first (FK order): opportunities/contacts reference companies.
+      // Skip the delete entirely when there are no audit-tracked ids — Prisma
+      // rejects an empty `{ in: [] }` as a validation error (-> 400).
       const [opportunities, contacts] = await Promise.all([
-        prisma.opportunity.deleteMany({
-          where: { orgId, id: { in: idsByEntity['opportunity'] ?? [] } },
-        }),
-        prisma.contact.deleteMany({ where: { orgId, id: { in: idsByEntity['contact'] ?? [] } } }),
+        oppIds.length
+          ? prisma.opportunity.deleteMany({ where: { orgId, id: { in: oppIds } } })
+          : Promise.resolve({ count: 0 }),
+        contactIds.length
+          ? prisma.contact.deleteMany({ where: { orgId, id: { in: contactIds } } })
+          : Promise.resolve({ count: 0 }),
       ]);
       const [companies, leads] = await Promise.all([
         prisma.company.deleteMany({
           where: {
             orgId,
-            OR: [{ source: sourceTag }, { id: { in: idsByEntity['company'] ?? [] } }],
+            ...(companyIds.length
+              ? { OR: [{ source: sourceTag }, { id: { in: companyIds } }] }
+              : { source: sourceTag }),
           },
         }),
         prisma.lead.deleteMany({
           where: {
             orgId,
-            OR: [{ source: sourceTag }, { id: { in: idsByEntity['lead'] ?? [] } }],
+            ...(leadIds.length
+              ? { OR: [{ source: sourceTag }, { id: { in: leadIds } }] }
+              : { source: sourceTag }),
           },
         }),
       ]);
