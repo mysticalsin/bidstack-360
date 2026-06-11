@@ -89,10 +89,12 @@ export const LeadCreate = z.object({
   score: z.number().int().min(0).max(100).default(0),
   ownerId: z.string().uuid().optional(),
   notes: z.string().max(5000).optional(),
-  budget: z.string().max(20).optional(),
-  authority: z.string().max(20).optional(),
-  need: z.string().max(20).optional(),
-  timeline: z.string().max(20).optional(),
+  // BANT fields are free-text in the UI ("What problem are they trying to
+  // solve?") — max(20) rejected any real sentence with a 400.
+  budget: z.string().max(500).optional(),
+  authority: z.string().max(500).optional(),
+  need: z.string().max(500).optional(),
+  timeline: z.string().max(500).optional(),
 });
 export type LeadCreate = z.infer<typeof LeadCreate>;
 
@@ -110,10 +112,11 @@ export const LeadPatch = z
     score: z.number().int().min(0).max(100).optional(),
     ownerId: z.string().uuid().optional().nullable(),
     notes: z.string().max(5000).optional().nullable(),
-    budget: z.string().max(20).optional().nullable(),
-    authority: z.string().max(20).optional().nullable(),
-    need: z.string().max(20).optional().nullable(),
-    timeline: z.string().max(20).optional().nullable(),
+    // Same free-text rationale as LeadCreate — 20 chars 400'd real sentences.
+    budget: z.string().max(500).optional().nullable(),
+    authority: z.string().max(500).optional().nullable(),
+    need: z.string().max(500).optional().nullable(),
+    timeline: z.string().max(500).optional().nullable(),
     customFieldValues: z.array(CustomFieldValueInput).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
