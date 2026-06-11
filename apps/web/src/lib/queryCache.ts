@@ -85,7 +85,26 @@ function shouldPersistQueryKey(key: unknown[]): boolean {
   return true;
 }
 
+let pagehideBound = false;
+
 export function persistCache(queryClient: QueryClient): void {
+  // Flush any pending debounced write before the page is hidden/closed so a
+  // close inside the debounce window doesn't lose the last updates.
+  if (!pagehideBound && typeof window !== 'undefined') {
+    pagehideBound = true;
+    const flushOnHide = () => {
+      if (flushTimer) {
+        clearTimeout(flushTimer);
+        flushTimer = null;
+      }
+      flushStore();
+    };
+    window.addEventListener('pagehide', flushOnHide);
+    window.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flushOnHide();
+    });
+  }
+
   const cache = queryClient.getQueryCache();
   cache.subscribe((event) => {
     if (event.type !== 'updated' || event.query.state.status !== 'success') return;
@@ -111,8 +130,10 @@ export function persistCache(queryClient: QueryClient): void {
 export function hydrateCache(queryClient: QueryClient): void {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return;
-    const stored = JSON.parse(raw) as Record<string, PersistedEntry>;
+    // Prefer localStorage (a real page reload); fall back to the in-memory
+    // mirror for SPA soft-navigation where a debounced write hasn't flushed yet.
+    const stored = raw ? (JSON.parse(raw) as Record<string, PersistedEntry>) : (store ?? {});
+    if (Object.keys(stored).length === 0) return;
     store = stored; // seed the in-memory mirror so later writes don't re-read
     const now = Date.now();
 
