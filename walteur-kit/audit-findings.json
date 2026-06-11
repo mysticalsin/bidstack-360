@@ -1,0 +1,1237 @@
+{
+  "confirmed": [
+    {
+      "title": "Provider webhook routes lack `public:true` — blocked by Clerk auth in production",
+      "severity": "major",
+      "file": "apps/api/src/routes/integrations/twilio.ts",
+      "line": 42,
+      "evidence": "app.post(\n  '/twilio/webhook/status',\n  {\n    schema: {  // <-- NO `config: { public: true }`\n      description: 'Twilio delivery status webhook',",
+      "why": "The auth plugin's global onRequest hook (auth.ts:368-387) returns early ONLY when `req.routeOptions?.config?.public` is set; otherwise it runs verifyClerkAuth, which throws 401 when no Bearer token is present. Twilio/Microsoft Graph/Zoom send no Clerk JWT, so in production (CLERK_SECRET_KEY set) every one of these provider webhooks 401s before its handler/signature check ever runs. The same omission exists in integrations/twilio.ts (status+inbound), integrations/microsoft-webhook.ts (GET validation handshake + POST notifications, lines 54/75), and integrations/calls-webhooks.ts (zoom line 48 only sets `rawBody:true`, teams line 159, twilio-voice line 242). Result: SMS delivery-status/inbound, Outlook incremental mail sync, and Zoom/Teams/Twilio call-recording ingestion are all dead in production. Tests pass because in NODE_ENV=test the loopback stub auth (auth.ts:43-55) succeeds for 127.0.0.1, masking the break.",
+      "fix": "Add `config: { public: true }` (the routes already self-protect via X-Twilio-Signature / clientState / Zoom signature) to every provider webhook route, matching the pattern already used by /webhooks/dust, slack-commands, slack/events, and signatures/webhook/docusign.",
+      "effort": "S",
+      "dimension": "security-tenancy",
+      "fid": "security-tenancy-0",
+      "verdict": {
+        "isReal": true,
+        "confidence": "high",
+        "corrected_severity": "major",
+        "notes": "Confirmed at every cited location. The global fp-wrapped auth onRequest hook (apps/api/src/plugins/auth.ts:368-392, registered server.ts:178 before routes at :207) bypasses auth ONLY when req.routeOptions?.config?.public is set; otherwise with CLERK_SECRET_KEY present it calls verifyClerkAuth which throws 401 at auth.ts:89-91 when no Bearer token exists. None of the provider webhook routes set config.public: twilio.ts:42 and :121 (schema only), microsoft-webhook.ts:54 and :75 (schema only), calls-webhooks.ts:48 (config:{rawBody:true} only), :159, :242, plus an uncited eighth route at :338 (/twilio-voice/twiml/:callSessionId) also affected. No compensating controls: no onRoute hook, no path-based skip, providers send no x-api-key; sibling public routes (zapier.ts, slack.ts:354, webhooks.ts:116 dust, signatures.ts:268, public-nps.ts, track.ts, health.ts) all explicitly use config:{public:true}, proving it is the sole opt-out mechanism. Comments in server.routes.ts:206/219/232 (\"NO auth prefix\", \"Unauthenticated webhook routes\") document intent but no prefix-based exemption exists — intent/implementation mismatch. Test masking is consistent: NODE_ENV=test without CLERK_SECRET_KEY falls to loopback stub auth (auth.ts:43-77), and fastify inject originates from 127.0.0.1. Severity stays major: fails closed (401 before handler, no data exposure), but in production with Clerk all provider webhooks are dead — SMS status/inbound (incl. TCPA STOP opt-out ingestion), Outlook incremental sync, Zoom/Teams/Twilio call events, recording ingestion, and TwiML generation (breaks outbound calls mid-flow). Fix: add config:{public:true} per route (preserving rawBody:true on zoom)."
+      }
+    },
+    {
+      "title": "Booking cancel link in confirmation email points to a non-existent route (404) — attendees can never cancel",
+      "severity": "major",
+      "file": "apps/api/src/routes/bookings.helpers.ts",
+      "line": 80,
+      "evidence": "const cancelUrl = `${appBaseUrl}/api/v1/public/bookings/${params.bookingId}/cancel?token=${params.cancelToken}`;  — but the route is registered as '/bookings/:id/cancel' (bookings-public.ts:357) under prefix '/api/v1' (server.routes.ts:189: await server.register(bookingsRoutes, { prefix: '/api/v1' });), i.e. /api/v1/bookings/:id/cancel. No route exists at /api/v1/public/bookings/... and the rewriteUrl hook (server.ts:56) only rewrites '/api/' -> '/api/v1/', never strips 'public'.",
+      "why": "Per the design comment in bookings-public.ts (lines 7-8), the cancelToken is delivered ONLY in the confirmation email. Every attendee who clicks 'cancel' gets a 404, so public self-cancellation is broken end-to-end; slots stay blocked and hosts get no-shows with no way for the invitee to free the slot. The unit test (booking-email.test.ts:34) asserts the wrong URL string, so tests pass while the feature is dead.",
+      "fix": "Change cancelUrl to `${appBaseUrl}/api/v1/bookings/${params.bookingId}/cancel?token=...` (or register the public route at '/public/bookings/:id/cancel' to match), and update booking-email.test.ts to assert against the real registered route.",
+      "effort": "S",
+      "dimension": "api-correctness-a",
+      "fid": "api-correctness-a-0",
+      "verdict": {
+        "isReal": true,
+        "confidence": "high",
+        "corrected_severity": "major",
+        "notes": "Claim verified end-to-end; I tried to refute it and could not. Evidence chain: (1) D:\\BIDCRM\\apps\\api\\src\\routes\\bookings.helpers.ts:80 builds `${appBaseUrl}/api/v1/public/bookings/${params.bookingId}/cancel?token=...`. (2) The cancel route is defined at '/bookings/:id/cancel' (D:\\BIDCRM\\apps\\api\\src\\routes\\bookings-public.ts:355-357), registered via the orchestrator D:\\BIDCRM\\apps\\api\\src\\routes\\bookings.ts:12-15 with NO extra prefix, under prefix '/api/v1' (D:\\BIDCRM\\apps\\api\\src\\server.routes.ts:189) — so the real endpoint is GET /api/v1/bookings/:id/cancel. bookingsPublicRoutes is registered exactly once repo-wide (grep confirmed); there is no second mount under a '/public' prefix. (3) Compensating controls checked and absent: the rewriteUrl hook (D:\\BIDCRM\\apps\\api\\src\\server.ts:54-60) only rewrites '/api/x' -> '/api/v1/x' when the URL does NOT already start with '/api/v'; '/api/v1/public/bookings/...' passes through untouched and never has 'public' stripped. The api-versioning plugin (apps/api/src/plugins/api-versioning.ts) only validates the version segment, no URL munging. No setNotFoundHandler/catch-all anywhere in apps/api/src. Vite dev/preview proxies pass '/api' through with no path rewrite (apps/web/vite.config.ts:62-77). Repo-wide grep for 'public/bookings' hits only the helper and its test. (4) The 'public' segment was likely copied from the NPS pattern — public-nps.ts genuinely defines '/public/nps/:token' paths inside the plugin; bookings-public.ts does not. (5) Impact confirmed: per the design comment (bookings-public.ts:7-8) cancelToken is delivered only in the confirmation email; the 201 response does return cancelToken but grep shows zero frontend usage of it (apps/web/src), so the email link is the sole cancel path and it 404s. The unit test (apps/api/src/routes/booking-email.test.ts:34) asserts the exact wrong URL, locking in the bug. Severity corrected critical -> major: the attendee self-cancel feature is completely dead, but there is no security exposure, data loss, or outage; booking creation, calendar push, and the rest of the flow work, and hosts can still manage events from their own calendar. One-line fix (drop '/public' from the URL, or add a route alias) plus updating the test assertion."
+      }
+    },
+    {
+      "title": "Public booking creation has a TOCTOU race — two concurrent requests can double-book the same slot",
+      "severity": "major",
+      "file": "apps/api/src/routes/bookings-public.ts",
+      "line": 273,
+      "evidence": "if (!availableSlots.includes(slotIso)) { throw server.httpErrors.conflict(...); }\nconst booking = await prisma.booking.create({ data: { ... status: 'CONFIRMED' } });  — the availability read (lines 223-270) and the create (line 277) are not in a transaction, and schema.prisma's Booking model has no unique constraint on (bookingPageId, startAt) — only @@index([orgId, bookingPageId, startAt]) (schema.prisma:3370).",
+      "why": "Two attendees submitting the same slot within the check-then-create window (which spans 2 DB queries + slot computation) both pass the includes() check and both get CONFIRMED bookings for the same time. The 5/hour rate limit is per-IP and does not prevent this. Double-booked sales calls are the cardinal failure of a scheduling feature.",
+      "fix": "Add a partial unique index on (bookingPageId, startAt) WHERE status = 'CONFIRMED' AND deleted_at IS NULL, catch P2002 and return 409; or wrap check+create in a serializable transaction / pg advisory lock keyed on (bookingPageId, startAt). Also wrap booking.create + calendarEvent.create + booking.update (lines 277-314) in one transaction so a mid-flight failure can't leave a booking without its calendar event.",
+      "effort": "M",
+      "dimension": "api-correctness-a",
+      "fid": "api-correctness-a-1",
+      "verdict": {
+        "isReal": true,
+        "confidence": "high",
+        "corrected_severity": "major",
+        "notes": "Confirmed TOCTOU race in apps/api/src/routes/bookings-public.ts POST /booking-pages/:slug/bookings. Availability check (lines 223-275: two findMany queries + computeSlots + includes() at line 273) and booking.create (line 277, status CONFIRMED) are separate non-transactional operations spanning multiple awaited DB round trips — two concurrent requests both pass the check and both insert. Exhaustively verified there are NO compensating controls: (1) schema.prisma:3345-3375 Booking has only @unique on cancelToken; @@index([orgId, bookingPageId, startAt]) is non-unique, so the second insert succeeds; (2) migrations contain no exclusion constraint, no tstzrange/btree_gist, no overlap trigger — only unique indexes are cancel_token and booking_pages(org_id, slug); (3) idempotency plugin (plugins/idempotency.ts:185-187) requires Idempotency-Key header AND authenticated userId, so it cannot apply to this public endpoint and wouldn't dedupe two different attendees anyway; (4) no Redis per-slot lock anywhere in apps/api/src; (5) Prisma middleware is only PII-encryption + soft-delete, no write serialization; (6) no worker-side conflict reconciliation; (7) rate limit is per-IP (keyGenerator: req.ip, 5/hour) — irrelevant for two attendees on different IPs. Severity \"major\" is correct: double-booking is the core correctness failure of scheduling, trivially triggerable, but not a security/tenant-isolation/data-loss issue. Fix: partial unique index on (booking_page_id, start_at) WHERE status='CONFIRMED' AND deleted_at IS NULL (or a tstzrange EXCLUDE constraint to also catch overlapping non-identical slots) + catch P2002 and return 409."
+      }
+    },
+    {
+      "title": "Availability endpoint returns next-day slots (unchecked against next-day events) for all UTC+ timezones",
+      "severity": "major",
+      "file": "apps/api/src/routes/bookings-public.ts",
+      "line": 90,
+      "evidence": "const rangeStart = new Date(`${date}T12:00:00Z`);\nconst rangeEnd = new Date(`${date}T23:59:59Z`);  — computeSlots then does `let cursor = startOfDayInTz(rangeStart, tz); while (cursor <= rangeEnd) { ... cursor = new Date(cursor.getTime() + dayMs); }` (availability.ts:76-113). For Europe/Paris, startOfDayInTz = date-1T22:00Z; the second iteration cursor = dateT22:00Z is still <= dateT23:59:59Z, so the loop generates the FULL next local day too.",
+      "why": "For every timezone east of UTC (including Paris, where Mantu operates), GET /booking-pages/:slug/availability?date=X returns slots for X AND X+1 mixed together. Worse, blocking events were only fetched up to fetchEnd = XT23:59:59Z+buffer (line 107), so the phantom next-day slots ignore the owner's real next-day meetings — users can pick a 'free' slot that collides with an existing event.",
+      "fix": "Compute rangeEnd as end-of-day in the requested tz (e.g. startOfDayInTz(date, tz) + 24h − 1ms) instead of a fixed `T23:59:59Z`, and derive the event-fetch window from those tz-correct bounds; alternatively have computeSlots stop after one day when a single date is requested.",
+      "effort": "M",
+      "dimension": "api-correctness-a",
+      "fid": "api-correctness-a-2",
+      "verdict": {
+        "isReal": true,
+        "confidence": "high",
+        "corrected_severity": "major",
+        "notes": "CONFIRMED by direct trace. (1) apps/api/src/routes/bookings-public.ts:90-91 sets rangeStart=dateT12:00:00Z, rangeEnd=dateT23:59:59Z. (2) packages/shared/src/calendar/availability.ts:76-78,113: cursor=startOfDayInTz(rangeStart,tz); loop condition `cursor <= rangeEnd`; cursor+=24h. For any UTC+h tz (h>0), startOfDayInTz(noon UTC)=dateT(-h):00Z, so the second iteration cursor=dateT(24-h):00Z which is <= dateT23:59:59Z — e.g. Europe/Paris CEST: first cursor date-1T22:00Z, second cursor dateT22:00Z. Iteration 2's zoned date parts resolve to date+1 local, so applyTimeInTz generates FULL next-local-day windows; the inner loop never checks slotStart against rangeStart/rangeEnd, so all next-day slots are returned. For UTC and UTC- timezones the second cursor exceeds rangeEnd, so the bug is UTC+-only, exactly as claimed. (3) Blocking data is fetched only up to fetchEnd=dateT23:59:59Z+buffer (lines 105-135), so next-day events/bookings starting after that are invisible — phantom slots ignore the owner's real next-day calendar. (4) No compensating controls: apps/web/src/pages/PublicBookingPage.tsx maps availability.slots directly (line 181) with no date filter, and sends the visitor's browser tz (line 43) — Paris visitors hit this on every request. availability.test.ts covers only UTC and America/New_York, so the UTC+ branch is untested. ONE impact correction: a colliding phantom slot cannot become a persisted double-booking — the POST /bookings handler re-fetches events overlapping the chosen slot and re-runs computeSlots for the slot's actual local day (lines 216-275), rejecting with 409. So the harm is: wrong availability shown for every UTC+ visitor (next-day slots mixed under the selected day), 409 failures on slots presented as free, and successful bookings on a day the user never selected (non-colliding phantom slots pass validation). Core-feature correctness defect in the product's primary market timezone; severity major stands."
+      }
+    },
+    {
+      "title": "AI bid-score calibration micros threshold off by 1000x — comment says >10M EUR but code triggers at €10k",
+      "severity": "major",
+      "file": "apps/api/src/routes/bid-scores.ts",
+      "line": 328,
+      "evidence": "if (opp.valueMicros > 10_000_000_000) {\n  // > 10M EUR in micros\n  calibratedCriteria.deal_size = 5;\n}  — 10M EUR in micros is 10,000,000 × 1,000,000 = 10^13; 10_000_000_000 is 10^10 = €10,000.",
+      "why": "Money stored in micros (CLAUDE.md hard convention) mixed with a unit-scale constant. Virtually every opportunity above €10k gets deal_size auto-maxed to 5, inflating the AI-calibrated totalScore and skewing the bid/no-bid recommendation toward 'bid' for small deals — the exact judgment this feature exists to protect.",
+      "fix": "Change the constant to 10_000_000_000_000n (10^13) or express it as 10_000_000 * 1_000_000, and add a MICROS multiplier constant so the unit is explicit.",
+      "effort": "S",
+      "dimension": "api-correctness-a",
+      "fid": "api-correctness-a-3",
+      "verdict": {
+        "isReal": true,
+        "confidence": "high",
+        "corrected_severity": "major",
+        "notes": "Confirmed. apps/api/src/routes/bid-scores.ts:328 compares BigInt valueMicros (stored ×1e6 per schema + seeds: packages/db/prisma/schema.prisma:372, packages/db/src/seed.ts:126, seed-org-data.ts eur()) against 10_000_000_000 = 1e10 micros = EUR 10k, while the comment/intent is >10M EUR = 1e13 micros. 1000x off. BigInt>Number comparison is valid JS so it fires silently. All seeded deals (EUR 430k-2.4M) trigger the boost; none would at the intended threshold, so deal_size is auto-maxed to 5 for essentially every real deal. Quantified impact: deal_size weight 10/100, 3->5 adds exactly +4 to totalScore, flipping 71-74 scores across the >=75 'bid' threshold. The buggy heuristic runs regardless of DUST_API_KEY (hasDust only alters reasoning text). No compensating Prisma extension/middleware transforms money units. Mitigations that keep it from critical: the ai-calibrate result is a non-persisted suggestion that overwrites the draft form (BidNoBidPage.tsx:61) but the user can edit before saving. Major stands: 1000x unit error in core bid/no-bid decision-support logic that renders the deal-size criterion non-discriminating and skews AI suggestions toward 'bid'."
+      }
+    },
+    {
+      "title": "GET /calls cursor pagination filters by random UUID order while sorting by scheduledAt — pages duplicate and skip rows",
+      "severity": "major",
+      "file": "apps/api/src/routes/calls.read.routes.ts",
+      "line": 55,
+      "evidence": "...(cursor ? { id: { lt: cursor } } : {}),\n},\norderBy: { scheduledAt: 'desc' },  — id is a random UUID (no correlation with scheduledAt), so `id < cursor` excludes an arbitrary ~half of all sessions, then re-sorts the remainder by scheduledAt.",
+      "why": "Page 2 of the call list re-returns rows already shown on page 1 (any row whose UUID happens to be < the cursor) and permanently hides rows whose UUID is >= the cursor — infinite-scroll on the calls panel shows duplicates and silently loses calls. Also scheduledAt is NULL for quick-start calls, which Postgres sorts NULLS FIRST under DESC, pushing instant calls to the top regardless of recency.",
+      "fix": "Use Prisma's cursor: { id } with a deterministic compound orderBy [{ scheduledAt: 'desc' }, { id: 'desc' }] and skip: 1 (as accounts.ts does), or fall back to createdAt-based keyset pagination with id tiebreaker.",
+      "effort": "S",
+      "dimension": "api-correctness-a",
+      "fid": "api-correctness-a-4",
+      "verdict": {
+        "isReal": true,
+        "confidence": "high",
+        "corrected_severity": "major",
+        "notes": "Confirmed. apps/api/src/routes/calls.read.routes.ts:55 filters `id: { lt: cursor }` while line 57 sorts `scheduledAt: 'desc'`, and line 86 emits the last row's id as nextCursor. CallSession.id is @default(uuid()) (random v4, packages/db/prisma/schema.prisma:4015), so the cursor predicate is uncorrelated with the sort key: page 2 re-returns page-1 rows whose UUID < cursor and permanently excludes rows whose UUID >= cursor. The path is live: apps/web/src/hooks/useCalls.ts (useInfiniteQuery, passes nextCursor back as cursor) and apps/web/src/pages/CallsPage.tsx (Load more -> fetchNextPage, pages.flatMap with no dedup). No tiebreaker orderBy, no Prisma cursor keyset, no global middleware compensates. NULL sub-claim also verified: quick-start calls (calls.write.routes.ts:118) never set scheduledAt (DateTime? in schema), and Prisma plain 'desc' yields Postgres default NULLS FIRST, pinning instant calls to the top. Same broken pattern repeated in apps/api/src/routes/integrations/twilio.ts:261. Major is the right severity: user-visible duplicates and silently hidden calls once a filter exceeds limit (25), but no data loss, security, or tenancy impact."
+      }
+    },
+    {
+      "title": "GET /calendar/events from/to filter drops events that span the range boundary",
+      "severity": "major",
+      "file": "apps/api/src/routes/calendar.ts",
+      "line": 80,
+      "evidence": "...(from ? { startAt: { gte: new Date(from) } } : {}),\n...(to ? { endAt: { lte: new Date(to) } } : {}),  — requires the event to be FULLY inside [from, to] instead of overlapping it.",
+      "why": "Any event that starts before the queried window or ends after it vanishes from the calendar view: a meeting running 23:30→00:30 disappears from both days, a multi-day all-day event disappears from every week view that doesn't fully contain it. Users see free time where they are busy — and the booking flows trust this same table.",
+      "fix": "Use the overlap predicate: `...(to ? { startAt: { lte: new Date(to) } } : {}), ...(from ? { endAt: { gte: new Date(from) } } : {})` (same shape already used correctly in bookings-public.ts:116-117).",
+      "effort": "S",
+      "dimension": "api-correctness-a",
+      "fid": "api-correctness-a-5",
+      "verdict": {
+        "isReal": true,
+        "confidence": "high",
+        "corrected_severity": "major",
+        "notes": "Confirmed at apps/api/src/routes/calendar.ts:80-81 — filter is `startAt >= from AND endAt <= to` (containment), not overlap (`startAt <= to AND endAt >= from`). Sole consumer apps/web/src/pages/CalendarPage.tsx:82-83 sends exact week boundaries with no padding, so events crossing the Mon-00:00 week boundary (e.g., Sun 23:30→Mon 00:30) are dropped from BOTH adjacent week views, and multi-day events spanning a week boundary vanish from the week containing their start. Defect and calendar-view impact verified. HOWEVER, the claim's worst-case amplification is false: booking flows do NOT use this endpoint or filter — apps/api/src/routes/bookings-public.ts:116-117 and :230-231 query calendarEvent with correct overlap semantics (startAt lte rangeEnd, endAt gte rangeStart) plus buffer padding, so slot computation and double-booking checks are unaffected. Severity stays major for a calendar silently hiding busy time, but the \"booking flows trust this same table\" justification should be removed."
+      }
+    },
+    {
+      "title": "@mention extraction regex stops at first whitespace — mentions never match multi-word user names, notifications silently dropped",
+      "severity": "major",
+      "file": "apps/api/src/routes/collaboration.ts",
+      "line": 353,
+      "evidence": "const matches = body.match(/@([\\w\\s]+?)(?=\\s|$|@)/g) ?? [];  — the lazy `+?` with a `(?=\\s|$|@)` lookahead terminates at the first space, so '@John Smith' yields 'John'. The lookup is exact: `tx.user.findMany({ where: { orgId: ..., name: { in: mentions } } })` (line 130-131).",
+      "why": "User.name values are full names ('John Smith'), so the exact `in` match finds nobody — Mention rows and the unread badge are never created for any user whose name contains a space, i.e. essentially everyone. The collaboration @mention feature silently does nothing, with no error surfaced.",
+      "fix": "Match greedily up to a word boundary against known users (fetch org users once and scan the body for '@'+name), or change the regex to capture full names (e.g. /@([\\w]+(?:\\s[\\w]+)*)/g) and match case-insensitively; add a test with a two-word name.",
+      "effort": "S",
+      "dimension": "api-correctness-a",
+      "fid": "api-correctness-a-6",
+      "verdict": {
+        "isReal": true,
+        "confidence": "high",
+        "corrected_severity": "major",
+        "notes": "Confirmed with eyes on code and an empirical Node test. apps/api/src/routes/collaboration.ts:353 uses /@([\\w\\s]+?)(?=\\s|$|@)/g — the lazy quantifier terminates at the first space ('@Jane Smith' extracts 'Jane'), and lines 130-131 do an exact `name: { in: mentions }` lookup. All seeded User.name values are multi-word (packages/db/src/seed-data.ts: 'Jane Smith', 'Mark Thompson', 'Tony Walteur', ...), so the lookup finds nobody, mention.createMany gets an empty array, and the request still returns 201 — silent failure, no Mention rows, no unread badge. No compensating controls: CommentCreate schema (packages/shared/src/schemas/collaboration.ts) has only bodyMd (no explicit mention IDs), no Prisma middleware affects name matching, and no tests cover collaboration routes. Bonus defect: \\w excludes accented chars, so 'Léon' fails even as a single token. Severity stays major (not critical): feature is silently dead but no data loss/security impact, and no web-app comment composer currently posts to /api/v1/comments — exposure today is the live API endpoint plus the mention badge UI that reads from it."
+      }
+    },
+    {
+      "title": "PATCH /companies/:id/tier clobbers keyAccountOwnerId and keyAccountNotes when caller only changes the tier",
+      "severity": "major",
+      "file": "apps/api/src/routes/accounts.ts",
+      "line": 292,
+      "evidence": "const updateData: Prisma.CompanyUpdateManyMutationInput = {\n  tier,\n  keyAccountOwnerId: keyAccountOwnerId ?? null,\n  keyAccountNotes: keyAccountNotes ?? null,\n};  — both body fields are .optional() (lines 256-257), yet omission writes NULL.",
+      "why": "Any client that PATCHes only { tier: 'key' } (e.g. a tier dropdown) silently erases the existing key-account owner assignment and the accumulated account notes. That is unrecoverable data loss of CRM relationship context on every tier toggle.",
+      "fix": "Only include the fields when provided: `...(keyAccountOwnerId !== undefined ? { keyAccountOwnerId } : {}), ...(keyAccountNotes !== undefined ? { keyAccountNotes } : {})`, and accept explicit null in the schema for intentional clearing.",
+      "effort": "S",
+      "dimension": "api-correctness-a",
+      "fid": "api-correctness-a-7",
+      "verdict": {
+        "isReal": true,
+        "confidence": "high",
+        "corrected_severity": "major",
+        "notes": "Confirmed at apps/api/src/routes/accounts.ts:292-296: body fields keyAccountOwnerId/keyAccountNotes are .optional() (lines 256-257) but the update writes `?? null` unconditionally, so PATCH { tier } nulls existing owner and notes — even when tier stays 'key'. No compensating control: packages/db middleware is only PII-encryption + soft-delete; audit log records ownerId but NOT notes, so notes loss is unrecoverable. The repo's own convention contradicts an 'intentional replacement' reading — companies.ts PATCH (lines 258-262) uses the `!== undefined` preserve-on-omission idiom. Integration test (accounts.integration.test.ts:102,114) itself exercises the clobber path without asserting preservation. Only caveat: no frontend/MCP caller exists yet (useKeyAccounts.ts is read-only), so impact is latent on live API surface rather than active in the UI; severity major is still appropriate for silent data loss on a permission-gated public endpoint."
+      }
+    },
+    {
+      "title": "Key-accounts list aggregates opportunity value from an unordered take:1000 sample — totals silently wrong for large orgs",
+      "severity": "major",
+      "file": "apps/api/src/routes/accounts.ts",
+      "line": 90,
+      "evidence": "prisma.opportunity.findMany({\n  where: { orgId, companyId: { in: companyIds }, deletedAt: null },\n  select: { companyId: true, valueMicros: true, stage: true },\n  take: 1000,\n}),  — no orderBy, and companyIds can hold up to 200 companies (limit max 200).",
+      "why": "Once the page's companies collectively exceed 1,000 opportunities, an arbitrary (planner-dependent) subset is summed: totalValue, openDeals, and opportunityCount on the Key Accounts screen under-report by whatever was cut off, and which rows are dropped is nondeterministic between requests. The file's own header comment (lines 41-44) says this take-ceiling pattern was removed for exactly this reason — it survived in the aggregate query.",
+      "fix": "Replace the JS aggregation with prisma.opportunity.groupBy({ by: ['companyId'], where: {...}, _sum: { valueMicros: true }, _count: true }) plus a second groupBy filtered to open stages (or one raw GROUP BY query as /accounts/top already does).",
+      "effort": "M",
+      "dimension": "api-correctness-a",
+      "fid": "api-correctness-a-8",
+      "verdict": {
+        "isReal": true,
+        "confidence": "high",
+        "corrected_severity": "major",
+        "notes": "Confirmed. apps/api/src/routes/accounts.ts:89-94: opportunity.findMany has take:1000 with no orderBy over up to 200 (default 50) page companies; JS aggregation (lines 105-114) computes totalValue/openDeals/opportunityCount from whatever arbitrary 1,000-row subset Postgres returns once the page's companies exceed 1,000 opportunities — silent, nondeterministic under-reporting. No compensating controls: packages/db/src/index.ts registers only PII-encryption (off by default) and soft-delete middleware (injects deletedAt:null only); neither touches take/orderBy. Frontend KeyAccountsPage.tsx:126-133 sums these values into headline \"Total pipeline\"/\"Open deals\" StatCards, so the error surfaces and compounds. The same file proves intent: lines 41-44 comment says take:1000 was removed from company listing for this exact reason, and /accounts/top (lines 153-158) was rewritten as SQL GROUP BY for the same reason — this aggregate query is the surviving instance. Adjacent contact.groupBy (line 95) uses the correct uncapped aggregation pattern. Severity stays major: data-correctness on a decision-driving financial screen, but only triggers for orgs whose key-account page collectively exceeds 1,000 active opportunities; not security or data loss."
+      }
+    },
+    {
+      "title": "Migration/import queue has no worker consumer — all CSV & HubSpot imports hang in RUNNING forever",
+      "severity": "critical",
+      "file": "apps/api/src/routes/migrations.ts",
+      "line": 179,
+      "evidence": "const queue = getQueue(); ... await queue.add(`${job.id}-chunk-${i}`, payload, { jobId: `${job.id}-${entityType}-chunk-${i}` }); ... const updated = await prisma.migrationJob.update({ where: { id: job.id }, data: { status: 'RUNNING', startedAt: new Date() } });  // MIGRATION.name === 'migration' (queue-config.core.ts:127); grep of apps/worker/src for any new Worker on 'migration'/MIGRATION.name returns NOTHING, and main.ts starts no migration worker",
+      "why": "Both migration producers (start-csv here and start-hubspot in migrations-hubspot.routes.ts) enqueue chunk jobs to the 'migration' BullMQ queue, store the rows in Redis with a 1h TTL, and flip the job to RUNNING — but no worker in apps/worker ever consumes that queue. Every Salesforce-CSV, generic-CSV, and HubSpot import is silently dead on arrival: zero records are ever written, the job is stuck at RUNNING indefinitely, and the staged rows expire from Redis after an hour. The entire data-migration feature is non-functional.",
+      "fix": "Implement and register a migration worker (e.g. apps/worker/src/queues/migration.ts exporting startMigrationWorker that consumes MIGRATION.name, reads the redisKey chunk, applies mappings, upserts companies/leads/contacts/deals/tasks with external-id dedup, and updates MigrationJob progress/status), then add it to the Promise.all in apps/worker/src/main.ts.",
+      "effort": "L",
+      "dimension": "api-correctness-b",
+      "fid": "api-correctness-b-0",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Open redirect in unauthenticated email click-tracking endpoint (comment claims an allowlist that does not exist)",
+      "severity": "major",
+      "file": "apps/api/src/routes/track.ts",
+      "line": 141,
+      "evidence": "let redirectUrl: URL; try { redirectUrl = new URL(url); } catch { throw server.httpErrors.badRequest('Invalid redirect URL'); } if (!['http:', 'https:'].includes(redirectUrl.protocol)) { throw server.httpErrors.badRequest('Only http/https URLs are allowed'); } return reply.redirect(redirectUrl.toString(), 302);  // header comment lines 14-15: 'Redirect targets (click tracking) are validated against an allowlist to prevent open redirect abuse.'",
+      "why": "The route is public (config.public=true) and reachable from any email. The only validation is http/https protocol — there is NO allowlist despite the file header asserting one. The redirect also fires regardless of whether the token resolves to a real pixel (the DB lookup is fire-and-forget). An attacker sends /api/track/email/click/anything?url=https://evil.example and gets a 302 off the trusted BidStack domain, a classic phishing/open-redirect vector.",
+      "fix": "Validate the decoded url against an allowlist (e.g. require the target host to match PUBLIC_BASE_URL or a configured set of partner domains), or look up the tracked link's stored canonical URL by token and redirect to that instead of an attacker-supplied querystring value. Remove the inaccurate allowlist comment if not implementing one.",
+      "effort": "S",
+      "dimension": "api-correctness-b",
+      "fid": "api-correctness-b-1",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Migration undo only deletes companies & leads — HubSpot-imported contacts, deals & tasks are left orphaned while reporting success",
+      "severity": "major",
+      "file": "apps/api/src/routes/migrations.ts",
+      "line": 299,
+      "evidence": "const [companies, leads] = await Promise.all([ prisma.company.deleteMany({ where: { orgId, source: sourceTag } }), prisma.lead.deleteMany({ where: { orgId, source: sourceTag } }), ]); const deletedCount = companies.count + leads.count; ... return { message: `Undo complete — deleted ${deletedCount} records`, deletedCount };",
+      "why": "start-hubspot imports four entity types — companies, contacts, deals, tasks (migrations-hubspot.routes.ts:204) — but undo only removes Company and Lead rows tagged with the migration source. Contacts, opportunities (deals) and tasks created by an import survive an 'undo', yet the response claims the undo is complete. Users believe a bad import was fully reverted when stale records remain, corrupting their CRM data.",
+      "fix": "Delete every entity type the import can create (contact, opportunity, task) scoped by orgId + source=sourceTag in FK-safe order inside one transaction, and include their counts in deletedCount. Drive the set of tables off the job's imported entityType rather than hardcoding company+lead.",
+      "effort": "M",
+      "dimension": "api-correctness-b",
+      "fid": "api-correctness-b-2",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Lead-conversion mints opportunity code from a 4-digit timestamp with no collision retry — 500s and pollutes the OP-#### sequence",
+      "severity": "major",
+      "file": "apps/api/src/routes/leads.write.routes.ts",
+      "line": 278,
+      "evidence": "const code = `OP-${Date.now().toString().slice(-4)}`; ... const opp = await tx.opportunity.create({ data: { orgId: req.auth.orgId, code, ... } });  // Opportunity has @@unique([orgId, code]) (schema.prisma:407); no try/catch/retry around the $transaction, unlike mintNextCode + 5x retry used by POST /opportunities, /opportunities/import and sales-orders",
+      "why": "The last 4 digits of Date.now() cycle every 10 seconds, so two lead conversions in the same org within that window produce the same code and hit the unique constraint — the whole conversion transaction (contact + opportunity + lead status flip) rolls back and returns a 500, losing the conversion. The ad-hoc OP-#### value also collides with the sequence space owned by mintNextCode (OP-2001, OP-2002…), so a converted lead can later block normal opportunity creation. Every other opportunity-creating path uses mintNextCode inside a bounded retry loop; this one does not.",
+      "fix": "Generate the code with the existing mintNextCode(tx, orgId) helper and wrap the conversion transaction in the same bounded retry-on-isUniqueViolation loop used by the create/import handlers.",
+      "effort": "M",
+      "dimension": "api-correctness-b",
+      "fid": "api-correctness-b-3",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "usePatchOpportunity onMutate crashes on the cached count query — every opportunity inline edit fails before the PATCH is sent",
+      "severity": "critical",
+      "file": "apps/web/src/hooks/useOpportunities.ts",
+      "line": 109,
+      "evidence": "qc.getQueriesData<OpportunityPage>({ queryKey: ['opportunities'] }).forEach(([key, value]) => { listSnapshots.push([key, value]); if (!value) return; qc.setQueryData<OpportunityPage>(key, { ...value, items: value.items.map((o) => ...) }); — the prefix filter also matches useOpportunityCount's key ['opportunities','count',opts] (useOpportunities.ts:32) whose data is { count: number }, so value.items.map throws TypeError. The sibling hook already carries the guard: useStageMutation.ts:33 'if (!value || !Array.isArray((value as any).items)) return;'",
+      "why": "Sidebar.tsx:29 and MobileNav.tsx:75 mount useOpportunityCount({excludeClosed:true}) on every page, so the count entry is always in the cache. In React Query v5 an error thrown in onMutate rejects the mutation and the mutationFn never runs — every inline edit on the Opportunity Detail page (name, customer, value, probability, stage, due date) errors with 'Save failed — changes reverted' and nothing is ever saved.",
+      "fix": "Copy the guard from useStageMutation.ts:33 into usePatchOpportunity.onMutate: `if (!value || !Array.isArray((value as { items?: unknown }).items)) return;` before mapping items.",
+      "effort": "S",
+      "dimension": "web-correctness",
+      "fid": "web-correctness-0",
+      "verdict": {
+        "isReal": true,
+        "confidence": "high",
+        "corrected_severity": "critical",
+        "notes": "Verified in code. apps/web/src/hooks/useOpportunities.ts:106-114: getQueriesData({queryKey:['opportunities']}) prefix-matches the count query key ['opportunities','count',opts] (line 32); guard is only `if (!value) return;`, count data {count:number} is truthy and lacks .items, so value.items.map (line 112) throws TypeError. Count query is always populated: useOpportunityCount({excludeClosed:true}) mounted by Sidebar.tsx:29 and MobileNav.tsx:75, both rendered unconditionally in AppShell.tsx (lines 20/28) which wraps all routes (App.tsx:65). react-query is ^5.62.7; in v5 a throw in onMutate is caught before mutationFn runs — PATCH never sent, mutation rejects, onError fires with undefined context (so partially-applied optimistic list updates are not even rolled back — extra cache corruption beyond the claim), and toast 'Save failed — changes reverted.' shows. No compensating controls: QueryClient (main.tsx:47) has only a retry policy, no MutationCache handlers; tests mock the hook (OpportunitiesPage.test.tsx:11). Sibling useStageMutation.ts:33 has the missing guard `if (!value || !Array.isArray(value.items)) return;` (auditor's quote of that line was slightly paraphrased; immaterial). Impact confirmed: all 7 inline-edit fields on OpportunityDetailPage.tsx (mutateAsync, lines 134-238) and 4 patch.mutate sites in OpportunityRow.tsx fail deterministically. Critical is the correct severity."
+      }
+    },
+    {
+      "title": "useFormatMoney / useDisplayMoneyMicros default sourceCurrency 'CAD' — EUR-denominated opportunity micros are FX-converted from CAD, skewing dashboard numbers ~35%",
+      "severity": "critical",
+      "file": "apps/web/src/hooks/useFormatMoney.ts",
+      "line": 24,
+      "evidence": "formatMoneyMicros: (micros: string | number | bigint, sourceCurrency = 'CAD', ...) => { ... const converted = convert(value, sourceCurrency); — callers omit the currency: WinRateCard.tsx:69 '{formatMoneyMicros(stats.wonRevenueMicros)}', PipelineSnapshot.tsx:75, TeamLeaderboard.tsx:65, CompanyTabs.tsx:116 '{formatMoneyMicros(o.valueMicros)}'. Yet the same opportunity value is EUR everywhere else: OpportunityDetailPage.tsx:212 label=\"Edit deal value (EUR)\", AccountsPage.tsx:129 formatMoneyMicros(totalPipeline, 'EUR'). useDisplayMoney.ts:22 has the same 'CAD' default.",
+      "why": "convert() runs amount/CADrate*EURrate (currency.ts:355-366). For a European user (store default EUR via detectLocalCurrency), every win/loss, pipeline-snapshot, leaderboard, and company-tab amount is understated by the CAD→EUR rate (~0.65x), while the opportunity detail page shows the true EUR figure — the same deal shows two different values. CLAUDE.md and CompanyTabs.tsx:80 even contradict each other ('org base currency (CAD)' vs EUR labels) — mixed-unit money display is a data-integrity defect.",
+      "fix": "Change the default sourceCurrency to 'EUR' in useFormatMoney.ts:20/24 and useDisplayMoney.ts:10/22 (or remove the default and make sourceCurrency required so each call site states the denomination); resolve the CAD-vs-EUR org-base conflict in one place.",
+      "effort": "M",
+      "dimension": "web-correctness",
+      "fid": "web-correctness-1",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Mutations invalidate ['pipeline-report'] but the query key is ['report:pipeline'] — pipeline KPIs stay stale after edits, lead conversion, and stage changes",
+      "severity": "minor",
+      "file": "apps/web/src/hooks/useOpportunities.ts",
+      "line": 135,
+      "evidence": "usePatchOpportunity.onSettled: void qc.invalidateQueries({ queryKey: ['pipeline-report'] }); — but usePipelineReport.ts:15 declares queryKey: ['report:pipeline']. Same dead key in useLeads.ts:81 (useConvertLead) and usePipelineStages.ts:42, while useStageMutation.ts:79 and useCreateOpportunity (useOpportunities.ts:74) correctly use ['report:pipeline'].",
+      "why": "After inline-editing an opportunity's value/probability, converting a lead, or editing pipeline stages, the /reports pipeline aggregates (totalOpen, weightedPipeline, byStage) never refetch — users see stale revenue figures until a manual reload. The comment 'Pipeline reports aggregate over opportunities; refresh' shows intent that silently does nothing.",
+      "fix": "Export a shared PIPELINE_REPORT_KEY = ['report:pipeline'] from usePipelineReport.ts and use it in useOpportunities.ts:135, useLeads.ts:81, usePipelineStages.ts:42.",
+      "effort": "S",
+      "dimension": "web-correctness",
+      "fid": "web-correctness-2",
+      "verdict": {
+        "isReal": true,
+        "confidence": "high",
+        "corrected_severity": "minor",
+        "notes": "MECHANICS CONFIRMED. Exhaustive grep of apps/web/src shows ['pipeline-report'] is registered by NO useQuery anywhere — it is a dead no-op invalidation at exactly the three cited sites: apps/web/src/hooks/useOpportunities.ts:135 (usePatchOpportunity.onSettled, with the intent comment \"Pipeline reports aggregate over opportunities; refresh\"), apps/web/src/hooks/useLeads.ts:81 (useConvertLead, comment \"P1 #10: ...pipeline report must reflect the new opportunity\"), and apps/web/src/hooks/usePipelineStages.ts:42 (usePatchPipelineStage). Sibling mutations use the live key ['report:pipeline'] (useOpportunities.ts:74, useStageMutation.ts:79), proving the divergence. No compensating control fires: refetchOnWindowFocus is false globally (apps/web/src/main.tsx:59).\n\nIMPACT OVERSTATED on two counts, hence severity downgrade to minor:\n(1) \"Never refetch until manual reload\" is false. Global staleTime is 120s with default refetchOnMount=true (main.tsx:60), so the report refetches automatically on the next mount/navigation once >2 min old. Worst-case staleness is bounded to ~2 minutes plus next page visit, not indefinite. (A manual reload also wouldn't reliably help — localStorage hydration in apps/web/src/lib/queryCache.ts re-seeds the cache via setQueryData, marking it fresh.)\n(2) The \"/reports pipeline aggregates\" impact is misattributed. There are TWO hooks named usePipelineReport: ReportsPage.tsx imports the one from apps/web/src/hooks/useReports.ts:38-44, whose key is ['reports','pipeline'] (staleTime 60s) — that key is invalidated by NO mutation, including the \"correct\" ['report:pipeline'] ones, so fixing the cited dead key changes nothing for /reports. The consumers actually hit by this bug are DashboardPage.tsx:60 and components/dashboard/OrgDashboard.tsx:40, which use apps/web/src/hooks/usePipelineReport.ts (key ['report:pipeline']) for the pipeline-by-stage KPI card.\n\nNet: real dead-key bug (plus an undiagnosed third-key fragmentation: 'report:pipeline' vs 'reports','pipeline' vs dead 'pipeline-report'), but the user-visible effect is dashboard pipeline KPIs lagging by at most ~2 minutes after inline edits / lead conversion / stage probability changes — self-healing staleness of analytics aggregates, no data corruption. Minor, not major."
+      }
+    },
+    {
+      "title": "LeadDetailPage binds controlled inputs to server cache with a debounced mutation and no local state — in-flight typing is wiped when the mutation re-render snaps the field back",
+      "severity": "major",
+      "file": "apps/web/src/pages/LeadDetailPage.tsx",
+      "line": 328,
+      "evidence": "<textarea id=\"lead-notes\" value={l.notes ?? ''} onChange={(e) => debouncedUpdate({ notes: e.target.value || null })} ... /> — same pattern for score (line 247-248), budget (280-281), authority, need, timeline. `l` is lead.data from React Query; onChange never updates any state, and useUpdateLead (useLeads.ts:47-56) has no optimistic onMutate.",
+      "why": "While typing, nothing re-renders so the DOM keeps the text; 500ms after the last keystroke update.mutate fires, the mutation's isPending flip re-renders the page, and React resets the controlled input to the stale cached value — visible text vanishes (returning only after the refetch), and anything typed during the round-trip is permanently lost. Classic form-data-loss on the lead qualification screen.",
+      "fix": "Hold field values in local state seeded from lead.data (or use defaultValue + onBlur save), or add an optimistic onMutate to useUpdateLead that patches the ['leads', id] cache so the controlled value tracks what the user typed.",
+      "effort": "M",
+      "dimension": "web-correctness",
+      "fid": "web-correctness-3",
+      "verdict": {
+        "isReal": true,
+        "confidence": "high",
+        "corrected_severity": "major",
+        "notes": "Confirmed. LeadDetailPage.tsx binds controlled inputs (notes L326-329, score L247-248, budget L280-281, authority L290-291, need L298-300, timeline L308-311) directly to React Query cache (l = lead.data) with onChange calling only a debounced mutate; no local state exists for any field. useDebouncedCallback is a stateless setTimeout debounce (its flush() only cancels, never fires). useUpdateLead (useLeads.ts:47-56) has no onMutate optimistic write; main.tsx QueryClient has no global MutationCache/onMutate defaults. No compensating control found. Contrast: useUpdateLeadById (useLeads.ts:89-116) implements the correct optimistic onMutate pattern for list inline edits, but the detail page doesn't use it. Mechanism correction: the bug is worse than claimed — React's controlled-input restoration reverts the DOM to the value prop after EVERY input event when no state update occurs (classic value-without-setState read-only behavior), so each keystroke snaps back immediately, the fields appear frozen, and the debounced PATCH sends stale-cache-value + only the last keystroke's delta, potentially persisting a corrupted partial value. Claimed outcome (typed text wiped, data loss on lead qualification screen) holds. Major severity is correct: six fields on a core screen are unusable/lossy, but no security/tenancy impact."
+      }
+    },
+    {
+      "title": "ConvertLeadDialog's stage selection is silently discarded — LeadConvertBody has no 'stage' field",
+      "severity": "major",
+      "file": "apps/web/src/pages/leadDetail/ConvertLeadDialog.tsx",
+      "line": 18,
+      "evidence": "interface ConvertForm { opportunityName: string; opportunityValueMicros: number; stage: OpportunityStage; } ... onConvert(form) — but useLeads.ts:61-65 types the body as { opportunityName?; opportunityValueMicros?; pipelineStageId? } and the server schema (packages/shared/src/schemas/leads.ts:123-127 LeadConvertBody) only accepts opportunityName/opportunityValueMicros/pipelineStageId; non-strict Zod strips the unknown 'stage' key.",
+      "why": "The user picks 'Negotiation' or 'Closed won' in the convert dialog, the request succeeds, and the new opportunity lands in the server-default stage instead — the dropdown is a no-op. Misplaced deals corrupt pipeline reporting right at the lead→opportunity handoff.",
+      "fix": "Map the dialog's stage to the convert payload: either send `stage` after adding it to LeadConvertBody, or resolve the selected enum to a pipelineStageId (via usePipelineStages) and pass `pipelineStageId` as the API already supports.",
+      "effort": "M",
+      "dimension": "web-correctness",
+      "fid": "web-correctness-4",
+      "verdict": {
+        "isReal": true,
+        "confidence": "high",
+        "corrected_severity": "major",
+        "notes": "Confirmed end to end. ConvertLeadDialog.tsx:15-19 sends { opportunityName, opportunityValueMicros, stage } via onConvert(form); LeadDetailPage.tsx:76-85 forwards it unmapped to convert.mutate; useLeads.ts:58-72 body type has only pipelineStageId (never populated); api.ts JSON.stringifies without transformation. Server LeadConvertBody (packages/shared/src/schemas/leads.ts:123-127) is non-strict z.object, so 'stage' is stripped and the request succeeds. Handler (apps/api/src/routes/leads.write.routes.ts:279-300) reads only body.pipelineStageId; since it is always undefined from this UI, every conversion lands in the org's default pipeline stage (lowest orderIndex, fallback 's1_lead'). The stage dropdown — including 'Closed won' — is a silent no-op with a success toast. No compensating control (no interceptor, no enum→pipelineStageId mapping anywhere in apps/web). Deeper mismatch: dialog uses legacy OpportunityStage enum values while the endpoint expects a PipelineStage row UUID, so the dialog was never wired to the new pipeline model. Major is the right severity: silent failure of a visible control in the core lead→opportunity workflow corrupting stage placement/reporting, but recoverable by manually moving the opportunity and no data loss or tenancy impact."
+      }
+    },
+    {
+      "title": "Lead conversion fails for any opportunity value above €1M — micros sent by the dialog exceed a max copied from the units-based schema",
+      "severity": "major",
+      "file": "apps/web/src/pages/leadDetail/ConvertLeadDialog.tsx",
+      "line": 68,
+      "evidence": "opportunityValueMicros: Math.round(Number(e.target.value) * 1_000_000) — for an input of 2,000,000 (EUR) this sends 2e12. The wire schema caps it at 1e12 micros: packages/shared/src/schemas/leads.ts:125 'opportunityValueMicros: z.number().min(0).max(1_000_000_000_000)' — i.e. €1,000,000 — while the unit-based Opportunity.value allows up to 1e12 EUR (opportunity.ts:65). The max was written for units but applied to micros.",
+      "why": "Mantu bids are routinely multi-million EUR. Converting any lead worth more than €1M returns a 400 and the UI shows only 'Failed to convert lead' (LeadDetailPage.tsx:83) with no hint why — the core lead→opportunity flow is broken for exactly the deals that matter most. This is a micros-vs-units mixing defect at the wire boundary.",
+      "fix": "Raise the schema max to 1_000_000_000_000 * 1_000_000 (or `.max(1e18)`) to express the same €1e12 ceiling in micros, and surface the server validation message in the error toast.",
+      "effort": "S",
+      "dimension": "web-correctness",
+      "fid": "web-correctness-5",
+      "verdict": {
+        "isReal": true,
+        "confidence": "high",
+        "corrected_severity": "major",
+        "notes": "Confirmed micros-vs-units mismatch at the wire boundary. ConvertLeadDialog.tsx:68 sends opportunityValueMicros = EUR input * 1e6 (field verified as micros: display divides by 1e6, and the API handler stores it directly as valueMicros BigInt at leads.write.routes.ts:309). The wire schema LeadConvertBody (packages/shared/src/schemas/leads.ts:125) caps it at max(1_000_000_000_000) = 1e12 micros = €1,000,000, while the unit-based Opportunity.value (opportunity.ts:65) uses the same literal for EUR units (max €1e12) — strong evidence the max was copied from the units schema. Validation is genuinely enforced: fastify-type-provider-zod validatorCompiler is set globally (apps/api/src/server.ts:101) and the convert route declares body: LeadConvertBody (leads.write.routes.ts:247), so any value > €1M returns 400 before the handler. No compensating controls: no input max/clamp in the dialog, no client-side validation (useLeads.ts:58-72 posts the form raw), and LeadDetailPage.tsx:83 shows only a generic 'Failed to convert lead' toast. Boundary is inclusive (€1M exactly passes; €1,000,000.01+ fails). Severity major is correct: core lead-to-opportunity conversion fails opaquely for multi-million EUR deals (Mantu's norm), but not critical — no data loss/security impact and a workaround exists (convert with value ≤ €1M or blank, then edit the opportunity value, whose unit-based update schema allows up to 1e12 EUR)."
+      }
+    },
+    {
+      "title": "Pipeline board fetches only the first 50 opportunities and computes 'Total pipeline' / 'Win rate' KPIs over that truncated page",
+      "severity": "major",
+      "file": "apps/web/src/pages/PipelinePage.tsx",
+      "line": 34,
+      "evidence": "const { data, isLoading, isError, error } = useOpportunities({ limit: 50 }); ... (line 175) 'const totalValue = opps.reduce((acc, o) => acc + o.value, 0);' — OpportunityPage is cursor-paged (opportunity.ts:141-145 'nextCursor: z.string().nullable()') but the page never follows nextCursor and renders no truncation indicator.",
+      "why": "Once a tenant has more than 50 opportunities, the Kanban silently drops the rest: cards disappear from columns, and the KPI bar's Total pipeline, Open value, Win rate, and Active deals are computed over an arbitrary 50-row slice — managers make calls on understated numbers with no warning.",
+      "fix": "Use useInfiniteQuery following nextCursor (or a dedicated aggregate endpoint for the KPI bar, e.g. the existing /api/reports/pipeline), and show a 'showing N of M' indicator when truncated.",
+      "effort": "M",
+      "dimension": "web-correctness",
+      "fid": "web-correctness-6",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "React Query localStorage persistence rewrites the entire cache blob on every query success and never evicts — unbounded growth and main-thread jank",
+      "severity": "major",
+      "file": "apps/web/src/lib/queryCache.ts",
+      "line": 44,
+      "evidence": "cache.subscribe((event) => { ... const stored = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}') ...; stored[JSON.stringify(queryKey)] = { state: event.query.state, timestamp: Date.now() }; localStorage.setItem(CACHE_KEY, JSON.stringify(stored)); }); — hydrateCache (line 68) skips entries older than 24h but nothing ever deletes them from storage.",
+      "why": "Every successful query update synchronously parses and re-stringifies ALL previously persisted queries (every filter permutation of ['opportunities', {…}], ['leads', {…}], etc. accumulates forever). On an active workspace this is an O(total-cache) main-thread write per fetch — growing jank until the 5MB quota is hit, after which persistence silently dies in the catch block.",
+      "fix": "Prune expired entries on write (or on hydrate, write back the filtered object), debounce/coalesce writes (e.g. idle-callback batched flush), and cap the number of persisted keys.",
+      "effort": "M",
+      "dimension": "web-correctness",
+      "fid": "web-correctness-7",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Quick-add menu: 'New opportunity' and 'New task' options do nothing",
+      "severity": "critical",
+      "file": "apps/web/src/components/quickadd/QuickAddMenu.tsx",
+      "line": 178,
+      "evidence": "{pick === 'opportunity' ? (\n  <CreateOpportunityDialog trigger={<span style={{ display: 'none' }} />} />\n) : null}\n{pick === 'task' ? <TaskDialogAuto onDone={() => setPick(null)} /> : null}\n— CreateOpportunityDialog.tsx:28 `const [open, setOpen] = useState(false);` opens only via its trigger, which is rendered display:none; TaskDialogAuto returns `<CreateTaskDialog />` uncontrolled (internalOpen=false) so it never opens either. The comment at line 188 claims triggers are clicked 'on the next tick' but no such click exists.",
+      "why": "The global `N` quick-add shortcut (advertised in the keyboard-shortcuts help) silently fails for 2 of its 4 options: choosing 'New opportunity' or 'New task' closes the menu and nothing appears. Power users' primary create flow is dead, and the uncontrolled CreateTaskDialog also injects a stray '+ New task' default trigger button into the layout root. `pick` is never reset for 'opportunity', so retries also fail.",
+      "fix": "Use the working ContactDialogAuto pattern for all entities: pass controlled `open`/`onOpenChange` to CreateTaskDialog (it already supports it) and add a controlled-open prop to CreateOpportunityDialog, clearing `pick` on close.",
+      "effort": "S",
+      "dimension": "ux-states-a11y",
+      "fid": "ux-states-a11y-0",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Calendar create-event failure is completely silent (no error state, unhandled rejection)",
+      "severity": "major",
+      "file": "apps/web/src/pages/CalendarPage.tsx",
+      "line": 268,
+      "evidence": "onSave={async (body) => {\n  await createEvent.mutateAsync(body);\n  setShowModal(false);\n}}\n— useCreateEvent (lines 35–42) defines no onError; CreateEventModal.tsx:26-34 `function handleSubmit(e) { e.preventDefault(); onSave({...}) }` neither awaits nor catches; main.tsx QueryClient has no global MutationCache onError.",
+      "why": "If POST /api/v1/calendar/events fails (validation, provider down, 5xx after retry), the rejected promise is unhandled: the Save button flips from 'Saving…' back to 'Create event', the modal stays open, and no message ever appears. The user believes the meeting was pushed to Google/Microsoft when it was not — a missed-meeting class of bug.",
+      "fix": "Add an inline error state in CreateEventModal (catch around onSave, render role=\"alert\" message) or an onError toast in useCreateEvent, matching the pattern used in intake/ReceiveStep.tsx:44.",
+      "effort": "S",
+      "dimension": "ux-states-a11y",
+      "fid": "ux-states-a11y-1",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Bid/No-Bid: Save Score and AI Calibrate fail silently; opportunity list has no loading/error state",
+      "severity": "major",
+      "file": "apps/web/src/pages/BidNoBidPage.tsx",
+      "line": 53,
+      "evidence": "createScore.mutate({ opportunityId, criteria: scores, notes: notes || undefined });\n— hooks/useBidScore.ts useCreateBidScore/useAICalibrate/useBidScoreDefend define no onError and BidNoBidPage passes none; the opportunity <select> (lines 165–184) renders `opps?.items.map(...)` from `const { data: opps } = useOpportunities(...)` with isLoading/isError discarded.",
+      "why": "A failed 'Save Score' returns the button to its idle label with zero feedback — the go/no-go decision the team believes is recorded is silently lost. Likewise, if the opportunities query errors, the dropdown just shows '— Select an opportunity —' with no explanation, making the whole page look empty for no visible reason.",
+      "fix": "Add onError toasts (toast.error) to the three mutations as done in AgentStudioPage.tsx:143, plus a success confirmation for Save; render a loading option / inline ErrorState for the useOpportunities query.",
+      "effort": "S",
+      "dimension": "ux-states-a11y",
+      "fid": "ux-states-a11y-2",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Hand-rolled NewProductDialog has no focus trap, no initial focus, and Escape that doesn't work on open",
+      "severity": "major",
+      "file": "apps/web/src/pages/ProductsPage.tsx",
+      "line": 257,
+      "evidence": "<div className=\"fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4\"\n  onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}>\n  <div role=\"dialog\" aria-modal=\"true\" ...>\n— No FocusScope/Radix, no autoFocus on any field, no Tab containment; the React onKeyDown only fires when focus is inside the overlay, but on open focus remains on the 'New product' trigger button behind it.",
+      "why": "Keyboard users opening the dialog can keep tabbing through the (visually obscured) page behind it, and pressing Escape immediately after opening does nothing because focus never entered the dialog. aria-modal=\"true\" tells screen readers content is trapped when it is not — a WCAG 2.4.3/2.1.2 failure on a core admin flow.",
+      "fix": "Replace the hand-rolled wrapper with the existing Radix-backed `Modal` from components/ui/Modal.tsx (as CreateEventModal does), which provides focus trap, initial focus, and Escape for free.",
+      "effort": "M",
+      "dimension": "ux-states-a11y",
+      "fid": "ux-states-a11y-3",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Calendar week grid: time slots and event chips are mouse-only divs — unreachable by keyboard or screen reader",
+      "severity": "major",
+      "file": "apps/web/src/pages/CalendarPage.tsx",
+      "line": 230,
+      "evidence": "<div key={`${toIso(day)}-${hour}`} className=\"border-t border-l ... cursor-pointer hover:bg-...\" onClick={() => { ... setShowModal(true); }}>\n  {dayHourEvents.map((ev) => (\n    <div key={ev.id} title={ev.subject} className={`absolute ... text-xs text-white truncate ...`}>\n— neither the clickable slot nor the event chip has role, tabIndex, onKeyDown, or any focusable child.",
+      "why": "Keyboard and assistive-tech users cannot open the click-a-slot create flow at all, and synced events (including CONFLICT-state ones flagged only by a ⚠ glyph and a title tooltip) are invisible to the Tab order and screen readers — the page's primary content is mouse-only, violating WCAG 2.1.1.",
+      "fix": "Render each slot and each event as a <button> with an aria-label (e.g. 'Tue 10:00 — create event', '⚠ Sync conflict: {subject}, 10:00–10:30, Google'), and move chips into the button content.",
+      "effort": "M",
+      "dimension": "ux-states-a11y",
+      "fid": "ux-states-a11y-4",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "RFP pipeline page shows the upload zone while the resume query is still loading after a refresh",
+      "severity": "major",
+      "file": "apps/web/src/pages/RfpPipelinePage.tsx",
+      "line": 140,
+      "evidence": "{stage === 'idle' && <RfpUploadZone />}\n— line 62: `const { data: latest } = useRfpLatestOrchestration(opportunityId);` discards isLoading; the store resets to 'idle' on mount (lines 70–74) and only flips to the resumed stage after the query settles (lines 80–87).",
+      "why": "Refreshing mid-run (or returning to the page) briefly — or for the whole duration of a slow request — presents 'upload your RFP' for an RFP that is already being processed or awaiting approval. A user can start a duplicate upload over a running orchestration, and the flash of the wrong state erodes trust in the live pipeline view.",
+      "fix": "Use the query's isLoading: while the latest-orchestration check is in flight and stage==='idle', render a skeleton/spinner instead of RfpUploadZone.",
+      "effort": "S",
+      "dimension": "ux-states-a11y",
+      "fid": "ux-states-a11y-5",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Agent create/update failures are silent: awaited mutation rejection is void-ed with no error UI",
+      "severity": "major",
+      "file": "apps/web/src/pages/AgentsPage.tsx",
+      "line": 130,
+      "evidence": "const handleCreate = async (body) => {\n  await createAgent.mutateAsync(body);\n  setDialogOpen(false);\n};\n... onSubmit={(body) => { ... void handleCreate(body); }}\n— hooks/useAgents.ts contains no onError/toast, AgentDialog receives only `isPending`, and there is no global MutationCache onError.",
+      "why": "If creating or updating an RFP agent fails, the rejected promise from `void handleCreate(body)` is unhandled: the dialog stays open, the submit button just stops saying its pending label, and the user gets no indication their agent configuration was not saved.",
+      "fix": "Wrap the mutateAsync calls in try/catch and surface toast.error (pattern already used in AgentStudioPage.tsx:72/143), or thread an error message into AgentDialog.",
+      "effort": "S",
+      "dimension": "ux-states-a11y",
+      "fid": "ux-states-a11y-6",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Global /search runs up to 6 independent DB queries strictly sequentially",
+      "severity": "major",
+      "file": "apps/api/src/routes/search.ts",
+      "line": 81,
+      "evidence": "Line 57: `const opps = await prisma.$queryRaw<...>` ... Line 81: `const contacts = await prisma.contact.findMany({` ... Line 106: `const companies = await prisma.companyEnrichment.findMany({` ... Line 131: `const tasks = await prisma.task.findMany({` ... Line 152: `const notes = await prisma.note.findMany({` ... Line 176: `const orders = await prisma.salesOrder.findMany({` — each inside its own `if (requestedTypes.includes(...))` block, awaited one after another with no data dependency between them.",
+      "why": "The default request (no `types` param) executes all six queries back-to-back, so global search latency is the SUM of six ILIKE scans instead of the max. This endpoint backs the command palette and search page typeahead — the single most latency-sensitive interaction in the app — and the slowdown multiplies under the palette's per-keystroke firing (see separate finding).",
+      "fix": "Run the six per-type lookups with `Promise.all` (each returning its mapped items), then apply `addResults` in the existing fixed type order after all resolve — ordering and the 30-item cap are preserved because addResults is called in deterministic sequence on the resolved arrays.",
+      "effort": "S",
+      "dimension": "performance",
+      "fid": "performance-0",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "GET /api/opportunities list pulls the `intel` JSONB column for every row but never returns it",
+      "severity": "major",
+      "file": "apps/api/src/routes/opportunities.ts",
+      "line": 57,
+      "evidence": "Lines 39-74: `const items = await prisma.opportunity.findMany({ where: {...}, include: { owner: {...}, territory: {...}, pipelineStage: {...}, _count: {...} }, ... take: limit + 1 })` — `include` (not `select`) fetches all scalar columns. Schema (packages/db/prisma/schema.prisma:378): `intel Json @default(\"{}\")`, seeded with full intel payloads (`seed.ts:133 intel: intelFor(o.code)` — financials, triggers, decision units). The list serializer (apps/api/src/serializers/opportunity.ts:64-90 `serializeOpportunity`) never reads `intel`; only `serializeOpportunityFull` (detail route) does.",
+      "why": "The hottest list endpoint (opportunities table, pipeline board, palette search, dashboard) transfers up to 101 multi-KB JSONB blobs from Postgres into Node per request and then throws them away — wasted DB I/O, network, and JSON deserialization that grows linearly as enrichment fills `intel`. Same pattern on GET /api/leads (leads.read.routes.ts:43 `include: { owner: ... }` pulls `intel` + `notes` the list serializer drops).",
+      "fix": "Replace `include` with an explicit `select` listing only the fields `serializeOpportunity` consumes (id, code, customer, name, stage, pipelineStageId, valueMicros, probability, dueDate, industry, logoUrl, country, territoryId, updatedAt, viewCount + the existing relation selects). Apply the same projection to the leads list query.",
+      "effort": "S",
+      "dimension": "performance",
+      "fid": "performance-1",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Command palette fires two network searches on every keystroke — no debounce or deferral",
+      "severity": "major",
+      "file": "apps/web/src/components/command/usePaletteItems.tsx",
+      "line": 61,
+      "evidence": "Lines 61-70: `const oppSearch = useQuery({ enabled: query.trim().length >= 2, queryKey: ['palette:opps', query], queryFn: ... api(`/api/opportunities?search=...`) }); const globalSearch = useGlobalSearch(query);` — `query` is the raw input state (CommandPalette.tsx:75 `const [query, setQuery] = useState('')`, :83 `usePaletteItems(query, onClose)`), and useGlobalSearch.ts:19-26 has no debounce either.",
+      "why": "Every keystroke past 2 characters creates two new query keys and two HTTP requests; typing a 10-char query fires ~16 requests, each of which triggers up to 6 sequential ILIKE table scans server-side (search.ts). Abort signals cancel the client wait but the Postgres work is already dispatched — a self-inflicted load amplifier on the most-used shortcut. ContactsPage already solved this with useDeferredValue (ContactsPage.tsx:33), so the palette is below the codebase's own bar.",
+      "fix": "Debounce the search term before it reaches the query keys: keep instant local filtering on `query`, but derive `const debouncedQuery = useDebouncedValue(query, 250)` (or at minimum `useDeferredValue`) and pass that to `oppSearch`'s queryKey and `useGlobalSearch`.",
+      "effort": "S",
+      "dimension": "performance",
+      "fid": "performance-2",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Two copies of framer-motion shipped: `motion@12.40` (login) duplicates `framer-motion@12.38` (app-wide)",
+      "severity": "major",
+      "file": "apps/web/src/components/login/Hero.tsx",
+      "line": 2,
+      "evidence": "Hero.tsx:1-2: `import { useReducedMotion } from 'framer-motion';` + `import { motion } from 'motion/react';` — both libraries in one component. apps/web/package.json declares both `\"framer-motion\": \"^12.38.0\"` and `\"motion\": \"^12.40.0\"`; pnpm-lock.yaml resolves BOTH `framer-motion@12.38.0` (line 4325) and `framer-motion@12.40.0` (line 4339, pulled in by `motion@12.40.0`). All six login components (Hero, Navbar, HeroBadge, DemoSignIn, BottomLeftCard, BottomRightCorner) import from 'motion/react'.",
+      "why": "Vite bundles two full copies of the motion runtime (~45KB gzip each) — the login chunk pays for framer-motion@12.40 while the shell already ships 12.38, roughly doubling animation-library bytes on the demo entry route where LCP < 2.5s is the stated gate. Bonus correctness hazard: the two copies have separate React contexts, so App.tsx's `<MotionConfig reducedMotion>` (framer-motion) does not govern the 'motion/react' components.",
+      "fix": "Standardize on one import source: change the six login components to `import { motion } from 'framer-motion'` and remove the `motion` dependency (or vice-versa, aliasing `framer-motion` → `motion` in vite config so the lockfile resolves a single copy).",
+      "effort": "M",
+      "dimension": "performance",
+      "fid": "performance-3",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Login hero autoplays a full-screen CloudFront MP4 with preload=\"auto\", no poster, and ignores reduced motion",
+      "severity": "major",
+      "file": "apps/web/src/components/login/Hero.tsx",
+      "line": 30,
+      "evidence": "Lines 25-34: `<video autoPlay muted loop playsInline preload=\"auto\" className=\"absolute inset-0 w-full h-full object-cover ...\"> <source src={VIDEO_URL} type=\"video/mp4\" /> </video>` where VIDEO_URL (line 9) is a remote CloudFront .mp4. The component computes `const reducedMotion = useReducedMotion()` (line 13) but only applies it to the h1/p text animations — the video plays regardless.",
+      "why": "The entry route downloads a multi-MB video that competes with the JS chunks for bandwidth; with no `poster`, the hero background paints blank until enough video buffers, pushing LCP well past the 2.5s budget on median connections. Playing it under prefers-reduced-motion also violates the repo's own mandatory reduced-motion rule.",
+      "fix": "Add a `poster` (first-frame WebP/AVIF) so LCP is an image, set `preload=\"metadata\"` (or `none` + lazy attach src after first paint), and render the static poster instead of the video when `reducedMotion` is true.",
+      "effort": "S",
+      "dimension": "performance",
+      "fid": "performance-4",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Tiptap + Y.js editor stack statically bundled into the three hottest detail-page chunks",
+      "severity": "major",
+      "file": "apps/web/src/pages/OpportunityDetailPage.tsx",
+      "line": 18,
+      "evidence": "OpportunityDetailPage.tsx:18: `import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';` (same static import in ContactDetailPage.tsx:14 and LeadDetailPage.tsx:15). CollaborativeRichTextEditor.tsx:20-23 statically imports `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/extension-collaboration`, `@tiptap/extension-collaboration-cursor` (entire ProseMirror stack) plus the yjs binding; rendered unconditionally at the bottom of the page (OpportunityDetailPage.tsx:284).",
+      "why": "Tiptap + ProseMirror + yjs adds roughly 100KB gzip of parse/execute cost to the opportunity, lead, and contact detail chunks — the most-navigated record views in the CRM — for a below-the-fold scratch-pad most visits never touch. First navigation to any record pays editor boot cost before the page interactive.",
+      "fix": "Code-split the editor: `const CollaborativeNotesSection = lazy(() => import('@/components/editor/CollaborativeNotesSection'))` wrapped in `<Suspense fallback={<LoadingSkeleton/>}>`, or mount it on first interaction/intersection so the detail chunk stays editor-free.",
+      "effort": "S",
+      "dimension": "performance",
+      "fid": "performance-5",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Web ships an entire analytics report-builder against API endpoints that do not exist (GET/POST /api/reports, /run, /runs, /duplicate)",
+      "severity": "critical",
+      "file": "apps/web/src/hooks/useAnalyticsReports.ts",
+      "line": 147,
+      "evidence": "useAnalyticsReports.ts:147 `queryFn: () => api<Report[]>('/api/reports')`, :155 `api<Report>(`/api/reports/${id}`)`, :225 `api<ReportRun>(`/api/reports/${id}/run`, ...)`, :236 `api<ReportRun>('/api/reports/run', ...)`. The API registers only legacy stat routes: apps/api/src/routes/reports.ts:39 `server.get('/reports/pipeline', ...)` (plus /reports/sales-intelligence, /reports/leads, /reports/service-desk, /reports/tasks). server.routes.ts:120 registers only `reportsRoutes` — no analytics-reports CRUD/run module exists anywhere under apps/api/src. ReportsListPage is routed at /reports/list (AppRoutes.tsx:295-301) and WidgetRenderer.tsx:28 `import { useReportRun, useRunReport } from '@/hooks/useAnalyticsReports'`.",
+      "why": "Every visit to /reports/list 404s (api() normalizes to /api/v1/reports which Fastify never registered) — list, create, run, duplicate, delete, preview, and the dashboard widgets that render saved report runs are all dead. A whole shipped, routed, navigable feature is broken for every user.",
+      "fix": "Either implement the analytics-reports API (Report + ReportRun CRUD/run routes with shared Zod schemas in packages/shared) or remove/feature-flag ReportsListPage, the /reports/list route, and report-backed widgets until the backend lands. Add a shared ReportQuery schema so web and API cannot drift again.",
+      "effort": "L",
+      "dimension": "contracts-shared",
+      "fid": "contracts-shared-0",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Lead conversion caps opportunity value at €1M — micros field reuses the units-scale max bound",
+      "severity": "major",
+      "file": "packages/shared/src/schemas/leads.ts",
+      "line": 125,
+      "evidence": "leads.ts:125 `opportunityValueMicros: z.number().min(0).max(1_000_000_000_000).optional()` — 1e12 MICROS = €1,000,000. The dialog sends micros: ConvertLeadDialog.tsx:68 `opportunityValueMicros: Math.round(Number(e.target.value) * 1_000_000)`. Compare the units-based cap it was copied from: opportunity.ts:65 `value: z.number().nonnegative().max(1_000_000_000_000)` (= €1T), and the references route which uses the correctly scaled micros cap: references.ts:102 `valueMicros: z.number().int().min(0).max(1_000_000_000_000_000)`.",
+      "why": "Converting a lead with opportunity value above €1,000,000 returns 400 and the UI shows only the generic toast 'Failed to convert lead' (LeadDetailPage.tsx:83). In a bid/presales CRM where deals routinely exceed €1M, the lead→opportunity conversion path is effectively unusable for the most important deals.",
+      "fix": "Change the bound to micros scale: `.max(1_000_000_000_000_000_000)` or align with the create-opportunity cap (1e12 units × 1e6 = 1e18 micros); add a test converting a €5M lead. Surface zod field errors in ConvertLeadDialog instead of the generic toast.",
+      "effort": "S",
+      "dimension": "contracts-shared",
+      "fid": "contracts-shared-1",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "ConvertLeadDialog stage selection is silently stripped by the API — converted opportunity always lands in the first pipeline stage",
+      "severity": "major",
+      "file": "apps/web/src/pages/leadDetail/ConvertLeadDialog.tsx",
+      "line": 18,
+      "evidence": "ConvertLeadDialog.tsx:18 `stage: OpportunityStage;` in ConvertForm, :35 `stage: 's1_ongoing'` default, :87-90 renders a <select> with options up to 'closed_won'/'closed_lost'; the form is posted verbatim via useLeads.ts:67 `api(`/api/leads/${id}/convert`, { method: 'POST', body })`. But the shared body schema has no `stage`: leads.ts:123-127 `LeadConvertBody = z.object({ opportunityName…, opportunityValueMicros…, pipelineStageId… })` — zod strips the unknown key — and the route then defaults: leads.write.routes.ts:280 `let stageKey = 's1_lead';` … :291-299 falls back to `tx.pipelineStage.findFirst({ … orderBy: { orderIndex: 'asc' } })`.",
+      "why": "The user explicitly picks a stage (e.g. 'Negotiation' or 'Closed won') during conversion, gets a success toast, and the opportunity is silently created in 'S1 Lead'. Pipeline reports, forecasts, and the Kanban all show the wrong stage with no error — classic web-sends-field-API-ignores version skew.",
+      "fix": "Either add `stage: OpportunityStage.optional()` to LeadConvertBody and resolve it to the matching pipelineStage key in the convert route, or have the dialog translate the chosen stage to `pipelineStageId` (it already fetches /pipeline-stages elsewhere) and drop the dead `stage` form field.",
+      "effort": "M",
+      "dimension": "contracts-shared",
+      "fid": "contracts-shared-2",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Opportunity money crosses the wire in three different encodings: units number ('value'), micros string ('valueMicros'), micros number ('valueMicros'/'valueSum')",
+      "severity": "major",
+      "file": "apps/api/src/serializers/opportunity.ts",
+      "line": 76,
+      "evidence": "serializers/opportunity.ts:76 `value: Number(o.valueMicros) / 1_000_000` (units, number) for /opportunities, while the SAME logical field is micros-string on company detail — company.ts:107 `valueMicros: z.string()` / serializers/company.ts:100 `valueMicros: x.valueMicros.toString()` — and micros-number on analytics — crm.analytics.ts:106 `valueMicros: z.number().int().nonnegative()` and reports.ts:26 `valueSum: z.number()` populated by funnel.service.ts:23 `valueSum: Number(g._sum.valueMicros ?? 0) / 1_000_000` (units again, despite the 'micros-on-wire' doctrine stated in sales-dashboard.ts:3-5).",
+      "why": "CLAUDE.md mandates micros on the wire, formatted at the edge. The per-endpoint mix forces every consumer to know which scale each field uses; the €1M lead-convert cap bug (other finding) is direct fallout of this ambiguity, and `Number(o.valueMicros)` silently loses precision for values ≥ 2^53 micros. Any new consumer (MCP tools, Dust push, CSV exports) must re-learn the scale per endpoint.",
+      "fix": "Standardize new/changed endpoints on string-encoded micros (the documented convention in sales-orders/invoices/sales-dashboard); for the legacy `value`-in-units fields, document the unit in the shared schema with a `/** units (EUR), not micros */` doc-comment and add a lint/codereview rule that any field touching valueMicros must end in `Micros`.",
+      "effort": "L",
+      "dimension": "contracts-shared",
+      "fid": "contracts-shared-3",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "All CI quality gates target a 'main' branch that does not exist — no PR or push ever runs typecheck/lint/tests",
+      "severity": "critical",
+      "file": ".github/workflows/ci.yml",
+      "line": 5,
+      "evidence": "on:\n  push:\n    branches: [main]\n  pull_request:\n    branches: [main]\n— but `git branch -r | grep -iE 'main|master'` returns nothing; remote HEAD is `demo` and the integration branch is `feat/wave9-rfp-engine`. Same `branches: [main]` filter in e2e.yml:11-13, semgrep.yml:11-13, lighthouse.yml:5-7, dependency-review.yml:13.",
+      "why": "The entire CI suite (typecheck, lint, unit, integration with Postgres+Redis, Playwright E2E, Semgrep, dependency review) is dead code: it never triggers on any push or PR because no branch named 'main' exists in the repo. Merges into demo/feat/wave9-rfp-engine are completely ungated — broken builds, failing tests, and vulnerable dependencies ship silently. Only gitleaks (unfiltered triggers) actually runs.",
+      "fix": "Change the branch filters to the real integration branches, e.g. `branches: [demo, 'feat/**']` (or rename the default branch to main), in ci.yml, e2e.yml, semgrep.yml, lighthouse.yml and dependency-review.yml, and add branch-protection required checks on the default branch.",
+      "effort": "S",
+      "dimension": "infra-worker",
+      "fid": "infra-worker-0",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "MCP server Redis client never reconnects; with prod fail-closed rate limiting one Redis blip permanently 503s all MCP traffic while /health stays green",
+      "severity": "critical",
+      "file": "apps/mcp-server/src/redis.ts",
+      "line": 17,
+      "evidence": "export const redis = new Redis(redisUrl, { connectTimeout: 1_000, enableOfflineQueue: false, maxRetriesPerRequest: 1, retryStrategy: () => null });\n— `retryStrategy: () => null` means ioredis gives up permanently after one disconnect. The comment claims it 'Mirrors apps/api/src/redis.ts', but the API version has `ensureRedisReady()` (apps/api/src/redis.ts:22-37) to reconnect; the MCP copy has no reconnect path. In production the limiter fails CLOSED: hourly-rate-limit.ts:153-155 `if (failClosedOnRedisError) { ... throw reply.server.httpErrors.serviceUnavailable(...)}` and server.ts:118 `skipOnError: !failClosedOnRateLimitError`. Meanwhile main.ts:28-45 /health only probes Prisma, not Redis.",
+      "why": "A single transient Redis restart/network blip puts the client into terminal 'end' state. Every subsequent /mcp request hits the dead client, the rate limiter fails closed, and the server returns 503 forever — a permanent production outage of the whole MCP surface until someone manually restarts the pod. The Docker HEALTHCHECK hits /health (DB-only), so the orchestrator keeps the bricked pod in rotation indefinitely.",
+      "fix": "Port `ensureRedisReady()`/`redisStatusCanReconnect()` from apps/api/src/redis.ts into apps/mcp-server/src/redis.ts and call it before `tickAndRead()` (or use a sane `retryStrategy: (times) => Math.min(times * 200, 2000)`), and include a Redis ping in the MCP /health response so a dead limiter takes the pod out of rotation.",
+      "effort": "S",
+      "dimension": "infra-worker",
+      "fid": "infra-worker-1",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "No 'error' listener on any of the ~30 BullMQ Workers/Queues — connection and lock-renewal failures are silently swallowed to console.error, invisible to Pino/Sentry",
+      "severity": "major",
+      "file": "apps/worker/src/main.ts",
+      "line": 84,
+      "evidence": "const workers: Worker[] = [];\nconst queues: Queue[] = [];\n— grep for `\\.on\\('error'` across apps/worker/src finds only the shared connection (main.ts:81) and test files; not one production Worker or Queue registers an error handler (e.g. dust-poll.ts:127-160 `const worker = new Worker(QUEUE_NAME, async (job) => {...}, { connection });` then only `workers.push(worker)`). BullMQ 5.76.6 worker.js:131 `this.blockingConnection.on('error', error => this.emit('error', error))` and lock-manager.js:44 `this.worker.emit('error', new Error(`could not renew lock for job ${jobId}`))` route these to the unhandled-'error' fallback in queue-base.js:89-103, which just does `console.error(err)`.",
+      "why": "Blocking-connection drops, scheduler errors, and — worst — lock-renewal failures (the precursor to a job being marked stalled and processed TWICE, e.g. double webhook deliveries or double Dust/LLM spend) are dumped to raw stderr instead of the structured Pino/Sentry pipeline. In production (LOG_LEVEL=warn, JSON logs) these are effectively invisible, so duplicate processing and Redis instability cannot be diagnosed or alerted on. Also violates the repo's own 'no console output, use Pino' rule via the library fallback.",
+      "fix": "In main.ts after the start* calls (or inside each start function), iterate the registered handles: `for (const w of workers) w.on('error', (err) => log.error({ err, queue: w.name }, 'worker error'));` and the same for `queues`, optionally wiring Sentry capture.",
+      "effort": "S",
+      "dimension": "infra-worker",
+      "fid": "infra-worker-2",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "API routes construct a new BullMQ Queue per request and never close it — listener/memory leak on the shared Redis connection",
+      "severity": "major",
+      "file": "apps/api/src/routes/calendar.ts",
+      "line": 50,
+      "evidence": "function getPushQueue(): Queue {\n  return new Queue(CALENDAR_PUSH.name, { connection: redis, defaultJobOptions: CALENDAR_PUSH.defaultJobOptions });\n}\n— called per request at calendar.ts:168, 239, 292 with no `queue.close()`. Same pattern in bookings-public.ts:47-52, calls.read.routes.ts:221-224, calls-webhooks.ts:131-134 and 316-319. BullMQ queue-base.js:43 attaches `this.connection.on('error', ...)` to the shared ioredis client on every construction. monitoring.ts:146-151 documents the convention these violate: 'WHY close after each call: Queue objects hold a Redis connection per instance... close() releases BullMQ's internal client'.",
+      "why": "Every calendar create/update/delete, public booking, call-analysis trigger, and Zoom/Twilio webhook accumulates un-removed event listeners and BullMQ internal state on the long-lived shared Redis connection. Under production traffic this grows unboundedly: MaxListenersExceededWarning noise, rising memory in the 512MB-capped api container, and eventual degradation/restart — a slow-burn leak in the hottest write paths.",
+      "fix": "Hoist each queue to a lazily-initialized module-level singleton (the pattern already used by apps/api/src/queues/*.ts, e.g. rfp-story-match.ts:37 `queueSingleton = new Queue(...)`), or `await queue.close()` in a finally block as monitoring.ts does.",
+      "effort": "S",
+      "dimension": "infra-worker",
+      "fid": "infra-worker-3",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Zoom recording.completed webhook enqueues call-fetch-recording without an idempotency jobId — duplicate webhook delivery double-transcribes calls",
+      "severity": "major",
+      "file": "apps/api/src/routes/integrations/calls-webhooks.ts",
+      "line": 135,
+      "evidence": "await queue.add('zoom-recording', {\n  callSessionId: session.id,\n  orgId: session.orgId,\n  provider: 'ZOOM',\n  meetingUuid,\n});\n— no `jobId` option, and the downstream processor (apps/worker/src/queues/calls.ts:101-187 processFetchRecording) has no already-processed guard: it unconditionally updates recordingUrl and enqueues 'transcribe', which enqueues 'analyze'. The Twilio path at calls-webhooks.ts:316-329 has the same gap.",
+      "why": "Zoom (and Twilio) webhooks are at-least-once and retry on slow/5xx responses. Each duplicate delivery launches a full second pipeline for the same call session: a second Deepgram transcription (paid per audio minute), a second LLM analysis, and duplicate writes/deal updates. Real money and corrupted call analytics from a routine webhook retry.",
+      "fix": "Pass a natural idempotency key when enqueuing: `{ jobId: `zoom:${meetingUuid}` }` (and `twilio:${RecordingSid}` for the Twilio path) so BullMQ dedupes re-deliveries; optionally also skip in processFetchRecording when the session already has a recordingUrl/transcript.",
+      "effort": "S",
+      "dimension": "infra-worker",
+      "fid": "infra-worker-4",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "dust-poll: one org's Dust failure aborts the poll for all remaining orgs and trips a global circuit breaker — tenant isolation failure in scheduled sync",
+      "severity": "major",
+      "file": "apps/worker/src/queues/dust-poll.ts",
+      "line": 146,
+      "evidence": "try {\n  for (const orgId of targetOrgIds) {\n    await pollOrgDust(orgId, log);\n  }\n  consecutiveFailures = 0;\n} catch (err) {\n  consecutiveFailures++;\n  if (consecutiveFailures >= CIRCUIT_THRESHOLD) {\n    circuitOpenUntil = Date.now() + CIRCUIT_COOLDOWN_MS;\n    ...\n  throw err;\n}\n— the try wraps the whole multi-org loop; pollOrgDust can throw (dust.listDocuments on a 401/expired key), so every org after the failing one in iteration order is skipped.",
+      "why": "Multi-tenant reliability bug: a single tenant with revoked/expired Dust credentials starves Dust sync for every org sorted after it on every 5-minute tick, and after 3 ticks the circuit breaker (consecutiveFailures/circuitOpenUntil are global, lines 30-33) suspends polling for ALL tenants for 10 minutes. One bad customer config silently breaks the feature for everyone else, with the per-org failure indistinguishable from a platform outage.",
+      "fix": "Move the try/catch inside the loop: catch per-org errors, log with orgId, write a failed sync_event for that org, and only count a tick as failed (for the circuit) when all orgs fail or the failure is infrastructure-level (e.g. DB/Redis), not per-tenant credentials.",
+      "effort": "S",
+      "dimension": "infra-worker",
+      "fid": "infra-worker-5",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Calendar feature fully built but orphaned — no navigation surface links to /calendar",
+      "severity": "major",
+      "file": "apps/web/src/routes/AppRoutes.tsx",
+      "line": 270,
+      "evidence": "AppRoutes.tsx:270 `path=\"/calendar\"` renders CalendarPage, whose header (CalendarPage.tsx:2) reads \"CalendarPage — month/week/day view of synced events with two-way sync support ... 'Create event' modal that enqueues a push to the connected calendar\". Repo-wide search finds zero inbound links: navConfig.ts NAV_SECTIONS (lines 37-104) has no '/calendar' entry, commandPaletteUtils.ts NAV_TARGETS (lines 40-52) omits it, useGlobalShortcuts.ts CHORD_TARGETS (lines 25-35) omits it, and no Link/navigate('/calendar') exists anywhere in apps/web/src.",
+      "why": "An entire table-stakes CRM capability (calendar with Google/MS two-way sync, conflict badges, event creation) was built, tested, and routed, but no user can ever discover or reach it — it only loads if someone hand-types the URL. The feature is effectively shipped dead weight while users believe BidStack has no calendar.",
+      "fix": "Add { to: '/calendar', label: 'Calendar', icon: 'calendar' } to the 'Workspace' section of navConfig.ts NAV_SECTIONS (this propagates to both Sidebar and MobileNav), and add it to NAV_TARGETS in commandPaletteUtils.ts.",
+      "effort": "S",
+      "dimension": "feature-completeness",
+      "fid": "feature-completeness-0",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Calls feature (sessions list, transcripts, AI summaries) orphaned — /calls unreachable",
+      "severity": "major",
+      "file": "apps/web/src/routes/AppRoutes.tsx",
+      "line": 278,
+      "evidence": "AppRoutes.tsx:278 `path=\"/calls\"` renders CallsPage, whose header (CallsPage.tsx:2-11) reads \"Full-page list of all call sessions in the org, with filters ... Clicking a row opens a slide-over detail panel with CallSummaryPanel and CallTranscriptViewer tabs.\" No entry in navConfig.ts NAV_SECTIONS, no NAV_TARGETS entry, no Link/navigate('/calls') anywhere in apps/web/src (verified by grep).",
+      "why": "Call logging/recording review is a CRM table-stake (Salesforce, HubSpot, Pipedrive all surface it prominently). A 14 KB page plus CallSummaryPanel/CallTranscriptViewer components and the useCalls hook family exist but are unreachable, so the activity-capture story silently loses its calls leg.",
+      "fix": "Add { to: '/calls', label: 'Calls', icon: 'phone' } to the 'Workspace' section in navConfig.ts and to NAV_TARGETS in commandPaletteUtils.ts.",
+      "effort": "S",
+      "dimension": "feature-completeness",
+      "fid": "feature-completeness-1",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Custom analytics dashboards cluster orphaned — /analytics and /dashboards only link to each other",
+      "severity": "major",
+      "file": "apps/web/src/routes/AppRoutes.tsx",
+      "line": 324,
+      "evidence": "AppRoutes.tsx:324 `path=\"/analytics\"` and :332 `path=\"/dashboards\"` are routed, but the only inbound links in the entire web app are circular: AnalyticsDashboardPage.tsx:137/180 `to=\"/dashboards\"` and DashboardsListPage.tsx:142 `to={`/analytics?id=${d.id}`}`. Neither path appears in navConfig.ts, commandPaletteUtils.ts NAV_TARGETS, or useGlobalShortcuts.ts. AnalyticsDashboardPage.tsx:2 describes it as \"The user's main analytics workspace. Drag-resizable widget grid.\"",
+      "why": "Customizable reporting dashboards (widget grids, multiple dashboards per user) are a table-stake vs Salesforce/HubSpot/Attio. The whole feature — useDashboards CRUD hooks, WidgetRenderer, WidgetConfigModal — is a closed island no user can enter, so 'reporting dashboard' parity is claimable in code but false in product.",
+      "fix": "Add { to: '/analytics', label: 'Analytics', icon: 'reports' } and { to: '/dashboards', label: 'Dashboards', icon: 'dashboard' } under a Reporting group in navConfig.ts NAV_SECTIONS, or link them from the routed /reports page header.",
+      "effort": "S",
+      "dimension": "feature-completeness",
+      "fid": "feature-completeness-2",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Custom Objects feature cluster unreachable — entry points only exist inside the cluster itself",
+      "severity": "major",
+      "file": "apps/web/src/routes/AppRoutes.tsx",
+      "line": 360,
+      "evidence": "AppRoutes.tsx:360 routes `path=\"/custom-objects\"` (plus /o/:objectKey at :387 and admin editor routes in AdminRoutes.tsx:39-64). The only links to /settings/custom-objects come from inside the cluster: CustomObjectListPage.tsx:70, CustomObjectDetailPage.tsx:235, CustomObjectEditorPage.tsx:66/79, CustomObjectsAdminPage.tsx:190. SettingsLayout.tsx GROUPS (lines 26-53) contains no custom-objects section; navConfig.ts and NAV_TARGETS contain no '/custom-objects'.",
+      "why": "Customizable objects are the headline table-stake of Attio/Salesforce-class CRMs. The full stack exists (definitions, fields, relations, record list/detail, admin editor, useCustomObjects hooks) but a user starting from the sidebar or Settings can never reach any of it — circular links only work once you are already inside.",
+      "fix": "Add a 'Custom objects' item (admin: true) to SettingsLayout GROUPS 'Enterprise controls' that links to /settings/custom-objects, and add { to: '/custom-objects', label: 'Custom Objects', icon: 'list' } to navConfig.ts for record browsing.",
+      "effort": "S",
+      "dimension": "feature-completeness",
+      "fid": "feature-completeness-3",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Saved analytics reports list (/reports/list) orphaned; its own header claims it is the /reports entry",
+      "severity": "major",
+      "file": "apps/web/src/pages/ReportsListPage.tsx",
+      "line": 1,
+      "evidence": "ReportsListPage.tsx:1-4: \"// ReportsListPage — /reports (analytics reports) ... This replaces/augments the legacy ReportsPage which served pipeline stats ... this is the new analytics entry.\" In reality AppRoutes.tsx:296 routes it at `path=\"/reports/list\"` while /reports (AppRoutes.tsx:288) still serves the legacy ReportsPage, and grep finds no Link/navigate to '/reports/list' anywhere in apps/web/src.",
+      "why": "Saved/scheduled reports with run/duplicate/delete actions (useRunReport, useDuplicateReport, useDeleteReport) are table-stakes reporting management — built, routed, but unreachable, and the in-code comment contradicts the actual routing, guaranteeing future confusion about which reports surface is canonical.",
+      "fix": "Either link 'Saved reports' from the routed ReportsPage header to /reports/list and add it to NAV_TARGETS, or fulfill the comment by routing ReportsListPage at /reports and moving the legacy pipeline stats to a tab; update the stale header comment either way.",
+      "effort": "S",
+      "dimension": "feature-completeness",
+      "fid": "feature-completeness-4",
+      "verdict": {
+        "isReal": true,
+        "confidence": "high",
+        "corrected_severity": "major",
+        "notes": "Verified with own eyes. (1) ReportsListPage.tsx:1-4 header claims the page serves /reports and is \"the new analytics entry\"; AppRoutes.tsx:288 actually routes /reports to legacy ReportsPage and ReportsListPage only at /reports/list (AppRoutes.tsx:296). (2) Exhaustive grep of apps/web/src finds zero Link/navigate references to '/reports/list' outside the route definition — sidebar nav (navConfig.ts:101), command palette (commandPaletteUtils.ts:47), keyboard shortcuts (useKeyboardShortcuts.ts:17, useGlobalShortcuts.ts:32), SidebarCards.tsx:53, and RfpResponseHubPage.tsx:316 all point to /reports; ReportsPage.tsx (read in full) has no tab or link to it. (3) No compensating control: the only other useAnalyticsReportsList consumer is WidgetConfigModal.tsx (widget source dropdown), which exposes none of the run/duplicate/delete management actions. AppRoutes.tsx:303-306 comment even stubs /reports/new and /reports/:id/edit specifically so ReportsList actions don't 404, confirming intended-but-incomplete integration. Page is reachable only by hand-typed URL, so severity is low-end major (feature surface built and functional but undiscoverable, plus actively misleading in-code documentation), not minor."
+      }
+    },
+    {
+      "title": "Predictive scoring admin page (/admin/predictive) has no inbound link from any admin surface",
+      "severity": "major",
+      "file": "apps/web/src/routes/AdminRoutes.tsx",
+      "line": 66,
+      "evidence": "AdminRoutes.tsx:66 routes `path=\"/admin/predictive\"` behind RequireAdmin, but a repo-wide grep for '/admin/predictive' matches only the route definition and the API URL strings in usePredictiveScore.ts:97/109. SettingsLayout.tsx GROUPS (lines 26-53) has no predictive entry; navConfig.ts ADMIN_SETTINGS (line 110) contains only '/settings'.",
+      "why": "Admins cannot reach the model management/retrain controls (PredictiveAdminPage, 9.9K) that govern lead/deal scoring shown elsewhere in the app (LeadScoreBadge), so the scoring feature cannot be operated, audited, or retrained through the UI.",
+      "fix": "Add an admin-gated 'Predictive scoring' item to SettingsLayout GROUPS 'Enterprise controls' linking to /admin/predictive (matching how RFP Analytics is exposed as a Settings tab).",
+      "effort": "S",
+      "dimension": "feature-completeness",
+      "fid": "feature-completeness-5",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Duplicate detection is report-only — no merge action exists anywhere in the app",
+      "severity": "major",
+      "file": "apps/web/src/components/integrations/DataQualitySection.tsx",
+      "line": 127,
+      "evidence": "DataQualitySection.tsx:127-131 renders detected duplicates as a read-only list: `<ul className=\"mt-3 divide-y divide-[var(--border-subtle)]\">{issues.map((issue) => (<IssueRow key={issue.id} issue={issue} />))}</ul>` with KIND_LABEL 'duplicate_company' (line 17). A repo-wide case-insensitive grep for 'merge' in apps/web/src matches only tailwind-merge utilities and RFP board layout comments — no record-merge mutation, dialog, or route exists.",
+      "why": "Salesforce, HubSpot, Pipedrive, and Attio all ship one-click duplicate merge; detection without remediation means flagged duplicate companies/contacts can only be fixed by manual delete-and-retype, losing notes, tasks, and opportunity links — the exact data-loss scenario merge exists to prevent.",
+      "fix": "Add a 'Merge' action on duplicate_company/duplicate-contact issue rows opening a survivor-picker dialog, backed by a transactional org-scoped API endpoint that reassigns child records (contacts, opportunities, notes, tasks, files) to the surviving record and tombstones the loser in audit_log.",
+      "effort": "L",
+      "dimension": "feature-completeness",
+      "fid": "feature-completeness-6",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "Email integration absent — mailto anchors and unsent templates are the only email capability",
+      "severity": "major",
+      "file": "apps/web/src/pages/ContactDetailPage.tsx",
+      "line": 96,
+      "evidence": "ContactDetailPage.tsx:96 `<a href={`mailto:${c.email}`} className=\"hover:text-[var(--brand-primary)]\">` is the deepest email affordance on a contact; same pattern at LeadDetailPage.tsx:131 and contacts/ContactTable.tsx:298. EmailTemplatesSection.tsx exists in Settings but no compose/send/log path consumes templates; an SmsComposerModal exists (components/sms/SmsComposerModal.tsx:2 \"compose and send SMS from a CRM entity\") while no email equivalent exists anywhere in apps/web/src/components.",
+      "why": "Email send-and-log is the single most-used table-stake in every benchmark CRM; reps live in it. BidStack ships SMS composing but not email, and the Settings email templates are write-only dead config since nothing can send them. SPEC.md §10 defers 'email sync' to post-v0.1, but template authoring without any send path is an inconsistent half-feature today.",
+      "fix": "Minimum viable parity: an EmailComposerModal (mirroring SmsComposerModal) on contact/lead/opportunity pages that sends via a server-side provider, consumes the existing EmailTemplates, and logs the send to the entity timeline; full inbox sync can stay post-v0.1.",
+      "effort": "L",
+      "dimension": "feature-completeness",
+      "fid": "feature-completeness-7",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    },
+    {
+      "title": "QuickStart onboarding checklist (/quick-start) unreachable — new users can never find it",
+      "severity": "major",
+      "file": "apps/web/src/routes/AppRoutes.tsx",
+      "line": 92,
+      "evidence": "AppRoutes.tsx:92 routes `path=\"/quick-start\"` to QuickStartPage (QuickStartPage.tsx:1-4: \"Single-page onboarding checklist with 8 items ... Progress bar reflects completedChecklist from the onboarding store\"). Grep across apps/web/src finds no Link, navigate, NAV_SECTIONS, NAV_TARGETS, or tour-steps reference to '/quick-start' — the only matches are the route definition and the page's own header comment.",
+      "why": "The onboarding checklist exists specifically to activate new users, but neither the ProductTour, SampleDataBanner, help drawer, nor any nav links to it, so activation tooling that was built and is maintained (onboarding store wiring) has zero distribution — directly hurting first-session success on a CRM being benchmarked for demo readiness.",
+      "fix": "Link /quick-start from the SampleDataBanner and the HelpDrawer, and surface it in navConfig.ts Home section for users whose completedChecklist is not full.",
+      "effort": "S",
+      "dimension": "feature-completeness",
+      "fid": "feature-completeness-8",
+      "verdict": {
+        "isReal": true,
+        "confidence": "low",
+        "notes": "verifier died — kept conservatively"
+      }
+    }
+  ],
+  "minors": [
+    {
+      "title": "Public signing submission endpoint lacks the rate limit its own comment promises",
+      "severity": "minor",
+      "file": "apps/api/src/routes/public-sign.ts",
+      "line": 78,
+      "evidence": "server.post(\n  '/sign/:token',\n  {\n    config: { public: true },  // <-- no rateLimit; header comment claims \"10 attempts per IP per hour\"\n    schema: {\n      params: z.object({ token: z.string().min(8).max(200) }),",
+      "why": "The file header (line 10) states \"Rate-limited aggressively: 10 attempts per IP per hour,\" but neither the GET nor POST /sign/:token route sets any `rateLimit` config (grep finds none). The endpoint accepts and acts on signature submissions where the token is the sole credential, and the schema even permits 8-char tokens. It therefore falls back to only the broad global IP limit, not the documented aggressive per-route cap — weaker brute-force/abuse protection than designed, on a legally-significant document-signing action. The same per-route gap exists on the other public token endpoints public-nps.ts (lines 257/278) and cs.ts /nps/surveys/:id/respond (line 214).",
+      "fix": "Add `rateLimit: { max: 10, timeWindow: '1 hour', keyGenerator: (req) => req.ip }` to the /sign/:token route config (and comparable caps to the NPS public endpoints) so behavior matches the documented protection.",
+      "effort": "S",
+      "dimension": "security-tenancy",
+      "fid": "security-tenancy-3",
+      "verified": "unverified-minor"
+    },
+    {
+      "title": "GET /activities cursor uses strict lt on occurredAt — rows sharing the boundary timestamp are skipped between pages",
+      "severity": "minor",
+      "file": "apps/api/src/routes/activities.ts",
+      "line": 137,
+      "evidence": "...(cursor ? { occurredAt: { lt: new Date(cursor) } } : {}),  — with orderBy { occurredAt: 'desc' } and nextCursor = items[items.length - 1]?.occurredAt.toISOString() (line 152); occurredAt defaults to new Date() so bulk/system writers stamp many rows with the same millisecond. nextCursor is also non-null whenever items.length > 0, even on the final page.",
+      "why": "When several activities share the page-boundary occurredAt (imports, webhook fan-out, system events logged in one tick), every row with that timestamp other than those on page 1 is silently dropped from the feed — users reviewing an account timeline miss activities with no indication. The always-set nextCursor additionally forces one guaranteed-empty extra fetch per feed.",
+      "fix": "Paginate on a compound key: orderBy [{ occurredAt: 'desc' }, { id: 'desc' }] with cursor { id } + skip 1 (id encoded in nextCursor), and return nextCursor only when items.length === limit at minimum.",
+      "effort": "S",
+      "dimension": "api-correctness-a",
+      "fid": "api-correctness-a-9",
+      "verified": "unverified-minor"
+    },
+    {
+      "title": "Global search caps results to 30 in fixed type order BEFORE sorting by relevance — exact matches in later types can be dropped",
+      "severity": "minor",
+      "file": "apps/api/src/routes/search.ts",
+      "line": 37,
+      "evidence": "const addResults = (items: typeof results) => { const remaining = totalCap - results.length; if (remaining > 0) { results.push(...items.slice(0, remaining)); } };  // called in fixed order opportunity→contact→company→task→note→sales_order; then at line 200: results.sort((a, b) => b.score - a.score);",
+      "why": "The 30-row cap is applied as each type is appended, in a hardcoded type order, and only afterwards are results sorted by score. With limit>~5 and many opportunity/contact hits, the cap fills before sales_order/note are queried, so an exact-match (score 100) sales order or note never appears even though it should outrank partial opportunity matches. Search relevance is silently order-biased rather than score-driven.",
+      "fix": "Collect all per-type results first, sort the combined list by score descending, then slice to totalCap — or interleave by score before truncating.",
+      "effort": "S",
+      "dimension": "api-correctness-b",
+      "fid": "api-correctness-b-4",
+      "verified": "unverified-minor"
+    },
+    {
+      "title": "detectCurrency parses the zustand persist envelope incorrectly — the user's saved display currency is never read by lib formatters",
+      "severity": "minor",
+      "file": "apps/web/src/lib/format.ts",
+      "line": 34,
+      "evidence": "const raw = window.localStorage.getItem('bidstack:currency-locale'); if (raw) { const parsed = JSON.parse(raw) as { currency?: string }; if (parsed.currency) return parsed.currency; } — but zustand persist (currency.ts:369-372, name 'bidstack:currency-locale', partialize) stores {\"state\":{\"currency\":\"USD\",\"autoDetect\":false},\"version\":0}, so parsed.currency is always undefined and the function always falls back to 'EUR'.",
+      "why": "Any formatMoney/formatMoneyMicros call without an explicit currency ignores the currency the user picked in the CurrencySelector and renders EUR, so screens mix the converted display currency (hook-based callers) with EUR (lib-based callers) after the user switches currency.",
+      "fix": "Read the envelope: `const parsed = JSON.parse(raw) as { state?: { currency?: string } }; if (parsed.state?.currency) return parsed.state.currency;` (keep the flat fallback for legacy values).",
+      "effort": "S",
+      "dimension": "web-correctness",
+      "fid": "web-correctness-8",
+      "verified": "unverified-minor"
+    },
+    {
+      "title": "Sales dashboard count KPIs hardcode en-US number formatting, bypassing the app's locale system",
+      "severity": "minor",
+      "file": "apps/web/src/pages/salesDashboard/dashboardHelpers.ts",
+      "line": 30,
+      "evidence": "return new Intl.NumberFormat('en-US').format(kpi.value); — while lib/format.ts:7-9 documents: \"WHY: hardcoded 'en-US' throughout the codebase broke FR/ES locales — numbers, dates, and currency symbols all rendered in English format\".",
+      "why": "Non-money KPIs (order counts etc.) on the Sales Dashboard render with English digit grouping ('1,234') for FR/ES users whose every other number on the same page is locale-formatted — regression against the documented i18n fix.",
+      "fix": "Use the locale-aware helper: `new Intl.NumberFormat(detectLocale()).format(kpi.value)` (export detectLocale from lib/format.ts or add a formatNumber helper there).",
+      "effort": "S",
+      "dimension": "web-correctness",
+      "fid": "web-correctness-9",
+      "verified": "unverified-minor"
+    },
+    {
+      "title": "24×24px icon-only buttons violate the 44×44 touch-target floor (toast dismiss, contacts clear-search)",
+      "severity": "minor",
+      "file": "apps/web/src/components/ui/Toast.tsx",
+      "line": 188,
+      "evidence": "className=\"ml-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] ...\"\n— same h-6 w-6 (24px) on ContactsPage.tsx:329 'Clear search' and webhooks/DeliveryHistoryPanel.tsx:104; repo convention for compensating exists (`pointer-coarse:min-h-11 pointer-coarse:min-w-11`, see pages/forecasts/ForecastList.tsx:191) but is not applied here.",
+      "why": "Dismissing a toast is time-pressured (it auto-expires) and a 24px target on touch devices is roughly a quarter of the mandated 44×44 area — the repo's own hard floor ('44×44px minimum touch targets on every interactive element') and WCAG 2.5.8 both fail.",
+      "fix": "Add `pointer-coarse:min-h-11 pointer-coarse:min-w-11` (the established codebase pattern) to the Toast dismiss, ContactsPage clear-search, and DeliveryHistoryPanel copy buttons.",
+      "effort": "S",
+      "dimension": "ux-states-a11y",
+      "fid": "ux-states-a11y-7",
+      "verified": "unverified-minor"
+    },
+    {
+      "title": "Calendar event chip fallback bg-gray-400 with text-white fails contrast (~1.9:1)",
+      "severity": "minor",
+      "file": "apps/web/src/pages/CalendarPage.tsx",
+      "line": 242,
+      "evidence": "className={`absolute inset-x-0.5 top-0.5 rounded px-1 py-0.5 text-xs text-white truncate\n  ${PROVIDER_COLORS[ev.provider] ?? 'bg-gray-400'}\n— PROVIDER_COLORS only defines google_workspace and microsoft_graph; any other provider renders white text on gray-400 (#9ca3af), ≈1.9:1 contrast.",
+      "why": "Event titles from any future/unknown provider become effectively unreadable (WCAG 1.4.3 requires 4.5:1 for this small text), and the hardcoded Tailwind gray bypasses the theme-token system the rest of the page uses, so it also ignores dark mode.",
+      "fix": "Fall back to a token pair, e.g. `bg-[var(--surface-sunken)] text-[var(--fg-primary)]` (and drop the unconditional text-white into the per-provider classes).",
+      "effort": "S",
+      "dimension": "ux-states-a11y",
+      "fid": "ux-states-a11y-8",
+      "verified": "unverified-minor"
+    },
+    {
+      "title": "Intake step buttons/badges use hardcoded light-palette colors with no dark variant",
+      "severity": "minor",
+      "file": "apps/web/src/pages/intake/ReviewStep.tsx",
+      "line": 120,
+      "evidence": "className=\"opacity-0 transition-opacity group-hover:opacity-100 ... hover:bg-red-50 hover:text-red-600 focus-visible:ring-2 ...\"\n— and ExtractStep.tsx:123: `${styles[status] ?? 'bg-gray-100 text-gray-700'}` while every other status in the map uses var(--danger-tint)/var(--success-tint) tokens.",
+      "why": "In dark mode the delete affordance hovers to a near-white pink (bg-red-50) chip on a dark card, and unknown extraction statuses render a light-gray badge with dark-gray text — both break the repo's 'dark mode is mandatory via CSS variables' rule and look visibly broken against tokenized neighbors.",
+      "fix": "Replace with the existing tokens: `hover:bg-[var(--danger-tint)] hover:text-[var(--danger)]` in ReviewStep and `bg-[var(--surface-sunken)] text-[var(--fg-secondary)]` as the StatusBadge fallback.",
+      "effort": "S",
+      "dimension": "ux-states-a11y",
+      "fid": "ux-states-a11y-9",
+      "verified": "unverified-minor"
+    },
+    {
+      "title": "Custom field values saved with one sequential upsert round-trip per field",
+      "severity": "minor",
+      "file": "apps/api/src/routes/custom-fields.ts",
+      "line": 325,
+      "evidence": "Lines 325-346: `for (const [definitionId, value] of Object.entries(values)) { if (!allowedIds.has(definitionId)) continue; const upserted = await prisma.customFieldValue.upsert({ where: { orgId_entityType_entityId_definitionId: {...} }, update: {...}, create: {...} }); results.push(upserted); }` — awaited inside the loop.",
+      "why": "Saving an entity with N custom fields issues N serial round-trips to Postgres (latency = N × RTT + N upserts). With the allowed cap of 500 active definitions (line 310 `take: 500`), a form save can degrade from one batched write to hundreds of sequential queries.",
+      "fix": "Batch the upserts: `await prisma.$transaction(entries.map(([definitionId, value]) => prisma.customFieldValue.upsert({...})))` — single round-trip pipeline, preserves per-row results and ordering.",
+      "effort": "S",
+      "dimension": "performance",
+      "fid": "performance-6",
+      "verified": "unverified-minor"
+    },
+    {
+      "title": "GET /competitors returns an unbounded org-wide findMany with no take",
+      "severity": "minor",
+      "file": "apps/api/src/routes/competitors.ts",
+      "line": 56,
+      "evidence": "Lines 56-60: `const rows = await prisma.competitorProfile.findMany({ where: { orgId, deletedAt: null }, orderBy: { name: 'asc' }, select: { id: true, name: true, domain: true, aliases: true, createdAt: true } });` — no `take`, no cursor. Same pattern at cs.ts:131 (`prisma.churnSignal.findMany({ where, orderBy: [...] })`) and migrations.ts:230 (`prisma.migrationMapping.findMany({ where: {...}, orderBy: {...} })`).",
+      "why": "Violates the repo's hard rule that admin/settings reads must be bounded; an org that accumulates competitor profiles (or churn signals per account) loads the entire table into memory and serializes it on every request — a slow, memory-spiking response with no pagination escape hatch.",
+      "fix": "Add `take: 200` (matching the documented bounded-read convention) or convert to cursor pagination like accounts.ts /accounts/key; apply the same bound to cs.ts:131 and migrations.ts:230.",
+      "effort": "S",
+      "dimension": "performance",
+      "fid": "performance-7",
+      "verified": "unverified-minor"
+    },
+    {
+      "title": "Exchange-rates upstream fetch has no timeout and no cache-stampede guard",
+      "severity": "minor",
+      "file": "apps/api/src/routes/exchange-rates.ts",
+      "line": 80,
+      "evidence": "Lines 76-82: `if (cache && Date.now() - cache.ts < CACHE_TTL_MS) { return cache.data; } const res = await fetch('https://open.er-api.com/v6/latest/EUR', { headers: { Accept: 'application/json' } });` — no AbortSignal/timeout, and `cache` stores resolved data only (line 115 `cache = { data, ts: Date.now() }`), not the in-flight promise.",
+      "why": "When the 1-hour cache expires, every concurrent request (the route allows 300/min and 'the app shell may request it from many tabs/pages') independently fires the upstream fetch — a thundering herd on a free third-party API. If the upstream hangs, requests pile up indefinitely because the fetch has no timeout, tying up server resources. The crm/summary.ts cache in the same codebase already does promise-coalescing correctly (summary.ts:219-220).",
+      "fix": "Cache the in-flight promise (the crmSummaryCache pattern from crm/summary.ts) so concurrent misses share one upstream call, and pass `signal: AbortSignal.timeout(5000)` to the fetch, falling back to stale cache data on failure.",
+      "effort": "S",
+      "dimension": "performance",
+      "fid": "performance-8",
+      "verified": "unverified-minor"
+    },
+    {
+      "title": "ComplianceMatrix renders all rows unvirtualized and re-renders every row when one saves",
+      "severity": "minor",
+      "file": "apps/web/src/components/rfp/compliance/ComplianceMatrix.tsx",
+      "line": 80,
+      "evidence": "Lines 1-2 (self-acknowledged): `// TODO: add @tanstack/react-virtual for 200+ row matrices`. Lines 80-87: `{data.items.map((row) => (<ComplianceRow key={row.id} row={row} onSave={handleSave} isSaving={saveRow.isPending} />))}` — ComplianceRow is not wrapped in React.memo, `handleSave` is recreated each render, and `isSaving={saveRow.isPending}` flips for ALL rows whenever any single row saves.",
+      "why": "A 200+ requirement RFP renders every row's DOM up front inside the 480px scroll container, and each row save toggles `saveRow.isPending` twice, re-rendering the entire matrix both times — visible jank while editing compliance answers on large tenders, the exact workload this screen exists for.",
+      "fix": "Wrap ComplianceRow in React.memo with a useCallback'd onSave, pass a per-row saving flag (track the saving rowId from the mutation variables instead of the global isPending), and add @tanstack/react-virtual for the row list as the TODO already prescribes.",
+      "effort": "M",
+      "dimension": "performance",
+      "fid": "performance-9",
+      "verified": "unverified-minor"
+    },
+    {
+      "title": "Same wire field 'stage' carries pipeline-stage display NAME on GET but enum CODE on stage-move response and in filters",
+      "severity": "minor",
+      "file": "apps/api/src/serializers/opportunity.ts",
+      "line": 73,
+      "evidence": "serializers/opportunity.ts:73 `stage: o.pipelineStage?.name ?? o.stage ?? null` (display name like 'S4 Negotiation' once pipelineStageId is set), while opportunities.transitions.ts:136 returns `stage: nextStage` (enum code like 's4_negotiation') and OpportunityFilter.stage (opportunity.ts:132) validates the legacy enum codes. The web papers over it with name-matching: pipeline-stages.ts:52 `LEGACY_PIPELINE_STAGES.find((s) => s.name.toLowerCase() === stage.name.toLowerCase())`, and useStageMutation.ts:68 `{ ...o, ...data }` writes the code into a cache slot that the list GET fills with the name.",
+      "why": "One field, two value domains. The frontend heuristic only works while stage names exactly match the hardcoded legacy names — PATCH /pipeline-stages/:id allows renaming a stage (pipeline-stages.ts:117-155), after which business-key resolution degrades to UUIDs and any consumer comparing `stage === 'closed_won'` against list data gets false negatives. React Query caches hold mixed name/code values for the same field after a Kanban move.",
+      "fix": "Serialize `stage` as the pipelineStage.key (code) consistently — display names already travel in the nested `pipelineStage.name` — and bump consumers (resolvePipelineStage falls back cleanly since keys match LEGACY ids).",
+      "effort": "M",
+      "dimension": "contracts-shared",
+      "fid": "contracts-shared-4",
+      "verified": "unverified-minor"
+    },
+    {
+      "title": "Web API client never validates responses against the shared Zod schemas — contract drift surfaces as silent undefined",
+      "severity": "minor",
+      "file": "apps/web/src/lib/api.ts",
+      "line": 133,
+      "evidence": "api.ts:133 `return data as T;` — the only wire boundary in the web app is an unchecked type cast. Zero call sites parse with the schemas that exist for exactly this purpose (e.g. useOpportunities.ts:24 `api<OpportunityPage>(...)`, useCrmDashboard.ts:14 `api<CrmDashboardSnapshot>(path)`); packages/shared schemas are imported as types only across apps/web/src.",
+      "why": "This is the explicit hunt case 'API responses not parsed/validated against shared schemas'. Routes without server response schemas (e.g. references.ts has querystring/body only) deliver completely unvalidated payloads, and any server-side shape change (field rename, enum addition) reaches components as silent undefined instead of a detectable contract error — the missing /api/reports feature (other finding) shipped precisely because nothing validates the boundary.",
+      "fix": "Add a `parsedApi(path, schema, opts)` helper that runs `schema.parse(data)` in dev (and `safeParse` + Sentry report in prod) and migrate the high-traffic hooks (opportunities, leads, companies, dashboard) to it.",
+      "effort": "M",
+      "dimension": "contracts-shared",
+      "fid": "contracts-shared-5",
+      "verified": "unverified-minor"
+    },
+    {
+      "title": "FieldPicker fallback enums drift from shared schemas: task statuses 'todo'/'cancelled' don't exist, lead status missing 'nurture', task 'priority' field doesn't exist",
+      "severity": "minor",
+      "file": "apps/web/src/components/reports/FieldPicker.tsx",
+      "line": 48,
+      "evidence": "FieldPicker.tsx:48 `{ key: 'status', ... enumValues: ['todo', 'in_progress', 'done', 'cancelled'] }` vs shared task.ts:4 `TaskStatus = z.enum(['open', 'in_progress', 'done', 'blocked'])`; FieldPicker.tsx:49 offers `priority` with ['low','medium','high','urgent'] but the shared Task schema (task.ts:7-16) has no priority field; FieldPicker.tsx:23 lead status list omits 'nurture' present in leads.ts:6-13.",
+      "why": "Filters built from the fallback list can never match data ('todo'/'cancelled' rows don't exist; 'nurture' leads can't be selected), so saved report filters silently return empty/incomplete result sets once the report backend exists.",
+      "fix": "Derive FALLBACK_FIELDS enumValues from the shared schemas (`TaskStatus.options`, `LeadStatus.options`) instead of hand-copied literals, and drop the nonexistent task `priority` entry.",
+      "effort": "S",
+      "dimension": "contracts-shared",
+      "fid": "contracts-shared-6",
+      "verified": "unverified-minor"
+    },
+    {
+      "title": "References endpoints have no response schema and spread raw Prisma rows — leak orgId/deletedAt and bypass all contract validation",
+      "severity": "minor",
+      "file": "apps/api/src/routes/references.ts",
+      "line": 44,
+      "evidence": "references.ts:44-49 `return { ...ref, company: ref.company ?? null, valueMicros: ... }` spreads the full Prisma row (includes `orgId`, `deletedAt`); the GET route schema (references.ts:55-63) declares only `querystring` — no `response` schema — unlike every sibling route (e.g. contacts.ts:44 `response: { 200: ContactPage }`). No `Reference` schema exists in packages/shared/src/schemas; the client re-declares the shape locally in useReferences.ts:4-19.",
+      "why": "Internal columns (orgId, deletedAt) leak to the browser, the wire shape is defined twice (route serializer + web interface) with nothing keeping them in sync, and a Prisma model change (new column) silently changes the public payload — exactly the local-schema-diverges-from-shared hunt case.",
+      "fix": "Add a `Reference` Zod schema to packages/shared, set `response: { 200: z.object({ items: z.array(Reference) }) }` (and 200/201 on the mutations), and make serializeReference enumerate fields explicitly instead of spreading the row.",
+      "effort": "S",
+      "dimension": "contracts-shared",
+      "fid": "contracts-shared-7",
+      "verified": "unverified-minor"
+    },
+    {
+      "title": "job_processed_total / job_failed_total Prometheus counters are defined but never incremented anywhere — queue observability advertised by /metrics is permanently empty",
+      "severity": "minor",
+      "file": "apps/api/src/routes/health.ts",
+      "line": 147,
+      "evidence": "export const jobProcessedTotal = new Counter(\n  'job_processed_total',\n  'BullMQ jobs successfully processed',\n  ['queue'],\n);\nexport const jobFailedTotal = new Counter(\n  'job_failed_total',\n  'BullMQ jobs that failed (all retries exhausted)',\n  ['queue'],\n);\n— grep across apps/ shows the only references are the definitions and the ALL_METRICS registration (health.ts:165-166); no `.inc()` call exists in api or worker, and the worker runs in a separate process with no /metrics of its own.",
+      "why": "The file header (lines 19-20) documents these as tracked metrics, so anyone building dashboards or alerting on job failures (e.g. 'page when job_failed_total spikes') gets series that never report — failed BullMQ jobs across 30+ production queues are invisible to Prometheus. Dead-letter accumulation (removeOnFail keeps 30 days of failures) goes unnoticed; the existing /monitoring queue-depth route is the only, polling-based, signal.",
+      "fix": "Either delete the two counters and their doc lines (honest surface), or expose a /metrics endpoint from the worker's existing health server and increment the counters from centralized `worker.on('completed'/'failed')` handlers (pairs with the missing-error-listener fix).",
+      "effort": "M",
+      "dimension": "infra-worker",
+      "fid": "infra-worker-6",
+      "verified": "unverified-minor"
+    },
+    {
+      "title": "Worker graceful shutdown never disconnects Prisma — Postgres connections are dropped abruptly on every deploy",
+      "severity": "minor",
+      "file": "apps/worker/src/main.ts",
+      "line": 192,
+      "evidence": "    await Promise.all(workers.map((w) => w.close()));\n    await Promise.all(queues.map((q) => q.close()));\n    await connection.quit();\n    clearTimeout(timeout);\n    process.exit(0);\n— no `await prisma.$disconnect()`, although the worker imports prisma (line 12) and every queue handler uses it. The MCP server does it correctly (apps/mcp-server/src/main.ts:65 `await prisma.$disconnect()`).",
+      "why": "On every SIGTERM (each deploy roll, scale-down, or supervisor restart) the worker exits with the Prisma pool's Postgres connections still open, leaving orphaned backends on the server until TCP/idle timeout. With Postgres capped at default max_connections and the API also pooling, frequent restarts can transiently exhaust connection slots and cause 'too many connections' errors for the API replicas.",
+      "fix": "Add `await prisma.$disconnect();` in the shutdown() function after the queue/connection closes, mirroring apps/mcp-server/src/main.ts.",
+      "effort": "S",
+      "dimension": "infra-worker",
+      "fid": "infra-worker-7",
+      "verified": "unverified-minor"
+    },
+    {
+      "title": "Standalone /roles and /admin/rfp admin pages are orphaned duplicates of Settings tabs",
+      "severity": "minor",
+      "file": "apps/web/src/routes/AdminRoutes.tsx",
+      "line": 74,
+      "evidence": "AdminRoutes.tsx:74 routes `path=\"/roles\"` and :23 routes `path=\"/admin/rfp\"`; grep finds no inbound Link/navigate to either path anywhere in apps/web/src. Their content is reachable only via Settings tabs (WorkspaceSection.tsx:11 mounts RolesSection; SettingsLayout 'rfp-analytics' tab mounts RfpAnalyticsSection), leaving RolesPage.tsx (11.7K, which adds a permission matrix beyond RolesSection per its header comment lines 1-5) and AdminRfpPage.tsx dead.",
+      "why": "RolesPage's extra permission-matrix view is functionality users never see, and two unreachable routed pages add maintenance surface plus drift risk between the standalone page and the Settings tab versions of the same feature.",
+      "fix": "Either link /roles and /admin/rfp from their corresponding Settings sections ('Open full page' affordance) or delete the standalone pages and routes, folding the RolesPage permission matrix into RolesSection.",
+      "effort": "S",
+      "dimension": "feature-completeness",
+      "fid": "feature-completeness-9",
+      "verified": "unverified-minor"
+    }
+  ],
+  "refuted": [
+    {
+      "fid": "security-tenancy-1",
+      "title": "Open redirect in email click-tracking endpoint (no allowlist despite doc claim)",
+      "refutation": "The cited code (D:\\BIDCRM\\apps\\api\\src\\routes\\track.ts:141-145) does match the auditor's quote: the click handler validates only redirectUrl.protocol (http/https), then 302-redirects to the attacker-controlled `url` query param with no host allowlist (the word \"allowlist\" appears only in the doc comment at line 14), and the redirect fires regardless of token validity (DB lookup is fire-and-forget in setImmediate). In isolation it is an open-redirect code pattern.\n\nBUT the claimed impact (a live, public, exploitable 302 from the BidStack domain) is NOT present because the route is never mounted:\n1) createTrackRoutes — the only export in track.ts — is never imported or registered. D:\\BIDCRM\\apps\\api\\src\\server.routes.ts is the central route registry (\"All server.register(...) calls live here\") enumerating ~90 route modules; routes/track is absent from both the imports (lines 11-114) and the registrations (lines 117-259).\n2) D:\\BIDCRM\\apps\\api\\src\\server.ts buildServer() registers plugins explicitly and calls registerRoutes(server) as the sole route mechanism — there is no @fastify/autoload or glob auto-registration that could pull in track.ts.\n3) Monorepo-wide grep for createTrackRoutes / routes/track / track/email/click finds only the definition in src/routes/track.ts and its compiled mirror in dist/routes/track.js — no registration and no caller anywhere in apps/ or packages/.\n4) Click links are never generated: injectTrackingPixel (email-integration.helpers.ts, microsoft-graph.service.ts) only builds the /track/email/open/${token} pixel URL; nothing ever produces a /track/email/click/... URL.\n\nSo the whole track.ts module is unwired dead code; a request to /track/email/click/...?url=... would 404. The open redirect is unreachable in the running app, so the claimed phishing/redirect primitive cannot be exercised. This is a latent code-quality defect (handler lacks the allowlist its own comment promises; wiring the route up later would create a real open redirect), but it does NOT have the claimed major exploitable impact today. Refuted."
+    },
+    {
+      "fid": "security-tenancy-2",
+      "title": "User role change endpoint allows privilege escalation — no admin-role gate or last-admin/self guard",
+      "refutation": "REFUTED. The endpoint text is quoted accurately (apps/api/src/routes/users.ts:61-95 — gated only by requirePermission('users:write'), no requireRole('admin'), no last-admin/self guard), but the claimed IMPACT (privilege escalation + org lockout) does not hold against the actual authz model.\n\n1. users:write is an admin-tier permission by design. Per packages/shared/src/types/rbac-matrix.ts (RBAC_MATRIX) and the regression test rbac-matrix.test.ts:91,178, users:write is granted to the Admin role ONLY — no other seeded system role (Sales Manager, AE, SDR, Customer Success, Read-Only) has it. Its seeded description (packages/db/src/seed.rbac.ts:93) is literally \"Update organization users and role assignments.\" For a non-admin to hold users:write, an admin must create a custom role granting it and assign it — and BOTH role-creation/assignment paths in roles.ts are themselves double-gated [settings:write + requireRole('admin')]. So a holder of users:write is, by definition, a delegated user-administrator exercising the permission, not escalating beyond it.\n\n2. Changing user.role is non-authoritative for RBAC. apps/api/src/plugins/rbac.ts:47-81 shows requirePermission is driven solely by UserRole grant rows; the legacy req.auth.role==='admin' claim fallback was explicitly REMOVED (see the in-code comment + docs/adr/0001-rbac-no-claim-fallback.md). This endpoint mutates the user.role scalar column only — it never creates/removes UserRole grants. So setting user.role='admin' confers ZERO additional RBAC permissions, and demoting user.role='member' cannot strip anyone's actual admin permissions (their Admin UserRole grant is untouched) — refuting the org-lockout sub-claim.\n\n3. user.role is re-synced from Clerk on every request in production. apps/api/src/plugins/auth.ts:214-224 upserts with update:{ role: clerkRole } inside verifyClerkAuth, which the onRequest hook (lines 368-392) runs on every authenticated request. The only consumer of req.auth.role for gating is requireRole()'s fast-path (rbac.ts:27-28); but since the column is overwritten with the Clerk-derived role on the target's (and the actor's) very next request, any role-change written by this endpoint is immediately reverted and never grants durable elevated access. In Clerk production the endpoint is effectively a no-op for authorization. The non-Clerk modes where user.role is read directly are dev-only stub (single seed user, loopback-restricted) and DEMO_MODE (public, each visitor gets an isolated single-user throwaway org), where self-promotion is meaningless.\n\nResidual: there is a legitimate but minor defense-in-depth inconsistency — users.ts omits the requireRole('admin') second gate that roles.ts applies, and lacks a self/last-admin invariant. That is a hardening nit, not the claimed major privilege-escalation/lockout, because the gate is already admin-tier and the mutated field is non-authoritative and self-correcting in production. Severity as framed is not supported."
+    }
+  ],
+  "coverage": [
+    {
+      "dimension": "security-tenancy",
+      "examined": "Read the auth boundary end-to-end: plugins/auth.ts (Clerk JWT + API-key + loopback-restricted stub auth, cross-org checks, JIT provisioning), plugins/demo-auth.ts (HMAC-signed demo sessions), plugins/rbac.ts (requireRole/requirePermission, no claim fallback), and server.ts (helmet CSP, CORS origin allowlist, global IP/user rate limit, Pino redaction). Enumerated every `config:{public:true}` route and audited each public/unauthenticated surface: bookings-public.ts, public-sign.ts, public-nps.ts, cs.ts NPS respond, demo.ts, track.ts, exchange-rates, zapier.ts, slack-commands.ts, slack/events, webhooks/dust, signatures/docusign, migrations-hubspot callback, plus the provider webhooks that omit public (twilio, microsoft-webhook, calls-webhooks zoom/teams/twilio-voice). Checked injection: grepped all $queryRaw/$executeRaw (accounts.ts, bid-workspace-rfp.ts, search.ts, crews.ts, crew-agents.ts, sales-dashboard.service.ts) — all use tagged-template parameterization with ::uuid casts and org_id predicates; no RawUnsafe/Prisma.raw string interpolation found. Checked multi-tenancy/IDOR by grepping `where:{id...}` across routes/services and verifying org scope on activities, document-templates, files, account-intel, companies, contacts, roles, users, calendar — every mutate-by-id is preceded by or combined with an orgId-scoped findFirst/updateMany. Verified webhook org-derivation is server-side (subscription secret / token lookup / clientState), never client headers. Confirmed track.ts has no allowlist code and public-sign.ts has no rateLimit via targeted greps. Did not run servers/tests (read-only); did not inspect the Prisma schema for DB-level unique constraints (e.g., booking slot), so a potential booking TOCTOU was left out as unprovable from code alone."
+    },
+    {
+      "dimension": "api-correctness-a",
+      "examined": "Read in full: apps/api/src/routes/accounts.ts, activities.ts, agents.ts, audit-logs.ts, bid-scores.ts, bid-workspace.ts, bid-workspace.helpers.ts, bid-workspace-requirements.ts, bookings-public.ts, bookings-pages.ts, bookings.helpers.ts, calendar.ts, calls.read.routes.ts, calls.write.routes.ts, collaboration.ts, companies.ts, competitors.ts, contacts.ts, crews.ts, crm/summary.ts, crm/companies.ts. Cross-checked supporting code to evidence findings: packages/shared/src/calendar/availability.ts (computeSlots timezone loop), packages/db/prisma/schema.prisma (Booking + BidScore models for unique constraints), apps/api/src/server.routes.ts and server.ts (route prefixes + rewriteUrl) to verify the booking cancel-link route mismatch. Not read for time/budget: account-intel.ts, agent-provider-credentials.routes.ts, ai-assistant.ts, booking-email.ts body, crew-agents.ts, calls.helpers.ts, cs.ts, custom-* (several outside the stated a–c scope list), and crm/{dashboard,connectors,health,widgets}.ts beyond a directory scan — findings there may exist but are unaudited. Test files excluded per instructions."
+    },
+    {
+      "dimension": "api-correctness-b",
+      "examined": "Audited apps/api/src d-z route handlers plus the Fastify bootstrap. Read the app bootstrap (server.ts plugin ordering, error-handler/rate-limit registration order, CSP/CORS) and main.ts (graceful shutdown, unhandledRejection/uncaughtException). Read in full: migrations.ts, migrations-hubspot.routes.ts, invoices.mutations.ts, invoices.payments.ts, invoices.export.ts, opportunities.mutations.ts, opportunities.transitions.ts, leads.write.routes.ts, proposals.ts, workflows.ts, search.ts, reports.ts, territories-forecast.ts, tags.ts, service-desk.ts, files.ts, track.ts, public-sign.ts, public-nps.ts, webhook-subscriptions.ts, sales-orders.write.routes.ts, integrations/zapier.ts, dust-credentials.routes.ts, plus the producer-side queue helper queues/webhook-delivery.ts. Cross-checked the BullMQ MIGRATION queue config in packages/shared/queue-config.core.ts and every `new Worker(...)` in apps/worker/src (and worker main.ts) to confirm consumer wiring, and the Opportunity/ServiceCase Prisma models for unique-key behaviour. Focus was logic correctness: queue producer/consumer wiring, non-atomic writes, swallowed errors, money-unit handling, pagination, filters, and code-generation collisions. Money handling (micros/BigInt) and org-scoping were consistently correct in the files reviewed; invoice payment auto-pay concurrency and CSV export were already hardened."
+    },
+    {
+      "dimension": "web-correctness",
+      "examined": "Read in full: OpportunityDetailPage.tsx, PipelinePage.tsx, SalesDashboardPage.tsx + salesDashboard/dashboardHelpers.ts, LeadDetailPage.tsx + leadDetail/ConvertLeadDialog.tsx, companyDetail/CompanyTabs.tsx; hooks useOpportunities.ts, useStageMutation.ts, usePipelineReport.ts, useContacts.ts, useLeads.ts, useFormatMoney.ts, useDisplayMoney.ts, useAccountIntel.ts, useCommandContext.ts, useDebouncedCallback.ts; stores/currency.ts; lib/format.ts, lib/api.ts, lib/queryCache.ts. Cross-verified wire contracts against packages/shared/src/schemas/opportunity.ts and leads.ts and apps/api serializers (opportunity.ts, company.ts, account-intel.ts) to confirm money units (micros vs units) and accepted body fields. Grepped apps/web/src for console.log/debug (none found), setInterval/addEventListener cleanup patterns (all reviewed sites had cleanups or were module-level), formatMoneyMicros/useDisplayMoneyMicros call sites, query-key mismatches ('pipeline-report' vs 'report:pipeline'), and useOpportunityCount mounting (Sidebar/MobileNav always mounted). Excluded BIDCRM-design/, twenty-bidstack/, tests, and migrations per instructions."
+    },
+    {
+      "dimension": "ux-states-a11y",
+      "examined": "Surveyed all 66 page files in apps/web/src/pages (state-marker grep per file for loading/error/empty handling) plus the page subdirectories, then read in full: ProductsPage (+ its hand-rolled NewProductDialog), CalendarPage + calendarPage/CreateEventModal, BidNoBidPage, RfpPipelinePage, RolesPage, AgentsPage, ContactsPage (search region), intake/ReviewStep + ExtractStep, and PublicSignPage (a11y grep). In components I read CommandPalette, QuickAddMenu (traced into CreateOpportunityDialog and CreateTaskDialog prop contracts), Toast, HelpDrawer, WidgetRenderer, and grepped state handling in all 12 components that call useQuery directly (SmartCompanyDialog, OpportunityTabs, FieldPicker, IntegrationsSection, RfpAnalyticsSection, ErpConnectorCard, Sidebar, etc.). Cross-cutting sweeps: hand-rolled overlays (fixed inset-0), prefers-reduced-motion coverage, hardcoded white/black/gray Tailwind colors, sub-44px interactive elements (h-6/h-7/h-8 buttons), native confirm() usage, global focus-visible rules in index.css, and main.tsx QueryClient defaults plus useBidScore/useAgents/lib/api to confirm no global mutation error handling exists. Excluded per instructions: BIDCRM-design, twenty-bidstack, .claude, tests, login components (intentional video-bg styling)."
+    },
+    {
+      "dimension": "performance",
+      "examined": "API: enumerated all 70+ route files in apps/api/src/routes; read search.ts, reports.ts, crm/summary.ts, accounts.ts, opportunities.ts (+mutations/transitions/timeline/export), leads.read.routes.ts, tasks.ts, cs.ts, competitors.ts, migrations.ts, custom-fields.ts, exchange-rates.ts, rfp-pipeline.ts, bid-scores.ts, proposals.ts, account-intel.ts, lead-rot.ts in full or in relevant ranges; ran an awk scan over every route file for findMany blocks lacking take/cursor, grepped all for-of loops for await-in-loop N+1, scanned adjacent sequential prisma awaits, checked external fetch calls in request paths, verified fire-and-forget Dust pushes and queue producers (rfp-embed-requirement). Web: App.tsx, routes/lazyPages.tsx (route splitting confirmed), recharts import locality, all refetchInterval/setInterval polling sites, TopbarSearch, CommandPalette + usePaletteItems + useGlobalSearch (debounce check), SearchPage, ContactsPage, OpportunitiesPage, PipelinePage (memoization/virtualization), ComplianceMatrix + ComplianceRow, CollaborativeRichTextEditor/NotesSection import graph into the three detail pages, login Hero/Navbar/DemoSignIn (video + dual motion-library imports), img loading=lazy coverage, and pnpm-lock.yaml to confirm two resolved framer-motion versions. Notable areas verified clean: crm/summary caching, accounts top/key (raw SQL aggregation), opportunity import batching, opportunity-timeline Promise.all, conditional run-status polling, route-level code splitting."
+    },
+    {
+      "dimension": "contracts-shared",
+      "examined": "Read the shared wire schemas in packages/shared/src/schemas (opportunity, company, contact, leads, task, activity, invoices, sales-orders, sales-dashboard, crm.analytics, crm.entities, opportunity-contact) and traced each against its API route and serializer: apps/api/src/routes/{opportunities,opportunities.transitions,opportunities.mutations,contacts,leads.read/write,references,accounts,pipeline-stages,reports,sales-dashboard,sales-orders.read,activities,opportunity-contacts}.ts, serializers/{opportunity,company}.ts, services/reports/funnel.service.ts and sales-intelligence.summary.ts, services/crm/dashboard.{queries,utils}.ts, and server.routes.ts (full route-registration inventory). On the web side I examined the fetch boundary (lib/api.ts, lib/format.ts, lib/pipeline-stages.ts) and the consuming hooks/pages: useOpportunities, useStageMutation, useLeads + ConvertLeadDialog/LeadDetailPage, useReferences + NewReferenceDialog, useCompanies, useTasks, useCrmDashboard, usePipelineReport, useTopAccounts, useAnalyticsReports + ReportsListPage/FieldPicker/WidgetRenderer, OpportunitiesPage, OrgDashboard, PipelineSnapshot, salesDashboard/dashboardHelpers, accountsPage/accountUtils, plus the Prisma schema for Reference and Activity enums. Focus areas per the brief: response-validation gaps, schema-vs-route field drift, enum drift (stage/status), micros-vs-units money encoding, date serialization, and web-sends/API-ignores skew. Excluded BIDCRM-design/, packages/twenty-bidstack/, tests, and migrations."
+    },
+    {
+      "dimension": "infra-worker",
+      "examined": "Read in full: apps/worker/src/main.ts (boot, env check, health server, shutdown, process handlers), queues/dust-poll.ts, queues/webhook-delivery.ts, queues/rfp-orchestrator.ts (incl. reaper), queues/calls.ts fetch/transcribe processors, queues/sms.ts header; packages/shared/src/queue-config.core.ts and queue-config.rfp.ts (retry/backoff/DLQ retention for every queue); apps/mcp-server/src/main.ts, server.ts (transports, sessions, rate-limit wiring), auth.ts, redis.ts, plugins/hourly-rate-limit.ts; apps/api/src/routes/health.ts (livez/readyz/health/metrics), apps/api/src/redis.ts, apps/api/src/env.ts (boot Zod validation + semantic checks); grepped all `new Queue(` producers in apps/api (queues/*.ts singletons vs per-request constructions in calendar.ts, bookings-public.ts, calls.read.routes.ts, calls-webhooks.ts, monitoring.ts) and all `.on('error')` registrations in apps/worker; verified BullMQ 5.76.6 source (queue-base.js emit fallback, worker.js blockingConnection error forwarding, lock-manager.js) to confirm error-swallowing behavior; read all 7 .github/workflows files and confirmed via `git branch -r` that no main/master branch exists; read Dockerfile (per-stage HEALTHCHECKs, curl availability) and docker-compose.prod.yml (service deps, required env, healthchecks). Excluded per instructions: BIDCRM-design/, packages/twenty-bidstack/, .claude/, prisma/migrations, *.test.ts files."
+    },
+    {
+      "dimension": "feature-completeness",
+      "examined": "Read SPEC.md fully and PROGRESS.md (first 850 lines covering 2026-06-07 back to Sprint 0). Inventoried apps/web/src/pages (70 page files + 23 subdirs), App.tsx, and the full route tree (routes/AppRoutes.tsx, BidRoutes.tsx, SalesRoutes.tsx, AdminRoutes.tsx, OpsRoutes.tsx, lazyPages.tsx). Cross-checked every routed path against all navigation surfaces: components/layout/navConfig.ts (single source for Sidebar + MobileNav), Sidebar.tsx, Topbar.tsx + topbar/ (search→/search, notifications→/tasks), command/commandPaletteUtils.ts NAV_TARGETS + usePaletteItems.tsx, hooks/useGlobalShortcuts.ts chords, quickadd/QuickAddMenu.tsx, onboarding ProductTour/tour-steps.ts, help/HelpDrawer.tsx, and SettingsLayout.tsx GROUPS. Spot-read CalendarPage, CallsPage, AnalyticsDashboardPage, DashboardsListPage, ReportsListPage, QuickStartPage, DataQualitySection, CrmConfigurationSection, ContactsPage/CompaniesPage bulk logic, PipelinePage/pipelineBoard drag-drop, OpportunityDetailPage timeline, and grepped for CSV import/export, merge/duplicate, email compose, console.log/TODO stubs. BENCHMARK MATRIX (vs Salesforce/HubSpot/Pipedrive/Attio table-stakes): Contact CRUD+search/filters = PRESENT-ROUTED (/contacts, ContactDialog, CSV import via ContactCsvImportDialog, bulk delete); Company CRUD = PRESENT-ROUTED (/companies, SmartCompanyDialog, bulk export/delete); Deal CRUD = PRESENT-ROUTED (/opportunities + detail + CreateOpportunityDialog + bulk); Pipeline kanban drag-drop = PRESENT-ROUTED (/pipeline, PipelineCard draggable + StageColumn onDrop); Activity timeline = PRESENT (useOpportunityTimeline on OpportunityDetailPage:53); Tasks/reminders = PRESENT-ROUTED (/tasks list+calendar view, overdueTasks nav badge); Email integration = ABSENT (mailto only; templates unsendable — SPEC §10 defers sync, finding 8); Notes = PRESENT (notes/ components, QuickAdd note); Reporting dashboard = PRESENT-ROUTED (/reports) but custom-dashboard cluster /analytics+/dashboards = PRESENT-BUT-ORPHANED (finding 3) and saved-reports /reports/list = ORPHANED (finding 5); CSV import/export = PRESENT (contacts import; export on opportunities/leads/companies/tasks/orders/invoices/audit-log); Permissions/roles = PRESENT (RolesSection via Settings→Workspace; standalone /roles ORPHANED, finding 10); Global search = PRESENT-ROUTED (/search via topbar, palette, g-f chord); Bulk actions = PRESENT (BulkActionBar on contacts/companies/opportunities); Duplicate detection/merge = PARTIAL (detection report only, NO merge — finding 7); Customizable fields = PRESENT (CustomFieldsSection in Settings CRM config) but custom OBJECTS cluster = PRESENT-BUT-ORPHANED (finding 4); Mobile-responsive = PRESENT (MobileNav drawer, responsive baselines in e2e); Calendar = PRESENT-BUT-ORPHANED (finding 1); Calls = PRESENT-BUT-ORPHANED (finding 2); Onboarding quick-start = PRESENT-BUT-ORPHANED (finding 9); /admin/predictive = ORPHANED (finding 6). No console.log stubs found in shipped web code (only a virtualization TODO comment in ComplianceMatrix.tsx:1)."
+    }
+  ]
+}
