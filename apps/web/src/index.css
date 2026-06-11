@@ -1097,6 +1097,20 @@ a {
     padding 260ms cubic-bezier(0.32, 0.72, 0, 1),
     gap 260ms cubic-bezier(0.32, 0.72, 0, 1);
 }
+/* Expanded: the toggle sits absolutely at right:8px (32px wide) — reserve
+   that strip so the brand text can never run underneath it, and ellipsize
+   the tagline instead of letting it clip under the button. */
+.sidebar:not(.is-collapsed) .sb-brand {
+  padding-right: 48px;
+}
+.sidebar:not(.is-collapsed) .sb-brand > div:last-child {
+  min-width: 0;
+}
+.sidebar:not(.is-collapsed) .sb-tag {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 /* Collapsed: center the [B] mark in the rail. The toggle is now stacked
    above it (handled by .sb-toggle:not(absolute)) so there's no overlap. */
 .sidebar.is-collapsed .sb-brand {
