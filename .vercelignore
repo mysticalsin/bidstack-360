@@ -1,0 +1,29 @@
+# Keep the Vercel upload small (10MB request limit). Exclude the heavy
+# non-source directories only — KEEP every workspace package.json/source so
+# `pnpm install` can resolve the monorepo (build:demo = packages/shared + apps/web).
+
+# Heavy non-source siblings (the actual >10MB offenders)
+BIDCRM-design/
+scratch_skills/
+scratch_img/
+.tmp/
+.audit-screens/
+.planning/
+handoff/
+.corepack/
+.claude/
+.codex/
+
+# Build outputs / caches (also gitignored — belt-and-suspenders)
+**/dist/
+**/build/
+**/.turbo/
+**/.vite/
+**/coverage/
+**/playwright-report/
+**/test-results/
+*.tsbuildinfo
+
+# Working artifacts not needed by the build
+walteur-kit/
+_relay/
