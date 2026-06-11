@@ -48,7 +48,7 @@ const ENTITY_ALIASES: Record<string, TargetEntity> = {
   deals: 'opportunity',
 };
 
-function normalizeEntity(entityType: string): TargetEntity | null {
+export function normalizeEntity(entityType: string): TargetEntity | null {
   return ENTITY_ALIASES[entityType.toLowerCase()] ?? null;
 }
 
@@ -60,17 +60,19 @@ function asTrimmed(v: unknown): string | null {
   return s.length > 0 ? s : null;
 }
 
-function asInt(v: unknown): number | null {
+export function asInt(v: unknown): number | null {
   const s = asTrimmed(v);
-  if (!s) return null;
+  if (!s || !/\d/.test(s)) return null; // require a digit — "n/a" is not 0
   const n = Number(s.replace(/[,\s]/g, ''));
   return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
 /** Currency units (e.g. "1,200,000.50") → micros BigInt. */
-function asMicros(v: unknown): bigint | null {
+export function asMicros(v: unknown): bigint | null {
   const s = asTrimmed(v);
-  if (!s) return null;
+  // Require a digit so a non-numeric cell ("n/a", "TBD") is SKIPPED, not
+  // silently coerced to €0 (Number('') === 0 would otherwise do that).
+  if (!s || !/\d/.test(s)) return null;
   const n = Number(s.replace(/[^0-9.-]/g, ''));
   if (!Number.isFinite(n)) return null;
   return BigInt(Math.round(n * 1_000_000));
@@ -103,7 +105,7 @@ const OPP_STAGES = new Set([
 ]);
 
 /** Loose source-CRM stage label → canonical OpportunityStage. */
-function mapStage(v: unknown): string {
+export function mapStage(v: unknown): string {
   const s = asTrimmed(v)?.toLowerCase().replace(/[\s-]+/g, '_');
   if (!s) return 's1_lead';
   if (OPP_STAGES.has(s)) return s;
@@ -117,7 +119,7 @@ function mapStage(v: unknown): string {
 }
 
 /** Map a source row through the column mappings into { targetField: rawValue }. */
-function applyMappings(
+export function applyMappings(
   row: Record<string, unknown>,
   mappings: Record<string, string | null>,
 ): Record<string, unknown> {
