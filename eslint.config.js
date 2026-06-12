@@ -95,6 +95,7 @@ export default tseslint.config(
       '.clone/**', // ephemeral agent worktrees
       '.swarm_state/**', // agent swarm output directory
       '.tmp-screens/**', // playwright screenshot dumps
+      '.vercel/**', // Vercel CLI build output — bundled artifacts, not source
       '.lighthouserc.js', // Lighthouse CI config
       'tmp-*.cjs', // root-level temp migration scripts
       'tmp-*.js', // root-level temp scripts

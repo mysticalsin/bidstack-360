@@ -111,3 +111,4 @@ apps/web/e2e/responsive/*-snapshots/
 # Scratch / exploratory scripts at repo root
 screenshot-*.cjs
 scratch-*.js
+.vercel

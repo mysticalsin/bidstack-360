@@ -1,0 +1,460 @@
+{
+ "confirmed": [
+  {
+   "title": "POST /reports/:id/run mutates persisted state with no permission gate and accepts an arbitrary query override",
+   "file": "apps/api/src/routes/analytics-reports.ts:259-293",
+   "severity": "major",
+   "evidence": "The route has no preHandler (every other mutating analytics route uses `preHandler: [server.requirePermission('reports:write')]`, e.g. lines 74, 119, 160, 196), yet it creates AnalyticsReportRun rows, bumps report.lastRunAt, and writes an audit log. Worse, line 275: `const query = req.body?.query ?? (report.query as unknown as AnalyticsQuery);` — any authenticated org member WITHOUT reports:write can substitute a completely different query (different entity, filters, aggregates) and have its results persisted into the report's official run history. Dashboards surface that history: analytics-dashboards.ts `latestRunIds()` resolves widget.config.latestRunId to the most recent run, so a read-only user can poison the numbers every dashboard viewer sees for that report (e.g. make a revenue KPI show rows from the `goal`/forecasts entity). Tenant isolation itself holds (compile still injects the caller's org_id), but this is an intra-org privilege/integrity bypass.",
+   "fix": "Add `preHandler: [server.requirePermission('reports:write')]` (or a dedicated reports:run permission) to POST /reports/:id/run; alternatively only persist runs for the stored query and treat body-override runs as ephemeral like POST /reports/run.",
+   "lens": "sql-injection",
+   "verdict": {
+    "isReal": true,
+    "severityAdjusted": "major",
+    "reason": "Verified at apps/api/src/routes/analytics-reports.ts:259-293. The POST /reports/:id/run handler has NO preHandler, while every other mutating analytics route gates with `preHandler: [server.requirePermission('reports:write')]` (lines 74, 119, 160, 196). Grep confirms only those 4 preHandlers exist in the file; the run route is not among them, and neither the plugin registration (server.routes.ts:126) nor the auth/rbac plugins apply an instance-wide write gate (rbac.ts only enforces when requirePermission is explicitly attached). The route mutates persisted state: runPersistedReport (analytics-reports.helpers.ts:88-128) creates an AnalyticsReportRun row and bumps report.lastRunAt, and the handler writes an auditLog (lines 281-290). Line 275 (`const query = req.body?.query ?? (report.query ...)`) with body schema `z.object({ query: AnalyticsQuery.optional() }).optional()` lets any authenticated org member without reports:write substitute an arbitrary valid query (different entity/filters/aggregates) and persist it as the report's run. The dashboard amplification is real: analytics-dashboards.ts latestRunIds() (lines 97-109) resolves widget.config.latestRunId to the most recent run per report (orderBy createdAt desc, distinct reportId) and surfaces it to all viewers via serializeWidget, so a read-only user can poison the numbers every dashboard viewer sees. Tenant isolation does hold (analytics-engine.ts:287 always injects `org_id = ${orgId}::uuid` from req.auth.orgId, fields allowlisted), so this is an intra-org broken-access-control / integrity bypass, not a cross-tenant leak. That scope (authenticated same-org, integrity not confidentiality) keeps it at major rather than critical."
+   }
+  },
+  {
+   "title": "Run result storage is unbounded — no retention, no per-report cap, no rate limit",
+   "file": "apps/api/src/routes/analytics-reports.helpers.ts:101-115",
+   "severity": "major",
+   "evidence": "`runPersistedReport` stores `result: rows as object[]` (up to ANALYTICS_MAX_LIMIT=1000 full-width rows — a plain row select on `lead` emits ALL 17 allowlisted columns including 500-char BANT text fields) into `analytics_report_runs.result Json` (schema.prisma:4975). Runs are never pruned: GET /reports/:id/runs only `take: 20` (analytics-reports.ts:307) but every POST inserts a new row forever, and there is no rate limit. Combined with the missing permission gate on POST /reports/:id/run, any authenticated user can loop the endpoint and grow the table by multiple MB per request — a storage-exhaustion vector against the shared Postgres instance.",
+   "fix": "On each successful run, delete runs older than the newest N (e.g. 20) per report inside the same transaction; cap serialized result size (reject/truncate above a byte budget); rate-limit the run endpoints.",
+   "lens": "sql-injection",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified at all cited locations. analytics-reports.helpers.ts:108 stores result: rows as object[] into analytics_report_runs.result Json (schema.prisma:4975) on every POST /reports/:id/run. ANALYTICS_MAX_LIMIT=1000 (analytics-engine.ts:32) and the Zod AnalyticsQuery schema leaves limit uncapped (analytics.ts:131), so clampLimit's 1000 is the only bound. Plain row selects emit ALL allowlisted columns (analytics-engine.ts:279-285); LEAD_FIELDS has exactly 17 fields including 4 BANT string columns recently widened to 500 chars. No retention exists anywhere: only integration tests delete analyticsReportRun rows; the worker prunes yjsUpdate and AI-audit data but not analytics runs; GET /reports/:id/runs take:20 is read-side only. POST /reports/:id/run has no requirePermission preHandler (unlike the reports:write-gated write routes) and no per-route rateLimit config, unlike comparable heavy endpoints. One overstatement: a global per-user rate limit of API_RATE_LIMIT_MAX (default 120/min, server.ts:192-205) does exist, so \"no rate limit\" is not literally true — but at multiple MB per run, 120 runs/min still permits hundreds of MB/hour of permanent, never-pruned growth, and even legitimate repeated/scheduled runs accumulate unboundedly. Core defect (unbounded storage, no retention, no per-report cap, no permission gate or per-route limit on the run endpoint) is real.",
+    "severityAdjusted": "major"
+   }
+  },
+  {
+   "title": "Raw database error messages persisted to run.error and returned to clients",
+   "file": "apps/api/src/routes/analytics-reports.helpers.ts:119-123",
+   "severity": "minor",
+   "evidence": "`const message = err instanceof Error ? err.message : 'Query execution failed';` stores the raw exception message on the run row, and `serializeRun` (line 69) ships `error: r.error` on the wire. For non-AnalyticsQueryError failures (e.g. an out-of-range date param like '0000-01-01' which passes Date.parse but fails the ::timestamptz cast), Prisma raw-query errors look like 'Raw query failed. Code: `22008`. Message: ...' and can include generated SQL fragments / table+column names — internal schema disclosure to any org user. Only AnalyticsQueryError messages are written to be client-safe.",
+   "fix": "Persist err.message only when `err instanceof AnalyticsQueryError`; otherwise store a generic 'Query execution failed' and log the real error via the request-scoped Pino logger.",
+   "lens": "sql-injection",
+   "verdict": {
+    "isReal": true,
+    "reason": "Confirmed. runPersistedReport (apps/api/src/routes/analytics-reports.helpers.ts:119-123) persists raw err.message to run.error for ANY Error, with no AnalyticsQueryError discrimination; serializeRun (line 69) ships it, and POST /reports/:id/run plus both GET runs endpoints (analytics-reports.ts:291, :309, :326) return it to any authenticated org user — the AnalyticsReportRun schema (packages/shared/src/schemas/analytics.ts:162) passes any string. The trigger is real: coerceScalar's date branch (analytics-engine.ts:79-83) validates only via Date.parse, so '0000-01-01' (valid in JS, no year zero in Postgres) reaches the ::timestamptz cast and fails at execution as a Prisma P2010 error ('Raw query failed. Code: `22008`...'), which is not an AnalyticsQueryError; Zod's value: z.unknown() doesn't block it and the run endpoint skips the dry-compile validateQuery. No downstream guard exists — onSend hooks are header-only and the global error handler is bypassed since the message travels as data in a 200. The preview route (/reports/run line 240-243) rethrows non-AnalyticsQueryError failures instead, confirming only AnalyticsQueryError messages were designed to be client-safe. Minor caveat: the evidence's 'SQL fragments / table+column names' leak is overstated (identifiers are allowlisted; a 22008 message echoes the user's own input), but Prisma/Postgres error codes and messages — and potentially DB host info on connection failures — are disclosed verbatim, so the defect stands as described at minor severity.",
+    "severityAdjusted": "minor"
+   }
+  },
+  {
+   "title": "TIME_BUCKET_SQL prototype-key lookup is the one Prisma.raw fed by a non-allowlist string",
+   "file": "apps/api/src/lib/analytics-engine.ts:231-232",
+   "severity": "minor",
+   "evidence": "`const bucket = TIME_BUCKET_SQL[g.timeBucket] ?? fail(...)` followed by `Prisma.raw(`'${bucket}'`)`. TIME_BUCKET_SQL is a plain object, so inherited keys bypass the `?? fail` guard: `timeBucket: 'constructor'` (or 'toString'/'valueOf') returns a truthy Function whose source gets interpolated into raw SQL — e.g. date_trunc('function Object() { [native code] }', ...). Not exploitable today: (a) the Zod enum AnalyticsTimeBucket gates every wire path and both write paths validate stored queries, and (b) V8 function source contains no single quotes so it cannot escape the literal — but this is the only spot where a string not taken verbatim from analytics-fields.ts/a closed switch reaches Prisma.raw, violating the engine's stated standalone invariant ('identifiers come ONLY from analytics-fields.ts').",
+   "fix": "Guard with `Object.prototype.hasOwnProperty.call(TIME_BUCKET_SQL, g.timeBucket)` (mirroring getEntitySpec) or use a Map — and bind the bucket as a parameter instead of Prisma.raw: `Prisma.sql`date_trunc(${bucket}, ${Prisma.raw(field.column)})`` (date_trunc accepts a text parameter).",
+   "lens": "sql-injection",
+   "verdict": {
+    "isReal": true,
+    "reason": "VERIFIED at apps/api/src/lib/analytics-engine.ts:231-232. TIME_BUCKET_SQL (line 38) is a plain object literal (Record<string,string>), not Object.create(null) or a Map, so inherited keys ('constructor'/'toString'/'valueOf') return a truthy Function that bypasses the `?? fail` nullish guard; the resulting `'${bucket}'` would interpolate the function source into Prisma.raw inside date_trunc. The mechanism is real JS behavior and is correctly the ONLY Prisma.raw fed by a non-allowlist dynamic-key lookup: every other Prisma.raw in the file draws from the field allowlist (field.column/spec.table), a literal, or a value already narrowed by a closed switch/equality check (op at 129-130, agg.fn at 205/209, s.dir at 295). This violates the engine's stated standalone invariant. HOWEVER it is a latent defense-in-depth nit, not an active vuln: (a) every wire path gates timeBucket through the Zod enum AnalyticsTimeBucket (schemas/analytics.ts:46, AnalyticsGroupBy.timeBucket :115) — a non-enum value fails Fastify/Zod validation -> 400 before the compiler; write paths dry-compile via validateQuery and the /reports/:id/run stored-query fallback was validated on write; and (b) V8 native function source contains no single quote, so it cannot escape the SQL literal (Postgres would just reject the invalid date_trunc field at runtime). The claim is accurate and honestly self-scoped. Defensible fix: Object.hasOwn / Map / closed switch like the op and agg.fn patterns already used in the same file.",
+    "severityAdjusted": "minor"
+   }
+  },
+  {
+   "title": "Unbounded in/notIn arrays and uncapped aggregates/sort lists allow parameter/SQL blowup",
+   "file": "packages/shared/src/schemas/analytics.ts:86,106-131",
+   "severity": "minor",
+   "evidence": "`value: z.unknown().optional()` (line 86) puts no bound on `in`/`notIn` arrays; the engine only checks non-empty (analytics-engine.ts:144) and binds every element as a parameter via Prisma.join (line 147-148). The 50-condition budget counts conditions, not array elements, so one condition can carry tens of thousands of bound params (until Fastify's body limit / Postgres's 65535-param protocol cap, which surfaces as 500s). Likewise `aggregates`, `groupBy`, and `sort` arrays (lines 128-131) have no `.max()`, so thousands of COUNT(*) aggregates with distinct aliases or repeated sort terms compile into pathologically large SQL. Pure resource-exhaustion, no injection (everything stays parameterized/allowlisted).",
+   "fix": "Add caps in the Zod schema (e.g. in/notIn ≤ 200 values, aggregates ≤ 20, groupBy ≤ 5, sort ≤ 5) and mirror the checks in the engine for defense-in-depth on stored queries.",
+   "lens": "sql-injection",
+   "verdict": {
+    "isReal": true,
+    "severityAdjusted": "minor",
+    "reason": "Confirmed at the cited locations. analytics.ts:86 `value: z.unknown().optional()` puts no length bound on `in`/`notIn` arrays; analytics-engine.ts:144 only checks the array is non-empty, and lines 147-148 map every element to a bound parameter via `Prisma.join`, so param count == array length. The condition budget at lines 179-181 increments per condition node (`budget.conditions += 1`), not per array element, so the ANALYTICS_MAX_FILTER_CONDITIONS=50 cap does not constrain a single oversized `in` list. With server.ts:53 bodyLimit at 10 MiB, an authenticated caller (the `/reports/run` preview endpoint at analytics-reports.ts:227 has auth but no `requirePermission` gate) can submit tens of thousands of values in one condition, exceeding Postgres's 65535-parameter protocol cap -> 500s. Likewise `aggregates`/`sort` (analytics.ts:128,131) have no `.max()`: the engine sort loop (lines 292-296) does not dedupe, so a repeated sort term compiles into pathologically large SQL, and distinct explicit aliases let thousands of aggregates through the duplicate-alias guard. It is pure resource exhaustion — everything stays parameterized and allowlisted (no injection). One part of the claim is overstated: `groupBy` cannot actually blow up because `addAlias(g.field)` (line 268) plus the field allowlist bound it to the number of allowlisted fields. Severity 'minor' is appropriate: requires a valid authenticated session, no data exposure or injection, impact limited to a 500 / degraded DB query — a hardening gap (add `.max()` on the value array and on aggregates/sort), not a critical vuln."
+   }
+  },
+  {
+   "title": "Widget mutations skip the owner-or-admin check that protects the parent dashboard",
+   "file": "apps/api/src/routes/analytics-dashboards.ts:285-406",
+   "severity": "minor",
+   "evidence": "PATCH/DELETE on the dashboard itself enforce `dashboard.ownerId !== req.auth.userId && !(await isOrgAdmin(req))` → 403 (lines 208-210, 246-248), but POST/PATCH/DELETE /dashboards/:id/widgets/* only require visibility (`findVisibleDashboard`) + reports:write. Any org member with reports:write can therefore add, rewire (point widget.reportId at a different report, line 351), or delete every widget on another user's shared dashboard — defacing content the owner-only rule was written to protect. Intra-org only; reportId is correctly re-verified org-scoped (lines 293-299, 341-347).",
+   "fix": "Apply the same owner-or-admin check to widget create/update/delete on non-owned dashboards, or document that shared dashboards are intentionally collaboratively editable.",
+   "lens": "sql-injection",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified in apps/api/src/routes/analytics-dashboards.ts. Dashboard PATCH/DELETE enforce an explicit owner-or-admin 403 after findVisibleDashboard (lines 207-210, 245-248), but the three widget mutation routes — POST /dashboards/:id/widgets (285-326), PATCH /dashboards/:id/widgets/:widgetId (328-374), DELETE /dashboards/:id/widgets/:widgetId (376-406) — only call findVisibleDashboard plus requirePermission('reports:write'). findVisibleDashboard's owner/admin branch (line 129) applies only when !isShared, so any org member passes for shared dashboards. No compensating guard exists: route registration (server.routes.ts:127) adds nothing, AnalyticsWidgetCreate/Patch Zod schemas (packages/shared/src/schemas/analytics.ts:241-261) validate shape only, and rbac requirePermission checks the permission key against UserRole/RolePermission, not ownership. Result: any org member with reports:write can add, rewire (reportId update at line 351), or hard-delete (deleteMany at line 390) widgets on another user's shared dashboard, while being forbidden from renaming it — an incoherent asymmetry, not deliberate design. Claim's caveats also check out: intra-org only, and reportId is re-verified org-scoped before write (lines 293-298, 341-346).",
+    "severityAdjusted": "minor"
+   }
+  },
+  {
+   "title": "Zero cross-org coverage in the integration tests — tenant isolation only asserted on SQL text",
+   "file": "apps/api/src/routes/analytics-reports.integration.test.ts:1",
+   "severity": "minor",
+   "evidence": "Neither analytics-reports.integration.test.ts nor analytics-dashboards.integration.test.ts creates a second org or asserts a 404/empty result for cross-org access (grep for org2/otherOrg/cross-org returns nothing). The org boundary is verified only as a string match in the unit test (analytics-engine.test.ts:31 `expect(text).toContain('WHERE org_id = $1::uuid ...')`) — no test would fail if a route passed the wrong orgId into compileAnalyticsQuery or dropped orgId from a Prisma where clause (e.g. the runs lookups). For the feature whose whole job is compiling user JSON into raw SQL, the isolation invariant deserves an end-to-end test.",
+   "fix": "Add integration cases: seed org A + org B; org B requests GET/PATCH/DELETE/run on org A's report and dashboard ids (expect 404), and a run on an org-B report over shared tables returns only org-B rows.",
+   "lens": "sql-injection",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified at the cited locations. Both analytics integration suites (apps/api/src/routes/analytics-reports.integration.test.ts, analytics-dashboards.integration.test.ts) use only the single org_seed_mantu org; grep for org2/otherOrg/cross-org in these files returns nothing. Their 'foreign' tests (reports line 96-105; dashboards line 167-177, despite being labeled 'Cross-tenant reportId rejected') use a nonexistent UUID, which 404s/400s regardless of org scoping — they cannot detect a dropped orgId. The isolation invariant is otherwise asserted only as a SQL-text string match in analytics-engine.test.ts:31 (expect(text).toContain('WHERE org_id = $1::uuid...')) with the org id supplied by the test itself. analytics-reports.ts relies on ~20 Prisma lookups scoped by orgId: req.auth.orgId plus req.auth.orgId passed into compileAnalyticsQuery; removing any of them would break no existing test. Guards elsewhere (Zod schema, field allowlist, auth plugin) constrain query shape and identity but never exercise two tenants in tests. Other suites in the same repo (migrations.*, rfp-pipeline.*, crews) do create a foreign org and assert cross-org 404, so this is a genuine deviation from the codebase's own pattern. Routes are correctly scoped today, so this is a test-coverage gap, not a live leak — minor severity stands.",
+    "severityAdjusted": "minor"
+   }
+  },
+  {
+   "title": "Grouped/time-bucketed queries have no deterministic ORDER BY and are silently truncated by LIMIT",
+   "file": "apps/api/src/lib/analytics-engine.ts:297-305",
+   "severity": "major",
+   "evidence": "`if (orderParts.length === 0 && aggregates.length === 0 && emittedAliases.has('createdAt')) { orderParts.push(Prisma.sql`\"createdAt\" DESC`); }` — the default ordering applies ONLY to plain row selects. Every aggregate/groupBy query (the line/bar/pie path) gets NO ORDER BY, then `LIMIT ${clampLimit(query.limit)}` (default 100) is appended unconditionally. Postgres GROUP BY (hash agg) output order is unspecified, so: (a) a time-series `groupBy: [{field:'createdAt', timeBucket:'MONTH'}]` returns buckets in arbitrary order — charts plot scrambled series; (b) a groupBy on a high-cardinality field (e.g. lead `companyName`) with >100 groups silently drops an ARBITRARY subset of groups, so totals are wrong with no error. No test covers ordering or truncation of grouped output.",
+   "fix": "When groupBy is present and no sort is given, default to ORDER BY the groupBy expressions (ASC for timeBucket). Consider rejecting or flagging grouped queries whose group count hits the LIMIT.",
+   "lens": "correctness",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified at apps/api/src/lib/analytics-engine.ts:297-305. The default ORDER BY (\"createdAt\" DESC) is gated on aggregates.length === 0, and lines 252-255 inject a synthetic COUNT(*) aggregate for any groupBy-without-aggregates query, so EVERY grouped/aggregate query (all chart paths) compiles with no ORDER BY unless the client explicitly sends sort. LIMIT (default 100 via clampLimit) is appended unconditionally at line 305. No guard exists elsewhere: the Zod schema (packages/shared/src/schemas/analytics.ts:130) makes sort optional with no refinement tying it to groupBy, and executeAnalyticsQuery (apps/api/src/routes/analytics-reports.helpers.ts:79) passes the query straight to the compiler with no default sort injection. Postgres hash-aggregate output order is unspecified, so (a) unsorted time-bucket series return buckets in arbitrary order and (b) groupBy on a >100-cardinality field silently returns an arbitrary subset of groups with no error. Test coverage confirms the gap: analytics-engine.test.ts asserts the default ORDER BY only for plain row selects (line 179) and tests explicit sort on grouped queries, but no test covers default ordering or LIMIT truncation of grouped output. Partial mitigation only: clients CAN pass sort (group-field and aggregate aliases are sortable), but nothing requires or defaults it.",
+    "severityAdjusted": "major"
+   }
+  },
+  {
+   "title": "Run endpoints skip reports:write and persist runs for arbitrary query overrides, poisoning run history",
+   "file": "apps/api/src/routes/analytics-reports.ts:259-293",
+   "severity": "major",
+   "evidence": "POST `/reports/:id/run` has no `preHandler: [server.requirePermission('reports:write')]` (unlike create/patch/delete/duplicate) yet it WRITES: creates an AnalyticsReportRun row, stores up to 1000 result rows in `result`, and bumps `report.lastRunAt` (helpers.ts:101-115). It also accepts `body.query` as a full override (`const query = req.body?.query ?? (report.query as ...)`, line 275) — the override run is persisted against the report with NO record of which query produced it (AnalyticsReportRun has no query column, schema.prisma:4967-4984). GET `/reports/:id/runs` then returns rows whose `result`/`rowCount` do not correspond to `report.query`, and the dashboard widget `latestRunId` (analytics-dashboards.ts:96-109) will happily point a KPI widget at an override run's data. Any authenticated org user without reports:write can do all of this.",
+   "fix": "Either require reports:write on the persisted-run route, or persist the effective query on the run row; at minimum mark override runs (e.g. `isAdHoc`) and exclude them from latestRunId/lastRunAt.",
+   "lens": "correctness",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified at apps/api/src/routes/analytics-reports.ts:259-293. POST /reports/:id/run has no preHandler while create/patch/duplicate/delete all require reports:write (lines 74/119/160/196); RBAC plugin (plugins/rbac.ts) is opt-in per route and the global auth hook only authenticates, so any authenticated org user (or read-scope API key) can invoke it. The handler accepts a full query override (line 275: `req.body?.query ?? report.query`) and runPersistedReport (analytics-reports.helpers.ts:88-128) persists an AnalyticsReportRun with up to 1000 result rows (ANALYTICS_MAX_LIMIT clamp, analytics-engine.ts:31-32,305) and bumps report.lastRunAt. AnalyticsReportRun has no query column (schema.prisma:4967-4984) and the audit log diff records only {runId, status}, so override runs are indistinguishable from real runs. GET /reports/:id/runs returns them, and analytics-dashboards.ts:96-109 latestRunIds wires the newest run (override or not) into widget config.latestRunId, so shared dashboards display poisoned data. Mitigating guards exist (Zod AnalyticsQuery schema, engine field allowlist, org-scoped SQL) but they only prevent injection/cross-org reads, not the missing write authorization or run-history poisoning. The sibling POST /reports/run preview endpoint is explicitly ephemeral, confirming persisted override runs are unintended.",
+    "severityAdjusted": "major"
+   }
+  },
+  {
+   "title": "Empty OR filter group compiles to TRUE — wrong identity element widens results",
+   "file": "apps/api/src/lib/analytics-engine.ts:186",
+   "severity": "minor",
+   "evidence": "`if (parts.length === 0) return Prisma.sql`TRUE`;` regardless of `group.logic`. TRUE is the identity for AND, but the identity for OR is FALSE. A nested `{logic:'OR', conditions:[]}` inside an AND tree (exactly what a filter-builder UI emits when the user adds a group before any condition) becomes a no-op TRUE instead of matching nothing or erroring, so the preview silently returns ALL rows as if the group passed. The wire schema (packages/shared/src/schemas/analytics.ts:98-104) allows `conditions: []`, so this is reachable.",
+   "fix": "Reject empty groups with AnalyticsQueryError (preferred), or return FALSE for empty OR groups.",
+   "lens": "correctness",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified at apps/api/src/lib/analytics-engine.ts:186 — buildFilterGroup returns Prisma.sql`TRUE` for any empty group before consulting group.logic, so an empty OR group becomes a no-op (TRUE) instead of the correct OR identity (FALSE) or an error. Reachable: the Zod schema (packages/shared/src/schemas/analytics.ts:98-104) allows conditions: [] with no .min(1), and the call chain (analytics-reports.ts:37, analytics-reports.helpers.ts:79 -> compileAnalyticsQuery line 289) has no pruning or empty-group guard. Not intentional leniency: the engine hard-fails the analogous empty-disjunction case (`in` with empty array, lines 144-146) with a test locking that strictness in (analytics-engine.test.ts:201-218), while line 186 has no comment and no test. Org scoping (line 287) is applied outside the filter tree, so impact is over-broad results within the tenant only — severity minor is correct.",
+    "severityAdjusted": "minor"
+   }
+  },
+  {
+   "title": "Number coercion accepts '' / arrays / 'Infinity' — compiles wrong predicates instead of 400",
+   "file": "apps/api/src/lib/analytics-engine.ts:71-77",
+   "severity": "minor",
+   "evidence": "`const n = typeof value === 'number' ? value : Number(value); if (typeof value === 'boolean' || value == null || Number.isNaN(n)) fail(...)` — `Number('')` === 0, `Number('  ')` === 0, `Number([])` === 0, `Number([5])` === 5, `Number('Infinity')` === Infinity; none are NaN, so a filter `{field:'score', operator:'eq', value:''}` (empty input box) compiles to `score = 0` and returns real rows instead of a 400. The value is `z.unknown()` on the wire (analytics.ts:86) so all of these reach the engine.",
+   "fix": "Only accept `typeof value === 'number' && Number.isFinite(value)` or a string matching a strict numeric regex; reject everything else.",
+   "lens": "correctness",
+   "verdict": {
+    "isReal": true,
+    "reason": "Confirmed at apps/api/src/lib/analytics-engine.ts:71-77. coerceScalar's number branch computes Number(value) and rejects only booleans, null/undefined, and NaN — but Number('')===0, Number('  ')===0, Number([])===0, Number([5])===5, Number('Infinity')===Infinity, none NaN, so all pass. The wire schema (packages/shared/src/schemas/analytics.ts:86) types filter value as z.unknown().optional(), and the route (analytics-reports.ts:231-241) validates only shape before calling compileAnalyticsQuery, so these values reach the engine unfiltered. buildCondition passes cond.value directly to coerceScalar for eq/neq/gt/gte/lt/lte with no array check (the array guard only covers in/notIn), so {field:'score', operator:'eq', value:''} compiles to a bound `score = 0` predicate and returns real rows instead of a 400; 'Infinity' compiles to an Infinity parameter that errors at the DB (500) on integer/numeric columns. Field allowlist checks names only; numeric fields (score, valueMicros, amountMicros, etc.) exist. No injection or tenancy impact (values are parameterized, org_id scoping intact), and no test pins the current behavior — it is a validation gap producing silently wrong results, matching the claimed minor severity.",
+    "severityAdjusted": "minor"
+   }
+  },
+  {
+   "title": "JS Date.parse accepts strings Postgres rejects — preview route 500s instead of 400",
+   "file": "apps/api/src/lib/analytics-engine.ts:79-84",
+   "severity": "minor",
+   "evidence": "`if (typeof value !== 'string' || Number.isNaN(Date.parse(value))) fail(...); return Prisma.sql`${value}::timestamptz`;` — validation runs in JS but parsing runs in Postgres on the ORIGINAL string. Node's `Date.parse('0')` is valid (year 2000), but `'0'::timestamptz` raises 22007 in Postgres, which surfaces as a raw PrismaClientKnownRequestError. In POST /reports/run (analytics-reports.ts:240-242) only AnalyticsQueryError maps to 400, so this returns HTTP 500; in runPersistedReport it lands as a cryptic driver message in run.error. The two parsers disagree on a whole family of inputs ('1', '0', bare numbers, some locale formats).",
+   "fix": "Validate with a strict ISO-8601 regex (date or full timestamp) instead of Date.parse, or normalize to `new Date(value).toISOString()` before binding.",
+   "lens": "correctness",
+   "verdict": {
+    "isReal": true,
+    "reason": "Confirmed at apps/api/src/lib/analytics-engine.ts:78-84: the date branch gates on JS Date.parse but binds the original string with a ::timestamptz cast, and the two parsers genuinely disagree. Verified empirically that Node's Date.parse('0') returns 946702800000 (year 2000, not NaN), while Postgres rejects '0'::timestamptz with SQLSTATE 22007. No upstream guard exists: AnalyticsFilterCondition.value is z.unknown() in packages/shared/src/schemas/analytics.ts:86, and the field allowlist exposes many date fields (createdAt, dueDate, etc.), so {field:'createdAt', operator:'gt', value:'0'} reaches the engine. In POST /reports/run (apps/api/src/routes/analytics-reports.ts:238-243) only AnalyticsQueryError maps to 400; the resulting Prisma raw-query failure is P2010, which the global error handler (apps/api/src/plugins/error-handler.ts) does not map (only P2002/P2025/P2003), so it falls through to a generic 500. In runPersistedReport (analytics-reports.helpers.ts:116-123) the raw driver message is persisted to run.error as claimed. Minor inaccuracy in the claim: the 500 body is the sanitized generic 'Something went wrong', not a raw PrismaClientKnownRequestError serialization — the status-code defect stands regardless.",
+    "severityAdjusted": "minor"
+   }
+  },
+  {
+   "title": "Micros money aggregates cast to ::float8 — silent integer precision loss past 2^53 micros",
+   "file": "apps/api/src/lib/analytics-engine.ts:202-211",
+   "severity": "minor",
+   "evidence": "`return Prisma.sql`${Prisma.raw(agg.fn)}(${col})::float8`;` for SUM/AVG (and MIN/MAX numeric). `value_micros`/`amount_micros` are BigInt columns (schema.prisma:378, 2755) per the repo money rule (\"store amounts in micros (integer)\"). SUM(value_micros) in Postgres is exact NUMERIC, but the ::float8 cast rounds once the aggregate exceeds 2^53 ≈ 9.007e15 micros (≈ €9.0B) — an org-wide multi-year pipeline sum silently loses low-order digits. Same hazard in normalizeAnalyticsRows (line 320): `if (typeof value === 'bigint') out[key] = Number(value)`. Nothing in the wire contract marks these as inexact.",
+   "fix": "Return money aggregates as strings (drop ::float8, serialize Decimal/BigInt via .toString()) or document/clamp the float8 contract explicitly; format at the edge per repo convention.",
+   "lens": "correctness",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified at the cited location. analytics-engine.ts lines 202-211 cast SUM/AVG (and numeric MIN/MAX) to ::float8, and line 320 converts bigint driver values via Number(). The aggregated columns are BigInt micros (schema.prisma: Opportunity.valueMicros @map(\"value_micros\"), Forecast.amountMicros @map(\"amount_micros\")) and both are allowlisted as type 'number' in analytics-fields.ts (lines 88, 207), so SUM(value_micros)::float8 is reachable. Postgres SUM(bigint) is exact NUMERIC; the float8 cast silently rounds once the aggregate exceeds 2^53 micros (~€9.0B). No guard exists: the Zod schema in packages/shared/src/schemas/analytics.ts validates query shape only (no mention of precision/safe-integer), and executeAnalyticsQuery in analytics-reports.helpers.ts pipes raw rows straight through normalizeAnalyticsRows into a Json column / JSON wire format with nothing marking the values inexact. The defect exists exactly as described, violating the repo money rule (store micros as exact integers). Severity 'minor' is appropriate: the threshold (~€9B org-wide sum) is a far edge case for this product, and below 2^53 the float8 integers are exact.",
+    "severityAdjusted": "minor"
+   }
+  },
+  {
+   "title": "Time buckets and date comparisons are session-timezone (UTC) only — no tz parameter, boundary shift for European users",
+   "file": "apps/api/src/lib/analytics-engine.ts:229-233",
+   "severity": "minor",
+   "evidence": "`date_trunc('${bucket}', column)` on timestamptz columns truncates in the connection's TimeZone (UTC under Prisma), and date filter values bind as `${value}::timestamptz` (line 83) interpreted the same way. AnalyticsQuery (analytics.ts:125-133) has no timezone field, so DAY/WEEK/MONTH/QUARTER/YEAR boundaries are UTC: a lead created 23:30 CEST on May 31 lands in the June bucket; 'createdAt gte 2026-01-01' is off by 1-2h for CET/CEST users. WEEK is ISO Monday-start — fine for Europe but undocumented for the frontend.",
+   "fix": "Add an optional IANA timezone to AnalyticsQuery (validated against an allowlist) and compile `date_trunc(bucket, col AT TIME ZONE $tz)`; document the Monday week-start.",
+   "lens": "correctness",
+   "verdict": {
+    "isReal": true,
+    "reason": "Confirmed at apps/api/src/lib/analytics-engine.ts:229-233: groupByExpr emits date_trunc('<bucket>', column) with no AT TIME ZONE and no tz parameter; line 83 binds date filter values as ${value}::timestamptz. Date columns are @db.Timestamptz(6) in packages/db/prisma/schema.prisma, the query runs via prisma.$queryRaw (analytics-reports.helpers.ts:75-82) where Prisma pins the session TimeZone to UTC, and AnalyticsQuery (packages/shared/src/schemas/analytics.ts:125-133) has no timezone field — no guard anywhere in the call chain (Zod schemas, analytics-fields.ts allowlists, routes, auth) compensates. So DAY/WEEK/MONTH/QUARTER/YEAR boundaries and bare-date comparisons are UTC: events in the first 1-2 local hours of a CET/CEST period land in the prior UTC bucket, and 'gte 2026-01-01' is 1-2h off for European users; WEEK is ISO Monday-start and undocumented. Note: the evidence's specific example is directionally inverted (23:30 CEST May 31 = 21:30 UTC May 31 stays in May; the actual shift case is e.g. 01:00 CEST June 1 landing in the May UTC bucket), but the substantive defect exists exactly as claimed.",
+    "severityAdjusted": "minor"
+   }
+  },
+  {
+   "title": "SUM/AVG/MIN/MAX over zero rows yields value: null — KPI contract (rows[0].value: number) unguarded and untested",
+   "file": "apps/api/src/lib/analytics-engine.ts:202-211",
+   "severity": "minor",
+   "evidence": "A lone `{fn:'SUM', field:'valueMicros'}` with no groupBy gets the KPI alias 'value' (aggregateAlias, lines 216-225) and produces one row with `value: null` when no rows match (SQL SUM/AVG/MIN/MAX of an empty set is NULL; no COALESCE). The KPI contract test only pins COUNT (`expect(typeof run.result[0]!.value).toBe('number')`, analytics-reports.integration.test.ts:204), so the null case is never encoded — a freshly-filtered KPI tile will receive null where the frontend types expect a number.",
+   "fix": "COALESCE SUM/COUNT-like aggregates to 0 in the compiler (leave AVG/MIN/MAX null deliberately and document it), and add a test pinning the empty-set behavior.",
+   "lens": "correctness",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified at analytics-engine.ts:202-211 — SUM/AVG/MIN/MAX compile to e.g. `SUM(col)::float8` with no COALESCE; a lone aggregate without groupBy gets the KPI alias 'value' (line 222, isSingleKpi at line 273, comment documents \"KPI widgets read rows[0].value\"). SQL aggregates over an empty set return NULL (only COUNT returns 0), so a zero-match filter produces [{ value: null }]. No guard downstream: normalizeAnalyticsRows passes null through (else-branch, line 328), executeAnalyticsQuery adds nothing, and the shared Zod response schema types result as z.array(z.record(z.unknown())), so null serializes silently. The only KPI-contract test (analytics-reports.integration.test.ts:204) pins typeof value === 'number' for COUNT(*) only — the one aggregate immune to the null case — and engine unit tests assert COALESCE-free SQL text, so the gap is untested exactly as claimed. Minor caveat: \"frontend types expect a number\" is slightly overstated — no frontend KPI widget exists yet and the wire type is Record<string, unknown>; the contract lives in a code comment + COUNT-only test, making this a latent contract violation rather than a live break. Severity 'minor' is appropriate.",
+    "severityAdjusted": "minor"
+   }
+  },
+  {
+   "title": "GET /reports/:id/runs/:runId ignores the report's soft-delete — deleted report data remains readable",
+   "file": "apps/api/src/routes/analytics-reports.ts:313-328",
+   "severity": "minor",
+   "evidence": "The single-run route queries only `analyticsReportRun.findFirst({ where: { id: runId, reportId: id, orgId } })` with no check that the parent report has `deletedAt: null`, while the sibling list route (lines 299-303) and every other report route do check it. After DELETE /reports/:id (soft delete), the runs list 404s but any previously-seen runId still returns 200 with the full persisted `result` rows — inconsistent soft-delete filtering that leaks the deleted report's data.",
+   "fix": "Gate the run fetch on a `findFirst` of the report with `deletedAt: null` (same as the list route).",
+   "lens": "correctness",
+   "verdict": {
+    "isReal": true,
+    "reason": "Confirmed at apps/api/src/routes/analytics-reports.ts:313-328: the single-run handler queries only analyticsReportRun.findFirst({ where: { id: runId, reportId: id, orgId } }) without fetching the parent report or checking deletedAt, while the sibling runs-list route (lines 299-303) and every other report route filter on deletedAt: null. DELETE /reports/:id is a soft delete (lines 207-208 set deletedAt via update), so the Prisma onDelete: Cascade on AnalyticsReportRun (schema.prisma:4980) never fires and run rows persist. No downstream guard mitigates it: AnalyticsReportRun has no deletedAt column, serializeRun (analytics-reports.helpers.ts:60-72) returns the persisted result rows, and the AnalyticsReportRun Zod response schema (packages/shared/src/schemas/analytics.ts:153-164) includes result, so Fastify serialization returns the full data. A same-org user with a previously-seen runId gets 200 with the deleted report's result rows. Severity minor is correct: org scoping is intact (no cross-tenant exposure); this is inconsistent soft-delete filtering with residual same-org readability of deleted data.",
+    "severityAdjusted": "minor"
+   }
+  },
+  {
+   "title": "Widget mutation authorization is inconsistent with dashboard mutation — any reports:write holder can rewrite a shared dashboard's content",
+   "file": "apps/api/src/routes/analytics-dashboards.ts:285-406",
+   "severity": "minor",
+   "evidence": "PATCH/DELETE `/dashboards/:id` enforce `dashboard.ownerId !== req.auth.userId && !(await isOrgAdmin(req))` → 403 (lines 208-210, 246-248), but POST/PATCH/DELETE `/dashboards/:id/widgets...` only call `findVisibleDashboard` — which PASSES for any `isShared: true` dashboard — plus the generic reports:write permission. Net effect: a non-owner cannot rename a shared dashboard but CAN add, retitle, repoint (reportId) and delete every widget on it, i.e. replace its entire content. Either both levels should be owner/admin-gated or neither; the current split contradicts the route's own header comment about owner/admin visibility rules.",
+   "fix": "Apply the same owner-or-admin check to widget create/patch/delete (or explicitly document shared dashboards as org-editable and drop the check from dashboard PATCH).",
+   "lens": "correctness",
+   "verdict": {
+    "isReal": true,
+    "reason": "Confirmed at apps/api/src/routes/analytics-dashboards.ts. Dashboard PATCH/DELETE enforce owner-or-admin (lines 208-210, 246-248 → 403), but all three widget mutation routes (POST 285-326, PATCH 328-374, DELETE 376-406) gate only on requirePermission('reports:write') + findVisibleDashboard, which passes for any isShared=true dashboard (line 129 short-circuits the owner/admin check). No compensating guard exists elsewhere: requirePermission (plugins/rbac.ts:47-72) is a pure role-permission lookup with no ownership concept, and AnalyticsWidgetCreate/Patch (packages/shared/src/schemas/analytics.ts:241-261) validate shape only and explicitly permit reportId/title/type/config/position changes; the only handler-level check is that a new reportId belongs to the same org. Net effect matches the claim: a non-owner with reports:write cannot rename a shared dashboard (403) yet can add, retitle, repoint, and hard-delete every widget on it — replacing its entire content — contradicting the PATCH route's own 'Only the owner or an admin can modify this dashboard' error. Severity minor is right: same-org actors with reports:write only, mutations audit-logged, no cross-tenant exposure.",
+    "severityAdjusted": "minor"
+   }
+  },
+  {
+   "title": "Unbounded findMany on GET /reports — exact repeat of logged MISTAKES entry; route 400s in dev/test",
+   "file": "apps/api/src/routes/analytics-reports.ts:63",
+   "severity": "critical",
+   "evidence": "`const reports = await prisma.analyticsReport.findMany({ where: { orgId: req.auth.orgId, deletedAt: null }, orderBy: { createdAt: 'desc' } });` — no `take`. The query guard (apps/api/src/plugins/query-guard.ts:23 `REJECT_UNBOUNDED = process.env.NODE_ENV !== 'production'`; lines 56-66 rewrite the response to 400) rejects any findMany without `take` outside production. MISTAKES.md:151 ('2026-06-05 BUG: Settings admin panels called unbounded backend reads') and MISTAKES.md:330 ('Any findMany added to request paths must include an explicit, business-justified bound and deterministic order') make this a repeated logged mistake — HALT-level per mistakes-protocol. Consequence: the integration test `GET /api/reports lists the created report` (analytics-reports.integration.test.ts:88-94) expects 200 but gets 400 against a reachable DB, so this suite cannot have run green end-to-end.",
+   "fix": "Add an explicit business-justified bound, e.g. `take: 200`, with deterministic order (already has orderBy). Re-run the integration suite against a live DB.",
+   "lens": "conventions",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified at every link in the chain. (1) apps/api/src/routes/analytics-reports.ts:63-66 has findMany on analyticsReport with where+orderBy but no `take` — the sibling route at line 304 has `take: 20`, so this is an omission, not a pattern. (2) The guard is real and unavoidable: plugins/query-guard.ts:23 `REJECT_UNBOUNDED = NODE_ENV !== 'production'`, lines 56-71 rewrite the response to 400; lib/prisma-middleware.ts:51-58 flags ANY findMany lacking `take` with no model/route exemptions; plugin registered globally via fp() in server.ts:184 before registerRoutes (line 207), which mounts analyticsReportsRoutes at /api/v1 (server.routes.ts:126). Zod schemas/field allowlists in packages/shared validate query content only — they do not bound this list read. (3) vitest.config.ts forces NODE_ENV=test, so the guard rejects during tests. (4) MISTAKES.md:151 and :330 match verbatim — this is an exact repeat of the logged 'unbounded findMany in request path' mistake (HALT-level per mistakes-protocol). (5) Live run: the integration suite fails 9/13 right now. Nuance: in the current dev DB the migration isn't applied (P2021: public.analytics_reports missing), so GET /api/v1/reports currently 500s before the guard can fire (the middleware only records warnings after next() succeeds). Once migrated, GET /reports deterministically 400s in dev/test as claimed. The claim's conclusion — the suite cannot have run green end-to-end — is empirically confirmed either way.",
+    "severityAdjusted": "high"
+   }
+  },
+  {
+   "title": "Four unbounded findMany sites in dashboards routes — guard 400s GET/PATCH dashboards and even rewrites successful widget 201s to 400",
+   "file": "apps/api/src/routes/analytics-dashboards.ts:102",
+   "severity": "critical",
+   "evidence": "No `take` on: (1) line 102 `prisma.analyticsReportRun.findMany({ where: { orgId, reportId: { in: reportIds } }, orderBy..., distinct: ['reportId'] })` in latestRunIds — Prisma applies `distinct` in memory, so this also fetches every run row for those reports as the runs table grows; (2) line 141 `prisma.analyticsDashboard.findMany` (GET /dashboards); (3) line 191 and (4) line 274 `prisma.analyticsDashboardWidget.findMany`. In dev/test the query-guard onSend hook rewrites responses to 400 — including POST /dashboards/:id/widgets, where the widget row is already created before latestRunIds (line 321) trips the guard, so the write succeeds but the client receives 400. Tests expecting 200/201 (analytics-dashboards.integration.test.ts:78, 86, 135, 151) cannot pass against a live DB. Same repeated MISTAKES.md entry as above.",
+   "fix": "Bound each read (`take` on dashboards/widgets lists). For latestRunIds, in-memory distinct + take is incorrect together — replace with `prisma.analyticsReportRun.groupBy({ by: ['reportId'], _max: { createdAt } })` plus a bounded lookup, or one raw `DISTINCT ON (report_id)` query.",
+   "lens": "conventions",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified at every cited location. All four findMany calls (analytics-dashboards.ts lines 102, 141, 191, 274) lack `take`; prisma-middleware.ts:51-58 flags any findMany without take (no allowlist), and query-guard.ts:56-66 rewrites the response to 400 whenever NODE_ENV !== 'production' (tests run NODE_ENV=test per package.json and vitest.config.ts; plugin registered unconditionally at server.ts:184; rewriteUrl at server.ts:54 routes /api/* test URLs to these handlers). POST /dashboards/:id/widgets commits the widget (line 300) and audit log (line 311) before latestRunIds (line 321) fires the unbounded query, so the write persists while the client receives 400 instead of 201 — confirming the rewritten-201 claim. Integration test expectations at lines 78, 86, 135, 151 cannot pass against a live DB (GET list/detail always trip line 141/191; widget create/list trip 102/274). Schema has no nativeDistinct preview feature, so Prisma applies distinct in memory at line 102, fetching all run rows for the report set. MISTAKES.md lines 151, 326, 1364 log this exact guard-vs-unbounded-findMany failure three prior times, and sibling routes (bid-workspace-rfp.ts:114, migrations.ts:304) explicitly add `take` citing the guard. Zod schemas, field allowlists, and auth provide no mitigation — the guard acts on the Prisma call itself. Only minor overstatement: PATCH /dashboards/:id trips only when the dashboard has report-bound widgets (latestRunIds early-returns otherwise), so the specific PATCH test at line 96 would pass; this does not affect the four cited failing assertions.",
+    "severityAdjusted": "high"
+   }
+  },
+  {
+   "title": "POST /reports/:id/run persists writes with no permission gate and no run retention",
+   "file": "apps/api/src/routes/analytics-reports.ts:259-267",
+   "severity": "major",
+   "evidence": "Every other mutating analytics endpoint uses `preHandler: [server.requirePermission('reports:write')]` (lines 74, 119, 160, 196), but POST /reports/:id/run has none — yet it creates AnalyticsReportRun rows storing up to 1000 rows of result Json each (analytics-reports.helpers.ts:94-115), bumps report.lastRunAt, and writes auditLog. It also accepts `req.body?.query` (line 275) so a read-only user can execute an arbitrary ad-hoc query and have its output recorded as an official run of someone else's report — the run row stores no record of which query produced it. Runs are never pruned (reads only `take: 20` at line 307), so repeated calls grow analytics_report_runs without bound.",
+   "fix": "Decide and enforce: either gate /:id/run behind a permission (e.g. reports:write or a reports:run), or at minimum cap stored result size and add run-count pruning per report; persist the executed query (or an override flag) on the run row.",
+   "lens": "conventions",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified at apps/api/src/routes/analytics-reports.ts:259-293 — POST /reports/:id/run has no preHandler while every other mutating endpoint in analytics-reports.ts (lines 74, 119, 160, 196) and all six mutations in analytics-dashboards.ts use requirePermission('reports:write'). The rbac plugin (plugins/rbac.ts) enforces per-permission UserRole grants with no admin fallback, and 'reports:read' is a distinct permission, so read-only/permissionless org users can hit this route (only the global auth hook applies). The handler persists writes: runPersistedReport (analytics-reports.helpers.ts:88-128) creates an AnalyticsReportRun row storing result Json (engine clamps to ANALYTICS_MAX_LIMIT=1000 rows), bumps report.lastRunAt, and the route writes auditLog. Line 275 accepts req.body?.query as an override; the AnalyticsReportRun model (schema.prisma:4967-4984) has no query column, so the ad-hoc query's output is recorded as an official run with no provenance. No retention exists: the only analyticsReportRun.deleteMany calls are test cleanup, and the worker has no analytics-run pruning job; GET /runs merely reads take:20. Caveats that bound (but do not negate) the claim: caller must be an authenticated org member, and the 'arbitrary' query is constrained by the AnalyticsQuery Zod schema, entity/field allowlists, org scoping, and the 1000-row LIMIT — it is arbitrary only within the analytics DSL, not raw SQL. The deliberate contrast with the unguarded preview endpoint POST /reports/run, which documents 'Nothing is persisted', confirms the persisting variant is missing its gate rather than intentionally open.",
+    "severityAdjusted": "major"
+   }
+  },
+  {
+   "title": "runPersistedReport swallows ALL errors into run.error, leaking raw Prisma/driver messages to clients with zero Pino logging",
+   "file": "apps/api/src/routes/analytics-reports.helpers.ts:116-124",
+   "severity": "major",
+   "evidence": "`catch (err) { const message = err instanceof Error ? err.message : 'Query execution failed'; await prisma.analyticsReportRun.updateMany({ ..., data: { status: 'error', ..., error: message } }); }` — the catch is not limited to AnalyticsQueryError. A Prisma `$queryRaw` failure message (e.g. 'Raw query failed. Code: 42703 ...' including generated SQL fragments/column names) is persisted and returned to the client via serializeRun (run.error, schema analytics.ts:162). Unexpected infra errors (DB blip, schema drift) become HTTP 200 with status 'error' and are never logged — violating repo conventions 'errors thrown in route handlers', 'Pino logging not console' (no logger exists anywhere in this helper), and CLAUDE.md Rule 12 fail-loud. Contrast: the preview route correctly maps only AnalyticsQueryError to 400 and rethrows the rest (analytics-reports.ts:240-243).",
+   "fix": "In the catch: if `err instanceof AnalyticsQueryError`, persist err.message; otherwise persist a generic 'Query execution failed', log the real error through a passed-in request-scoped Pino logger, and keep status 'error'.",
+   "lens": "conventions",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified at apps/api/src/routes/analytics-reports.helpers.ts:116-124: the catch is unconditional and persists raw err.message into run.error for ANY Error, not just AnalyticsQueryError. The message reaches clients: serializeRun (helpers.ts:69) maps error through, POST /reports/:id/run returns it as HTTP 200, and the response schema exposes it (packages/shared/src/schemas/analytics.ts:162, error: z.string().optional()); it is also persisted and re-served via GET /reports/:id/runs. The engine's identifier allowlist (analytics-engine.ts) blocks injection but cannot prevent runtime driver errors — $queryRaw failures (e.g. 42703 with column names on schema drift) and PrismaClientInitializationError (includes DB host:port) are instanceof Error and leak verbatim. Zero Pino logging in the helper or the run route (grep confirms no logger reference); the $transaction is also inside the try, so persistence failures are swallowed too. The cited contrast with the preview route (analytics-reports.ts:240-243, AnalyticsQueryError→400, rest rethrown to Fastify's logging error handler) is accurate. Minor overstatements: (1) PrismaClient is built with log:['error'] (packages/db/src/index.ts:20), so Prisma-level errors do print to stdout — though unstructured and not request-scoped Pino per repo convention; (2) exposure is limited to authenticated org users; (3) persisting error status on the run row is deliberate design per inline comments — but that design should still narrow to AnalyticsQueryError and genericize/log unexpected errors. Core defect stands as described.",
+    "severityAdjusted": "major"
+   }
+  },
+  {
+   "title": "Widget create/patch/delete on shared dashboards bypass the owner-or-admin guard enforced on the dashboard itself",
+   "file": "apps/api/src/routes/analytics-dashboards.ts:285-406",
+   "severity": "major",
+   "evidence": "PATCH /dashboards/:id (line 208) and DELETE /dashboards/:id (line 246) both enforce `dashboard.ownerId !== req.auth.userId && !(await isOrgAdmin(req))` → 403. The widget mutation routes (POST line 285, PATCH line 328, DELETE line 376) only call `findVisibleDashboard` — and any shared dashboard is visible to every org member. Result: a non-owner with reports:write cannot rename a shared dashboard but CAN hard-delete all its widgets (`analyticsDashboardWidget.deleteMany`, line 390 — no soft delete, no undo) or repoint them at other reports. Inconsistent authz model on the same resource tree.",
+   "fix": "Apply the same owner-or-admin check to widget mutations, or document shared-dashboard collaborative editing as intended and make dashboard PATCH consistent with it.",
+   "lens": "conventions",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified at apps/api/src/routes/analytics-dashboards.ts. Dashboard PATCH (lines 208-210) and DELETE (246-248) enforce ownerId-or-isOrgAdmin → 403, but the three widget mutation routes (POST :285, PATCH :328, DELETE :376) gate only on requirePermission('reports:write') + findVisibleDashboard. findVisibleDashboard (line 129) skips the owner/admin check whenever isShared=true, so any org member with reports:write (seeded: Sales Manager, plus write-scoped API keys which bypass the DB permission check at plugins/rbac.ts:50-53) can create, repoint (reportId accepted at lines 341-355), or hard-delete widgets on another user's shared dashboard while being 403'd from renaming it. The delete is irreversible: deleteMany at line 390 and the AnalyticsDashboardWidget model (packages/db/prisma/schema.prisma:5007-5026) has no deletedAt column, unlike the dashboard which is soft-deleted. No guard elsewhere saves it: requirePermission has no ownership semantics, the Zod schemas (packages/shared/src/schemas/analytics.ts:241-261) are field validation only, and no test codifies non-owner widget editing as intended. The file header frames isShared purely as visibility and the 403 message claims modification is owner/admin-only, so the asymmetry is an authz inconsistency, not documented design. Mitigations: org-internal only, privileged role required, all mutations audit-logged.",
+    "severityAdjusted": "major"
+   }
+  },
+  {
+   "title": "Number coercion accepts '' and [] as 0 — invalid filter values silently match rows instead of 400",
+   "file": "apps/api/src/lib/analytics-engine.ts:71-77",
+   "severity": "minor",
+   "evidence": "`const n = typeof value === 'number' ? value : Number(value); if (typeof value === 'boolean' || value == null || Number.isNaN(n)) fail(...)` — `Number('')` and `Number([])` are 0, `Number(['7'])` is 7, so `{ field: 'score', operator: 'eq', value: '' }` compiles to `score = 0` and returns wrong data instead of rejecting. The wire schema leaves value as `z.unknown()` (analytics.ts:86), so this coercion IS the server-side validation — repo rule 'validate all inputs server-side' makes silent garbage-in unacceptable.",
+   "fix": "Only accept `typeof value === 'number'` or a string matching a strict numeric regex; fail on arrays/objects/empty string.",
+   "lens": "conventions",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified at apps/api/src/lib/analytics-engine.ts:71-77. The number branch computes n = Number(value) and only rejects booleans, null/undefined, and NaN. Number('') === 0, Number([]) === 0, Number(['7']) === 7 — none are NaN, '' == null is false, and typeof [] is 'object', so all pass the guard and bind as numbers. buildCondition's eq/neq/gt/gte/lt/lte branches pass cond.value directly to coerceScalar with no array check (only in/notIn validate arrays). No upstream guard exists: the wire schema leaves value as z.unknown().optional() (packages/shared/src/schemas/analytics.ts:86), the route chain (analytics-reports.helpers.ts executeAnalyticsQuery → compileAnalyticsQuery) adds no value validation, and field allowlists validate names only. So { field: 'score', operator: 'eq', value: '' } compiles to a parameterized score = 0 and silently returns wrong rows instead of a 400. The explicit boolean/null/NaN rejections show intent to reject non-numeric input, making this a genuine coercion gap, not intended behavior. Not a security issue (values remain bound parameters, org-scoping intact), so 'minor' severity is appropriate.",
+    "severityAdjusted": "minor"
+   }
+  },
+  {
+   "title": "Runs list ships full result Json blobs (up to 20 × 1000 rows) — findMany without column selection",
+   "file": "apps/api/src/routes/analytics-reports.ts:304-308",
+   "severity": "minor",
+   "evidence": "`prisma.analyticsReportRun.findMany({ where..., orderBy..., take: 20 })` has no `select`, so each of the 20 run rows carries its complete `result` Json (clamped at 1000 rows per run by ANALYTICS_MAX_LIMIT) and serializeRun forwards it. A run-history list needs status/rowCount/timestamps, not 20 full result sets — violates the repo 'No SELECT * — always specify columns' rule with real payload impact; the per-run endpoint (line 313) already exists for fetching one result.",
+   "fix": "Add `select` omitting `result` (or `omit: { result: true }`) on the list query; keep full result only on GET /reports/:id/runs/:runId.",
+   "lens": "conventions",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified at apps/api/src/routes/analytics-reports.ts:304-308: analyticsReportRun.findMany has no select, so all columns including the result Json are fetched for up to 20 runs. serializeRun (analytics-reports.helpers.ts:68) forwards result, and the response schema AnalyticsReportRun (packages/shared/src/schemas/analytics.ts:161) includes result as an optional field, so Fastify's Zod serializer ships the full blobs rather than stripping them. ANALYTICS_MAX_LIMIT = 1000 (apps/api/src/lib/analytics-engine.ts:32) confirms each persisted run can hold up to 1000 rows, so the list response can carry 20 x 1000 rows. The per-run endpoint at line 313 already serves single-run results, and the adjacent report lookup (lines 299-302) uses select, showing the 'always specify columns' convention is followed elsewhere in the same handler. No guard in the call chain mitigates the payload.",
+    "severityAdjusted": "minor"
+   }
+  },
+  {
+   "title": "analytics-dashboards.ts exceeds the 400-line max-file rule",
+   "file": "apps/api/src/routes/analytics-dashboards.ts:407",
+   "severity": "minor",
+   "evidence": "File is 407 lines (`wc -l` = 407); .claude/rules/code-quality.md: 'Max file length: 400 (split if longer)'. The serializers + latestRunIds + isOrgAdmin/findVisibleDashboard block (lines 30-134) is extractable exactly as analytics-reports.helpers.ts already does for the sibling route file.",
+   "fix": "Move the Db* interfaces, serializeWidget/serializeDashboard, parsePosition, and latestRunIds into analytics-dashboards.helpers.ts, mirroring the existing helpers pattern.",
+   "lens": "conventions",
+   "verdict": {
+    "isReal": true,
+    "reason": "Confirmed: apps/api/src/routes/analytics-dashboards.ts is exactly 407 lines (wc -l; file ends with code, no blank-line padding), exceeding the 400-line max in .claude/rules/code-quality.md (\"Max file length: 400 lines (split if longer)\"). The cited extractable block (lines 30-134: DbDashboard/DbWidget interfaces, serializeWidget/serializeDashboard, latestRunIds, isOrgAdmin/findVisibleDashboard) exists as described, and the sibling analytics-reports.helpers.ts (128 lines) proves the extraction pattern is already established for the parallel route file. Runtime guards (Zod schemas, auth plugin) are irrelevant to a static file-length convention. One nuance: findVisibleDashboard closes over `server.httpErrors`, so extraction requires passing that dependency, but this does not invalidate the claim.",
+    "severityAdjusted": "minor"
+   }
+  },
+  {
+   "title": "compileAnalyticsQuery is 59 lines — over the 50-line max-function rule",
+   "file": "apps/api/src/lib/analytics-engine.ts:248-306",
+   "severity": "minor",
+   "evidence": "`export function compileAnalyticsQuery(...)` spans lines 248-306 (59 lines), exceeding the repo rule 'Max function: 50 lines' (CLAUDE.md quality rules / code-quality.md). The select-list construction (lines 258-285) and order-by construction (lines 291-300) are self-contained blocks.",
+   "fix": "Extract buildSelectList(spec, aggregates, groupBy) and buildOrderBy(query, emittedAliases) helpers; compileAnalyticsQuery keeps WHERE assembly + final composition.",
+   "lens": "conventions",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified: compileAnalyticsQuery in apps/api/src/lib/analytics-engine.ts spans lines 248-306 = 59 physical lines, exceeding the documented 50-line max-function rule in CLAUDE.md and .claude/rules/code-quality.md. Even excluding 5 blank and 4 comment lines it sits at exactly 50 statement lines (at the ceiling under the most charitable counting). The cited extraction candidates (select-list lines 258-285, order-by lines 291-300) are accurate self-contained blocks. No ESLint rule enforces this, and Zod/allowlist/auth guards are irrelevant — it is purely a maintainability convention violation with no behavioral impact, so 'minor' severity is correct.",
+    "severityAdjusted": "minor"
+   }
+  },
+  {
+   "title": "Run rows can be stuck 'running' forever — no reaper, timeout, or crash-safe lifecycle",
+   "file": "apps/api/src/routes/analytics-reports.helpers.ts:94-124",
+   "severity": "major",
+   "evidence": "`const run = await prisma.analyticsReportRun.create({ data: { ..., status: 'running', startedAt } })` (line 94-96) is written first; the terminal state is only set by a later updateMany. If the process crashes/restarts between the two writes, OR the catch-block recovery write itself fails (line 120-123 — e.g. DB outage mid-run; that throw also bubbles to a 500), the row stays 'running' permanently. There is no timeout column, no staleness sweep, and the code comment (line 117-118) says the frontend polls run.status — so a stuck row polls forever. The 'pending' status in the wire enum (packages/shared/src/schemas/analytics.ts:150) and schema default (schema.prisma:4971) is never used by any code path.",
+   "fix": "Since the run is synchronous, create the row once with its final status inside the same code path (or wrap create+execute+finalize so a failure path always lands done|error). Additionally treat 'running' rows older than a threshold as 'error' on read, or sweep them at startup/cron.",
+   "lens": "resilience",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified at apps/api/src/routes/analytics-reports.helpers.ts: the run row is committed with status 'running' (lines 94-96) and the terminal state is only set by later updateMany calls — the success transaction (101-115) or the catch-block write (120-123). The catch-block updateMany is itself unguarded, so a DB failure there bubbles to a 500 and leaves the row 'running'. Repo-wide grep confirms no reaper, staleness sweep, or timeout touches analyticsReportRun (the worker has reapers for rfp-orchestration and crew runs, but none for analytics runs), and the AnalyticsReportRun model (schema.prisma:4967-4984) has no timeout/heartbeat column. The 'pending' default (schema.prisma:4971) and enum member (analytics.ts:150) are never written by any code path. However, the lifecycle is synchronous within a single HTTP request (POST /reports/:id/run returns the final run row), the crash window is one query's duration, and no code gates on a 'running' row — re-runs are unobstructed. A stuck row is a permanent 'running' artifact in run history / post-crash polling, not a functional blocker, so severity is downgraded to minor.",
+    "severityAdjusted": "minor"
+   }
+  },
+  {
+   "title": "No statement timeout or execution-cost cap on the user-shaped raw query",
+   "file": "apps/api/src/routes/analytics-reports.helpers.ts:79-81",
+   "severity": "major",
+   "evidence": "`const rows = await prisma.$queryRaw<...>(sql)` runs the compiled query with no `statement_timeout` and no Fastify request timeout. The LIMIT clamp (analytics-engine.ts:305) bounds output rows, not work: GROUP BY aggregates scan entire tenant tables, and the filter grammar permits up to 50 OR'd `ILIKE '%...%'` conditions (analytics-engine.ts:132-141, cap at line 34/180) which defeat indexes and force seq scans on large tables (activities). One slow query holds a Prisma pool connection until Postgres finishes; a handful of concurrent runs can exhaust the pool and stall the whole API.",
+   "fix": "Execute inside prisma.$transaction with `SET LOCAL statement_timeout = '10s'` (or an equivalent pool/server-level timeout) so runaway queries are cancelled, and surface the cancellation as run.status='error'.",
+   "lens": "resilience",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified at apps/api/src/routes/analytics-reports.helpers.ts:79-81 — prisma.$queryRaw(sql) executes the user-shaped query with no timeout or cancellation at any layer. Repo-wide grep finds zero statement_timeout settings; PrismaClient (packages/db/src/index.ts:19-21) is constructed with only a log option (no datasource URL options, no connection_limit/pool_timeout); the Fastify constructor (apps/api/src/server.ts:52) sets no requestTimeout/connectionTimeout (Fastify defaults: disabled), and an HTTP timeout could not cancel the Postgres query anyway. The queryGuardPlugin only logs slow queries post-hoc. Evidence details all check out: the LIMIT clamp (analytics-engine.ts:305, max 1000) bounds output rows after GROUP BY aggregation work; contains/startsWith compile to ILIKE with leading % (analytics-engine.ts:132-141) which defeats indexes; up to 50 OR'd conditions allowed (cap at lines 34/180-181) and the shared Zod schema (packages/shared/src/schemas/analytics.ts:98-104) adds no tighter bound; the entity allowlist includes activities (analytics-fields.ts:219). The preview endpoint POST /reports/run (analytics-reports.ts:227-255) lets any authenticated user run arbitrary schema-valid queries synchronously; the per-user per-minute rate limit does not bound concurrent in-flight queries, so a handful of slow queries can exhaust Prisma's default pool (num_cpus*2+1) and stall all DB-backed endpoints (P2024 pool timeouts). Tempering factors — auth required, queries are single-table and org-scoped with no JOINs (worst case O(tenant rows x 50 ILIKE patterns)) — bound the blast radius but do not refute the defect.",
+    "severityAdjusted": "major"
+   }
+  },
+  {
+   "title": "run.error persists raw Prisma/driver error text and returns it to clients with HTTP 200, bypassing the sanitizing error handler; failures are never logged",
+   "file": "apps/api/src/routes/analytics-reports.helpers.ts:119-123",
+   "severity": "major",
+   "evidence": "`const message = err instanceof Error ? err.message : 'Query execution failed'` stores err.message verbatim in the run row, and serializeRun (line 69) ships it to the client. Prisma raw-query failures read like \"Raw query failed. Code: `42...`. Message: `<db error>`\" and PrismaClientInitializationError messages include the DB host/port (\"Can't reach database server at `host:5432`\"). The centralized handler deliberately hides exactly this class of detail for 5xx (apps/api/src/plugins/error-handler.ts:56-74: \"may contain DB connection strings ... ORM internals\"), but the run.error path returns it inside a 200 response. The catch also swallows the error without any Pino logging — engine/DB failures are invisible to ops.",
+   "fix": "Persist err.message only when `err instanceof AnalyticsQueryError`; otherwise store a generic 'Query execution failed' and log the real error with the request-scoped logger (pass it into runPersistedReport).",
+   "lens": "resilience",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified at apps/api/src/routes/analytics-reports.helpers.ts:119-123: the catch persists err.message verbatim to run.error with no Pino logging, serializeRun (line 69) forwards it, and POST /reports/:id/run (analytics-reports.ts:259-292, schema response {200: AnalyticsReportRun}) returns it in an HTTP 200; AnalyticsReportRun.error is z.string().optional() (packages/shared/src/schemas/analytics.ts:162) so Zod passes raw text through. This bypasses the centralized handler (plugins/error-handler.ts:56-74) which deliberately hides 5xx detail AND does the only error logging — so engine/DB failures are never logged (the audit-log write records only runId+status). Non-AnalyticsQueryError failures reaching this catch are raw Prisma errors: user-triggerable via the Date.parse-vs-Postgres laxness in coerceScalar (analytics-engine.ts:78-83, `${value}::timestamptz` → 'Raw query failed. Code: 22007...'), plus statement timeouts and mid-request connection loss; raw text is also re-served by GET /reports/:id/runs[/:runId]. One evidence overstatement: the PrismaClientInitializationError host:port leak largely self-limits because the pre-try run.create or the in-catch updateMany would also fail and bubble to the sanitized 500 handler; realistic leaks are PG error codes/messages and ORM internals to authenticated same-org users. Core claim stands: raw driver text persisted + returned in 200, sanitizer bypassed, failures invisible to ops.",
+    "severityAdjusted": "major"
+   }
+  },
+  {
+   "title": "GET /reports/:id/runs returns full result blobs for 20 runs (multi-MB responses, all loaded in memory)",
+   "file": "apps/api/src/routes/analytics-reports.ts:304-309",
+   "severity": "major",
+   "evidence": "`prisma.analyticsReportRun.findMany({ where: {...}, orderBy: { createdAt: 'desc' }, take: 20 })` has no `select`, and `runs.map(serializeRun)` includes `result` (helpers.ts:68). Each persisted result holds up to ANALYTICS_MAX_LIMIT=1000 normalized rows (lead rows include 500-char BANT text fields), so the history listing can materialize and return ~20 full result sets — tens of MB per request — for what the UI needs as a status list.",
+   "fix": "In the list endpoint, `select` only metadata columns (id, status, startedAt, finishedAt, rowCount, error, createdAt) and omit `result`; serve the payload only from GET /reports/:id/runs/:runId.",
+   "lens": "resilience",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified at apps/api/src/routes/analytics-reports.ts:304-309: GET /reports/:id/runs runs analyticsReportRun.findMany with take: 20 and no select, so the full `result` JSON blob of each run is loaded into memory; serializeRun (apps/api/src/routes/analytics-reports.helpers.ts:68) copies `result` into the response, and the Zod response schema AnalyticsReportRun (packages/shared/src/schemas/analytics.ts:161) explicitly includes `result: z.array(z.record(z.unknown())).optional()`, so the fastify-type-provider-zod serializer ships all 20 blobs to the client — no guard strips them. Blob size is realistic: runPersistedReport persists the full row set (helpers.ts:108), ANALYTICS_MAX_LIMIT=1000 (analytics-engine.ts:32) is reachable via saved query limit (AnalyticsQuery.limit has no Zod max), and non-aggregate queries select every allowlisted column including the four 500-char lead BANT text columns (analytics-engine.ts:279-285, analytics-fields.ts:57-60). A dedicated GET /reports/:id/runs/:runId endpoint already exists for fetching a single run's result, confirming the history listing doesn't need the blobs. Caveat: ANALYTICS_DEFAULT_LIMIT=100 and aggregate results are small, so worst case needs raw-row reports with high explicit limits — but the structural defect (N full result sets fetched and returned for a status list, no pagination/projection) exists exactly as described.",
+    "severityAdjusted": "major"
+   }
+  },
+  {
+   "title": "Unbounded run-result storage: every run persists up to 1000 rows of Json and runs are never pruned",
+   "file": "apps/api/src/routes/analytics-reports.helpers.ts:101-110",
+   "severity": "major",
+   "evidence": "`result: rows as object[]` stores the full (clamped-to-1000-row) result set on every POST /reports/:id/run. Reads only `take: 20` (analytics-reports.ts:307) but nothing ever deletes older rows — AnalyticsReportRun (schema.prisma:4967-4980) has no retention mechanism and no code path prunes it. Dashboard auto-refresh or repeated manual runs grow analytics_report_runs (and its Json payloads) without bound; this also feeds the in-memory distinct defect in latestRunIds.",
+   "fix": "After a successful run, delete runs beyond the newest N (e.g. 20, matching the read cap) per report inside the same transaction; optionally store `result` only on the latest run or cap its serialized size.",
+   "lens": "resilience",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified at the cited locations. analytics-reports.helpers.ts:94 creates a new analyticsReportRun row on every POST /reports/:id/run, and lines 101-110 persist the full result set (`result: rows as object[]`). The only size bound is the engine clamp (analytics-engine.ts:31-32, 239-241, 305: ANALYTICS_MAX_LIMIT=1000, default 100); the Zod AnalyticsQuery schema (packages/shared/src/schemas/analytics.ts:131) leaves `limit` uncapped, so no upstream guard reduces the stored payload. Reads use take:20 (analytics-reports.ts:307), yet a repo-wide search finds zero pruning: the only analyticsReportRun.deleteMany calls are in two integration test files, and the worker app — which has retention jobs for other tables (rfp.audit-cleanup 90d, yjs-compaction 30d) — has none for analytics_report_runs. schema.prisma:4967-4984 confirms `result Json?` with no TTL; the only deletion path is FK cascade on report/org hard delete, but report deletion in the API is soft (deletedAt, analytics-reports.ts:205-209), so runs of deleted reports persist forever, slightly strengthening the claim. The run endpoint also has no requirePermission gate or rate limit, so repeated manual runs or dashboard auto-refresh grow the table without bound. Defect exists exactly as described.",
+    "severityAdjusted": "major"
+   }
+  },
+  {
+   "title": "latestRunIds uses Prisma in-memory `distinct` — fetches every run row for the referenced reports on each dashboard read",
+   "file": "apps/api/src/routes/analytics-dashboards.ts:102-107",
+   "severity": "major",
+   "evidence": "`prisma.analyticsReportRun.findMany({ where: { orgId, reportId: { in: reportIds } }, orderBy: { createdAt: 'desc' }, distinct: ['reportId'], ... })` — on Prisma 5.22 without the `nativeDistinct` preview flag (packages/db/prisma/schema.prisma generator: previewFeatures = [\"postgresqlExtensions\"] only), `distinct` is applied in the query engine AFTER fetching all matching rows; it does not emit SQL DISTINCT ON. So GET /api/v1/dashboards (which hydrates ALL widgets across all visible dashboards, line 150-151) pulls every run ever created for those reports into memory on every read. Combined with the missing run pruning, dashboard latency and API memory degrade linearly and unboundedly with run count. The comment on line 100-101 claiming 'no N+1' masks this.",
+   "fix": "Replace with a raw `SELECT DISTINCT ON (report_id) id, report_id FROM analytics_report_runs WHERE org_id = $1 AND report_id = ANY($2) ORDER BY report_id, created_at DESC`, or enable the nativeDistinct preview feature.",
+   "lens": "resilience",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified at apps/api/src/routes/analytics-dashboards.ts:102-107: findMany uses distinct:['reportId'] + orderBy createdAt desc with no take. packages/db/prisma/schema.prisma:7 enables only [\"postgresqlExtensions\"] (Prisma ^5.22.0), so nativeDistinct is off and Prisma applies distinct in-memory in the query engine after fetching ALL rows matching the where clause — no SQL DISTINCT ON or LIMIT is emitted. GET /dashboards (lines 140-152) calls latestRunIds over all widgets of all visible dashboards on every read; the same helper backs GET /dashboards/:id and /:id/widgets. Run rows grow unboundedly: every report execution creates one (analytics-reports.helpers.ts:94 via analytics-reports.ts:276) and the only deleteMany calls are in integration tests — no pruning exists. No guard in Zod schemas, field allowlists, or auth changes this. Mitigant: select is only {id, reportId} (two UUIDs/row), excluding the large result Json, so the per-row constant is small — but transfer and engine memory still scale linearly and unboundedly with total run count on the hottest analytics read path. The 'no N+1' comment is accurate on query count but masks row volume.",
+    "severityAdjusted": "major"
+   }
+  },
+  {
+   "title": "onDelete: SetNull is dead code — report deletion is soft, leaving widgets with dangling reportId references",
+   "file": "packages/db/prisma/schema.prisma:5021",
+   "severity": "major",
+   "evidence": "`report AnalyticsReport? @relation(fields: [reportId], references: [id], onDelete: SetNull)` only fires on a hard DELETE, but DELETE /api/v1/reports/:id soft-deletes (`data: { deletedAt: new Date() }`, analytics-reports.ts:205-220) and never touches widgets. After deletion, widget.reportId still points at a report whose GET 404s (deletedAt:null filter, analytics-reports.ts:108-111), while latestRunIds (analytics-dashboards.ts:89,102-108) still injects a latestRunId for the deleted report's runs into widget.config — the dashboard serves widgets bound to an unreachable report. serializeWidget handles reportId=null correctly (line 66), but the soft-delete path can never produce null, so that handling never engages.",
+   "fix": "In the report-delete transaction, add `prisma.analyticsDashboardWidget.updateMany({ where: { reportId: existing.id, orgId }, data: { reportId: null } })` (mirroring the SetNull intent), or filter widget.reportId against live reports during dashboard hydration.",
+   "lens": "resilience",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified at all cited locations. schema.prisma:5021 has onDelete: SetNull on AnalyticsDashboardWidget.report, but DELETE /reports/:id (analytics-reports.ts:205-220) only sets deletedAt in a transaction with an audit-log insert — no widget cleanup, and a repo-wide grep shows no production code ever hard-deletes AnalyticsReport (only integration-test cleanup), so SetNull never fires in app flows. After soft-delete, GET /reports/:id 404s (deletedAt:null filter, lines 108-111), yet latestRunIds (analytics-dashboards.ts:97-108) queries runs by reportId with no deletedAt check on the parent report, so all dashboard/widget GET routes still serialize the stale reportId and inject latestRunId into widget.config. serializeWidget's null handling (line 66) can never engage. Guards checked: widget create/patch validate reportId against non-deleted reports at write time only (analytics-dashboards.ts:293-298, 341-346); Zod schemas validate shape only; no cleanup job. Additional nuance: GET /reports/:id/runs/:runId (analytics-reports.ts:313-328) skips the report deletedAt check, so the injected run remains fetchable — widgets can serve data from a deleted report while the report resource 404s. Defect exists exactly as described.",
+    "severityAdjusted": "minor"
+   }
+  },
+  {
+   "title": "No concurrent-run dedup and no permission gate on the run/preview endpoints",
+   "file": "apps/api/src/routes/analytics-reports.ts:259-268",
+   "severity": "minor",
+   "evidence": "POST /reports/:id/run (line 259-267) and POST /reports/run (line 227-234) are the only non-GET routes without `preHandler: [server.requirePermission(...)]`, and nothing dedups concurrent runs of the same report — N parallel requests start N parallel raw queries and persist N 1000-row result blobs plus N audit rows. Combined with the missing statement timeout, any authenticated org member can tie up the Prisma connection pool by hammering an expensive report.",
+   "fix": "If a run for the report is already 'running', return that run instead of creating a new one (findFirst status:'running' before create, or a partial unique index), and add an appropriate requirePermission to both execution endpoints.",
+   "lens": "resilience",
+   "verdict": {
+    "isReal": true,
+    "reason": "Verified in apps/api/src/routes/analytics-reports.ts: POST /reports/run (lines 227-234) and POST /reports/:id/run (lines 259-267) are the only non-GET routes in the file without preHandler: [server.requirePermission('reports:write')] — POST /reports (74), PATCH (119), duplicate (160), and DELETE (196) all have it. RBAC (plugins/rbac.ts) is per-route opt-in and the global auth hook (plugins/auth.ts:368) only authenticates, so any authenticated org member can run reports; line 264 even allows a body query override, letting a non-privileged member execute arbitrary allowlisted queries. No dedup exists: runPersistedReport (analytics-reports.helpers.ts:88-128) unconditionally creates a 'running' row and executes prisma.$queryRaw with no in-flight check, lock, or idempotency key, so N parallel requests produce N raw queries, N persisted result blobs (up to 1000 rows each per ANALYTICS_MAX_LIMIT) and N auditLog rows (route line 281). No statement timeout is set in the engine. Partial mitigation found: a global per-user rate limit of 120 req/min in production (server.ts:192-205, env.ts:87) caps the hammering vector, and queries are Zod-validated, field-allowlisted, org-scoped, and row-capped at 1000 — these bound the impact and justify keeping severity at minor rather than escalating.",
+    "severityAdjusted": "minor"
+   }
+  },
+  {
+   "title": "Number coercion silently maps garbage filter values to 0 instead of rejecting them",
+   "file": "apps/api/src/lib/analytics-engine.ts:71-77",
+   "severity": "minor",
+   "evidence": "`const n = typeof value === 'number' ? value : Number(value)` with only boolean/null/NaN rejected: `Number('')` → 0, `Number('  ')` → 0, `Number([])` → 0, `Number(['5'])` → 5. A widget filter with an empty/array value (value is z.unknown() on the wire, schemas/analytics.ts:86) silently compiles to `col = 0` and returns wrong data instead of failing fast with 400 — a malformed saved report degrades into quietly incorrect charts rather than a visible error.",
+   "fix": "Accept only `typeof value === 'number'` or a non-empty numeric string (`typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value))`); fail everything else.",
+   "lens": "resilience",
+   "verdict": {
+    "isReal": true,
+    "reason": "Confirmed at apps/api/src/lib/analytics-engine.ts:71-77. The guard only rejects boolean, null/undefined, and NaN — but Number('') === 0, Number('  ') === 0, Number([]) === 0, and Number(['5']) === 5, none of which are NaN, so they pass and silently compile to `col = 0` (or 5). No upstream guard exists: the wire schema (packages/shared/src/schemas/analytics.ts:86) types filter value as z.unknown().optional(), the field allowlist validates only field keys, and routes (analytics-reports.ts:37, analytics-reports.helpers.ts:79) pass the parsed query straight to compileAnalyticsQuery. The engine's own pattern is fail-fast (it rejects garbage dates, non-boolean booleans, out-of-set enums, and NaN strings), and analytics-engine.test.ts has no number-coercion tests, so this is an inconsistency/oversight, not intentional. Result: a malformed saved report degrades into quietly wrong query results instead of a 400.",
+    "severityAdjusted": "minor"
+   }
+  }
+ ],
+ "allCounts": 35
+}
