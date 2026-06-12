@@ -184,6 +184,12 @@ model Org {
   documentTemplates      DocumentTemplate[]
   signatureRequests      SignatureRequest[]
 
+  // Analytics report builder (custom reports + dashboards)
+  analyticsReports          AnalyticsReport[]
+  analyticsReportRuns       AnalyticsReportRun[]
+  analyticsDashboards       AnalyticsDashboard[]
+  analyticsDashboardWidgets AnalyticsDashboardWidget[]
+
   @@index([deletedAt])
   @@map("orgs")
 }
@@ -4925,4 +4931,96 @@ model CrewRun {
   // < cutoff) so the 5-minute sweep is an index scan, not a seq scan.
   @@index([status, createdAt], map: "crew_runs_status_created_idx")
   @@map("crew_runs")
+}
+
+// ─── Analytics report builder (custom reports + dashboards) ────────────────
+// Backs apps/web hooks useAnalyticsReports / useDashboards. The `query` Json
+// column holds an AnalyticsQuery (see @bidstack/shared schemas/analytics.ts);
+// it is compiled to ONE parameterized SQL statement by the api analytics
+// engine — identifiers come exclusively from server-side field maps.
+
+model AnalyticsReport {
+  id          String    @id @default(uuid()) @db.Uuid
+  orgId       String    @map("org_id") @db.Uuid
+  name        String
+  description String?
+  ownerId     String    @map("owner_id") @db.Uuid
+  query       Json
+  chartType   String    @default("table") @map("chart_type")
+  schedule    String?
+  lastRunAt   DateTime? @map("last_run_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org                        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  runs    AnalyticsReportRun[]
+  widgets AnalyticsDashboardWidget[]
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([orgId, createdAt(sort: Desc)], map: "analytics_reports_org_created_idx")
+  @@index([orgId])
+  @@index([deletedAt])
+  @@map("analytics_reports")
+}
+
+model AnalyticsReportRun {
+  id         String    @id @default(uuid()) @db.Uuid
+  orgId      String    @map("org_id") @db.Uuid
+  reportId   String    @map("report_id") @db.Uuid
+  status     String    @default("pending") // pending | running | done | error
+  startedAt  DateTime? @map("started_at") @db.Timestamptz(6)
+  finishedAt DateTime? @map("finished_at") @db.Timestamptz(6)
+  rowCount   Int?      @map("row_count")
+  result     Json?
+  error      String?
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org    Org             @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  report AnalyticsReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, reportId, createdAt(sort: Desc)], map: "analytics_report_runs_org_report_created_idx")
+  @@map("analytics_report_runs")
+}
+
+model AnalyticsDashboard {
+  id          String   @id @default(uuid()) @db.Uuid
+  orgId       String   @map("org_id") @db.Uuid
+  name        String
+  description String?
+  ownerId     String   @map("owner_id") @db.Uuid
+  isShared    Boolean  @default(false) @map("is_shared")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org                        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  widgets AnalyticsDashboardWidget[]
+
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([orgId, createdAt(sort: Desc)], map: "analytics_dashboards_org_created_idx")
+  @@index([orgId])
+  @@index([deletedAt])
+  @@map("analytics_dashboards")
+}
+
+model AnalyticsDashboardWidget {
+  id          String   @id @default(uuid()) @db.Uuid
+  orgId       String   @map("org_id") @db.Uuid
+  dashboardId String   @map("dashboard_id") @db.Uuid
+  reportId    String?  @map("report_id") @db.Uuid
+  title       String
+  type        String
+  config      Json     @default("{}")
+  position    Json     @default("{\"x\": 0, \"y\": 0, \"w\": 4, \"h\": 3}")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org       Org                @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  dashboard AnalyticsDashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  report    AnalyticsReport?   @relation(fields: [reportId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, dashboardId], map: "analytics_dashboard_widgets_org_dash_idx")
+  @@index([reportId])
+  @@map("analytics_dashboard_widgets")
 }

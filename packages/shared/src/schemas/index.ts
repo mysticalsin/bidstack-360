@@ -38,3 +38,4 @@ export * from './email-template.js';
 export * from './lead-rot.js';
 export * from './rfp-agent-assignment.js';
 export * from './webhooks.js';
+export * from './analytics.js';

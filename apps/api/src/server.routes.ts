@@ -35,6 +35,9 @@ import { predictiveScoringRoutes } from './routes/predictive-scoring.js';
 import { searchRoutes } from './routes/search.js';
 import { serviceDeskRoutes } from './routes/service-desk.js';
 import { reportsRoutes } from './routes/reports.js';
+// Analytics report builder (custom reports + dashboards + entity field metadata)
+import { analyticsReportsRoutes } from './routes/analytics-reports.js';
+import { analyticsDashboardsRoutes } from './routes/analytics-dashboards.js';
 import { salesDashboardRoutes } from './routes/sales-dashboard.js';
 import { salesOrdersRoutes } from './routes/sales-orders.js';
 import { tasksRoutes } from './routes/tasks.js';
@@ -118,6 +121,10 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(contactsRoutes, { prefix: '/api/v1' });
   await server.register(tasksRoutes, { prefix: '/api/v1' });
   await server.register(reportsRoutes, { prefix: '/api/v1' });
+  // Analytics report builder. Param routes validate :id as uuid; Fastify's
+  // radix tree keeps the legacy static /reports/{pipeline,...} routes winning.
+  await server.register(analyticsReportsRoutes, { prefix: '/api/v1' });
+  await server.register(analyticsDashboardsRoutes, { prefix: '/api/v1' });
   await server.register(searchRoutes, { prefix: '/api/v1' });
   await server.register(salesDashboardRoutes, { prefix: '/api/v1' });
   await server.register(salesOrdersRoutes, { prefix: '/api/v1' });
