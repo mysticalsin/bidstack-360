@@ -7,6 +7,7 @@ import { NotificationPrefsSection } from '@/components/settings/NotificationPref
 import { SecuritySection } from '@/components/settings/SecuritySection';
 import { WorkspaceSection } from '@/components/settings/WorkspaceSection';
 import { CrmConfigurationSection } from '@/components/settings/CrmConfigurationSection';
+import { DataImportSection } from '@/components/settings/DataImportSection';
 import { TopAccountsSection } from '@/components/settings/TopAccountsSection';
 import { DeveloperAccessSection } from '@/components/settings/DeveloperAccessSection';
 import { LanguageSwitcher } from '@/components/settings/LanguageSwitcher';
@@ -26,6 +27,7 @@ const SECTION_TITLES: Record<SettingsSection, string> = {
   security: 'Security',
   workspace: 'Workspace',
   crm: 'Data configuration',
+  'data-import': 'Data import',
   'top-accounts': 'Top accounts',
   groups: 'Access groups',
   'opportunity-filters': 'Opportunity filters',
@@ -53,6 +55,7 @@ export function SettingsPage() {
     security: <SecuritySection />,
     workspace: <WorkspaceSection />,
     crm: <CrmConfigurationSection />,
+    'data-import': <DataImportSection />,
     'top-accounts': <TopAccountsSection />,
     groups: <AccessGroupsSection />,
     'opportunity-filters': <OpportunityFiltersSection />,

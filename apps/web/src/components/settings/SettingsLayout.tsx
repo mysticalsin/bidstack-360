@@ -12,6 +12,7 @@ export type SettingsSection =
   | 'workspace'
   | 'language'
   | 'crm'
+  | 'data-import'
   | 'top-accounts'
   | 'groups'
   | 'opportunity-filters'
@@ -46,6 +47,7 @@ const GROUPS: Group[] = [
     items: [
       { id: 'workspace', label: 'Workspace', icon: 'settings' },
       { id: 'crm', label: 'Data configuration', icon: 'sliders', admin: true },
+      { id: 'data-import', label: 'Data import', icon: 'upload', admin: true },
       { id: 'top-accounts', label: 'Top accounts', icon: 'star', admin: true },
       { id: 'groups', label: 'Access groups', icon: 'contacts', admin: true },
       { id: 'opportunity-filters', label: 'Opportunity filters', icon: 'sliders', admin: true },
