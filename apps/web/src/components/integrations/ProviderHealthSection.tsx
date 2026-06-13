@@ -7,7 +7,8 @@ import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { ErrorState, LoadingSkeleton, EmptyState } from '@/components/ui/StateMessages';
 import { Button } from '@/components/ui/Button';
 import { Icon, type IconName } from '@/components/ui/Icon';
-import { useProviderHealth } from '@/hooks/useCrmIntegrations';
+import { useProviderHealth, useTestProviderHealth } from '@/hooks/useCrmIntegrations';
+import { toast } from '@/components/ui/Toast';
 import { relativeTime } from '@/lib/format';
 import type { ProviderHealth } from '@bidstack/shared';
 
@@ -27,7 +28,23 @@ const STATUS_ORDER: Record<ProviderHealth['status'], number> = {
 
 export function ProviderHealthSection() {
   const { data, isLoading, isFetching, isError, error, refetch } = useProviderHealth();
+  const test = useTestProviderHealth();
   const items = data?.items ? [...data.items].sort(byStatus) : [];
+
+  const runTest = () =>
+    test.mutate(undefined, {
+      onSuccess: (res) => {
+        const down = res.items.filter((p) => p.status === 'down').length;
+        const disabled = res.items.filter((p) => p.status === 'disabled').length;
+        toast.success('Connections re-checked', {
+          description:
+            down > 0
+              ? `${down} provider${down === 1 ? '' : 's'} down.`
+              : `All reachable providers responded${disabled ? ` · ${disabled} not configured` : ''}.`,
+        });
+      },
+      onError: (err: Error) => toast.error('Could not run the test', { description: err.message }),
+    });
 
   const downCount = items.filter((p) => p.status === 'down').length;
   const degradedCount = items.filter((p) => p.status === 'degraded').length;
@@ -45,9 +62,20 @@ export function ProviderHealthSection() {
         title="Provider health"
         caption={caption}
         action={
-          <Badge tone={downCount > 0 ? 'tomato' : degradedCount > 0 ? 'amber' : 'jade'}>
-            {isFetching ? 'refreshing' : downCount + degradedCount > 0 ? 'attention' : 'stable'}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={runTest}
+              disabled={test.isPending}
+              aria-label="Test all provider connections now"
+            >
+              {test.isPending ? 'Testing…' : 'Test now'}
+            </Button>
+            <Badge tone={downCount > 0 ? 'tomato' : degradedCount > 0 ? 'amber' : 'jade'}>
+              {isFetching ? 'refreshing' : downCount + degradedCount > 0 ? 'attention' : 'stable'}
+            </Badge>
+          </div>
         }
       />
       {isLoading ? (

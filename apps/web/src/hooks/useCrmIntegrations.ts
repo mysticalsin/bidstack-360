@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
 import type { CrmConnector, DataQualityReport, ProviderHealth } from '@bidstack/shared';
@@ -35,6 +35,19 @@ export function useProviderHealth() {
     refetchInterval: 30 * 1000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
+  });
+}
+
+// On-demand "Test now": re-checks every provider's liveness/config server-side
+// right now and writes the fresh snapshot straight into the polled query cache.
+export function useTestProviderHealth() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api<{ items: ProviderHealth[]; checkedAt: string }>('/api/crm/provider-health/test', {
+        method: 'POST',
+      }),
+    onSuccess: (data) => qc.setQueryData(['crm-provider-health'], { items: data.items }),
   });
 }
 
