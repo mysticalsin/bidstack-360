@@ -17,6 +17,8 @@ import {
   useUpdateContact,
 } from '@/hooks/useContacts';
 import { useTableSort } from '@/hooks/useTableSort';
+import { useCursorPagination } from '@/hooks/useCursorPagination';
+import { CursorPager } from '@/components/ui/CursorPager';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { pushUndo } from '@/stores/undoStack';
 import type { Contact } from '@bidstack/shared';
@@ -32,8 +34,13 @@ export function ContactsPage() {
   // idle tick rather than on every keystroke.
   const deferredSearch = useDeferredValue(search);
   const [editTarget, setEditTarget] = useState<Contact | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Reset to page 1 whenever the result set changes (new search or sort).
+  const pager = useCursorPagination(`${deferredSearch}|${searchParams.get('sort') ?? ''}`);
   const { data, isLoading, isError, error, refetch } = useContacts({
     search: deferredSearch.trim() || undefined,
+    limit: 50,
+    ...(pager.cursor ? { cursor: pager.cursor } : {}),
   });
   const del = useDeleteContact();
   // A2 — inline cell editing (Twenty pattern). One mutation instance covers
@@ -63,8 +70,8 @@ export function ContactsPage() {
   );
   // Persist sort in the URL so a sorted view is back/forward-navigable and
   // shareable. "?sort=name.asc" → key=name, dir=asc. Default (unsorted)
-  // omits the param so plain "/contacts" stays clean.
-  const [searchParams, setSearchParams] = useSearchParams();
+  // omits the param so plain "/contacts" stays clean. (searchParams hoisted
+  // above so the cursor pager can key off the sort param.)
   const parseSortParam = (raw: string | null): ContactSortState => {
     if (!raw) return { key: null, dir: null };
     const [k, d] = raw.split('.');
@@ -358,6 +365,17 @@ export function ContactsPage() {
         setEditTarget={setEditTarget}
         onDelete={onDelete}
         setContextMenu={setContextMenu}
+      />
+
+      <CursorPager
+        currentPage={pager.page}
+        hasNext={Boolean(data?.nextCursor)}
+        hasPrevious={pager.hasPrevious}
+        isLoading={isLoading}
+        itemCount={items.length}
+        label="contacts"
+        onNext={() => pager.goNext(data?.nextCursor)}
+        onPrevious={pager.goPrevious}
       />
 
       {/* Controlled edit dialog — single instance, re-seeded by the

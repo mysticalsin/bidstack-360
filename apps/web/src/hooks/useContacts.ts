@@ -6,11 +6,14 @@ import type { Contact, ContactCreate, ContactPatch } from '@bidstack/shared';
 interface ContactsParams {
   customer?: string;
   search?: string;
+  cursor?: string;
+  limit?: number;
 }
 
-// Each list query holds an `items` envelope so the API can append metadata
-// later (counts, next-cursor) without a breaking type change.
-type ContactsPayload = { items: Contact[] };
+// Cursor-paginated envelope. nextCursor is the opaque token for the next page
+// (null when there are no more rows). The backend already returns this; the
+// client previously dropped it, silently capping the list at the default 50.
+type ContactsPayload = { items: Contact[]; nextCursor: string | null };
 
 export function useContact(id: string | undefined) {
   return useQuery({
@@ -28,6 +31,8 @@ export function useContacts(params: ContactsParams = {}) {
       const usp = new URLSearchParams();
       if (params.customer) usp.set('customer', params.customer);
       if (params.search) usp.set('search', params.search);
+      if (params.cursor) usp.set('cursor', params.cursor);
+      if (params.limit) usp.set('limit', String(params.limit));
       const path = `/api/contacts${usp.toString() ? `?${usp.toString()}` : ''}`;
       return api<ContactsPayload>(path, { signal });
     },
