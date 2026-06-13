@@ -41,6 +41,18 @@ export interface SampleDeal {
   stageIndex: number; // index into template stages array
 }
 
+// Canonical OpportunityStage funnel — sample deals are spread across it by their
+// template stage position so the enum `stage` column is valid and demo data
+// looks realistic in forecasting/analytics.
+const FUNNEL_STAGES = [
+  's1_lead',
+  's1_ongoing',
+  's2_sent',
+  's3_technical_iteration',
+  's4_negotiation',
+  'closed_won',
+] as const;
+
 export interface SampleTask {
   title: string;
   dueOffsetDays: number; // days from now
@@ -186,7 +198,12 @@ export async function installTemplate(
           code: `SAMPLE-${templateName.slice(0, 3)}-${idx + 1}`,
           customer: d.customer,
           name: d.name,
-          stage: 'discovery' as never, // legacy field — use stage column
+          // Map the template stage position onto the canonical OpportunityStage
+          // enum so the enum `stage` column (analytics/forecasting use it) is
+          // valid AND realistic; pipelineStageId still drives the Kanban board.
+          // ('discovery' was not a valid enum member — the old `as never` cast
+          //  hid that, and install only ran once the picker UI was wired.)
+          stage: FUNNEL_STAGES[Math.min(d.stageIndex, FUNNEL_STAGES.length - 1)] ?? 's1_lead',
           pipelineStageId: stage.id,
           valueMicros: d.valueMicros,
           probability: d.probability,

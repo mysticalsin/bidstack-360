@@ -31,7 +31,12 @@ interface OnboardingState {
   // Sample data banner
   hasSampleData: boolean;
 
+  // Template picker modal (transient — not persisted)
+  templatePickerOpen: boolean;
+
   // Actions
+  openTemplatePicker: () => void;
+  closeTemplatePicker: () => void;
   startTour: () => void;
   advance: () => void;
   back: () => void;
@@ -80,6 +85,14 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   tourSeen: false,
   completedChecklist: [],
   hasSampleData: false,
+  templatePickerOpen: false,
+
+  openTemplatePicker() {
+    set({ templatePickerOpen: true });
+  },
+  closeTemplatePicker() {
+    set({ templatePickerOpen: false });
+  },
 
   startTour() {
     set({ tourActive: true, currentStepIndex: 0 });

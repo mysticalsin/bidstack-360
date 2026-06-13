@@ -19,7 +19,7 @@ interface ChecklistItemDef {
 
 export function QuickStartPage() {
   const navigate = useNavigate();
-  const { completedChecklist, markChecklistItem, skipToStep, startTour, tourActive } =
+  const { completedChecklist, markChecklistItem, skipToStep, startTour, tourActive, openTemplatePicker } =
     useOnboardingStore();
 
   function launchTourAt(stepIndex: number) {
@@ -39,7 +39,7 @@ export function QuickStartPage() {
       key: 'template',
       label: 'Pick a template pipeline',
       description: 'Choose B2B SaaS, Agency, Enterprise, or Inside Sales as a starting point.',
-      action: () => navigate('/pipeline'),
+      action: () => openTemplatePicker(),
     },
     {
       key: 'first_lead',
