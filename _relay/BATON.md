@@ -1,7 +1,20 @@
 # BATON — BidStack demo-feedback program (WALTEUR)
 
-**Shift:** Claude (Fable 5) - 2026-06-13 - branch `demo` - /goal "Salesforce-level"
+**Shift:** Claude (Fable 5) - 2026-06-13 - branch `demo` - /goal "Salesforce-level" (extended)
 **Goal:** Autonomous quality climb vs best-in-class. Benchmark in `walteur-kit/salesforce-gap.json` (scores updated this shift).
+
+## Session waves (all gates green, each pushed to origin/demo)
+1. notifications 22->74 · 2. RBAC capability-manifest + role assignment 38->62 · 3. CSV import wizard 38->? · 4. report builder 42->80 (+3-dim adversarial review, 10 findings fixed) · 5. global search multi-term ranked 52->66 (+GIN-index-match perf fix from review) · 6. Contacts pagination (data-loss bug) · 7. Leads/Companies column sorting (list-management ->72) · 8. onboarding TemplatePicker wired + **fixed latent install bug** (sample opps used invalid stage 'discovery'; `as never` cast hid it; never caught because picker was a null stub) onboarding ->74.
+Each wave: workflow-scouted, built on existing tested primitives where possible, unit+integration tested, adversarially reviewed where risk warranted.
+
+## STOP POINT — remaining gaps need Tony's product/security direction (not surgical)
+- **permissions-sharing (62):** record-level sharing-rules engine, team hierarchy, per-field permissions, login-as/impersonation — all architectural; need a data-model + security decision before building.
+- **search-nav-copilot (66):** conversational/action-taking copilot — large LLM build; needs product scope + eval harness, and Rule 5 (only route judgment to the model).
+- Smaller deferred: Tasks pagination (entangled w/ drag-reorder+calendar+client filters), generalize SavedViewsBar beyond Tasks, Accounts card-grid bulk/export, list virtualization, server-persisted currency/locale, workspace invites, scheduled-report execution (schedule is an opaque string, no cron worker), scatter chart preview adapter.
+The high-leverage surgically-verifiable wins are now closed; everything left is large-feature or already ≥74.
+
+---
+
 
 ## State NOW - 3 verified waves, gates green, PUSHED to origin/demo (HEAD after 99316a45 + gap-tracker commit)
 - **Wave: notifications (22->74).** Notification table + migration 20260613002000; service seam `notification.service.ts` (createNotification/notifyUsers writes row + realtime push); emit points: @mention (collaboration.ts), cross-sell assign, governance assign, **bid-override director escalation** (was the #1 deferred item — now DONE). Endpoints GET/PATCH/POST under /api/v1 (org+per-user scoped). Web notification center replaces mentions-only bell (useNotifications, typed feed, mark-read/all, 60s poll). Test: notifications.integration.test.ts (4).
