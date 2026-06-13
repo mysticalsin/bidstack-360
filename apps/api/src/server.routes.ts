@@ -44,6 +44,7 @@ import { sectorViewRoutes } from './routes/sector-view.js';
 import { infosearchRoutes } from './routes/infosearch.js';
 import { crossSellRoutes } from './routes/cross-sell.js';
 import { contractAgreementRoutes } from './routes/contract-agreements.js';
+import { winLossRoutes } from './routes/win-loss.js';
 import { governanceRoutes } from './routes/governance.js';
 import { projectReferencesRoutes } from './routes/project-references.js';
 import { orgSettingsRoutes } from './routes/org-settings.js';
@@ -137,6 +138,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(infosearchRoutes, { prefix: '/api/v1' });
   await server.register(crossSellRoutes, { prefix: '/api/v1' });
   await server.register(contractAgreementRoutes, { prefix: '/api/v1' });
+  await server.register(winLossRoutes, { prefix: '/api/v1' });
   await server.register(governanceRoutes, { prefix: '/api/v1' });
   await server.register(projectReferencesRoutes, { prefix: '/api/v1' });
   await server.register(orgSettingsRoutes, { prefix: '/api/v1' });

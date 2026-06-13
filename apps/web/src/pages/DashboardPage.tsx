@@ -30,6 +30,10 @@ import { CrossSellCard } from '@/components/account-intel/CrossSellCard';
 import { GovernanceLogCard } from '@/components/account-intel/GovernanceLogCard';
 import { SpotlightRefsCard } from '@/components/account-intel/SpotlightRefsCard';
 import { ContractAgreementsCard } from '@/components/account-intel/ContractAgreementsCard';
+import {
+  WinLossReasonsCard,
+  type ClosedOpp,
+} from '@/components/account-intel/WinLossReasonsCard';
 import { CockpitCustomizeMenu } from '@/components/cockpit/CockpitCustomizeMenu';
 import { Reveal } from '@/components/motion/Reveal';
 import { NotesPanel } from '@/components/notes/NotesPanel';
@@ -175,6 +179,10 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
   );
   // A card shows unless the user explicitly hid it (default-visible).
   const show = (id: string) => visibleCards[id] !== false;
+  // This account's closed deals, for win/loss reason capture.
+  const closedOpps: ClosedOpp[] = (accountOpps ?? [])
+    .filter((o) => o.stage === 'closed_won' || o.stage === 'closed_lost')
+    .map((o) => ({ id: o.id, name: o.name, outcome: o.stage === 'closed_won' ? 'won' : 'lost' }));
 
   return (
     <>
@@ -270,6 +278,11 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
           {show('winLoss') && (
             <Reveal delay={0.03}>
               <WinLossCard cockpit={cockpit} />
+            </Reveal>
+          )}
+          {show('winLossReasons') && (
+            <Reveal delay={0.03}>
+              <WinLossReasonsCard closedOpps={closedOpps} />
             </Reveal>
           )}
           {show('infoSearchLeads') && (

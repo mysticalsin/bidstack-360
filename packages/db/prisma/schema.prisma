@@ -192,6 +192,7 @@ model Org {
   governanceActions  GovernanceAction[]
   projectReferences  ProjectReference[]
   contractAgreements ContractAgreement[]
+  winLossRecords     WinLossRecord[]
   notifications      Notification[]
 
   @@index([deletedAt])
@@ -440,6 +441,7 @@ model Opportunity {
   competitorInsights   CompetitorInsight[]
   approvalGates        ApprovalGate[]
   submissionPackages   SubmissionPackage[]
+  winLossRecord        WinLossRecord?
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -4789,6 +4791,50 @@ enum ContractStatus {
   terminated
 
   @@map("contract_status")
+}
+
+// Win/Loss reason capture (core value prop: managers don't document WHY deals
+// are won/lost). One record per closed opportunity; the (orgId, outcome, reason)
+// index backs the pattern-flagging aggregate. Reasons are entered manually today
+// (not in the OM dataset); a future connector can backfill.
+model WinLossRecord {
+  id            String          @id @default(uuid()) @db.Uuid
+  orgId         String          @map("org_id") @db.Uuid
+  opportunityId String          @unique @map("opportunity_id") @db.Uuid
+  outcome       WinLossOutcome
+  reason        WinLossReasonCode
+  competitor    String?
+  note          String?
+  recordedById  String          @map("recorded_by_id") @db.Uuid
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org         Org         @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, outcome, reason], map: "win_loss_records_org_outcome_reason_idx")
+  @@index([orgId, opportunityId], map: "win_loss_records_org_opp_idx")
+  @@map("win_loss_records")
+}
+
+enum WinLossOutcome {
+  won
+  lost
+
+  @@map("win_loss_outcome")
+}
+
+enum WinLossReasonCode {
+  price
+  product_fit
+  timing
+  competitor
+  relationship
+  scope
+  no_decision
+  other
+
+  @@map("win_loss_reason_code")
 }
 
 // A4 — comitology / governance meeting log per key account.

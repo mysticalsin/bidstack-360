@@ -56,6 +56,9 @@ vi.mock('@/components/account-intel/SpotlightRefsCard', () => ({
 vi.mock('@/components/account-intel/ContractAgreementsCard', () => ({
   ContractAgreementsCard: () => <div data-testid="contracts-card" />,
 }));
+vi.mock('@/components/account-intel/WinLossReasonsCard', () => ({
+  WinLossReasonsCard: () => <div data-testid="win-loss-reasons-card" />,
+}));
 
 vi.mock('@/components/dashboard/OrgDashboard', () => ({
   OrgDashboard: () => <div data-testid="org-dashboard" />,

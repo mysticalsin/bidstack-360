@@ -28,6 +28,7 @@ export const COCKPIT_CARDS: { id: string; label: string; group: 'main' | 'side' 
   { id: 'healthScore', label: 'Signal coverage', group: 'side' },
   { id: 'revenueEvolution', label: 'Revenue evolution', group: 'side' },
   { id: 'winLoss', label: 'Win / loss', group: 'side' },
+  { id: 'winLossReasons', label: 'Win / loss reasons', group: 'side' },
   { id: 'infoSearchLeads', label: 'InfoSearch leads', group: 'side' },
   { id: 'kpiSidebar', label: 'KPI sidebar', group: 'side' },
   { id: 'dataTrust', label: 'Data trust', group: 'side' },
