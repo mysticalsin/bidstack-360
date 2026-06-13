@@ -11,6 +11,8 @@ import { SpotlightTable } from '@/components/ui/SpotlightTable';
 import { confirm as confirmDialog } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/components/ui/Toast';
 import { useCompanies, useCreateCompany, useDeleteCompany } from '@/hooks/useCompanies';
+import { useCursorPagination } from '@/hooks/useCursorPagination';
+import { CursorPager } from '@/components/ui/CursorPager';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 
@@ -21,10 +23,12 @@ export function CompaniesPage() {
   const [params, setParams] = useSearchParams();
   const [showNew, setShowNew] = useState(false);
 
-  const filter = useMemo(() => {
-    const search = params.get('search') ?? undefined;
-    return { search, limit: 50 };
-  }, [params]);
+  const searchParam = params.get('search') ?? undefined;
+  const pager = useCursorPagination(searchParam ?? '');
+  const filter = useMemo(
+    () => ({ search: searchParam, limit: 50, ...(pager.cursor ? { cursor: pager.cursor } : {}) }),
+    [searchParam, pager.cursor],
+  );
 
   const companies = useCompanies(filter);
   const createCompany = useCreateCompany();
@@ -112,7 +116,7 @@ export function CompaniesPage() {
         <div>
           <h1 className="page-title">Companies</h1>
           <p className="page-sub">
-            {items.length} {items.length === 1 ? 'company' : 'companies'} visible in the CRM.
+            {items.length} {items.length === 1 ? 'company' : 'companies'} visible.
           </p>
         </div>
         <LiquidGlassButton onClick={() => setShowNew(true)}>
@@ -228,7 +232,7 @@ export function CompaniesPage() {
           message={
             searchTerm
               ? `Nothing matched "${searchTerm}". Try a company name or domain.`
-              : 'Create the first company to start building the CRM account list.'
+              : 'Create the first company to start building your account list.'
           }
           action={
             searchTerm ? (
@@ -298,6 +302,16 @@ export function CompaniesPage() {
               ))}
             </tbody>
           </SpotlightTable>
+          <CursorPager
+            currentPage={pager.page}
+            hasNext={Boolean(companies.data?.nextCursor)}
+            hasPrevious={pager.hasPrevious}
+            isLoading={companies.isLoading}
+            itemCount={items.length}
+            label="companies"
+            onNext={() => pager.goNext(companies.data?.nextCursor)}
+            onPrevious={pager.goPrevious}
+          />
         </Card>
       )}
     </div>

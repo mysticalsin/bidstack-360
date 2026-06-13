@@ -13,6 +13,8 @@ import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
 import { useDeleteLead, useLeads, useUpdateLeadById } from '@/hooks/useLeads';
+import { useCursorPagination } from '@/hooks/useCursorPagination';
+import { CursorPager } from '@/components/ui/CursorPager';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { LeadStatus, LeadPriority } from '@bidstack/shared';
 import { LeadRow } from './leadsPage/LeadRow';
@@ -41,11 +43,13 @@ export function LeadsPage() {
   const deferredSearch = useDeferredValue(search);
   const [statusFilter, setStatusFilter] = useState<LeadStatus | ''>('');
   const [priorityFilter, setPriorityFilter] = useState<LeadPriority | ''>('');
+  const pager = useCursorPagination(`${deferredSearch}|${statusFilter}|${priorityFilter}`);
   const { data, isLoading, isError, error, refetch } = useLeads({
     search: deferredSearch.trim() || undefined,
     status: statusFilter || undefined,
     priority: priorityFilter || undefined,
     limit: 50,
+    ...(pager.cursor ? { cursor: pager.cursor } : {}),
   });
   const del = useDeleteLead();
   // A2 — inline cell editing (Twenty pattern). One mutation instance fans
@@ -358,6 +362,16 @@ export function LeadsPage() {
               ))}
             </tbody>
           </SpotlightTable>
+          <CursorPager
+            currentPage={pager.page}
+            hasNext={Boolean(data?.nextCursor)}
+            hasPrevious={pager.hasPrevious}
+            isLoading={isLoading}
+            itemCount={items.length}
+            label="leads"
+            onNext={() => pager.goNext(data?.nextCursor)}
+            onPrevious={pager.goPrevious}
+          />
         </Card>
       )}
     </div>
