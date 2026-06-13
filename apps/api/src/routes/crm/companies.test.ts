@@ -37,6 +37,10 @@ afterAll(async () => {
     await prisma.companyEnrichment.deleteMany({
       where: { orgId, normalizedName: TEST_NORMALIZED },
     });
+    await prisma.companyFieldOverride.deleteMany({ where: { orgId } });
+    await prisma.auditLog.deleteMany({
+      where: { orgId, action: { in: ['company.field_override', 'company.field_override_revert'] } },
+    });
   }
   if (server) await server.close();
   if (dbReachable) await prisma.$disconnect();
@@ -215,4 +219,39 @@ describe('crm companies routes', () => {
       expect(body.items.length).toBeGreaterThan(0);
     },
   );
+  skipIfNoDb('field override moves the KPI to Internal Data and survives revert', async () => {
+    // WHY: the account-view contract says an edited Apollo field is INTERNAL
+    // data flagged as manually overridden — never silently mixed back in.
+    const put = await server.inject({
+      method: 'PUT',
+      url: '/api/crm/companies/Mantu/field-overrides',
+      payload: { fieldKey: 'industry', value: 'Aerospace & Defense' },
+    });
+    expect(put.statusCode).toBe(200);
+
+    const cockpit = await server.inject({ method: 'GET', url: '/api/crm/companies/mantu' });
+    expect(cockpit.statusCode).toBe(200);
+    const kpis = (cockpit.json() as { kpis: Array<Record<string, unknown>> }).kpis;
+    const industry = kpis.find((k) => k.label === 'Industry');
+    expect(industry?.value).toBe('Aerospace & Defense');
+    expect(industry?.block).toBe('internal');
+    expect(industry?.overridden).toBe(true);
+
+    const audit = await prisma.auditLog.findFirst({
+      where: { orgId: orgId!, action: 'company.field_override', targetId: 'mantu' },
+    });
+    expect(audit).not.toBeNull();
+
+    const del = await server.inject({
+      method: 'DELETE',
+      url: '/api/crm/companies/Mantu/field-overrides/industry',
+    });
+    expect(del.statusCode).toBe(204);
+    const after = await server.inject({ method: 'GET', url: '/api/crm/companies/mantu' });
+    const industryAfter = (after.json() as { kpis: Array<Record<string, unknown>> }).kpis.find(
+      (k) => k.label === 'Industry',
+    );
+    expect(industryAfter?.overridden).toBeUndefined();
+    expect(industryAfter?.block).toBe('external');
+  });
 });

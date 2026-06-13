@@ -1,12 +1,15 @@
 import { motion, useReducedMotion } from 'framer-motion';
-import { memo } from 'react';
+import { memo, useState, type FormEvent } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { AnimatedNumber } from '@/components/motion/AnimatedNumber';
 import { Icon } from '@/components/ui/Icon';
+import { toast } from '@/components/ui/Toast';
+import { api } from '@/lib/api';
 import { springSnap, staggerChild, staggerParent } from '@/lib/motion';
 import { GlassCard } from '@/components/ui/GlassCard';
 
-import type { AccountCockpitSnapshot } from '@bidstack/shared';
+import type { AccountCockpitSnapshot, CockpitKpi } from '@bidstack/shared';
 
 import { KPI_TONE_BG, KPI_TONE_FG, iconForKpi } from './_tokens';
 
@@ -14,65 +17,197 @@ interface Props {
   cockpit: AccountCockpitSnapshot;
 }
 
+// The account view never mixes its two data worlds: Apollo-sourced External
+// Intelligence renders apart from Internal Data (ABC / Opportunity
+// Management), each under an explicit header. A manually edited field moves
+// to Internal and carries the "manually overridden" flag.
 export const KpiRow = memo(function KpiRow({ cockpit }: Props) {
+  const external = cockpit.kpis.filter((k) => k.block === 'external');
+  const internal = cockpit.kpis.filter((k) => k.block !== 'external');
+  const lastSynced = cockpit.externalLastSyncedAt
+    ? cockpit.externalLastSyncedAt.slice(0, 10)
+    : null;
+
+  return (
+    <div className="space-y-3">
+      <KpiBlock
+        title="External Intelligence"
+        caption={
+          lastSynced
+            ? `Apollo-sourced · Last updated: ${lastSynced} (refreshes ~every 2 weeks)`
+            : 'Apollo-sourced · not synced yet'
+        }
+        kpis={external}
+        companyKey={cockpit.company.id}
+        editable
+      />
+      <KpiBlock
+        title="Internal Data"
+        caption="ABC / Opportunity Management — projects, deals, outcomes"
+        kpis={internal}
+        companyKey={cockpit.company.id}
+      />
+    </div>
+  );
+});
+
+function KpiBlock({
+  title,
+  caption,
+  kpis,
+  companyKey,
+  editable = false,
+}: {
+  title: string;
+  caption: string;
+  kpis: CockpitKpi[];
+  companyKey: string;
+  editable?: boolean;
+}) {
   const reduced = useReducedMotion();
-  // Adapt the column count to the available KPI tiles — 6 is the design
-  // ceiling, 3 is the minimum that still reads as a row. The CSS classes
-  // .cols-3/4/6 live in index.css and collapse responsively below ~720px.
-  const cols = Math.min(6, Math.max(3, cockpit.kpis.length));
-  const colsClass = cols >= 6 ? 'cols-6' : cols === 4 ? 'cols-4' : 'cols-3';
+  if (kpis.length === 0) return null;
+  const cols = Math.min(6, Math.max(3, kpis.length));
+  const colsClass = cols >= 6 ? 'cols-6' : cols >= 4 ? 'cols-4' : 'cols-3';
   return (
     <motion.section
-      className={`kpi-grid ${colsClass}`}
-      aria-label="Account metrics"
+      aria-label={title}
       variants={reduced ? undefined : staggerParent}
       initial="initial"
       animate="animate"
     >
-      {cockpit.kpis.map((kpi) => (
-        <GlassCard
-          key={kpi.label}
-          /* spotlight removed — no cursor-tracking glow */
-          className="flex gap-3"
-          variants={reduced ? undefined : staggerChild}
-          transition={springSnap}
-        >
-          <div
-            className="kpi-icon"
-            style={{ background: KPI_TONE_BG[kpi.tone], color: KPI_TONE_FG[kpi.tone] }}
-            aria-hidden
+      <div className="mb-1.5 flex items-baseline gap-2 px-0.5">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-secondary)]">
+          {title}
+        </h3>
+        <span className="text-[11px] text-[var(--fg-tertiary)]">{caption}</span>
+      </div>
+      <div className={`kpi-grid ${colsClass}`}>
+        {kpis.map((kpi) => (
+          <GlassCard
+            key={kpi.label}
+            className="flex gap-3"
+            variants={reduced ? undefined : staggerChild}
+            transition={springSnap}
           >
-            <Icon name={iconForKpi(kpi.label)} size={18} />
-          </div>
-          <div className="kpi-text" style={{ flex: 1, minWidth: 0 }}>
-            <div className="kpi-label">{kpi.label}</div>
-            <div className="kpi-value">
-              <KpiValue raw={kpi.value} reduced={reduced} />
+            <div
+              className="kpi-icon"
+              style={{ background: KPI_TONE_BG[kpi.tone], color: KPI_TONE_FG[kpi.tone] }}
+              aria-hidden
+            >
+              <Icon name={iconForKpi(kpi.label)} size={18} />
             </div>
-            {kpi.detail ? <div className="kpi-sub">{kpi.detail}</div> : null}
-          </div>
-          <div
-            aria-hidden
-            style={{
-              color: KPI_TONE_FG[kpi.tone],
-              alignSelf: 'flex-start',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'flex-end',
-              gap: 2,
-            }}
-          >
-            <SourceBadge
-              label={kpi.sourceLabel ?? 'Internal'}
-              state={kpi.sourceState ?? 'crm'}
-              hint={kpi.sourceHint ?? kpi.detail ?? 'BidStack internal data'}
-            />
-          </div>
-        </GlassCard>
-      ))}
+            <div className="kpi-text" style={{ flex: 1, minWidth: 0 }}>
+              <div className="kpi-label">{kpi.label}</div>
+              <div className="kpi-value">
+                <KpiValue raw={kpi.value} reduced={reduced} />
+              </div>
+              {kpi.detail ? <div className="kpi-sub">{kpi.detail}</div> : null}
+            </div>
+            <div
+              style={{
+                color: KPI_TONE_FG[kpi.tone],
+                alignSelf: 'flex-start',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-end',
+                gap: 2,
+              }}
+            >
+              <SourceBadge
+                label={kpi.overridden ? 'Manually overridden' : (kpi.sourceLabel ?? 'Internal')}
+                state={kpi.sourceState ?? 'crm'}
+                hint={kpi.sourceHint ?? kpi.detail ?? 'BidStack internal data'}
+              />
+              {editable && kpi.fieldKey ? (
+                <FieldOverrideEditor kpi={kpi} companyKey={companyKey} />
+              ) : null}
+            </div>
+          </GlassCard>
+        ))}
+      </div>
     </motion.section>
   );
-});
+}
+
+/**
+ * Inline editor for an Apollo-sourced KPI. Saving creates a field override:
+ * the value moves to the Internal Data block on the next snapshot and is
+ * flagged as manually overridden — the Apollo snapshot itself is untouched.
+ */
+function FieldOverrideEditor({ kpi, companyKey }: { kpi: CockpitKpi; companyKey: string }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState('');
+  const queryClient = useQueryClient();
+  const fieldKey = kpi.fieldKey as NonNullable<CockpitKpi['fieldKey']>;
+
+  const save = useMutation({
+    mutationFn: (value: string | number) =>
+      api(`/api/crm/companies/${encodeURIComponent(companyKey)}/field-overrides`, {
+        method: 'PUT',
+        body: { fieldKey, value },
+      }),
+    onSuccess: () => {
+      toast.success('Field overridden', {
+        description: `${kpi.label} moved to Internal Data with your value.`,
+      });
+      setOpen(false);
+      void queryClient.invalidateQueries({ queryKey: ['crm-dashboard'] });
+    },
+    onError: (err: Error) => toast.error('Override failed', { description: err.message }),
+  });
+
+  const onSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    const trimmed = draft.trim();
+    if (!trimmed) return;
+    if (fieldKey === 'industry') {
+      save.mutate(trimmed);
+      return;
+    }
+    const numeric = Number(trimmed.replace(/[,\s]/g, ''));
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+      toast.error('Invalid value', { description: 'Enter a positive number.' });
+      return;
+    }
+    // Revenue is entered in plain currency units; the wire wants micros.
+    save.mutate(fieldKey === 'annualRevenueMicros' ? Math.round(numeric * 1_000_000) : numeric);
+  };
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        className="min-h-[28px] rounded px-1.5 text-[10px] font-medium text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)]"
+        aria-label={`Override ${kpi.label}`}
+        onClick={() => setOpen(true)}
+      >
+        Edit
+      </button>
+    );
+  }
+  return (
+    <form onSubmit={onSubmit} className="flex items-center gap-1">
+      <input
+        autoFocus
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setOpen(false);
+        }}
+        aria-label={`New value for ${kpi.label}`}
+        placeholder={fieldKey === 'industry' ? 'Industry' : 'Number'}
+        className="w-24 rounded border border-[var(--border)] bg-[var(--surface)] px-1.5 py-1 text-xs text-[var(--fg-primary)]"
+      />
+      <button
+        type="submit"
+        disabled={save.isPending}
+        className="min-h-[28px] rounded bg-[var(--brand-primary)] px-2 text-[10px] font-semibold text-[var(--fg-on-brand,white)] disabled:opacity-50"
+      >
+        {save.isPending ? '…' : 'Save'}
+      </button>
+    </form>
+  );
+}
 
 function SourceBadge({
   label,
@@ -80,7 +215,7 @@ function SourceBadge({
   hint,
 }: {
   label: string;
-  state: NonNullable<AccountCockpitSnapshot['kpis'][number]['sourceState']>;
+  state: NonNullable<CockpitKpi['sourceState']>;
   hint: string;
 }) {
   const className =

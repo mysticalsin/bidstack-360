@@ -10,7 +10,6 @@ import { DashboardSkeleton } from '@/components/skeletons/PageSkeletons';
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Reveal } from '@/components/motion/Reveal';
 import { useOrgSummary } from '@/hooks/useOrgSummary';
-import { useCrmDashboard } from '@/hooks/useCrmDashboard';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { springSoft } from '@/lib/motion';
 import { formatMoney } from '@/lib/format';
@@ -34,7 +33,6 @@ import { WinRateCard } from './widgets/WinRateCard';
 export const OrgDashboard = memo(function OrgDashboard() {
   const reduced = useReducedMotion();
   const summary = useOrgSummary();
-  const dashboard = useCrmDashboard();
   const pipelineReport = usePipelineReport();
   const { currency, convert } = useCurrencyStore();
 
@@ -145,9 +143,6 @@ export const OrgDashboard = memo(function OrgDashboard() {
     ] satisfies OrgKpi[];
   }, [closedLost, closedWon, pipelineStages, s]);
 
-  const topCompanies = dashboard.data?.companies.slice(0, 5) ?? [];
-
-
   if (summary.isLoading) return <DashboardSkeleton />;
   if (summary.isError) {
     return (
@@ -232,11 +227,9 @@ export const OrgDashboard = memo(function OrgDashboard() {
             <RecentActivityCard activity={s?.recentActivity ?? []} />
           </Reveal>
 
-          {topCompanies.length > 0 && (
-            <Reveal delay={0.1}>
-              <TopAccountsCard companies={topCompanies} />
-            </Reveal>
-          )}
+          <Reveal delay={0.1}>
+            <TopAccountsCard />
+          </Reveal>
 
           <Reveal delay={0.12}>
             <SalesFunnelCard

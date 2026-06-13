@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from 'framer-motion';
-import { memo } from 'react';
+import { memo, useState } from 'react';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge } from '@/components/ui/Badge';
@@ -105,9 +105,58 @@ export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props)
           </ul>
         </div>
       </div>
+      <SignalFactorPanel factors={cockpit.health.factors ?? []} />
     </Card>
   );
 });
+
+/**
+ * Explainability panel (M2): the 0-100 score is useless without context, so
+ * each contributing factor states what it measures and the action to take.
+ */
+function SignalFactorPanel({
+  factors,
+}: {
+  factors: NonNullable<AccountCockpitSnapshot['health']['factors']>;
+}) {
+  const [open, setOpen] = useState(false);
+  if (factors.length === 0) return null;
+  return (
+    <div className="border-t border-[var(--border)] px-5 pb-4">
+      <button
+        type="button"
+        className="flex min-h-[44px] w-full items-center justify-between text-left text-xs font-semibold uppercase tracking-wider text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)]"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span>What drives this score</span>
+        <span aria-hidden>{open ? '−' : '+'}</span>
+      </button>
+      {open ? (
+        <ul className="space-y-3" aria-label="Score factors">
+          {factors.map((f) => (
+            <li key={f.key} className="text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium text-[var(--fg-primary)]">{f.label}</span>
+                <span className="flex items-center gap-2">
+                  <span className="text-xs tabular-nums text-[var(--fg-tertiary)]">
+                    {f.score}/100
+                  </span>
+                  <Badge tone={badgeTone(f.band)}>{labelForHealth(f.band)}</Badge>
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">{f.whatItMeasures}</p>
+              <p className="mt-0.5 text-xs text-[var(--fg-secondary)]">
+                <span className="font-medium">Next: </span>
+                {f.recommendedAction}
+              </p>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
 
 function labelForHealth(key: (typeof ORDER)[number]): string {
   if (key === 'strong') return 'Strong';

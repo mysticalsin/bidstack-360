@@ -2,67 +2,17 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import {
+  BID_CRITERIA,
   BidScoreCreate,
   BidScoreItem,
   BidScoreList,
   BidScoreFilter,
   BidScoreAICalibrateResponse,
   BidScoreDefendResponse,
+  computeBidComposite,
 } from '@bidstack/shared';
 import { MemOSService } from '@bidstack/memos';
 import { defendBidScore } from '../services/ai/dust-agent.service.js';
-
-const CRITERIA_WEIGHTS: Record<string, { weight: number; category: string }> = {
-  fit: { weight: 15, category: 'strategic' },
-  relationship: { weight: 10, category: 'strategic' },
-  competitive: { weight: 12, category: 'strategic' },
-  tech_capability: { weight: 15, category: 'technical' },
-  resource_avail: { weight: 10, category: 'technical' },
-  solution_ready: { weight: 8, category: 'technical' },
-  deal_size: { weight: 10, category: 'commercial' },
-  profitability: { weight: 10, category: 'commercial' },
-  timeline_fit: { weight: 5, category: 'commercial' },
-  risk_profile: { weight: 5, category: 'risk' },
-};
-
-function computeBidScore(criteria: Record<string, number>): {
-  totalScore: number;
-  categoryScores: Record<string, number>;
-  weightedSum: number;
-  totalWeight: number;
-  recommendation: 'bid' | 'no_bid' | 'proceed_with_caution';
-} {
-  const catMap: Record<string, { sum: number; weight: number }> = {};
-  let weightedSum = 0;
-  let totalWeight = 0;
-
-  for (const [key, weightInfo] of Object.entries(CRITERIA_WEIGHTS)) {
-    const score = criteria[key] ?? 0;
-    const normalized = (score / 5) * weightInfo.weight;
-    weightedSum += normalized;
-    totalWeight += weightInfo.weight;
-
-    let entry = catMap[weightInfo.category];
-    if (!entry) {
-      entry = { sum: 0, weight: 0 };
-      catMap[weightInfo.category] = entry;
-    }
-    entry.sum += normalized;
-    entry.weight += weightInfo.weight;
-  }
-
-  const totalScore = totalWeight > 0 ? Math.round((weightedSum / totalWeight) * 100) : 0;
-  const categoryScores: Record<string, number> = {};
-  for (const [cat, data] of Object.entries(catMap)) {
-    categoryScores[cat] = data.weight > 0 ? Math.round((data.sum / data.weight) * 100) : 0;
-  }
-
-  let recommendation: 'bid' | 'no_bid' | 'proceed_with_caution' = 'no_bid';
-  if (totalScore >= 75) recommendation = 'bid';
-  else if (totalScore >= 50) recommendation = 'proceed_with_caution';
-
-  return { totalScore, categoryScores, weightedSum, totalWeight, recommendation };
-}
 
 function serializeBidScore(row: {
   id: string;
@@ -78,6 +28,8 @@ function serializeBidScore(row: {
   memosPolicies: string[];
   recommendation: string;
   notes: string | null;
+  overrideJustification: string | null;
+  overriddenBy: string | null;
   createdAt: Date;
   updatedAt: Date;
 }): z.infer<typeof BidScoreItem> {
@@ -95,6 +47,8 @@ function serializeBidScore(row: {
     memosPolicies: row.memosPolicies,
     recommendation: row.recommendation as 'bid' | 'no_bid' | 'proceed_with_caution',
     notes: row.notes,
+    overrideJustification: row.overrideJustification,
+    overriddenBy: row.overriddenBy,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -162,7 +116,7 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req, reply) => {
-      const { opportunityId, criteria, notes } = req.body;
+      const { opportunityId, criteria, notes, decision, override } = req.body;
       const opportunity = await prisma.opportunity.findFirst({
         where: { orgId: req.auth.orgId, id: opportunityId, deletedAt: null },
         select: { id: true },
@@ -172,7 +126,25 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
       }
 
       const { totalScore, categoryScores, weightedSum, totalWeight, recommendation } =
-        computeBidScore(criteria);
+        computeBidComposite(criteria);
+
+      // Below-threshold bypass: proceeding against a non-bid recommendation
+      // REQUIRES an acknowledged justification (≥ 30 chars, enforced by Zod).
+      if (decision === 'override') {
+        if (recommendation === 'bid') {
+          return reply.badRequest(
+            'Recommendation is already "bid" — there is nothing to override.',
+          );
+        }
+        if (!override) {
+          return reply.badRequest(
+            'Overriding a below-threshold recommendation requires an acknowledged justification (min 30 characters).',
+          );
+        }
+      } else if (override) {
+        return reply.badRequest('An override payload requires decision: "override".');
+      }
+      const isOverride = decision === 'override' && Boolean(override);
 
       // Fetch historical policies from MemOS for calibration
       const policies = await memos.getPoliciesForScope(
@@ -190,22 +162,47 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       const nextVersion = (latest?.version ?? 0) + 1;
 
-      const row = await prisma.bidScore.create({
-        data: {
-          orgId: req.auth.orgId,
-          opportunityId,
-          scoredBy: req.auth.userId,
-          version: nextVersion,
-          criteria: criteria as Record<string, number>,
-          totalScore,
-          categoryScores: categoryScores as Record<string, number>,
-          weightedSum,
-          totalWeight,
-          aiSuggested: false,
-          memosPolicies: policies.map((p) => p.id),
-          recommendation,
-          notes: notes ?? null,
-        },
+      const row = await prisma.$transaction(async (tx) => {
+        const created = await tx.bidScore.create({
+          data: {
+            orgId: req.auth.orgId,
+            opportunityId,
+            scoredBy: req.auth.userId,
+            version: nextVersion,
+            criteria: criteria as Record<string, number>,
+            totalScore,
+            categoryScores: categoryScores as Record<string, number>,
+            weightedSum,
+            totalWeight,
+            aiSuggested: false,
+            memosPolicies: policies.map((p) => p.id),
+            recommendation,
+            notes: notes ?? null,
+            overrideJustification: isOverride ? (override?.justification ?? null) : null,
+            overriddenBy: isOverride ? req.auth.userId : null,
+          },
+        });
+        if (isOverride && override) {
+          // Director/VP visibility surface: explicit audit row (the generic
+          // mutation-audit safety net only logs an opaque http.mutation entry).
+          await tx.auditLog.create({
+            data: {
+              orgId: req.auth.orgId,
+              userId: req.auth.userId,
+              action: 'bid_score.override',
+              targetType: 'bid_score',
+              targetId: created.id,
+              diff: {
+                opportunityId,
+                version: nextVersion,
+                totalScore,
+                recommendation,
+                justification: override.justification,
+              },
+            },
+          });
+        }
+        return created;
       });
 
       // Log to MemOS L1
@@ -279,33 +276,31 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
       // Build context for AI calibration (stub when no Dust key)
       const hasDust = Boolean(process.env.DUST_API_KEY);
 
-      // Default heuristic calibration based on MemOS policies
-      const calibratedCriteria: Record<string, number> = {
-        fit: 3,
-        relationship: 3,
-        competitive: 3,
-        tech_capability: 3,
-        resource_avail: 3,
-        solution_ready: 3,
-        deal_size: 3,
-        profitability: 3,
-        timeline_fit: 3,
-        risk_profile: 3,
-      };
+      // Default heuristic calibration: neutral 3 across the shared registry.
+      const calibratedCriteria: Record<string, number> = Object.fromEntries(
+        BID_CRITERIA.map((c) => [c.id, 3]),
+      );
 
-      // Adjust based on policies
+      // Adjust based on policies. profitability/risk_profile keyword bumps
+      // both map onto financial_risk in the unified registry.
       for (const policy of policies) {
-        const insight = policy.insight ?? '';
-        if (insight.toLowerCase().includes('strong')) {
-          calibratedCriteria.fit = Math.min(5, (calibratedCriteria.fit ?? 3) + 1);
-        }
-        if (insight.toLowerCase().includes('weak') || insight.toLowerCase().includes('risk')) {
-          calibratedCriteria.risk_profile = Math.max(0, (calibratedCriteria.risk_profile ?? 3) - 1);
-        }
-        if (insight.toLowerCase().includes('profit') || insight.toLowerCase().includes('margin')) {
-          calibratedCriteria.profitability = Math.min(
+        const insight = (policy.insight ?? '').toLowerCase();
+        if (insight.includes('strong')) {
+          calibratedCriteria.strategic_fit = Math.min(
             5,
-            (calibratedCriteria.profitability ?? 3) + 1,
+            (calibratedCriteria.strategic_fit ?? 3) + 1,
+          );
+        }
+        if (insight.includes('weak') || insight.includes('risk')) {
+          calibratedCriteria.financial_risk = Math.max(
+            0,
+            (calibratedCriteria.financial_risk ?? 3) - 1,
+          );
+        }
+        if (insight.includes('profit') || insight.includes('margin')) {
+          calibratedCriteria.financial_risk = Math.min(
+            5,
+            (calibratedCriteria.financial_risk ?? 3) + 1,
           );
         }
       }
@@ -331,7 +326,8 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
         }
       }
 
-      const { totalScore, categoryScores, recommendation } = computeBidScore(calibratedCriteria);
+      const { totalScore, categoryScores, recommendation } =
+        computeBidComposite(calibratedCriteria);
 
       const reasoning = [
         `Calibrated from ${policies.length} MemOS policy(ies) and ${worldModels.length} world model(s).`,

@@ -1,5 +1,5 @@
-// Top Accounts — highest-value accounts ranked by total revenue/pipeline.
-// Auto-computed rankings, expandable into full account intelligence.
+// Top Accounts — the curated global top-10 when admins have ranked accounts
+// in Settings; otherwise an auto leaderboard by total revenue/pipeline.
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
+import { KeyAccountBadge, TopAccountBadge } from '@/components/company/AccountTierBadges';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useTopAccounts } from '@/hooks/useTopAccounts';
 import { useAccountIndustries } from '@/hooks/useKeyAccounts';
@@ -29,6 +30,7 @@ export function TopAccountsPage() {
   });
 
   const items = accounts.data?.items ?? [];
+  const source = accounts.data?.source ?? 'auto';
   const accountError = accounts.error instanceof Error ? accounts.error.message : undefined;
   const industryError = industries.error instanceof Error ? industries.error.message : undefined;
 
@@ -40,11 +42,25 @@ export function TopAccountsPage() {
       animate="animate"
     >
       <motion.header variants={reducedMotion ? undefined : staggerChild}>
-        <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
-          Account Ranking
-        </h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
+            Account Ranking
+          </h1>
+          {!accounts.isLoading && !accounts.isError ? (
+            source === 'curated' ? (
+              <Badge tone="amber">
+                <Icon name="trophy" size={11} ariaHidden />
+                Curated — Amaris global top 10
+              </Badge>
+            ) : (
+              <Badge tone="gray">Auto-ranked by pipeline value</Badge>
+            )
+          ) : null}
+        </div>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          Highest-value accounts ranked by total pipeline and revenue.
+          {source === 'curated'
+            ? 'The global top 10, hand-picked and ordered by admins in Settings.'
+            : 'Highest-value accounts ranked by total pipeline and revenue.'}
         </p>
       </motion.header>
 
@@ -176,7 +192,10 @@ export function TopAccountsPage() {
                       >
                         {account.name}
                       </Link>
-                      {account.tier === 'key' && <Badge tone="purple">Key</Badge>}
+                      {source === 'curated' && (
+                        <TopAccountBadge rank={account.topAccountRank ?? index + 1} />
+                      )}
+                      {account.tier === 'key' && <KeyAccountBadge />}
                       {account.industry && <Badge tone="gray">{account.industry}</Badge>}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-[var(--fg-secondary)]">

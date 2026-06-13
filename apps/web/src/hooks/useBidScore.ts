@@ -15,6 +15,8 @@ interface BidScoreItem {
   memosPolicies: string[];
   recommendation: 'bid' | 'no_bid' | 'proceed_with_caution';
   notes: string | null;
+  overrideJustification: string | null;
+  overriddenBy: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -50,6 +52,8 @@ export function useCreateBidScore() {
       opportunityId: string;
       criteria: Record<string, number>;
       notes?: string;
+      decision?: 'follow' | 'override';
+      override?: { acknowledged: true; justification: string };
     }) => {
       return api<BidScoreItem>('/api/v1/bid-scores', {
         method: 'POST',

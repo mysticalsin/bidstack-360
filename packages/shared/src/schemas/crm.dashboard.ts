@@ -35,10 +35,24 @@ export type DashboardWidget = z.infer<typeof DashboardWidget>;
 export const HealthBand = z.enum(['strong', 'good', 'needs_attention', 'critical']);
 export type HealthBand = z.infer<typeof HealthBand>;
 
+// One contributing factor of the Signal Coverage score. A bare 0-100 number
+// is useless to a manager — every factor says what it measures and what to do.
+export const SignalFactor = z.object({
+  key: z.enum(['firmographics', 'contacts', 'engagement', 'pipeline']),
+  label: z.string().min(1),
+  whatItMeasures: z.string().min(1),
+  recommendedAction: z.string().min(1),
+  score: z.number().int().min(0).max(100),
+  band: HealthBand,
+});
+export type SignalFactor = z.infer<typeof SignalFactor>;
+
 export const CompanyHealth = z.object({
   score: z.number().int().min(0).max(100),
   band: HealthBand,
   counts: z.record(z.number().int().nonnegative()),
+  // Optional for wire-compat with snapshots persisted before factors shipped.
+  factors: z.array(SignalFactor).optional(),
 });
 export type CompanyHealth = z.infer<typeof CompanyHealth>;
 
@@ -165,21 +179,36 @@ export const ReleaseScore = z.object({
 });
 export type ReleaseScore = z.infer<typeof ReleaseScore>;
 
+export const CockpitKpi = z.object({
+  label: z.string().min(1),
+  value: z.string().min(1),
+  detail: z.string().nullable(),
+  tone: z.enum(['blue', 'jade', 'purple', 'amber', 'teal', 'rose']),
+  sourceLabel: z.string().min(1).optional(),
+  sourceState: z.enum(['apollo_fresh', 'apollo_stale', 'verified', 'crm', 'missing']).optional(),
+  sourceHint: z.string().min(1).optional(),
+  // External Intelligence (Apollo-sourced) vs Internal Data (ABC/OM) — the
+  // two blocks are never mixed in the UI. Manually edited fields move to
+  // internal and carry overridden=true.
+  block: z.enum(['external', 'internal']).optional(),
+  overridden: z.boolean().optional(),
+  // Set on editable external KPIs so the UI can PUT a field override.
+  fieldKey: z.enum(['industry', 'employeeCount', 'annualRevenueMicros']).optional(),
+});
+export type CockpitKpi = z.infer<typeof CockpitKpi>;
+
 export const AccountCockpitSnapshot = z.object({
   company: CrmCompany,
-  kpis: z.array(
-    z.object({
-      label: z.string().min(1),
-      value: z.string().min(1),
-      detail: z.string().nullable(),
-      tone: z.enum(['blue', 'jade', 'purple', 'amber', 'teal', 'rose']),
-      sourceLabel: z.string().min(1).optional(),
-      sourceState: z
-        .enum(['apollo_fresh', 'apollo_stale', 'verified', 'crm', 'missing'])
-        .optional(),
-      sourceHint: z.string().min(1).optional(),
-    }),
-  ),
+  kpis: z.array(CockpitKpi),
+  // Apollo refresh timestamp for the External Intelligence block header
+  // ("Last updated: …" — Apollo refreshes roughly every 2 weeks).
+  externalLastSyncedAt: z.string().nullable().optional(),
+  // Per-account revenue evolution sourced from ABC. The block renders ONLY
+  // when SHOW_REVENUE_BLOCK is on AND points exist — never an empty state.
+  // Stays undefined until the ABC revenue API is wired.
+  revenueEvolution: z
+    .array(z.object({ period: z.string().min(1), revenueMicros: z.number().int().nonnegative() }))
+    .optional(),
   technicalStack: z.array(TechnicalStackCategory),
   health: CompanyHealth,
   keyContacts: z.array(CrmPerson),

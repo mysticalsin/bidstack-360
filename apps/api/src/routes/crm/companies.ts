@@ -11,6 +11,8 @@ import {
   domainFor,
   getCompaniesOnly,
 } from '../../services/crm/dashboard.service.js';
+import { normalizeName } from '../../services/crm/dashboard.utils.js';
+import { invalidateDashboardSnapshotCache } from './dashboard.js';
 import {
   queueApolloEnrichment,
   upsertVerifiedCompanyEnrichment,
@@ -222,6 +224,108 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
         prisma,
         log: req.log,
       });
+    },
+  );
+
+  // ─── Field overrides (M1) ───────────────────────────────────────────────────
+  // Manual correction of an Apollo-sourced cockpit field. The enrichment
+  // snapshot is never mutated — the override layers on top and the field moves
+  // to the Internal Data block flagged "manually overridden".
+  const FieldOverrideBody = z.discriminatedUnion('fieldKey', [
+    z.object({ fieldKey: z.literal('industry'), value: z.string().trim().min(1).max(120) }),
+    z.object({ fieldKey: z.literal('employeeCount'), value: z.number().int().positive().max(10_000_000) }),
+    z.object({
+      fieldKey: z.literal('annualRevenueMicros'),
+      // Micros (int × 1e6); bounded to the same €9e15 float8-exact ceiling
+      // the analytics engine documents.
+      value: z.number().int().positive().max(9e15),
+    }),
+  ]);
+  const FieldOverrideResponse = z.object({
+    companyKey: z.string(),
+    fieldKey: z.string(),
+    value: z.unknown(),
+    updatedAt: z.string().datetime(),
+  });
+
+  server.put(
+    '/crm/companies/:companyKey/field-overrides',
+    {
+      preHandler: server.requirePermission('companies:write'),
+      schema: {
+        params: z.object({ companyKey: z.string().min(1).max(255) }),
+        body: FieldOverrideBody,
+        response: { 200: FieldOverrideResponse },
+      },
+    },
+    async (req) => {
+      const companyKey = normalizeName(req.params.companyKey);
+      const saved = await prisma.companyFieldOverride.upsert({
+        where: {
+          orgId_companyKey_fieldKey: {
+            orgId: req.auth.orgId,
+            companyKey,
+            fieldKey: req.body.fieldKey,
+          },
+        },
+        create: {
+          orgId: req.auth.orgId,
+          companyKey,
+          fieldKey: req.body.fieldKey,
+          value: req.body.value,
+          overriddenById: req.auth.userId,
+        },
+        update: { value: req.body.value, overriddenById: req.auth.userId },
+      });
+      await prisma.auditLog.create({
+        data: {
+          orgId: req.auth.orgId,
+          userId: req.auth.userId,
+          action: 'company.field_override',
+          targetType: 'company',
+          targetId: companyKey,
+          diff: { fieldKey: req.body.fieldKey, value: req.body.value },
+        },
+      });
+      invalidateDashboardSnapshotCache(req.auth.orgId);
+      return {
+        companyKey,
+        fieldKey: saved.fieldKey,
+        value: saved.value,
+        updatedAt: saved.updatedAt.toISOString(),
+      };
+    },
+  );
+
+  server.delete(
+    '/crm/companies/:companyKey/field-overrides/:fieldKey',
+    {
+      preHandler: server.requirePermission('companies:write'),
+      schema: {
+        params: z.object({
+          companyKey: z.string().min(1).max(255),
+          fieldKey: z.enum(['industry', 'employeeCount', 'annualRevenueMicros']),
+        }),
+        response: { 204: z.null() },
+      },
+    },
+    async (req, reply) => {
+      const companyKey = normalizeName(req.params.companyKey);
+      await prisma.companyFieldOverride.deleteMany({
+        where: { orgId: req.auth.orgId, companyKey, fieldKey: req.params.fieldKey },
+      });
+      await prisma.auditLog.create({
+        data: {
+          orgId: req.auth.orgId,
+          userId: req.auth.userId,
+          action: 'company.field_override_revert',
+          targetType: 'company',
+          targetId: companyKey,
+          diff: { fieldKey: req.params.fieldKey },
+        },
+      });
+      invalidateDashboardSnapshotCache(req.auth.orgId);
+      return reply.code(204).send(null);
     },
   );
 };

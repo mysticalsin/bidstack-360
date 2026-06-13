@@ -2,8 +2,40 @@ import { randomUUID } from 'node:crypto';
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { prisma } from '@bidstack/db';
+import { BID_CRITERIA, BID_TOTAL_WEIGHT, computeBidComposite } from '@bidstack/shared';
 import { buildServer } from '../server.js';
 import type { FastifyInstance } from 'fastify';
+
+// Frontend and backend each kept a diverging criteria table before M8 —
+// saving from the UI silently zeroed ~20 of 100 weight points. The shared
+// registry is the single source of truth; these invariants guard it.
+describe('shared bid criteria registry (no DB needed)', () => {
+  it('weights sum to exactly 100', () => {
+    expect(BID_CRITERIA.reduce((acc, c) => acc + c.weight, 0)).toBe(BID_TOTAL_WEIGHT);
+  });
+
+  it('composite always divides by the full weight, even partially rated', () => {
+    // strategic_fit weight is 14: a lone 5/5 rating is 14/100, not 100/100.
+    expect(computeBidComposite({ strategic_fit: 5 }).totalScore).toBe(14);
+  });
+});
+
+// All ten registry criteria rated 4-5 → composite 85 → recommendation 'bid'.
+const BID_WORTHY_CRITERIA = {
+  strategic_fit: 5,
+  relationship: 4,
+  competitive: 5,
+  tech_capability: 4,
+  resource_avail: 4,
+  solution_ready: 4,
+  deal_size: 4,
+  payment_terms: 4,
+  financial_risk: 4,
+  timeline_risk: 4,
+};
+
+// All 2s → composite 40 → recommendation 'no_bid' (below the 50 floor).
+const BELOW_THRESHOLD_CRITERIA = Object.fromEntries(BID_CRITERIA.map((c) => [c.id, 2]));
 
 describe.skipIf(!process.env.DATABASE_URL)('bid-score routes', () => {
   let server: FastifyInstance;
@@ -65,7 +97,7 @@ describe.skipIf(!process.env.DATABASE_URL)('bid-score routes', () => {
       url: '/api/v1/bid-scores',
       payload: {
         opportunityId: oppId,
-        criteria: { fit: 4, relationship: 3, competitive: 5, tech_capability: 4, resource_avail: 3, solution_ready: 4, deal_size: 3, profitability: 4, timeline_fit: 3, risk_profile: 4 },
+        criteria: BID_WORTHY_CRITERIA,
         notes: 'Strong candidate',
       },
     });
@@ -74,6 +106,109 @@ describe.skipIf(!process.env.DATABASE_URL)('bid-score routes', () => {
     expect(body.totalScore).toBeGreaterThan(0);
     expect(body.recommendation).toBe('bid');
     expect(body.opportunityId).toBe(oppId);
+    expect(body.overrideJustification).toBeNull();
+    expect(body.overriddenBy).toBeNull();
+  });
+
+  it('POST /api/v1/bid-scores rejects proceeding below threshold without a justification', async () => {
+    const list = await server.inject({ method: 'GET', url: '/api/v1/opportunities?limit=1' });
+    const { items } = list.json();
+    if (items.length === 0) {
+      console.warn('[skip] no seeded opportunities');
+      return;
+    }
+
+    // decision=override with no override payload → 400, nothing persisted.
+    const missing = await server.inject({
+      method: 'POST',
+      url: '/api/v1/bid-scores',
+      payload: {
+        opportunityId: items[0].id,
+        criteria: BELOW_THRESHOLD_CRITERIA,
+        decision: 'override',
+      },
+    });
+    expect(missing.statusCode).toBe(400);
+
+    // Justification under the 30-char mandatory floor → 400 (Zod).
+    const tooShort = await server.inject({
+      method: 'POST',
+      url: '/api/v1/bid-scores',
+      payload: {
+        opportunityId: items[0].id,
+        criteria: BELOW_THRESHOLD_CRITERIA,
+        decision: 'override',
+        override: { acknowledged: true, justification: 'too short' },
+      },
+    });
+    expect(tooShort.statusCode).toBe(400);
+  });
+
+  it('POST /api/v1/bid-scores rejects an override when the recommendation is already bid', async () => {
+    const list = await server.inject({ method: 'GET', url: '/api/v1/opportunities?limit=1' });
+    const { items } = list.json();
+    if (items.length === 0) {
+      console.warn('[skip] no seeded opportunities');
+      return;
+    }
+
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/v1/bid-scores',
+      payload: {
+        opportunityId: items[0].id,
+        criteria: BID_WORTHY_CRITERIA,
+        decision: 'override',
+        override: {
+          acknowledged: true,
+          justification: 'There is nothing to override here, the score is already a bid.',
+        },
+      },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('POST /api/v1/bid-scores with a valid override persists the justification and writes the director-visible audit row', async () => {
+    const list = await server.inject({ method: 'GET', url: '/api/v1/opportunities?limit=1' });
+    const { items } = list.json();
+    if (items.length === 0) {
+      console.warn('[skip] no seeded opportunities');
+      return;
+    }
+    const justification =
+      'Strategic market entry mandated by regional leadership despite weak score.';
+
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/v1/bid-scores',
+      payload: {
+        opportunityId: items[0].id,
+        criteria: BELOW_THRESHOLD_CRITERIA,
+        decision: 'override',
+        override: { acknowledged: true, justification },
+      },
+    });
+    expect(res.statusCode).toBe(201);
+    const body = res.json();
+    expect(body.recommendation).toBe('no_bid');
+    expect(body.overrideJustification).toBe(justification);
+    expect(body.overriddenBy).toBeTruthy();
+
+    // The override must be independently auditable — the latest endpoint
+    // alone is not an audit trail.
+    const auditRow = await prisma.auditLog.findFirst({
+      where: { action: 'bid_score.override', targetType: 'bid_score', targetId: body.id },
+    });
+    expect(auditRow).not.toBeNull();
+    expect((auditRow?.diff as { justification?: string })?.justification).toBe(justification);
+
+    // And the latest-per-opportunity surface exposes it.
+    const latest = await server.inject({
+      method: 'GET',
+      url: `/api/v1/bid-scores/${items[0].id}/latest`,
+    });
+    expect(latest.statusCode).toBe(200);
+    expect(latest.json().overrideJustification).toBe(justification);
   });
 
   it('POST /api/v1/bid-scores rejects opportunities outside the caller org', async () => {
@@ -84,7 +219,7 @@ describe.skipIf(!process.env.DATABASE_URL)('bid-score routes', () => {
       url: '/api/v1/bid-scores',
       payload: {
         opportunityId: foreignOpp.id,
-        criteria: { fit: 4, relationship: 3, competitive: 5, tech_capability: 4, resource_avail: 3, solution_ready: 4, deal_size: 3, profitability: 4, timeline_fit: 3, risk_profile: 4 },
+        criteria: BID_WORTHY_CRITERIA,
       },
     });
 
@@ -119,7 +254,7 @@ describe.skipIf(!process.env.DATABASE_URL)('bid-score routes', () => {
       url: '/api/v1/bid-scores',
       payload: {
         opportunityId: oppId,
-        criteria: { fit: 2, relationship: 2, competitive: 2, tech_capability: 2, resource_avail: 2, solution_ready: 2, deal_size: 2, profitability: 2, timeline_fit: 2, risk_profile: 2 },
+        criteria: BELOW_THRESHOLD_CRITERIA,
       },
     });
 
@@ -148,7 +283,7 @@ describe.skipIf(!process.env.DATABASE_URL)('bid-score routes', () => {
       url: '/api/v1/bid-scores',
       payload: {
         opportunityId: oppId,
-        criteria: { fit: 4, relationship: 3, competitive: 5, tech_capability: 4, resource_avail: 3, solution_ready: 4, deal_size: 3, profitability: 4, timeline_fit: 3, risk_profile: 4 },
+        criteria: BID_WORTHY_CRITERIA,
       },
     });
     expect(create.statusCode).toBe(201);

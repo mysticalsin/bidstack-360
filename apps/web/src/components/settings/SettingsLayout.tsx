@@ -12,6 +12,9 @@ export type SettingsSection =
   | 'workspace'
   | 'language'
   | 'crm'
+  | 'top-accounts'
+  | 'groups'
+  | 'opportunity-filters'
   | 'rfp-analytics'
   | 'integrations'
   | 'webhooks'
@@ -43,6 +46,9 @@ const GROUPS: Group[] = [
     items: [
       { id: 'workspace', label: 'Workspace', icon: 'settings' },
       { id: 'crm', label: 'Data configuration', icon: 'sliders', admin: true },
+      { id: 'top-accounts', label: 'Top accounts', icon: 'star', admin: true },
+      { id: 'groups', label: 'Access groups', icon: 'contacts', admin: true },
+      { id: 'opportunity-filters', label: 'Opportunity filters', icon: 'sliders', admin: true },
       { id: 'rfp-analytics', label: 'RFP Analytics', icon: 'trophy', admin: true },
       { id: 'integrations', label: 'Integrations', icon: 'link' },
       { id: 'webhooks', label: 'Webhooks', icon: 'webhook', admin: true },

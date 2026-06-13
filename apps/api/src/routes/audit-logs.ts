@@ -45,6 +45,7 @@ type XlsxModule = {
 
 const CRM_TARGETS = new Set([
   'account',
+  'bid_score',
   'company',
   'contact',
   'lead',

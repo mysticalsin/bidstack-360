@@ -1,11 +1,16 @@
 // Key Accounts & Top Accounts routes.
-// Key accounts are manually flagged (tier = 'key').
-// Top accounts are auto-ranked by total revenue/pipeline.
+// Key accounts are manually flagged (tier = 'key') — regional strategic accounts.
+// Top accounts are the admin-curated global top-10 (Company.topAccountRank);
+// when no curation exists the endpoint falls back to an auto leaderboard
+// ranked by total revenue/pipeline and labels the payload source: 'auto'.
 
 import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, type Prisma } from '@bidstack/db';
+import { TOP_ACCOUNTS_MAX, TopAccountListUpdate, TopAccountsSource } from '@bidstack/shared';
+
+import { emptyAccountStats, fetchAccountStats } from './accounts.helpers.js';
 
 const KeyAccountResponse = z.object({
   id: z.string().uuid(),
@@ -136,7 +141,8 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
     },
   });
 
-  // GET /api/v1/accounts/top — list top N accounts by total opportunity value
+  // GET /api/v1/accounts/top — curated global top-10 when an admin has set
+  // Company.topAccountRank; otherwise the auto leaderboard by opportunity value.
   app.get('/accounts/top', {
     schema: {
       querystring: z.object({
@@ -144,11 +150,68 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
         search: z.string().max(200).optional(),
         industry: z.string().max(100).optional(),
       }),
-      response: { 200: z.object({ items: z.array(TopAccountResponse) }) },
+      response: {
+        200: z.object({ items: z.array(TopAccountResponse), source: TopAccountsSource }),
+      },
     },
     handler: async (req, reply) => {
       const { orgId } = req.auth;
       const { limit, search, industry } = req.query;
+
+      // Curated mode: ANY non-null rank in the org switches the endpoint to the
+      // manually ordered list (search/industry still filter within it).
+      const curatedCount = await prisma.company.count({
+        where: { orgId, deletedAt: null, topAccountRank: { not: null } },
+      });
+      if (curatedCount > 0) {
+        const curated = await prisma.company.findMany({
+          where: {
+            orgId,
+            deletedAt: null,
+            topAccountRank: { not: null },
+            ...(search
+              ? {
+                  OR: [
+                    { name: { contains: search, mode: 'insensitive' as const } },
+                    { domain: { contains: search, mode: 'insensitive' as const } },
+                  ],
+                }
+              : {}),
+            ...(industry
+              ? { industry: { equals: industry, mode: 'insensitive' as const } }
+              : {}),
+          },
+          orderBy: { topAccountRank: 'asc' },
+          take: Math.min(limit, TOP_ACCOUNTS_MAX),
+        });
+
+        const stats = await fetchAccountStats(
+          orgId,
+          curated.map((c) => c.id),
+        );
+        const items = curated.map((c) => {
+          const s = stats.get(c.id) ?? emptyAccountStats();
+          return {
+            id: c.id,
+            name: c.name,
+            domain: c.domain,
+            industry: c.industry,
+            logoUrl: c.logoUrl,
+            tier: c.tier,
+            keyAccountSince: c.keyAccountSince?.toISOString() ?? null,
+            keyAccountOwnerId: c.keyAccountOwnerId,
+            keyAccountNotes: c.keyAccountNotes,
+            // topAccountRank is non-null by the where clause above; ?? 0 keeps TS honest.
+            topAccountRank: c.topAccountRank ?? 0,
+            totalValue: s.totalValue,
+            wonValue: s.wonValue,
+            openDeals: s.openDeals,
+            contactCount: s.contactCount,
+            opportunityCount: s.opportunityCount,
+          };
+        });
+        return reply.send({ items, source: 'curated' as const });
+      }
 
       // WHY raw SQL: the previous implementation loaded all companies (take:1000)
       // and their opportunities (take:1000) into JS, then sorted and sliced.
@@ -242,7 +305,64 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
         opportunityCount: Number(row.opportunityCount),
       }));
 
-      return reply.send({ items });
+      return reply.send({ items, source: 'auto' as const });
+    },
+  });
+
+  // PUT /api/v1/accounts/top-list — replace the curated global top-10.
+  // Body order = rank order (index 0 → rank 1). An empty list clears curation
+  // and reverts /accounts/top to the auto leaderboard.
+  app.put('/accounts/top-list', {
+    preHandler: server.requirePermission('accounts:write'),
+    schema: {
+      body: TopAccountListUpdate,
+      response: { 200: z.object({ companyIds: z.array(z.string().uuid()) }) },
+    },
+    handler: async (req, reply) => {
+      const { orgId, userId } = req.auth;
+      const { companyIds } = req.body;
+
+      if (companyIds.length > 0) {
+        const owned = await prisma.company.findMany({
+          where: { id: { in: companyIds }, orgId, deletedAt: null },
+          select: { id: true },
+          take: TOP_ACCOUNTS_MAX,
+        });
+        if (owned.length !== companyIds.length) {
+          const ownedIds = new Set(owned.map((c) => c.id));
+          const missing = companyIds.filter((id) => !ownedIds.has(id));
+          throw server.httpErrors.badRequest(
+            `Companies not found in your organization: ${missing.join(', ')}`,
+          );
+        }
+      }
+
+      await prisma.$transaction(async (tx) => {
+        // Clear every existing rank first so removed/reordered companies never
+        // keep a stale position, then write rank 1..N in body order.
+        await tx.company.updateMany({
+          where: { orgId, topAccountRank: { not: null } },
+          data: { topAccountRank: null },
+        });
+        for (const [index, companyId] of companyIds.entries()) {
+          await tx.company.updateMany({
+            where: { id: companyId, orgId, deletedAt: null },
+            data: { topAccountRank: index + 1 },
+          });
+        }
+        await tx.auditLog.create({
+          data: {
+            orgId,
+            userId,
+            action: 'accounts.top_list.update',
+            targetType: 'company',
+            targetId: null,
+            diff: { companyIds },
+          },
+        });
+      });
+
+      return reply.send({ companyIds });
     },
   });
 

@@ -1,101 +1,18 @@
-// Types, data constants, and pure helpers for the Bid/No-Bid decision matrix.
+// UI types, display constants, and pure helpers for the Bid/No-Bid matrix.
+// The criteria registry, weights, composite math, and recommendation
+// thresholds live in @bidstack/shared (bid-criteria.ts) — the API consumes
+// the same module, so the live UI total can never diverge from the
+// persisted one again.
+import {
+  BID_CRITERIA,
+  BID_THRESHOLDS,
+  bidRecommendation,
+  type BidCriterionDef,
+} from '@bidstack/shared';
 
-export interface Criterion {
-  id: string;
-  label: string;
-  description: string;
-  category: 'strategic' | 'technical' | 'commercial' | 'risk';
-  weight: number;
-  icon: string;
-}
+export type Criterion = BidCriterionDef;
 
-export const CRITERIA: Criterion[] = [
-  {
-    id: 'fit',
-    label: 'Strategic Fit',
-    description:
-      'How well does this opportunity align with our core capabilities and strategic direction?',
-    category: 'strategic',
-    weight: 15,
-    icon: 'target',
-  },
-  {
-    id: 'relationship',
-    label: 'Client Relationship',
-    description:
-      'Strength of existing relationship with the client. Prior wins, references, and decision-unit access.',
-    category: 'strategic',
-    weight: 10,
-    icon: 'contacts',
-  },
-  {
-    id: 'competitive',
-    label: 'Competitive Position',
-    description:
-      'Our differentiation vs known competitors. Are we the incumbent? Do we have technical edge?',
-    category: 'strategic',
-    weight: 12,
-    icon: 'trophy',
-  },
-  {
-    id: 'tech_capability',
-    label: 'Technical Capability',
-    description: 'Do we have the people, technology, and certifications to deliver?',
-    category: 'technical',
-    weight: 15,
-    icon: 'settings',
-  },
-  {
-    id: 'resource_avail',
-    label: 'Resource Availability',
-    description:
-      'Are the required team members and subject-matter experts available for this timeline?',
-    category: 'technical',
-    weight: 10,
-    icon: 'clock',
-  },
-  {
-    id: 'solution_ready',
-    label: 'Solution Readiness',
-    description:
-      'Level of maturity of our proposed solution. Proof-of-concept, prior delivery, or greenfield?',
-    category: 'technical',
-    weight: 8,
-    icon: 'tasks',
-  },
-  {
-    id: 'deal_size',
-    label: 'Deal Size',
-    description: 'Total contract value relative to our average deal size and revenue targets.',
-    category: 'commercial',
-    weight: 10,
-    icon: 'dollar',
-  },
-  {
-    id: 'margin_potential',
-    label: 'Margin Potential',
-    description: 'Expected profitability after delivery costs, partner fees, and risk provisions.',
-    category: 'commercial',
-    weight: 8,
-    icon: 'growth',
-  },
-  {
-    id: 'payment_terms',
-    label: 'Payment Terms',
-    description: 'Acceptable payment schedule, milestones, and cash-flow impact.',
-    category: 'commercial',
-    weight: 5,
-    icon: 'briefcase',
-  },
-  {
-    id: 'timeline_risk',
-    label: 'Timeline Risk',
-    description: 'Is the proposal deadline realistic? Can we produce a quality response?',
-    category: 'risk',
-    weight: 7,
-    icon: 'warning',
-  },
-];
+export const CRITERIA: readonly Criterion[] = BID_CRITERIA;
 
 export type ScoreValue = 0 | 1 | 2 | 3 | 4 | 5;
 export type Scores = Record<string, ScoreValue>;
@@ -130,13 +47,18 @@ export function getRecommendation(score: number): {
   color: string;
   status: 'success' | 'warning' | 'danger';
 } {
-  if (score >= 75)
+  const rec = bidRecommendation(score);
+  if (rec === 'bid') {
     return { verdict: 'BID — Strong fit', color: 'var(--success)', status: 'success' };
-  if (score >= 55)
+  }
+  if (rec === 'proceed_with_caution') {
     return {
       verdict: 'CONDITIONAL BID — Review risks',
       color: 'var(--warning)',
       status: 'warning',
     };
+  }
   return { verdict: 'NO-BID — Insufficient alignment', color: 'var(--danger)', status: 'danger' };
 }
+
+export { BID_THRESHOLDS };

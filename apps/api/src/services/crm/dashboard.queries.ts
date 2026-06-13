@@ -298,6 +298,12 @@ export async function buildCompanyCockpit(
     }),
   ]);
 
+  const fieldOverrides = await prismaClient.companyFieldOverride.findMany({
+    where: { orgId, companyKey: normalizeName(company.name) },
+    select: { fieldKey: true, value: true },
+    take: 10,
+  });
+
   return buildCockpit({
     company,
     companies,
@@ -306,5 +312,7 @@ export async function buildCompanyCockpit(
     tasks,
     risks: riskRows,
     compliance: complianceRows,
+    fieldOverrides,
+    winLossAvailable: process.env.WIN_LOSS_DATA_AVAILABLE === 'true',
   });
 }

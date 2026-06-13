@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
+import { KeyAccountBadge } from '@/components/company/AccountTierBadges';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useKeyAccounts, useAccountIndustries } from '@/hooks/useKeyAccounts';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
@@ -42,7 +43,8 @@ export function KeyAccountsPage() {
           Strategic Accounts
         </h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          Strategic accounts owned for pipeline, coverage, and executive follow-through.
+          Regional strategic accounts owned for pipeline, coverage, and executive follow-through —
+          distinct from the curated global Top 10.
         </p>
       </motion.header>
 
@@ -177,7 +179,7 @@ export function KeyAccountsPage() {
                       >
                         {account.name}
                       </Link>
-                      <Badge tone="purple">Key</Badge>
+                      <KeyAccountBadge />
                       {account.industry ? <Badge tone="gray">{account.industry}</Badge> : null}
                     </div>
                     {account.domain ? (

@@ -19,6 +19,13 @@ function dashboardCacheKey(orgId: string, account: string | undefined): string {
   return `${orgId}:${account ?? ''}`;
 }
 
+/** Drop the in-process snapshot cache for one org (field-override writes call this). */
+export function invalidateDashboardSnapshotCache(orgId: string): void {
+  for (const key of dashboardCache.keys()) {
+    if (key.startsWith(`${orgId}:`)) dashboardCache.delete(key);
+  }
+}
+
 async function cachedDashboardSnapshot(
   orgId: string,
   account: string | undefined,

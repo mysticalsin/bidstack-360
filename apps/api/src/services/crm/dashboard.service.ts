@@ -303,6 +303,11 @@ export async function buildDashboardSnapshot(
     companies.find((company) => company.name === 'Mantu') ??
     companies[0] ??
     fallbackCompany('Mantu');
+  const fieldOverrides = await prisma.companyFieldOverride.findMany({
+    where: { orgId, companyKey: normalizeName(selectedCompany.name) },
+    select: { fieldKey: true, value: true },
+    take: 10,
+  });
 
   return {
     generatedAt: new Date().toISOString(),
@@ -314,6 +319,8 @@ export async function buildDashboardSnapshot(
       tasks,
       risks: riskRows,
       compliance: complianceRows,
+      fieldOverrides,
+      winLossAvailable: process.env.WIN_LOSS_DATA_AVAILABLE === 'true',
     }),
     companies,
     deals,

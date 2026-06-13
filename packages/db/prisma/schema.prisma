@@ -176,10 +176,21 @@ model Org {
   signatureRequests      SignatureRequest[]
 
   // Analytics report builder (custom reports + dashboards)
+  companyFieldOverrides     CompanyFieldOverride[]
   analyticsReports          AnalyticsReport[]
   analyticsReportRuns       AnalyticsReportRun[]
   analyticsDashboards       AnalyticsDashboard[]
   analyticsDashboardWidgets AnalyticsDashboardWidget[]
+
+  // M7 — access-based data scoping (admin-managed groups; future ABC sync target)
+  userGroups       UserGroup[]
+  userGroupMembers UserGroupMember[]
+
+  // Wave A — pre-sales governance surfaces
+  crossSellActions   CrossSellAction[]
+  governanceMeetings GovernanceMeeting[]
+  governanceActions  GovernanceAction[]
+  projectReferences  ProjectReference[]
 
   @@index([deletedAt])
   @@map("orgs")
@@ -241,6 +252,13 @@ model User {
   createdTags       Tag[]              @relation("TagCreatedBy")
   taggedEntities    EntityTag[]        @relation("EntityTagTaggedBy")
   createdEmailTemplates EmailTemplate[] @relation("EmailTemplateCreatedBy")
+
+  // M7 — access-based data scoping
+  groupMemberships UserGroupMember[]
+
+  // Wave A — pre-sales governance assignments
+  crossSellAssignments  CrossSellAction[]  @relation("CrossSellAssignee")
+  governanceActionsOwned GovernanceAction[] @relation("GovernanceActionOwner")
 
   @@index([orgId])
   @@index([deletedAt])
@@ -314,6 +332,29 @@ model Company {
   @@index([orgId, createdAt(sort: Desc)], map: "companies_org_created_idx")
   @@index([deletedAt])
   @@map("companies")
+}
+
+// Manual correction of an Apollo-sourced (External Intelligence) field.
+// The enrichment snapshot is never mutated; the override layers on top, the
+// field renders in the Internal Data block flagged "manually overridden".
+model CompanyFieldOverride {
+  id             String   @id @default(uuid()) @db.Uuid
+  orgId          String   @map("org_id") @db.Uuid
+  // Normalized company name (dashboard.utils normalizeName) — the cockpit's
+  // company identity spans enrichment uuids AND opportunity-derived slugs,
+  // so the override keys on the normalized name, not a companies-table FK.
+  companyKey     String   @map("company_key")
+  fieldKey       String   @map("field_key") // industry | employeeCount | annualRevenueMicros
+  value          Json
+  overriddenById String   @map("overridden_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, companyKey, fieldKey], map: "company_field_overrides_org_company_field_key")
+  @@index([orgId, companyKey])
+  @@map("company_field_overrides")
 }
 
 // ─── Core entities ────────────────────────────────────────────────────────
@@ -2335,6 +2376,10 @@ model OrgSettings {
   notificationPrefs Json      @default("{}") @map("notification_prefs")
   /// Per-org daily AI cost cap in micros (default 5 000 000 = $5.00). 0 = unlimited.
   aiCostCapDailyMicros BigInt @default(5000000) @map("ai_cost_cap_daily_micros")
+  /// M6 — ABC opportunity filter rules (OpportunityFilterRules shape in shared).
+  /// Adjustable in Settings without a code change; consumed by the future ABC
+  /// sync connector at ingestion time. {} = no filtering.
+  opportunityFilterRules Json @default("{}") @map("opportunity_filter_rules")
   updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt         DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -2390,6 +2435,54 @@ model LeadRoutingRule {
   @@index([orgId, active, priority(sort: Desc)], map: "lead_rules_org_active_priority_idx")
   @@index([deletedAt])
   @@map("lead_routing_rules")
+}
+
+// ─── Access groups (M7 — access-based data scoping) ──────────────────────
+// Admin-managed user groups that mirror group access in the source systems
+// (ABC, Opportunity Management). No live connector exists yet — groups are
+// maintained by org admins in Settings; a future sync job will write the same
+// tables. Visibility semantics live in apps/api/src/lib/access-scope.ts:
+// a user's visible scope is the UNION of their groups' scopeCountries;
+// zero memberships or any scopeAll group means unrestricted (back-compat).
+
+model UserGroup {
+  id             String    @id @default(uuid()) @db.Uuid
+  orgId          String    @map("org_id") @db.Uuid
+  name           String
+  description    String?
+  /// ISO-2 country codes this group may see (e.g. ["FR","DE"]).
+  scopeCountries String[]  @default([]) @map("scope_countries")
+  /// true = members of this group see everything in the org.
+  scopeAll       Boolean   @default(false) @map("scope_all")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  org     Org               @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  members UserGroupMember[]
+
+  @@unique([orgId, name])
+  @@index([orgId])
+  @@index([deletedAt])
+  @@map("user_groups")
+}
+
+model UserGroupMember {
+  id        String   @id @default(uuid()) @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  groupId   String   @map("group_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org   Org       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  group UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  // getAccessScope looks up by (orgId, userId) on every scoped list read.
+  @@index([orgId, userId], map: "user_group_members_org_user_idx")
+  @@index([orgId])
+  @@map("user_group_members")
 }
 
 // ─── Forecasting ──────────────────────────────────────────────────────────
@@ -2638,6 +2731,12 @@ model BidScore {
   // Recommendation
   recommendation String // bid | no_bid | proceed_with_caution
   notes          String?
+
+  // Below-threshold override: explicit columns (not Json) for auditability.
+  // Set only when the scorer proceeds against a no_bid/proceed_with_caution
+  // recommendation; surfaced to directors/VPs via audit log + latest endpoint.
+  overrideJustification String? @map("override_justification")
+  overriddenBy          String? @map("overridden_by") @db.Uuid
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -4566,4 +4665,130 @@ model AnalyticsDashboardWidget {
   @@index([orgId, dashboardId], map: "analytics_dashboard_widgets_org_dash_idx")
   @@index([reportId])
   @@map("analytics_dashboard_widgets")
+}
+
+// ─── Wave A — pre-sales governance surfaces ───────────────────────────────────
+// Account identity in these tables is the normalized company name
+// (`accountKey`, same convention as CompanyFieldOverride.companyKey) — the
+// cockpit's company id spans enrichment uuids AND opportunity-derived slugs,
+// so a companies-table FK would not cover every account.
+
+enum GovernanceStatus {
+  open
+  in_progress
+  done
+
+  @@map("governance_status")
+}
+
+enum GovernanceMeetingType {
+  monthly_committee
+  quarterly_c_level
+  brm
+  sar_review
+  other
+
+  @@map("governance_meeting_type")
+}
+
+enum ProjectReferenceStatus {
+  draft
+  manager_review
+  validated
+  dispatched
+
+  @@map("project_reference_status")
+}
+
+// A2 — cross-country / cross-team sales action on a shared account. Structured
+// and assignable (NOT a chat); pre-sales owns it.
+model CrossSellAction {
+  id             String           @id @default(uuid()) @db.Uuid
+  orgId          String           @map("org_id") @db.Uuid
+  accountKey     String           @map("account_key")
+  description    String
+  requestingUnit String           @map("requesting_unit")
+  assignedUnit   String           @map("assigned_unit")
+  assigneeId     String?          @map("assignee_id") @db.Uuid
+  dueDate        DateTime?        @map("due_date") @db.Timestamptz(6)
+  status         GovernanceStatus @default(open)
+  notes          String?
+  createdById    String           @map("created_by_id") @db.Uuid
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?        @map("deleted_at") @db.Timestamptz(6)
+
+  org      Org   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  assignee User? @relation("CrossSellAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, accountKey], map: "cross_sell_actions_org_account_idx")
+  @@index([orgId, status], map: "cross_sell_actions_org_status_idx")
+  @@index([deletedAt])
+  @@map("cross_sell_actions")
+}
+
+// A4 — comitology / governance meeting log per key account.
+model GovernanceMeeting {
+  id           String                @id @default(uuid()) @db.Uuid
+  orgId        String                @map("org_id") @db.Uuid
+  accountKey   String                @map("account_key")
+  meetingType  GovernanceMeetingType @map("meeting_type")
+  date         DateTime              @db.Timestamptz(6)
+  participants String[]
+  outcomes     String?
+  createdById  String                @map("created_by_id") @db.Uuid
+  createdAt    DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt    DateTime?             @map("deleted_at") @db.Timestamptz(6)
+
+  org     Org                @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  actions GovernanceAction[]
+
+  @@index([orgId, accountKey, date(sort: Desc)], map: "governance_meetings_org_account_date_idx")
+  @@index([deletedAt])
+  @@map("governance_meetings")
+}
+
+model GovernanceAction {
+  id          String           @id @default(uuid()) @db.Uuid
+  orgId       String           @map("org_id") @db.Uuid
+  meetingId   String           @map("meeting_id") @db.Uuid
+  description String
+  ownerId     String?          @map("owner_id") @db.Uuid
+  dueDate     DateTime?        @map("due_date") @db.Timestamptz(6)
+  status      GovernanceStatus @default(open)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org               @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  meeting GovernanceMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  owner   User?             @relation("GovernanceActionOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, meetingId], map: "governance_actions_org_meeting_idx")
+  @@map("governance_actions")
+}
+
+// A5 — Spotlight Ref receiving end. Validated project references attached to an
+// account. Ingestion (consultant -> manager flow) is OUT until Spotlight Ref is
+// reworked; this is the display + pre-sales validation side only.
+model ProjectReference {
+  id               String                 @id @default(uuid()) @db.Uuid
+  orgId            String                 @map("org_id") @db.Uuid
+  accountKey       String                 @map("account_key")
+  title            String
+  technicalSummary String?                @map("technical_summary")
+  businessSummary  String?                @map("business_summary")
+  status           ProjectReferenceStatus @default(manager_review)
+  sourceSystem     String                 @default("spotlight_ref") @map("source_system")
+  validatedById    String?                @map("validated_by_id") @db.Uuid
+  dispatchedAt     DateTime?              @map("dispatched_at") @db.Timestamptz(6)
+  createdAt        DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt        DateTime?              @map("deleted_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, accountKey], map: "project_references_org_account_idx")
+  @@index([deletedAt])
+  @@map("project_references")
 }

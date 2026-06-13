@@ -11,9 +11,11 @@ import type {
   AccountCockpitSnapshot,
   AiInsight,
   BidOpportunity,
+  CompanyHealth,
   CrmActivity,
   CrmCompany,
   CrmDashboardSnapshot,
+  SignalFactor,
 } from '@bidstack/shared';
 
 import { defaultCompliance, defaultRisks, defaultTechnicalStack } from './dashboard.defaults.js';
@@ -32,6 +34,169 @@ import {
 
 const COCKPIT_RISK_LIMIT = 6;
 const COCKPIT_COMPLIANCE_LIMIT = 6;
+
+// ─── Signal coverage (M2) ─────────────────────────────────────────────────────
+// Real 4-factor scoring replacing the old hardcoded 72/strong placeholder.
+// Each factor carries what it measures and the action a manager should take.
+
+type HealthBandValue = z.infer<typeof SignalFactor>['band'];
+
+function bandFor(score: number): HealthBandValue {
+  if (score >= 75) return 'strong';
+  if (score >= 50) return 'good';
+  if (score >= 25) return 'needs_attention';
+  return 'critical';
+}
+
+const FACTOR_ACTIONS: Record<
+  z.infer<typeof SignalFactor>['key'],
+  Record<'low' | 'high', string>
+> = {
+  firmographics: {
+    low: 'Run an Apollo enrichment (Enrich now) to fill industry, headcount, and revenue.',
+    high: 'Profile is well covered — re-sync Apollo if older than two weeks.',
+  },
+  contacts: {
+    low: 'Map more stakeholders: add contacts with roles and influence ratings.',
+    high: 'Contact map is healthy — confirm the champion before the next milestone.',
+  },
+  engagement: {
+    low: 'No recent activity — schedule a touchpoint or log the latest interaction.',
+    high: 'Engagement cadence is active — keep follow-ups inside their due dates.',
+  },
+  pipeline: {
+    low: 'Open deals are missing stage, owner, or close-date data — complete them.',
+    high: 'Pipeline records are complete — review probabilities at the next review.',
+  },
+};
+
+function factor(
+  key: z.infer<typeof SignalFactor>['key'],
+  label: string,
+  whatItMeasures: string,
+  score: number,
+): z.infer<typeof SignalFactor> {
+  const clamped = Math.max(0, Math.min(100, Math.round(score)));
+  const band = bandFor(clamped);
+  return {
+    key,
+    label,
+    whatItMeasures,
+    recommendedAction:
+      FACTOR_ACTIONS[key][band === 'strong' || band === 'good' ? 'high' : 'low'],
+    score: clamped,
+    band,
+  };
+}
+
+export function computeSignalCoverage(input: {
+  company: z.infer<typeof CrmCompany>;
+  contacts: Array<{ influence: number | null; email: string | null }>;
+  openDeals: Array<{ probability: number; dueDate: Date | null; owner: unknown | null }>;
+  tasks: Array<{ status: string; dueDate: Date | null; createdAt: Date }>;
+}): CompanyHealth {
+  const { company, contacts, openDeals, tasks } = input;
+
+  const freshness = company.strategicIntel?.freshness;
+  const firmographics = factor(
+    'firmographics',
+    'Firmographic coverage',
+    'Industry, headcount, revenue, tech stack, and Apollo freshness.',
+    (company.industry ? 20 : 0) +
+      (company.employeeCount ? 20 : 0) +
+      (company.annualRevenueMicros ? 20 : 0) +
+      ((company.technicalStack?.length ?? 0) > 0 ? 15 : 0) +
+      (freshness === 'fresh' ? 25 : freshness === 'stale' ? 10 : 0),
+  );
+
+  const withEmail = contacts.filter((c) => c.email).length;
+  const contactFactor = factor(
+    'contacts',
+    'Contact coverage',
+    'Stakeholders mapped, influence rated, and reachable by email.',
+    Math.min(40, contacts.length * 10) +
+      (contacts.some((c) => (c.influence ?? 0) >= 4)
+        ? 30
+        : contacts.some((c) => c.influence != null)
+          ? 15
+          : 0) +
+      (contacts.length > 0 ? Math.round((withEmail / contacts.length) * 30) : 0),
+  );
+
+  const now = Date.now();
+  const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+  const recent = tasks.filter((t) => now - t.createdAt.getTime() < thirtyDays).length;
+  const open = tasks.filter((t) => t.status !== 'done');
+  const onTrack = open.filter((t) => !t.dueDate || t.dueDate.getTime() >= now).length;
+  const engagement = factor(
+    'engagement',
+    'Engagement recency',
+    'Activity in the last 30 days and follow-ups still inside their due dates.',
+    Math.min(50, recent * 17) + (open.length > 0 ? Math.round((onTrack / open.length) * 50) : 25),
+  );
+
+  const complete = openDeals.filter(
+    (d) => d.probability > 0 && d.dueDate != null && d.owner != null,
+  ).length;
+  const pipeline = factor(
+    'pipeline',
+    'Pipeline data quality',
+    'Open deals carrying probability, owner, and an expected close date.',
+    (openDeals.length > 0 ? 40 : 0) +
+      (openDeals.length > 0 ? Math.round((complete / openDeals.length) * 60) : 0),
+  );
+
+  const factors = [firmographics, contactFactor, engagement, pipeline];
+  // Weights: external intel is the cockpit's backbone; the rest split evenly.
+  const score = Math.round(
+    firmographics.score * 0.3 +
+      contactFactor.score * 0.25 +
+      engagement.score * 0.2 +
+      pipeline.score * 0.25,
+  );
+  const counts: Record<string, number> = {
+    strong: 0,
+    good: 0,
+    needs_attention: 0,
+    critical: 0,
+  };
+  for (const f of factors) counts[f.band] = (counts[f.band] ?? 0) + 1;
+  return { score, band: bandFor(score), counts, factors };
+}
+
+// ─── Field overrides (M1) ─────────────────────────────────────────────────────
+
+export interface CockpitFieldOverride {
+  fieldKey: string;
+  value: unknown;
+}
+
+/** Apply manual overrides on top of the (immutable) enrichment-derived company. */
+export function applyFieldOverrides(
+  company: z.infer<typeof CrmCompany>,
+  overrides: CockpitFieldOverride[],
+): { company: z.infer<typeof CrmCompany>; overriddenKeys: Set<string> } {
+  const overriddenKeys = new Set<string>();
+  if (overrides.length === 0) return { company, overriddenKeys };
+  const next = { ...company };
+  for (const o of overrides) {
+    if (o.fieldKey === 'industry' && typeof o.value === 'string' && o.value) {
+      next.industry = o.value;
+      overriddenKeys.add('industry');
+    } else if (o.fieldKey === 'employeeCount' && typeof o.value === 'number' && o.value > 0) {
+      next.employeeCount = Math.round(o.value);
+      overriddenKeys.add('employeeCount');
+    } else if (
+      o.fieldKey === 'annualRevenueMicros' &&
+      typeof o.value === 'number' &&
+      o.value > 0
+    ) {
+      next.annualRevenueMicros = o.value;
+      overriddenKeys.add('annualRevenueMicros');
+    }
+  }
+  return { company: next, overriddenKeys };
+}
 
 // ─── Activity serializer ──────────────────────────────────────────────────────
 
@@ -233,14 +398,19 @@ export function serializeBidOpportunity(row: {
 // ─── Main cockpit builder ─────────────────────────────────────────────────────
 
 export function buildCockpit({
-  company,
+  company: rawCompany,
   opportunities,
   contacts,
   tasks,
   risks,
   compliance,
+  fieldOverrides = [],
+  winLossAvailable = false,
 }: {
   company: z.infer<typeof CrmCompany>;
+  fieldOverrides?: CockpitFieldOverride[];
+  /** WIN_LOSS_DATA_AVAILABLE flag — when false the won/lost KPI is omitted entirely. */
+  winLossAvailable?: boolean;
   companies: Array<z.infer<typeof CrmCompany>>;
   opportunities: Array<{
     id: string;
@@ -297,6 +467,7 @@ export function buildCockpit({
     sourceAttribution: unknown;
   }>;
 }): z.infer<typeof AccountCockpitSnapshot> {
+  const { company, overriddenKeys } = applyFieldOverrides(rawCompany, fieldOverrides);
   const companyOpps = opportunities.filter((opp) => {
     const opportunityCompanyKey = normalizeName(opp.customer);
     return opp.customer === company.name || opportunityCompanyKey === company.id;
@@ -360,21 +531,39 @@ export function buildCockpit({
   };
   const fieldSource = (hasValue: boolean) =>
     hasValue ? (apolloIntel ? apolloSource : verifiedSource) : missingApolloSource;
-  const crmSource = {
-    sourceLabel: 'CRM',
+  const internalSource = {
+    sourceLabel: 'Internal',
     sourceState: 'crm' as const,
     sourceHint: 'Computed from BidStack opportunities.',
   };
+  const overrideSource = {
+    sourceLabel: 'Manual override',
+    sourceState: 'verified' as const,
+    sourceHint: 'Edited by a user — supersedes the Apollo value.',
+  };
+  // An overridden field leaves the External Intelligence block: it is now
+  // internal data and must say so (never mixed, per the account-view contract).
+  const externalField = (
+    fieldKey: 'industry' | 'employeeCount' | 'annualRevenueMicros',
+    hasValue: boolean,
+  ) =>
+    overriddenKeys.has(fieldKey)
+      ? { ...overrideSource, block: 'internal' as const, overridden: true, fieldKey }
+      : { ...fieldSource(hasValue), block: 'external' as const, fieldKey };
+
+  const wonDeals = companyOpps.filter((opp) => opp.pipelineStage?.isWon).length;
+  const lostDeals = companyOpps.filter((opp) => opp.pipelineStage?.isLost).length;
 
   return {
     company,
+    externalLastSyncedAt: apolloLastSyncedAt,
     kpis: [
       {
         label: 'Industry',
         value: company.industry ? titleCase(company.industry) : 'Not verified',
         detail: company.industry ? 'company profile' : 'connect Apollo to verify',
         tone: 'blue',
-        ...fieldSource(Boolean(company.industry)),
+        ...externalField('industry', Boolean(company.industry)),
       },
       {
         label: 'Employees',
@@ -383,28 +572,14 @@ export function buildCockpit({
           : 'Not verified',
         detail: company.employeeCount ? 'company headcount' : 'connect Apollo to verify',
         tone: company.employeeCount ? 'jade' : 'amber',
-        ...fieldSource(Boolean(company.employeeCount)),
+        ...externalField('employeeCount', Boolean(company.employeeCount)),
       },
       {
         label: 'Annual revenue',
         value: annualRevenue,
         detail: company.annualRevenueMicros ? 'company revenue' : 'connect Apollo to verify',
         tone: company.annualRevenueMicros ? 'purple' : 'amber',
-        ...fieldSource(Boolean(company.annualRevenueMicros)),
-      },
-      {
-        label: 'Projects',
-        value: companyOpps.length.toString(),
-        detail: 'active and historical',
-        tone: 'blue',
-        ...crmSource,
-      },
-      {
-        label: 'Open deals',
-        value: openDeals.length.toString(),
-        detail: 'External CRM pipeline',
-        tone: 'amber',
-        ...crmSource,
+        ...externalField('annualRevenueMicros', Boolean(company.annualRevenueMicros)),
       },
       {
         label: 'Apollo sync',
@@ -417,14 +592,41 @@ export function buildCockpit({
         detail: apolloIntel ? apolloIntel.creditPolicy.replace('_', ' ') : 'connect in Settings',
         tone: apolloIntel?.freshness === 'fresh' ? 'jade' : 'amber',
         ...(apolloIntel ? apolloSource : missingApolloSource),
+        block: 'external' as const,
       },
+      {
+        label: 'Projects',
+        value: companyOpps.length.toString(),
+        detail: 'active and historical',
+        tone: 'blue',
+        ...internalSource,
+        block: 'internal' as const,
+      },
+      {
+        label: 'Open deals',
+        value: openDeals.length.toString(),
+        detail: 'opportunity pipeline',
+        tone: 'amber',
+        ...internalSource,
+        block: 'internal' as const,
+      },
+      // Won/Lost rides the WIN_LOSS_DATA_AVAILABLE flag: hidden entirely when
+      // the source system cannot back it — never an empty placeholder.
+      ...(winLossAvailable
+        ? [
+            {
+              label: 'Won / Lost',
+              value: `${wonDeals} / ${lostDeals}`,
+              detail: 'closed outcomes',
+              tone: 'teal' as const,
+              ...internalSource,
+              block: 'internal' as const,
+            },
+          ]
+        : []),
     ],
     technicalStack: mergeTechnicalStack(company.technicalStack ?? [], defaultTechnicalStack()),
-    health: {
-      score: 72,
-      band: 'strong',
-      counts: { strong: 12, good: 18, needs_attention: 7, critical: 3 },
-    },
+    health: computeSignalCoverage({ company, contacts, openDeals, tasks }),
     keyContacts: contacts
       .filter((contact) => contact.customer === company.name)
       .slice(0, 5)

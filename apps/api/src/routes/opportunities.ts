@@ -17,6 +17,11 @@ import {
   OpportunityPatch,
 } from '@bidstack/shared';
 
+import {
+  applyOpportunityScope,
+  getAccessScope,
+  scopeCacheTag,
+} from '../lib/access-scope.js';
 import { serializeOpportunity, serializeOpportunityFull } from '../serializers/opportunity.js';
 import { opportunityExportRoutes } from './opportunities.export.js';
 import { opportunityMutationsRoutes } from './opportunities.mutations.js';
@@ -34,26 +39,32 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const { pipelineStageId, stage, owner, industry, search, cursor, limit } = req.query;
+      // M7 access scoping: group-restricted users only see opportunities in
+      // their countries (or that they own). See lib/access-scope.ts.
+      const accessScope = await getAccessScope(req.auth.orgId, req.auth.userId);
       return req.cache(
         async () => {
           const items = await prisma.opportunity.findMany({
-            where: {
-              orgId: req.auth.orgId,
-              deletedAt: null,
-              ...(pipelineStageId ? { pipelineStageId } : {}),
-              ...(stage ? { stage } : {}),
-              ...(industry ? { industry } : {}),
-              ...(owner ? { owner: { email: owner } } : {}),
-              ...(search
-                ? {
-                    OR: [
-                      { customer: { contains: search, mode: 'insensitive' } },
-                      { name: { contains: search, mode: 'insensitive' } },
-                      { code: { contains: search, mode: 'insensitive' } },
-                    ],
-                  }
-                : {}),
-            },
+            where: applyOpportunityScope(
+              {
+                orgId: req.auth.orgId,
+                deletedAt: null,
+                ...(pipelineStageId ? { pipelineStageId } : {}),
+                ...(stage ? { stage } : {}),
+                ...(industry ? { industry } : {}),
+                ...(owner ? { owner: { email: owner } } : {}),
+                ...(search
+                  ? {
+                      OR: [
+                        { customer: { contains: search, mode: 'insensitive' } },
+                        { name: { contains: search, mode: 'insensitive' } },
+                        { code: { contains: search, mode: 'insensitive' } },
+                      ],
+                    }
+                  : {}),
+              },
+              accessScope,
+            ),
             // Explicit select (not include) so the large `intel` JSONB column
             // is NOT fetched for every list row — the list serializer never
             // returns it (only the detail endpoint does).
@@ -120,7 +131,8 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
             nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
           };
         },
-        { ttlSeconds: 20, tags: ['opportunities-list'] },
+        // scopeCacheTag keeps scoped users out of the org-shared cache entry.
+        { ttlSeconds: 20, tags: ['opportunities-list', scopeCacheTag(accessScope)] },
       );
     },
   );
@@ -139,21 +151,26 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const { pipelineStageId, excludeClosed } = req.query;
+      // Scoped alongside the list so badge counts match the visible rows.
+      const accessScope = await getAccessScope(req.auth.orgId, req.auth.userId);
       return req.cache(
         async () => {
           const count = await prisma.opportunity.count({
-            where: {
-              orgId: req.auth.orgId,
-              deletedAt: null,
-              ...(pipelineStageId ? { pipelineStageId } : {}),
-              ...(excludeClosed
-                ? { stage: { notIn: ['closed_won', 'closed_lost'] as PrismaStage[] } }
-                : {}),
-            },
+            where: applyOpportunityScope(
+              {
+                orgId: req.auth.orgId,
+                deletedAt: null,
+                ...(pipelineStageId ? { pipelineStageId } : {}),
+                ...(excludeClosed
+                  ? { stage: { notIn: ['closed_won', 'closed_lost'] as PrismaStage[] } }
+                  : {}),
+              },
+              accessScope,
+            ),
           });
           return { count };
         },
-        { ttlSeconds: 20, tags: ['opportunities-count'] },
+        { ttlSeconds: 20, tags: ['opportunities-count', scopeCacheTag(accessScope)] },
       );
     },
   );

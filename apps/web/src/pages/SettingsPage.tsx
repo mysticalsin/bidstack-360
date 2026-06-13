@@ -7,12 +7,15 @@ import { NotificationPrefsSection } from '@/components/settings/NotificationPref
 import { SecuritySection } from '@/components/settings/SecuritySection';
 import { WorkspaceSection } from '@/components/settings/WorkspaceSection';
 import { CrmConfigurationSection } from '@/components/settings/CrmConfigurationSection';
+import { TopAccountsSection } from '@/components/settings/TopAccountsSection';
 import { DeveloperAccessSection } from '@/components/settings/DeveloperAccessSection';
 import { LanguageSwitcher } from '@/components/settings/LanguageSwitcher';
 import { IntegrationsSection } from '@/components/settings/IntegrationsSection';
 import { WebhooksSection } from '@/components/settings/WebhooksSection';
 import { AuditLogSection } from '@/components/settings/AuditLogSection';
 import { RfpAnalyticsSection } from '@/components/settings/RfpAnalyticsSection';
+import { AccessGroupsSection } from '@/components/settings/AccessGroupsSection';
+import { OpportunityFiltersSection } from '@/components/settings/OpportunityFiltersSection';
 
 const SECTION_TITLES: Record<SettingsSection, string> = {
   overview: 'Overview',
@@ -22,7 +25,10 @@ const SECTION_TITLES: Record<SettingsSection, string> = {
   notifications: 'Notifications',
   security: 'Security',
   workspace: 'Workspace',
-  crm: 'CRM configuration',
+  crm: 'Data configuration',
+  'top-accounts': 'Top accounts',
+  groups: 'Access groups',
+  'opportunity-filters': 'Opportunity filters',
   'rfp-analytics': 'RFP Analytics',
   integrations: 'Integrations',
   webhooks: 'Webhooks',
@@ -47,6 +53,9 @@ export function SettingsPage() {
     security: <SecuritySection />,
     workspace: <WorkspaceSection />,
     crm: <CrmConfigurationSection />,
+    'top-accounts': <TopAccountsSection />,
+    groups: <AccessGroupsSection />,
+    'opportunity-filters': <OpportunityFiltersSection />,
     'rfp-analytics': <RfpAnalyticsSection />,
     integrations: <IntegrationsSection />,
     webhooks: <WebhooksSection />,

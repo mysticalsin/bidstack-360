@@ -11,10 +11,21 @@ export const BidScoreCategory = z.enum(['strategic', 'technical', 'commercial', 
 
 export const BidScoreRecommendation = z.enum(['bid', 'no_bid', 'proceed_with_caution']);
 
+/** 'follow' = accept the computed recommendation; 'override' = proceed with the bid anyway. */
+export const BidScoreDecision = z.enum(['follow', 'override']);
+
+/** Mandatory acknowledgement + justification when proceeding against a below-threshold recommendation. */
+export const BidScoreOverride = z.object({
+  acknowledged: z.literal(true),
+  justification: z.string().min(30).max(5000),
+});
+
 export const BidScoreCreate = z.object({
   opportunityId: z.string().uuid(),
   criteria: BidScoreCriteria,
   notes: z.string().max(5000).optional(),
+  decision: BidScoreDecision.optional().default('follow'),
+  override: BidScoreOverride.optional(),
 });
 
 export const BidScoreUpdate = z.object({
@@ -36,6 +47,9 @@ export const BidScoreItem = z.object({
   memosPolicies: z.array(z.string().uuid()),
   recommendation: BidScoreRecommendation,
   notes: z.string().nullable(),
+  // Below-threshold override audit trail (director/VP visibility surface).
+  overrideJustification: z.string().nullable(),
+  overriddenBy: z.string().uuid().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
