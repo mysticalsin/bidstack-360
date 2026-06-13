@@ -241,7 +241,12 @@ export const analyticsReportsRoutes: FastifyPluginAsyncZod = async (server) => {
   // Nothing is persisted; reportId is '' per the frontend contract.
   server.post(
     '/reports/run',
-    { preHandler: [server.requirePermission('reports:read')], 
+    {
+      preHandler: [server.requirePermission('reports:read')],
+      // Ephemeral preview runs a full analytics query (10s statement timeout);
+      // cap per user so the builder's live preview can't be used to hammer the
+      // DB. Matches the saved-run limit.
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
       schema: {
         body: z.object({ query: AnalyticsQuery }),
         response: { 200: AnalyticsReportRun },

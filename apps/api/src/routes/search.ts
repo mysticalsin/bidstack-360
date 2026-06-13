@@ -35,6 +35,10 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/search',
     {
+      // Per-user cap: search fans out concurrent ILIKE queries across 6 entities,
+      // so protect it from runaway autocomplete/abuse at scale. Generous enough
+      // for fast debounced typing (2/sec sustained).
+      config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
       schema: {
         querystring: z.object({
           q: z.string().trim().min(1).max(120),
