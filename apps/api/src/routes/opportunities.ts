@@ -185,8 +185,15 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
+      // M7 access scoping also applies to detail-by-id: a country-restricted
+      // user must not open an out-of-scope opportunity by direct link/ID. Same
+      // visibility predicate as the list/count paths -> out-of-scope = 404.
+      const accessScope = await getAccessScope(req.auth.orgId, req.auth.userId);
       const opp = await prisma.opportunity.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        where: applyOpportunityScope(
+          { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+          accessScope,
+        ),
         include: {
           // BS-25: narrow owner select — see fix at /opportunities create.
           owner: { select: { id: true, name: true, email: true } },

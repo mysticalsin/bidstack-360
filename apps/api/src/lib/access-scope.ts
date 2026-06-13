@@ -17,10 +17,10 @@
 //   "own records only" — intentional, not a bug.
 //
 // HONEST LIMITS of v1 (documented gaps, not silent ones):
-// - Only opportunity LIST + COUNT endpoints are scoped — the sensitive
-//   commercial dataset. Companies/leads/contacts stay org-visible even
-//   though Company.countryCode exists (v2 candidate). Detail-by-id
-//   (GET /opportunities/:id) is NOT scoped — direct links still resolve.
+// - Opportunity LIST + COUNT + DETAIL-by-id (GET /opportunities/:id) are
+//   scoped — a restricted user cannot open an out-of-scope deal by direct
+//   link/ID. Companies/leads/contacts stay org-visible even though
+//   Company.countryCode exists (v2 candidate).
 // - API-key callers (req.auth.userId = "apikey:<id>", not a User row) are
 //   unrestricted: keys are org-level credentials gated by read/write scopes.
 
