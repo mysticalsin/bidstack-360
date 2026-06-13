@@ -1,13 +1,12 @@
 /**
  * InfoSearch call lists / lead intel for the open account (A6).
- * Hidden entirely unless INFOSEARCH_ENABLED is on server-side — the brief
- * forbids empty placeholders for unconfigured integrations.
+ * Shows live data when INFOSEARCH_ENABLED is configured; otherwise the API
+ * returns clearly-labelled sample data so the section is never empty.
  */
 import { useQuery } from '@tanstack/react-query';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
-import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import { api } from '@/lib/api';
 
 interface InfoSearchLead {
@@ -22,11 +21,14 @@ interface InfoSearchLead {
 
 interface InfoSearchLeadsResponse {
   enabled: boolean;
+  preview: boolean;
   items: InfoSearchLead[];
 }
 
 export function InfoSearchLeadsCard({ account }: { account: string }) {
-  const flags = useFeatureFlags();
+  // Always fetch: when InfoSearch is configured we show live leads; when not,
+  // the API returns clearly-labelled sample data (preview) so the team sees
+  // the populated section rather than nothing.
   const leads = useQuery({
     queryKey: ['infosearch-leads', account],
     queryFn: ({ signal }) =>
@@ -34,18 +36,21 @@ export function InfoSearchLeadsCard({ account }: { account: string }) {
         `/api/infosearch/leads?account=${encodeURIComponent(account)}`,
         { signal },
       ),
-    enabled: flags.infosearchEnabled && account.length > 0,
+    enabled: account.length > 0,
     staleTime: 2 * 60 * 1000,
   });
 
-  if (!flags.infosearchEnabled) return null;
-  if (leads.data && !leads.data.enabled) return null;
+  const preview = leads.data?.preview ?? false;
 
   return (
     <Card role="region" aria-label="InfoSearch lead intel">
       <SectionHeader
         title="InfoSearch leads"
-        caption="Call lists and lead intel for this account — pulled live from InfoSearch"
+        caption={
+          preview
+            ? 'Sample lead intel — connect InfoSearch (INFOSEARCH_ENABLED) for live call lists'
+            : 'Call lists and lead intel for this account — pulled live from InfoSearch'
+        }
       />
       <div className="px-5 pb-5">
         {leads.isLoading ? (

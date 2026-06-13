@@ -8,6 +8,7 @@ export { CommandCenter } from './CommandCenter';
 export { DataTrustCard } from './DataTrustCard';
 export { HealthScoreCard } from './HealthScoreCard';
 export { RevenueEvolutionCard } from './RevenueEvolutionCard';
+export { WinLossCard } from './WinLossCard';
 export { KeyContactsCard } from './KeyContactsCard';
 export { KpiRow } from './KpiRow';
 export { KpiSidebar } from './KpiSidebar';

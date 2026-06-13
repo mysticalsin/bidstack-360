@@ -100,10 +100,14 @@ export const envSchema = z.object({
   // Served to the SPA via GET /api/v1/config/features so a flag flip is a
   // restart, not a rebuild. Default false: dependent blocks hide entirely
   // (the brief forbids empty/null states for unavailable data sources).
-  // Win/Loss block — Opportunity Management API does not expose the field yet.
-  WIN_LOSS_DATA_AVAILABLE: z.enum(['true', 'false']).default('false'),
-  // Account revenue + evolution block — ABC revenue API not yet available.
-  SHOW_REVENUE_BLOCK: z.enum(['true', 'false']).default('false'),
+  // Win/Loss block — derived from the account's own BidStack opportunity
+  // pipeline (won/lost stages), so the data is real today. Default on; set
+  // false only to hide the block.
+  WIN_LOSS_DATA_AVAILABLE: z.enum(['true', 'false']).default('true'),
+  // Revenue-evolution block — won-deal value by close month from the account's
+  // own pipeline. Real today; default on (a richer ABC-sourced revenue feed can
+  // replace the source later without changing the contract).
+  SHOW_REVENUE_BLOCK: z.enum(['true', 'false']).default('true'),
   // InfoSearch lead-intel MCP integration.
   INFOSEARCH_ENABLED: z.enum(['true', 'false']).default('false'),
   INFOSEARCH_MCP_URL: z.string().url().optional().or(z.literal('')),

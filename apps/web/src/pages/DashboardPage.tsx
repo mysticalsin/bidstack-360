@@ -18,6 +18,7 @@ import {
   PipelineByStageCard,
   RecentOpportunitiesCard,
   RevenueEvolutionCard,
+  WinLossCard,
   TechStackCard,
   UpsellFilesCard,
 } from '@/components/cockpit';
@@ -226,6 +227,9 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
           </Reveal>
           <Reveal delay={0.02}>
             <RevenueEvolutionCard cockpit={cockpit} />
+          </Reveal>
+          <Reveal delay={0.03}>
+            <WinLossCard cockpit={cockpit} />
           </Reveal>
           <Reveal delay={0.03}>
             <InfoSearchLeadsCard account={cockpit.company.name} />

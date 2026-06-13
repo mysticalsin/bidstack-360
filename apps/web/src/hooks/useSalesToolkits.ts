@@ -12,6 +12,8 @@ export interface SalesToolkitCourse {
 
 export interface SalesToolkitsResponse {
   enabled: boolean;
+  /** True when items are illustrative sample data, not a live LMS fetch. */
+  preview: boolean;
   items: SalesToolkitCourse[];
 }
 

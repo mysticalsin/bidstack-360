@@ -6,7 +6,7 @@
 import { useMemo, useState } from 'react';
 
 import { Badge } from '@/components/ui/Badge';
-import { Card, SectionHeader } from '@/components/ui/Card';
+import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useSalesToolkits } from '@/hooks/useSalesToolkits';
@@ -41,15 +41,14 @@ export default function SalesToolkitsPage() {
           title="Mantu Academy is unreachable"
           message={toolkits.error?.message ?? 'The LMS did not respond. Try again shortly.'}
         />
-      ) : !toolkits.data?.enabled ? (
-        <ConnectLmsCard />
-      ) : toolkits.data.items.length === 0 ? (
+      ) : toolkits.data && toolkits.data.items.length === 0 ? (
         <EmptyState
           title={sector ? `No courses tagged "${sector}"` : 'No courses published yet'}
           message="Courses appear here as soon as Mantu Academy publishes them with sector tags."
         />
       ) : (
         <>
+          {toolkits.data?.preview ? <SampleBanner /> : null}
           {sectors.length > 0 ? (
             <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter by sector">
               <SectorChip label="All sectors" active={sector === ''} onClick={() => setSector('')} />
@@ -64,7 +63,7 @@ export default function SalesToolkitsPage() {
             </div>
           ) : null}
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {toolkits.data.items.map((course) => (
+            {(toolkits.data?.items ?? []).map((course) => (
               <Card key={course.id} className="flex flex-col">
                 <div className="flex-1 p-5">
                   <div className="mb-2 flex flex-wrap gap-1.5">
@@ -126,30 +125,18 @@ function SectorChip({
   );
 }
 
-function ConnectLmsCard() {
+function SampleBanner() {
   return (
-    <Card>
-      <SectionHeader
-        title="Connect Mantu Academy"
-        caption="The LMS integration is not configured for this deployment."
-      />
-      <div className="space-y-2 px-5 pb-5 text-sm text-[var(--fg-secondary)]">
-        <p>
-          Set the <code className="text-xs">LMS_360L_ENABLED</code>,{' '}
-          <code className="text-xs">LMS_360L_BASE_URL</code> and{' '}
-          <code className="text-xs">LMS_360L_API_KEY</code> environment variables on the API, then
-          restart it. Courses are always pulled live from{' '}
-          <a
-            className="text-[var(--brand-primary)] underline-offset-2 hover:underline"
-            href="https://mantuacademy.360learning.com/"
-            target="_blank"
-            rel="noreferrer"
-          >
-            mantuacademy.360learning.com
-          </a>
-          — nothing is stored in BidStack.
-        </p>
+    <div
+      role="status"
+      className="flex items-start gap-3 rounded-lg border border-[var(--warning)] bg-[var(--warning-tint)] p-3 text-sm text-[var(--fg-primary)]"
+    >
+      <Icon name="info" size={16} aria-hidden />
+      <div>
+        <strong className="font-semibold">Sample data.</strong> These are illustrative toolkits.
+        Set <code className="text-xs">LMS_360L_ENABLED</code> + credentials to pull live courses
+        from Mantu Academy.
       </div>
-    </Card>
+    </div>
   );
 }

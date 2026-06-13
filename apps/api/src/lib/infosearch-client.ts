@@ -39,6 +39,42 @@ export interface InfoSearchLead {
   listName: string | null;
 }
 
+/**
+ * Illustrative sample leads for the preview state (InfoSearch not configured).
+ * Clearly sample — the route flags preview:true and the UI banners it.
+ */
+export function sampleInfoSearchLeads(account: string): InfoSearchLead[] {
+  return [
+    {
+      id: 'sample-1',
+      name: 'Jordan Avery',
+      company: account,
+      title: 'VP, Technology',
+      phone: '+1 555 0142',
+      email: 'jordan.avery@example.com',
+      listName: 'Q3 outbound — enterprise',
+    },
+    {
+      id: 'sample-2',
+      name: 'Priya Nair',
+      company: account,
+      title: 'Director, Procurement',
+      phone: '+1 555 0188',
+      email: 'priya.nair@example.com',
+      listName: 'Q3 outbound — enterprise',
+    },
+    {
+      id: 'sample-3',
+      name: 'Marc Olsen',
+      company: account,
+      title: 'Head of Security',
+      phone: null,
+      email: 'marc.olsen@example.com',
+      listName: 'Security decision-makers',
+    },
+  ];
+}
+
 export function infosearchConfigured(): boolean {
   const env = getEnv();
   return (

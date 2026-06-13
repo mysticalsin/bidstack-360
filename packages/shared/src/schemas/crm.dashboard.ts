@@ -203,11 +203,22 @@ export const AccountCockpitSnapshot = z.object({
   // Apollo refresh timestamp for the External Intelligence block header
   // ("Last updated: …" — Apollo refreshes roughly every 2 weeks).
   externalLastSyncedAt: z.string().nullable().optional(),
-  // Per-account revenue evolution sourced from ABC. The block renders ONLY
-  // when SHOW_REVENUE_BLOCK is on AND points exist — never an empty state.
-  // Stays undefined until the ABC revenue API is wired.
+  // Per-account revenue evolution — won-deal value by close month, derived
+  // from the account's own pipeline. The block renders when SHOW_REVENUE_BLOCK
+  // is on AND points exist, so an account with no won deals shows nothing
+  // rather than an empty chart.
   revenueEvolution: z
     .array(z.object({ period: z.string().min(1), revenueMicros: z.number().int().nonnegative() }))
+    .optional(),
+  // Won/lost summary derived from the account's own opportunity pipeline.
+  winLoss: z
+    .object({
+      wonCount: z.number().int().nonnegative(),
+      lostCount: z.number().int().nonnegative(),
+      wonValueMicros: z.number().int().nonnegative(),
+      lostValueMicros: z.number().int().nonnegative(),
+      winRate: z.number().int().min(0).max(100),
+    })
     .optional(),
   technicalStack: z.array(TechnicalStackCategory),
   health: CompanyHealth,

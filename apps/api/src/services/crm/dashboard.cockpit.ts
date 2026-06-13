@@ -551,12 +551,51 @@ export function buildCockpit({
       ? { ...overrideSource, block: 'internal' as const, overridden: true, fieldKey }
       : { ...fieldSource(hasValue), block: 'external' as const, fieldKey };
 
-  const wonDeals = companyOpps.filter((opp) => opp.pipelineStage?.isWon).length;
-  const lostDeals = companyOpps.filter((opp) => opp.pipelineStage?.isLost).length;
+  // Won/lost by the pipeline-stage flags OR the canonical `stage` column —
+  // an opportunity can carry closed_won/closed_lost without a pipelineStage FK.
+  const wonOpps = companyOpps.filter(
+    (opp) => opp.pipelineStage?.isWon || opp.stage === 'closed_won',
+  );
+  const lostOpps = companyOpps.filter(
+    (opp) => opp.pipelineStage?.isLost || opp.stage === 'closed_lost',
+  );
+  const wonDeals = wonOpps.length;
+  const lostDeals = lostOpps.length;
+  const toMicros = (v: bigint | number | unknown): number =>
+    typeof v === 'bigint' ? Number(v) : typeof v === 'number' ? v : 0;
+  const wonValueMicros = wonOpps.reduce((sum, o) => sum + toMicros(o.valueMicros), 0);
+  const lostValueMicros = lostOpps.reduce((sum, o) => sum + toMicros(o.valueMicros), 0);
+  const decided = wonDeals + lostDeals;
+  const winLoss = {
+    wonCount: wonDeals,
+    lostCount: lostDeals,
+    wonValueMicros,
+    lostValueMicros,
+    winRate: decided > 0 ? Math.round((wonDeals / decided) * 100) : 0,
+  };
+
+  // Revenue evolution: won-deal value grouped by close month (dueDate proxy),
+  // last 12 months ascending. Derived from THIS account's real pipeline — no
+  // external ABC feed required. Empty array when the account has no won deals.
+  const revenueByMonth = new Map<string, number>();
+  for (const o of wonOpps) {
+    const when = o.dueDate ?? null;
+    if (!when) continue;
+    const d = when instanceof Date ? when : new Date(when as string);
+    if (Number.isNaN(d.getTime())) continue;
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+    revenueByMonth.set(key, (revenueByMonth.get(key) ?? 0) + toMicros(o.valueMicros));
+  }
+  const revenueEvolution = [...revenueByMonth.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .slice(-12)
+    .map(([period, revenueMicros]) => ({ period, revenueMicros }));
 
   return {
     company,
     externalLastSyncedAt: apolloLastSyncedAt,
+    revenueEvolution,
+    winLoss,
     kpis: [
       {
         label: 'Industry',

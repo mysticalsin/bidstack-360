@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { CrmCompany } from '@bidstack/shared';
 
-import { applyFieldOverrides, computeSignalCoverage } from './dashboard.cockpit.js';
+import { applyFieldOverrides, buildCockpit, computeSignalCoverage } from './dashboard.cockpit.js';
 
 function company(partial: Partial<CrmCompany> = {}): CrmCompany {
   return {
@@ -124,5 +124,76 @@ describe('applyFieldOverrides', () => {
     ]);
     expect(next.industry).toBe('banking');
     expect(overriddenKeys.size).toBe(0);
+  });
+});
+
+describe('buildCockpit win/loss + revenue derivation', () => {
+  const baseArgs = (opps: unknown[]) => ({
+    company: company({ name: 'Acme' }),
+    companies: [],
+    opportunities: opps as never,
+    contacts: [],
+    tasks: [],
+    risks: [],
+    compliance: [],
+    fieldOverrides: [],
+    winLossAvailable: true,
+  });
+
+  function opp(over: Record<string, unknown>) {
+    return {
+      id: 'o',
+      customer: 'Acme',
+      name: 'deal',
+      stage: 'qualified',
+      pipelineStage: null,
+      valueMicros: 1_000_000n,
+      probability: 50,
+      dueDate: null,
+      owner: null,
+      ...over,
+    };
+  }
+
+  it('derives win/loss from the canonical stage column (no pipelineStage FK needed)', () => {
+    const cockpit = buildCockpit(
+      baseArgs([
+        opp({ stage: 'closed_won', valueMicros: 500_000_000_000n, dueDate: new Date('2026-01-15') }),
+        opp({ stage: 'closed_won', valueMicros: 300_000_000_000n, dueDate: new Date('2026-02-15') }),
+        opp({ stage: 'closed_lost', valueMicros: 200_000_000_000n, dueDate: new Date('2026-02-20') }),
+        opp({ stage: 'qualified' }),
+      ]),
+    );
+    expect(cockpit.winLoss).toEqual({
+      wonCount: 2,
+      lostCount: 1,
+      wonValueMicros: 800_000_000_000,
+      lostValueMicros: 200_000_000_000,
+      winRate: 67,
+    });
+  });
+
+  it('builds revenue evolution from won deals grouped by close month, ascending', () => {
+    const cockpit = buildCockpit(
+      baseArgs([
+        opp({ stage: 'closed_won', valueMicros: 500_000_000_000n, dueDate: new Date('2026-02-10') }),
+        opp({ stage: 'closed_won', valueMicros: 250_000_000_000n, dueDate: new Date('2026-02-25') }),
+        opp({ stage: 'closed_won', valueMicros: 100_000_000_000n, dueDate: new Date('2026-01-05') }),
+        // lost + open contribute nothing to revenue
+        opp({ stage: 'closed_lost', valueMicros: 900_000_000_000n, dueDate: new Date('2026-02-01') }),
+        opp({ stage: 'qualified', dueDate: new Date('2026-03-01') }),
+      ]),
+    );
+    expect(cockpit.revenueEvolution).toEqual([
+      { period: '2026-01', revenueMicros: 100_000_000_000 },
+      { period: '2026-02', revenueMicros: 750_000_000_000 },
+    ]);
+  });
+
+  it('emits empty revenue + zero win rate for an account with no closed deals', () => {
+    const cockpit = buildCockpit(baseArgs([opp({ stage: 'qualified' })]));
+    expect(cockpit.revenueEvolution).toEqual([]);
+    expect(cockpit.winLoss?.winRate).toBe(0);
+    expect(cockpit.winLoss?.wonCount).toBe(0);
   });
 });

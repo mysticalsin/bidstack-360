@@ -9,10 +9,13 @@ import {
   infosearchConfigured,
   InfoSearchError,
   notifyInfoSearchActivity,
+  sampleInfoSearchLeads,
 } from '../lib/infosearch-client.js';
 
 const InfoSearchLeadsResponse = z.object({
   enabled: z.boolean(),
+  // True when items are illustrative sample data, not a live InfoSearch fetch.
+  preview: z.boolean(),
   items: z.array(
     z.object({
       id: z.string(),
@@ -40,11 +43,13 @@ export const infosearchRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      if (!infosearchConfigured()) return { enabled: false, items: [] };
+      if (!infosearchConfigured()) {
+        return { enabled: false, preview: true, items: sampleInfoSearchLeads(req.query.account) };
+      }
       try {
         const items = await fetchInfoSearchLeads(req.query.account);
         notifyInfoSearchActivity({ account: req.query.account, userEmail: req.auth.email ?? null });
-        return { enabled: true, items };
+        return { enabled: true, preview: false, items };
       } catch (err) {
         if (err instanceof InfoSearchError) {
           req.log.warn({ err }, 'infosearch fetch failed');

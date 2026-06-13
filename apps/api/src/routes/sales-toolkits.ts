@@ -1,14 +1,18 @@
 // Sales Toolkits — industry-tagged Mantu Academy (360Learning) courses.
-// Always a LIVE fetch (no local storage, per the brief); when the integration
-// is disabled or unconfigured the route says so and the UI shows its
-// "Connect LMS" prompt instead of an empty grid.
+// Live fetch (no local storage, per the brief) when configured. When NOT
+// configured we return a small set of clearly-labelled SAMPLE courses
+// (preview:true) so the section shows its populated shape; the UI banners it
+// as sample data and offers the connect prompt. Never silently passes sample
+// data off as live.
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { fetchLmsCourses, lmsConfigured, LmsError } from '../lib/lms-360learning.js';
+import { fetchLmsCourses, lmsConfigured, LmsError, sampleLmsCourses } from '../lib/lms-360learning.js';
 
 const SalesToolkitsResponse = z.object({
   enabled: z.boolean(),
+  // True when items are illustrative sample data, not a live LMS fetch.
+  preview: z.boolean(),
   items: z.array(
     z.object({
       id: z.string(),
@@ -31,10 +35,12 @@ export const salesToolkitsRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      if (!lmsConfigured()) return { enabled: false, items: [] };
+      if (!lmsConfigured()) {
+        return { enabled: false, preview: true, items: sampleLmsCourses(req.query.sector) };
+      }
       try {
         const items = await fetchLmsCourses(req.query.sector);
-        return { enabled: true, items };
+        return { enabled: true, preview: false, items };
       } catch (err) {
         if (err instanceof LmsError) {
           req.log.warn({ err }, 'sales-toolkits LMS fetch failed');

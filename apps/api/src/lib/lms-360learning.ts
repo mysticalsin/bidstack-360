@@ -38,6 +38,48 @@ export interface SalesToolkitCourse {
 
 export class LmsError extends Error {}
 
+/**
+ * Illustrative sample courses for the preview state (LMS not configured).
+ * Clearly sample — the route flags preview:true and the UI banners it. Lets
+ * the team see the populated Sales Toolkits shape before creds are wired.
+ */
+export function sampleLmsCourses(sector?: string): SalesToolkitCourse[] {
+  const all: SalesToolkitCourse[] = [
+    {
+      id: 'sample-fins-1',
+      title: 'Winning Financial Services Bids',
+      description: 'Positioning, compliance hooks, and proof points for banking & insurance pursuits.',
+      sectorTags: ['Financial Services', 'Banking'],
+      url: 'https://mantuacademy.360learning.com/',
+    },
+    {
+      id: 'sample-health-1',
+      title: 'Healthcare Digital Transformation Playbook',
+      description: 'Reference architectures and value stories for hospital and payer accounts.',
+      sectorTags: ['Healthcare'],
+      url: 'https://mantuacademy.360learning.com/',
+    },
+    {
+      id: 'sample-mfg-1',
+      title: 'Industrial & Manufacturing Solution Selling',
+      description: 'Industry 4.0 narratives, OT/IT security, and supply-chain modernization.',
+      sectorTags: ['Manufacturing', 'Industrial'],
+      url: 'https://mantuacademy.360learning.com/',
+    },
+    {
+      id: 'sample-cyber-1',
+      title: 'Cybersecurity Pitch Essentials',
+      description: 'Zero Trust, SOC, and incident-response framing for any sector.',
+      sectorTags: ['Cybersecurity', 'Cross-sector'],
+      url: 'https://mantuacademy.360learning.com/',
+    },
+  ];
+  const wanted = sector?.trim().toLowerCase();
+  return wanted
+    ? all.filter((c) => c.sectorTags.some((t) => t.toLowerCase().includes(wanted)))
+    : all;
+}
+
 /** True when the 360Learning integration is enabled AND configured. */
 export function lmsConfigured(): boolean {
   const env = getEnv();

@@ -4,6 +4,7 @@
  * on each account cockpit (CrossSellCard).
  */
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
@@ -93,7 +94,14 @@ export default function CrossSellPage() {
             <tbody>
               {actions.data!.items.map((a) => (
                 <tr key={a.id} className="border-b border-[var(--border)]">
-                  <td className="px-4 py-2.5 text-[var(--fg-primary)]">{a.accountKey}</td>
+                  <td className="px-4 py-2.5">
+                    <Link
+                      to={`/accounts/${encodeURIComponent(a.accountKey)}`}
+                      className="text-[var(--brand-primary)] hover:underline"
+                    >
+                      {a.accountKey}
+                    </Link>
+                  </td>
                   <td className="px-4 py-2.5 text-[var(--fg-secondary)]">{a.description}</td>
                   <td className="px-4 py-2.5 text-xs text-[var(--fg-tertiary)]">
                     {a.requestingUnit} → {a.assignedUnit}
