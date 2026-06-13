@@ -2,9 +2,10 @@
   "dimensions": [
     {
       "dimension": "list-management",
-      "score": 58,
+      "score": 72,
       "currentState": "Operational lists are built from shared primitives, not a generic DataTable: useBulkSelection, useTableSort + SortableHeader (3-state asc/desc/none, URL-persisted single-column sort), BulkActionBar (sticky, X selected, export/delete/clear), SpotlightTable, lib/csv.ts (CSV with formula-injection sanitization and UTF-8 BOM). Opportunities and Contacts are richest: single-column sort, bulk select with indeterminate header checkbox, bulk delete (undo on Contacts), bulk export, bulk stage-change on Opps, inline editing, sticky headers; Opps also has a server-streamed CSV export endpoint. Leads and Companies share the bulk-select/export/delete pattern with single status/priority/search filters. Tasks has the only saved/named views (SavedViewsBar + savedViews store, localStorage) plus drag-reorder and a calendar toggle. Accounts is a card grid with search/industry/sort but no checkboxes, bulk actions, or export. A global density pref (compact/comfortable/spacious) exists but only in Settings; a CursorPager component exists but is imported nowhere; a full AND/OR FilterBuilder exists only in Reports. Lists fetch a hard cap (Opps 100, Leads/Companies 50, Contacts server default) and never page even though the backend returns nextCursor.",
-      "gapCount": 8
+      "gapCount": 8,
+      "resolvedNote": "PARTIALLY CLOSED 2026-06-13: Contacts list cursor-paginated (was silently capped at 50 — data-loss bug fixed) to the existing backend contract; Leads + Companies gained 3-state URL-persisted column sorting (SortableHeader + useTableSort) for parity with Opps/Contacts (Companies also now renders the sorted page, not raw). REMAINING: Tasks pagination (entangled with drag-reorder + calendar + client filters), generalize SavedViewsBar beyond Tasks, Accounts card-grid bulk/export, list virtualization."
     },
     {
       "dimension": "search-nav-copilot",
