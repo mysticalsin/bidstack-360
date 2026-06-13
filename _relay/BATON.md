@@ -1,5 +1,23 @@
 # BATON — BidStack demo-feedback program (WALTEUR)
 
+**Shift:** Claude (Fable 5) - 2026-06-13 - branch `demo` - /goal "Salesforce-level"
+**Goal:** Autonomous quality climb vs best-in-class. Benchmark in `walteur-kit/salesforce-gap.json` (scores updated this shift).
+
+## State NOW - 3 verified waves, gates green, PUSHED to origin/demo (HEAD after 99316a45 + gap-tracker commit)
+- **Wave: notifications (22->74).** Notification table + migration 20260613002000; service seam `notification.service.ts` (createNotification/notifyUsers writes row + realtime push); emit points: @mention (collaboration.ts), cross-sell assign, governance assign, **bid-override director escalation** (was the #1 deferred item — now DONE). Endpoints GET/PATCH/POST under /api/v1 (org+per-user scoped). Web notification center replaces mentions-only bell (useNotifications, typed feed, mark-read/all, 60s poll). Test: notifications.integration.test.ts (4).
+- **Wave: permissions/RBAC (38->62).** GET /me/capabilities manifest; GET/POST/DELETE /users/:id/roles (admin+users:* gated, audited, idempotent upsert); bounded the now-reachable loadUserPermissions findMany. Web useCapabilities/useHasPermission + TeamSection "Manage roles" panel (UserRolesManager). Test: users.roles.integration.test.ts (3). 55 existing RBAC tests still green.
+- **Wave: CSV import wizard (38->60).** Front door over the existing (already-tested) migration engine. lib/csv-parse.ts (RFC-4180, unit-tested), lib/import-fields.ts (per-entity catalog + autoMap, tested), useMigrations hook, CsvImportWizard (upload->map->run, dedup, live progress, errors.csv), reachable at Settings>Data import (admin). Test: csv-parse.test.ts (7).
+
+## Gates (this shift)
+typecheck all-green; lint green; targeted API tests green (notifications 4, user-roles 3, roles/rbac/matrix 55, cross-sell+governance 7, bid-scores 10); web csv-parse 7 + apiMutationBodies 2. DB live (Postgres 5433) used for integration runs.
+
+## NEXT (prioritized remaining salesforce-gap waves)
+1. reporting-dashboards (42) — report-builder UI absent (backend strong); add drill-through; scheduling is cosmetic. LARGE UI wave.
+2. search-nav-copilot (52) — broaden /api/search, copilot depth.
+3. list-management (58) — saved/named views beyond Tasks; list virtualization; Accounts grid has no bulk actions/export.
+
+---
+
 **Shift:** Claude (Fable 5 -> Opus 4.8) - 2026-06-12/13 - branch `demo`
 **Goal:** Demo-feedback program as the OFFICIAL production build + concreteness pass + enterprise-readiness. Per `walteur-kit/PLAN.md`.
 
