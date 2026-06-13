@@ -29,6 +29,7 @@ import { InfoSearchLeadsCard } from '@/components/account-intel/InfoSearchLeadsC
 import { CrossSellCard } from '@/components/account-intel/CrossSellCard';
 import { GovernanceLogCard } from '@/components/account-intel/GovernanceLogCard';
 import { SpotlightRefsCard } from '@/components/account-intel/SpotlightRefsCard';
+import { CockpitCustomizeMenu } from '@/components/cockpit/CockpitCustomizeMenu';
 import { Reveal } from '@/components/motion/Reveal';
 import { NotesPanel } from '@/components/notes/NotesPanel';
 import { DashboardSkeleton } from '@/components/skeletons/PageSkeletons';
@@ -39,6 +40,7 @@ import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { useTasks } from '@/hooks/useTasks';
 import { daysUntil } from '@/lib/format';
 import { useAccountHistory } from '@/stores/accountHistory';
+import { useCockpitLayout } from '@/stores/cockpitLayout';
 import { ApiError } from '@/lib/api';
 import { useIsAdmin } from '@/lib/auth';
 import { useEnrichCompany } from '@/hooks/useEnrichCompany';
@@ -77,6 +79,9 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
 
   const isAdmin = useIsAdmin();
   const enrich = useEnrichCompany();
+  // Per-user block visibility (Customize menu). Default-visible: an unknown/new
+  // id is shown unless the user explicitly turned it off.
+  const visibleCards = useCockpitLayout((s) => s.visibleCards);
   const company = dashboard.data?.cockpit.company;
   const companyId = company?.id;
   const companyName = company?.name;
@@ -167,6 +172,8 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
   const accountOpps = opps.data?.items.filter(
     (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
   );
+  // A card shows unless the user explicitly hid it (default-visible).
+  const show = (id: string) => visibleCards[id] !== false;
 
   return (
     <>
@@ -179,90 +186,133 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
         </div>
       )}
       <PageHead cockpit={cockpit} accountView={isAccountView} />
+      {isAccountView && (
+        <div className="flex justify-end">
+          <CockpitCustomizeMenu />
+        </div>
+      )}
       <KpiRow cockpit={cockpit} />
       <CommandCenter cockpit={cockpit} />
 
       <section className="cockpit-grid" aria-label="Account cockpit">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
-          <Reveal>
-            <TechStackCard cockpit={cockpit} />
-          </Reveal>
+          {show('techStack') && (
+            <Reveal>
+              <TechStackCard cockpit={cockpit} />
+            </Reveal>
+          )}
 
-          <Reveal delay={0.04}>
-            <div className="dash-row-3">
-              <BusinessSnapshotCard cockpit={cockpit} />
-              <OpenIssuesCard risks={cockpit.risks} compliance={cockpit.compliance} />
-              <PipelineByStageCard report={report.data} />
-            </div>
-          </Reveal>
+          {(show('businessSnapshot') || show('openIssues') || show('pipelineStage')) && (
+            <Reveal delay={0.04}>
+              <div className="dash-row-3">
+                {show('businessSnapshot') && <BusinessSnapshotCard cockpit={cockpit} />}
+                {show('openIssues') && (
+                  <OpenIssuesCard risks={cockpit.risks} compliance={cockpit.compliance} />
+                )}
+                {show('pipelineStage') && <PipelineByStageCard report={report.data} />}
+              </div>
+            </Reveal>
+          )}
 
-          <Reveal delay={0.12}>
-            <RecentOpportunitiesCard
-              opps={opps}
-              accountName={cockpit.company.name}
-              items={accountOpps}
-            />
-          </Reveal>
+          {show('recentOpportunities') && (
+            <Reveal delay={0.12}>
+              <RecentOpportunitiesCard
+                opps={opps}
+                accountName={cockpit.company.name}
+                items={accountOpps}
+              />
+            </Reveal>
+          )}
 
-          <Reveal delay={0.16}>
-            <ActivityTimelineCard cockpit={cockpit} />
-          </Reveal>
+          {show('activityTimeline') && (
+            <Reveal delay={0.16}>
+              <ActivityTimelineCard cockpit={cockpit} />
+            </Reveal>
+          )}
 
-          <Reveal delay={0.18}>
-            <CrossSellCard accountKey={cockpit.company.id} />
-          </Reveal>
+          {show('crossSell') && (
+            <Reveal delay={0.18}>
+              <CrossSellCard accountKey={cockpit.company.id} />
+            </Reveal>
+          )}
 
-          <Reveal delay={0.2}>
-            <GovernanceLogCard accountKey={cockpit.company.id} />
-          </Reveal>
+          {show('governance') && (
+            <Reveal delay={0.2}>
+              <GovernanceLogCard accountKey={cockpit.company.id} />
+            </Reveal>
+          )}
 
-          <Reveal delay={0.22}>
-            <SpotlightRefsCard accountKey={cockpit.company.id} />
-          </Reveal>
+          {show('spotlightRefs') && (
+            <Reveal delay={0.22}>
+              <SpotlightRefsCard accountKey={cockpit.company.id} />
+            </Reveal>
+          )}
         </div>
 
         <aside className="cockpit-side" aria-label="Cockpit details">
-          <Reveal>
-            <HealthScoreCard cockpit={cockpit} />
-          </Reveal>
-          <Reveal delay={0.02}>
-            <RevenueEvolutionCard cockpit={cockpit} />
-          </Reveal>
-          <Reveal delay={0.03}>
-            <WinLossCard cockpit={cockpit} />
-          </Reveal>
-          <Reveal delay={0.03}>
-            <InfoSearchLeadsCard account={cockpit.company.name} />
-          </Reveal>
-          <Reveal delay={0.04}>
-            <KpiSidebar
-              snapshot={snapshot}
-              overdueCount={overdueCount}
-              tasksLoading={tasks.isLoading}
-            />
-          </Reveal>
-          <Reveal delay={0.08}>
-            <DataTrustCard cockpit={cockpit} />
-          </Reveal>
-          <Reveal delay={0.12}>
-            <LiveDataMeshCard cockpit={cockpit} />
-          </Reveal>
-          <Reveal delay={0.16}>
-            <KeyContactsCard cockpit={cockpit} />
-          </Reveal>
-          <Reveal delay={0.2}>
-            <NotesPanel
-              accountId={accountId}
-              companyName={cockpit.company.name}
-              domain={cockpit.company.domain}
-            />
-          </Reveal>
-          <Reveal delay={0.24}>
-            {accountId ? <FilesPanel accountId={accountId} /> : <UpsellFilesCard />}
-          </Reveal>
-          <Reveal delay={0.28}>
-            {accountId ? <AccountIntelPanel accountId={accountId} /> : null}
-          </Reveal>
+          {show('healthScore') && (
+            <Reveal>
+              <HealthScoreCard cockpit={cockpit} />
+            </Reveal>
+          )}
+          {show('revenueEvolution') && (
+            <Reveal delay={0.02}>
+              <RevenueEvolutionCard cockpit={cockpit} />
+            </Reveal>
+          )}
+          {show('winLoss') && (
+            <Reveal delay={0.03}>
+              <WinLossCard cockpit={cockpit} />
+            </Reveal>
+          )}
+          {show('infoSearchLeads') && (
+            <Reveal delay={0.03}>
+              <InfoSearchLeadsCard account={cockpit.company.name} />
+            </Reveal>
+          )}
+          {show('kpiSidebar') && (
+            <Reveal delay={0.04}>
+              <KpiSidebar
+                snapshot={snapshot}
+                overdueCount={overdueCount}
+                tasksLoading={tasks.isLoading}
+              />
+            </Reveal>
+          )}
+          {show('dataTrust') && (
+            <Reveal delay={0.08}>
+              <DataTrustCard cockpit={cockpit} />
+            </Reveal>
+          )}
+          {show('liveDataMesh') && (
+            <Reveal delay={0.12}>
+              <LiveDataMeshCard cockpit={cockpit} />
+            </Reveal>
+          )}
+          {show('keyContacts') && (
+            <Reveal delay={0.16}>
+              <KeyContactsCard cockpit={cockpit} />
+            </Reveal>
+          )}
+          {show('notes') && (
+            <Reveal delay={0.2}>
+              <NotesPanel
+                accountId={accountId}
+                companyName={cockpit.company.name}
+                domain={cockpit.company.domain}
+              />
+            </Reveal>
+          )}
+          {show('files') && (
+            <Reveal delay={0.24}>
+              {accountId ? <FilesPanel accountId={accountId} /> : <UpsellFilesCard />}
+            </Reveal>
+          )}
+          {show('accountIntel') && accountId && (
+            <Reveal delay={0.28}>
+              <AccountIntelPanel accountId={accountId} />
+            </Reveal>
+          )}
         </aside>
       </section>
     </>

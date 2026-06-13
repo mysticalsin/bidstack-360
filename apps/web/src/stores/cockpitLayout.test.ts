@@ -47,6 +47,20 @@ describe('useCockpitLayout', () => {
     expect(useCockpitLayout.getState().visibleCards).toEqual(COCKPIT_DEFAULTS.visibleCards);
   });
 
+  it('every catalog card has a default and the new cockpit blocks are covered', async () => {
+    const { COCKPIT_CARDS, COCKPIT_DEFAULTS } = await loadCockpitLayout();
+    // Catalog and defaults must stay in lockstep — a card the menu lists but the
+    // store has no default for (or vice versa) is a wiring bug.
+    const catalogIds = COCKPIT_CARDS.map((c) => c.id).sort();
+    const defaultIds = Object.keys(COCKPIT_DEFAULTS.visibleCards).sort();
+    expect(catalogIds).toEqual(defaultIds);
+    expect(COCKPIT_CARDS.every((c) => COCKPIT_DEFAULTS.visibleCards[c.id] === true)).toBe(true);
+    // Cards added for the demo-feedback cockpit are present + toggleable.
+    for (const id of ['crossSell', 'governance', 'spotlightRefs', 'winLoss', 'revenueEvolution']) {
+      expect(catalogIds).toContain(id);
+    }
+  });
+
   it('scopes preferences to user IDs so layout stays isolated between profiles', async () => {
     const { useCockpitLayout } = await loadCockpitLayout();
 
