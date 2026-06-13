@@ -13,6 +13,10 @@ type DashboardCacheEntry = {
 };
 
 const DASHBOARD_CACHE_TTL_MS = 10_000;
+// Cap so the in-process cache can't grow unbounded across the process lifetime
+// (many orgs × accounts). At the ceiling we clear wholesale — entries are
+// cheap to rebuild and 10s-lived. Mirrors access-scope.ts.
+const DASHBOARD_CACHE_MAX = 500;
 const dashboardCache = new Map<string, DashboardCacheEntry>();
 
 function dashboardCacheKey(orgId: string, account: string | undefined): string {
@@ -37,6 +41,7 @@ async function cachedDashboardSnapshot(
   if (cached && cached.expiresAt > now) return cached.promise;
 
   const promise = buildDashboardSnapshot(orgId, account, prisma, log);
+  if (dashboardCache.size >= DASHBOARD_CACHE_MAX) dashboardCache.clear();
   dashboardCache.set(key, { expiresAt: now + DASHBOARD_CACHE_TTL_MS, promise });
   try {
     return await promise;

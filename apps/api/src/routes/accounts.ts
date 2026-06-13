@@ -38,6 +38,7 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
 
   // GET /api/v1/accounts/key — list key accounts (cursor-paginated)
   app.get('/accounts/key', {
+    preHandler: app.requirePermission('accounts:read'),
     schema: {
       querystring: z.object({
         search: z.string().max(200).optional(),
@@ -91,35 +92,12 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
 
       const companyIds = page.map((c) => c.id);
 
-      const [opps, contacts] = await Promise.all([
-        prisma.opportunity.findMany({
-          where: { orgId, companyId: { in: companyIds }, deletedAt: null },
-          select: { companyId: true, valueMicros: true, stage: true },
-          take: 1000,
-        }),
-        prisma.contact.groupBy({
-          by: ['companyId'],
-          where: { orgId, companyId: { in: companyIds }, deletedAt: null },
-          _count: { id: true },
-        }),
-      ]);
-
-      const contactMap = new Map(contacts.map((c) => [c.companyId, c._count.id]));
-      const oppMap = new Map<string, { totalValue: number; openDeals: number; count: number }>();
-
-      for (const o of opps) {
-        if (!o.companyId) continue;
-        const existing = oppMap.get(o.companyId) ?? { totalValue: 0, openDeals: 0, count: 0 };
-        existing.totalValue += Number(o.valueMicros) / 1_000_000;
-        existing.count += 1;
-        if (o.stage !== 'closed_won' && o.stage !== 'closed_lost') {
-          existing.openDeals += 1;
-        }
-        oppMap.set(o.companyId, existing);
-      }
+      // Exact Postgres aggregation (groupBy) — an in-JS reduce over a
+      // take-capped findMany silently undercounts pipeline-heavy pages.
+      const stats = await fetchAccountStats(orgId, companyIds);
 
       const items = page.map((c) => {
-        const o = oppMap.get(c.id) ?? { totalValue: 0, openDeals: 0, count: 0 };
+        const o = stats.get(c.id) ?? emptyAccountStats();
         return {
           id: c.id,
           name: c.name,
@@ -132,8 +110,8 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
           keyAccountNotes: c.keyAccountNotes,
           totalValue: o.totalValue,
           openDeals: o.openDeals,
-          contactCount: contactMap.get(c.id) ?? 0,
-          opportunityCount: o.count,
+          contactCount: o.contactCount,
+          opportunityCount: o.opportunityCount,
         };
       });
 
@@ -144,6 +122,7 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
   // GET /api/v1/accounts/top — curated global top-10 when an admin has set
   // Company.topAccountRank; otherwise the auto leaderboard by opportunity value.
   app.get('/accounts/top', {
+    preHandler: app.requirePermission('accounts:read'),
     schema: {
       querystring: z.object({
         limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -455,6 +434,7 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
 
   // GET /api/v1/accounts/industries — distinct industries for filter dropdown
   app.get('/accounts/industries', {
+    preHandler: app.requirePermission('accounts:read'),
     schema: {
       response: { 200: z.object({ items: z.array(z.string()) }) },
     },

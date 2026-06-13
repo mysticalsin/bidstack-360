@@ -19,6 +19,12 @@ const SAFETY_NET_PREFIXES = [
   '/api/v1/admin',
   '/api/v1/ai-assistant',
   '/api/v1/bid-scores',
+  // Demo-feedback program surfaces — auto-audit successes + 403 denials.
+  '/api/v1/cross-sell-actions',
+  '/api/v1/governance-meetings',
+  '/api/v1/project-references',
+  '/api/v1/org-settings',
+  '/api/v1/user-groups',
   '/api/v1/booking-pages',
   '/api/v1/bookings',
   '/api/v1/calendar',

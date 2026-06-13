@@ -48,6 +48,9 @@ export const sectorViewRoutes: FastifyPluginAsyncZod = async (server) => {
         orderBy: { createdAt: 'desc' },
       });
 
+      // rows is the top-1000 sample (bounded read); totalAccounts reflects the
+      // sample, not necessarily the whole org. Documented in the response so a
+      // consumer doesn't read it as an org-wide census.
       const totalAccounts = rows.length;
       const classified = rows.filter((r) => r.industry && r.industry.trim());
       const bySector = new Map<

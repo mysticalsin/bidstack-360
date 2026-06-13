@@ -52,8 +52,8 @@ Status: [ ] open · [x] done+verified · [~] in progress · [R] report-only
 ### Wave M — MODIFY (account core)
 - [x] M1 Cockpit split: "External Intelligence" block (Apollo: tech stack/employees/revenue/financial health + "Last updated" + stale badge) vs "Internal Data" block (projects/opportunities/won-lost); never mixed. `CompanyFieldOverride` model + PATCH endpoint; edited field renders in Internal with "manually overridden" flag. — opus
 - [x] M2 Signal Coverage real scoring: server-side 4-factor function (firmographic coverage, contact coverage, engagement recency, pipeline data quality) each with band+label+what-it-measures+recommended action; expandable panel UI; replaces hardcoded 72. — opus
-- [x] M3 Revenue+evolution block behind SHOW_REVENUE_BLOCK (default false ⇒ hidden entirely, no empty state); ABC-API data source stub documented. — sonnet
-- [x] M4 Win/Loss block behind WIN_LOSS_DATA_AVAILABLE (default false ⇒ hidden). — sonnet
+- [x] M3 Revenue+evolution DERIVED from won-deal pipeline by month, behind SHOW_REVENUE_BLOCK (default TRUE — data is real; swap to ABC feed later). Hidden only when no won deals. — sonnet
+- [x] M4 Win/Loss DERIVED from the opportunity pipeline (won/lost/win-rate), behind WIN_LOSS_DATA_AVAILABLE (default TRUE — data is real). Computed via Postgres aggregate (uncapped). — sonnet
 - [x] M5 Top Accounts curation: admin Settings editor writes topAccountRank (top-10), /accounts/top serves curated list (auto fallback labeled); Top vs Key visual distinction (badges) everywhere both appear. — sonnet
 - [x] M6 ABC opportunity filter rules in Settings: org-scoped config (first GET/PUT /api/v1/org-settings route; expertise-vs-solution type, framework/agreement type rules), filters applied to opportunity pulls. — opus (new org-settings surface)
 - [x] M7 Access-scoping layer: UserGroup/UserGroupMember/GroupScopeRule models + read-filter middleware on accounts+opportunities lists + admin Settings groups editor + seeds + negative tests. — opus (security)

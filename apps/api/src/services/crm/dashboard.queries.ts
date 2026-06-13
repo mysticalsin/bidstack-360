@@ -9,7 +9,7 @@
  */
 import { type z } from 'zod';
 
-import { type PrismaClient } from '@bidstack/db';
+import { Prisma, type PrismaClient } from '@bidstack/db';
 import type {
   CrmCompany,
   CrmDeal,
@@ -21,7 +21,7 @@ import type {
 } from '@bidstack/shared';
 
 import { buildCompanies } from './company-enrichment.service.js';
-import { buildCockpit } from './dashboard.cockpit.js';
+import { buildCockpit, type AccountPerformance } from './dashboard.cockpit.js';
 import { asProviderStatus, mapDealStage, normalizeName, record } from './dashboard.utils.js';
 
 // ─── Row serializers ──────────────────────────────────────────────────────────
@@ -210,10 +210,10 @@ export async function buildCompanyCockpit(
     companies.find((c) => normalizeName(c.name) === companyId);
   if (!company) return null;
 
-  // Step 2: load company-specific data in parallel (5 queries, all filtered by company)
-  const [opportunities, contacts, tasks, riskRows, complianceRows] = await Promise.all([
+  // Step 2: load company-specific data in parallel (filtered by company)
+  const [opportunities, contacts, tasks, riskRows, complianceRows, performance] = await Promise.all([
     prismaClient.opportunity.findMany({
-      where: { orgId, customer: company.name },
+      where: { orgId, customer: company.name, deletedAt: null },
       select: {
         id: true,
         customer: true,
@@ -296,6 +296,7 @@ export async function buildCompanyCockpit(
       orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
       take: 50,
     }),
+    fetchAccountPerformance(orgId, company.name, prismaClient),
   ]);
 
   const fieldOverrides = await prismaClient.companyFieldOverride.findMany({
@@ -314,5 +315,61 @@ export async function buildCompanyCockpit(
     compliance: complianceRows,
     fieldOverrides,
     winLossAvailable: process.env.WIN_LOSS_DATA_AVAILABLE === 'true',
+    performance,
   });
+}
+
+/**
+ * Exact win/loss + revenue-by-month for ONE account, computed in Postgres so
+ * the numbers are correct regardless of how many opportunities the account has
+ * (the cockpit's opportunity list is take-capped for display; aggregates must
+ * not be). Sums are BigInt in SQL, returned as Number micros at the edge.
+ */
+export async function fetchAccountPerformance(
+  orgId: string,
+  customer: string,
+  prismaClient: PrismaClient,
+): Promise<AccountPerformance> {
+  const [byStage, revenueRows] = await Promise.all([
+    prismaClient.opportunity.groupBy({
+      by: ['stage'],
+      where: { orgId, customer, deletedAt: null, stage: { in: ['closed_won', 'closed_lost'] } },
+      _sum: { valueMicros: true },
+      _count: { _all: true },
+    }),
+    prismaClient.$queryRaw<Array<{ period: string; revenue: bigint | null }>>(Prisma.sql`
+      SELECT to_char(date_trunc('month', due_date), 'YYYY-MM') AS period,
+             SUM(value_micros) AS revenue
+      FROM opportunities
+      WHERE org_id = ${orgId}::uuid
+        AND customer = ${customer}
+        AND stage = 'closed_won'
+        AND deleted_at IS NULL
+        AND due_date IS NOT NULL
+      GROUP BY 1
+      ORDER BY 1 DESC
+      LIMIT 12
+    `),
+  ]);
+
+  const won = byStage.find((r) => r.stage === 'closed_won');
+  const lost = byStage.find((r) => r.stage === 'closed_lost');
+  const wonCount = won?._count._all ?? 0;
+  const lostCount = lost?._count._all ?? 0;
+  const decided = wonCount + lostCount;
+
+  return {
+    winLoss: {
+      wonCount,
+      lostCount,
+      wonValueMicros: Number(won?._sum.valueMicros ?? 0),
+      lostValueMicros: Number(lost?._sum.valueMicros ?? 0),
+      winRate: decided > 0 ? Math.round((wonCount / decided) * 100) : 0,
+    },
+    // Raw query returns newest-first (for the LIMIT 12 window); the chart wants
+    // oldest-first.
+    revenueEvolution: revenueRows
+      .map((r) => ({ period: r.period, revenueMicros: Number(r.revenue ?? 0) }))
+      .reverse(),
+  };
 }

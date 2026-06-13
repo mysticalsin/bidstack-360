@@ -164,6 +164,63 @@ export function computeSignalCoverage(input: {
   return { score, band: bandFor(score), counts, factors };
 }
 
+// ─── Account performance (win/loss + revenue) ────────────────────────────────
+
+export interface AccountPerformance {
+  winLoss: {
+    wonCount: number;
+    lostCount: number;
+    wonValueMicros: number;
+    lostValueMicros: number;
+    winRate: number;
+  };
+  revenueEvolution: Array<{ period: string; revenueMicros: number }>;
+}
+
+/**
+ * Derive win/loss + revenue-by-month from an in-memory opportunity array.
+ * Used by unit tests and as a fallback; production callers pass an exact
+ * Postgres aggregate instead (the array can be take-capped). Won/lost honor
+ * either the pipelineStage flags or the canonical `stage` column.
+ */
+export function deriveAccountPerformance(
+  opps: Array<{
+    stage: string;
+    valueMicros: bigint | number | unknown;
+    dueDate: Date | null | unknown;
+    pipelineStage?: { isWon: boolean; isLost: boolean } | null;
+  }>,
+): AccountPerformance {
+  const toMicros = (v: bigint | number | unknown): number =>
+    typeof v === 'bigint' ? Number(v) : typeof v === 'number' ? v : 0;
+  const wonOpps = opps.filter((o) => o.pipelineStage?.isWon || o.stage === 'closed_won');
+  const lostOpps = opps.filter((o) => o.pipelineStage?.isLost || o.stage === 'closed_lost');
+  const decided = wonOpps.length + lostOpps.length;
+
+  const revenueByMonth = new Map<string, number>();
+  for (const o of wonOpps) {
+    const when = o.dueDate ?? null;
+    if (!when) continue;
+    const d = when instanceof Date ? when : new Date(when as string);
+    if (Number.isNaN(d.getTime())) continue;
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+    revenueByMonth.set(key, (revenueByMonth.get(key) ?? 0) + toMicros(o.valueMicros));
+  }
+  return {
+    winLoss: {
+      wonCount: wonOpps.length,
+      lostCount: lostOpps.length,
+      wonValueMicros: wonOpps.reduce((s, o) => s + toMicros(o.valueMicros), 0),
+      lostValueMicros: lostOpps.reduce((s, o) => s + toMicros(o.valueMicros), 0),
+      winRate: decided > 0 ? Math.round((wonOpps.length / decided) * 100) : 0,
+    },
+    revenueEvolution: [...revenueByMonth.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .slice(-12)
+      .map(([period, revenueMicros]) => ({ period, revenueMicros })),
+  };
+}
+
 // ─── Field overrides (M1) ─────────────────────────────────────────────────────
 
 export interface CockpitFieldOverride {
@@ -406,11 +463,19 @@ export function buildCockpit({
   compliance,
   fieldOverrides = [],
   winLossAvailable = false,
+  performance,
 }: {
   company: z.infer<typeof CrmCompany>;
   fieldOverrides?: CockpitFieldOverride[];
   /** WIN_LOSS_DATA_AVAILABLE flag — when false the won/lost KPI is omitted entirely. */
   winLossAvailable?: boolean;
+  /**
+   * Exact win/loss + revenue-by-month from Postgres aggregates (account-scoped,
+   * uncapped). Production callers pass this so the numbers don't depend on the
+   * take-capped `opportunities` array; when absent (unit tests) the values are
+   * derived from the passed opportunities instead.
+   */
+  performance?: AccountPerformance;
   companies: Array<z.infer<typeof CrmCompany>>;
   opportunities: Array<{
     id: string;
@@ -551,45 +616,13 @@ export function buildCockpit({
       ? { ...overrideSource, block: 'internal' as const, overridden: true, fieldKey }
       : { ...fieldSource(hasValue), block: 'external' as const, fieldKey };
 
-  // Won/lost by the pipeline-stage flags OR the canonical `stage` column —
-  // an opportunity can carry closed_won/closed_lost without a pipelineStage FK.
-  const wonOpps = companyOpps.filter(
-    (opp) => opp.pipelineStage?.isWon || opp.stage === 'closed_won',
-  );
-  const lostOpps = companyOpps.filter(
-    (opp) => opp.pipelineStage?.isLost || opp.stage === 'closed_lost',
-  );
-  const wonDeals = wonOpps.length;
-  const lostDeals = lostOpps.length;
-  const toMicros = (v: bigint | number | unknown): number =>
-    typeof v === 'bigint' ? Number(v) : typeof v === 'number' ? v : 0;
-  const wonValueMicros = wonOpps.reduce((sum, o) => sum + toMicros(o.valueMicros), 0);
-  const lostValueMicros = lostOpps.reduce((sum, o) => sum + toMicros(o.valueMicros), 0);
-  const decided = wonDeals + lostDeals;
-  const winLoss = {
-    wonCount: wonDeals,
-    lostCount: lostDeals,
-    wonValueMicros,
-    lostValueMicros,
-    winRate: decided > 0 ? Math.round((wonDeals / decided) * 100) : 0,
-  };
-
-  // Revenue evolution: won-deal value grouped by close month (dueDate proxy),
-  // last 12 months ascending. Derived from THIS account's real pipeline — no
-  // external ABC feed required. Empty array when the account has no won deals.
-  const revenueByMonth = new Map<string, number>();
-  for (const o of wonOpps) {
-    const when = o.dueDate ?? null;
-    if (!when) continue;
-    const d = when instanceof Date ? when : new Date(when as string);
-    if (Number.isNaN(d.getTime())) continue;
-    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-    revenueByMonth.set(key, (revenueByMonth.get(key) ?? 0) + toMicros(o.valueMicros));
-  }
-  const revenueEvolution = [...revenueByMonth.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .slice(-12)
-    .map(([period, revenueMicros]) => ({ period, revenueMicros }));
+  // Win/loss + revenue: prefer the exact Postgres aggregate the production
+  // callers pass (account-scoped, uncapped, BigInt-safe). Fall back to deriving
+  // from the passed opportunities for unit tests / pure use — that path is
+  // take-capped, so it is NOT used on the live cockpit.
+  const { winLoss, revenueEvolution } = performance ?? deriveAccountPerformance(companyOpps);
+  const wonDeals = winLoss.wonCount;
+  const lostDeals = winLoss.lostCount;
 
   return {
     company,

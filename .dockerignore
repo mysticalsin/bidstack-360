@@ -85,3 +85,7 @@ load-tests
 load-tests/**
 packages/twenty-bidstack
 packages/twenty-bidstack/**
+
+# scratch scaffold — never ship to the image
+scratch_img/
+scratch_skills/

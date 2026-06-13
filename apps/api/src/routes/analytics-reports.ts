@@ -43,7 +43,7 @@ export const analyticsReportsRoutes: FastifyPluginAsyncZod = async (server) => {
 
   server.get(
     '/entities/:type/fields',
-    { schema: { params: z.object({ type: z.string() }), response: { 200: z.array(AnalyticsFieldDef) } } },
+    { preHandler: [server.requirePermission('reports:read')],  schema: { params: z.object({ type: z.string() }), response: { 200: z.array(AnalyticsFieldDef) } } },
     async (req) => {
       const spec = getEntitySpec(req.params.type);
       if (!spec) throw server.httpErrors.notFound(`Unknown entity: ${req.params.type}`);
@@ -58,7 +58,10 @@ export const analyticsReportsRoutes: FastifyPluginAsyncZod = async (server) => {
 
   server.get(
     '/reports',
-    { schema: { response: { 200: z.array(AnalyticsReport) } } },
+    {
+      preHandler: [server.requirePermission('reports:read')],
+      schema: { response: { 200: z.array(AnalyticsReport) } },
+    },
     async (req) => {
       const reports = await prisma.analyticsReport.findMany({
         where: { orgId: req.auth.orgId, deletedAt: null },
@@ -106,7 +109,10 @@ export const analyticsReportsRoutes: FastifyPluginAsyncZod = async (server) => {
 
   server.get(
     '/reports/:id',
-    { schema: { params: IdParam, response: { 200: AnalyticsReport } } },
+    {
+      preHandler: [server.requirePermission('reports:read')],
+      schema: { params: IdParam, response: { 200: AnalyticsReport } },
+    },
     async (req) => {
       const report = await prisma.analyticsReport.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
@@ -235,7 +241,7 @@ export const analyticsReportsRoutes: FastifyPluginAsyncZod = async (server) => {
   // Nothing is persisted; reportId is '' per the frontend contract.
   server.post(
     '/reports/run',
-    {
+    { preHandler: [server.requirePermission('reports:read')], 
       schema: {
         body: z.object({ query: AnalyticsQuery }),
         response: { 200: AnalyticsReportRun },
@@ -309,7 +315,7 @@ export const analyticsReportsRoutes: FastifyPluginAsyncZod = async (server) => {
 
   server.get(
     '/reports/:id/runs',
-    { schema: { params: IdParam, response: { 200: z.array(AnalyticsReportRun) } } },
+    { preHandler: [server.requirePermission('reports:read')],  schema: { params: IdParam, response: { 200: z.array(AnalyticsReportRun) } } },
     async (req) => {
       const report = await prisma.analyticsReport.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
@@ -339,7 +345,7 @@ export const analyticsReportsRoutes: FastifyPluginAsyncZod = async (server) => {
 
   server.get(
     '/reports/:id/runs/:runId',
-    {
+    { preHandler: [server.requirePermission('reports:read')], 
       schema: {
         params: z.object({ id: z.string().uuid(), runId: z.string().uuid() }),
         response: { 200: AnalyticsReportRun },

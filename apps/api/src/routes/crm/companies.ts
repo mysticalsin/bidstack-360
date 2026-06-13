@@ -260,32 +260,36 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const companyKey = normalizeName(req.params.companyKey);
-      const saved = await prisma.companyFieldOverride.upsert({
-        where: {
-          orgId_companyKey_fieldKey: {
+      // Override + its audit row must land together or not at all.
+      const saved = await prisma.$transaction(async (tx) => {
+        const row = await tx.companyFieldOverride.upsert({
+          where: {
+            orgId_companyKey_fieldKey: {
+              orgId: req.auth.orgId,
+              companyKey,
+              fieldKey: req.body.fieldKey,
+            },
+          },
+          create: {
             orgId: req.auth.orgId,
             companyKey,
             fieldKey: req.body.fieldKey,
+            value: req.body.value,
+            overriddenById: req.auth.userId,
           },
-        },
-        create: {
-          orgId: req.auth.orgId,
-          companyKey,
-          fieldKey: req.body.fieldKey,
-          value: req.body.value,
-          overriddenById: req.auth.userId,
-        },
-        update: { value: req.body.value, overriddenById: req.auth.userId },
-      });
-      await prisma.auditLog.create({
-        data: {
-          orgId: req.auth.orgId,
-          userId: req.auth.userId,
-          action: 'company.field_override',
-          targetType: 'company',
-          targetId: companyKey,
-          diff: { fieldKey: req.body.fieldKey, value: req.body.value },
-        },
+          update: { value: req.body.value, overriddenById: req.auth.userId },
+        });
+        await tx.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'company.field_override',
+            targetType: 'company',
+            targetId: companyKey,
+            diff: { fieldKey: req.body.fieldKey, value: req.body.value },
+          },
+        });
+        return row;
       });
       invalidateDashboardSnapshotCache(req.auth.orgId);
       return {

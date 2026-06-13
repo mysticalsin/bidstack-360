@@ -446,6 +446,7 @@ model Opportunity {
   @@index([orgId, pipelineStageId], map: "opps_org_pipeline_stage_idx")
   @@index([orgId, ownerId], map: "opps_org_owner_idx")
   @@index([orgId, customer], map: "opps_org_customer_idx")
+  @@index([orgId, companyId], map: "opps_org_company_idx")
   @@index([orgId])
   @@index([companyId])
   @@index([territoryId])

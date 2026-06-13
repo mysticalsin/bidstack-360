@@ -37,6 +37,7 @@ import {
   defaultReleaseScore,
 } from './dashboard.defaults.js';
 import {
+  fetchAccountPerformance,
   serializeDeal,
   serializeProviderHealth,
   serializeQueueHealth,
@@ -303,11 +304,16 @@ export async function buildDashboardSnapshot(
     companies.find((company) => company.name === 'Mantu') ??
     companies[0] ??
     fallbackCompany('Mantu');
-  const fieldOverrides = await prisma.companyFieldOverride.findMany({
-    where: { orgId, companyKey: normalizeName(selectedCompany.name) },
-    select: { fieldKey: true, value: true },
-    take: 10,
-  });
+  const [fieldOverrides, performance] = await Promise.all([
+    prisma.companyFieldOverride.findMany({
+      where: { orgId, companyKey: normalizeName(selectedCompany.name) },
+      select: { fieldKey: true, value: true },
+      take: 10,
+    }),
+    // Account-scoped aggregate — the org-wide `opportunities` array above is
+    // a 100-row sample and must NOT back the selected account's win/loss.
+    fetchAccountPerformance(orgId, selectedCompany.name, prisma),
+  ]);
 
   return {
     generatedAt: new Date().toISOString(),
@@ -321,6 +327,7 @@ export async function buildDashboardSnapshot(
       compliance: complianceRows,
       fieldOverrides,
       winLossAvailable: process.env.WIN_LOSS_DATA_AVAILABLE === 'true',
+      performance,
     }),
     companies,
     deals,

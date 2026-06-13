@@ -40,10 +40,12 @@ export const WinLossCard = memo(function WinLossCard({ cockpit }: Props) {
         <div
           className="mt-3 flex h-2 overflow-hidden rounded-full bg-[var(--surface-sunken)]"
           role="img"
-          aria-label={`${wl.wonCount} won, ${wl.lostCount} lost`}
+          aria-label={`${wl.wonCount} won, ${wl.lostCount} lost — ${wl.winRate}% win rate`}
         >
+          {/* Right border on the won segment keeps the split perceivable at
+              0%/100% and without relying on the success/danger hue alone. */}
           <div
-            className="bg-[var(--success)]"
+            className="border-r border-[var(--surface)] bg-[var(--success)]"
             style={{ width: `${wl.winRate}%` }}
           />
           <div className="flex-1 bg-[var(--danger)]" />
