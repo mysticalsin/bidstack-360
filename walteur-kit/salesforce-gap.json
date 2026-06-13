@@ -8,9 +8,10 @@
     },
     {
       "dimension": "search-nav-copilot",
-      "score": 52,
+      "score": 66,
       "currentState": "BidStack has a real, well-built foundation here. A ⌘K/Ctrl+K command palette (apps/web/src/components/command/CommandPalette.tsx + usePaletteItems.tsx) merges contextual page commands, palette-recents (localStorage), cockpit-visit recents, ~11 nav targets, and live results from in-memory caches (accounts, contacts, tasks) plus two debounced server searches (global /api/search and opportunity search). It has solid a11y: combobox/listbox roles, aria-activedescendant, 44px touch rows, reduced-motion, type-to-filter capture. The backend /api/search (apps/api/src/routes/search.ts) does org-scoped ILIKE substring matching across opportunity/contact/company/task/note with a hand-rolled 0/60/80/100 score and a 30-item cap, run concurrently. A dedicated /search page (SearchPage.tsx) gives grouped tabs + counts. Navigation has URL-derived breadcrumbs (Breadcrumbs.tsx), a topbar recent-search dropdown (TopbarSearch.tsx), vim-style \"g d/o/p…\" chords + ⌘/ focus (useGlobalShortcuts.ts), and a quick-add \"N\" menu (QuickAddMenu.tsx) for 4 create flows. The \"AI assistant\" (apps/api/src/routes/ai-assistant.ts) is NOT a conversational copilot — it is 5 fixed structured endpoints (email-draft, deal-sentiment, meeting-prep, enrich-contact, account-intel) surfaced only on specific cards (MeetingPrepCard, AccountIntelPanel), with no free-form ask/chat route and no ability to take actions.",
-      "gapCount": 9
+      "gapCount": 9,
+      "resolvedNote": "PARTIALLY CLOSED 2026-06-13: global search upgraded from whole-substring single-field matching to tokenized token-AND retrieval + field-weighted, recency-tiebroken scoring (lib/search-score.ts, unit+integration tested) across all 6 entity types incl opportunity trigram SQL. REMAINING: conversational/free-form copilot (today 5 fixed structured AI endpoints, no chat/ask route, no action-taking) — large LLM build, deferred."
     },
     {
       "dimension": "notifications-activity",
