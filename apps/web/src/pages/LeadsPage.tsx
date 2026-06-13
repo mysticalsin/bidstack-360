@@ -79,6 +79,7 @@ export function LeadsPage() {
       score: (l) => l.score,
       source: (l) => l.source,
     }),
+    // PRIORITY_ORDER is a module-scope constant (stable) — no deps needed.
     [],
   );
   const parseSortParam = (raw: string | null): SortState<LeadSortKey> => {
