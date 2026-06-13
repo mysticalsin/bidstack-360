@@ -1,3 +1,4 @@
+import compress from '@fastify/compress';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -158,6 +159,15 @@ export async function buildServer(): Promise<FastifyInstance> {
     credentials: true,
   });
   await server.register(sensible);
+
+  // Response compression — JSON list/dashboard/analytics payloads are large and
+  // dominate egress at scale. brotli+gzip, only above 1KB (tiny bodies cost more
+  // to compress than they save). Honors the client's Accept-Encoding.
+  await server.register(compress, {
+    global: true,
+    threshold: 1024,
+    encodings: ['br', 'gzip', 'deflate'],
+  });
 
   // Permissions-Policy is not exposed by @fastify/helmet@12 (helmet@7), so we
   // set it manually on every outbound response.
