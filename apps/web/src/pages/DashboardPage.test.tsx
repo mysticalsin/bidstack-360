@@ -35,8 +35,22 @@ vi.mock('@/components/cockpit', () => ({
   ),
   PipelineByStageCard: () => <div data-testid="pipeline-card" />,
   RecentOpportunitiesCard: () => <div data-testid="recent-opps" />,
+  RevenueEvolutionCard: () => <div data-testid="revenue-card" />,
   TechStackCard: () => <div data-testid="tech-card" />,
   UpsellFilesCard: () => <div data-testid="upsell-files" />,
+}));
+
+vi.mock('@/components/account-intel/InfoSearchLeadsCard', () => ({
+  InfoSearchLeadsCard: () => <div data-testid="infosearch-card" />,
+}));
+vi.mock('@/components/account-intel/CrossSellCard', () => ({
+  CrossSellCard: () => <div data-testid="cross-sell-card" />,
+}));
+vi.mock('@/components/account-intel/GovernanceLogCard', () => ({
+  GovernanceLogCard: () => <div data-testid="governance-card" />,
+}));
+vi.mock('@/components/account-intel/SpotlightRefsCard', () => ({
+  SpotlightRefsCard: () => <div data-testid="spotlight-card" />,
 }));
 
 vi.mock('@/components/dashboard/OrgDashboard', () => ({
