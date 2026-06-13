@@ -48,7 +48,7 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
     ['Hiring movement', hiringSummary],
     ['Leadership changes', leadershipSummary],
     [
-      'Apollo sync',
+      'External sync',
       strategic?.lastSyncedAt
         ? `${strategic.freshness} - ${relativeTime(strategic.lastSyncedAt)}`
         : 'Not synced',

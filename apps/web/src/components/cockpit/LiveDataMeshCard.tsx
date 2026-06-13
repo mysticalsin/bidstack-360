@@ -179,7 +179,7 @@ function fallbackConnectors(): CrmConnector[] {
     ),
     fallbackConnector(
       'apollo-organizations',
-      'Apollo',
+      'External Intelligence',
       'credentialed_api',
       'people',
       lastCheckedAt,

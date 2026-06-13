@@ -38,8 +38,8 @@ export function IntegrationMotionRail({
     : [
         { name: 'ERP', status: 'healthy' },
         { name: 'External CRM', status: 'healthy' },
-        { name: 'Apollo', status: 'disabled' },
-        { name: 'TradingView', status: 'healthy' },
+        { name: 'External Intelligence', status: 'disabled' },
+        { name: 'Market data', status: 'healthy' },
       ];
   return (
     <div className="integration-motion-rail" aria-label="CRM integration status">

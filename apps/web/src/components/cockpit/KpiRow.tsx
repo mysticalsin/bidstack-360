@@ -34,8 +34,8 @@ export const KpiRow = memo(function KpiRow({ cockpit }: Props) {
         title="External Intelligence"
         caption={
           lastSynced
-            ? `Apollo-sourced · Last updated: ${lastSynced} (refreshes ~every 2 weeks)`
-            : 'Apollo-sourced · not synced yet'
+            ? `External source · Last updated: ${lastSynced} (refreshes ~every 2 weeks)`
+            : 'External source · not synced yet'
         }
         kpis={external}
         companyKey={cockpit.company.id}
@@ -163,7 +163,9 @@ function FieldOverrideEditor({ kpi, companyKey }: { kpi: CockpitKpi; companyKey:
         { method: 'DELETE' },
       ),
     onSuccess: () => {
-      toast.success('Reverted to Apollo', { description: `${kpi.label} uses the Apollo value again.` });
+      toast.success('Reverted to external value', {
+        description: `${kpi.label} uses the external source value again.`,
+      });
       void queryClient.invalidateQueries({ queryKey: ['crm-dashboard'] });
     },
     onError: (err: Error) => toast.error('Revert failed', { description: err.message }),
@@ -202,7 +204,7 @@ function FieldOverrideEditor({ kpi, companyKey }: { kpi: CockpitKpi; companyKey:
             type="button"
             disabled={revert.isPending}
             className="inline-flex min-h-[44px] items-center rounded px-2 text-[11px] font-medium text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] disabled:opacity-50"
-            aria-label={`Revert ${kpi.label} to the Apollo value`}
+            aria-label={`Revert ${kpi.label} to the external source value`}
             onClick={() => revert.mutate()}
           >
             {revert.isPending ? '…' : 'Revert'}

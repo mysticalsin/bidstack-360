@@ -101,11 +101,11 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
                     cockpit.company.strategicIntel.freshness === 'fresh' ? 'linked' : 'warning'
                   }
                 >
-                  Apollo {cockpit.company.strategicIntel.freshness} -{' '}
+                  External {cockpit.company.strategicIntel.freshness} -{' '}
                   {relativeTime(cockpit.company.strategicIntel.lastSyncedAt)}
                 </span>
               ) : (
-                <span data-tone="warning">Apollo not synced</span>
+                <span data-tone="warning">External source not synced</span>
               )}
               {linkedOpp ? (
                 <span data-tone="linked">Opportunity linked</span>

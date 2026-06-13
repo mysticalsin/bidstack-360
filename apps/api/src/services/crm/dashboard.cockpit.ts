@@ -101,7 +101,7 @@ export function computeSignalCoverage(input: {
   const firmographics = factor(
     'firmographics',
     'Firmographic coverage',
-    'Industry, headcount, revenue, tech stack, and Apollo freshness.',
+    'Industry, headcount, revenue, tech stack, and external-source freshness.',
     (company.industry ? 20 : 0) +
       (company.employeeCount ? 20 : 0) +
       (company.annualRevenueMicros ? 20 : 0) +
@@ -566,20 +566,20 @@ export function buildCockpit({
   const apolloSource =
     apolloIntel?.freshness === 'fresh' && apolloLastSyncedAt
       ? {
-          sourceLabel: 'Apollo fresh',
+          sourceLabel: 'External · fresh',
           sourceState: 'apollo_fresh' as const,
           sourceHint: `Synced ${apolloLastSyncedAt.slice(0, 10)}`,
         }
       : apolloIntel?.freshness === 'stale' && apolloLastSyncedAt
         ? {
-            sourceLabel: 'Apollo stale',
+            sourceLabel: 'External · stale',
             sourceState: 'apollo_stale' as const,
             sourceHint: `Last synced ${apolloLastSyncedAt.slice(0, 10)}`,
           }
         : {
-            sourceLabel: 'Needs Apollo',
+            sourceLabel: 'Needs enrichment',
             sourceState: 'missing' as const,
-            sourceHint: 'Connect Apollo MCP/API to refresh this field.',
+            sourceHint: 'Connect an external data source in Settings to refresh this field.',
           };
   const verifiedSource = {
     sourceLabel: company.source === 'verified_data' ? 'Verified' : 'CRM',
@@ -590,9 +590,9 @@ export function buildCockpit({
         : 'BidStack CRM pipeline record',
   };
   const missingApolloSource = {
-    sourceLabel: 'Needs Apollo',
+    sourceLabel: 'Needs enrichment',
     sourceState: 'missing' as const,
-    sourceHint: 'Connect Apollo MCP/API to verify this company attribute.',
+    sourceHint: 'Connect an external data source in Settings to verify this attribute.',
   };
   const fieldSource = (hasValue: boolean) =>
     hasValue ? (apolloIntel ? apolloSource : verifiedSource) : missingApolloSource;
@@ -654,7 +654,7 @@ export function buildCockpit({
         ...externalField('annualRevenueMicros', Boolean(company.annualRevenueMicros)),
       },
       {
-        label: 'Apollo sync',
+        label: 'External sync',
         value:
           apolloIntel?.freshness === 'fresh'
             ? 'Fresh'

@@ -36,7 +36,7 @@ export default function SectorViewPage() {
       ) : !view.data || view.data.sectors.length === 0 ? (
         <EmptyState
           title="No sector data yet"
-          message="Accounts gain a sector when ABC classification (or Apollo enrichment) fills their industry."
+          message="Accounts gain a sector when ABC classification (or external enrichment) fills their industry."
         />
       ) : (
         <>

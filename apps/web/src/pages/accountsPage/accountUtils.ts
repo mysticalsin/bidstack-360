@@ -98,9 +98,11 @@ export function sourceLabel(source: string): string {
   const normalized = source.toLowerCase();
   if (normalized.includes('external_erp')) return 'ERP';
   if (normalized.includes('external_crm')) return 'External CRM';
-  if (normalized.includes('apollo')) return 'Apollo';
-  if (normalized.includes('brandfetch')) return 'Brandfetch';
-  if (normalized.includes('logo_dev')) return 'Logo.dev';
+  // Data-source vendor names stay out of the product UI (Settings/MCP only) —
+  // surface a neutral source label on the account view instead.
+  if (normalized.includes('apollo')) return 'External Intelligence';
+  if (normalized.includes('brandfetch')) return 'Logo provider';
+  if (normalized.includes('logo_dev')) return 'Logo provider';
   if (normalized.includes('official')) return 'Official';
   if (normalized.includes('favicon')) return 'Favicon';
   if (normalized.includes('bidstack')) return 'BidStack';
