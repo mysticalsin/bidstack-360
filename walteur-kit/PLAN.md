@@ -36,39 +36,39 @@
 Status: [ ] open · [x] done+verified · [~] in progress · [R] report-only
 
 ### Wave 0 — baseline (analytics WIP + hygiene)
-- [~] T0.1 Analytics migration generated+applied; analytics tests green; fix confirmed review findings (wf_21553843); commit WIP. — opus
+- [x] T0.1 Analytics migration generated+applied; analytics tests green; fix confirmed review findings (wf_21553843); commit WIP. — opus
 - [x] T0.2 Lint root-cause fixed (.vercel eslint ignore + no-fallthrough); typecheck green. — sonnet
 
 ### Wave R — REMOVE (one commit per cluster; generated drop migration last)
-- [ ] R1 Delete sales-orders module: pages/hooks/routes/services/tests/seeds/nav/i18n/e2e refs (recon `quotes` file list). — sonnet
-- [ ] R2 Delete products module + RBAC seed perms + top-products surfaces (recon `products`). — sonnet
-- [ ] R3 Delete invoices+payments module + ArAgingCard + dead crm/invoices.service.ts + webhook enum tolerance (recon `invoices`). — sonnet
-- [ ] R4 Delete /sales dashboard page + /api/sales-dashboard backend + trim sales-intelligence report (quotation KPIs out; cockpit SalesIntelligencePanel removed); OrgDashboard minimal (drop fabricated WorkspaceHealth/WeeklyGoal/TopAccountsCard-fake). — opus (shared wire schema surgery)
-- [ ] R5 Delete RFP-Agent cluster (agents pages/routes/services/models/nocobase client/schemas) + decouple dust-agent.service + schemas/agent.ts + mutation-audit prefix + rbac seeds + palette/nav. RfpPipelinePage stays. — opus (cross-imports)
-- [ ] R6 Schema: drop Quote/QuoteLine/QuoteVersion/Product/ProductCategory/SalesOrder/SalesOrderLine/Invoice/InvoiceLine/Payment/Agent/AgentRun/RfpAgentAssignment + enums; generated drop migration via migrate diff; db:generate; shared build. — opus (destructive, generated-only)
-- [ ] R7 CRM-wording purge (~45 strings: logo tagline, demo hero, Enter-CRM button, manifest, tour, error copy, API brief/Slack/Dust copy) → "bid piloting" vocabulary; 4 pinned test files updated in lockstep. — sonnet
-- [ ] R8 Wave-R gates: typecheck+lint+API/web tests touched-suites green; commit. — sonnet
+- [x] R1 Delete sales-orders module: pages/hooks/routes/services/tests/seeds/nav/i18n/e2e refs (recon `quotes` file list). — sonnet
+- [x] R2 Delete products module + RBAC seed perms + top-products surfaces (recon `products`). — sonnet
+- [x] R3 Delete invoices+payments module + ArAgingCard + dead crm/invoices.service.ts + webhook enum tolerance (recon `invoices`). — sonnet
+- [x] R4 Delete /sales dashboard page + /api/sales-dashboard backend + trim sales-intelligence report (quotation KPIs out; cockpit SalesIntelligencePanel removed); OrgDashboard minimal (drop fabricated WorkspaceHealth/WeeklyGoal/TopAccountsCard-fake). — opus (shared wire schema surgery)
+- [x] R5 Delete RFP-Agent cluster (agents pages/routes/services/models/nocobase client/schemas) + decouple dust-agent.service + schemas/agent.ts + mutation-audit prefix + rbac seeds + palette/nav. RfpPipelinePage stays. — opus (cross-imports)
+- [x] R6 Schema: drop Quote/QuoteLine/QuoteVersion/Product/ProductCategory/SalesOrder/SalesOrderLine/Invoice/InvoiceLine/Payment/Agent/AgentRun/RfpAgentAssignment + enums; generated drop migration via migrate diff; db:generate; shared build. — opus (destructive, generated-only)
+- [x] R7 CRM-wording purge (~45 strings: logo tagline, demo hero, Enter-CRM button, manifest, tour, error copy, API brief/Slack/Dust copy) → "bid piloting" vocabulary; 4 pinned test files updated in lockstep. — sonnet
+- [x] R8 Wave-R gates: typecheck+lint+API/web tests touched-suites green; commit. — sonnet
 
 ### Wave M — MODIFY (account core)
-- [ ] M1 Cockpit split: "External Intelligence" block (Apollo: tech stack/employees/revenue/financial health + "Last updated" + stale badge) vs "Internal Data" block (projects/opportunities/won-lost); never mixed. `CompanyFieldOverride` model + PATCH endpoint; edited field renders in Internal with "manually overridden" flag. — opus
-- [ ] M2 Signal Coverage real scoring: server-side 4-factor function (firmographic coverage, contact coverage, engagement recency, pipeline data quality) each with band+label+what-it-measures+recommended action; expandable panel UI; replaces hardcoded 72. — opus
-- [ ] M3 Revenue+evolution block behind SHOW_REVENUE_BLOCK (default false ⇒ hidden entirely, no empty state); ABC-API data source stub documented. — sonnet
-- [ ] M4 Win/Loss block behind WIN_LOSS_DATA_AVAILABLE (default false ⇒ hidden). — sonnet
-- [ ] M5 Top Accounts curation: admin Settings editor writes topAccountRank (top-10), /accounts/top serves curated list (auto fallback labeled); Top vs Key visual distinction (badges) everywhere both appear. — sonnet
-- [ ] M6 ABC opportunity filter rules in Settings: org-scoped config (first GET/PUT /api/v1/org-settings route; expertise-vs-solution type, framework/agreement type rules), filters applied to opportunity pulls. — opus (new org-settings surface)
-- [ ] M7 Access-scoping layer: UserGroup/UserGroupMember/GroupScopeRule models + read-filter middleware on accounts+opportunities lists + admin Settings groups editor + seeds + negative tests. — opus (security)
-- [ ] M8 Bid/No-Bid upgrade: shared criteria registry (payment_terms, deal_size, resource_avail, strategic_fit, financial_risk, competitive); composite+per-criteria breakdown on opportunity detail; below-threshold override w/ mandatory justification, persisted+audit-logged+director-visible; fix divisor/threshold divergences. — opus
+- [x] M1 Cockpit split: "External Intelligence" block (Apollo: tech stack/employees/revenue/financial health + "Last updated" + stale badge) vs "Internal Data" block (projects/opportunities/won-lost); never mixed. `CompanyFieldOverride` model + PATCH endpoint; edited field renders in Internal with "manually overridden" flag. — opus
+- [x] M2 Signal Coverage real scoring: server-side 4-factor function (firmographic coverage, contact coverage, engagement recency, pipeline data quality) each with band+label+what-it-measures+recommended action; expandable panel UI; replaces hardcoded 72. — opus
+- [x] M3 Revenue+evolution block behind SHOW_REVENUE_BLOCK (default false ⇒ hidden entirely, no empty state); ABC-API data source stub documented. — sonnet
+- [x] M4 Win/Loss block behind WIN_LOSS_DATA_AVAILABLE (default false ⇒ hidden). — sonnet
+- [x] M5 Top Accounts curation: admin Settings editor writes topAccountRank (top-10), /accounts/top serves curated list (auto fallback labeled); Top vs Key visual distinction (badges) everywhere both appear. — sonnet
+- [~] M6 ABC opportunity filter rules in Settings: org-scoped config (first GET/PUT /api/v1/org-settings route; expertise-vs-solution type, framework/agreement type rules), filters applied to opportunity pulls. — opus (new org-settings surface)
+- [x] M7 Access-scoping layer: UserGroup/UserGroupMember/GroupScopeRule models + read-filter middleware on accounts+opportunities lists + admin Settings groups editor + seeds + negative tests. — opus (security)
+- [x] M8 Bid/No-Bid upgrade: shared criteria registry (payment_terms, deal_size, resource_avail, strategic_fit, financial_risk, competitive); composite+per-criteria breakdown on opportunity detail; below-threshold override w/ mandatory justification, persisted+audit-logged+director-visible; fix divisor/threshold divergences. — opus
 - [ ] M9 Wave-M gates + commit. — sonnet
 
 ### Wave A — ADD
-- [ ] A1 Feature-flag spine: env.ts additions + GET /api/v1/config/features + web useFeatureFlags hook; flags wired. — sonnet (FIRST — M3/M4/A5/A6 depend)
-- [ ] A2 Cross-sell action log: model+routes+page+nav+account section (account, description, requesting/assigned country-team, assignee, due date, status, notes). — sonnet
-- [ ] A3 Sector/Industry view: aggregation endpoint (industry × country, account count, FTE volume) + page + nav + data-quality warning banner. — sonnet
-- [ ] A4 Comitology log: GovernanceMeeting + actions models+routes+account section+page (meeting type/date/participants/outcomes/actions w/ owner+due+status). — sonnet
-- [ ] A5 Spotlight Ref receiving end: ProjectReference model+display section per account+ingestion stub with TODO. — sonnet
-- [ ] A6 InfoSearch MCP integration: client (odoo-mcp-client pattern), INFOSEARCH_MCP_URL/INFOSEARCH_API_KEY/INFOSEARCH_ENABLED, account-page leads section, activity webhook event on account view, graceful hide. — opus (external integration)
-- [ ] A7 Sales Toolkits LMS: 360Learning client (dust-client pattern), LMS_360L_API_KEY/LMS_360L_BASE_URL + LMS_360L_ENABLED, nav section, live course grid filtered by sector tag, new-tab links, "Connect LMS" prompt + Settings config when unset. — opus (external integration)
-- [ ] A8 Schema migration for A2–A5 models (one generated migration); seeds for demo. — sonnet
+- [x] A1 Feature-flag spine: env.ts additions + GET /api/v1/config/features + web useFeatureFlags hook; flags wired. — sonnet (FIRST — M3/M4/A5/A6 depend)
+- [~] A2 Cross-sell action log: model+routes+page+nav+account section (account, description, requesting/assigned country-team, assignee, due date, status, notes). — sonnet
+- [x] A3 Sector/Industry view: aggregation endpoint (industry × country, account count, FTE volume) + page + nav + data-quality warning banner. — sonnet
+- [~] A4 Comitology log: GovernanceMeeting + actions models+routes+account section+page (meeting type/date/participants/outcomes/actions w/ owner+due+status). — sonnet
+- [~] A5 Spotlight Ref receiving end: ProjectReference model+display section per account+ingestion stub with TODO. — sonnet
+- [x] A6 InfoSearch MCP integration: client (odoo-mcp-client pattern), INFOSEARCH_MCP_URL/INFOSEARCH_API_KEY/INFOSEARCH_ENABLED, account-page leads section, activity webhook event on account view, graceful hide. — opus (external integration)
+- [x] A7 Sales Toolkits LMS: 360Learning client (dust-client pattern), LMS_360L_API_KEY/LMS_360L_BASE_URL + LMS_360L_ENABLED, nav section, live course grid filtered by sector tag, new-tab links, "Connect LMS" prompt + Settings config when unset. — opus (external integration)
+- [~] A8 Schema migration for A2–A5 models (one generated migration); seeds for demo. — sonnet
 - [ ] A9 Wave-A gates + commit. — sonnet
 
 ### Wave V — VERIFY + SHIP

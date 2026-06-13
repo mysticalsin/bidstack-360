@@ -74,6 +74,22 @@ Then move `deploy.workflow.yml.draft` → `.github/workflows/deploy.yml` (mainta
 - [ ] Job→apps ordering is enforced by the **pipeline** (migrate job gates roll-apps), not by bicep `dependsOn` (which only orders creation). Confirm the pipeline poll loop's terminal states match `az containerapp job execution` output.
 - [ ] Cost/scale: SKUs (`Standard_D2ds_v5`, Redis C1) and min/max replicas are placeholders — right-size them.
 
+## Demo-feedback program constraints (2026-06-12)
+
+- **All sensitive config rides env vars** — no hardcoded endpoints/keys anywhere
+  in the app. New variables (see `.env.example`): `WIN_LOSS_DATA_AVAILABLE`,
+  `SHOW_REVENUE_BLOCK`, `INFOSEARCH_ENABLED` + `INFOSEARCH_MCP_URL`/`INFOSEARCH_API_KEY`,
+  `LMS_360L_ENABLED` + `LMS_360L_BASE_URL`/`LMS_360L_API_KEY`. Flags are served
+  to the SPA at runtime via `GET /api/v1/config/features`, so a flag flip is a
+  Container App restart — not an image rebuild. Secrets belong in Key Vault
+  like every other secret above.
+- **Security validation gate:** the app must run end-to-end on mock/seed data
+  only until the group security team validates the Azure deployment. Concretely:
+  keep ABC/Opportunity-Management connectors disconnected (they do not exist
+  yet), keep `DEMO_MODE` seed data, and do not load real client data. The
+  access-scoping layer (Settings → Access groups) must be configured and
+  reviewed as part of that validation before any real-tenant rollout.
+
 ## Known gaps (intentionally not modelled)
 
 - Custom domains + managed certs (api/web ingress).

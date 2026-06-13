@@ -17,12 +17,17 @@ import {
   PageHead,
   PipelineByStageCard,
   RecentOpportunitiesCard,
+  RevenueEvolutionCard,
   TechStackCard,
   UpsellFilesCard,
 } from '@/components/cockpit';
 import { OrgDashboard } from '@/components/dashboard/OrgDashboard';
 import { FilesPanel } from '@/components/files/FilesPanel';
 import { AccountIntelPanel } from '@/components/account-intel/AccountIntelPanel';
+import { InfoSearchLeadsCard } from '@/components/account-intel/InfoSearchLeadsCard';
+import { CrossSellCard } from '@/components/account-intel/CrossSellCard';
+import { GovernanceLogCard } from '@/components/account-intel/GovernanceLogCard';
+import { SpotlightRefsCard } from '@/components/account-intel/SpotlightRefsCard';
 import { Reveal } from '@/components/motion/Reveal';
 import { NotesPanel } from '@/components/notes/NotesPanel';
 import { DashboardSkeleton } from '@/components/skeletons/PageSkeletons';
@@ -201,11 +206,29 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
           <Reveal delay={0.16}>
             <ActivityTimelineCard cockpit={cockpit} />
           </Reveal>
+
+          <Reveal delay={0.18}>
+            <CrossSellCard accountKey={cockpit.company.id} />
+          </Reveal>
+
+          <Reveal delay={0.2}>
+            <GovernanceLogCard accountKey={cockpit.company.id} />
+          </Reveal>
+
+          <Reveal delay={0.22}>
+            <SpotlightRefsCard accountKey={cockpit.company.id} />
+          </Reveal>
         </div>
 
         <aside className="cockpit-side" aria-label="Cockpit details">
           <Reveal>
             <HealthScoreCard cockpit={cockpit} />
+          </Reveal>
+          <Reveal delay={0.02}>
+            <RevenueEvolutionCard cockpit={cockpit} />
+          </Reveal>
+          <Reveal delay={0.03}>
+            <InfoSearchLeadsCard account={cockpit.company.name} />
           </Reveal>
           <Reveal delay={0.04}>
             <KpiSidebar

@@ -60,6 +60,8 @@ async function main() {
     });
     usersByInitials.set(u.initials, user.id);
   }
+  // First seeded user — stable author for org-level seed records below.
+  const seedUserId = usersByInitials.values().next().value as string;
   console.log(`  ✓ users: ${fixtureUsers.length}`);
 
   const bookingOwnerId = usersByInitials.get('JS');
@@ -325,6 +327,104 @@ async function main() {
     });
     console.log('  ✓ seeded signature request for test-sign-token');
   }
+
+  // ─── Wave A — pre-sales governance surfaces (account: ci-financial) ─────────
+  const ACCOUNT_KEY = 'ci-financial';
+  await prisma.crossSellAction.deleteMany({ where: { orgId: org.id, accountKey: ACCOUNT_KEY } });
+  await prisma.crossSellAction.createMany({
+    data: [
+      {
+        orgId: org.id,
+        accountKey: ACCOUNT_KEY,
+        description: 'Introduce the UK cybersecurity practice to the CI Financial CISO.',
+        requestingUnit: 'Canada — Pre-sales',
+        assignedUnit: 'UK — Cyber',
+        status: 'in_progress',
+        dueDate: new Date(Date.now() + 14 * 86_400_000),
+        createdById: seedUserId,
+      },
+      {
+        orgId: org.id,
+        accountKey: ACCOUNT_KEY,
+        description: 'Share the Montreal data-platform reference deck with the France team.',
+        requestingUnit: 'France — Data',
+        assignedUnit: 'Canada — Pre-sales',
+        status: 'open',
+        createdById: seedUserId,
+      },
+      {
+        orgId: org.id,
+        accountKey: ACCOUNT_KEY,
+        description: 'Joint QBR prep with the Managed Services unit.',
+        requestingUnit: 'Canada — Pre-sales',
+        assignedUnit: 'Global — MSP',
+        status: 'done',
+        createdById: seedUserId,
+      },
+    ],
+  });
+
+  await prisma.governanceMeeting.deleteMany({ where: { orgId: org.id, accountKey: ACCOUNT_KEY } });
+  await prisma.governanceMeeting.create({
+    data: {
+      orgId: org.id,
+      accountKey: ACCOUNT_KEY,
+      meetingType: 'monthly_committee',
+      date: new Date(Date.now() - 10 * 86_400_000),
+      participants: ['Account Director', 'Pre-sales Lead', 'Delivery Manager'],
+      outcomes: 'Agreed to fast-track the MSP expansion proposal; flagged a staffing risk in Q3.',
+      createdById: seedUserId,
+      actions: {
+        create: [
+          {
+            orgId: org.id,
+            description: 'Draft the MSP expansion SOW.',
+            status: 'in_progress',
+            dueDate: new Date(Date.now() + 7 * 86_400_000),
+          },
+          { orgId: org.id, description: 'Confirm Q3 staffing plan with resourcing.', status: 'open' },
+        ],
+      },
+    },
+  });
+  await prisma.governanceMeeting.create({
+    data: {
+      orgId: org.id,
+      accountKey: ACCOUNT_KEY,
+      meetingType: 'quarterly_c_level',
+      date: new Date(Date.now() - 45 * 86_400_000),
+      participants: ['CIO (client)', 'VP Sales', 'Account Director'],
+      outcomes: 'Renewed executive sponsorship; cybersecurity named the top FY priority.',
+      createdById: seedUserId,
+    },
+  });
+
+  await prisma.projectReference.deleteMany({ where: { orgId: org.id, accountKey: ACCOUNT_KEY } });
+  await prisma.projectReference.createMany({
+    data: [
+      {
+        orgId: org.id,
+        accountKey: ACCOUNT_KEY,
+        title: 'Core banking platform modernization',
+        technicalSummary:
+          'Migrated a legacy monolith to a cloud-native microservices estate on AWS.',
+        businessSummary: 'Cut release lead time from weeks to days; 99.95% uptime in year one.',
+        status: 'validated',
+        sourceSystem: 'spotlight_ref',
+        validatedById: seedUserId,
+      },
+      {
+        orgId: org.id,
+        accountKey: ACCOUNT_KEY,
+        title: 'Zero Trust security rollout',
+        technicalSummary: 'Identity-first segmentation across 12,000 endpoints.',
+        businessSummary: 'Reduced incident response time by 60%.',
+        status: 'manager_review',
+        sourceSystem: 'spotlight_ref',
+      },
+    ],
+  });
+  console.log('  ✓ pre-sales governance: cross-sell, comitology, references');
 
   console.log('✅ Seed complete.');
 }

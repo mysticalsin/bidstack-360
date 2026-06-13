@@ -48,7 +48,10 @@ export const NAV_SECTIONS: NavSection[] = [
     key: 'sales',
     title: 'Sales',
     icon: 'dollar',
-    items: [{ to: '/forecasts', label: 'Forecasts', icon: 'growth' }],
+    items: [
+      { to: '/forecasts', label: 'Forecasts', icon: 'growth' },
+      { to: '/sales-toolkits', label: 'Sales Toolkits', icon: 'book' },
+    ],
   },
   {
     key: 'accounts',
@@ -59,6 +62,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { to: '/key-accounts', label: 'Key Accounts', icon: 'star' },
       { to: '/top-accounts', label: 'Top Accounts', icon: 'trophy' },
       { to: '/companies', label: 'Companies', icon: 'list' },
+      { to: '/sector-view', label: 'Sector View', icon: 'globe' },
+      { to: '/cross-sell', label: 'Cross-sell', icon: 'git-branch' },
       { to: '/contacts', label: 'Contacts', icon: 'contacts' },
       { to: '/references', label: 'Reference Library', icon: 'book' },
     ],

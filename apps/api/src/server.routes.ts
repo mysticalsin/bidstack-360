@@ -37,6 +37,14 @@ import { reportsRoutes } from './routes/reports.js';
 // Analytics report builder (custom reports + dashboards + entity field metadata)
 import { analyticsReportsRoutes } from './routes/analytics-reports.js';
 import { analyticsDashboardsRoutes } from './routes/analytics-dashboards.js';
+import { configFeaturesRoutes } from './routes/config-features.js';
+import { salesToolkitsRoutes } from './routes/sales-toolkits.js';
+import { sectorViewRoutes } from './routes/sector-view.js';
+import { infosearchRoutes } from './routes/infosearch.js';
+import { crossSellRoutes } from './routes/cross-sell.js';
+import { governanceRoutes } from './routes/governance.js';
+import { projectReferencesRoutes } from './routes/project-references.js';
+import { orgSettingsRoutes } from './routes/org-settings.js';
 import { tasksRoutes } from './routes/tasks.js';
 import { territoryRoutes } from './routes/territories.js';
 import { accountIntelRoutes } from './routes/account-intel.js';
@@ -52,6 +60,8 @@ import { webhookSubscriptionsRoutes } from './routes/webhook-subscriptions.js';
 import { companiesRoutes } from './routes/companies.js';
 import { customFieldsRoutes } from './routes/custom-fields.js';
 import { roleRoutes } from './routes/roles.js';
+// M7 — access groups (admin-managed data-scoping groups)
+import { userGroupRoutes } from './routes/user-groups.js';
 import { microsoftRoutes } from './routes/microsoft.js';
 import { pipelineStageRoutes } from './routes/pipeline-stages.js';
 import { accountsRoutes } from './routes/accounts.js';
@@ -119,6 +129,14 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   // radix tree keeps the legacy static /reports/{pipeline,...} routes winning.
   await server.register(analyticsReportsRoutes, { prefix: '/api/v1' });
   await server.register(analyticsDashboardsRoutes, { prefix: '/api/v1' });
+  await server.register(configFeaturesRoutes, { prefix: '/api/v1' });
+  await server.register(salesToolkitsRoutes, { prefix: '/api/v1' });
+  await server.register(sectorViewRoutes, { prefix: '/api/v1' });
+  await server.register(infosearchRoutes, { prefix: '/api/v1' });
+  await server.register(crossSellRoutes, { prefix: '/api/v1' });
+  await server.register(governanceRoutes, { prefix: '/api/v1' });
+  await server.register(projectReferencesRoutes, { prefix: '/api/v1' });
+  await server.register(orgSettingsRoutes, { prefix: '/api/v1' });
   await server.register(searchRoutes, { prefix: '/api/v1' });
   await server.register(auditLogsRoutes, { prefix: '/api/v1' });
   await server.register(crmDashboardRoutes, { prefix: '/api/v1' });
@@ -165,6 +183,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(companiesRoutes, { prefix: '/api/v1' });
   await server.register(customFieldsRoutes, { prefix: '/api/v1' });
   await server.register(roleRoutes, { prefix: '/api/v1' });
+  await server.register(userGroupRoutes, { prefix: '/api/v1' });
   await server.register(pipelineStageRoutes, { prefix: '/api/v1' });
   await server.register(microsoftRoutes, { prefix: '/api/v1' });
   await server.register(accountsRoutes, { prefix: '/api/v1' });

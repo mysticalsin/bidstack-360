@@ -70,6 +70,9 @@ export const PipelinePage = lazy(() =>
 export const ForecastsPage = lazy(() =>
   import('@/pages/ForecastsPage').then((m) => ({ default: m.ForecastsPage })),
 );
+export const SalesToolkitsPage = lazy(() => import('@/pages/SalesToolkitsPage'));
+export const SectorViewPage = lazy(() => import('@/pages/SectorViewPage'));
+export const CrossSellPage = lazy(() => import('@/pages/CrossSellPage'));
 export const TerritoriesPage = lazy(() =>
   import('@/pages/TerritoriesPage').then((m) => ({ default: m.TerritoriesPage })),
 );

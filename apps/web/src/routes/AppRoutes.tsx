@@ -30,6 +30,9 @@ import {
   DashboardPage,
   DashboardsListPage,
   ForecastsPage,
+  SalesToolkitsPage,
+  SectorViewPage,
+  CrossSellPage,
   KeyAccountsPage,
   LeadDetailPage,
   LeadsPage,
@@ -235,6 +238,30 @@ export function AppRoutes() {
             element={
               <RequireAuth>
                 <ForecastsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/sales-toolkits"
+            element={
+              <RequireAuth>
+                <SalesToolkitsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/sector-view"
+            element={
+              <RequireAuth>
+                <SectorViewPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/cross-sell"
+            element={
+              <RequireAuth>
+                <CrossSellPage />
               </RequireAuth>
             }
           />
