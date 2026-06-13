@@ -57,6 +57,10 @@ describe('contract agreement routes', () => {
         globalRebateBps: 750,
         currency: 'EUR',
         rateReviewSchedule: 'annual',
+        rateCard: [
+          { role: 'Senior Consultant', rateMicros: 800_000_000, unit: 'day' },
+          { role: 'Architect', rateMicros: 1_100_000_000, unit: 'day' },
+        ],
       },
     });
     expect(create.statusCode).toBe(201);
@@ -66,12 +70,20 @@ describe('contract agreement routes', () => {
       countries: string[];
       globalRebateBps: number;
       status: string;
+      rateCard: { role: string; rateMicros: number; unit: string }[];
     };
     expect(body.kind).toBe('msa');
     // Country codes are normalized to uppercase ISO-2 by the schema.
     expect(body.countries).toEqual(['FR', 'DE', 'ES']);
     expect(body.globalRebateBps).toBe(750);
     expect(body.status).toBe('active');
+    // Rate card round-trips (different MSAs carry different negotiated rates).
+    expect(body.rateCard).toHaveLength(2);
+    expect(body.rateCard[0]).toEqual({
+      role: 'Senior Consultant',
+      rateMicros: 800_000_000,
+      unit: 'day',
+    });
     const id = body.id;
 
     const list = await server.inject({

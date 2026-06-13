@@ -4746,6 +4746,11 @@ model ContractAgreement {
   countries       String[]              @default([]) @map("countries")
   globalRebateBps Int?                  @map("global_rebate_bps")
   currency        String                @default("EUR") @db.VarChar(3)
+  // Negotiated rate card for this MSA/contract: an array of
+  // { role, rateMicros, unit, currency? } lines. Validated by the shared
+  // RateCardLine zod schema at the API edge. Embedded (not a child table) so a
+  // contract carries its rate card as one visual unit.
+  rateCard        Json                  @default("[]") @map("rate_card")
   effectiveDate   DateTime?             @map("effective_date") @db.Date
   expiryDate      DateTime?             @map("expiry_date") @db.Date
   rateReviewSchedule ContractRateSchedule @default(annual) @map("rate_review_schedule")

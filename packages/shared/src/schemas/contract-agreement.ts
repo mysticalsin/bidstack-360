@@ -16,6 +16,18 @@ export type ContractStatus = z.infer<typeof ContractStatus>;
 // ISO-3166 alpha-2, uppercased. Bounded list so one record can't carry a huge array.
 const CountryCode = z.string().trim().length(2).toUpperCase();
 
+export const RateCardUnit = z.enum(['day', 'hour', 'month', 'year', 'fixed']);
+export type RateCardUnit = z.infer<typeof RateCardUnit>;
+
+// One negotiated rate line: a role/profile and its rate (money in micros).
+export const RateCardLine = z.object({
+  role: z.string().min(1).max(120),
+  rateMicros: z.number().int().min(0).max(1_000_000_000_000),
+  unit: RateCardUnit,
+  currency: z.string().length(3).nullable().optional(),
+});
+export type RateCardLine = z.infer<typeof RateCardLine>;
+
 export const ContractAgreement = z.object({
   id: z.string().uuid(),
   accountKey: z.string().min(1),
@@ -24,6 +36,7 @@ export const ContractAgreement = z.object({
   countries: z.array(CountryCode).max(100),
   globalRebateBps: z.number().int().min(0).max(100_000).nullable(),
   currency: z.string().length(3),
+  rateCard: z.array(RateCardLine).max(200),
   effectiveDate: z.string().datetime().nullable(),
   expiryDate: z.string().datetime().nullable(),
   rateReviewSchedule: ContractRateSchedule,
@@ -42,6 +55,7 @@ export const ContractAgreementCreate = z.object({
   countries: z.array(CountryCode).max(100).default([]),
   globalRebateBps: z.number().int().min(0).max(100_000).nullable().optional(),
   currency: z.string().length(3).default('EUR'),
+  rateCard: z.array(RateCardLine).max(200).default([]),
   effectiveDate: z.string().datetime().nullable().optional(),
   expiryDate: z.string().datetime().nullable().optional(),
   rateReviewSchedule: ContractRateSchedule.default('annual'),
@@ -58,6 +72,7 @@ export const ContractAgreementPatch = z
     countries: z.array(CountryCode).max(100).optional(),
     globalRebateBps: z.number().int().min(0).max(100_000).nullable().optional(),
     currency: z.string().length(3).optional(),
+    rateCard: z.array(RateCardLine).max(200).optional(),
     effectiveDate: z.string().datetime().nullable().optional(),
     expiryDate: z.string().datetime().nullable().optional(),
     rateReviewSchedule: ContractRateSchedule.optional(),

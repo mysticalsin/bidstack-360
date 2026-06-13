@@ -15,7 +15,13 @@ import {
   useContractAgreements,
   useCreateContractAgreement,
 } from '@/hooks/useContractAgreements';
-import type { ContractAgreement, ContractKind, ContractStatus } from '@bidstack/shared';
+import type {
+  ContractAgreement,
+  ContractKind,
+  ContractStatus,
+  RateCardLine,
+  RateCardUnit,
+} from '@bidstack/shared';
 
 const STATUS_TONE: Record<ContractStatus, 'jade' | 'amber' | 'gray' | 'tomato'> = {
   active: 'jade',
@@ -30,6 +36,28 @@ const KIND_LABEL: Record<ContractKind, string> = {
   nda: 'NDA',
   other: 'Other',
 };
+
+const UNIT_LABEL: Record<RateCardUnit, string> = {
+  day: '/day',
+  hour: '/hr',
+  month: '/mo',
+  year: '/yr',
+  fixed: ' fixed',
+};
+
+function formatRate(rateMicros: number, currency: string, unit: RateCardUnit): string {
+  let amount: string;
+  try {
+    amount = new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 0,
+    }).format(rateMicros / 1_000_000);
+  } catch {
+    amount = `${(rateMicros / 1_000_000).toLocaleString()} ${currency}`;
+  }
+  return `${amount}${UNIT_LABEL[unit]}`;
+}
 
 const inputCls =
   'rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm';
@@ -79,6 +107,30 @@ export function ContractAgreementsCard({ accountKey }: { accountKey: string }) {
                   </div>
                   <Badge tone={STATUS_TONE[a.status]}>{a.status}</Badge>
                 </div>
+                {a.rateCard.length > 0 && (
+                  <table className="mt-2 w-full text-xs">
+                    <thead>
+                      <tr className="text-left text-[var(--fg-tertiary)]">
+                        <th scope="col" className="py-1 font-medium">
+                          Role
+                        </th>
+                        <th scope="col" className="py-1 text-right font-medium">
+                          Rate
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {a.rateCard.map((line, i) => (
+                        <tr key={`${line.role}-${i}`} className="border-t border-[var(--border)]">
+                          <td className="py-1 text-[var(--fg-secondary)]">{line.role}</td>
+                          <td className="py-1 text-right text-[var(--fg-primary)]">
+                            {formatRate(line.rateMicros, line.currency ?? a.currency, line.unit)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </li>
             ))}
           </ul>
@@ -96,9 +148,19 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
     reference: '',
     countries: '',
     globalRebatePct: '',
+    currency: 'EUR',
     expiryDate: '',
     rateReviewSchedule: 'annual' as ContractAgreement['rateReviewSchedule'],
   });
+  // Rate-card lines (role -> rate). Rate is entered in major units and converted
+  // to micros on submit (money-in-micros convention).
+  const [rateLines, setRateLines] = useState<{ role: string; rate: string; unit: RateCardUnit }[]>(
+    [],
+  );
+  const addLine = () => setRateLines((ls) => [...ls, { role: '', rate: '', unit: 'day' }]);
+  const updateLine = (i: number, patch: Partial<{ role: string; rate: string; unit: RateCardUnit }>) =>
+    setRateLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+  const removeLine = (i: number) => setRateLines((ls) => ls.filter((_, idx) => idx !== i));
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -111,6 +173,13 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
       .map((c) => c.trim().toUpperCase())
       .filter((c) => c.length === 2);
     const pct = form.globalRebatePct.trim();
+    const rateCard: RateCardLine[] = rateLines
+      .filter((l) => l.role.trim() && l.rate.trim() && Number.isFinite(Number(l.rate)))
+      .map((l) => ({
+        role: l.role.trim(),
+        rateMicros: Math.round(Number(l.rate) * 1_000_000),
+        unit: l.unit,
+      }));
     create.mutate(
       {
         accountKey,
@@ -118,7 +187,8 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
         reference: form.reference.trim(),
         countries,
         globalRebateBps: pct ? Math.round(Number(pct) * 100) : null,
-        currency: 'EUR',
+        currency: form.currency.trim().toUpperCase() || 'EUR',
+        rateCard,
         expiryDate: form.expiryDate ? new Date(form.expiryDate).toISOString() : null,
         rateReviewSchedule: form.rateReviewSchedule,
         status: 'active',
@@ -132,9 +202,11 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
             reference: '',
             countries: '',
             globalRebatePct: '',
+            currency: 'EUR',
             expiryDate: '',
             rateReviewSchedule: 'annual',
           });
+          setRateLines([]);
         },
         onError: (err: Error) => toast.error('Could not save', { description: err.message }),
       },
@@ -211,7 +283,71 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
           className={inputCls}
           aria-label="Expiry date"
         />
+        <input
+          value={form.currency}
+          onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}
+          placeholder="Currency (EUR)"
+          maxLength={3}
+          className={inputCls}
+          aria-label="Currency"
+        />
       </div>
+
+      {/* Rate card — negotiated role rates for this MSA/contract */}
+      <div className="space-y-2 border-t border-[var(--border)] pt-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
+          Rate card
+        </p>
+        {rateLines.map((line, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <input
+              value={line.role}
+              onChange={(e) => updateLine(i, { role: e.target.value })}
+              placeholder="Role / profile"
+              className={`${inputCls} flex-1`}
+              aria-label={`Rate line ${i + 1} role`}
+            />
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={line.rate}
+              onChange={(e) => updateLine(i, { rate: e.target.value })}
+              placeholder="Rate"
+              className={`${inputCls} w-24`}
+              aria-label={`Rate line ${i + 1} rate`}
+            />
+            <select
+              value={line.unit}
+              onChange={(e) => updateLine(i, { unit: e.target.value as RateCardUnit })}
+              className={inputCls}
+              aria-label={`Rate line ${i + 1} unit`}
+            >
+              <option value="day">/day</option>
+              <option value="hour">/hr</option>
+              <option value="month">/mo</option>
+              <option value="year">/yr</option>
+              <option value="fixed">fixed</option>
+            </select>
+            <button
+              type="button"
+              onClick={() => removeLine(i)}
+              className="min-h-[44px] min-w-[44px] rounded text-[var(--fg-tertiary)] hover:text-[var(--danger)]"
+              aria-label={`Remove rate line ${i + 1}`}
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={addLine}
+          className="min-h-[44px] rounded px-2 text-xs text-[var(--brand-primary)] hover:underline"
+        >
+          + Add rate line
+        </button>
+      </div>
+
       <div className="flex gap-2">
         <Button type="submit" disabled={create.isPending}>
           {create.isPending ? 'Saving…' : 'Save'}

@@ -11,7 +11,9 @@ import {
   ContractAgreementFilter,
   ContractAgreementPage,
   ContractAgreementPatch,
+  RateCardLine,
 } from '@bidstack/shared';
+import { z as zod } from 'zod';
 
 import { normalizeName } from '../services/crm/dashboard.utils.js';
 
@@ -23,6 +25,7 @@ interface DbRow {
   countries: string[];
   globalRebateBps: number | null;
   currency: string;
+  rateCard: unknown;
   effectiveDate: Date | null;
   expiryDate: Date | null;
   rateReviewSchedule: string;
@@ -41,6 +44,7 @@ const SELECT = {
   countries: true,
   globalRebateBps: true,
   currency: true,
+  rateCard: true,
   effectiveDate: true,
   expiryDate: true,
   rateReviewSchedule: true,
@@ -60,6 +64,9 @@ function serialize(row: DbRow): z.infer<typeof ContractAgreement> {
     countries: row.countries,
     globalRebateBps: row.globalRebateBps,
     currency: row.currency,
+    // The Json column is validated back into RateCardLine[]; a malformed legacy
+    // value degrades to an empty card rather than failing the read.
+    rateCard: zod.array(RateCardLine).safeParse(row.rateCard).data ?? [],
     effectiveDate: row.effectiveDate?.toISOString() ?? null,
     expiryDate: row.expiryDate?.toISOString() ?? null,
     rateReviewSchedule: row.rateReviewSchedule as z.infer<
@@ -116,6 +123,7 @@ export const contractAgreementRoutes: FastifyPluginAsyncZod = async (server) => 
           countries: req.body.countries,
           globalRebateBps: req.body.globalRebateBps ?? null,
           currency: req.body.currency,
+          rateCard: req.body.rateCard,
           effectiveDate: toDate(req.body.effectiveDate) ?? null,
           expiryDate: toDate(req.body.expiryDate) ?? null,
           rateReviewSchedule: req.body.rateReviewSchedule,
@@ -161,6 +169,7 @@ export const contractAgreementRoutes: FastifyPluginAsyncZod = async (server) => 
           ...(b.countries !== undefined ? { countries: b.countries } : {}),
           ...(b.globalRebateBps !== undefined ? { globalRebateBps: b.globalRebateBps } : {}),
           ...(b.currency !== undefined ? { currency: b.currency } : {}),
+          ...(b.rateCard !== undefined ? { rateCard: b.rateCard } : {}),
           ...(b.effectiveDate !== undefined ? { effectiveDate: toDate(b.effectiveDate) } : {}),
           ...(b.expiryDate !== undefined ? { expiryDate: toDate(b.expiryDate) } : {}),
           ...(b.rateReviewSchedule !== undefined
