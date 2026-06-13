@@ -1,12 +1,35 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { prisma } from '@bidstack/db';
+import { prisma, Prisma } from '@bidstack/db';
 import { SearchResponse } from '@bidstack/shared';
+
+import { scoreMatch, tokenize } from '../lib/search-score.js';
 
 const VALID_TYPES = ['opportunity', 'lead', 'contact', 'company', 'task', 'note'] as const;
 
 type ValidType = (typeof VALID_TYPES)[number];
+
+/**
+ * Token-AND retrieval clause: a row matches only when EVERY query token appears
+ * in at least one of `fields` (case-insensitive). This is what lets a multi-term
+ * query like "acme paris" find a company named Acme located in Paris, where the
+ * two terms live in different columns. Returns undefined for an empty token list
+ * so callers fall back to no extra filter.
+ */
+function tokenAndClauses(
+  tokens: string[],
+  fields: string[],
+): { OR: Record<string, { contains: string; mode: 'insensitive' }>[] }[] {
+  return tokens.map((tok) => ({
+    OR: fields.map((f) => ({ [f]: { contains: tok, mode: 'insensitive' as const } })),
+  }));
+}
+
+function recencyMs(...dates: (Date | null | undefined)[]): number {
+  for (const d of dates) if (d) return d.getTime();
+  return 0;
+}
 
 export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
@@ -31,55 +54,61 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
         : [...VALID_TYPES];
 
       const totalCap = 30;
+      const tokens = tokenize(q);
       type SearchItem = z.infer<typeof SearchResponse>['items'][number];
-      const buckets: SearchItem[][] = [];
-      // Each type pushes its mapped rows into its own bucket; buckets are
-      // concatenated, score-sorted, and capped AFTER all queries resolve — so
-      // the global cap keeps the highest-scoring matches regardless of type
-      // order (the old running cap could drop a better match from a later type).
-      const addResults = (items: SearchItem[]) => {
+      // Carry a recency timestamp alongside each item so equally-relevant matches
+      // are tie-broken by "most recently touched" instead of arbitrary type order.
+      type Scored = { item: SearchItem; recency: number };
+      const buckets: Scored[][] = [];
+      const addResults = (items: Scored[]) => {
         buckets.push(items);
       };
-
-      const like = `%${q}%`;
-      const lowerQ = q.toLowerCase();
-
-      function score(...fields: (string | null | undefined)[]): number {
-        const text = fields.filter(Boolean).join(' ').toLowerCase();
-        if (text === lowerQ) return 100;
-        const idx = text.indexOf(lowerQ);
-        if (idx === 0) return 80;
-        if (idx > 0) return 60;
-        return 0;
-      }
 
       const queries: Array<Promise<unknown>> = [];
 
       if (requestedTypes.includes('opportunity')) {
-        queries.push((async () => {
-        // Leverage the GIN trigram index on (customer || ' ' || name || ' ' || code).
-        const opps = await prisma.$queryRaw<
-          Array<{ id: string; code: string; customer: string; name: string }>
-        >`
-          SELECT id, code, customer, name
-          FROM opportunities
-          WHERE org_id = ${req.auth.orgId}::uuid
-            AND deleted_at IS NULL
-            AND (customer || ' ' || name || ' ' || code) ILIKE ${like}
-          ORDER BY updated_at DESC
-          LIMIT ${perTypeLimit}
-        `;
-        addResults(
-          opps.map((o) => ({
-            type: 'opportunity' as const,
-            id: o.id,
-            title: `${o.code} — ${o.name}`,
-            subtitle: o.customer,
-            url: `/opportunities/${o.id}`,
-            score: score(o.code, o.name, o.customer),
-          })),
+        queries.push(
+          (async () => {
+            // GIN trigram index on (customer || ' ' || name || ' ' || code).
+            // Each token must match the concatenated text (token-AND).
+            const concat = Prisma.sql`(customer || ' ' || name || ' ' || code)`;
+            const tokenConds =
+              tokens.length > 0
+                ? Prisma.join(
+                    tokens.map((t) => Prisma.sql`${concat} ILIKE ${`%${t}%`}`),
+                    ' AND ',
+                  )
+                : Prisma.sql`TRUE`;
+            const opps = await prisma.$queryRaw<
+              Array<{ id: string; code: string; customer: string; name: string; updated_at: Date }>
+            >`
+              SELECT id, code, customer, name, updated_at
+              FROM opportunities
+              WHERE org_id = ${req.auth.orgId}::uuid
+                AND deleted_at IS NULL
+                AND (${tokenConds})
+              ORDER BY updated_at DESC
+              LIMIT ${perTypeLimit}
+            `;
+            addResults(
+              opps.map((o) => ({
+                item: {
+                  type: 'opportunity' as const,
+                  id: o.id,
+                  title: `${o.code} — ${o.name}`,
+                  subtitle: o.customer,
+                  url: `/opportunities/${o.id}`,
+                  score: scoreMatch(q, [
+                    { text: o.name, weight: 3 },
+                    { text: o.customer, weight: 3 },
+                    { text: o.code, weight: 2 },
+                  ]),
+                },
+                recency: recencyMs(o.updated_at),
+              })),
+            );
+          })(),
         );
-        })());
       }
 
       if (requestedTypes.includes('lead')) {
@@ -89,24 +118,32 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
               where: {
                 orgId: req.auth.orgId,
                 deletedAt: null,
-                OR: [
-                  { firstName: { contains: q, mode: 'insensitive' } },
-                  { lastName: { contains: q, mode: 'insensitive' } },
-                  { email: { contains: q, mode: 'insensitive' } },
-                  { companyName: { contains: q, mode: 'insensitive' } },
-                ],
+                AND: tokenAndClauses(tokens, [
+                  'firstName',
+                  'lastName',
+                  'email',
+                  'companyName',
+                ]) as Prisma.LeadWhereInput['AND'],
               },
               orderBy: { statusChangedAt: 'desc' },
               take: perTypeLimit,
             });
             addResults(
               leads.map((l) => ({
-                type: 'lead' as const,
-                id: l.id,
-                title: `${l.firstName} ${l.lastName}`.trim(),
-                subtitle: [l.companyName, l.email].filter(Boolean).join(' · '),
-                url: `/leads/${l.id}`,
-                score: score(l.firstName, l.lastName, l.email, l.companyName),
+                item: {
+                  type: 'lead' as const,
+                  id: l.id,
+                  title: `${l.firstName} ${l.lastName}`.trim(),
+                  subtitle: [l.companyName, l.email].filter(Boolean).join(' · '),
+                  url: `/leads/${l.id}`,
+                  score: scoreMatch(q, [
+                    { text: l.firstName, weight: 3 },
+                    { text: l.lastName, weight: 3 },
+                    { text: l.companyName, weight: 2 },
+                    { text: l.email, weight: 2 },
+                  ]),
+                },
+                recency: recencyMs(l.statusChangedAt, l.updatedAt, l.createdAt),
               })),
             );
           })(),
@@ -114,118 +151,151 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
       }
 
       if (requestedTypes.includes('contact')) {
-        queries.push((async () => {
-        const contacts = await prisma.contact.findMany({
-          where: {
-            orgId: req.auth.orgId,
-            deletedAt: null,
-            OR: [
-              { name: { contains: q, mode: 'insensitive' } },
-              { email: { contains: q, mode: 'insensitive' } },
-              { role: { contains: q, mode: 'insensitive' } },
-            ],
-          },
-          take: perTypeLimit,
-        });
-        addResults(
-          contacts.map((c) => ({
-            type: 'contact' as const,
-            id: c.id,
-            title: c.name,
-            subtitle: [c.role, c.email, c.customer].filter(Boolean).join(' · '),
-            url: `/contacts?search=${encodeURIComponent(c.name)}`,
-            score: score(c.name, c.email, c.role, c.customer),
-          })),
+        queries.push(
+          (async () => {
+            const contacts = await prisma.contact.findMany({
+              where: {
+                orgId: req.auth.orgId,
+                deletedAt: null,
+                AND: tokenAndClauses(tokens, [
+                  'name',
+                  'email',
+                  'role',
+                ]) as Prisma.ContactWhereInput['AND'],
+              },
+              take: perTypeLimit,
+            });
+            addResults(
+              contacts.map((c) => ({
+                item: {
+                  type: 'contact' as const,
+                  id: c.id,
+                  title: c.name,
+                  subtitle: [c.role, c.email, c.customer].filter(Boolean).join(' · '),
+                  url: `/contacts?search=${encodeURIComponent(c.name)}`,
+                  score: scoreMatch(q, [
+                    { text: c.name, weight: 3 },
+                    { text: c.role, weight: 2 },
+                    { text: c.email, weight: 2 },
+                    { text: c.customer, weight: 2 },
+                  ]),
+                },
+                recency: recencyMs(c.createdAt),
+              })),
+            );
+          })(),
         );
-        })());
       }
 
       if (requestedTypes.includes('company')) {
-        queries.push((async () => {
-        const companies = await prisma.companyEnrichment.findMany({
-          where: {
-            orgId: req.auth.orgId,
-            deletedAt: null,
-            OR: [
-              { normalizedName: { contains: q, mode: 'insensitive' } },
-              { domain: { contains: q, mode: 'insensitive' } },
-              { tradeName: { contains: q, mode: 'insensitive' } },
-            ],
-          },
-          take: perTypeLimit,
-        });
-        addResults(
-          companies.map((c) => ({
-            type: 'company' as const,
-            id: c.id,
-            title: c.tradeName ?? c.legalName,
-            subtitle: c.domain ?? '',
-            url: `/accounts/${encodeURIComponent(c.id)}`,
-            score: score(c.normalizedName, c.domain, c.tradeName),
-          })),
+        queries.push(
+          (async () => {
+            const companies = await prisma.companyEnrichment.findMany({
+              where: {
+                orgId: req.auth.orgId,
+                deletedAt: null,
+                AND: tokenAndClauses(tokens, [
+                  'normalizedName',
+                  'domain',
+                  'tradeName',
+                  'legalName',
+                ]) as Prisma.CompanyEnrichmentWhereInput['AND'],
+              },
+              take: perTypeLimit,
+            });
+            addResults(
+              companies.map((c) => ({
+                item: {
+                  type: 'company' as const,
+                  id: c.id,
+                  title: c.tradeName ?? c.legalName,
+                  subtitle: c.domain ?? '',
+                  url: `/accounts/${encodeURIComponent(c.id)}`,
+                  score: scoreMatch(q, [
+                    { text: c.tradeName, weight: 3 },
+                    { text: c.normalizedName, weight: 3 },
+                    { text: c.domain, weight: 2 },
+                    { text: c.legalName, weight: 2 },
+                  ]),
+                },
+                recency: recencyMs(c.updatedAt, c.createdAt),
+              })),
+            );
+          })(),
         );
-        })());
       }
 
       if (requestedTypes.includes('task')) {
-        queries.push((async () => {
-        const tasks = await prisma.task.findMany({
-          where: {
-            orgId: req.auth.orgId,
-            deletedAt: null,
-            title: { contains: q, mode: 'insensitive' },
-          },
-          take: perTypeLimit,
-        });
-        addResults(
-          tasks.map((t) => ({
-            type: 'task' as const,
-            id: t.id,
-            title: t.title,
-            subtitle: t.status,
-            url: `/tasks?search=${encodeURIComponent(t.title)}`,
-            score: score(t.title),
-          })),
+        queries.push(
+          (async () => {
+            const tasks = await prisma.task.findMany({
+              where: {
+                orgId: req.auth.orgId,
+                deletedAt: null,
+                AND: tokenAndClauses(tokens, ['title']) as Prisma.TaskWhereInput['AND'],
+              },
+              take: perTypeLimit,
+            });
+            addResults(
+              tasks.map((t) => ({
+                item: {
+                  type: 'task' as const,
+                  id: t.id,
+                  title: t.title,
+                  subtitle: t.status,
+                  url: `/tasks?search=${encodeURIComponent(t.title)}`,
+                  score: scoreMatch(q, [{ text: t.title, weight: 3 }]),
+                },
+                recency: recencyMs(t.createdAt),
+              })),
+            );
+          })(),
         );
-        })());
       }
 
       if (requestedTypes.includes('note')) {
-        queries.push((async () => {
-        const notes = await prisma.note.findMany({
-          where: {
-            orgId: req.auth.orgId,
-            deletedAt: null,
-            OR: [
-              { title: { contains: q, mode: 'insensitive' } },
-              { bodyMd: { contains: q, mode: 'insensitive' } },
-            ],
-          },
-          take: perTypeLimit,
-        });
-        addResults(
-          notes.map((n) => ({
-            type: 'note' as const,
-            id: n.id,
-            title: n.title,
-            subtitle: n.accountId,
-            url: `/accounts/${encodeURIComponent(n.accountId)}`,
-            score: score(n.title) + (n.bodyMd.toLowerCase().includes(lowerQ) ? 5 : 0),
-          })),
+        queries.push(
+          (async () => {
+            const notes = await prisma.note.findMany({
+              where: {
+                orgId: req.auth.orgId,
+                deletedAt: null,
+                AND: tokenAndClauses(tokens, [
+                  'title',
+                  'bodyMd',
+                ]) as Prisma.NoteWhereInput['AND'],
+              },
+              take: perTypeLimit,
+            });
+            addResults(
+              notes.map((n) => ({
+                item: {
+                  type: 'note' as const,
+                  id: n.id,
+                  title: n.title,
+                  subtitle: n.accountId,
+                  url: `/accounts/${encodeURIComponent(n.accountId)}`,
+                  score: scoreMatch(q, [
+                    { text: n.title, weight: 3 },
+                    { text: n.bodyMd, weight: 1 },
+                  ]),
+                },
+                recency: recencyMs(n.updatedAt, n.createdAt),
+              })),
+            );
+          })(),
         );
-        })());
       }
 
-
-      // All per-type queries run concurrently (was strictly sequential).
+      // All per-type queries run concurrently.
       await Promise.all(queries);
 
-      // Sort by relevance descending so the highest-quality matches surface
-      // first, then apply the global cap so it keeps the best across all types.
+      // Rank by relevance, then by recency for ties, then keep the best globally.
       const results = buckets
         .flat()
-        .sort((a, b) => b.score - a.score)
-        .slice(0, totalCap);
+        .sort((a, b) => b.item.score - a.item.score || b.recency - a.recency)
+        .slice(0, totalCap)
+        .map((s) => s.item);
 
       return { items: results };
     },
