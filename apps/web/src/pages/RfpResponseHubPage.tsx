@@ -313,7 +313,7 @@ export function RfpResponseHubPage() {
             title={t('pages.rfpHub.agents.winLoss.title')}
             description={t('pages.rfpHub.agents.winLoss.description')}
             cta={t('pages.rfpHub.agents.winLoss.cta')}
-            to="/reports"
+            to="/reports/list"
           />
         </div>
       </Card>

@@ -50,7 +50,7 @@ export function QuickActionsCard() {
 
 const QUICK_LINKS = [
   { label: 'Pipeline', href: '/pipeline', icon: 'briefcase' },
-  { label: 'Reports', href: '/reports', icon: 'reports' },
+  { label: 'Reports', href: '/reports/list', icon: 'reports' },
   { label: 'Tasks', href: '/tasks', icon: 'tasks' },
   { label: 'Settings', href: '/settings', icon: 'settings' },
 ];

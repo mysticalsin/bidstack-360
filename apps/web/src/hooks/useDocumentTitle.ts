@@ -8,6 +8,7 @@ const ROUTE_TITLES: Record<string, string> = {
   '/contacts': 'Contacts',
   '/tasks': 'Tasks',
   '/reports': 'Reports',
+  '/analytics': 'Analytics',
   '/integrations': 'Integrations',
   '/settings': 'Settings',
   '/login': 'Sign in',

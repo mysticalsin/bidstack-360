@@ -30,6 +30,8 @@ const ROUTE_TITLES: Record<string, string> = {
   '/workflows': 'Workflows',
   '/intake': 'Document Intake',
   '/reports': 'Reports',
+  '/analytics': 'Analytics',
+  '/dashboards': 'Dashboards',
   '/search': 'Search',
   '/integrations': 'Integrations',
   '/audit-log': 'Audit Log',

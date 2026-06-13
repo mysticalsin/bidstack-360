@@ -4,7 +4,7 @@
 // All children receive consistent dark-mode aware padding + border styling.
 
 import { motion, useReducedMotion } from 'framer-motion';
-import { MoreHorizontal, RefreshCw } from 'lucide-react';
+import { AlertTriangle, BarChart3, MoreHorizontal, RefreshCw } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { cn } from '@/lib/cn';
@@ -187,9 +187,7 @@ function ChartSkeleton() {
 function ChartError({ message }: { message: string }) {
   return (
     <div role="alert" className="flex flex-col items-center justify-center py-10 text-center">
-      <span className="text-2xl mb-2" aria-hidden>
-        ⚠
-      </span>
+      <AlertTriangle size={22} className="mb-2 text-[var(--danger)]" aria-hidden />
       <p className="text-xs text-[var(--danger)]">{message}</p>
     </div>
   );
@@ -198,9 +196,7 @@ function ChartError({ message }: { message: string }) {
 function ChartEmpty({ message }: { message: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-10 text-center">
-      <span className="text-2xl mb-2" aria-hidden>
-        📊
-      </span>
+      <BarChart3 size={22} className="mb-2 text-[var(--fg-tertiary)]" aria-hidden />
       <p className="text-xs text-[var(--fg-tertiary)]">{message}</p>
     </div>
   );

@@ -26,10 +26,10 @@ export function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      {/* The "New report" CTA pointed at the custom report-builder cluster
-          (/reports/new, /api/reports*) whose backend does not exist yet, so it
-          led to a broken page. Removed until that backend ships — the live
-          pipeline/leads/service-desk/tasks reports below are fully functional. */}
+      {/* Legacy canned-stats view (pipeline/leads/service-desk/tasks). The
+          custom report builder now lives at /reports/list -> /reports/new
+          (the canonical "Reports" nav destination); this page is kept for its
+          fixed operational dashboards and is still reachable by URL. */}
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">Reports</h1>

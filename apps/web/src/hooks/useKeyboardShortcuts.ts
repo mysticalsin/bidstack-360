@@ -14,7 +14,7 @@ const CHORD_ROUTES: Record<string, string> = {
   p: '/pipeline',
   c: '/contacts',
   t: '/tasks',
-  r: '/reports',
+  r: '/reports/list',
   s: '/settings',
 };
 

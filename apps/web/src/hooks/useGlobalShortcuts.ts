@@ -29,7 +29,7 @@ const CHORD_TARGETS: Record<string, string> = {
   c: '/contacts',
   t: '/tasks',
   s: '/settings',
-  r: '/reports',
+  r: '/reports/list',
   a: '/accounts',
   f: '/search',
 };

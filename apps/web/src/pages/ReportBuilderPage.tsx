@@ -54,7 +54,8 @@ const CHART_TYPES: { value: ChartType; label: string }[] = [
   { value: 'gauge', label: 'Gauge' },
   { value: 'heatmap', label: 'Heatmap' },
   { value: 'radar', label: 'Radar' },
-  { value: 'scatter', label: 'Scatter' },
+  // 'scatter' is a valid engine chartType but the preview has no {x,y} adapter
+  // yet, so it is intentionally omitted from the picker (no silent table swap).
 ];
 
 const inputCls = cn(
@@ -242,10 +243,15 @@ function BuilderForm({ initial, reportId }: { initial: Report | null; reportId: 
                   min={1}
                   max={1000}
                   className={cn(inputCls, 'max-w-[8rem]')}
-                  value={limit}
+                  // `limit || ''` lets the field be cleared while typing instead of
+                  // snapping to 1 on every keystroke; blur restores a sane default.
+                  value={limit || ''}
                   onChange={(e) =>
-                    setLimit(Math.max(1, Math.min(1000, Number(e.target.value) || 1)))
+                    setLimit(Math.min(1000, Math.max(0, Math.trunc(Number(e.target.value) || 0))))
                   }
+                  onBlur={() => {
+                    if (!limit) setLimit(100);
+                  }}
                   aria-label="Row limit"
                 />
               </div>

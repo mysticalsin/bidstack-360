@@ -57,12 +57,12 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     id: 'reports',
-    title: 'Build dashboards in minutes',
-    body: 'Drag-and-drop widgets to create reports your team actually uses. Share dashboards or schedule them as email digests.',
+    title: 'Build reports in minutes',
+    body: 'Compose a report from any object — filter, group, and aggregate — preview it live, then save it or pin it to an analytics dashboard.',
     target: '[data-tour="reports-new"]',
-    route: '/reports',
+    route: '/reports/list',
     placement: 'bottom',
-    ctaLabel: 'Invite your team',
+    ctaLabel: 'Create a report',
   },
 ];
 
