@@ -191,6 +191,7 @@ model Org {
   governanceMeetings GovernanceMeeting[]
   governanceActions  GovernanceAction[]
   projectReferences  ProjectReference[]
+  contractAgreements ContractAgreement[]
   notifications      Notification[]
 
   @@index([deletedAt])
@@ -4728,6 +4729,66 @@ model CrossSellAction {
   @@index([orgId, status], map: "cross_sell_actions_org_status_idx")
   @@index([deletedAt])
   @@map("cross_sell_actions")
+}
+
+// Contractual management per key/top account — MSAs, framework agreements, the
+// countries each covers, global rebate terms, and the rate re-evaluation
+// schedule. Demo feedback (Marc + Marie-Benoît). Rebate stored in basis points
+// (integer) to avoid float drift, consistent with the money-in-micros rule.
+model ContractAgreement {
+  id              String                @id @default(uuid()) @db.Uuid
+  orgId           String                @map("org_id") @db.Uuid
+  accountKey      String                @map("account_key")
+  kind            ContractKind          @default(msa)
+  reference       String
+  countries       String[]              @default([]) @map("countries")
+  globalRebateBps Int?                  @map("global_rebate_bps")
+  currency        String                @default("EUR") @db.VarChar(3)
+  effectiveDate   DateTime?             @map("effective_date") @db.Date
+  expiryDate      DateTime?             @map("expiry_date") @db.Date
+  rateReviewSchedule ContractRateSchedule @default(annual) @map("rate_review_schedule")
+  nextRateReviewAt   DateTime?          @map("next_rate_review_at") @db.Date
+  status          ContractStatus        @default(active)
+  notes           String?
+  createdById     String                @map("created_by_id") @db.Uuid
+  createdAt       DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime?             @map("deleted_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, accountKey], map: "contract_agreements_org_account_idx")
+  @@index([orgId, status], map: "contract_agreements_org_status_idx")
+  @@index([deletedAt])
+  @@map("contract_agreements")
+}
+
+enum ContractKind {
+  msa
+  framework
+  sow
+  nda
+  other
+
+  @@map("contract_kind")
+}
+
+enum ContractRateSchedule {
+  annual
+  biannual
+  quarterly
+  adhoc
+
+  @@map("contract_rate_schedule")
+}
+
+enum ContractStatus {
+  active
+  pending
+  expired
+  terminated
+
+  @@map("contract_status")
 }
 
 // A4 — comitology / governance meeting log per key account.

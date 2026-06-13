@@ -1,0 +1,82 @@
+// Contractual management per key/top account — MSAs, framework agreements, the
+// countries each covers, global rebate terms (basis points), and the rate
+// re-evaluation schedule. Demo feedback (Marc + Marie-Benoît). Read-tracked,
+// pre-sales-owned; not a contract-authoring system.
+import { z } from 'zod';
+
+export const ContractKind = z.enum(['msa', 'framework', 'sow', 'nda', 'other']);
+export type ContractKind = z.infer<typeof ContractKind>;
+
+export const ContractRateSchedule = z.enum(['annual', 'biannual', 'quarterly', 'adhoc']);
+export type ContractRateSchedule = z.infer<typeof ContractRateSchedule>;
+
+export const ContractStatus = z.enum(['active', 'pending', 'expired', 'terminated']);
+export type ContractStatus = z.infer<typeof ContractStatus>;
+
+// ISO-3166 alpha-2, uppercased. Bounded list so one record can't carry a huge array.
+const CountryCode = z.string().trim().length(2).toUpperCase();
+
+export const ContractAgreement = z.object({
+  id: z.string().uuid(),
+  accountKey: z.string().min(1),
+  kind: ContractKind,
+  reference: z.string().min(1).max(255),
+  countries: z.array(CountryCode).max(100),
+  globalRebateBps: z.number().int().min(0).max(100_000).nullable(),
+  currency: z.string().length(3),
+  effectiveDate: z.string().datetime().nullable(),
+  expiryDate: z.string().datetime().nullable(),
+  rateReviewSchedule: ContractRateSchedule,
+  nextRateReviewAt: z.string().datetime().nullable(),
+  status: ContractStatus,
+  notes: z.string().max(4000).nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type ContractAgreement = z.infer<typeof ContractAgreement>;
+
+export const ContractAgreementCreate = z.object({
+  accountKey: z.string().min(1).max(255),
+  kind: ContractKind.default('msa'),
+  reference: z.string().min(1).max(255),
+  countries: z.array(CountryCode).max(100).default([]),
+  globalRebateBps: z.number().int().min(0).max(100_000).nullable().optional(),
+  currency: z.string().length(3).default('EUR'),
+  effectiveDate: z.string().datetime().nullable().optional(),
+  expiryDate: z.string().datetime().nullable().optional(),
+  rateReviewSchedule: ContractRateSchedule.default('annual'),
+  nextRateReviewAt: z.string().datetime().nullable().optional(),
+  status: ContractStatus.default('active'),
+  notes: z.string().max(4000).nullable().optional(),
+});
+export type ContractAgreementCreate = z.infer<typeof ContractAgreementCreate>;
+
+export const ContractAgreementPatch = z
+  .object({
+    kind: ContractKind.optional(),
+    reference: z.string().min(1).max(255).optional(),
+    countries: z.array(CountryCode).max(100).optional(),
+    globalRebateBps: z.number().int().min(0).max(100_000).nullable().optional(),
+    currency: z.string().length(3).optional(),
+    effectiveDate: z.string().datetime().nullable().optional(),
+    expiryDate: z.string().datetime().nullable().optional(),
+    rateReviewSchedule: ContractRateSchedule.optional(),
+    nextRateReviewAt: z.string().datetime().nullable().optional(),
+    status: ContractStatus.optional(),
+    notes: z.string().max(4000).nullable().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, {
+    message: 'PATCH body must contain at least one field',
+  });
+export type ContractAgreementPatch = z.infer<typeof ContractAgreementPatch>;
+
+export const ContractAgreementFilter = z.object({
+  accountKey: z.string().max(255).optional(),
+  status: ContractStatus.optional(),
+});
+export type ContractAgreementFilter = z.infer<typeof ContractAgreementFilter>;
+
+export const ContractAgreementPage = z.object({
+  items: z.array(ContractAgreement),
+});
+export type ContractAgreementPage = z.infer<typeof ContractAgreementPage>;

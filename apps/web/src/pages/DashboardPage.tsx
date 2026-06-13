@@ -29,6 +29,7 @@ import { InfoSearchLeadsCard } from '@/components/account-intel/InfoSearchLeadsC
 import { CrossSellCard } from '@/components/account-intel/CrossSellCard';
 import { GovernanceLogCard } from '@/components/account-intel/GovernanceLogCard';
 import { SpotlightRefsCard } from '@/components/account-intel/SpotlightRefsCard';
+import { ContractAgreementsCard } from '@/components/account-intel/ContractAgreementsCard';
 import { CockpitCustomizeMenu } from '@/components/cockpit/CockpitCustomizeMenu';
 import { Reveal } from '@/components/motion/Reveal';
 import { NotesPanel } from '@/components/notes/NotesPanel';
@@ -245,6 +246,12 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
           {show('spotlightRefs') && (
             <Reveal delay={0.22}>
               <SpotlightRefsCard accountKey={cockpit.company.id} />
+            </Reveal>
+          )}
+
+          {show('contracts') && (
+            <Reveal delay={0.24}>
+              <ContractAgreementsCard accountKey={cockpit.company.id} />
             </Reveal>
           )}
         </div>
