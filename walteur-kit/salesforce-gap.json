@@ -1,949 +1,952 @@
 {
- "dimensions": [
-  {
-   "dimension": "list-management",
-   "score": 58,
-   "currentState": "Operational lists are built from shared primitives, not a generic DataTable: useBulkSelection, useTableSort + SortableHeader (3-state asc/desc/none, URL-persisted single-column sort), BulkActionBar (sticky, X selected, export/delete/clear), SpotlightTable, lib/csv.ts (CSV with formula-injection sanitization and UTF-8 BOM). Opportunities and Contacts are richest: single-column sort, bulk select with indeterminate header checkbox, bulk delete (undo on Contacts), bulk export, bulk stage-change on Opps, inline editing, sticky headers; Opps also has a server-streamed CSV export endpoint. Leads and Companies share the bulk-select/export/delete pattern with single status/priority/search filters. Tasks has the only saved/named views (SavedViewsBar + savedViews store, localStorage) plus drag-reorder and a calendar toggle. Accounts is a card grid with search/industry/sort but no checkboxes, bulk actions, or export. A global density pref (compact/comfortable/spacious) exists but only in Settings; a CursorPager component exists but is imported nowhere; a full AND/OR FilterBuilder exists only in Reports. Lists fetch a hard cap (Opps 100, Leads/Companies 50, Contacts server default) and never page even though the backend returns nextCursor.",
-   "gapCount": 8
-  },
-  {
-   "dimension": "search-nav-copilot",
-   "score": 52,
-   "currentState": "BidStack has a real, well-built foundation here. A ⌘K/Ctrl+K command palette (apps/web/src/components/command/CommandPalette.tsx + usePaletteItems.tsx) merges contextual page commands, palette-recents (localStorage), cockpit-visit recents, ~11 nav targets, and live results from in-memory caches (accounts, contacts, tasks) plus two debounced server searches (global /api/search and opportunity search). It has solid a11y: combobox/listbox roles, aria-activedescendant, 44px touch rows, reduced-motion, type-to-filter capture. The backend /api/search (apps/api/src/routes/search.ts) does org-scoped ILIKE substring matching across opportunity/contact/company/task/note with a hand-rolled 0/60/80/100 score and a 30-item cap, run concurrently. A dedicated /search page (SearchPage.tsx) gives grouped tabs + counts. Navigation has URL-derived breadcrumbs (Breadcrumbs.tsx), a topbar recent-search dropdown (TopbarSearch.tsx), vim-style \"g d/o/p…\" chords + ⌘/ focus (useGlobalShortcuts.ts), and a quick-add \"N\" menu (QuickAddMenu.tsx) for 4 create flows. The \"AI assistant\" (apps/api/src/routes/ai-assistant.ts) is NOT a conversational copilot — it is 5 fixed structured endpoints (email-draft, deal-sentiment, meeting-prep, enrich-contact, account-intel) surfaced only on specific cards (MeetingPrepCard, AccountIntelPanel), with no free-form ask/chat route and no ability to take actions.",
-   "gapCount": 9
-  },
-  {
-   "dimension": "notifications-activity",
-   "score": 22,
-   "currentState": "BidStack has a partial notification surface but no unified notification system. There is NO `Notification` model in Prisma (packages/db/prisma/schema.prisma) — only `Mention`, `Activity`, `AuditLog`, `Comment`, and `UserPresence`. The topbar bell (apps/web/src/components/layout/topbar/TopbarNotifications.tsx) is mentions-only: it reads `/api/mentions` + `/api/mentions/summary` (apps/api/src/routes/collaboration.ts) via React Query with `staleTime: 30_000` and no `refetchInterval`, so it is polled-on-mount, not real-time, and every item shows the hardcoded string \"Someone mentioned you in a comment\". @mention resolution (longest-name-wins) runs only on comment create. A full WebSocket realtime stack exists (apps/api/src/plugins/realtime.ts, services/realtime.service.ts, services/presence.service.ts) with a documented `notification:user:<userId>` channel — but grep confirms NOTHING ever publishes to that channel, and the web app never opens `/api/realtime` at all (the only `new WebSocket` in apps/web is the Yjs editor client in lib/yjs-client.ts). Notification preferences (apps/web/src/components/settings/NotificationPrefsSection.tsx) are localStorage-only (`bidstack:notifications`), not persisted server-side and not enforced by any code. There is no email digest, no SLA/breach engine, no assignment/stage-change/task-due push, and no global activity feed. Per-record timelines do exist: apps/api/src/routes/opportunity-timeline.ts reconstructs a feed read-side from AuditLog (`opportunity.stage`, `opportunity.update`) + Task + Comment, and the cockpit ActivityTimelineCard renders account-scoped activity. Slack service (apps/api/src/services/slack.service.ts) ships `dmUser` and `formatNotificationToBlocks` referencing a \"notification engine\", but those functions are never called anywhere.",
-   "gapCount": 7
-  },
-  {
-   "dimension": "permissions-sharing",
-   "score": 38,
-   "currentState": "BidStack has a deep RBAC foundation on the backend that is largely disconnected from the product. The DB models Role/Permission/RolePermission/UserRole (packages/db/prisma/schema.prisma:2299-2361) back 48 permission keys and 16 seeded org-scoped roles. The rbac plugin enforces a role gate and a granular permission gate with no admin claim-fallback (apps/api/src/plugins/rbac.ts), and rbac.service.ts adds a per-request permission cache. Role definitions are fully manageable by admins via /api/roles CRUD with audit logging. However, enforcement is inconsistent: 134 requirePermission calls in 40 files, but core write surfaces (leads.write.routes.ts, opportunities.mutations.ts, reports.ts, files.ts, workflows.ts, activities.ts, tags.ts, account-intel.ts, search.ts) have ZERO permission gates, so any authenticated user can mutate them. There is no endpoint or UI to assign a custom Role to a user (UserRole rows are written only by the seed and ensureAdminRoleGrant). getUserPermissions, the documented capability manifest, is never called, so the frontend authorization model is the binary useIsAdmin() (apps/web/src/lib/auth.tsx:380), with TeamSection only toggling a legacy admin/member string. The RolesPage matrix is hardcoded read-only from rbac-matrix.ts and shows only 6 of the 16 seeded roles. Record-level sharing is limited to M7 country-based scoping of the opportunity LIST/COUNT only (apps/api/src/lib/access-scope.ts), leaving detail-by-id, companies, leads and contacts org-visible. There is no per-field permission, no record-level sharing rules engine, no team hierarchy, and no login-as / impersonation anywhere.",
-   "gapCount": 8
-  },
-  {
-   "dimension": "reporting-dashboards",
-   "score": 42,
-   "currentState": "Strong backend, builder UI absent, scheduling cosmetic, no drill-through.",
-   "gapCount": 2
-  },
-  {
-   "dimension": "ux-polish-states",
-   "score": 78,
-   "currentState": "BidStack's web app (apps/web, React 18 + Vite + Tailwind 4 + framer-motion) has a genuinely strong state-handling foundation. There is a shared StateMessages module (EmptyState/ErrorState/LoadingSkeleton) used by 84 files, a layout-matched skeleton set (DashboardSkeleton, TableSkeleton, KanbanSkeleton, DetailPageSkeleton in components/skeletons/PageSkeletons.tsx) that mirrors real layout, and an Apple-grade Toast system (Toast.tsx) with dedupe, bounded stack (5), per-tone durations, Undo action support, ARIA alert/status roles and reduced-motion. The account cockpit (DashboardPage.tsx + components/cockpit + components/account-intel) is the most polished surface: every self-fetching card (CrossSellCard, GovernanceLogCard, SpotlightRefsCard, InfoSearchLeadsCard, AccountIntelPanel, LiveDataMeshCard) renders explicit loading/error/empty states, uses Lucide-style Icon (not emoji), respects useReducedMotion everywhere, has ARIA tablists with full keyboard nav, 44px touch targets, and a stale-snapshot fallback with a Retry banner on transient cockpit errors. The cockpit is responsive: index.css and cockpit.css collapse command-center / KPI grid / dash-row-3 at 1180px and 720px, the KPI grid steps 6->3->2 columns, and there is a real MobileNav drawer in AppShell. Optimistic updates (onMutate) exist in 6 hooks (useContacts/useLeads/useNotes/useOpportunities/useStageMutation/useTasks). The weak spots are consistency, not capability: emoji used as UI glyphs in the two shared state components, generic flat-bar skeletons on core list/grid pages (causing layout shift), one detail page that bypasses the shared state components entirely, and Undo wired in only one place despite the Toast supporting it app-wide.",
-   "gapCount": 6
-  },
-  {
-   "dimension": "accessibility",
-   "score": 82,
-   "currentState": "BidStack's web frontend has an unusually mature, deliberate WCAG 2.2 AA posture. The token palette (apps/web/src/index.css) carries inline-verified contrast ratios for both light and dark modes, with several colors explicitly remediated to clear 4.5:1 (e.g. --fg-tertiary #6b7280, --warning #8a5a00, --danger #b82032). A global *:focus-visible 2px brand ring + halo is defined with a native-control fallback, a focus-visible skip-link targets a focusable <main id=\"main\" tabIndex={-1}>, and prefers-reduced-motion is honored globally (with a data-motion='full' opt-out) and via useReducedMotion() in components. There are dedicated LiveAnnouncer + RouteAnnouncer aria-live regions and 92 files using role=alert/status/aria-live. Charts (apps/web/src/components/charts/CartesianCharts.tsx, chartShared.tsx) wrap each Recharts SVG in role=img with a descriptive aria-label plus an sr-only <table> data fallback; the win/loss bar uses a non-color-only split. CommandPalette implements a full combobox/listbox/aria-activedescendant pattern with >=44px rows; LeadKanbanView is keyboard-operable via arrow keys with aria-roledescription; AccountIntelPanel hand-rolls the complete WAI-ARIA tabs pattern (roving tabindex, Home/End, aria-controls/tabpanel). Dialogs/Modals/Tabs use Radix for focus trapping. The Input primitive (apps/web/src/components/ui/Input.tsx) correctly wires aria-invalid, aria-describedby, aria-errormessage and role=alert. There is a real axe-core Playwright suite (apps/web/e2e/a11y/axe.spec.ts) that gates on critical/serious violations across 19 routes with a tracked baseline.json. The main weaknesses are: the core account cockpit detail route and opened dialog/kanban/RFP states are not covered by the axe suite; several record-creation dialogs shadow the accessible Input primitive with a local minimal input that never connects field errors via aria-describedby; QuickAddMenu's listbox lacks aria-activedescendant; charts double-expose the SVG + data table; and emoji are still used as UI icons in several surfaces.",
-   "gapCount": 7
-  },
-  {
-   "dimension": "performance-reliability",
-   "score": 74,
-   "currentState": "BidStack has a genuinely strong performance/reliability backend foundation that is well above typical for a product at this stage. The Prisma schema (packages/db/prisma/schema.prisma, 4795 lines) carries 390 @@index declarations including composite orgId+filter indexes on the hot tables (Opportunity: opps_org_stage_idx, opps_org_company_idx, opps_org_owner_idx, etc.) plus a GIN trigram search index defined in a raw migration. The cockpit/dashboard hot path (apps/api/src/services/crm/dashboard.service.ts) runs 12 bounded, column-selected queries in a single Promise.all with no N+1, fronted by a two-tier cache (in-process promise cache in apps/api/src/routes/crm/dashboard.ts + a Redis layer in apps/api/src/plugins/redis-cache.ts). The accounts top-10 path (apps/api/src/routes/accounts.ts) was deliberately rewritten from an in-JS reduce-over-take:1000 into a single Postgres GROUP BY, and key-account lists use cursor pagination with Postgres groupBy aggregation (accounts.helpers.ts). A Prisma middleware (apps/api/src/lib/prisma-middleware.ts via queryGuard plugin) detects slow queries (>500ms), N+1 (>10 identical patterns/request), and unbounded findMany (rejected in dev). Idempotency is fully implemented (apps/api/src/plugins/idempotency.ts: Redis+memory fallback, body fingerprinting, in-flight locking, 24h replay cache). Real-time presence is real (apps/api/src/plugins/realtime.ts: WebSocket + Redis pub/sub, tenant-scoped channels, heartbeats). BullMQ workers centralize defaultJobOptions (packages/shared/src/queue-config.core.ts: attempts + exponential backoff + bounded retention) and the worker (apps/worker/src/main.ts) has graceful shutdown, a dual DB+Redis health probe, fail-fast prod config, and stuck-job reapers. The two material weaknesses are on the frontend and at the edge: no list virtualization exists anywhere (only ComplianceMatrix.tsx uses a virtualizer; react-window/react-virtual are not even dependencies), the list pages never consume the cursor pagination the API exposes (useContacts/useCompanies fire a single useQuery capped at 50 rows with no load-more), and HTTP response compression is not registered (@fastify/compress is absent from apps/api/package.json).",
-   "gapCount": 6
-  },
-  {
-   "dimension": "onboarding-import-settings",
-   "score": 38,
-   "currentState": "BidStack has a surprisingly complete onboarding/import BACKEND that is almost entirely unreachable from the UI. A real migration engine exists: apps/api/src/routes/migrations.ts (start-csv, save/get mappings, cancel, undo within 24h, errors.csv download) plus migrations-hubspot.routes.ts (HubSpot OAuth) and a BullMQ worker (apps/worker/src/queues/migration.ts) with per-entity writers, three dedup strategies (skip/update/duplicate), value coercion to micros, stage mapping, and an audit-based undo trail. An onboarding backend also exists: apps/api/src/routes/onboarding.ts installs four pipeline templates (B2B SaaS, Agency, Enterprise, Inside Sales) and seeds/deletes sample data. BUT the web app has NO migration/import/onboarding hooks (nothing calls start-csv or /onboarding/templates/:t/install). apps/web/src/components/onboarding/TemplatePicker.tsx returns null (a stub), and SampleDataBanner only renders when store.hasSampleData is true but setHasSampleData(true) is never called anywhere, so it is dead. The only reachable import is ImportOpportunitiesDialog.tsx, a raw JSON-paste textarea hitting /opportunities/import with no field mapping, CSV parsing, preview, or dedup. The user-facing onboarding surface is QuickStartPage.tsx (an 8-item localStorage checklist) plus a 6-step ProductTour; the Pick a template pipeline item just navigates to /pipeline. Settings (SettingsPage.tsx, 16 sections) is broad but shallow in places: workspace is a read-only org fingerprint with no invites; team only promotes/demotes roles; currency/locale is localStorage-only and not persisted server-side; pipeline stages can only be renamed/recolored (pipeline-stages.ts exposes GET+PATCH only, the 7 stages are a fixed set). Org-level settings (org-settings.ts) persist only opportunity-filter rules; there is no branding/logo upload and no template gallery surfaced to users.",
-   "gapCount": 9
-  }
- ],
- "gaps": [
-  {
-   "title": "No pagination or infinite scroll on operational lists",
-   "bestInClass": "Load 25-50 rows then page/infinite-scroll the full set with a true total count and every record reachable.",
-   "today": "Opps fetch limit 100 (OpportunitiesPage.tsx:53), Leads/Companies 50, Contacts no limit (useContacts.ts), Accounts all in-memory. Backend returns nextCursor (contacts.ts:80) and CursorPager.tsx exists but is imported nowhere; rows past the cap are invisible and counts describe only the visible slice.",
-   "kind": "table_stakes_missing",
-   "effort": "M",
-   "leverage": "high",
-   "files": [
-    "apps/web/src/components/ui/CursorPager.tsx",
-    "apps/web/src/hooks/useContacts.ts",
-    "apps/web/src/pages/OpportunitiesPage.tsx",
-    "apps/web/src/pages/LeadsPage.tsx",
-    "apps/web/src/pages/CompaniesPage.tsx",
-    "apps/api/src/routes/contacts.ts"
-   ],
-   "dimension": "list-management"
-  },
-  {
-   "title": "Saved/named views exist only for Tasks and only in localStorage",
-   "bestInClass": "Every core object has named, server-persisted, shareable saved views recalled on load as the primary navigation metaphor.",
-   "today": "SavedViewsBar + savedViews.ts are wired to Tasks only and localStorage-only by design (savedViews.ts:6-8), so no cross-device or team sync. Opps/Leads/Contacts/Companies/Accounts persist sort/filter to the URL but have no save/recall affordance.",
-   "kind": "differentiator",
-   "effort": "L",
-   "leverage": "high",
-   "files": [
-    "apps/web/src/stores/savedViews.ts",
-    "apps/web/src/components/task/SavedViewsBar.tsx",
-    "apps/web/src/pages/OpportunitiesPage.tsx",
-    "apps/web/src/pages/ContactsPage.tsx",
-    "apps/web/src/pages/LeadsPage.tsx"
-   ],
-   "dimension": "list-management"
-  },
-  {
-   "title": "No multi-filter builder on operational lists, only single fixed quick filters",
-   "bestInClass": "A chip bar composing multiple conditions with operators, AND/OR logic, and date ranges, applied server-side.",
-   "today": "A nested AND/OR FilterBuilder (eq/neq/contains/gt/lt/isNull) exists but only in the Reports builder (components/reports/FilterBuilder.tsx). Lists offer 1-2 fixed selects: Leads status+priority (LeadsPage.tsx:207), Opps stage chips, Accounts industry, Companies/Contacts search only; no value/owner/date/tag conditions.",
-   "kind": "table_stakes_missing",
-   "effort": "L",
-   "leverage": "high",
-   "files": [
-    "apps/web/src/components/reports/FilterBuilder.tsx",
-    "apps/web/src/pages/OpportunitiesPage.tsx",
-    "apps/web/src/pages/LeadsPage.tsx",
-    "apps/web/src/pages/ContactsPage.tsx"
-   ],
-   "dimension": "list-management"
-  },
-  {
-   "title": "No column show/hide or reorder on any list",
-   "bestInClass": "A column manager toggles columns on/off, drag-reorders them, and persists the layout per view, exposing 12+ optional columns.",
-   "today": "Columns are hard-coded in each thead (ContactTable, OpportunitiesTableHead, CompaniesPage.tsx:278, LeadsPage.tsx:309). A grep for columnVisibility/hideColumn/reorderColumn/visibleColumns finds no list-table matches; no way to surface tags, owner, last activity, or custom fields.",
-   "kind": "polish_gap",
-   "effort": "M",
-   "leverage": "medium",
-   "files": [
-    "apps/web/src/pages/contacts/ContactTable.tsx",
-    "apps/web/src/pages/opportunities/OpportunitiesTableHead.tsx",
-    "apps/web/src/pages/CompaniesPage.tsx",
-    "apps/web/src/pages/LeadsPage.tsx"
-   ],
-   "dimension": "list-management"
-  },
-  {
-   "title": "Density toggle exists globally but is never surfaced in list toolbars",
-   "bestInClass": "A density control in the list toolbar so users adjust row height where they read the data, and rows visibly re-space.",
-   "today": "preferences.ts defines density (compact/comfortable/spacious as html data-density) but it is only changeable in Settings > Appearance. No list header exposes it and tables do not visibly key off it, so the feature is invisible to list users.",
-   "kind": "polish_gap",
-   "effort": "S",
-   "leverage": "medium",
-   "files": [
-    "apps/web/src/stores/preferences.ts",
-    "apps/web/src/components/settings/AppearanceSection.tsx",
-    "apps/web/src/pages/ContactsPage.tsx"
-   ],
-   "dimension": "list-management"
-  },
-  {
-   "title": "Accounts, the core view, has no bulk select, checkboxes, or export",
-   "bestInClass": "The flagship object list supports row selection, bulk tag/assign/export, and column views like every other object.",
-   "today": "AccountsPage.tsx is a motion card grid (AccountCard) with search/industry/4-option sort but no checkbox column, no useBulkSelection, no BulkActionBar, and no CSV export, unlike Opps/Leads/Contacts/Companies. Rows are derived in-memory from useCrmDashboard with no pagination.",
-   "kind": "polish_gap",
-   "effort": "M",
-   "leverage": "medium",
-   "files": [
-    "apps/web/src/pages/AccountsPage.tsx",
-    "apps/web/src/pages/accountsPage/AccountCard.tsx",
-    "apps/web/src/components/ui/BulkActionBar.tsx"
-   ],
-   "dimension": "list-management"
-  },
-  {
-   "title": "Single-column sort only, no multi-column or secondary sort",
-   "bestInClass": "Shift-click or a sort manager to sort by multiple keys, e.g. Stage asc then Value desc.",
-   "today": "useTableSort.ts holds one {key,dir} SortState and SortableHeader cycles one column (SortableHeader.tsx:49-56); the URL encodes one sort token. No secondary sort path.",
-   "kind": "polish_gap",
-   "effort": "M",
-   "leverage": "low",
-   "files": [
-    "apps/web/src/hooks/useTableSort.ts",
-    "apps/web/src/components/ui/SortableHeader.tsx",
-    "apps/web/src/pages/OpportunitiesPage.tsx"
-   ],
-   "dimension": "list-management"
-  },
-  {
-   "title": "Export is CSV-only and export-all is limited to the loaded page",
-   "bestInClass": "Export to CSV and native XLSX, with a server-driven export of the full filtered set rather than rows in memory.",
-   "today": "lib/csv.ts is CSV-only. Opps has a server-streamed full export (opportunities.export.ts), but Leads/Contacts/Companies export-all builds client-side from the capped loaded page (only the visible 50-100). No XLSX anywhere.",
-   "kind": "polish_gap",
-   "effort": "M",
-   "leverage": "low",
-   "files": [
-    "apps/web/src/lib/csv.ts",
-    "apps/web/src/pages/LeadsPage.tsx",
-    "apps/web/src/pages/CompaniesPage.tsx",
-    "apps/api/src/routes/opportunities.export.ts"
-   ],
-   "dimension": "list-management"
-  },
-  {
-   "title": "No conversational copilot that answers questions over the data or takes actions",
-   "bestInClass": "Attio AI, HubSpot Breeze, and Salesforce Einstein Copilot offer a chat surface (often in the same ⌘K bar) where a user types 'which open bids slip this quarter?' or 'summarize my MAHLE account and draft a follow-up' and gets a grounded answer plus offered actions. The copilot reads pipeline/account data and can execute (create task, change stage, send email) with confirmation.",
-   "today": "The 'AI assistant' is 5 fixed RPC endpoints (apps/api/src/routes/ai-assistant.ts: email-draft, deal-sentiment, meeting-prep, enrich-contact, account-intel). Each is bound to a specific button/card (MeetingPrepCard.tsx, AccountIntelPanel.tsx) with hardcoded inputs. There is no /ai-assistant/ask or /chat route, no free-text question entry, no tool-calling loop, and no conversational state beyond a feedback row. A buyer evaluating against HubSpot/Salesforce will immediately see there is no copilot.",
-   "kind": "differentiator",
-   "effort": "L",
-   "leverage": "high",
-   "files": [
-    "apps/api/src/routes/ai-assistant.ts",
-    "apps/api/src/services/ai-assistant.service.ts",
-    "apps/api/src/services/ai-assistant.context.ts",
-    "apps/web/src/hooks/useAiAssistant.ts",
-    "apps/web/src/components/ai/MeetingPrepCard.tsx",
-    "apps/web/src/components/command/CommandPalette.tsx"
-   ],
-   "dimension": "search-nav-copilot"
-  },
-  {
-   "title": "Command palette cannot run actions — it only navigates and finds records",
-   "bestInClass": "Linear, Raycast, Attio and Notion all let ⌘K execute commands: 'Create opportunity', 'Change stage to Won', 'Assign to me', 'Add task'. The palette is the action surface, not just a finder.",
-   "today": "The only actions in the palette come from useCommandContext (apps/web/src/hooks/useCommandContext.ts), which is registered by EXACTLY ONE page — OpportunityDetailPage.tsx — contributing 2 actions ('Create task for X', 'Open AI briefing'). There are zero global actions: no 'New opportunity/contact/task' in the palette, no 'change stage', no 'go to settings tab'. Global create lives in a SEPARATE 'N' menu (QuickAddMenu.tsx), so the palette and the action surface are architecturally split. The 'action' group in commandPaletteUtils.ts is defined but almost entirely unused.",
-   "kind": "table_stakes_missing",
-   "effort": "M",
-   "leverage": "high",
-   "files": [
-    "apps/web/src/components/command/usePaletteItems.tsx",
-    "apps/web/src/components/command/commandPaletteUtils.ts",
-    "apps/web/src/hooks/useCommandContext.ts",
-    "apps/web/src/components/quickadd/QuickAddMenu.tsx",
-    "apps/web/src/pages/OpportunityDetailPage.tsx"
-   ],
-   "dimension": "search-nav-copilot"
-  },
-  {
-   "title": "Palette nav targets are badly out of sync with the real navigation (~11 of ~30 routes)",
-   "bestInClass": "Every primary destination is jumpable from ⌘K. Linear/Attio derive palette nav from the same source of truth as the sidebar so they never drift.",
-   "today": "NAV_TARGETS in commandPaletteUtils.ts hardcodes 11 destinations (dashboard, accounts, opportunities, pipeline, contacts, tasks, reports, integrations, audit-log, settings, search). The actual app (navConfig.ts NAV_SECTIONS) ships ~30 routes: Leads, Forecasts, Sales Toolkits, Key Accounts, Top Accounts, Companies, Sector View, Cross-sell, References, Territories, Bid/No-Bid Matrix, RFP Response Hub, Proposals, Agent Studio, Calendar, Calls, Service Desk, Workflows, Custom Objects, Document Intake, Quick Start. None of these are reachable via the palette's 'Go to X' commands, and several (e.g. /integrations as a standalone route) no longer match navConfig. NAV_TARGETS should be derived from NAV_SECTIONS.",
-   "kind": "table_stakes_missing",
-   "effort": "S",
-   "leverage": "high",
-   "files": [
-    "apps/web/src/components/command/commandPaletteUtils.ts",
-    "apps/web/src/components/layout/navConfig.ts",
-    "apps/web/src/components/command/usePaletteItems.tsx"
-   ],
-   "dimension": "search-nav-copilot"
-  },
-  {
-   "title": "Two parallel search systems that don't share results, ranking, or recents",
-   "bestInClass": "One global search backend powers the palette, the topbar bar, and the full search page with consistent ranking and shared recents.",
-   "today": "There are two independent search frontends: the palette (usePaletteItems.tsx, which blends client-cached lists + /api/search + /api/opportunities) and TopbarSearch.tsx (which just navigates to /search?q=). They use DIFFERENT recents stores (palette-recents.ts in localStorage vs the recentSearches Zustand store) and DIFFERENT result shapes. The palette mixes client-side matchers (matchCompanies/matchContacts/matchTasks in commandPaletteUtils.ts, capped to whatever the dashboard/contacts/tasks hooks happened to load) with server search, so palette results for an entity can differ from the /search page results for the same query. This duplication is a maintenance and consistency liability a power user notices.",
-   "kind": "polish_gap",
-   "effort": "M",
-   "leverage": "medium",
-   "files": [
-    "apps/web/src/components/command/usePaletteItems.tsx",
-    "apps/web/src/components/command/commandPaletteUtils.ts",
-    "apps/web/src/components/layout/topbar/TopbarSearch.tsx",
-    "apps/web/src/lib/palette-recents.ts",
-    "apps/web/src/stores/recentSearches.ts"
-   ],
-   "dimension": "search-nav-copilot"
-  },
-  {
-   "title": "Backend search is substring ILIKE with no fuzzy/typo tolerance, no pagination, no relevance weighting across fields",
-   "bestInClass": "Salesforce/HubSpot/Attio use trigram or full-text search with typo tolerance (Postgres pg_trgm similarity, Algolia, or tsvector), per-field weighting (name > email > body), and paginated/infinite results. A misspelled query ('Mahel' for 'MAHLE') still returns the account.",
-   "today": "search.ts builds `%q%` and runs Prisma `contains` / raw ILIKE — pure substring, so 'Mahel', 'MAHEL' or a transposed character returns nothing. The score() helper only checks exact / startsWith / contains (100/80/60) on a joined string; there is no field weighting and no fuzzy match. Results are hard-capped at 30 with no offset/pagination and the global search hook (useGlobalSearch.ts) requests limit=16 with no 'load more'. The opportunity raw query has a trigram GIN index comment but the matching itself is still ILIKE, not similarity().",
-   "kind": "polish_gap",
-   "effort": "M",
-   "leverage": "medium",
-   "files": [
-    "apps/api/src/routes/search.ts",
-    "apps/web/src/hooks/useGlobalSearch.ts",
-    "apps/web/src/pages/SearchPage.tsx"
-   ],
-   "dimension": "search-nav-copilot"
-  },
-  {
-   "title": "Search results are not grouped in the palette and the topbar bar has no inline results at all",
-   "bestInClass": "Cmd+K groups results under labeled headers (Accounts / Contacts / Recents / Actions) with section dividers, and the topbar search shows live grouped results as you type — you rarely need a full-page search.",
-   "today": "The palette renders a single flat list with only a tiny per-row group tag (groupTag() in commandPaletteUtils.ts: 'acct','who','todo'); there are no section headers or visual grouping, so on a busy query accounts, contacts and nav items interleave. The topbar SearchBar.tsx shows ONLY a recent-searches dropdown — it has no live result preview and just routes to /search on Enter. So the only true grouped, multi-entity result surface is the separate /search page (SearchPage.tsx), which is a navigation away.",
-   "kind": "polish_gap",
-   "effort": "M",
-   "leverage": "medium",
-   "files": [
-    "apps/web/src/components/command/CommandPalette.tsx",
-    "apps/web/src/components/command/commandPaletteUtils.ts",
-    "apps/web/src/components/layout/topbar/TopbarSearch.tsx"
-   ],
-   "dimension": "search-nav-copilot"
-  },
-  {
-   "title": "Keyboard shortcut system is shallow and the help panel is incomplete/inaccurate",
-   "bestInClass": "Comprehensive, discoverable shortcuts (j/k navigation in lists, e to edit, x to select, c to create, / to search) with a complete, generated cheat-sheet and per-context hints.",
-   "today": "Global shortcuts (useGlobalShortcuts.ts) are limited to ⌘/ focus + 9 'g _' chords; the QuickAddMenu adds 'N'. The help panel (KeyboardShortcutsHelp.tsx) is a hardcoded list of 10 entries that OMITS several real shortcuts (g a → accounts, g f → search, the 'N' quick-add) and lists none of the palette's ⌘1-⌘9/⌘A/⌘L nav hints shown in NAV_TARGETS — so the documented shortcuts disagree with the implemented ones. There are no list-level shortcuts (select/next/prev row) anywhere.",
-   "kind": "polish_gap",
-   "effort": "S",
-   "leverage": "medium",
-   "files": [
-    "apps/web/src/hooks/useGlobalShortcuts.ts",
-    "apps/web/src/components/KeyboardShortcutsHelp.tsx",
-    "apps/web/src/components/command/commandPaletteUtils.ts",
-    "apps/web/src/components/quickadd/QuickAddMenu.tsx"
-   ],
-   "dimension": "search-nav-copilot"
-  },
-  {
-   "title": "Breadcrumbs humanize raw slugs/UUIDs instead of resolving real entity names",
-   "bestInClass": "Deep-link breadcrumbs show the real record name ('Accounts / MAHLE GmbH / Renewal Bid'), resolved from data, with proper deep-linking back to each level.",
-   "today": "Breadcrumbs.tsx derives crumbs purely from the URL and runs humanize() on every non-primary segment — so an account UUID or kebab slug becomes a title-cased version of the slug, not the real name. The code even has a no-op ternary `humanize(params.accountId === seg ? seg : seg)` revealing an abandoned attempt to special-case the account name. For opportunity/contact/task detail routes the breadcrumb shows the id, not the entity title.",
-   "kind": "polish_gap",
-   "effort": "M",
-   "leverage": "medium",
-   "files": [
-    "apps/web/src/components/ui/Breadcrumbs.tsx"
-   ],
-   "dimension": "search-nav-copilot"
-  },
-  {
-   "title": "Palette entity coverage is limited to 5 client-cached types plus opp search; leads, proposals, references, custom objects, calls are not searchable",
-   "bestInClass": "Global search spans every first-class object in the product (and often custom objects), so users trust ⌘K as the universal entry point.",
-   "today": "search.ts only indexes opportunity/contact/company/task/note. The palette additionally searches accounts/contacts/tasks but only over whatever the dashboard/useContacts/useTasks hooks already cached (matchCompanies/matchContacts/matchTasks operate on in-memory arrays, capped at 6 each), so results are incomplete on large tenants and miss anything not yet loaded. Major navConfig entities — Leads, Proposals, References, Custom Object records, Calls, Service Desk tickets, Forecasts — are not searchable at all from either the palette or /search.",
-   "kind": "table_stakes_missing",
-   "effort": "M",
-   "leverage": "high",
-   "files": [
-    "apps/api/src/routes/search.ts",
-    "apps/web/src/components/command/usePaletteItems.tsx",
-    "apps/web/src/components/command/commandPaletteUtils.ts"
-   ],
-   "dimension": "search-nav-copilot"
-  },
-  {
-   "title": "No Notification model or notification center — only a mentions bell mislabeled \"Notifications\"",
-   "bestInClass": "Salesforce/HubSpot/Attio ship a first-class notification center: a typed Notification record (assignment, @mention, stage change, SLA breach, task due, comment reply, record share) with read/unread state, a bell that aggregates ALL types, mark-all-read, grouping, and deep links to the source record.",
-   "today": "There is no `Notification` model in Prisma at all (packages/db/prisma/schema.prisma). The bell (TopbarNotifications.tsx) only surfaces `Mention` rows, shows the fixed text \"Someone mentioned you in a comment\", has no mark-all-read, no types, and \"View all mentions\" links to /tasks rather than a notification inbox.",
-   "kind": "table_stakes_missing",
-   "effort": "L",
-   "leverage": "high",
-   "files": [
-    "packages/db/prisma/schema.prisma",
-    "apps/web/src/components/layout/topbar/TopbarNotifications.tsx",
-    "apps/api/src/routes/collaboration.ts"
-   ],
-   "dimension": "notifications-activity"
-  },
-  {
-   "title": "Real-time notification channel is dead — nothing ever publishes to notification:user",
-   "bestInClass": "Assignments, @mentions, and stage changes appear in the bell in real time (WebSocket/SSE) without a refresh, with a toast for high-priority events.",
-   "today": "The WS plugin auto-subscribes each connection to `notification:user:<userId>` (apps/api/src/plugins/realtime.ts:173) but grep across apps confirms NO caller ever `publish()`es to that channel (only presence and entity-edit channels are published). Worse, the web app never connects to `/api/realtime` — the only WebSocket client in apps/web is the Yjs editor (lib/yjs-client.ts). So the bell relies on a 30s-stale poll (useMentions staleTime 30_000, no refetchInterval).",
-   "kind": "table_stakes_missing",
-   "effort": "M",
-   "leverage": "high",
-   "files": [
-    "apps/api/src/plugins/realtime.ts",
-    "apps/api/src/services/realtime.service.ts",
-    "apps/web/src/hooks/useMentions.ts",
-    "apps/web/src/lib/yjs-client.ts"
-   ],
-   "dimension": "notifications-activity"
-  },
-  {
-   "title": "Notification preferences are localStorage-only and enforce nothing",
-   "bestInClass": "Per-user, server-persisted notification preferences (per-channel: in-app/email/Slack; per-event-type; with quiet hours) that the delivery pipeline actually reads before sending.",
-   "today": "NotificationPrefsSection.tsx stores `{emailDigest, mentionPush, taskDueSoon, dealStageChange}` only in `localStorage['bidstack:notifications']`; no API, no DB column, and none of those four toggles is wired to any backend code. The UI promises features (daily digest, task reminders, stage-change alerts) that have no implementation.",
-   "kind": "table_stakes_missing",
-   "effort": "M",
-   "leverage": "high",
-   "files": [
-    "apps/web/src/components/settings/NotificationPrefsSection.tsx"
-   ],
-   "dimension": "notifications-activity"
-  },
-  {
-   "title": "No event delivery pipeline — no email digest, no SLA breach, no assignment/stage-change/task-due push",
-   "bestInClass": "A worker-driven engine emits notifications on domain events (assignment, stage change, SLA/idle-deal breach, task due) and delivers them in-app + email digest + Slack DM per the user's prefs.",
-   "today": "No BullMQ queue produces notifications. The Slack service exposes `dmUser` and `formatNotificationToBlocks` (apps/api/src/services/slack.service.ts) referencing a \"notification engine\", but those functions are never called. The activity worker grep shows queues for calls/RFP/CS but none for notification fan-out or digests. Stage changes are recorded to AuditLog (opportunity-timeline.ts reads `opportunity.stage`) but trigger no alert to the deal owner.",
-   "kind": "table_stakes_missing",
-   "effort": "L",
-   "leverage": "high",
-   "files": [
-    "apps/api/src/services/slack.service.ts",
-    "apps/api/src/routes/integrations/slack.ts",
-    "apps/api/src/services/activity.service.ts"
-   ],
-   "dimension": "notifications-activity"
-  },
-  {
-   "title": "No global activity feed — timelines are per-record only and reconstructed read-side",
-   "bestInClass": "A global/team activity firehose (\"what changed across my accounts today\") plus a unified per-record feed built from a single canonical event stream.",
-   "today": "There is an account-scoped cockpit feed (ActivityTimelineCard.tsx) and a per-opportunity timeline (opportunity-timeline.ts) that is reassembled at read time by merging AuditLog + Task + Comment — there is no org-wide feed route and `logActivity()` is only invoked in 3 places (custom-object.records.service.ts), so the `Activity` table is sparsely populated and isn't the source of truth for the timeline.",
-   "kind": "table_stakes_missing",
-   "effort": "M",
-   "leverage": "medium",
-   "files": [
-    "apps/api/src/routes/opportunity-timeline.ts",
-    "apps/web/src/components/cockpit/ActivityTimelineCard.tsx",
-    "apps/api/src/services/activity.service.ts"
-   ],
-   "dimension": "notifications-activity"
-  },
-  {
-   "title": "Presence infrastructure built but invisible to users",
-   "bestInClass": "Live presence avatars on records (\"Jane is also viewing this deal\"), typing/editing indicators, and an away/online status — Attio/Notion-grade collaboration cues.",
-   "today": "UserPresence model + `/api/presence` GET/POST + presence pub/sub all exist (collaboration.ts, presence.service.ts) and the WS plugin upserts presence on connect/ping, but the web app never reads `/api/presence` nor subscribes to `presence:org:<orgId>` — there is no presence avatar component, so all of this is unrendered backend.",
-   "kind": "polish_gap",
-   "effort": "M",
-   "leverage": "medium",
-   "files": [
-    "apps/api/src/routes/collaboration.ts",
-    "apps/api/src/services/presence.service.ts",
-    "apps/api/src/plugins/realtime.ts"
-   ],
-   "dimension": "notifications-activity"
-  },
-  {
-   "title": "Mention bell lacks context, deep links, and bulk actions",
-   "bestInClass": "Each notification shows actor avatar/name, a snippet of the comment, the record it's on, relative time, and clicks through to the exact comment with mark-read-on-view; supports mark-all-read.",
-   "today": "Every mention renders the static line \"Someone mentioned you in a comment\" with only a date (TopbarNotifications.tsx:101-105); it does not resolve the comment body, the author, or the parent record, and clicking does not navigate to the source. There is no mark-all-read action, only per-item.",
-   "kind": "polish_gap",
-   "effort": "M",
-   "leverage": "high",
-   "files": [
-    "apps/web/src/components/layout/topbar/TopbarNotifications.tsx",
-    "apps/api/src/routes/collaboration.ts",
-    "apps/web/src/hooks/useMentions.ts"
-   ],
-   "dimension": "notifications-activity"
-  },
-  {
-   "title": "No UI or API to assign a Role to a user",
-   "bestInClass": "Salesforce/HubSpot/Attio let an admin assign one or more roles/permission sets to a user from the user detail or members table; the change immediately alters access.",
-   "today": "roles.ts only CRUDs role definitions; the only user mutation is PATCH /users/:id/role toggling the legacy admin/member string (apps/api/src/routes/users.ts:61). UserRole rows are created only by the seed and ensureAdminRoleGrant, so the 14 non-Admin seeded roles can never be assigned in-app.",
-   "kind": "table_stakes_missing",
-   "effort": "M",
-   "leverage": "high",
-   "files": [
-    "apps/api/src/routes/users.ts",
-    "apps/api/src/routes/roles.ts",
-    "apps/web/src/components/settings/TeamSection.tsx"
-   ],
-   "dimension": "permissions-sharing"
-  },
-  {
-   "title": "Permission gates missing on core write surfaces",
-   "bestInClass": "Every object CRUD endpoint enforces the matching object permission; a Read-Only or SDR user is 403'd from writing opportunities even via the raw API.",
-   "today": "Only 40 of ~107 route files call requirePermission. leads.write.routes.ts, opportunities.mutations.ts, reports.ts, files.ts, workflows.ts, activities.ts, tags.ts, account-intel.ts and search.ts have no permission preHandler; they rely only on org-scoping, so any authenticated member can mutate leads and opportunities.",
-   "kind": "table_stakes_missing",
-   "effort": "M",
-   "leverage": "high",
-   "files": [
-    "apps/api/src/routes/leads.write.routes.ts",
-    "apps/api/src/routes/opportunities.mutations.ts",
-    "apps/api/src/routes/reports.ts",
-    "apps/api/src/routes/files.ts",
-    "apps/api/src/routes/workflows.ts"
-   ],
-   "dimension": "permissions-sharing"
-  },
-  {
-   "title": "Frontend authorization is binary admin/non-admin; no capability manifest",
-   "bestInClass": "The UI hides/disables actions per the user's actual permission set, driven by a capability payload fetched on session load.",
-   "today": "The whole web auth surface is useIsAdmin() === (role === 'admin') (apps/web/src/lib/auth.tsx:380). rbac.service.getUserPermissions is described as the capability manifest but is never called in apps/api/src; there is no /me or /capabilities endpoint.",
-   "kind": "table_stakes_missing",
-   "effort": "M",
-   "leverage": "high",
-   "files": [
-    "apps/api/src/services/rbac.service.ts",
-    "apps/web/src/lib/auth.tsx",
-    "apps/web/src/pages/RolesPage.tsx"
-   ],
-   "dimension": "permissions-sharing"
-  },
-  {
-   "title": "Hardcoded 6-role read-only matrix diverges from the 16 seeded roles",
-   "bestInClass": "A live, editable role grid that reads actual roles+permissions from the DB and toggles per-resource read/write inline.",
-   "today": "RolesPage renders a static 6-role matrix from rbac-matrix.ts, a separate source of truth from seed.rbac.ts (16 roles). The grid is read-only and the custom-role editor lists permissions as flat checkboxes with no resource grouping or read/write columns.",
-   "kind": "polish_gap",
-   "effort": "M",
-   "leverage": "medium",
-   "files": [
-    "apps/web/src/pages/RolesPage.tsx",
-    "apps/web/src/components/settings/RolesSection.tsx",
-    "packages/shared/src/types/rbac-matrix.ts"
-   ],
-   "dimension": "permissions-sharing"
-  },
-  {
-   "title": "No record-level sharing rules, field-level permissions, or team hierarchy",
-   "bestInClass": "Salesforce-style sharing: org-wide defaults, owner/team/criteria sharing rules, role-hierarchy roll-up, per-field read/edit per profile.",
-   "today": "The only record-level control is M7 country scoping of the opportunity LIST/COUNT (access-scope.ts). No Share model, no FieldPermission model, no manager hierarchy (only flat UserGroup + Territory.ownerId).",
-   "kind": "differentiator",
-   "effort": "L",
-   "leverage": "medium",
-   "files": [
-    "apps/api/src/lib/access-scope.ts",
-    "packages/db/prisma/schema.prisma",
-    "apps/api/src/routes/opportunities.ts"
-   ],
-   "dimension": "permissions-sharing"
-  },
-  {
-   "title": "Country scoping leaks on detail-by-id and non-list endpoints",
-   "bestInClass": "A sharing rule applies uniformly to list, detail, search, export and related reads.",
-   "today": "applyOpportunityScope is merged only into list/count where-clauses; GET /opportunities/:id, export, brief and search bypass scope (documented in access-scope.ts:19-25). A scoped user can open any opportunity by UUID and surface out-of-scope deals via /search.",
-   "kind": "table_stakes_missing",
-   "effort": "M",
-   "leverage": "medium",
-   "files": [
-    "apps/api/src/lib/access-scope.ts",
-    "apps/api/src/routes/opportunities.ts",
-    "apps/api/src/routes/search.ts"
-   ],
-   "dimension": "permissions-sharing"
-  },
-  {
-   "title": "No login-as / impersonation for admins",
-   "bestInClass": "Login-as-user lets an admin debug exactly what a given role/user sees, with an audit trail and an impersonation banner.",
-   "today": "No impersonation exists anywhere in apps or packages. With the binary admin UI and unwired capability manifest, an admin cannot verify what a Read-Only or SDR user experiences.",
-   "kind": "differentiator",
-   "effort": "M",
-   "leverage": "low",
-   "files": [
-    "apps/api/src/plugins/auth.ts",
-    "apps/web/src/lib/auth.tsx"
-   ],
-   "dimension": "permissions-sharing"
-  },
-  {
-   "title": "Permission audit covers role definitions but not role grants",
-   "bestInClass": "A filterable permission audit showing who changed which role and who was granted/revoked which role and when.",
-   "today": "role.create/update/delete are audit-logged (roles.ts), but UserRole grants/revokes are not audited and the viewer is a general log, not a permissions-scoped view.",
-   "kind": "polish_gap",
-   "effort": "S",
-   "leverage": "low",
-   "files": [
-    "apps/api/src/routes/roles.ts",
-    "apps/api/src/routes/users.ts",
-    "apps/web/src/pages/AuditLogPage.tsx"
-   ],
-   "dimension": "permissions-sharing"
-  },
-  {
-   "title": "Drag-build report builder UI is missing; backend unreachable from product",
-   "bestInClass": "Visual builder: pick entity, drag fields, filters, aggregates, group-by, live preview, save with chart type.",
-   "today": "Builder components and useCreateReport/useUpdateReport/usePreviewReport are never imported by any page. AppRoutes.tsx:332-347 routes /reports/new and /reports/:id/edit to the legacy fixed-tab ReportsPage, so reports can only be created via raw API. Two competing Reports pages: /reports legacy vs /reports/list real.",
-   "kind": "table_stakes_missing",
-   "effort": "L",
-   "leverage": "high",
-   "files": [
-    "apps/web/src/routes/AppRoutes.tsx",
-    "apps/web/src/components/reports/FilterBuilder.tsx",
-    "apps/web/src/hooks/useAnalyticsReports.ts",
-    "apps/web/src/pages/ReportsListPage.tsx"
-   ],
-   "dimension": "reporting-dashboards"
-  },
-  {
-   "title": "Scheduling cosmetic; no drill-through; weak export/edit/persist/sharing/KPI-deltas",
-   "bestInClass": "Scheduled email reports, click-to-drill, dashboard PDF/XLSX, in-place widget edit, persisted resizable grid, granular sharing, KPI deltas with sparklines.",
-   "today": "schedule is free-text with no worker executing it (schema.prisma:4593); charts have no onClick drill-through; export is per-widget CSV only; onConfigure omitted despite a live PATCH endpoint (AnalyticsDashboardPage.tsx:224); Reorder is local-only and never persisted; free-text xKey/yKey mapping (WidgetConfigModal.tsx:43); isShared is one org-wide boolean (schema.prisma:4635); OrgDashboard.tsx KPI tiles lack deltas though a delta/sparkline KpiCard.tsx exists.",
-   "kind": "table_stakes_missing",
-   "effort": "L",
-   "leverage": "high",
-   "files": [
-    "apps/api/src/routes/analytics-reports.ts",
-    "apps/web/src/components/widgets/WidgetRenderer.tsx",
-    "apps/web/src/pages/AnalyticsDashboardPage.tsx",
-    "apps/web/src/components/dashboard/OrgDashboard.tsx",
-    "apps/web/src/components/widgets/WidgetConfigModal.tsx"
-   ],
-   "dimension": "reporting-dashboards"
-  },
-  {
-   "title": "Emoji used as UI glyphs in the two shared state components (app-wide blast radius)",
-   "bestInClass": "Linear/Attio render a single consistent SVG icon family (Lucide/custom) in every empty, error, and toast state — never an OS emoji that renders differently per platform, breaks the one-accent-color rule, and looks AI-generated.",
-   "today": "StateMessages.tsx uses an emoji sparkle '✨' for EmptyState (line 29) and '⚠' for ErrorState (line 51); Toast.tsx TONE_STYLE uses text glyphs '✓','⚠','!','i' (lines 132-135) and a raw '×' dismiss (line 191) instead of the project's Lucide Icon component. These two files are imported by 84 files, so the emoji appears on every empty/error/toast surface in the product — directly violating the design-standards 'NEVER emoji as UI icons' rule. The cockpit cards themselves correctly use the Icon component, making the shared-component emoji a jarring inconsistency.",
-   "kind": "polish_gap",
-   "effort": "S",
-   "leverage": "high",
-   "files": [
-    "apps/web/src/components/ui/StateMessages.tsx",
-    "apps/web/src/components/ui/Toast.tsx",
-    "apps/web/src/components/ui/Icon.tsx"
-   ],
-   "dimension": "ux-polish-states"
-  },
-  {
-   "title": "Core list/grid pages use flat-bar LoadingSkeleton, not layout-matched skeletons — visible layout shift (CLS)",
-   "bestInClass": "Attio/Linear show a skeleton that is the exact shape of the incoming content (same grid columns, card heights, row count) so loading->loaded has near-zero layout shift and feels like the page rendering itself. The repo already has this pattern in TableSkeleton/KanbanSkeleton/DashboardSkeleton.",
-   "today": "AccountsPage.tsx renders an 'account-grid' of AccountCards but its loading state is <LoadingSkeleton rows={10} /> (line 70) — 10 stacked flat shimmer bars, so when data arrives the layout jumps from a vertical bar-stack to a multi-column card grid. The same generic LoadingSkeleton is used at page level in CompaniesPage, KeyAccountsPage, TopAccountsPage, CallsPage, ReportsPage, SalesToolkitsPage, SectorViewPage, ReferencesPage and ~11 others, while only 15 pages use the layout-matched TableSkeleton/KanbanSkeleton. A CardGridSkeleton matching account-grid would close the CLS gap and unify the loading feel.",
-   "kind": "polish_gap",
-   "effort": "M",
-   "leverage": "high",
-   "files": [
-    "apps/web/src/pages/AccountsPage.tsx",
-    "apps/web/src/pages/CompaniesPage.tsx",
-    "apps/web/src/pages/KeyAccountsPage.tsx",
-    "apps/web/src/pages/TopAccountsPage.tsx",
-    "apps/web/src/components/skeletons/PageSkeletons.tsx"
-   ],
-   "dimension": "ux-polish-states"
-  },
-  {
-   "title": "CustomObjectDetailPage bypasses the shared state system (inline pulse, plain-text not-found, no error branch)",
-   "bestInClass": "Every detail page uses one shared skeleton + EmptyState + ErrorState so loading/empty/error look identical across the product, and a fetch failure shows a recoverable error with a retry path — never a permanent loading shimmer or bare text.",
-   "today": "CustomObjectDetailPage.tsx (line 76-83) renders a hand-rolled `animate-pulse` div instead of DetailPageSkeleton, shows a plain-text 'Record not found.' (line 85-96) instead of EmptyState, and has no isError branch at all — a failed record fetch leaves recordQuery.isLoading false with no data, falling through to 'not found' or (on a transient error) an indefinite skeleton. Contrast CompanyDetailPage.tsx (lines 35-62) which correctly does DetailPageSkeleton -> ErrorState -> EmptyState with a Go-back action. This is the clearest single-page inconsistency.",
-   "kind": "table_stakes_missing",
-   "effort": "S",
-   "leverage": "medium",
-   "files": [
-    "apps/web/src/pages/CustomObjectDetailPage.tsx",
-    "apps/web/src/components/skeletons/DetailPageSkeleton.tsx",
-    "apps/web/src/components/ui/StateMessages.tsx"
-   ],
-   "dimension": "ux-polish-states"
-  },
-  {
-   "title": "Undo is supported by the Toast but wired into only one destructive action",
-   "bestInClass": "Attio/Linear/Gmail give Undo on every destructive or hard-to-reverse mutation (delete, archive, bulk action, stage move) via the toast action slot, so users act without fear. The infrastructure for this already exists here.",
-   "today": "Toast.tsx fully supports an action button and explicitly documents it as 'typically Undo for destructive ops' (lines 26-27, 71), but a search shows the Undo action label is used in exactly one place (ContactsPage.tsx). Other destructive flows surface plain toast.error/toast.success without undo: AccountIntelPanel.tsx solution/product deletes (deleteSolution/deleteProduct mutate with no undo), GovernanceLogCard/CrossSellCard deletes, and the 6 optimistic-update hooks. The optimistic-update plumbing (onMutate rollback in useContacts/useLeads/useTasks/etc.) is the hard part and already exists, so wiring undo into deletes is incremental.",
-   "kind": "differentiator",
-   "effort": "M",
-   "leverage": "medium",
-   "files": [
-    "apps/web/src/components/ui/Toast.tsx",
-    "apps/web/src/components/account-intel/AccountIntelPanel.tsx",
-    "apps/web/src/hooks/useTasks.ts",
-    "apps/web/src/pages/ContactsPage.tsx"
-   ],
-   "dimension": "ux-polish-states"
-  },
-  {
-   "title": "Cockpit aside stacks into a long single-column scroll on tablet (no intermediate breakpoint)",
-   "bestInClass": "On tablet, a dense cockpit either keeps a 2-column layout longer, or reorganizes secondary cards into a responsive 2-up grid so the user isn't forced through a 15-card vertical scroll. Linear/Salesforce Lightning reflow detail panes rather than fully stacking.",
-   "today": "cockpit.css .cockpit-grid is `minmax(0,2fr) minmax(0,1fr)` and collapses to a single `1fr` column at max-width:1180px (lines 465-480). Below 1180px the entire .cockpit-side aside (HealthScore, RevenueEvolution, WinLoss, InfoSearchLeads, KpiSidebar, DataTrust, LiveDataMesh, KeyContacts, Notes, Files, AccountIntel — ~11 cards from DashboardPage.tsx lines 224-265) drops below the main column as one long scroll. There is no intermediate tablet layout that arranges these secondary cards 2-up, so an iPad-portrait user scrolls through the full main column plus 11 stacked side cards. The command-center and KPI rows reflow well; the aside is the one surface that becomes a long-scroll on tablet.",
-   "kind": "polish_gap",
-   "effort": "M",
-   "leverage": "low",
-   "files": [
-    "apps/web/src/styles/cockpit.css",
-    "apps/web/src/pages/DashboardPage.tsx"
-   ],
-   "dimension": "ux-polish-states"
-  },
-  {
-   "title": "Reveal-wrapped cockpit cards start at opacity:0 and only appear on inView — blank cards if scroll/inView never fires",
-   "bestInClass": "Scroll-reveal animations degrade to fully-visible content for reduced-motion users and any no-JS/print/scroll-restoration edge case; content is never gated behind an intersection observer that might not fire.",
-   "today": "Reveal.tsx sets initial `{ opacity: 0 }` even when useReducedMotion is true, and only flips to visible when useInView (once:true, margin '-10% 0px') fires. DashboardPage.tsx wraps nearly every cockpit card in <Reveal> (lines 187-265). For reduced-motion users the cards are still hidden until scrolled into view (motion is correctly dropped, but the opacity gate remains), and in print/scroll-restoration-to-bottom scenarios a card whose observer never triggers stays at opacity 0. Best-in-class would set the reduced-motion initial to opacity:1 and/or use a fallback timeout so content can never be permanently invisible.",
-   "kind": "polish_gap",
-   "effort": "S",
-   "leverage": "low",
-   "files": [
-    "apps/web/src/components/motion/Reveal.tsx",
-    "apps/web/src/pages/DashboardPage.tsx"
-   ],
-   "dimension": "ux-polish-states"
-  },
-  {
-   "title": "Form fields don't link their error text — per-field aria-describedby/aria-invalid missing in core record dialogs",
-   "bestInClass": "Salesforce/HubSpot announce the specific invalid field and its message on focus: input gets aria-invalid=true and aria-describedby pointing at the inline error id, so a screen-reader user tabbing back to the field hears 'Customer, required, Customer and name are required'.",
-   "today": "The good Input primitive (apps/web/src/components/ui/Input.tsx) wires aria-invalid + aria-describedby + aria-errormessage correctly, but the core record-creation dialogs shadow it with a local minimal input. ContactDialog.tsx:140-238 uses raw `dialog-input`s and a custom Field that emits ONLY a single form-level role=alert summary (line 222) with no per-field association at all. CreateOpportunityDialog.tsx:225-266 generates an errorId per field but never sets aria-describedby/aria-invalid on the <Input>, so the wiring is dead. This raw `dialog-input` pattern appears in 7 files (19 instances).",
-   "kind": "table_stakes_missing",
-   "effort": "M",
-   "leverage": "high",
-   "files": [
-    "apps/web/src/components/contact/ContactDialog.tsx",
-    "apps/web/src/components/opportunity/CreateOpportunityDialog.tsx",
-    "apps/web/src/components/ui/Input.tsx",
-    "apps/web/src/components/task/CreateTaskDialog.tsx",
-    "apps/web/src/components/settings/ApiKeysSection.tsx"
-   ],
-   "dimension": "accessibility"
-  },
-  {
-   "title": "The core account cockpit and opened dialog/kanban states are never scanned by the axe suite",
-   "bestInClass": "Best-in-class teams run axe against the most data-dense, business-critical screen (the account 360 view) and against interactive states (modal open, kanban focused, multi-step wizard), not just empty list routes, because that is where custom ARIA breaks.",
-   "today": "apps/web/e2e/a11y/axe.spec.ts ROUTES (lines 17-37) covers 19 list/landing routes but NOT /accounts/:accountId (the cockpit — the product's core view, AppRoutes.tsx:129), nor RFP pipeline, nor any opened CommandPalette/QuickAddMenu/dialog, nor the LeadKanban focused/drag state. The custom hand-rolled tabs, kanban arrow-move, and combobox live exactly on these unscanned surfaces.",
-   "kind": "polish_gap",
-   "effort": "S",
-   "leverage": "medium",
-   "files": [
-    "apps/web/e2e/a11y/axe.spec.ts",
-    "apps/web/src/components/account-intel/AccountIntelPanel.tsx",
-    "apps/web/src/components/command/CommandPalette.tsx",
-    "apps/web/src/components/lead/LeadKanbanView.tsx"
-   ],
-   "dimension": "accessibility"
-  },
-  {
-   "title": "QuickAddMenu listbox has no aria-activedescendant — arrowed selection is silent to screen readers",
-   "bestInClass": "A listbox driven by arrow keys must move DOM focus to the active option OR set aria-activedescendant on the listbox so AT announces the highlighted row; CommandPalette in this same repo already does this correctly.",
-   "today": "apps/web/src/components/quickadd/QuickAddMenu.tsx uses role=listbox (line 129) and role=option + aria-selected (135-136), but the ArrowUp/Down handler lives on the Content div (105-124), focus never moves to the options, and the listbox has no aria-activedescendant. A SR user pressing arrows hears nothing change; only the visual highlight moves. (Same gap pattern, unlike CommandPalette which wired aria-activedescendant.)",
-   "kind": "table_stakes_missing",
-   "effort": "S",
-   "leverage": "medium",
-   "files": [
-    "apps/web/src/components/quickadd/QuickAddMenu.tsx"
-   ],
-   "dimension": "accessibility"
-  },
-  {
-   "title": "Charts double-expose to AT: inner Recharts SVG is not aria-hidden alongside the sr-only data table",
-   "bestInClass": "Accessible charting wraps the visualization in role=img with a label, provides ONE accessible representation (the data table), and marks the decorative SVG aria-hidden so the screen reader doesn't read both the role=img summary, the table, AND every Recharts tick/series node.",
-   "today": "In apps/web/src/components/charts/CartesianCharts.tsx every chart has role=img + sr-only <table> (good), but the Recharts <ResponsiveContainer>/SVG inside is not aria-hidden. Recharts emits its own focusable/role-bearing SVG primitives, so VoiceOver/NVDA will announce the role=img label, then the full data table, then wander the raw SVG nodes — verbose and confusing. The Sparkline (cockpit/Sparkline.tsx) is correctly aria-hidden; the big charts are not.",
-   "kind": "polish_gap",
-   "effort": "S",
-   "leverage": "low",
-   "files": [
-    "apps/web/src/components/charts/CartesianCharts.tsx",
-    "apps/web/src/components/charts/PolarCharts.tsx",
-    "apps/web/src/components/charts/chartShared.tsx"
-   ],
-   "dimension": "accessibility"
-  },
-  {
-   "title": "Global min-height/min-width: 44px on every button/[role=button]/a is too broad and risks layout breakage masking real targets",
-   "bestInClass": "Touch-target sizing is applied to genuinely interactive controls, scoped to coarse pointers (pointer: coarse), so dense desktop tables and inline chips stay compact while touch devices get 44px — exactly the pattern this repo already uses elsewhere via the `pointer-coarse:` variant.",
-   "today": "apps/web/src/index.css:504-509 forces min-height:44px AND min-width:44px on ALL button, [role=button], a unconditionally (not behind pointer:coarse). This over-inflates inline text links, badge/chip buttons and tiny icon buttons on desktop, and several components fight it back with negative-margin hacks (ChartContainer.tsx:100 `-m-[8px] p-[8px]`). The blanket rule both distorts dense layouts and can hide whether individual targets actually meet WCAG 2.5.8; it should be scoped to coarse pointers like the rest of the codebase.",
-   "kind": "polish_gap",
-   "effort": "S",
-   "leverage": "low",
-   "files": [
-    "apps/web/src/index.css",
-    "apps/web/src/components/charts/ChartContainer.tsx"
-   ],
-   "dimension": "accessibility"
-  },
-  {
-   "title": "Emoji used as UI icons in several surfaces — inconsistent AT exposure and off the single-icon-family standard",
-   "bestInClass": "A single SVG icon family (Lucide/Heroicons) is used for all UI glyphs; decorative ones are aria-hidden, meaningful ones get text alternatives. Emoji are never load-bearing UI icons because their AT announcement is unpredictable across platforms.",
-   "today": "Call providers render raw emoji as the only glyph (CallTimeline.tsx:35-38, CallButton.tsx:26-29 icon strings, CallsPage.tsx:76-79), and ChartContainer.tsx:191/202 uses ⚠/📊 emoji for error/empty states. Some are aria-hidden (acceptable), but CallTimeline/CallButton emit them as visible content without a consistent text label, so AT behavior varies. The repo already has a clean Lucide-style Icon set (components/ui/Icon.tsx) these should use.",
-   "kind": "polish_gap",
-   "effort": "M",
-   "leverage": "low",
-   "files": [
-    "apps/web/src/components/calls/CallTimeline.tsx",
-    "apps/web/src/components/calls/CallButton.tsx",
-    "apps/web/src/pages/CallsPage.tsx",
-    "apps/web/src/components/charts/ChartContainer.tsx",
-    "apps/web/src/components/ui/Icon.tsx"
-   ],
-   "dimension": "accessibility"
-  },
-  {
-   "title": "Icon component defaults aria-hidden=true, so a future icon-only button without an explicit aria-label is silently invisible to AT",
-   "bestInClass": "Icon-only controls have a guaranteed accessible name; either the icon library forces a title/aria-label on standalone use or lint enforces aria-label on icon-only buttons, so a missing label fails the build rather than shipping a silent control.",
-   "today": "apps/web/src/components/ui/Icon.tsx:337 hard-defaults ariaHidden=true for every Icon. Current icon buttons all add aria-label on the wrapping <button> (verified in Topbar, IntelTabs delete buttons, Toast dismiss), so today this is fine — but there is no lint guard (no eslint-plugin-jsx-a11y rule pinning aria-label on icon-only buttons was found), so the pattern depends entirely on author discipline. One missed label produces an unnamed, AT-invisible button with no automated catch on component tests (axe only runs on the 19 list routes).",
-   "kind": "polish_gap",
-   "effort": "S",
-   "leverage": "low",
-   "files": [
-    "apps/web/src/components/ui/Icon.tsx",
-    "apps/web/src/components/layout/Topbar.tsx"
-   ],
-   "dimension": "accessibility"
-  },
-  {
-   "title": "No list virtualization on any large table or kanban board",
-   "bestInClass": "Salesforce/Attio/HubSpot virtualize every grid and board (windowed rendering via react-virtual/AG-Grid) so a 10k-row table or a 500-card pipeline stays at 60fps with constant DOM node count and instant scroll.",
-   "today": "react-window/@tanstack/react-virtual are not dependencies (grep of apps/web/src returns only ComplianceMatrix.tsx). ContactTable, the companies grid, opportunities list, and the leads/pipeline kanban all render their full row/card set into the DOM. The only thing saving them today is the silent 50-row API cap (see next gap) — the instant pagination is fixed, scroll/paint will jank.",
-   "kind": "table_stakes_missing",
-   "effort": "L",
-   "leverage": "high",
-   "files": [
-    "apps/web/src/pages/contacts/ContactTable.tsx",
-    "apps/web/src/pages/CompaniesPage.tsx",
-    "apps/web/src/pages/ContactsPage.tsx",
-    "apps/web/src/pages/leadsPage",
-    "apps/web/src/pages/pipelineBoard",
-    "apps/web/package.json"
-   ],
-   "dimension": "performance-reliability"
-  },
-  {
-   "title": "Frontend never consumes the cursor pagination the API already exposes — lists silently cap at 50",
-   "bestInClass": "Infinite scroll or paged tables that transparently fetch the next page on scroll/click, so the user can reach every record. The backend already returns nextCursor.",
-   "today": "GET /api/companies and /api/contacts return { items, nextCursor } with cursor support (apps/api/src/routes/companies.ts:16, accounts.ts:40). But useCompanies/useContacts call useQuery once with no limit and never pass cursor or call fetchNextPage (only useCalls.ts uses useInfiniteQuery). CompaniesPage.tsx contains zero references to nextCursor/fetchNextPage. Result: a user with >50 companies or contacts can only ever see the first 50, with no indication more exist — a correctness-grade reliability bug, not just a perf nit. The server plumbing is done; the client just doesn't drive it.",
-   "kind": "table_stakes_missing",
-   "effort": "M",
-   "leverage": "high",
-   "files": [
-    "apps/web/src/hooks/useCompanies.ts",
-    "apps/web/src/hooks/useContacts.ts",
-    "apps/web/src/pages/CompaniesPage.tsx",
-    "apps/web/src/pages/ContactsPage.tsx"
-   ],
-   "dimension": "performance-reliability"
-  },
-  {
-   "title": "No HTTP response compression (gzip/brotli) on the API",
-   "bestInClass": "Brotli/gzip on all JSON responses (typically at the edge or via @fastify/compress) cuts dashboard/list payloads 60-80% on the wire — a directly noticeable TTFB/LCP win on the cockpit, which ships a large multi-section snapshot.",
-   "today": "@fastify/compress is not a dependency of apps/api (grep of package.json: NOT A DEPENDENCY) and is not registered in apps/api/src/server.ts. The cockpit dashboard snapshot (12-query aggregate with companies/activities/insights/bid rows) and list payloads are sent uncompressed. If a CDN/proxy isn't doing it in front, every cockpit load pays full JSON byte cost.",
-   "kind": "table_stakes_missing",
-   "effort": "S",
-   "leverage": "high",
-   "files": [
-    "apps/api/src/server.ts",
-    "apps/api/package.json"
-   ],
-   "dimension": "performance-reliability"
-  },
-  {
-   "title": "Cache invalidation is org-wide blunt — any mutation flushes every cached read for the tenant",
-   "bestInClass": "Tag/entity-scoped invalidation: editing one opportunity busts only opportunity/dashboard keys, not the entire org's cached surface, so caches actually survive long enough to absorb read load.",
-   "today": "apps/api/src/plugins/redis-cache.ts onSend hook runs cacheDel('bidstack:cache:${orgId}:*') on ANY successful POST/PUT/PATCH/DELETE. The cache helper supports tags (redis-cache.ts:53) but invalidation ignores them and wipes the whole org namespace. In an active org (constant edits) the dashboard/summary caches are flushed continuously, so the expensive 12-query snapshot rebuilds far more often than its 30s TTL implies — the cache buys little under real write load.",
-   "kind": "polish_gap",
-   "effort": "M",
-   "leverage": "medium",
-   "files": [
-    "apps/api/src/plugins/redis-cache.ts",
-    "apps/api/src/lib/redis-cache.ts"
-   ],
-   "dimension": "performance-reliability"
-  },
-  {
-   "title": "cacheDel SCAN runs on every mutation even when nothing is cached",
-   "bestInClass": "Invalidation is cheap/no-op when the entity has no cached keys (targeted DEL by known key, or a dirty-flag check) so writes don't pay a Redis SCAN tax.",
-   "today": "Every successful mutation triggers deleteRedisPattern (apps/api/src/lib/redis-cache.ts:47) which issues a cursor-based SCAN MATCH bidstack:cache:<org>:* COUNT 500 loop on the onSend path. Combined with the org-wide pattern above, the vast majority of mutating requests (most routes are not cached) pay an extra Redis round-trip per write for nothing. Bounded (maxKeys 10k) so it won't hang, but it's pure overhead on the write path's p50.",
-   "kind": "polish_gap",
-   "effort": "S",
-   "leverage": "low",
-   "files": [
-    "apps/api/src/lib/redis-cache.ts",
-    "apps/api/src/plugins/redis-cache.ts"
-   ],
-   "dimension": "performance-reliability"
-  },
-  {
-   "title": "No p50/p95 latency budget enforcement or query-count gate in CI",
-   "bestInClass": "Enterprise APIs ship a latency SLO with a CI guard (e.g. fail the build if the cockpit endpoint exceeds N queries or M ms against a seeded DB), turning the existing slow-query/N+1 instrumentation into a regression fence rather than a runtime log.",
-   "today": "The queryGuard middleware (apps/api/src/lib/prisma-middleware.ts) detects slow queries and N+1 and exposes X-Query-Count/X-Prisma-Time headers in dev, and OTel auto-instrumentation exists (apps/api/src/otel.ts), but there is no test that asserts the cockpit/dashboard stays within a query-count or latency budget. The strong observability is reactive (logs/headers) rather than enforced, so a future N+1 regression on the hottest path would only surface in production logs.",
-   "kind": "differentiator",
-   "effort": "M",
-   "leverage": "medium",
-   "files": [
-    "apps/api/src/lib/prisma-middleware.ts",
-    "apps/api/src/plugins/query-guard.ts",
-    "apps/api/src/routes/crm/dashboard.ts",
-    "apps/api/src/services/crm/dashboard.service.ts"
-   ],
-   "dimension": "performance-reliability"
-  },
-  {
-   "title": "CSV/Excel import wizard has a full backend but zero UI - completely unreachable",
-   "bestInClass": "HubSpot/Salesforce/Attio ship a guided import wizard: drag a CSV/XLSX, auto-detect columns, map source columns to fields with smart suggestions, choose a dedup key and strategy, preview the first N rows with validation errors highlighted, run, watch progress, and download failed rows.",
-   "today": "The engine is built and wired (apps/api/src/routes/migrations.ts start-csv/mappings/undo/errors.csv + worker dedup/coercion), but there is no front-end at all - no hook, no /import route, no nav entry, no Settings entry. The only thing a user can reach is ImportOpportunitiesDialog.tsx, a raw JSON-paste box. A team literally cannot self-onboard their data.",
-   "kind": "table_stakes_missing",
-   "effort": "L",
-   "leverage": "high",
-   "files": [
-    "apps/web/src/components/opportunity/ImportOpportunitiesDialog.tsx",
-    "apps/api/src/routes/migrations.ts",
-    "apps/worker/src/queues/migration.ts",
-    "apps/web/src/components/layout/navConfig.ts",
-    "apps/web/src/routes/AppRoutes.tsx"
-   ],
-   "dimension": "onboarding-import-settings"
-  },
-  {
-   "title": "Onboarding template gallery + sample data is dead code - TemplatePicker returns null, banner never fires",
-   "bestInClass": "Best-in-class onboarding lets a new workspace pick a starting template (pipeline + sample records) in the first 60 seconds and one-click load/clear demo data, with a persistent sample-data-on banner so it isn't shown to a client by accident.",
-   "today": "apps/web/src/components/onboarding/TemplatePicker.tsx is `return null;`. SampleDataBanner.tsx only shows when store.hasSampleData===true, but setHasSampleData(true) is never called anywhere, and nothing in the web app calls GET /onboarding/templates or POST /onboarding/templates/:t/install. QuickStartPage's Pick-a-template-pipeline just navigate('/pipeline'). The four templates and the install/delete sample-data endpoints exist server-side but are orphaned.",
-   "kind": "table_stakes_missing",
-   "effort": "M",
-   "leverage": "high",
-   "files": [
-    "apps/web/src/components/onboarding/TemplatePicker.tsx",
-    "apps/web/src/components/onboarding/SampleDataBanner.tsx",
-    "apps/web/src/pages/QuickStartPage.tsx",
-    "apps/api/src/routes/onboarding.ts",
-    "apps/api/src/services/onboarding-templates/b2b-saas.ts"
-   ],
-   "dimension": "onboarding-import-settings"
-  },
-  {
-   "title": "Onboarding checklist is localStorage-only with fake/non-actionable steps",
-   "bestInClass": "HubSpot's setup guide tracks real completion server-side (profile filled, first record created, email connected, team invited), syncs across devices, and each item performs the action inline or links to the exact place. Progress is org-aware and admin-visible.",
-   "today": "apps/web/src/stores/onboarding.ts persists completedChecklist to localStorage per user with no backend; clearing storage or switching devices resets it. Items are marked done on click regardless of whether the action happened (QuickStartPage.tsx markChecklistItem fires on button press). Steps reference capabilities that aren't wired (template pipeline; Invite-your-team navigates to /settings which has no invite flow). The store greps localStorage keys to find the userId (lines 110-113), a fragile hack.",
-   "kind": "polish_gap",
-   "effort": "M",
-   "leverage": "medium",
-   "files": [
-    "apps/web/src/stores/onboarding.ts",
-    "apps/web/src/pages/QuickStartPage.tsx"
-   ],
-   "dimension": "onboarding-import-settings"
-  },
-  {
-   "title": "No team invite flow - 'Invite your team' is a dead end",
-   "bestInClass": "Self-serve invites by email with role selection, pending-invite list, resend/revoke, and a join link - table stakes for any team SaaS, done in Settings > Users.",
-   "today": "TeamSection.tsx only lists existing users and lets an admin promote/demote roles. WorkspaceSection.original.tsx explicitly says member management is out of scope for v1 and Clerk owns invites in production. QuickStartPage's Invite-your-team navigates to /settings, which has no invite affordance, so the onboarding checklist promises something the app can't deliver.",
-   "kind": "table_stakes_missing",
-   "effort": "M",
-   "leverage": "high",
-   "files": [
-    "apps/web/src/components/settings/TeamSection.tsx",
-    "apps/web/src/components/settings/WorkspaceSection.original.tsx",
-    "apps/web/src/pages/QuickStartPage.tsx"
-   ],
-   "dimension": "onboarding-import-settings"
-  },
-  {
-   "title": "Currency & locale is localStorage-only, not persisted to the org",
-   "bestInClass": "Org-default currency, date format, and timezone are server-persisted, apply to every member, and drive money/date formatting app-wide; multi-currency CRMs store an exchange-rate table.",
-   "today": "CurrencyLocaleSection.tsx reads/writes a single localStorage key (bidstack:currency-locale) with no API call - it is per-browser, not per-org, and resets on cache clear. It defaults to CAD/America/Toronto even though money is stored in micros app-wide. org-settings.ts only persists opportunityFilterRules; there is no currency/locale column or route, so the setting has no effect on actual money/date rendering for the team.",
-   "kind": "polish_gap",
-   "effort": "M",
-   "leverage": "medium",
-   "files": [
-    "apps/web/src/components/settings/CurrencyLocaleSection.tsx",
-    "apps/api/src/routes/org-settings.ts"
-   ],
-   "dimension": "onboarding-import-settings"
-  },
-  {
-   "title": "Pipeline stages are a fixed 7-stage set - cannot add, delete, or reorder",
-   "bestInClass": "HubSpot/Salesforce let admins add/remove/reorder pipeline stages and create multiple named pipelines, with probabilities and won/lost semantics configurable per pipeline.",
-   "today": "pipeline-stages.ts exposes only GET and PATCH (name/probability/color). There is no POST/DELETE/reorder; ensureDefaultPipeline always seeds the same hard-coded DEFAULT_STAGES (s1_lead..closed_lost). PipelineStagesSection.tsx only edits name/probability/color per existing stage. Partly defensible for a canonical bid-piloting stage model, but still a self-onboarding gap vs the bar.",
-   "kind": "polish_gap",
-   "effort": "M",
-   "leverage": "medium",
-   "files": [
-    "apps/api/src/routes/pipeline-stages.ts",
-    "apps/web/src/components/settings/PipelineStagesSection.tsx"
-   ],
-   "dimension": "onboarding-import-settings"
-  },
-  {
-   "title": "No workspace branding (logo, name, accent color) in settings",
-   "bestInClass": "Enterprise CRMs let an admin set workspace name, upload a logo, and pick an accent that shows in the nav, on exported docs/proposals, and on public pages.",
-   "today": "WorkspaceSection.original.tsx is read-only (workspace ID, env, auth provider, signed-in user) with an explicit out-of-scope note. There is no logo upload, editable workspace name, or brand-color picker anywhere in settings or org-settings.ts. AppearanceSection.tsx only offers light/dark/density/motion. The app has public-facing PublicBookingPage and PublicSignPage, making the absence of tenant branding conspicuous.",
-   "kind": "polish_gap",
-   "effort": "M",
-   "leverage": "medium",
-   "files": [
-    "apps/web/src/components/settings/WorkspaceSection.original.tsx",
-    "apps/web/src/components/settings/AppearanceSection.tsx",
-    "apps/api/src/routes/org-settings.ts"
-   ],
-   "dimension": "onboarding-import-settings"
-  },
-  {
-   "title": "Import path is JSON-paste only - no CSV parse, field mapping, dedup choice, or preview",
-   "bestInClass": "Even the lightest import UX accepts a CSV/XLSX file, auto-maps columns, previews validation, and lets the user pick dedup behavior before committing.",
-   "today": "ImportOpportunitiesDialog.tsx asks the user to paste a JSON array into a textarea and POSTs to /opportunities/import (opportunities.mutations.ts). There is no file upload, no CSV/Excel parsing, no column mapping, no preview, no dedup selector, and it only covers opportunities - not companies/contacts/leads. The capable migrations backend with all of these features sits unused right beside it.",
-   "kind": "polish_gap",
-   "effort": "S",
-   "leverage": "high",
-   "files": [
-    "apps/web/src/components/opportunity/ImportOpportunitiesDialog.tsx",
-    "apps/api/src/routes/opportunities.mutations.ts"
-   ],
-   "dimension": "onboarding-import-settings"
-  },
-  {
-   "title": "No automation-rule builder in settings (only fixed lead-rot + opportunity filters)",
-   "bestInClass": "HubSpot workflows / Salesforce flow let admins build if-this-then-that automations (on stage change create task, assign owner, send email) from a no-code settings builder.",
-   "today": "Settings CRM config has LeadRotSection and OpportunityFiltersSection (persisted via org-settings.ts), plus a separate WorkflowsPage. But there is no general automation/trigger builder reachable from settings - the configurable surface is narrow and bespoke, not a generic rule engine a self-onboarding team would expect.",
-   "kind": "differentiator",
-   "effort": "L",
-   "leverage": "low",
-   "files": [
-    "apps/web/src/components/settings/CrmConfigurationSection.tsx",
-    "apps/web/src/components/settings/LeadRotSection.tsx",
-    "apps/web/src/pages/WorkflowsPage.tsx"
-   ],
-   "dimension": "onboarding-import-settings"
-  }
- ]
+  "dimensions": [
+    {
+      "dimension": "list-management",
+      "score": 58,
+      "currentState": "Operational lists are built from shared primitives, not a generic DataTable: useBulkSelection, useTableSort + SortableHeader (3-state asc/desc/none, URL-persisted single-column sort), BulkActionBar (sticky, X selected, export/delete/clear), SpotlightTable, lib/csv.ts (CSV with formula-injection sanitization and UTF-8 BOM). Opportunities and Contacts are richest: single-column sort, bulk select with indeterminate header checkbox, bulk delete (undo on Contacts), bulk export, bulk stage-change on Opps, inline editing, sticky headers; Opps also has a server-streamed CSV export endpoint. Leads and Companies share the bulk-select/export/delete pattern with single status/priority/search filters. Tasks has the only saved/named views (SavedViewsBar + savedViews store, localStorage) plus drag-reorder and a calendar toggle. Accounts is a card grid with search/industry/sort but no checkboxes, bulk actions, or export. A global density pref (compact/comfortable/spacious) exists but only in Settings; a CursorPager component exists but is imported nowhere; a full AND/OR FilterBuilder exists only in Reports. Lists fetch a hard cap (Opps 100, Leads/Companies 50, Contacts server default) and never page even though the backend returns nextCursor.",
+      "gapCount": 8
+    },
+    {
+      "dimension": "search-nav-copilot",
+      "score": 52,
+      "currentState": "BidStack has a real, well-built foundation here. A ⌘K/Ctrl+K command palette (apps/web/src/components/command/CommandPalette.tsx + usePaletteItems.tsx) merges contextual page commands, palette-recents (localStorage), cockpit-visit recents, ~11 nav targets, and live results from in-memory caches (accounts, contacts, tasks) plus two debounced server searches (global /api/search and opportunity search). It has solid a11y: combobox/listbox roles, aria-activedescendant, 44px touch rows, reduced-motion, type-to-filter capture. The backend /api/search (apps/api/src/routes/search.ts) does org-scoped ILIKE substring matching across opportunity/contact/company/task/note with a hand-rolled 0/60/80/100 score and a 30-item cap, run concurrently. A dedicated /search page (SearchPage.tsx) gives grouped tabs + counts. Navigation has URL-derived breadcrumbs (Breadcrumbs.tsx), a topbar recent-search dropdown (TopbarSearch.tsx), vim-style \"g d/o/p…\" chords + ⌘/ focus (useGlobalShortcuts.ts), and a quick-add \"N\" menu (QuickAddMenu.tsx) for 4 create flows. The \"AI assistant\" (apps/api/src/routes/ai-assistant.ts) is NOT a conversational copilot — it is 5 fixed structured endpoints (email-draft, deal-sentiment, meeting-prep, enrich-contact, account-intel) surfaced only on specific cards (MeetingPrepCard, AccountIntelPanel), with no free-form ask/chat route and no ability to take actions.",
+      "gapCount": 9
+    },
+    {
+      "dimension": "notifications-activity",
+      "score": 74,
+      "currentState": "BidStack has a partial notification surface but no unified notification system. There is NO `Notification` model in Prisma (packages/db/prisma/schema.prisma) — only `Mention`, `Activity`, `AuditLog`, `Comment`, and `UserPresence`. The topbar bell (apps/web/src/components/layout/topbar/TopbarNotifications.tsx) is mentions-only: it reads `/api/mentions` + `/api/mentions/summary` (apps/api/src/routes/collaboration.ts) via React Query with `staleTime: 30_000` and no `refetchInterval`, so it is polled-on-mount, not real-time, and every item shows the hardcoded string \"Someone mentioned you in a comment\". @mention resolution (longest-name-wins) runs only on comment create. A full WebSocket realtime stack exists (apps/api/src/plugins/realtime.ts, services/realtime.service.ts, services/presence.service.ts) with a documented `notification:user:<userId>` channel — but grep confirms NOTHING ever publishes to that channel, and the web app never opens `/api/realtime` at all (the only `new WebSocket` in apps/web is the Yjs editor client in lib/yjs-client.ts). Notification preferences (apps/web/src/components/settings/NotificationPrefsSection.tsx) are localStorage-only (`bidstack:notifications`), not persisted server-side and not enforced by any code. There is no email digest, no SLA/breach engine, no assignment/stage-change/task-due push, and no global activity feed. Per-record timelines do exist: apps/api/src/routes/opportunity-timeline.ts reconstructs a feed read-side from AuditLog (`opportunity.stage`, `opportunity.update`) + Task + Comment, and the cockpit ActivityTimelineCard renders account-scoped activity. Slack service (apps/api/src/services/slack.service.ts) ships `dmUser` and `formatNotificationToBlocks` referencing a \"notification engine\", but those functions are never called anywhere.",
+      "gapCount": 7,
+      "resolvedNote": "CLOSED 2026-06-13: unified Notification table + service seam (createNotification/notifyUsers) writing rows + realtime push; emit points at @mention, cross-sell assign, governance assign, bid-override director escalation; GET/PATCH/POST notification endpoints (org+per-user scoped); web notification center (typed feed, per-type icons, mark-read/mark-all, 60s poll). Tests: notifications.integration.test.ts."
+    },
+    {
+      "dimension": "permissions-sharing",
+      "score": 62,
+      "currentState": "BidStack has a deep RBAC foundation on the backend that is largely disconnected from the product. The DB models Role/Permission/RolePermission/UserRole (packages/db/prisma/schema.prisma:2299-2361) back 48 permission keys and 16 seeded org-scoped roles. The rbac plugin enforces a role gate and a granular permission gate with no admin claim-fallback (apps/api/src/plugins/rbac.ts), and rbac.service.ts adds a per-request permission cache. Role definitions are fully manageable by admins via /api/roles CRUD with audit logging. However, enforcement is inconsistent: 134 requirePermission calls in 40 files, but core write surfaces (leads.write.routes.ts, opportunities.mutations.ts, reports.ts, files.ts, workflows.ts, activities.ts, tags.ts, account-intel.ts, search.ts) have ZERO permission gates, so any authenticated user can mutate them. There is no endpoint or UI to assign a custom Role to a user (UserRole rows are written only by the seed and ensureAdminRoleGrant). getUserPermissions, the documented capability manifest, is never called, so the frontend authorization model is the binary useIsAdmin() (apps/web/src/lib/auth.tsx:380), with TeamSection only toggling a legacy admin/member string. The RolesPage matrix is hardcoded read-only from rbac-matrix.ts and shows only 6 of the 16 seeded roles. Record-level sharing is limited to M7 country-based scoping of the opportunity LIST/COUNT only (apps/api/src/lib/access-scope.ts), leaving detail-by-id, companies, leads and contacts org-visible. There is no per-field permission, no record-level sharing rules engine, no team hierarchy, and no login-as / impersonation anywhere.",
+      "gapCount": 8,
+      "resolvedNote": "PARTIALLY CLOSED 2026-06-13: write-surface RBAC gates added in prior wave; GET /me/capabilities manifest now exposed; GET/POST/DELETE /users/:id/roles (admin+users:* gated, audited, idempotent) assign custom roles; web useCapabilities/useHasPermission + TeamSection role-assignment panel. REMAINING: record-level sharing rules, team hierarchy, per-field perms, impersonation."
+    },
+    {
+      "dimension": "reporting-dashboards",
+      "score": 42,
+      "currentState": "Strong backend, builder UI absent, scheduling cosmetic, no drill-through.",
+      "gapCount": 2
+    },
+    {
+      "dimension": "ux-polish-states",
+      "score": 78,
+      "currentState": "BidStack's web app (apps/web, React 18 + Vite + Tailwind 4 + framer-motion) has a genuinely strong state-handling foundation. There is a shared StateMessages module (EmptyState/ErrorState/LoadingSkeleton) used by 84 files, a layout-matched skeleton set (DashboardSkeleton, TableSkeleton, KanbanSkeleton, DetailPageSkeleton in components/skeletons/PageSkeletons.tsx) that mirrors real layout, and an Apple-grade Toast system (Toast.tsx) with dedupe, bounded stack (5), per-tone durations, Undo action support, ARIA alert/status roles and reduced-motion. The account cockpit (DashboardPage.tsx + components/cockpit + components/account-intel) is the most polished surface: every self-fetching card (CrossSellCard, GovernanceLogCard, SpotlightRefsCard, InfoSearchLeadsCard, AccountIntelPanel, LiveDataMeshCard) renders explicit loading/error/empty states, uses Lucide-style Icon (not emoji), respects useReducedMotion everywhere, has ARIA tablists with full keyboard nav, 44px touch targets, and a stale-snapshot fallback with a Retry banner on transient cockpit errors. The cockpit is responsive: index.css and cockpit.css collapse command-center / KPI grid / dash-row-3 at 1180px and 720px, the KPI grid steps 6->3->2 columns, and there is a real MobileNav drawer in AppShell. Optimistic updates (onMutate) exist in 6 hooks (useContacts/useLeads/useNotes/useOpportunities/useStageMutation/useTasks). The weak spots are consistency, not capability: emoji used as UI glyphs in the two shared state components, generic flat-bar skeletons on core list/grid pages (causing layout shift), one detail page that bypasses the shared state components entirely, and Undo wired in only one place despite the Toast supporting it app-wide.",
+      "gapCount": 6
+    },
+    {
+      "dimension": "accessibility",
+      "score": 82,
+      "currentState": "BidStack's web frontend has an unusually mature, deliberate WCAG 2.2 AA posture. The token palette (apps/web/src/index.css) carries inline-verified contrast ratios for both light and dark modes, with several colors explicitly remediated to clear 4.5:1 (e.g. --fg-tertiary #6b7280, --warning #8a5a00, --danger #b82032). A global *:focus-visible 2px brand ring + halo is defined with a native-control fallback, a focus-visible skip-link targets a focusable <main id=\"main\" tabIndex={-1}>, and prefers-reduced-motion is honored globally (with a data-motion='full' opt-out) and via useReducedMotion() in components. There are dedicated LiveAnnouncer + RouteAnnouncer aria-live regions and 92 files using role=alert/status/aria-live. Charts (apps/web/src/components/charts/CartesianCharts.tsx, chartShared.tsx) wrap each Recharts SVG in role=img with a descriptive aria-label plus an sr-only <table> data fallback; the win/loss bar uses a non-color-only split. CommandPalette implements a full combobox/listbox/aria-activedescendant pattern with >=44px rows; LeadKanbanView is keyboard-operable via arrow keys with aria-roledescription; AccountIntelPanel hand-rolls the complete WAI-ARIA tabs pattern (roving tabindex, Home/End, aria-controls/tabpanel). Dialogs/Modals/Tabs use Radix for focus trapping. The Input primitive (apps/web/src/components/ui/Input.tsx) correctly wires aria-invalid, aria-describedby, aria-errormessage and role=alert. There is a real axe-core Playwright suite (apps/web/e2e/a11y/axe.spec.ts) that gates on critical/serious violations across 19 routes with a tracked baseline.json. The main weaknesses are: the core account cockpit detail route and opened dialog/kanban/RFP states are not covered by the axe suite; several record-creation dialogs shadow the accessible Input primitive with a local minimal input that never connects field errors via aria-describedby; QuickAddMenu's listbox lacks aria-activedescendant; charts double-expose the SVG + data table; and emoji are still used as UI icons in several surfaces.",
+      "gapCount": 7
+    },
+    {
+      "dimension": "performance-reliability",
+      "score": 74,
+      "currentState": "BidStack has a genuinely strong performance/reliability backend foundation that is well above typical for a product at this stage. The Prisma schema (packages/db/prisma/schema.prisma, 4795 lines) carries 390 @@index declarations including composite orgId+filter indexes on the hot tables (Opportunity: opps_org_stage_idx, opps_org_company_idx, opps_org_owner_idx, etc.) plus a GIN trigram search index defined in a raw migration. The cockpit/dashboard hot path (apps/api/src/services/crm/dashboard.service.ts) runs 12 bounded, column-selected queries in a single Promise.all with no N+1, fronted by a two-tier cache (in-process promise cache in apps/api/src/routes/crm/dashboard.ts + a Redis layer in apps/api/src/plugins/redis-cache.ts). The accounts top-10 path (apps/api/src/routes/accounts.ts) was deliberately rewritten from an in-JS reduce-over-take:1000 into a single Postgres GROUP BY, and key-account lists use cursor pagination with Postgres groupBy aggregation (accounts.helpers.ts). A Prisma middleware (apps/api/src/lib/prisma-middleware.ts via queryGuard plugin) detects slow queries (>500ms), N+1 (>10 identical patterns/request), and unbounded findMany (rejected in dev). Idempotency is fully implemented (apps/api/src/plugins/idempotency.ts: Redis+memory fallback, body fingerprinting, in-flight locking, 24h replay cache). Real-time presence is real (apps/api/src/plugins/realtime.ts: WebSocket + Redis pub/sub, tenant-scoped channels, heartbeats). BullMQ workers centralize defaultJobOptions (packages/shared/src/queue-config.core.ts: attempts + exponential backoff + bounded retention) and the worker (apps/worker/src/main.ts) has graceful shutdown, a dual DB+Redis health probe, fail-fast prod config, and stuck-job reapers. The two material weaknesses are on the frontend and at the edge: no list virtualization exists anywhere (only ComplianceMatrix.tsx uses a virtualizer; react-window/react-virtual are not even dependencies), the list pages never consume the cursor pagination the API exposes (useContacts/useCompanies fire a single useQuery capped at 50 rows with no load-more), and HTTP response compression is not registered (@fastify/compress is absent from apps/api/package.json).",
+      "gapCount": 6
+    },
+    {
+      "dimension": "onboarding-import-settings",
+      "score": 60,
+      "currentState": "BidStack has a surprisingly complete onboarding/import BACKEND that is almost entirely unreachable from the UI. A real migration engine exists: apps/api/src/routes/migrations.ts (start-csv, save/get mappings, cancel, undo within 24h, errors.csv download) plus migrations-hubspot.routes.ts (HubSpot OAuth) and a BullMQ worker (apps/worker/src/queues/migration.ts) with per-entity writers, three dedup strategies (skip/update/duplicate), value coercion to micros, stage mapping, and an audit-based undo trail. An onboarding backend also exists: apps/api/src/routes/onboarding.ts installs four pipeline templates (B2B SaaS, Agency, Enterprise, Inside Sales) and seeds/deletes sample data. BUT the web app has NO migration/import/onboarding hooks (nothing calls start-csv or /onboarding/templates/:t/install). apps/web/src/components/onboarding/TemplatePicker.tsx returns null (a stub), and SampleDataBanner only renders when store.hasSampleData is true but setHasSampleData(true) is never called anywhere, so it is dead. The only reachable import is ImportOpportunitiesDialog.tsx, a raw JSON-paste textarea hitting /opportunities/import with no field mapping, CSV parsing, preview, or dedup. The user-facing onboarding surface is QuickStartPage.tsx (an 8-item localStorage checklist) plus a 6-step ProductTour; the Pick a template pipeline item just navigates to /pipeline. Settings (SettingsPage.tsx, 16 sections) is broad but shallow in places: workspace is a read-only org fingerprint with no invites; team only promotes/demotes roles; currency/locale is localStorage-only and not persisted server-side; pipeline stages can only be renamed/recolored (pipeline-stages.ts exposes GET+PATCH only, the 7 stages are a fixed set). Org-level settings (org-settings.ts) persist only opportunity-filter rules; there is no branding/logo upload and no template gallery surfaced to users.",
+      "gapCount": 9,
+      "resolvedNote": "PARTIALLY CLOSED 2026-06-13: CSV import wizard (Settings>Data import) over existing migration engine — client RFC-4180 parser, per-entity field catalog + auto-map, dedup strategy, live progress, errors.csv download. REMAINING: onboarding TemplatePicker stub still returns null; HubSpot OAuth import UI; server-persisted currency/locale; workspace invites."
+    }
+  ],
+  "gaps": [
+    {
+      "title": "No pagination or infinite scroll on operational lists",
+      "bestInClass": "Load 25-50 rows then page/infinite-scroll the full set with a true total count and every record reachable.",
+      "today": "Opps fetch limit 100 (OpportunitiesPage.tsx:53), Leads/Companies 50, Contacts no limit (useContacts.ts), Accounts all in-memory. Backend returns nextCursor (contacts.ts:80) and CursorPager.tsx exists but is imported nowhere; rows past the cap are invisible and counts describe only the visible slice.",
+      "kind": "table_stakes_missing",
+      "effort": "M",
+      "leverage": "high",
+      "files": [
+        "apps/web/src/components/ui/CursorPager.tsx",
+        "apps/web/src/hooks/useContacts.ts",
+        "apps/web/src/pages/OpportunitiesPage.tsx",
+        "apps/web/src/pages/LeadsPage.tsx",
+        "apps/web/src/pages/CompaniesPage.tsx",
+        "apps/api/src/routes/contacts.ts"
+      ],
+      "dimension": "list-management"
+    },
+    {
+      "title": "Saved/named views exist only for Tasks and only in localStorage",
+      "bestInClass": "Every core object has named, server-persisted, shareable saved views recalled on load as the primary navigation metaphor.",
+      "today": "SavedViewsBar + savedViews.ts are wired to Tasks only and localStorage-only by design (savedViews.ts:6-8), so no cross-device or team sync. Opps/Leads/Contacts/Companies/Accounts persist sort/filter to the URL but have no save/recall affordance.",
+      "kind": "differentiator",
+      "effort": "L",
+      "leverage": "high",
+      "files": [
+        "apps/web/src/stores/savedViews.ts",
+        "apps/web/src/components/task/SavedViewsBar.tsx",
+        "apps/web/src/pages/OpportunitiesPage.tsx",
+        "apps/web/src/pages/ContactsPage.tsx",
+        "apps/web/src/pages/LeadsPage.tsx"
+      ],
+      "dimension": "list-management"
+    },
+    {
+      "title": "No multi-filter builder on operational lists, only single fixed quick filters",
+      "bestInClass": "A chip bar composing multiple conditions with operators, AND/OR logic, and date ranges, applied server-side.",
+      "today": "A nested AND/OR FilterBuilder (eq/neq/contains/gt/lt/isNull) exists but only in the Reports builder (components/reports/FilterBuilder.tsx). Lists offer 1-2 fixed selects: Leads status+priority (LeadsPage.tsx:207), Opps stage chips, Accounts industry, Companies/Contacts search only; no value/owner/date/tag conditions.",
+      "kind": "table_stakes_missing",
+      "effort": "L",
+      "leverage": "high",
+      "files": [
+        "apps/web/src/components/reports/FilterBuilder.tsx",
+        "apps/web/src/pages/OpportunitiesPage.tsx",
+        "apps/web/src/pages/LeadsPage.tsx",
+        "apps/web/src/pages/ContactsPage.tsx"
+      ],
+      "dimension": "list-management"
+    },
+    {
+      "title": "No column show/hide or reorder on any list",
+      "bestInClass": "A column manager toggles columns on/off, drag-reorders them, and persists the layout per view, exposing 12+ optional columns.",
+      "today": "Columns are hard-coded in each thead (ContactTable, OpportunitiesTableHead, CompaniesPage.tsx:278, LeadsPage.tsx:309). A grep for columnVisibility/hideColumn/reorderColumn/visibleColumns finds no list-table matches; no way to surface tags, owner, last activity, or custom fields.",
+      "kind": "polish_gap",
+      "effort": "M",
+      "leverage": "medium",
+      "files": [
+        "apps/web/src/pages/contacts/ContactTable.tsx",
+        "apps/web/src/pages/opportunities/OpportunitiesTableHead.tsx",
+        "apps/web/src/pages/CompaniesPage.tsx",
+        "apps/web/src/pages/LeadsPage.tsx"
+      ],
+      "dimension": "list-management"
+    },
+    {
+      "title": "Density toggle exists globally but is never surfaced in list toolbars",
+      "bestInClass": "A density control in the list toolbar so users adjust row height where they read the data, and rows visibly re-space.",
+      "today": "preferences.ts defines density (compact/comfortable/spacious as html data-density) but it is only changeable in Settings > Appearance. No list header exposes it and tables do not visibly key off it, so the feature is invisible to list users.",
+      "kind": "polish_gap",
+      "effort": "S",
+      "leverage": "medium",
+      "files": [
+        "apps/web/src/stores/preferences.ts",
+        "apps/web/src/components/settings/AppearanceSection.tsx",
+        "apps/web/src/pages/ContactsPage.tsx"
+      ],
+      "dimension": "list-management"
+    },
+    {
+      "title": "Accounts, the core view, has no bulk select, checkboxes, or export",
+      "bestInClass": "The flagship object list supports row selection, bulk tag/assign/export, and column views like every other object.",
+      "today": "AccountsPage.tsx is a motion card grid (AccountCard) with search/industry/4-option sort but no checkbox column, no useBulkSelection, no BulkActionBar, and no CSV export, unlike Opps/Leads/Contacts/Companies. Rows are derived in-memory from useCrmDashboard with no pagination.",
+      "kind": "polish_gap",
+      "effort": "M",
+      "leverage": "medium",
+      "files": [
+        "apps/web/src/pages/AccountsPage.tsx",
+        "apps/web/src/pages/accountsPage/AccountCard.tsx",
+        "apps/web/src/components/ui/BulkActionBar.tsx"
+      ],
+      "dimension": "list-management"
+    },
+    {
+      "title": "Single-column sort only, no multi-column or secondary sort",
+      "bestInClass": "Shift-click or a sort manager to sort by multiple keys, e.g. Stage asc then Value desc.",
+      "today": "useTableSort.ts holds one {key,dir} SortState and SortableHeader cycles one column (SortableHeader.tsx:49-56); the URL encodes one sort token. No secondary sort path.",
+      "kind": "polish_gap",
+      "effort": "M",
+      "leverage": "low",
+      "files": [
+        "apps/web/src/hooks/useTableSort.ts",
+        "apps/web/src/components/ui/SortableHeader.tsx",
+        "apps/web/src/pages/OpportunitiesPage.tsx"
+      ],
+      "dimension": "list-management"
+    },
+    {
+      "title": "Export is CSV-only and export-all is limited to the loaded page",
+      "bestInClass": "Export to CSV and native XLSX, with a server-driven export of the full filtered set rather than rows in memory.",
+      "today": "lib/csv.ts is CSV-only. Opps has a server-streamed full export (opportunities.export.ts), but Leads/Contacts/Companies export-all builds client-side from the capped loaded page (only the visible 50-100). No XLSX anywhere.",
+      "kind": "polish_gap",
+      "effort": "M",
+      "leverage": "low",
+      "files": [
+        "apps/web/src/lib/csv.ts",
+        "apps/web/src/pages/LeadsPage.tsx",
+        "apps/web/src/pages/CompaniesPage.tsx",
+        "apps/api/src/routes/opportunities.export.ts"
+      ],
+      "dimension": "list-management"
+    },
+    {
+      "title": "No conversational copilot that answers questions over the data or takes actions",
+      "bestInClass": "Attio AI, HubSpot Breeze, and Salesforce Einstein Copilot offer a chat surface (often in the same ⌘K bar) where a user types 'which open bids slip this quarter?' or 'summarize my MAHLE account and draft a follow-up' and gets a grounded answer plus offered actions. The copilot reads pipeline/account data and can execute (create task, change stage, send email) with confirmation.",
+      "today": "The 'AI assistant' is 5 fixed RPC endpoints (apps/api/src/routes/ai-assistant.ts: email-draft, deal-sentiment, meeting-prep, enrich-contact, account-intel). Each is bound to a specific button/card (MeetingPrepCard.tsx, AccountIntelPanel.tsx) with hardcoded inputs. There is no /ai-assistant/ask or /chat route, no free-text question entry, no tool-calling loop, and no conversational state beyond a feedback row. A buyer evaluating against HubSpot/Salesforce will immediately see there is no copilot.",
+      "kind": "differentiator",
+      "effort": "L",
+      "leverage": "high",
+      "files": [
+        "apps/api/src/routes/ai-assistant.ts",
+        "apps/api/src/services/ai-assistant.service.ts",
+        "apps/api/src/services/ai-assistant.context.ts",
+        "apps/web/src/hooks/useAiAssistant.ts",
+        "apps/web/src/components/ai/MeetingPrepCard.tsx",
+        "apps/web/src/components/command/CommandPalette.tsx"
+      ],
+      "dimension": "search-nav-copilot"
+    },
+    {
+      "title": "Command palette cannot run actions — it only navigates and finds records",
+      "bestInClass": "Linear, Raycast, Attio and Notion all let ⌘K execute commands: 'Create opportunity', 'Change stage to Won', 'Assign to me', 'Add task'. The palette is the action surface, not just a finder.",
+      "today": "The only actions in the palette come from useCommandContext (apps/web/src/hooks/useCommandContext.ts), which is registered by EXACTLY ONE page — OpportunityDetailPage.tsx — contributing 2 actions ('Create task for X', 'Open AI briefing'). There are zero global actions: no 'New opportunity/contact/task' in the palette, no 'change stage', no 'go to settings tab'. Global create lives in a SEPARATE 'N' menu (QuickAddMenu.tsx), so the palette and the action surface are architecturally split. The 'action' group in commandPaletteUtils.ts is defined but almost entirely unused.",
+      "kind": "table_stakes_missing",
+      "effort": "M",
+      "leverage": "high",
+      "files": [
+        "apps/web/src/components/command/usePaletteItems.tsx",
+        "apps/web/src/components/command/commandPaletteUtils.ts",
+        "apps/web/src/hooks/useCommandContext.ts",
+        "apps/web/src/components/quickadd/QuickAddMenu.tsx",
+        "apps/web/src/pages/OpportunityDetailPage.tsx"
+      ],
+      "dimension": "search-nav-copilot"
+    },
+    {
+      "title": "Palette nav targets are badly out of sync with the real navigation (~11 of ~30 routes)",
+      "bestInClass": "Every primary destination is jumpable from ⌘K. Linear/Attio derive palette nav from the same source of truth as the sidebar so they never drift.",
+      "today": "NAV_TARGETS in commandPaletteUtils.ts hardcodes 11 destinations (dashboard, accounts, opportunities, pipeline, contacts, tasks, reports, integrations, audit-log, settings, search). The actual app (navConfig.ts NAV_SECTIONS) ships ~30 routes: Leads, Forecasts, Sales Toolkits, Key Accounts, Top Accounts, Companies, Sector View, Cross-sell, References, Territories, Bid/No-Bid Matrix, RFP Response Hub, Proposals, Agent Studio, Calendar, Calls, Service Desk, Workflows, Custom Objects, Document Intake, Quick Start. None of these are reachable via the palette's 'Go to X' commands, and several (e.g. /integrations as a standalone route) no longer match navConfig. NAV_TARGETS should be derived from NAV_SECTIONS.",
+      "kind": "table_stakes_missing",
+      "effort": "S",
+      "leverage": "high",
+      "files": [
+        "apps/web/src/components/command/commandPaletteUtils.ts",
+        "apps/web/src/components/layout/navConfig.ts",
+        "apps/web/src/components/command/usePaletteItems.tsx"
+      ],
+      "dimension": "search-nav-copilot"
+    },
+    {
+      "title": "Two parallel search systems that don't share results, ranking, or recents",
+      "bestInClass": "One global search backend powers the palette, the topbar bar, and the full search page with consistent ranking and shared recents.",
+      "today": "There are two independent search frontends: the palette (usePaletteItems.tsx, which blends client-cached lists + /api/search + /api/opportunities) and TopbarSearch.tsx (which just navigates to /search?q=). They use DIFFERENT recents stores (palette-recents.ts in localStorage vs the recentSearches Zustand store) and DIFFERENT result shapes. The palette mixes client-side matchers (matchCompanies/matchContacts/matchTasks in commandPaletteUtils.ts, capped to whatever the dashboard/contacts/tasks hooks happened to load) with server search, so palette results for an entity can differ from the /search page results for the same query. This duplication is a maintenance and consistency liability a power user notices.",
+      "kind": "polish_gap",
+      "effort": "M",
+      "leverage": "medium",
+      "files": [
+        "apps/web/src/components/command/usePaletteItems.tsx",
+        "apps/web/src/components/command/commandPaletteUtils.ts",
+        "apps/web/src/components/layout/topbar/TopbarSearch.tsx",
+        "apps/web/src/lib/palette-recents.ts",
+        "apps/web/src/stores/recentSearches.ts"
+      ],
+      "dimension": "search-nav-copilot"
+    },
+    {
+      "title": "Backend search is substring ILIKE with no fuzzy/typo tolerance, no pagination, no relevance weighting across fields",
+      "bestInClass": "Salesforce/HubSpot/Attio use trigram or full-text search with typo tolerance (Postgres pg_trgm similarity, Algolia, or tsvector), per-field weighting (name > email > body), and paginated/infinite results. A misspelled query ('Mahel' for 'MAHLE') still returns the account.",
+      "today": "search.ts builds `%q%` and runs Prisma `contains` / raw ILIKE — pure substring, so 'Mahel', 'MAHEL' or a transposed character returns nothing. The score() helper only checks exact / startsWith / contains (100/80/60) on a joined string; there is no field weighting and no fuzzy match. Results are hard-capped at 30 with no offset/pagination and the global search hook (useGlobalSearch.ts) requests limit=16 with no 'load more'. The opportunity raw query has a trigram GIN index comment but the matching itself is still ILIKE, not similarity().",
+      "kind": "polish_gap",
+      "effort": "M",
+      "leverage": "medium",
+      "files": [
+        "apps/api/src/routes/search.ts",
+        "apps/web/src/hooks/useGlobalSearch.ts",
+        "apps/web/src/pages/SearchPage.tsx"
+      ],
+      "dimension": "search-nav-copilot"
+    },
+    {
+      "title": "Search results are not grouped in the palette and the topbar bar has no inline results at all",
+      "bestInClass": "Cmd+K groups results under labeled headers (Accounts / Contacts / Recents / Actions) with section dividers, and the topbar search shows live grouped results as you type — you rarely need a full-page search.",
+      "today": "The palette renders a single flat list with only a tiny per-row group tag (groupTag() in commandPaletteUtils.ts: 'acct','who','todo'); there are no section headers or visual grouping, so on a busy query accounts, contacts and nav items interleave. The topbar SearchBar.tsx shows ONLY a recent-searches dropdown — it has no live result preview and just routes to /search on Enter. So the only true grouped, multi-entity result surface is the separate /search page (SearchPage.tsx), which is a navigation away.",
+      "kind": "polish_gap",
+      "effort": "M",
+      "leverage": "medium",
+      "files": [
+        "apps/web/src/components/command/CommandPalette.tsx",
+        "apps/web/src/components/command/commandPaletteUtils.ts",
+        "apps/web/src/components/layout/topbar/TopbarSearch.tsx"
+      ],
+      "dimension": "search-nav-copilot"
+    },
+    {
+      "title": "Keyboard shortcut system is shallow and the help panel is incomplete/inaccurate",
+      "bestInClass": "Comprehensive, discoverable shortcuts (j/k navigation in lists, e to edit, x to select, c to create, / to search) with a complete, generated cheat-sheet and per-context hints.",
+      "today": "Global shortcuts (useGlobalShortcuts.ts) are limited to ⌘/ focus + 9 'g _' chords; the QuickAddMenu adds 'N'. The help panel (KeyboardShortcutsHelp.tsx) is a hardcoded list of 10 entries that OMITS several real shortcuts (g a → accounts, g f → search, the 'N' quick-add) and lists none of the palette's ⌘1-⌘9/⌘A/⌘L nav hints shown in NAV_TARGETS — so the documented shortcuts disagree with the implemented ones. There are no list-level shortcuts (select/next/prev row) anywhere.",
+      "kind": "polish_gap",
+      "effort": "S",
+      "leverage": "medium",
+      "files": [
+        "apps/web/src/hooks/useGlobalShortcuts.ts",
+        "apps/web/src/components/KeyboardShortcutsHelp.tsx",
+        "apps/web/src/components/command/commandPaletteUtils.ts",
+        "apps/web/src/components/quickadd/QuickAddMenu.tsx"
+      ],
+      "dimension": "search-nav-copilot"
+    },
+    {
+      "title": "Breadcrumbs humanize raw slugs/UUIDs instead of resolving real entity names",
+      "bestInClass": "Deep-link breadcrumbs show the real record name ('Accounts / MAHLE GmbH / Renewal Bid'), resolved from data, with proper deep-linking back to each level.",
+      "today": "Breadcrumbs.tsx derives crumbs purely from the URL and runs humanize() on every non-primary segment — so an account UUID or kebab slug becomes a title-cased version of the slug, not the real name. The code even has a no-op ternary `humanize(params.accountId === seg ? seg : seg)` revealing an abandoned attempt to special-case the account name. For opportunity/contact/task detail routes the breadcrumb shows the id, not the entity title.",
+      "kind": "polish_gap",
+      "effort": "M",
+      "leverage": "medium",
+      "files": [
+        "apps/web/src/components/ui/Breadcrumbs.tsx"
+      ],
+      "dimension": "search-nav-copilot"
+    },
+    {
+      "title": "Palette entity coverage is limited to 5 client-cached types plus opp search; leads, proposals, references, custom objects, calls are not searchable",
+      "bestInClass": "Global search spans every first-class object in the product (and often custom objects), so users trust ⌘K as the universal entry point.",
+      "today": "search.ts only indexes opportunity/contact/company/task/note. The palette additionally searches accounts/contacts/tasks but only over whatever the dashboard/useContacts/useTasks hooks already cached (matchCompanies/matchContacts/matchTasks operate on in-memory arrays, capped at 6 each), so results are incomplete on large tenants and miss anything not yet loaded. Major navConfig entities — Leads, Proposals, References, Custom Object records, Calls, Service Desk tickets, Forecasts — are not searchable at all from either the palette or /search.",
+      "kind": "table_stakes_missing",
+      "effort": "M",
+      "leverage": "high",
+      "files": [
+        "apps/api/src/routes/search.ts",
+        "apps/web/src/components/command/usePaletteItems.tsx",
+        "apps/web/src/components/command/commandPaletteUtils.ts"
+      ],
+      "dimension": "search-nav-copilot"
+    },
+    {
+      "title": "No Notification model or notification center — only a mentions bell mislabeled \"Notifications\"",
+      "bestInClass": "Salesforce/HubSpot/Attio ship a first-class notification center: a typed Notification record (assignment, @mention, stage change, SLA breach, task due, comment reply, record share) with read/unread state, a bell that aggregates ALL types, mark-all-read, grouping, and deep links to the source record.",
+      "today": "There is no `Notification` model in Prisma at all (packages/db/prisma/schema.prisma). The bell (TopbarNotifications.tsx) only surfaces `Mention` rows, shows the fixed text \"Someone mentioned you in a comment\", has no mark-all-read, no types, and \"View all mentions\" links to /tasks rather than a notification inbox.",
+      "kind": "table_stakes_missing",
+      "effort": "L",
+      "leverage": "high",
+      "files": [
+        "packages/db/prisma/schema.prisma",
+        "apps/web/src/components/layout/topbar/TopbarNotifications.tsx",
+        "apps/api/src/routes/collaboration.ts"
+      ],
+      "dimension": "notifications-activity"
+    },
+    {
+      "title": "Real-time notification channel is dead — nothing ever publishes to notification:user",
+      "bestInClass": "Assignments, @mentions, and stage changes appear in the bell in real time (WebSocket/SSE) without a refresh, with a toast for high-priority events.",
+      "today": "The WS plugin auto-subscribes each connection to `notification:user:<userId>` (apps/api/src/plugins/realtime.ts:173) but grep across apps confirms NO caller ever `publish()`es to that channel (only presence and entity-edit channels are published). Worse, the web app never connects to `/api/realtime` — the only WebSocket client in apps/web is the Yjs editor (lib/yjs-client.ts). So the bell relies on a 30s-stale poll (useMentions staleTime 30_000, no refetchInterval).",
+      "kind": "table_stakes_missing",
+      "effort": "M",
+      "leverage": "high",
+      "files": [
+        "apps/api/src/plugins/realtime.ts",
+        "apps/api/src/services/realtime.service.ts",
+        "apps/web/src/hooks/useMentions.ts",
+        "apps/web/src/lib/yjs-client.ts"
+      ],
+      "dimension": "notifications-activity"
+    },
+    {
+      "title": "Notification preferences are localStorage-only and enforce nothing",
+      "bestInClass": "Per-user, server-persisted notification preferences (per-channel: in-app/email/Slack; per-event-type; with quiet hours) that the delivery pipeline actually reads before sending.",
+      "today": "NotificationPrefsSection.tsx stores `{emailDigest, mentionPush, taskDueSoon, dealStageChange}` only in `localStorage['bidstack:notifications']`; no API, no DB column, and none of those four toggles is wired to any backend code. The UI promises features (daily digest, task reminders, stage-change alerts) that have no implementation.",
+      "kind": "table_stakes_missing",
+      "effort": "M",
+      "leverage": "high",
+      "files": [
+        "apps/web/src/components/settings/NotificationPrefsSection.tsx"
+      ],
+      "dimension": "notifications-activity"
+    },
+    {
+      "title": "No event delivery pipeline — no email digest, no SLA breach, no assignment/stage-change/task-due push",
+      "bestInClass": "A worker-driven engine emits notifications on domain events (assignment, stage change, SLA/idle-deal breach, task due) and delivers them in-app + email digest + Slack DM per the user's prefs.",
+      "today": "No BullMQ queue produces notifications. The Slack service exposes `dmUser` and `formatNotificationToBlocks` (apps/api/src/services/slack.service.ts) referencing a \"notification engine\", but those functions are never called. The activity worker grep shows queues for calls/RFP/CS but none for notification fan-out or digests. Stage changes are recorded to AuditLog (opportunity-timeline.ts reads `opportunity.stage`) but trigger no alert to the deal owner.",
+      "kind": "table_stakes_missing",
+      "effort": "L",
+      "leverage": "high",
+      "files": [
+        "apps/api/src/services/slack.service.ts",
+        "apps/api/src/routes/integrations/slack.ts",
+        "apps/api/src/services/activity.service.ts"
+      ],
+      "dimension": "notifications-activity"
+    },
+    {
+      "title": "No global activity feed — timelines are per-record only and reconstructed read-side",
+      "bestInClass": "A global/team activity firehose (\"what changed across my accounts today\") plus a unified per-record feed built from a single canonical event stream.",
+      "today": "There is an account-scoped cockpit feed (ActivityTimelineCard.tsx) and a per-opportunity timeline (opportunity-timeline.ts) that is reassembled at read time by merging AuditLog + Task + Comment — there is no org-wide feed route and `logActivity()` is only invoked in 3 places (custom-object.records.service.ts), so the `Activity` table is sparsely populated and isn't the source of truth for the timeline.",
+      "kind": "table_stakes_missing",
+      "effort": "M",
+      "leverage": "medium",
+      "files": [
+        "apps/api/src/routes/opportunity-timeline.ts",
+        "apps/web/src/components/cockpit/ActivityTimelineCard.tsx",
+        "apps/api/src/services/activity.service.ts"
+      ],
+      "dimension": "notifications-activity"
+    },
+    {
+      "title": "Presence infrastructure built but invisible to users",
+      "bestInClass": "Live presence avatars on records (\"Jane is also viewing this deal\"), typing/editing indicators, and an away/online status — Attio/Notion-grade collaboration cues.",
+      "today": "UserPresence model + `/api/presence` GET/POST + presence pub/sub all exist (collaboration.ts, presence.service.ts) and the WS plugin upserts presence on connect/ping, but the web app never reads `/api/presence` nor subscribes to `presence:org:<orgId>` — there is no presence avatar component, so all of this is unrendered backend.",
+      "kind": "polish_gap",
+      "effort": "M",
+      "leverage": "medium",
+      "files": [
+        "apps/api/src/routes/collaboration.ts",
+        "apps/api/src/services/presence.service.ts",
+        "apps/api/src/plugins/realtime.ts"
+      ],
+      "dimension": "notifications-activity"
+    },
+    {
+      "title": "Mention bell lacks context, deep links, and bulk actions",
+      "bestInClass": "Each notification shows actor avatar/name, a snippet of the comment, the record it's on, relative time, and clicks through to the exact comment with mark-read-on-view; supports mark-all-read.",
+      "today": "Every mention renders the static line \"Someone mentioned you in a comment\" with only a date (TopbarNotifications.tsx:101-105); it does not resolve the comment body, the author, or the parent record, and clicking does not navigate to the source. There is no mark-all-read action, only per-item.",
+      "kind": "polish_gap",
+      "effort": "M",
+      "leverage": "high",
+      "files": [
+        "apps/web/src/components/layout/topbar/TopbarNotifications.tsx",
+        "apps/api/src/routes/collaboration.ts",
+        "apps/web/src/hooks/useMentions.ts"
+      ],
+      "dimension": "notifications-activity"
+    },
+    {
+      "title": "No UI or API to assign a Role to a user",
+      "bestInClass": "Salesforce/HubSpot/Attio let an admin assign one or more roles/permission sets to a user from the user detail or members table; the change immediately alters access.",
+      "today": "roles.ts only CRUDs role definitions; the only user mutation is PATCH /users/:id/role toggling the legacy admin/member string (apps/api/src/routes/users.ts:61). UserRole rows are created only by the seed and ensureAdminRoleGrant, so the 14 non-Admin seeded roles can never be assigned in-app.",
+      "kind": "table_stakes_missing",
+      "effort": "M",
+      "leverage": "high",
+      "files": [
+        "apps/api/src/routes/users.ts",
+        "apps/api/src/routes/roles.ts",
+        "apps/web/src/components/settings/TeamSection.tsx"
+      ],
+      "dimension": "permissions-sharing"
+    },
+    {
+      "title": "Permission gates missing on core write surfaces",
+      "bestInClass": "Every object CRUD endpoint enforces the matching object permission; a Read-Only or SDR user is 403'd from writing opportunities even via the raw API.",
+      "today": "Only 40 of ~107 route files call requirePermission. leads.write.routes.ts, opportunities.mutations.ts, reports.ts, files.ts, workflows.ts, activities.ts, tags.ts, account-intel.ts and search.ts have no permission preHandler; they rely only on org-scoping, so any authenticated member can mutate leads and opportunities.",
+      "kind": "table_stakes_missing",
+      "effort": "M",
+      "leverage": "high",
+      "files": [
+        "apps/api/src/routes/leads.write.routes.ts",
+        "apps/api/src/routes/opportunities.mutations.ts",
+        "apps/api/src/routes/reports.ts",
+        "apps/api/src/routes/files.ts",
+        "apps/api/src/routes/workflows.ts"
+      ],
+      "dimension": "permissions-sharing"
+    },
+    {
+      "title": "Frontend authorization is binary admin/non-admin; no capability manifest",
+      "bestInClass": "The UI hides/disables actions per the user's actual permission set, driven by a capability payload fetched on session load.",
+      "today": "The whole web auth surface is useIsAdmin() === (role === 'admin') (apps/web/src/lib/auth.tsx:380). rbac.service.getUserPermissions is described as the capability manifest but is never called in apps/api/src; there is no /me or /capabilities endpoint.",
+      "kind": "table_stakes_missing",
+      "effort": "M",
+      "leverage": "high",
+      "files": [
+        "apps/api/src/services/rbac.service.ts",
+        "apps/web/src/lib/auth.tsx",
+        "apps/web/src/pages/RolesPage.tsx"
+      ],
+      "dimension": "permissions-sharing"
+    },
+    {
+      "title": "Hardcoded 6-role read-only matrix diverges from the 16 seeded roles",
+      "bestInClass": "A live, editable role grid that reads actual roles+permissions from the DB and toggles per-resource read/write inline.",
+      "today": "RolesPage renders a static 6-role matrix from rbac-matrix.ts, a separate source of truth from seed.rbac.ts (16 roles). The grid is read-only and the custom-role editor lists permissions as flat checkboxes with no resource grouping or read/write columns.",
+      "kind": "polish_gap",
+      "effort": "M",
+      "leverage": "medium",
+      "files": [
+        "apps/web/src/pages/RolesPage.tsx",
+        "apps/web/src/components/settings/RolesSection.tsx",
+        "packages/shared/src/types/rbac-matrix.ts"
+      ],
+      "dimension": "permissions-sharing"
+    },
+    {
+      "title": "No record-level sharing rules, field-level permissions, or team hierarchy",
+      "bestInClass": "Salesforce-style sharing: org-wide defaults, owner/team/criteria sharing rules, role-hierarchy roll-up, per-field read/edit per profile.",
+      "today": "The only record-level control is M7 country scoping of the opportunity LIST/COUNT (access-scope.ts). No Share model, no FieldPermission model, no manager hierarchy (only flat UserGroup + Territory.ownerId).",
+      "kind": "differentiator",
+      "effort": "L",
+      "leverage": "medium",
+      "files": [
+        "apps/api/src/lib/access-scope.ts",
+        "packages/db/prisma/schema.prisma",
+        "apps/api/src/routes/opportunities.ts"
+      ],
+      "dimension": "permissions-sharing"
+    },
+    {
+      "title": "Country scoping leaks on detail-by-id and non-list endpoints",
+      "bestInClass": "A sharing rule applies uniformly to list, detail, search, export and related reads.",
+      "today": "applyOpportunityScope is merged only into list/count where-clauses; GET /opportunities/:id, export, brief and search bypass scope (documented in access-scope.ts:19-25). A scoped user can open any opportunity by UUID and surface out-of-scope deals via /search.",
+      "kind": "table_stakes_missing",
+      "effort": "M",
+      "leverage": "medium",
+      "files": [
+        "apps/api/src/lib/access-scope.ts",
+        "apps/api/src/routes/opportunities.ts",
+        "apps/api/src/routes/search.ts"
+      ],
+      "dimension": "permissions-sharing"
+    },
+    {
+      "title": "No login-as / impersonation for admins",
+      "bestInClass": "Login-as-user lets an admin debug exactly what a given role/user sees, with an audit trail and an impersonation banner.",
+      "today": "No impersonation exists anywhere in apps or packages. With the binary admin UI and unwired capability manifest, an admin cannot verify what a Read-Only or SDR user experiences.",
+      "kind": "differentiator",
+      "effort": "M",
+      "leverage": "low",
+      "files": [
+        "apps/api/src/plugins/auth.ts",
+        "apps/web/src/lib/auth.tsx"
+      ],
+      "dimension": "permissions-sharing"
+    },
+    {
+      "title": "Permission audit covers role definitions but not role grants",
+      "bestInClass": "A filterable permission audit showing who changed which role and who was granted/revoked which role and when.",
+      "today": "role.create/update/delete are audit-logged (roles.ts), but UserRole grants/revokes are not audited and the viewer is a general log, not a permissions-scoped view.",
+      "kind": "polish_gap",
+      "effort": "S",
+      "leverage": "low",
+      "files": [
+        "apps/api/src/routes/roles.ts",
+        "apps/api/src/routes/users.ts",
+        "apps/web/src/pages/AuditLogPage.tsx"
+      ],
+      "dimension": "permissions-sharing"
+    },
+    {
+      "title": "Drag-build report builder UI is missing; backend unreachable from product",
+      "bestInClass": "Visual builder: pick entity, drag fields, filters, aggregates, group-by, live preview, save with chart type.",
+      "today": "Builder components and useCreateReport/useUpdateReport/usePreviewReport are never imported by any page. AppRoutes.tsx:332-347 routes /reports/new and /reports/:id/edit to the legacy fixed-tab ReportsPage, so reports can only be created via raw API. Two competing Reports pages: /reports legacy vs /reports/list real.",
+      "kind": "table_stakes_missing",
+      "effort": "L",
+      "leverage": "high",
+      "files": [
+        "apps/web/src/routes/AppRoutes.tsx",
+        "apps/web/src/components/reports/FilterBuilder.tsx",
+        "apps/web/src/hooks/useAnalyticsReports.ts",
+        "apps/web/src/pages/ReportsListPage.tsx"
+      ],
+      "dimension": "reporting-dashboards"
+    },
+    {
+      "title": "Scheduling cosmetic; no drill-through; weak export/edit/persist/sharing/KPI-deltas",
+      "bestInClass": "Scheduled email reports, click-to-drill, dashboard PDF/XLSX, in-place widget edit, persisted resizable grid, granular sharing, KPI deltas with sparklines.",
+      "today": "schedule is free-text with no worker executing it (schema.prisma:4593); charts have no onClick drill-through; export is per-widget CSV only; onConfigure omitted despite a live PATCH endpoint (AnalyticsDashboardPage.tsx:224); Reorder is local-only and never persisted; free-text xKey/yKey mapping (WidgetConfigModal.tsx:43); isShared is one org-wide boolean (schema.prisma:4635); OrgDashboard.tsx KPI tiles lack deltas though a delta/sparkline KpiCard.tsx exists.",
+      "kind": "table_stakes_missing",
+      "effort": "L",
+      "leverage": "high",
+      "files": [
+        "apps/api/src/routes/analytics-reports.ts",
+        "apps/web/src/components/widgets/WidgetRenderer.tsx",
+        "apps/web/src/pages/AnalyticsDashboardPage.tsx",
+        "apps/web/src/components/dashboard/OrgDashboard.tsx",
+        "apps/web/src/components/widgets/WidgetConfigModal.tsx"
+      ],
+      "dimension": "reporting-dashboards"
+    },
+    {
+      "title": "Emoji used as UI glyphs in the two shared state components (app-wide blast radius)",
+      "bestInClass": "Linear/Attio render a single consistent SVG icon family (Lucide/custom) in every empty, error, and toast state — never an OS emoji that renders differently per platform, breaks the one-accent-color rule, and looks AI-generated.",
+      "today": "StateMessages.tsx uses an emoji sparkle '✨' for EmptyState (line 29) and '⚠' for ErrorState (line 51); Toast.tsx TONE_STYLE uses text glyphs '✓','⚠','!','i' (lines 132-135) and a raw '×' dismiss (line 191) instead of the project's Lucide Icon component. These two files are imported by 84 files, so the emoji appears on every empty/error/toast surface in the product — directly violating the design-standards 'NEVER emoji as UI icons' rule. The cockpit cards themselves correctly use the Icon component, making the shared-component emoji a jarring inconsistency.",
+      "kind": "polish_gap",
+      "effort": "S",
+      "leverage": "high",
+      "files": [
+        "apps/web/src/components/ui/StateMessages.tsx",
+        "apps/web/src/components/ui/Toast.tsx",
+        "apps/web/src/components/ui/Icon.tsx"
+      ],
+      "dimension": "ux-polish-states"
+    },
+    {
+      "title": "Core list/grid pages use flat-bar LoadingSkeleton, not layout-matched skeletons — visible layout shift (CLS)",
+      "bestInClass": "Attio/Linear show a skeleton that is the exact shape of the incoming content (same grid columns, card heights, row count) so loading->loaded has near-zero layout shift and feels like the page rendering itself. The repo already has this pattern in TableSkeleton/KanbanSkeleton/DashboardSkeleton.",
+      "today": "AccountsPage.tsx renders an 'account-grid' of AccountCards but its loading state is <LoadingSkeleton rows={10} /> (line 70) — 10 stacked flat shimmer bars, so when data arrives the layout jumps from a vertical bar-stack to a multi-column card grid. The same generic LoadingSkeleton is used at page level in CompaniesPage, KeyAccountsPage, TopAccountsPage, CallsPage, ReportsPage, SalesToolkitsPage, SectorViewPage, ReferencesPage and ~11 others, while only 15 pages use the layout-matched TableSkeleton/KanbanSkeleton. A CardGridSkeleton matching account-grid would close the CLS gap and unify the loading feel.",
+      "kind": "polish_gap",
+      "effort": "M",
+      "leverage": "high",
+      "files": [
+        "apps/web/src/pages/AccountsPage.tsx",
+        "apps/web/src/pages/CompaniesPage.tsx",
+        "apps/web/src/pages/KeyAccountsPage.tsx",
+        "apps/web/src/pages/TopAccountsPage.tsx",
+        "apps/web/src/components/skeletons/PageSkeletons.tsx"
+      ],
+      "dimension": "ux-polish-states"
+    },
+    {
+      "title": "CustomObjectDetailPage bypasses the shared state system (inline pulse, plain-text not-found, no error branch)",
+      "bestInClass": "Every detail page uses one shared skeleton + EmptyState + ErrorState so loading/empty/error look identical across the product, and a fetch failure shows a recoverable error with a retry path — never a permanent loading shimmer or bare text.",
+      "today": "CustomObjectDetailPage.tsx (line 76-83) renders a hand-rolled `animate-pulse` div instead of DetailPageSkeleton, shows a plain-text 'Record not found.' (line 85-96) instead of EmptyState, and has no isError branch at all — a failed record fetch leaves recordQuery.isLoading false with no data, falling through to 'not found' or (on a transient error) an indefinite skeleton. Contrast CompanyDetailPage.tsx (lines 35-62) which correctly does DetailPageSkeleton -> ErrorState -> EmptyState with a Go-back action. This is the clearest single-page inconsistency.",
+      "kind": "table_stakes_missing",
+      "effort": "S",
+      "leverage": "medium",
+      "files": [
+        "apps/web/src/pages/CustomObjectDetailPage.tsx",
+        "apps/web/src/components/skeletons/DetailPageSkeleton.tsx",
+        "apps/web/src/components/ui/StateMessages.tsx"
+      ],
+      "dimension": "ux-polish-states"
+    },
+    {
+      "title": "Undo is supported by the Toast but wired into only one destructive action",
+      "bestInClass": "Attio/Linear/Gmail give Undo on every destructive or hard-to-reverse mutation (delete, archive, bulk action, stage move) via the toast action slot, so users act without fear. The infrastructure for this already exists here.",
+      "today": "Toast.tsx fully supports an action button and explicitly documents it as 'typically Undo for destructive ops' (lines 26-27, 71), but a search shows the Undo action label is used in exactly one place (ContactsPage.tsx). Other destructive flows surface plain toast.error/toast.success without undo: AccountIntelPanel.tsx solution/product deletes (deleteSolution/deleteProduct mutate with no undo), GovernanceLogCard/CrossSellCard deletes, and the 6 optimistic-update hooks. The optimistic-update plumbing (onMutate rollback in useContacts/useLeads/useTasks/etc.) is the hard part and already exists, so wiring undo into deletes is incremental.",
+      "kind": "differentiator",
+      "effort": "M",
+      "leverage": "medium",
+      "files": [
+        "apps/web/src/components/ui/Toast.tsx",
+        "apps/web/src/components/account-intel/AccountIntelPanel.tsx",
+        "apps/web/src/hooks/useTasks.ts",
+        "apps/web/src/pages/ContactsPage.tsx"
+      ],
+      "dimension": "ux-polish-states"
+    },
+    {
+      "title": "Cockpit aside stacks into a long single-column scroll on tablet (no intermediate breakpoint)",
+      "bestInClass": "On tablet, a dense cockpit either keeps a 2-column layout longer, or reorganizes secondary cards into a responsive 2-up grid so the user isn't forced through a 15-card vertical scroll. Linear/Salesforce Lightning reflow detail panes rather than fully stacking.",
+      "today": "cockpit.css .cockpit-grid is `minmax(0,2fr) minmax(0,1fr)` and collapses to a single `1fr` column at max-width:1180px (lines 465-480). Below 1180px the entire .cockpit-side aside (HealthScore, RevenueEvolution, WinLoss, InfoSearchLeads, KpiSidebar, DataTrust, LiveDataMesh, KeyContacts, Notes, Files, AccountIntel — ~11 cards from DashboardPage.tsx lines 224-265) drops below the main column as one long scroll. There is no intermediate tablet layout that arranges these secondary cards 2-up, so an iPad-portrait user scrolls through the full main column plus 11 stacked side cards. The command-center and KPI rows reflow well; the aside is the one surface that becomes a long-scroll on tablet.",
+      "kind": "polish_gap",
+      "effort": "M",
+      "leverage": "low",
+      "files": [
+        "apps/web/src/styles/cockpit.css",
+        "apps/web/src/pages/DashboardPage.tsx"
+      ],
+      "dimension": "ux-polish-states"
+    },
+    {
+      "title": "Reveal-wrapped cockpit cards start at opacity:0 and only appear on inView — blank cards if scroll/inView never fires",
+      "bestInClass": "Scroll-reveal animations degrade to fully-visible content for reduced-motion users and any no-JS/print/scroll-restoration edge case; content is never gated behind an intersection observer that might not fire.",
+      "today": "Reveal.tsx sets initial `{ opacity: 0 }` even when useReducedMotion is true, and only flips to visible when useInView (once:true, margin '-10% 0px') fires. DashboardPage.tsx wraps nearly every cockpit card in <Reveal> (lines 187-265). For reduced-motion users the cards are still hidden until scrolled into view (motion is correctly dropped, but the opacity gate remains), and in print/scroll-restoration-to-bottom scenarios a card whose observer never triggers stays at opacity 0. Best-in-class would set the reduced-motion initial to opacity:1 and/or use a fallback timeout so content can never be permanently invisible.",
+      "kind": "polish_gap",
+      "effort": "S",
+      "leverage": "low",
+      "files": [
+        "apps/web/src/components/motion/Reveal.tsx",
+        "apps/web/src/pages/DashboardPage.tsx"
+      ],
+      "dimension": "ux-polish-states"
+    },
+    {
+      "title": "Form fields don't link their error text — per-field aria-describedby/aria-invalid missing in core record dialogs",
+      "bestInClass": "Salesforce/HubSpot announce the specific invalid field and its message on focus: input gets aria-invalid=true and aria-describedby pointing at the inline error id, so a screen-reader user tabbing back to the field hears 'Customer, required, Customer and name are required'.",
+      "today": "The good Input primitive (apps/web/src/components/ui/Input.tsx) wires aria-invalid + aria-describedby + aria-errormessage correctly, but the core record-creation dialogs shadow it with a local minimal input. ContactDialog.tsx:140-238 uses raw `dialog-input`s and a custom Field that emits ONLY a single form-level role=alert summary (line 222) with no per-field association at all. CreateOpportunityDialog.tsx:225-266 generates an errorId per field but never sets aria-describedby/aria-invalid on the <Input>, so the wiring is dead. This raw `dialog-input` pattern appears in 7 files (19 instances).",
+      "kind": "table_stakes_missing",
+      "effort": "M",
+      "leverage": "high",
+      "files": [
+        "apps/web/src/components/contact/ContactDialog.tsx",
+        "apps/web/src/components/opportunity/CreateOpportunityDialog.tsx",
+        "apps/web/src/components/ui/Input.tsx",
+        "apps/web/src/components/task/CreateTaskDialog.tsx",
+        "apps/web/src/components/settings/ApiKeysSection.tsx"
+      ],
+      "dimension": "accessibility"
+    },
+    {
+      "title": "The core account cockpit and opened dialog/kanban states are never scanned by the axe suite",
+      "bestInClass": "Best-in-class teams run axe against the most data-dense, business-critical screen (the account 360 view) and against interactive states (modal open, kanban focused, multi-step wizard), not just empty list routes, because that is where custom ARIA breaks.",
+      "today": "apps/web/e2e/a11y/axe.spec.ts ROUTES (lines 17-37) covers 19 list/landing routes but NOT /accounts/:accountId (the cockpit — the product's core view, AppRoutes.tsx:129), nor RFP pipeline, nor any opened CommandPalette/QuickAddMenu/dialog, nor the LeadKanban focused/drag state. The custom hand-rolled tabs, kanban arrow-move, and combobox live exactly on these unscanned surfaces.",
+      "kind": "polish_gap",
+      "effort": "S",
+      "leverage": "medium",
+      "files": [
+        "apps/web/e2e/a11y/axe.spec.ts",
+        "apps/web/src/components/account-intel/AccountIntelPanel.tsx",
+        "apps/web/src/components/command/CommandPalette.tsx",
+        "apps/web/src/components/lead/LeadKanbanView.tsx"
+      ],
+      "dimension": "accessibility"
+    },
+    {
+      "title": "QuickAddMenu listbox has no aria-activedescendant — arrowed selection is silent to screen readers",
+      "bestInClass": "A listbox driven by arrow keys must move DOM focus to the active option OR set aria-activedescendant on the listbox so AT announces the highlighted row; CommandPalette in this same repo already does this correctly.",
+      "today": "apps/web/src/components/quickadd/QuickAddMenu.tsx uses role=listbox (line 129) and role=option + aria-selected (135-136), but the ArrowUp/Down handler lives on the Content div (105-124), focus never moves to the options, and the listbox has no aria-activedescendant. A SR user pressing arrows hears nothing change; only the visual highlight moves. (Same gap pattern, unlike CommandPalette which wired aria-activedescendant.)",
+      "kind": "table_stakes_missing",
+      "effort": "S",
+      "leverage": "medium",
+      "files": [
+        "apps/web/src/components/quickadd/QuickAddMenu.tsx"
+      ],
+      "dimension": "accessibility"
+    },
+    {
+      "title": "Charts double-expose to AT: inner Recharts SVG is not aria-hidden alongside the sr-only data table",
+      "bestInClass": "Accessible charting wraps the visualization in role=img with a label, provides ONE accessible representation (the data table), and marks the decorative SVG aria-hidden so the screen reader doesn't read both the role=img summary, the table, AND every Recharts tick/series node.",
+      "today": "In apps/web/src/components/charts/CartesianCharts.tsx every chart has role=img + sr-only <table> (good), but the Recharts <ResponsiveContainer>/SVG inside is not aria-hidden. Recharts emits its own focusable/role-bearing SVG primitives, so VoiceOver/NVDA will announce the role=img label, then the full data table, then wander the raw SVG nodes — verbose and confusing. The Sparkline (cockpit/Sparkline.tsx) is correctly aria-hidden; the big charts are not.",
+      "kind": "polish_gap",
+      "effort": "S",
+      "leverage": "low",
+      "files": [
+        "apps/web/src/components/charts/CartesianCharts.tsx",
+        "apps/web/src/components/charts/PolarCharts.tsx",
+        "apps/web/src/components/charts/chartShared.tsx"
+      ],
+      "dimension": "accessibility"
+    },
+    {
+      "title": "Global min-height/min-width: 44px on every button/[role=button]/a is too broad and risks layout breakage masking real targets",
+      "bestInClass": "Touch-target sizing is applied to genuinely interactive controls, scoped to coarse pointers (pointer: coarse), so dense desktop tables and inline chips stay compact while touch devices get 44px — exactly the pattern this repo already uses elsewhere via the `pointer-coarse:` variant.",
+      "today": "apps/web/src/index.css:504-509 forces min-height:44px AND min-width:44px on ALL button, [role=button], a unconditionally (not behind pointer:coarse). This over-inflates inline text links, badge/chip buttons and tiny icon buttons on desktop, and several components fight it back with negative-margin hacks (ChartContainer.tsx:100 `-m-[8px] p-[8px]`). The blanket rule both distorts dense layouts and can hide whether individual targets actually meet WCAG 2.5.8; it should be scoped to coarse pointers like the rest of the codebase.",
+      "kind": "polish_gap",
+      "effort": "S",
+      "leverage": "low",
+      "files": [
+        "apps/web/src/index.css",
+        "apps/web/src/components/charts/ChartContainer.tsx"
+      ],
+      "dimension": "accessibility"
+    },
+    {
+      "title": "Emoji used as UI icons in several surfaces — inconsistent AT exposure and off the single-icon-family standard",
+      "bestInClass": "A single SVG icon family (Lucide/Heroicons) is used for all UI glyphs; decorative ones are aria-hidden, meaningful ones get text alternatives. Emoji are never load-bearing UI icons because their AT announcement is unpredictable across platforms.",
+      "today": "Call providers render raw emoji as the only glyph (CallTimeline.tsx:35-38, CallButton.tsx:26-29 icon strings, CallsPage.tsx:76-79), and ChartContainer.tsx:191/202 uses ⚠/📊 emoji for error/empty states. Some are aria-hidden (acceptable), but CallTimeline/CallButton emit them as visible content without a consistent text label, so AT behavior varies. The repo already has a clean Lucide-style Icon set (components/ui/Icon.tsx) these should use.",
+      "kind": "polish_gap",
+      "effort": "M",
+      "leverage": "low",
+      "files": [
+        "apps/web/src/components/calls/CallTimeline.tsx",
+        "apps/web/src/components/calls/CallButton.tsx",
+        "apps/web/src/pages/CallsPage.tsx",
+        "apps/web/src/components/charts/ChartContainer.tsx",
+        "apps/web/src/components/ui/Icon.tsx"
+      ],
+      "dimension": "accessibility"
+    },
+    {
+      "title": "Icon component defaults aria-hidden=true, so a future icon-only button without an explicit aria-label is silently invisible to AT",
+      "bestInClass": "Icon-only controls have a guaranteed accessible name; either the icon library forces a title/aria-label on standalone use or lint enforces aria-label on icon-only buttons, so a missing label fails the build rather than shipping a silent control.",
+      "today": "apps/web/src/components/ui/Icon.tsx:337 hard-defaults ariaHidden=true for every Icon. Current icon buttons all add aria-label on the wrapping <button> (verified in Topbar, IntelTabs delete buttons, Toast dismiss), so today this is fine — but there is no lint guard (no eslint-plugin-jsx-a11y rule pinning aria-label on icon-only buttons was found), so the pattern depends entirely on author discipline. One missed label produces an unnamed, AT-invisible button with no automated catch on component tests (axe only runs on the 19 list routes).",
+      "kind": "polish_gap",
+      "effort": "S",
+      "leverage": "low",
+      "files": [
+        "apps/web/src/components/ui/Icon.tsx",
+        "apps/web/src/components/layout/Topbar.tsx"
+      ],
+      "dimension": "accessibility"
+    },
+    {
+      "title": "No list virtualization on any large table or kanban board",
+      "bestInClass": "Salesforce/Attio/HubSpot virtualize every grid and board (windowed rendering via react-virtual/AG-Grid) so a 10k-row table or a 500-card pipeline stays at 60fps with constant DOM node count and instant scroll.",
+      "today": "react-window/@tanstack/react-virtual are not dependencies (grep of apps/web/src returns only ComplianceMatrix.tsx). ContactTable, the companies grid, opportunities list, and the leads/pipeline kanban all render their full row/card set into the DOM. The only thing saving them today is the silent 50-row API cap (see next gap) — the instant pagination is fixed, scroll/paint will jank.",
+      "kind": "table_stakes_missing",
+      "effort": "L",
+      "leverage": "high",
+      "files": [
+        "apps/web/src/pages/contacts/ContactTable.tsx",
+        "apps/web/src/pages/CompaniesPage.tsx",
+        "apps/web/src/pages/ContactsPage.tsx",
+        "apps/web/src/pages/leadsPage",
+        "apps/web/src/pages/pipelineBoard",
+        "apps/web/package.json"
+      ],
+      "dimension": "performance-reliability"
+    },
+    {
+      "title": "Frontend never consumes the cursor pagination the API already exposes — lists silently cap at 50",
+      "bestInClass": "Infinite scroll or paged tables that transparently fetch the next page on scroll/click, so the user can reach every record. The backend already returns nextCursor.",
+      "today": "GET /api/companies and /api/contacts return { items, nextCursor } with cursor support (apps/api/src/routes/companies.ts:16, accounts.ts:40). But useCompanies/useContacts call useQuery once with no limit and never pass cursor or call fetchNextPage (only useCalls.ts uses useInfiniteQuery). CompaniesPage.tsx contains zero references to nextCursor/fetchNextPage. Result: a user with >50 companies or contacts can only ever see the first 50, with no indication more exist — a correctness-grade reliability bug, not just a perf nit. The server plumbing is done; the client just doesn't drive it.",
+      "kind": "table_stakes_missing",
+      "effort": "M",
+      "leverage": "high",
+      "files": [
+        "apps/web/src/hooks/useCompanies.ts",
+        "apps/web/src/hooks/useContacts.ts",
+        "apps/web/src/pages/CompaniesPage.tsx",
+        "apps/web/src/pages/ContactsPage.tsx"
+      ],
+      "dimension": "performance-reliability"
+    },
+    {
+      "title": "No HTTP response compression (gzip/brotli) on the API",
+      "bestInClass": "Brotli/gzip on all JSON responses (typically at the edge or via @fastify/compress) cuts dashboard/list payloads 60-80% on the wire — a directly noticeable TTFB/LCP win on the cockpit, which ships a large multi-section snapshot.",
+      "today": "@fastify/compress is not a dependency of apps/api (grep of package.json: NOT A DEPENDENCY) and is not registered in apps/api/src/server.ts. The cockpit dashboard snapshot (12-query aggregate with companies/activities/insights/bid rows) and list payloads are sent uncompressed. If a CDN/proxy isn't doing it in front, every cockpit load pays full JSON byte cost.",
+      "kind": "table_stakes_missing",
+      "effort": "S",
+      "leverage": "high",
+      "files": [
+        "apps/api/src/server.ts",
+        "apps/api/package.json"
+      ],
+      "dimension": "performance-reliability"
+    },
+    {
+      "title": "Cache invalidation is org-wide blunt — any mutation flushes every cached read for the tenant",
+      "bestInClass": "Tag/entity-scoped invalidation: editing one opportunity busts only opportunity/dashboard keys, not the entire org's cached surface, so caches actually survive long enough to absorb read load.",
+      "today": "apps/api/src/plugins/redis-cache.ts onSend hook runs cacheDel('bidstack:cache:${orgId}:*') on ANY successful POST/PUT/PATCH/DELETE. The cache helper supports tags (redis-cache.ts:53) but invalidation ignores them and wipes the whole org namespace. In an active org (constant edits) the dashboard/summary caches are flushed continuously, so the expensive 12-query snapshot rebuilds far more often than its 30s TTL implies — the cache buys little under real write load.",
+      "kind": "polish_gap",
+      "effort": "M",
+      "leverage": "medium",
+      "files": [
+        "apps/api/src/plugins/redis-cache.ts",
+        "apps/api/src/lib/redis-cache.ts"
+      ],
+      "dimension": "performance-reliability"
+    },
+    {
+      "title": "cacheDel SCAN runs on every mutation even when nothing is cached",
+      "bestInClass": "Invalidation is cheap/no-op when the entity has no cached keys (targeted DEL by known key, or a dirty-flag check) so writes don't pay a Redis SCAN tax.",
+      "today": "Every successful mutation triggers deleteRedisPattern (apps/api/src/lib/redis-cache.ts:47) which issues a cursor-based SCAN MATCH bidstack:cache:<org>:* COUNT 500 loop on the onSend path. Combined with the org-wide pattern above, the vast majority of mutating requests (most routes are not cached) pay an extra Redis round-trip per write for nothing. Bounded (maxKeys 10k) so it won't hang, but it's pure overhead on the write path's p50.",
+      "kind": "polish_gap",
+      "effort": "S",
+      "leverage": "low",
+      "files": [
+        "apps/api/src/lib/redis-cache.ts",
+        "apps/api/src/plugins/redis-cache.ts"
+      ],
+      "dimension": "performance-reliability"
+    },
+    {
+      "title": "No p50/p95 latency budget enforcement or query-count gate in CI",
+      "bestInClass": "Enterprise APIs ship a latency SLO with a CI guard (e.g. fail the build if the cockpit endpoint exceeds N queries or M ms against a seeded DB), turning the existing slow-query/N+1 instrumentation into a regression fence rather than a runtime log.",
+      "today": "The queryGuard middleware (apps/api/src/lib/prisma-middleware.ts) detects slow queries and N+1 and exposes X-Query-Count/X-Prisma-Time headers in dev, and OTel auto-instrumentation exists (apps/api/src/otel.ts), but there is no test that asserts the cockpit/dashboard stays within a query-count or latency budget. The strong observability is reactive (logs/headers) rather than enforced, so a future N+1 regression on the hottest path would only surface in production logs.",
+      "kind": "differentiator",
+      "effort": "M",
+      "leverage": "medium",
+      "files": [
+        "apps/api/src/lib/prisma-middleware.ts",
+        "apps/api/src/plugins/query-guard.ts",
+        "apps/api/src/routes/crm/dashboard.ts",
+        "apps/api/src/services/crm/dashboard.service.ts"
+      ],
+      "dimension": "performance-reliability"
+    },
+    {
+      "title": "CSV/Excel import wizard has a full backend but zero UI - completely unreachable",
+      "bestInClass": "HubSpot/Salesforce/Attio ship a guided import wizard: drag a CSV/XLSX, auto-detect columns, map source columns to fields with smart suggestions, choose a dedup key and strategy, preview the first N rows with validation errors highlighted, run, watch progress, and download failed rows.",
+      "today": "The engine is built and wired (apps/api/src/routes/migrations.ts start-csv/mappings/undo/errors.csv + worker dedup/coercion), but there is no front-end at all - no hook, no /import route, no nav entry, no Settings entry. The only thing a user can reach is ImportOpportunitiesDialog.tsx, a raw JSON-paste box. A team literally cannot self-onboard their data.",
+      "kind": "table_stakes_missing",
+      "effort": "L",
+      "leverage": "high",
+      "files": [
+        "apps/web/src/components/opportunity/ImportOpportunitiesDialog.tsx",
+        "apps/api/src/routes/migrations.ts",
+        "apps/worker/src/queues/migration.ts",
+        "apps/web/src/components/layout/navConfig.ts",
+        "apps/web/src/routes/AppRoutes.tsx"
+      ],
+      "dimension": "onboarding-import-settings"
+    },
+    {
+      "title": "Onboarding template gallery + sample data is dead code - TemplatePicker returns null, banner never fires",
+      "bestInClass": "Best-in-class onboarding lets a new workspace pick a starting template (pipeline + sample records) in the first 60 seconds and one-click load/clear demo data, with a persistent sample-data-on banner so it isn't shown to a client by accident.",
+      "today": "apps/web/src/components/onboarding/TemplatePicker.tsx is `return null;`. SampleDataBanner.tsx only shows when store.hasSampleData===true, but setHasSampleData(true) is never called anywhere, and nothing in the web app calls GET /onboarding/templates or POST /onboarding/templates/:t/install. QuickStartPage's Pick-a-template-pipeline just navigate('/pipeline'). The four templates and the install/delete sample-data endpoints exist server-side but are orphaned.",
+      "kind": "table_stakes_missing",
+      "effort": "M",
+      "leverage": "high",
+      "files": [
+        "apps/web/src/components/onboarding/TemplatePicker.tsx",
+        "apps/web/src/components/onboarding/SampleDataBanner.tsx",
+        "apps/web/src/pages/QuickStartPage.tsx",
+        "apps/api/src/routes/onboarding.ts",
+        "apps/api/src/services/onboarding-templates/b2b-saas.ts"
+      ],
+      "dimension": "onboarding-import-settings"
+    },
+    {
+      "title": "Onboarding checklist is localStorage-only with fake/non-actionable steps",
+      "bestInClass": "HubSpot's setup guide tracks real completion server-side (profile filled, first record created, email connected, team invited), syncs across devices, and each item performs the action inline or links to the exact place. Progress is org-aware and admin-visible.",
+      "today": "apps/web/src/stores/onboarding.ts persists completedChecklist to localStorage per user with no backend; clearing storage or switching devices resets it. Items are marked done on click regardless of whether the action happened (QuickStartPage.tsx markChecklistItem fires on button press). Steps reference capabilities that aren't wired (template pipeline; Invite-your-team navigates to /settings which has no invite flow). The store greps localStorage keys to find the userId (lines 110-113), a fragile hack.",
+      "kind": "polish_gap",
+      "effort": "M",
+      "leverage": "medium",
+      "files": [
+        "apps/web/src/stores/onboarding.ts",
+        "apps/web/src/pages/QuickStartPage.tsx"
+      ],
+      "dimension": "onboarding-import-settings"
+    },
+    {
+      "title": "No team invite flow - 'Invite your team' is a dead end",
+      "bestInClass": "Self-serve invites by email with role selection, pending-invite list, resend/revoke, and a join link - table stakes for any team SaaS, done in Settings > Users.",
+      "today": "TeamSection.tsx only lists existing users and lets an admin promote/demote roles. WorkspaceSection.original.tsx explicitly says member management is out of scope for v1 and Clerk owns invites in production. QuickStartPage's Invite-your-team navigates to /settings, which has no invite affordance, so the onboarding checklist promises something the app can't deliver.",
+      "kind": "table_stakes_missing",
+      "effort": "M",
+      "leverage": "high",
+      "files": [
+        "apps/web/src/components/settings/TeamSection.tsx",
+        "apps/web/src/components/settings/WorkspaceSection.original.tsx",
+        "apps/web/src/pages/QuickStartPage.tsx"
+      ],
+      "dimension": "onboarding-import-settings"
+    },
+    {
+      "title": "Currency & locale is localStorage-only, not persisted to the org",
+      "bestInClass": "Org-default currency, date format, and timezone are server-persisted, apply to every member, and drive money/date formatting app-wide; multi-currency CRMs store an exchange-rate table.",
+      "today": "CurrencyLocaleSection.tsx reads/writes a single localStorage key (bidstack:currency-locale) with no API call - it is per-browser, not per-org, and resets on cache clear. It defaults to CAD/America/Toronto even though money is stored in micros app-wide. org-settings.ts only persists opportunityFilterRules; there is no currency/locale column or route, so the setting has no effect on actual money/date rendering for the team.",
+      "kind": "polish_gap",
+      "effort": "M",
+      "leverage": "medium",
+      "files": [
+        "apps/web/src/components/settings/CurrencyLocaleSection.tsx",
+        "apps/api/src/routes/org-settings.ts"
+      ],
+      "dimension": "onboarding-import-settings"
+    },
+    {
+      "title": "Pipeline stages are a fixed 7-stage set - cannot add, delete, or reorder",
+      "bestInClass": "HubSpot/Salesforce let admins add/remove/reorder pipeline stages and create multiple named pipelines, with probabilities and won/lost semantics configurable per pipeline.",
+      "today": "pipeline-stages.ts exposes only GET and PATCH (name/probability/color). There is no POST/DELETE/reorder; ensureDefaultPipeline always seeds the same hard-coded DEFAULT_STAGES (s1_lead..closed_lost). PipelineStagesSection.tsx only edits name/probability/color per existing stage. Partly defensible for a canonical bid-piloting stage model, but still a self-onboarding gap vs the bar.",
+      "kind": "polish_gap",
+      "effort": "M",
+      "leverage": "medium",
+      "files": [
+        "apps/api/src/routes/pipeline-stages.ts",
+        "apps/web/src/components/settings/PipelineStagesSection.tsx"
+      ],
+      "dimension": "onboarding-import-settings"
+    },
+    {
+      "title": "No workspace branding (logo, name, accent color) in settings",
+      "bestInClass": "Enterprise CRMs let an admin set workspace name, upload a logo, and pick an accent that shows in the nav, on exported docs/proposals, and on public pages.",
+      "today": "WorkspaceSection.original.tsx is read-only (workspace ID, env, auth provider, signed-in user) with an explicit out-of-scope note. There is no logo upload, editable workspace name, or brand-color picker anywhere in settings or org-settings.ts. AppearanceSection.tsx only offers light/dark/density/motion. The app has public-facing PublicBookingPage and PublicSignPage, making the absence of tenant branding conspicuous.",
+      "kind": "polish_gap",
+      "effort": "M",
+      "leverage": "medium",
+      "files": [
+        "apps/web/src/components/settings/WorkspaceSection.original.tsx",
+        "apps/web/src/components/settings/AppearanceSection.tsx",
+        "apps/api/src/routes/org-settings.ts"
+      ],
+      "dimension": "onboarding-import-settings"
+    },
+    {
+      "title": "Import path is JSON-paste only - no CSV parse, field mapping, dedup choice, or preview",
+      "bestInClass": "Even the lightest import UX accepts a CSV/XLSX file, auto-maps columns, previews validation, and lets the user pick dedup behavior before committing.",
+      "today": "ImportOpportunitiesDialog.tsx asks the user to paste a JSON array into a textarea and POSTs to /opportunities/import (opportunities.mutations.ts). There is no file upload, no CSV/Excel parsing, no column mapping, no preview, no dedup selector, and it only covers opportunities - not companies/contacts/leads. The capable migrations backend with all of these features sits unused right beside it.",
+      "kind": "polish_gap",
+      "effort": "S",
+      "leverage": "high",
+      "files": [
+        "apps/web/src/components/opportunity/ImportOpportunitiesDialog.tsx",
+        "apps/api/src/routes/opportunities.mutations.ts"
+      ],
+      "dimension": "onboarding-import-settings"
+    },
+    {
+      "title": "No automation-rule builder in settings (only fixed lead-rot + opportunity filters)",
+      "bestInClass": "HubSpot workflows / Salesforce flow let admins build if-this-then-that automations (on stage change create task, assign owner, send email) from a no-code settings builder.",
+      "today": "Settings CRM config has LeadRotSection and OpportunityFiltersSection (persisted via org-settings.ts), plus a separate WorkflowsPage. But there is no general automation/trigger builder reachable from settings - the configurable surface is narrow and bespoke, not a generic rule engine a self-onboarding team would expect.",
+      "kind": "differentiator",
+      "effort": "L",
+      "leverage": "low",
+      "files": [
+        "apps/web/src/components/settings/CrmConfigurationSection.tsx",
+        "apps/web/src/components/settings/LeadRotSection.tsx",
+        "apps/web/src/pages/WorkflowsPage.tsx"
+      ],
+      "dimension": "onboarding-import-settings"
+    }
+  ]
 }
