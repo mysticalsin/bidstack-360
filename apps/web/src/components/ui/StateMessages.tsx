@@ -1,6 +1,7 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import type { ReactNode } from 'react';
 
+import { Icon } from '@/components/ui/Icon';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
 
 interface BaseProps {
@@ -23,10 +24,10 @@ export function EmptyState({ title, message, action }: BaseProps) {
         // state spinner that drifts so the user knows the page isn't frozen.
         animate={reduced ? undefined : { y: [0, -4, 0] }}
         transition={reduced ? undefined : { duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
-        className="text-3xl mb-3"
+        className="mb-3 text-[var(--fg-tertiary)]"
         aria-hidden
       >
-        ✨
+        <Icon name="sparkle" size={28} />
       </motion.div>
       <h2 className="text-sm font-semibold text-[var(--fg-primary)]">{title}</h2>
       {message ? (
@@ -47,8 +48,8 @@ export function ErrorState({ title, message, action }: BaseProps) {
       transition={springSoft}
       className="flex flex-col items-center justify-center py-16 text-center"
     >
-      <div className="text-3xl mb-3" aria-hidden>
-        ⚠
+      <div className="mb-3 text-[var(--danger)]" aria-hidden>
+        <Icon name="warning" size={28} />
       </div>
       <h2 className="text-sm font-semibold text-[var(--danger)]">{title}</h2>
       {message ? (

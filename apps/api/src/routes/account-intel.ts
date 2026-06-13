@@ -5,6 +5,13 @@ import { DocumentExtraction, ExtractDocumentRequest, AccountIntelSnapshot } from
 import { enqueueDocumentExtract } from '../queues/document-extract.js';
 
 export const accountIntelRoutes: FastifyPluginAsyncZod = async (server) => {
+
+  // RBAC: gate every route in this plugin by method — writes need 'accounts:write',
+  // reads need 'accounts:read'. Runs after the global auth onRequest.
+  server.addHook('preHandler', async (req) => {
+    const isWrite = req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH' || req.method === 'DELETE';
+    await server.requirePermission(isWrite ? 'accounts:write' : 'accounts:read')(req);
+  });
   // GET /api/accounts/:accountId/intel — solutions + products + extractions
   server.get(
     '/accounts/:accountId/intel',

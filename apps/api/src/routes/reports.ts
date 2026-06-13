@@ -26,6 +26,9 @@ const PipelineKpis = z.object({
 });
 
 export const reportsRoutes: FastifyPluginAsyncZod = async (server) => {
+
+  // RBAC: these are read endpoints; gate the whole plugin on the read permission.
+  server.addHook('preHandler', server.requirePermission('reports:read'));
   server.get('/reports/pipeline', { schema: { response: { 200: PipelineKpis } } }, async (req) =>
     getPipelineKpis(req.auth.orgId),
   );

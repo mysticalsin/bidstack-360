@@ -79,6 +79,13 @@ function serialize(row: DbFileRow): FileAttachment {
 }
 
 export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
+
+  // RBAC: gate every route in this plugin by method — writes need 'files:write',
+  // reads need 'files:read'. Runs after the global auth onRequest.
+  server.addHook('preHandler', async (req) => {
+    const isWrite = req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH' || req.method === 'DELETE';
+    await server.requirePermission(isWrite ? 'files:write' : 'files:read')(req);
+  });
   // 1. Issue a pre-signed upload URL.
   server.post(
     '/files/upload-url',

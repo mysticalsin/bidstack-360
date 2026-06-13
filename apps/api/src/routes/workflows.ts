@@ -7,6 +7,13 @@ import type { WorkflowActionKind, WorkflowTriggerKind } from '@bidstack/shared';
 import { isPublicHostname } from '../lib/ssrf-guard.js';
 
 export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
+
+  // RBAC: gate every route in this plugin by method — writes need 'workflows:write',
+  // reads need 'workflows:read'. Runs after the global auth onRequest.
+  server.addHook('preHandler', async (req) => {
+    const isWrite = req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH' || req.method === 'DELETE';
+    await server.requirePermission(isWrite ? 'workflows:write' : 'workflows:read')(req);
+  });
   // GET /api/workflows
   server.get(
     '/workflows',

@@ -18,6 +18,7 @@ export interface Item {
   group:
     | 'navigate'
     | 'opportunity'
+    | 'lead'
     | 'account'
     | 'contact'
     | 'task'
@@ -36,18 +37,47 @@ export interface Item {
 
 export type NavTarget = { to: string; label: string; hint: string };
 
+// Every navigable destination, kept in sync with navConfig.ts. Hints show the
+// real `g`-chord where one exists (useGlobalShortcuts CHORD_TARGETS); the rest
+// have none rather than a fake ⌘-digit that nothing binds.
 export const NAV_TARGETS: NavTarget[] = [
-  { to: '/dashboard', label: 'Go to Dashboard', hint: '⌘1' },
-  { to: '/accounts', label: 'Go to Accounts', hint: '⌘A' },
-  { to: '/opportunities', label: 'Go to Opportunities', hint: '⌘2' },
-  { to: '/pipeline', label: 'Go to Pipeline (kanban)', hint: '⌘3' },
-  { to: '/contacts', label: 'Go to Contacts', hint: '⌘4' },
-  { to: '/tasks', label: 'Go to Tasks', hint: '⌘5' },
-  { to: '/reports', label: 'Go to Reports', hint: '⌘6' },
-  { to: '/integrations', label: 'Go to Integrations', hint: '⌘7' },
-  { to: '/audit-log', label: 'Go to Audit log', hint: '⌘L' },
-  { to: '/settings', label: 'Go to Settings', hint: '⌘8' },
-  { to: '/search', label: 'Search across workspace', hint: '⌘9' },
+  // Home + accounts
+  { to: '/dashboard', label: 'Go to Dashboard', hint: 'g d' },
+  { to: '/accounts', label: 'Go to Accounts', hint: 'g a' },
+  { to: '/key-accounts', label: 'Go to Key Accounts', hint: '' },
+  { to: '/top-accounts', label: 'Go to Top Accounts', hint: '' },
+  { to: '/companies', label: 'Go to Companies', hint: '' },
+  { to: '/contacts', label: 'Go to Contacts', hint: 'g c' },
+  { to: '/sector-view', label: 'Go to Sector View', hint: '' },
+  { to: '/cross-sell', label: 'Go to Cross-sell actions', hint: '' },
+  { to: '/references', label: 'Go to Reference Library', hint: '' },
+  // Sales + pipeline
+  { to: '/leads', label: 'Go to Leads', hint: '' },
+  { to: '/opportunities', label: 'Go to Opportunities', hint: 'g o' },
+  { to: '/pipeline', label: 'Go to Pipeline (kanban)', hint: 'g p' },
+  { to: '/forecasts', label: 'Go to Forecasts', hint: '' },
+  { to: '/territories', label: 'Go to Territories', hint: '' },
+  { to: '/sales-toolkits', label: 'Go to Sales Toolkits', hint: '' },
+  // Bids + proposals
+  { to: '/bid-matrix', label: 'Go to Bid/No-Bid Matrix', hint: '' },
+  { to: '/rfp-response', label: 'Go to RFP Response Hub', hint: '' },
+  { to: '/proposals', label: 'Go to Proposals', hint: '' },
+  { to: '/intake', label: 'Go to Document Intake', hint: '' },
+  { to: '/agent-studio', label: 'Go to Agent Studio', hint: '' },
+  // Work
+  { to: '/tasks', label: 'Go to Tasks', hint: 'g t' },
+  { to: '/calendar', label: 'Go to Calendar', hint: '' },
+  { to: '/calls', label: 'Go to Calls', hint: '' },
+  { to: '/service-desk', label: 'Go to Service Desk', hint: '' },
+  { to: '/workflows', label: 'Go to Workflows', hint: '' },
+  { to: '/custom-objects', label: 'Go to Custom Objects', hint: '' },
+  { to: '/quick-start', label: 'Go to Quick Start', hint: '' },
+  { to: '/reports', label: 'Go to Reports', hint: 'g r' },
+  // System
+  { to: '/integrations', label: 'Go to Integrations', hint: '' },
+  { to: '/audit-log', label: 'Go to Audit log', hint: '' },
+  { to: '/settings', label: 'Go to Settings', hint: 'g s' },
+  { to: '/search', label: 'Search across workspace', hint: 'g f' },
 ];
 
 // ── Substring matchers ───────────────────────────────────────────────────────

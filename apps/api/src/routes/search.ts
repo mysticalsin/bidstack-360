@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { SearchResponse } from '@bidstack/shared';
 
-const VALID_TYPES = ['opportunity', 'contact', 'company', 'task', 'note'] as const;
+const VALID_TYPES = ['opportunity', 'lead', 'contact', 'company', 'task', 'note'] as const;
 
 type ValidType = (typeof VALID_TYPES)[number];
 
@@ -80,6 +80,37 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
           })),
         );
         })());
+      }
+
+      if (requestedTypes.includes('lead')) {
+        queries.push(
+          (async () => {
+            const leads = await prisma.lead.findMany({
+              where: {
+                orgId: req.auth.orgId,
+                deletedAt: null,
+                OR: [
+                  { firstName: { contains: q, mode: 'insensitive' } },
+                  { lastName: { contains: q, mode: 'insensitive' } },
+                  { email: { contains: q, mode: 'insensitive' } },
+                  { companyName: { contains: q, mode: 'insensitive' } },
+                ],
+              },
+              orderBy: { statusChangedAt: 'desc' },
+              take: perTypeLimit,
+            });
+            addResults(
+              leads.map((l) => ({
+                type: 'lead' as const,
+                id: l.id,
+                title: `${l.firstName} ${l.lastName}`.trim(),
+                subtitle: [l.companyName, l.email].filter(Boolean).join(' · '),
+                url: `/leads/${l.id}`,
+                score: score(l.firstName, l.lastName, l.email, l.companyName),
+              })),
+            );
+          })(),
+        );
       }
 
       if (requestedTypes.includes('contact')) {

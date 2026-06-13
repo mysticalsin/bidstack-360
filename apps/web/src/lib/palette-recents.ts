@@ -11,6 +11,7 @@ export interface RecentEntry {
   group:
     | 'navigate'
     | 'opportunity'
+    | 'lead'
     | 'account'
     | 'contact'
     | 'task'

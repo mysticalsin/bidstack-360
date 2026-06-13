@@ -20,6 +20,11 @@ import {
 } from '@bidstack/shared';
 
 export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
+
+  // RBAC: gate every route in this plugin. requirePermission throws 403 when the
+  // caller's roles lack the key (no admin claim-fallback). Runs after the global
+  // auth onRequest, so req.auth is populated.
+  server.addHook('preHandler', server.requirePermission('leads:write'));
   // ─── POST /api/leads ─────────────────────────────────────────────────────
   server.post(
     '/leads',

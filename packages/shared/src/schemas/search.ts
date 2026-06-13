@@ -2,10 +2,13 @@ import { z } from 'zod';
 
 export const SearchResultType = z.enum([
   'opportunity',
+  'lead',
   'contact',
   'company',
   'task',
   'note',
+  // 'sales_order' retained for tolerance of any persisted/cached value; the
+  // module was removed and nothing emits it.
   'sales_order',
 ]);
 export type SearchResultType = z.infer<typeof SearchResultType>;

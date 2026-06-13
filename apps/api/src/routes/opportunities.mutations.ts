@@ -24,6 +24,11 @@ import { serializeOpportunity } from '../serializers/opportunity.js';
 import { isUniqueViolation, mintNextCode } from './opportunities.helpers.js';
 
 export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) => {
+
+  // RBAC: gate every route in this plugin. requirePermission throws 403 when the
+  // caller's roles lack the key (no admin claim-fallback). Runs after the global
+  // auth onRequest, so req.auth is populated.
+  server.addHook('preHandler', server.requirePermission('opportunities:write'));
   // POST /api/opportunities
   server.post(
     '/opportunities',

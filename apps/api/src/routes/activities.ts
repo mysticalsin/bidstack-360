@@ -65,6 +65,13 @@ function serializeActivity(row: ActivityRow): z.infer<typeof Activity> {
 }
 
 export const activityRoutes: FastifyPluginAsyncZod = async (server) => {
+
+  // RBAC: gate every route in this plugin by method — writes need 'activities:write',
+  // reads need 'activities:read'. Runs after the global auth onRequest.
+  server.addHook('preHandler', async (req) => {
+    const isWrite = req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH' || req.method === 'DELETE';
+    await server.requirePermission(isWrite ? 'activities:write' : 'activities:read')(req);
+  });
   // ── Entity-scoped timeline (cursor pagination) ──────────────────────────
   // GET /api/v1/entities/:entityType/:entityId/activities
   server.get(

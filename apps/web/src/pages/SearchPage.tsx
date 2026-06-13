@@ -11,6 +11,7 @@ import { cn } from '@/lib/cn';
 const TABS = [
   { key: 'all', label: 'All' },
   { key: 'opportunity', label: 'Opportunities' },
+  { key: 'lead', label: 'Leads' },
   { key: 'contact', label: 'Contacts' },
   { key: 'company', label: 'Companies' },
   { key: 'task', label: 'Tasks' },
@@ -21,6 +22,7 @@ type TabKey = (typeof TABS)[number]['key'];
 
 const TYPE_ICONS: Record<string, string> = {
   opportunity: 'briefcase',
+  lead: 'zap',
   contact: 'contacts',
   company: 'building',
   task: 'tasks',
@@ -29,6 +31,7 @@ const TYPE_ICONS: Record<string, string> = {
 
 const TYPE_LABELS: Record<string, string> = {
   opportunity: 'Opportunity',
+  lead: 'Lead',
   contact: 'Contact',
   company: 'Company',
   task: 'Task',
