@@ -55,6 +55,10 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
 
       const totalCap = 30;
       const tokens = tokenize(q);
+      // Zod already rejects an all-whitespace q (trim + min 1), so this only
+      // fires on a degenerate token set. Guard anyway: an empty token list would
+      // make the token-AND clauses match-all (the whole org), never that.
+      if (tokens.length === 0) return { items: [] };
       type SearchItem = z.infer<typeof SearchResponse>['items'][number];
       // Carry a recency timestamp alongside each item so equally-relevant matches
       // are tie-broken by "most recently touched" instead of arbitrary type order.
@@ -69,9 +73,12 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
       if (requestedTypes.includes('opportunity')) {
         queries.push(
           (async () => {
-            // GIN trigram index on (customer || ' ' || name || ' ' || code).
-            // Each token must match the concatenated text (token-AND).
-            const concat = Prisma.sql`(customer || ' ' || name || ' ' || code)`;
+            // Each token must match the concatenated text (token-AND). The
+            // concat MUST be byte-identical to the GIN trigram index expression
+            // (migration 20260510235000: coalesce(...) on each column) — Postgres
+            // only uses an expression index when the predicate expression matches
+            // structurally, so a bare `customer || …` would silently seq-scan.
+            const concat = Prisma.sql`(coalesce(customer,'') || ' ' || coalesce(name,'') || ' ' || coalesce(code,''))`;
             const tokenConds =
               tokens.length > 0
                 ? Prisma.join(
