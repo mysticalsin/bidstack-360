@@ -11,6 +11,22 @@ import {
 } from '@bidstack/shared';
 
 import { cacheKey } from '../lib/redis-cache.js';
+import { notifyUsers } from '../services/notification.service.js';
+
+// Best-effort deep link for a mention notification. Unknown target types get no
+// URL rather than a broken route — the notification still shows in the bell.
+function commentTargetUrl(targetType: string, targetId: string): string | null {
+  const route: Record<string, string> = {
+    opportunity: 'opportunities',
+    account: 'accounts',
+    company: 'accounts',
+    lead: 'leads',
+    contact: 'contacts',
+    bid_score: 'opportunities',
+  };
+  const segment = route[targetType];
+  return segment ? `/${segment}/${targetId}` : null;
+}
 
 type MentionSummaryPayload = z.infer<typeof MentionSummary>;
 type MentionSummaryCacheEntry = {
@@ -111,6 +127,7 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req, reply) => {
+      let mentionedUserIds: string[] = [];
       const created = await prisma.$transaction(async (tx) => {
         const comment = await tx.comment.create({
           data: {
@@ -138,6 +155,7 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
           });
           const mentionedIds = resolveMentionedUserIds(candidates, users);
           if (mentionedIds.length) {
+            mentionedUserIds = mentionedIds;
             await tx.mention.createMany({
               data: mentionedIds.map((userId) => ({
                 orgId: req.auth.orgId,
@@ -151,6 +169,22 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
 
         return comment;
       });
+
+      // Push a notification per mentioned user (post-commit, best-effort) so the
+      // bell shows real "you were mentioned" items, not a generic placeholder.
+      if (mentionedUserIds.length) {
+        await notifyUsers({
+          orgId: req.auth.orgId,
+          userIds: mentionedUserIds,
+          excludeUserId: req.auth.userId,
+          type: 'mention',
+          title: `${created.author.name ?? 'Someone'} mentioned you`,
+          body: created.bodyMd.slice(0, 160),
+          entityType: created.targetType,
+          entityId: created.targetId,
+          url: commentTargetUrl(created.targetType, created.targetId),
+        });
+      }
 
       return reply.code(201).send({
         id: created.id,

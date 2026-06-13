@@ -11,6 +11,7 @@ import type { FastifyInstance } from 'fastify';
 import { realtimeRoutes } from './routes/realtime.js';
 import { auditLogsRoutes } from './routes/audit-logs.js';
 import { collaborationRoutes } from './routes/collaboration.js';
+import { notificationsRoutes } from './routes/notifications.js';
 import { contactsRoutes } from './routes/contacts.js';
 import { crmDashboardRoutes } from './routes/crm/dashboard.js';
 import { crmCompanyRoutes } from './routes/crm/companies.js';
@@ -168,6 +169,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(accountIntelRoutes, { prefix: '/api/v1' });
   await server.register(opportunityTimelineRoutes, { prefix: '/api/v1' });
   await server.register(collaborationRoutes, { prefix: '/api/v1' });
+  await server.register(notificationsRoutes, { prefix: '/api/v1' });
   await server.register(predictiveRoutes, { prefix: '/api/v1' });
   await server.register(predictiveScoringRoutes, { prefix: '/api/v1' });
   await server.register(serviceDeskRoutes, { prefix: '/api/v1' });

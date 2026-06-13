@@ -14,6 +14,7 @@ import {
 } from '@bidstack/shared';
 
 import { normalizeName } from '../services/crm/dashboard.utils.js';
+import { createNotification } from '../services/notification.service.js';
 
 const IdParam = z.object({ id: z.string().uuid() });
 const ActionParams = z.object({ id: z.string().uuid(), actionId: z.string().uuid() });
@@ -215,7 +216,7 @@ export const governanceRoutes: FastifyPluginAsyncZod = async (server) => {
       } catch {
         throw server.httpErrors.badRequest('Action owner is not a member of this org');
       }
-      await prisma.governanceAction.create({
+      const createdAction = await prisma.governanceAction.create({
         data: {
           orgId: req.auth.orgId,
           meetingId: meeting.id,
@@ -229,6 +230,19 @@ export const governanceRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: meeting.id, orgId: req.auth.orgId },
         select: MEETING_SELECT,
       });
+      // Notify the named owner that a governance action is theirs (best-effort).
+      if (createdAction.ownerId && createdAction.ownerId !== req.auth.userId) {
+        await createNotification({
+          orgId: req.auth.orgId,
+          userId: createdAction.ownerId,
+          type: 'assignment',
+          title: 'A governance action was assigned to you',
+          body: createdAction.description.slice(0, 160),
+          entityType: 'governance_action',
+          entityId: createdAction.id,
+          url: `/accounts/${updated.accountKey}`,
+        }).catch(() => {});
+      }
       return reply.code(201).send(serialize(updated));
     },
   );
@@ -249,7 +263,7 @@ export const governanceRoutes: FastifyPluginAsyncZod = async (server) => {
       if (!meeting) throw server.httpErrors.notFound('Meeting not found');
       const action = await prisma.governanceAction.findFirst({
         where: { id: req.params.actionId, meetingId: meeting.id, orgId: req.auth.orgId },
-        select: { id: true },
+        select: { id: true, ownerId: true, description: true },
       });
       if (!action) throw server.httpErrors.notFound('Action not found');
       if (req.body.ownerId !== undefined) {
@@ -274,6 +288,24 @@ export const governanceRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId: req.auth.orgId },
         select: MEETING_SELECT,
       });
+      // Notify only on a genuine re-assignment to a new, non-actor owner.
+      const newOwnerId = req.body.ownerId;
+      if (
+        newOwnerId &&
+        newOwnerId !== action.ownerId &&
+        newOwnerId !== req.auth.userId
+      ) {
+        await createNotification({
+          orgId: req.auth.orgId,
+          userId: newOwnerId,
+          type: 'assignment',
+          title: 'A governance action was assigned to you',
+          body: (req.body.description ?? action.description).slice(0, 160),
+          entityType: 'governance_action',
+          entityId: action.id,
+          url: `/accounts/${updated.accountKey}`,
+        }).catch(() => {});
+      }
       return serialize(updated);
     },
   );

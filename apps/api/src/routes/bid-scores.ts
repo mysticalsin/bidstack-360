@@ -1,6 +1,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
+import { notifyUsers } from '../services/notification.service.js';
 import {
   BID_CRITERIA,
   BidScoreCreate,
@@ -204,6 +205,31 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
         }
         return created;
       });
+
+      // Director/VP push: a below-threshold override is escalated as an in-app
+      // notification to managers, not just buried in the audit log. Best-effort.
+      if (isOverride && override) {
+        const managers = await prisma.userRole.findMany({
+          where: {
+            orgId: req.auth.orgId,
+            role: { orgId: req.auth.orgId, name: { in: ['Manager', 'Sales Manager'] }, deletedAt: null },
+            user: { orgId: req.auth.orgId, deletedAt: null },
+          },
+          select: { userId: true },
+          take: 100,
+        });
+        await notifyUsers({
+          orgId: req.auth.orgId,
+          userIds: managers.map((m) => m.userId),
+          excludeUserId: req.auth.userId,
+          type: 'bid_override',
+          title: 'Bid/No-Bid override needs review',
+          body: `An opportunity was advanced against a ${recommendation} recommendation (score ${totalScore}). Justification: ${override.justification.slice(0, 160)}`,
+          entityType: 'opportunity',
+          entityId: opportunityId,
+          url: `/opportunities/${opportunityId}`,
+        });
+      }
 
       // Log to MemOS L1
       await memos.logTrace({

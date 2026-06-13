@@ -13,6 +13,7 @@ import {
 } from '@bidstack/shared';
 
 import { normalizeName } from '../services/crm/dashboard.utils.js';
+import { createNotification } from '../services/notification.service.js';
 
 const IdParam = z.object({ id: z.string().uuid() });
 
@@ -130,6 +131,19 @@ export const crossSellRoutes: FastifyPluginAsyncZod = async (server) => {
           diff: { accountKey: created.accountKey, assignedUnit: created.assignedUnit },
         },
       });
+      // Tell the assignee they own a new cross-sell action (best-effort).
+      if (created.assigneeId && created.assigneeId !== req.auth.userId) {
+        await createNotification({
+          orgId: req.auth.orgId,
+          userId: created.assigneeId,
+          type: 'assignment',
+          title: 'New cross-sell action assigned to you',
+          body: created.description.slice(0, 160),
+          entityType: 'cross_sell_action',
+          entityId: created.id,
+          url: `/accounts/${created.accountKey}`,
+        }).catch(() => {});
+      }
       return reply.code(201).send(serialize(created));
     },
   );
@@ -143,7 +157,7 @@ export const crossSellRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const existing = await prisma.crossSellAction.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
-        select: { id: true },
+        select: { id: true, assigneeId: true },
       });
       if (!existing) throw server.httpErrors.notFound('Cross-sell action not found');
       if (req.body.assigneeId !== undefined) {
@@ -183,6 +197,23 @@ export const crossSellRoutes: FastifyPluginAsyncZod = async (server) => {
           diff: req.body as object,
         },
       });
+      // Notify only on a real re-assignment to a different, non-actor user.
+      if (
+        updated.assigneeId &&
+        updated.assigneeId !== existing.assigneeId &&
+        updated.assigneeId !== req.auth.userId
+      ) {
+        await createNotification({
+          orgId: req.auth.orgId,
+          userId: updated.assigneeId,
+          type: 'assignment',
+          title: 'A cross-sell action was assigned to you',
+          body: updated.description.slice(0, 160),
+          entityType: 'cross_sell_action',
+          entityId: updated.id,
+          url: `/accounts/${updated.accountKey}`,
+        }).catch(() => {});
+      }
       return serialize(updated);
     },
   );

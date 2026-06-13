@@ -191,6 +191,7 @@ model Org {
   governanceMeetings GovernanceMeeting[]
   governanceActions  GovernanceAction[]
   projectReferences  ProjectReference[]
+  notifications      Notification[]
 
   @@index([deletedAt])
   @@map("orgs")
@@ -259,6 +260,7 @@ model User {
   // Wave A — pre-sales governance assignments
   crossSellAssignments  CrossSellAction[]  @relation("CrossSellAssignee")
   governanceActionsOwned GovernanceAction[] @relation("GovernanceActionOwner")
+  notifications          Notification[]
 
   @@index([orgId])
   @@index([deletedAt])
@@ -4792,4 +4794,29 @@ model ProjectReference {
   @@index([orgId, accountKey], map: "project_references_org_account_idx")
   @@index([deletedAt])
   @@map("project_references")
+}
+
+// ─── Notifications (in-app notification center) ──────────────────────────────
+// One row per delivered notification per user. Created by notification.service
+// (which also publishes to the realtime `notification:user:<id>` channel) on
+// @mentions, assignments, and director escalations. readAt drives the unread
+// badge; entityType/entityId/url deep-link to the source.
+model Notification {
+  id         String    @id @default(uuid()) @db.Uuid
+  orgId      String    @map("org_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  type       String // mention | assignment | bid_override | stage_change | system
+  title      String
+  body       String?
+  entityType String?   @map("entity_type")
+  entityId   String?   @map("entity_id")
+  url        String?
+  readAt     DateTime? @map("read_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, userId, readAt, createdAt(sort: Desc)], map: "notifications_org_user_read_created_idx")
+  @@map("notifications")
 }
