@@ -138,9 +138,25 @@ export async function startDustPoller(
 
       // Target orgs: explicit orgId from a manual resync, else every org for the
       // scheduled poll. Each org is polled against its OWN Dust workspace.
-      const targetOrgIds = data.orgId
-        ? [data.orgId]
-        : (await prisma.org.findMany({ select: { id: true } })).map((o) => o.id);
+      // Cursor-based pagination prevents OOM at scale (10K+ orgs).
+      const ORG_BATCH_SIZE = 200;
+      const targetOrgIds: string[] = data.orgId ? [data.orgId] : [];
+
+      if (!data.orgId) {
+        let cursor: string | undefined;
+        while (true) {
+          const batch = await prisma.org.findMany({
+            select: { id: true },
+            take: ORG_BATCH_SIZE,
+            ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+            orderBy: { id: 'asc' },
+          });
+          if (batch.length === 0) break;
+          for (const o of batch) targetOrgIds.push(o.id);
+          cursor = batch[batch.length - 1]!.id;
+          if (batch.length < ORG_BATCH_SIZE) break;
+        }
+      }
 
       try {
         for (const orgId of targetOrgIds) {
