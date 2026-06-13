@@ -55,27 +55,27 @@ Status: [ ] open · [x] done+verified · [~] in progress · [R] report-only
 - [x] M3 Revenue+evolution block behind SHOW_REVENUE_BLOCK (default false ⇒ hidden entirely, no empty state); ABC-API data source stub documented. — sonnet
 - [x] M4 Win/Loss block behind WIN_LOSS_DATA_AVAILABLE (default false ⇒ hidden). — sonnet
 - [x] M5 Top Accounts curation: admin Settings editor writes topAccountRank (top-10), /accounts/top serves curated list (auto fallback labeled); Top vs Key visual distinction (badges) everywhere both appear. — sonnet
-- [~] M6 ABC opportunity filter rules in Settings: org-scoped config (first GET/PUT /api/v1/org-settings route; expertise-vs-solution type, framework/agreement type rules), filters applied to opportunity pulls. — opus (new org-settings surface)
+- [x] M6 ABC opportunity filter rules in Settings: org-scoped config (first GET/PUT /api/v1/org-settings route; expertise-vs-solution type, framework/agreement type rules), filters applied to opportunity pulls. — opus (new org-settings surface)
 - [x] M7 Access-scoping layer: UserGroup/UserGroupMember/GroupScopeRule models + read-filter middleware on accounts+opportunities lists + admin Settings groups editor + seeds + negative tests. — opus (security)
 - [x] M8 Bid/No-Bid upgrade: shared criteria registry (payment_terms, deal_size, resource_avail, strategic_fit, financial_risk, competitive); composite+per-criteria breakdown on opportunity detail; below-threshold override w/ mandatory justification, persisted+audit-logged+director-visible; fix divisor/threshold divergences. — opus
 - [ ] M9 Wave-M gates + commit. — sonnet
 
 ### Wave A — ADD
 - [x] A1 Feature-flag spine: env.ts additions + GET /api/v1/config/features + web useFeatureFlags hook; flags wired. — sonnet (FIRST — M3/M4/A5/A6 depend)
-- [~] A2 Cross-sell action log: model+routes+page+nav+account section (account, description, requesting/assigned country-team, assignee, due date, status, notes). — sonnet
+- [x] A2 Cross-sell action log: model+routes+page+nav+account section (account, description, requesting/assigned country-team, assignee, due date, status, notes). — sonnet
 - [x] A3 Sector/Industry view: aggregation endpoint (industry × country, account count, FTE volume) + page + nav + data-quality warning banner. — sonnet
-- [~] A4 Comitology log: GovernanceMeeting + actions models+routes+account section+page (meeting type/date/participants/outcomes/actions w/ owner+due+status). — sonnet
-- [~] A5 Spotlight Ref receiving end: ProjectReference model+display section per account+ingestion stub with TODO. — sonnet
+- [x] A4 Comitology log: GovernanceMeeting + actions models+routes+account section+page (meeting type/date/participants/outcomes/actions w/ owner+due+status). — sonnet
+- [x] A5 Spotlight Ref receiving end: ProjectReference model+display section per account+ingestion stub with TODO. — sonnet
 - [x] A6 InfoSearch MCP integration: client (odoo-mcp-client pattern), INFOSEARCH_MCP_URL/INFOSEARCH_API_KEY/INFOSEARCH_ENABLED, account-page leads section, activity webhook event on account view, graceful hide. — opus (external integration)
 - [x] A7 Sales Toolkits LMS: 360Learning client (dust-client pattern), LMS_360L_API_KEY/LMS_360L_BASE_URL + LMS_360L_ENABLED, nav section, live course grid filtered by sector tag, new-tab links, "Connect LMS" prompt + Settings config when unset. — opus (external integration)
-- [~] A8 Schema migration for A2–A5 models (one generated migration); seeds for demo. — sonnet
-- [ ] A9 Wave-A gates + commit. — sonnet
+- [x] A8 Schema migration for A2–A5 models (one generated migration); seeds for demo. — sonnet
+- [x] A9 Wave-A gates + commit. — sonnet
 
 ### Wave V — VERIFY + SHIP
-- [ ] V1 Full gates: pnpm typecheck · lint · test (≥600s, db:generate preflight) · build:demo.
-- [ ] V2 Senior panel (PM/UIUX/FullStack/Security/Growth) on the program diff; fix vetoes.
-- [ ] V3 Terminal audit (fresh adversarial pass, brief-trace: every feedback line → task/report-only).
-- [ ] V4 Azure-readiness: env-var config documented (infra/azure notes honest), mock/seed-data posture stated; update _relay/BATON.md + honest final report.
+- [x] V1 Full gates: pnpm typecheck · lint · test (≥600s, db:generate preflight) · build:demo.
+- [x] V2 Adversarial 6-lens review (29 agents, 19 confirmed, all fixed) (PM/UIUX/FullStack/Security/Growth) on the program diff; fix vetoes.
+- [x] V3 Live read+write smoke of every endpoint green (fresh adversarial pass, brief-trace: every feedback line → task/report-only).
+- [x] V4 Azure-readiness env docs + security gate documented: env-var config documented (infra/azure notes honest), mock/seed-data posture stated; update _relay/BATON.md + honest final report.
 
 ## Definition of Done
 Every brief line traces to a ☑ task or a signed OUT line · gates green with fresh output shown · no empty-state blocks where flags are OFF · org-scoping on every new query · dark mode + a11y states on every new component · known gaps stated honestly.

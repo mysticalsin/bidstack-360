@@ -1,33 +1,32 @@
 # BATON — BidStack demo-feedback program (WALTEUR)
 
-**Shift:** Claude (Fable 5) · 2026-06-12 · branch `demo`
-**Goal:** Implement Tony's demo-session feedback per `walteur-kit/PLAN.md` (source of truth — read it first).
+**Shift:** Claude (Fable 5 -> Opus 4.8) - 2026-06-12/13 - branch `demo`
+**Goal:** Implement the demo-session feedback as the OFFICIAL production build (not a demo). Per `walteur-kit/PLAN.md`.
 
-## State NOW
-- Wave 0 done, committed: analytics report-builder backend hardened (35-finding review in `walteur-kit/analytics-wip-review.json`), migration `20260612000100`, 43 tests green.
-- Wave R done, committed (`ea82e90e` + `4bfa937a`): quote-to-cash vertical (sales-orders/products/invoices/payments), /sales dashboard + sales-intelligence report family, RFP-Agent cluster (Dust squad + NocoBase) all REMOVED; drop migration `20260612001000` applied to local dev DB; CRM wording purged. Core RFP pipeline + Agent Studio untouched.
-- Feature-flag spine ready: env.ts flags (WIN_LOSS_DATA_AVAILABLE, SHOW_REVENUE_BLOCK, INFOSEARCH_ENABLED, LMS_360L_*), `GET /api/v1/config/features` route file (`apps/api/src/routes/config-features.ts`) — NOT yet registered in server.routes.ts; web hook `useFeatureFlags.ts` ready.
-- Gates at Wave-R commit: typecheck all-green, lint green, API suite green, web unit 248 green.
+## State NOW - program COMPLETE, gates green, NOT pushed
+All waves done + committed on `demo` (11 commits, unpushed):
+- Wave 0: analytics report-builder backend (hardened, migration 20260612000100)
+- Wave R: removed quote-to-cash (sales-orders/products/invoices/payments), /sales dashboard, RFP-Agent cluster; CRM wording purged. Drop migration 20260612001000.
+- Wave M: account-view external/internal split + CompanyFieldOverride (+revert), real 4-factor Signal Coverage, revenue/win-loss behind flags, Top-10 curation, M7 access scoping, M8 bid scoring. Migrations 001500/001600/002000/003000.
+- Wave A: cross-sell log, sector view, comitology, Spotlight-Ref receiving end, InfoSearch MCP, 360Learning toolkits, M6 ABC filter rules, feature-flag spine. Migration 20260613000100.
+- Wave V: adversarial 6-lens review (29 agents, 19 confirmed findings ALL fixed - walteur-kit/program-review.json), live read+write smoke of every endpoint green.
 
-## Next (Wave M — account view core, PLAN.md tasks M1-M9)
-1. Register configFeaturesRoutes in server.routes.ts.
-2. M1 cockpit External Intelligence vs Internal Data split + CompanyFieldOverride model + override flagging.
-3. M2 real 4-factor Signal Coverage scoring (replaces hardcoded 72 in dashboard.cockpit.ts:423).
-4. M3/M4 revenue + win/loss blocks behind flags (hidden when off — never empty states).
-5. M5 Top-10 curation via Company.topAccountRank + admin Settings editor; Top vs Key visual distinction.
-6. M6 ABC opportunity filter rules (first GET/PUT /org-settings route).
-7. M7 UserGroup access-scoping layer + negative tests.
-8. M8 Bid/No-Bid: shared criteria registry (6 brief criteria), breakdown on opportunity detail, below-threshold override w/ mandatory justification.
-Then Wave A (A2-A9: cross-sell log, sector view, comitology, spotlight-ref stub, InfoSearch MCP, 360Learning toolkits, migration+seeds) and Wave V (gates, panel, audit, honest report).
+## Gates (last run)
+- typecheck: all workspaces green
+- lint: green
+- API tests: 555 pass / 2 skip; web 253 pass; worker green
+- production web build (build:demo path): green
+- live API boot smoke (stub auth, seeded ci-financial): all 13 GETs 200 + cross-sell/override write+revert + sector-view + cockpit score=63/4-factor
 
-## Key context
-- Recon maps: `walteur-kit/recon-demo-feedback.json` (14 areas, file-level).
-- Scaffold pattern to copy: recon key `scaffold` (Tasks vertical: model->shared Zod->route->hook->page->nav).
-- MISTAKES ledger rules in force: bounded reads, org-scope every query, db:generate sequential preflight, >=600s root test timeout, shared build before consumer tests.
-- Prisma migrate dev is interactive-blocked on this shell -> use `migrate diff --from-url "$DATABASE_URL" --script > prisma/migrations/<stamp>_<name>/migration.sql` then `migrate deploy` (worked twice).
-- Deploy: push `demo` -> Vercel (web) + Railway (api/worker/PG/Redis). Drop migration is destructive on the demo DB (re-seeds, acceptable). NO push yet this shift.
+## NEXT
+1. Re-run full `pnpm test` after the review-fix commit (was running at handoff: task b3zesllt1) - confirm green.
+2. `git push origin demo` -> Vercel (web) + Railway (api/worker/PG/Redis). Railway runs migrate on boot; 6 new migrations apply in order. Demo DB re-seeds.
+3. Tony decision before real client data: security-team validation of the Azure deploy + configure Access Groups (M7) - documented in infra/azure/README.md. Flags WIN_LOSS_DATA_AVAILABLE / SHOW_REVENUE_BLOCK / INFOSEARCH_ENABLED / LMS_360L_ENABLED stay off until their data sources/creds exist.
+
+## Deferred (documented, pre-prod-acceptable or by-design)
+- Migration 001500+001600 squash (harmless sequence, empty table); CompanyFieldOverride.overridden_by_id has no users FK (attribution only, users soft-deleted); dashboard.cockpit.ts > 400 lines; SHOW_REVENUE_BLOCK inert until ABC revenue API lands (per brief); InfoSearch activity-log emails the viewer (the brief's explicit requirement).
 
 ## Watchouts
-- A subagent died on account session-limit mid-Wave-R (resets 8pm ET); deletions were finished inline. If spawning agents fails, work inline.
-- `.forge/RUN.md` untracked leftover — not part of this program, leave it.
-- Brief's `360L_*` env names are digit-first (invalid) -> implemented as `LMS_360L_*` (documented in env.ts).
+- Prisma migrate dev is interactive-blocked on this shell -> migrate diff --from-url + migrate deploy (used for all 6).
+- 360L_* env names are digit-first (invalid) -> LMS_360L_*.
+- tsx server has no hot-reload; reboot to pick up API changes when smoking live.
