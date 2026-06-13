@@ -56,7 +56,7 @@ export function MeetingNotesImportDialog({ accountId, companyName, domain, trigg
       });
       setResult(next);
       toast.success('Meeting notes imported', {
-        description: `${totalCreated(next)} CRM records were created or refreshed.`,
+        description: `${totalCreated(next)} records were created or refreshed.`,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');
@@ -88,12 +88,12 @@ export function MeetingNotesImportDialog({ accountId, companyName, domain, trigg
       </DialogTrigger>
       <DialogContent
         title="Import meeting notes"
-        description="Paste raw notes once. BidStack turns them into CRM data with source receipts."
+        description="Paste raw notes once. BidStack turns them into structured records with source receipts."
         className="meeting-import-dialog"
       >
         <form onSubmit={submit} className="meeting-import-shell">
           <div className="meeting-import-steps" aria-label="Import steps">
-            {['Paste notes', 'Extract signals', 'Save to CRM'].map((step, index) => (
+            {['Paste notes', 'Extract signals', 'Save to BidStack'].map((step, index) => (
               <motion.div
                 key={step}
                 initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
@@ -146,7 +146,7 @@ export function MeetingNotesImportDialog({ accountId, companyName, domain, trigg
               >
                 <div className="meeting-import-result-head">
                   <div>
-                    <span>Saved to CRM</span>
+                    <span>Saved to BidStack</span>
                     <strong>{totalSignals} extracted signals</strong>
                   </div>
                   <Badge tone="jade">{totalCreated(result)} records</Badge>

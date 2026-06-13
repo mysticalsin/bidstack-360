@@ -31,7 +31,7 @@ export function BottomRightCorner() {
       whileHover={shouldReduceMotion ? undefined : { scale: 1.01 }}
       whileTap={shouldReduceMotion ? undefined : { scale: 0.99 }}
       transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.8, delay: 0.4 }}
-      aria-label="Enter CRM Demo Sandbox"
+      aria-label="Enter the demo sandbox"
     >
       {/* Top intersection mask */}
       <div className="absolute -top-[1.5rem] sm:-top-[2rem] md:-top-[3.5rem] right-0 w-[1.5rem] sm:w-[2rem] md:w-[3.5rem] h-[1.5rem] sm:h-[2rem] md:h-[3.5rem] pointer-events-none">
@@ -75,7 +75,7 @@ export function BottomRightCorner() {
       {/* Info column */}
       <div className="flex flex-col">
         <span className="text-[16px] md:text-[20px] font-normal text-[rgba(30,50,90,0.95)] group-hover:text-[#2c4bff] transition-colors duration-200">
-          Enter CRM
+          Enter demo
         </span>
         <div className="flex items-center gap-1 text-[rgba(30,50,90,0.6)]">
           <span className="text-[12px] md:text-[15px] font-normal">Demo Sandbox</span>

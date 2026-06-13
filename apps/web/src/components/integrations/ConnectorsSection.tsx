@@ -70,7 +70,7 @@ export function ConnectorsSection() {
     <Card className="overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-primary)]">
       <SectionHeader
         title="Connectors catalog"
-        caption="External data sources the CRM can reach. Open feeds run without keys; licensed feeds need credentials."
+        caption="External data sources BidStack can reach. Open feeds run without keys; licensed feeds need credentials."
         action={
           <Badge
             tone={statusCounts.down > 0 ? 'tomato' : statusCounts.degraded > 0 ? 'amber' : 'jade'}

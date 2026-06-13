@@ -75,7 +75,7 @@ describe('CommandPalette — accounts section', () => {
   it('filters companies by name when the user types a substring', () => {
     renderPalette();
 
-    const input = screen.getByRole('combobox', { name: /search across the crm/i });
+    const input = screen.getByRole('combobox', { name: /search across the workspace/i });
     fireEvent.change(input, { target: { value: 'ari' } });
 
     // The Aritzia row is the only listbox option after filtering by "ari".

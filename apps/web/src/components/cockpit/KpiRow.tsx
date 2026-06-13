@@ -63,9 +63,9 @@ export const KpiRow = memo(function KpiRow({ cockpit }: Props) {
             }}
           >
             <SourceBadge
-              label={kpi.sourceLabel ?? 'CRM'}
+              label={kpi.sourceLabel ?? 'Internal'}
               state={kpi.sourceState ?? 'crm'}
-              hint={kpi.sourceHint ?? kpi.detail ?? 'BidStack CRM data'}
+              hint={kpi.sourceHint ?? kpi.detail ?? 'BidStack internal data'}
             />
           </div>
         </GlassCard>

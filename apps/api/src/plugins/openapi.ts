@@ -34,7 +34,7 @@ const openapiPluginImpl: FastifyPluginAsync = async (server) => {
       info: {
         title: 'BidStack 360° API',
         description:
-          'REST API for BidStack 360° — the bid/presales CRM for Mantu Group. ' +
+          'REST API for BidStack 360° — the pre-sales bid piloting platform for Mantu Group. ' +
           'All routes under `/api/v1/` require authentication. ' +
           'Pass either a Clerk JWT (`Authorization: Bearer <token>`) or an ' +
           'API key (`x-api-key: <key>`).',

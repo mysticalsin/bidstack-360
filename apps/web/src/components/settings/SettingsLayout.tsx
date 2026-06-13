@@ -42,7 +42,7 @@ const GROUPS: Group[] = [
     label: 'Enterprise controls',
     items: [
       { id: 'workspace', label: 'Workspace', icon: 'settings' },
-      { id: 'crm', label: 'CRM configuration', icon: 'sliders', admin: true },
+      { id: 'crm', label: 'Data configuration', icon: 'sliders', admin: true },
       { id: 'rfp-analytics', label: 'RFP Analytics', icon: 'trophy', admin: true },
       { id: 'integrations', label: 'Integrations', icon: 'link' },
       { id: 'webhooks', label: 'Webhooks', icon: 'webhook', admin: true },

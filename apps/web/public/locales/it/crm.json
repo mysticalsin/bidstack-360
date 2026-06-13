@@ -14,8 +14,6 @@
     "tasks": "Attività",
     "invoice": "Fattura",
     "invoices": "Fatture",
-    "quote": "Offerta",
-    "quotes": "Offerte",
     "product": "Prodotto",
     "products": "Prodotti",
     "territory": "Territorio",
@@ -58,7 +56,6 @@
     "company": "Dettaglio azienda",
     "task": "Dettaglio attività",
     "invoice": "Dettaglio fattura",
-    "quote": "Dettaglio offerta o ordine",
     "serviceCase": "Dettaglio caso di assistenza",
     "account": "Account: {{name}}"
   },

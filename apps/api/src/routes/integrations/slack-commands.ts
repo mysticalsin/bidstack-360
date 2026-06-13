@@ -109,11 +109,11 @@ async function dispatchCommand(
       return {
         response_type: 'ephemeral',
         text: [
-          ':wave: *BidStack 360 CRM*',
+          ':wave: *BidStack 360*',
           '',
           '*Available commands:*',
           '`/bidstack lead create <name>` - Create a new lead',
-          '`/bidstack search <query>` - Search CRM records',
+          '`/bidstack search <query>` - Search BidStack records',
           "`/bidstack tasks today` - View today's tasks",
         ].join('\n'),
       };

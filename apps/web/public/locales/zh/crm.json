@@ -14,8 +14,6 @@
     "tasks": "任务",
     "invoice": "发票",
     "invoices": "发票",
-    "quote": "报价",
-    "quotes": "报价",
     "product": "产品",
     "products": "产品",
     "territory": "区域",
@@ -58,7 +56,6 @@
     "company": "公司详情",
     "task": "任务详情",
     "invoice": "发票详情",
-    "quote": "报价或订单详情",
     "serviceCase": "服务工单详情",
     "account": "客户：{{name}}"
   },

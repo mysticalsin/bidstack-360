@@ -43,7 +43,7 @@ describe('buildOpportunityBrief', () => {
       ],
     });
 
-    expect(brief).toContain('Source-grounded CRM brief');
+    expect(brief).toContain('Source-grounded account brief');
     expect(brief).toContain('Payments Modernization');
     expect(brief).toContain('Validate margin model');
     expect(brief).toContain('Avery Sponsor');

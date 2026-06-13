@@ -26,7 +26,7 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     id: 'sidebar-nav',
-    title: 'Your CRM workspace',
+    title: 'Your bid piloting workspace',
     body: 'Everything lives in the sidebar — accounts, pipeline, contacts, tasks, and more. You can collapse it for more screen space.',
     target: '[data-tour="nav-sidebar"]',
     placement: 'right',

@@ -14,8 +14,6 @@
     "tasks": "Tasks",
     "invoice": "Invoice",
     "invoices": "Invoices",
-    "quote": "Quote",
-    "quotes": "Quotes",
     "product": "Product",
     "products": "Products",
     "territory": "Territory",
@@ -58,7 +56,6 @@
     "company": "Company detail",
     "task": "Task detail",
     "invoice": "Invoice detail",
-    "quote": "Quote or order detail",
     "serviceCase": "Service desk case detail",
     "account": "Account: {{name}}"
   },

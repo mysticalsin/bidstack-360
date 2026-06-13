@@ -188,7 +188,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
           }}
           placeholder="Search accounts, contacts, tasks, opportunities…"
           className="flex-1 bg-transparent text-sm text-[var(--fg-primary)] placeholder:text-[var(--fg-tertiary)] focus:outline-none"
-          aria-label="Search across the CRM"
+          aria-label="Search across the workspace"
           aria-autocomplete="list"
           aria-expanded="true"
           aria-controls="cmdk-list"

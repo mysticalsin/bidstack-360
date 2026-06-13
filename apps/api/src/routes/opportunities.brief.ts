@@ -112,7 +112,7 @@ export function buildOpportunityBrief(input: OpportunityBriefInput): string {
   return [
     `# Exec brief - ${opportunity.customer}`,
     '',
-    `> Source-grounded CRM brief | Updated: ${opportunity.updatedAt.toISOString()}`,
+    `> Source-grounded account brief | Updated: ${opportunity.updatedAt.toISOString()}`,
     '',
     `**Opportunity:** ${opportunity.name} (${opportunity.code})`,
     `**Stage:** ${stage} | **Value:** ${formatMoneyMicros(opportunity.valueMicros)} | **Probability:** ${opportunity.probability}% | **Due:** ${formatDate(opportunity.dueDate)}`,

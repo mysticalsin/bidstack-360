@@ -113,14 +113,14 @@ describe('opportunities routes', () => {
     expect(body.documents).toBeDefined();
   });
 
-  skipIfNoDb('POST /api/opportunities/:id/brief returns a grounded CRM brief', async () => {
+  skipIfNoDb('POST /api/opportunities/:id/brief returns a grounded account brief', async () => {
     const list = (await server.inject({ method: 'GET', url: '/api/opportunities?limit=1' })).json();
     const id = list.items[0].id;
     const res = await server.inject({ method: 'POST', url: `/api/opportunities/${id}/brief` });
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.model).toBe('crm-grounded-v1');
-    expect(body.brief).toContain('Source-grounded CRM brief');
+    expect(body.brief).toContain('Source-grounded account brief');
     expect(body.brief).not.toMatch(/stub|DUST_API_KEY|DUST_AGENT_EXEC_BRIEF/i);
     expect(body.tokens).toBeGreaterThan(50);
   });
@@ -305,18 +305,4 @@ describe('contacts + tasks + reports routes', () => {
     expect(body.byStage.length).toBeGreaterThan(0);
   });
 
-  skipIfNoDb('GET /api/reports/sales-intelligence returns countries and who is there', async () => {
-    const res = await server.inject({ method: 'GET', url: '/api/reports/sales-intelligence' });
-    expect(res.statusCode).toBe(200);
-    const body = res.json();
-    expect(body.kpis.some((kpi: { id: string }) => kpi.id === 'quotations')).toBe(true);
-    expect(body.topCountries.length).toBeGreaterThan(0);
-    expect(
-      body.topCountries.some(
-        (country: { topCustomers: string[]; people: { name: string }[] }) =>
-          country.topCustomers.length > 0 && country.people.length > 0,
-      ),
-    ).toBe(true);
-    expect(body.topProducts.length).toBeGreaterThan(0);
-  });
 });

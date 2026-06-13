@@ -104,7 +104,7 @@ export function BidStack360Logo({
             letterSpacing="0"
             className="fill-current opacity-60"
           >
-            BID INTELLIGENCE CRM
+            BID PILOTING PLATFORM
           </text>
         </g>
       ) : null}

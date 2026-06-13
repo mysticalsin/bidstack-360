@@ -51,7 +51,7 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
       adminOnly: false,
     },
     {
-      title: 'CRM data model',
+      title: 'Data model',
       detail: `${formatCount(pipelineStages.data?.items.length)} stages / ${formatCount(customFields.data?.items.length)} company fields`,
       tone: pipelineStages.isError || customFields.isError ? 'tomato' : 'blue',
       icon: 'sliders' as const,
@@ -94,7 +94,7 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
               Enterprise settings command center
             </div>
             <h3 className="mt-4 text-xl font-semibold tracking-tight text-[var(--fg-primary)]">
-              Configure the CRM once. Make every team move the same way.
+              Configure BidStack once. Make every team move the same way.
             </h3>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--fg-secondary)]">
               Settings now surfaces the working controls that affect BidStack across the app:
@@ -109,7 +109,7 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
             <div className="mt-3 space-y-2 text-sm text-[var(--fg-secondary)]">
               <ReadinessRow label="Personal preferences" complete />
               <ReadinessRow label="Workspace controls" complete={isAdmin} />
-              <ReadinessRow label="CRM configuration" complete={isAdmin} />
+              <ReadinessRow label="Data configuration" complete={isAdmin} />
               <ReadinessRow label="API and MCP access" complete={isAdmin} />
             </div>
           </div>
@@ -134,7 +134,7 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
       {!isAdmin ? (
         <Card>
           <div className="p-5 text-sm text-[var(--fg-secondary)]">
-            You can manage your personal settings here. Workspace, CRM, and developer controls are
+            You can manage your personal settings here. Workspace, data, and developer controls are
             limited to administrators.
           </div>
         </Card>
