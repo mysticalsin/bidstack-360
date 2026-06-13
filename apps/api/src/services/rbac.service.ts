@@ -56,6 +56,9 @@ async function loadUserPermissions(req: FastifyRequest): Promise<Set<string>> {
         },
       },
     },
+    // No user holds anywhere near this many roles; the bound satisfies the
+    // dev query-guard (this path is now reachable via GET /me/capabilities).
+    take: 200,
   });
 
   const perms = new Set<string>();

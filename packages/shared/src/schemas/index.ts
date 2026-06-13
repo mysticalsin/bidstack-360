@@ -41,3 +41,4 @@ export * from './governance.js';
 export * from './project-reference.js';
 export * from './opportunity-filters.js';
 export * from './notification.js';
+export * from './rbac.js';

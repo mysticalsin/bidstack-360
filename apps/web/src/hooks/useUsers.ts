@@ -60,3 +60,50 @@ export function useUpdateUserRole() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
   });
 }
+
+export interface AssignedRole {
+  roleId: string;
+  name: string;
+  description: string | null;
+  isSystem: boolean;
+}
+
+// Granular custom-role grants for a single user. Fetched lazily (per expanded
+// row) so the Team table doesn't fire one request per member on load.
+export function useUserRoles(userId: string | null, options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: ['user-roles', userId],
+    queryFn: ({ signal }) =>
+      api<{ items: AssignedRole[] }>(`/api/users/${userId}/roles`, { signal }),
+    enabled: (options.enabled ?? true) && userId !== null,
+    select: (data) => data.items,
+  });
+}
+
+export function useAssignUserRole(userId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (roleId: string) =>
+      api<{ items: AssignedRole[] }>(`/api/users/${userId}/roles`, {
+        method: 'POST',
+        body: { roleId },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['user-roles', userId] });
+      // The actor's own effective permissions may have changed.
+      qc.invalidateQueries({ queryKey: ['me', 'capabilities'] });
+    },
+  });
+}
+
+export function useRevokeUserRole(userId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (roleId: string) =>
+      api<void>(`/api/users/${userId}/roles/${roleId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['user-roles', userId] });
+      qc.invalidateQueries({ queryKey: ['me', 'capabilities'] });
+    },
+  });
+}
