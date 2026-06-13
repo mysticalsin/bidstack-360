@@ -141,6 +141,38 @@ export function serializeReleaseScore(row: {
 // ─── Lean company query ────────────────────────────────────────────────────────
 
 /** Fetch all CrmCompany objects for an org without loading the full dashboard. */
+// Single source of truth for the enrichment columns buildCompanies needs, so
+// the list builder and the single-company resolver stay in lockstep.
+const ENRICHMENT_SELECT = {
+  id: true,
+  tradeName: true,
+  legalName: true,
+  domain: true,
+  website: true,
+  industryCodes: true,
+  providerMetadata: true,
+  employeeCount: true,
+  annualRevenueMicros: true,
+  status: true,
+  registryIds: true,
+  formerNames: true,
+  incorporationDate: true,
+  logoUrl: true,
+  logoSource: true,
+  confidenceBps: true,
+  sourceAttribution: true,
+  updatedAt: true,
+} satisfies Prisma.CompanyEnrichmentSelect;
+
+const OPP_COMPANY_SELECT = {
+  customer: true,
+  industry: true,
+  logoUrl: true,
+  updatedAt: true,
+} satisfies Prisma.OpportunitySelect;
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export async function getCompaniesOnly(
   orgId: string,
   prisma: PrismaClient,
@@ -148,41 +180,55 @@ export async function getCompaniesOnly(
   const [opportunities, enrichments] = await Promise.all([
     prisma.opportunity.findMany({
       where: { orgId },
-      select: {
-        customer: true,
-        industry: true,
-        logoUrl: true,
-        updatedAt: true,
-      },
+      select: OPP_COMPANY_SELECT,
       orderBy: { updatedAt: 'desc' },
       take: 200,
     }),
     prisma.companyEnrichment.findMany({
       where: { orgId },
-      select: {
-        id: true,
-        tradeName: true,
-        legalName: true,
-        domain: true,
-        website: true,
-        industryCodes: true,
-        providerMetadata: true,
-        employeeCount: true,
-        annualRevenueMicros: true,
-        status: true,
-        registryIds: true,
-        formerNames: true,
-        incorporationDate: true,
-        logoUrl: true,
-        logoSource: true,
-        confidenceBps: true,
-        sourceAttribution: true,
-        updatedAt: true,
-      },
+      select: ENRICHMENT_SELECT,
       take: 500,
     }),
   ]);
   return buildCompanies(opportunities, enrichments);
+}
+
+/**
+ * Resolve a SINGLE company for the cockpit without loading the whole org.
+ *
+ * `companyId` is either an enrichment UUID or a normalized account key (the id
+ * buildCompanies assigns opportunity-only companies). The previous cockpit path
+ * loaded the org's top 200 opps + 500 enrichments and `.find()`-ed one — which
+ * both scaled O(n) per request AND silently 404'd any company outside that
+ * window. This resolves enrichment-backed companies by their unique
+ * (orgId, id|normalizedName) index, falling back to a bounded distinct-customer
+ * scan only for opportunity-only companies.
+ */
+export async function resolveCockpitCompany(
+  orgId: string,
+  companyId: string,
+  prisma: PrismaClient,
+): Promise<z.infer<typeof CrmCompany> | null> {
+  const isUuid = UUID_RE.test(companyId);
+  const enrichment = await prisma.companyEnrichment.findFirst({
+    where: { orgId, deletedAt: null, ...(isUuid ? { id: companyId } : { normalizedName: companyId }) },
+    select: ENRICHMENT_SELECT,
+  });
+  if (enrichment) return buildCompanies([], [enrichment])[0] ?? null;
+  // A UUID that isn't an enrichment can't be an opportunity-only company — those
+  // are keyed by normalized name, not a UUID.
+  if (isUuid) return null;
+  // Opportunity-only company: no normalized column to index on, so match within
+  // a bounded set of distinct customers (kept under the dev query-guard's 1000
+  // cap; ~5x the old 200 window).
+  const opportunities = await prisma.opportunity.findMany({
+    where: { orgId },
+    select: OPP_COMPANY_SELECT,
+    orderBy: { updatedAt: 'desc' },
+    distinct: ['customer'],
+    take: 1000,
+  });
+  return buildCompanies(opportunities, []).find((c) => c.id === companyId) ?? null;
 }
 
 // ─── Per-company cockpit query ────────────────────────────────────────────────
@@ -203,11 +249,9 @@ export async function buildCompanyCockpit(
   companyId: string,
   prismaClient: PrismaClient,
 ): Promise<z.infer<typeof AccountCockpitSnapshot> | null> {
-  // Step 1: resolve company from enrichments + opportunities (2 queries via getCompaniesOnly)
-  const companies = await getCompaniesOnly(orgId, prismaClient);
-  const company =
-    companies.find((c) => c.id === companyId) ??
-    companies.find((c) => normalizeName(c.name) === companyId);
+  // Step 1: resolve the single company by indexed lookup (was a full-org scan
+  // that also capped visibility at the top 200 opps / 500 enrichments).
+  const company = await resolveCockpitCompany(orgId, companyId, prismaClient);
   if (!company) return null;
 
   // Step 2: load company-specific data in parallel (filtered by company)
@@ -307,7 +351,9 @@ export async function buildCompanyCockpit(
 
   return buildCockpit({
     company,
-    companies,
+    // buildCockpit's type accepts the company list but never reads it; pass the
+    // resolved company alone rather than re-loading the whole org.
+    companies: [company],
     opportunities,
     contacts,
     tasks,
