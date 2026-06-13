@@ -15,7 +15,6 @@ import {
   ProposalDetailPage,
   ProposalsPage,
   ReferencesPage,
-  RfpAgentsPage,
   RfpPipelinePage,
   RfpResponseHubPage,
 } from './lazyPages';
@@ -37,14 +36,6 @@ export function bidRouteElements() {
         element={
           <RequireAuth>
             <RfpResponseHubPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/rfp/:id/agents"
-        element={
-          <RequireAuth>
-            <RfpAgentsPage />
           </RequireAuth>
         }
       />

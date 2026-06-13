@@ -15,6 +15,5 @@ export { OpenIssuesCard } from './OpenIssuesCard';
 export { PageHead } from './PageHead';
 export { PipelineByStageCard } from './PipelineByStageCard';
 export { RecentOpportunitiesCard } from './RecentOpportunitiesCard';
-export { SalesIntelligencePanel } from './SalesIntelligencePanel';
 export { TechStackCard } from './TechStackCard';
 export { UpsellFilesCard } from './UpsellFilesCard';

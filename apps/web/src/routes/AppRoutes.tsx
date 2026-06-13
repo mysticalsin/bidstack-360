@@ -4,7 +4,6 @@
  * Lazy page imports → ./lazyPages
  * Auth guards       → ./AuthGuards  (also re-exported here for callers)
  * Bid/RFP routes    → ./BidRoutes
- * Sales routes      → ./SalesRoutes
  * Admin routes      → ./AdminRoutes
  */
 import { AnimatePresence } from 'framer-motion';
@@ -54,7 +53,6 @@ import {
   PublicBookingPage,
 } from './lazyPages';
 import { opsRouteElements } from './OpsRoutes';
-import { salesRouteElements } from './SalesRoutes';
 
 // Re-export guards so callers that import from this module don't need to
 // update their import paths when we moved the definitions to AuthGuards.tsx.
@@ -402,7 +400,6 @@ export function AppRoutes() {
 
           {/* ── Domain route groups ──────────────────────────────────────── */}
           {bidRouteElements()}
-          {salesRouteElements()}
           {adminRouteElements()}
           {opsRouteElements()}
 

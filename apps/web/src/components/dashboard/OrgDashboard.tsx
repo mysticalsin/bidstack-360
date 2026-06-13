@@ -19,7 +19,6 @@ import type { OrgKpi } from './widgets/dashboard-types';
 import { stageColor, stageLabel } from './widgets/dashboard-types';
 import { KpiRow } from './widgets/KpiRow';
 import { InsightsBar } from './widgets/InsightsBar';
-import { WorkspaceHealthCard } from './widgets/WorkspaceHealthCard';
 import { PipelineCard } from './widgets/PipelineCard';
 import { PipelineByStageMini } from './widgets/PipelineByStageMini';
 import { AlertCard } from './widgets/AlertCard';
@@ -27,7 +26,6 @@ import { QuickActionsCard, QuickLinksCard } from './widgets/SidebarCards';
 import { RecentActivityCard } from './widgets/RecentActivityCard';
 import { TopAccountsCard } from './widgets/TopAccountsCard';
 import { SalesFunnelCard } from './widgets/SalesFunnelCard';
-import { WeeklyGoalCard } from './widgets/WeeklyGoalCard';
 import { WinRateCard } from './widgets/WinRateCard';
 
 // ─── OrgDashboard ─────────────────────────────────────────────────────────────
@@ -149,22 +147,6 @@ export const OrgDashboard = memo(function OrgDashboard() {
 
   const topCompanies = dashboard.data?.companies.slice(0, 5) ?? [];
 
-  // Composite health score from workspace signals — no API endpoint yet
-  const healthScore = useMemo(() => {
-    if (!s) return 78;
-    const factors = [
-      s.companies > 0 ? 20 : 0,
-      s.contacts > 0 ? 15 : 0,
-      s.openOpportunities > 0 ? 20 : 0,
-      s.overdueTasks === 0 ? 20 : Math.max(0, 20 - s.overdueTasks * 2),
-      s.openServiceCases < 5 ? 15 : Math.max(5, 15 - s.openServiceCases),
-      s.pipelineValue > 0 ? 10 : 0,
-    ];
-    return Math.min(
-      100,
-      factors.reduce((a, b) => a + b, 0),
-    );
-  }, [s]);
 
   if (summary.isLoading) return <DashboardSkeleton />;
   if (summary.isError) {
@@ -269,10 +251,6 @@ export const OrgDashboard = memo(function OrgDashboard() {
 
         {/* Sidebar */}
         <aside className="cockpit-side" aria-label="Workspace details">
-          <Reveal>
-            <WorkspaceHealthCard score={healthScore} reduced={reduced} />
-          </Reveal>
-
           <Reveal delay={0.04}>
             <PipelineCard
               value={convert(s?.pipelineValue ?? 0, 'EUR')}
@@ -316,14 +294,6 @@ export const OrgDashboard = memo(function OrgDashboard() {
 
           <Reveal delay={0.12}>
             <QuickActionsCard />
-          </Reveal>
-
-          <Reveal delay={0.12}>
-            <WeeklyGoalCard
-              pipelineValue={convert(s?.pipelineValue ?? 0, 'EUR')}
-              targetValue={convert(500_000, 'EUR')}
-              currency={currency}
-            />
           </Reveal>
 
           <Reveal delay={0.14}>

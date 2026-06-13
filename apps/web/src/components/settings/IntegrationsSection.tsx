@@ -13,7 +13,6 @@ import { Icon } from '@/components/ui/Icon';
 import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
 import { ErrorState } from '@/components/ui/StateMessages';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
-import { UpgradeBanner } from '@/components/ui/UpgradeBanner';
 import { useConnectorCatalog } from '@/hooks/useCrmIntegrations';
 import { useIsAdmin } from '@/lib/auth';
 import { api } from '@/lib/api';
@@ -70,12 +69,6 @@ export function IntegrationsSection() {
         onAddWebhook={() => setActiveTab('developer')}
       />
 
-      <UpgradeBanner
-        title="Agent and CRM connections"
-        message="Connect Dust agents, webhooks, and CRM sync monitoring from one place."
-        actionLabel="Manage agents"
-        href="/agents"
-      />
 
       {isError ? (
         <ErrorState

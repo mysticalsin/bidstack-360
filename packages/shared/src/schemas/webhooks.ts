@@ -9,6 +9,8 @@ export const WEBHOOK_EVENT_KEYS = [
   'proposal.submitted',
   'task.created',
   'task.completed',
+  // Invoicing module removed; values retained so persisted
+  // webhook_subscriptions rows still validate on read.
   'invoice.sent',
   'invoice.paid',
   'document.extracted',
@@ -98,16 +100,6 @@ export const WEBHOOK_EVENT_GROUPS: WebhookEventGroup[] = [
     group: 'Finance and customer signals',
     description: 'Billing and customer-success events for downstream operations.',
     events: [
-      {
-        key: 'invoice.sent',
-        label: 'Invoice sent',
-        description: 'An invoice is sent.',
-      },
-      {
-        key: 'invoice.paid',
-        label: 'Invoice paid',
-        description: 'An invoice payment is recorded.',
-      },
       {
         key: 'nps.survey_dispatched',
         label: 'NPS survey dispatched',

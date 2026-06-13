@@ -8,7 +8,6 @@
 import { Route } from 'react-router-dom';
 
 import {
-  AgentsPage,
   IntegrationsPage,
   SettingsPage,
   WebhooksPage,
@@ -19,14 +18,6 @@ import { RequireAuth } from './AuthGuards';
 export function opsRouteElements() {
   return (
     <>
-      <Route
-        path="/agents"
-        element={
-          <RequireAuth>
-            <AgentsPage />
-          </RequireAuth>
-        }
-      />
       <Route
         path="/workflows"
         element={

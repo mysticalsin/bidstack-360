@@ -57,8 +57,7 @@ model Org {
   providerHealth         ProviderHealth[]
   queueHealth            QueueHealth[]
   releaseScores          ReleaseScore[]
-  productCategories      ProductCategory[]
-  products               Product[]
+
   accountSolutions       AccountSolution[]
   accountProducts        AccountProduct[]
   documentExtractions    DocumentExtraction[]
@@ -70,11 +69,7 @@ model Org {
   reviewIssues           ReviewIssue[]
   approvalGates          ApprovalGate[]
   submissionPackages     SubmissionPackage[]
-  salesOrders            SalesOrder[]
-  salesOrderLines        SalesOrderLine[]
-  invoices               Invoice[]
-  invoiceLines           InvoiceLine[]
-  payments               Payment[]
+
   PredictiveScore        PredictiveScore[]
   PredictiveModel        PredictiveModel[]
   Workflow               Workflow[]
@@ -88,9 +83,7 @@ model Org {
   Territory              Territory[]
   LeadRoutingRule        LeadRoutingRule[]
   integrationConfigs     IntegrationConfig[]
-  agents                 Agent[]
-  agentRuns              AgentRun[]
-  rfpAgentAssignments    RfpAgentAssignment[]
+
   Forecast               Forecast[]
   Plugin                 Plugin[]
   VoiceCommandLog        VoiceCommandLog[]
@@ -98,9 +91,7 @@ model Org {
   memosPolicies          MemosPolicy[]
   memosWorldModels       MemosWorldModel[]
   bidScores              BidScore[]
-  quotes                 Quote[]
-  quoteLines             QuoteLine[]
-  quoteVersions          QuoteVersion[]
+
   pipelines              Pipeline[]
   pipelineStages         PipelineStage[]
   SubscriptionEvent      SubscriptionEvent[]
@@ -214,8 +205,7 @@ model User {
   auditLogs         AuditLog[]
   authoredNotes     Note[]
   uploadedFiles     FileAttachment[]
-  salesOrders       SalesOrder[]
-  invoices          Invoice[]
+
   Comment           Comment[]
   Mention           Mention[]
   ServiceCase       ServiceCase[]
@@ -300,8 +290,7 @@ model Company {
   opportunities       Opportunity[]
   notes               Note[]
   files               FileAttachment[]
-  salesOrders         SalesOrder[]
-  invoices            Invoice[]
+
   serviceCases        ServiceCase[]
   accountSolutions    AccountSolution[]
   accountProducts     AccountProduct[]
@@ -1871,352 +1860,11 @@ model MigrationMapping {
   @@map("migration_mappings")
 }
 
-// ─── Agents ────────────────────────────────────────────────────────────────
-
-enum AgentStatus {
-  idle
-  running
-  error
-  disabled
-
-  @@map("agent_status")
-}
-
-enum AgentRunStatus {
-  queued
-  running
-  completed
-  failed
-  cancelled
-
-  @@map("agent_run_status")
-}
-
-model Agent {
-  id           String      @id @default(uuid()) @db.Uuid
-  orgId        String      @map("org_id") @db.Uuid
-  name         String
-  description  String?
-  systemPrompt String      @map("system_prompt")
-  tools        Json        @default("[]") // IntegrationTool[]
-  status       AgentStatus @default(idle)
-  scheduleCron String?     @map("schedule_cron")
-  lastRunAt    DateTime?   @map("last_run_at") @db.Timestamptz(6)
-  config       Json        @default("{}")
-  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  org   Org        @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  runs  AgentRun[]
-  rfpAgentAssignments RfpAgentAssignment[]
-
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
-
-  @@index([orgId, status], map: "agents_org_status_idx")
-  @@index([deletedAt])
-  @@map("agents")
-}
-
-model AgentRun {
-  id         String         @id @default(uuid()) @db.Uuid
-  orgId      String         @map("org_id") @db.Uuid
-  agentId    String         @map("agent_id") @db.Uuid
-  status     AgentRunStatus @default(queued)
-  input      Json           @default("{}")
-  output     Json?
-  costMicros BigInt?        @map("cost_micros")
-  latencyMs  Int?           @map("latency_ms")
-  error      String?
-  startedAt  DateTime?      @map("started_at") @db.Timestamptz(6)
-  finishedAt DateTime?      @map("finished_at") @db.Timestamptz(6)
-  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-
-  org   Org   @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
-
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
-
-  @@index([orgId, createdAt(sort: Desc)], map: "agent_runs_org_created_idx")
-  @@index([agentId, createdAt(sort: Desc)], map: "agent_runs_agent_created_idx")
-  @@index([deletedAt])
-  @@map("agent_runs")
-}
-
 enum RfpAgentAssignmentStatus {
   active
   paused
 
   @@map("rfp_agent_assignment_status")
-}
-
-model RfpAgentAssignment {
-  id            String                   @id @default(uuid()) @db.Uuid
-  orgId         String                   @map("org_id") @db.Uuid
-  agentId       String                   @map("agent_id") @db.Uuid
-  rfpRequestId  String                   @map("rfp_request_id")
-  status        RfpAgentAssignmentStatus @default(active)
-  createdAt     DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  org   Org   @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
-
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
-
-  @@index([orgId, rfpRequestId, status], map: "rfp_agent_assignments_org_rfp_status_idx")
-  @@index([agentId, rfpRequestId], map: "rfp_agent_assignments_agent_rfp_idx")
-  @@index([deletedAt])
-  @@map("rfp_agent_assignments")
-}
-
-// ─── Sales module (Quotations + Orders + Products) ────────────────────────
-// Mirrors Odoo's sale.order/sale.order.line/product.template data model.
-// One `SalesOrder` row covers the full quotation→order lifecycle via `state`:
-//   draft / sent  → quotation
-//   confirmed     → sales order
-//   done          → locked / delivered
-//   cancelled     → cancelled
-// Money is stored in micros (integer × 1e6) per the rest of BidStack.
-
-enum OrderState {
-  draft
-  sent
-  confirmed
-  done
-  cancelled
-
-  @@map("order_state")
-}
-
-model ProductCategory {
-  id        String   @id @default(uuid()) @db.Uuid
-  orgId     String   @map("org_id") @db.Uuid
-  name      String
-  parentId  String?  @map("parent_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-
-  org      Org               @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  parent   ProductCategory?  @relation("ProductCategoryTree", fields: [parentId], references: [id])
-  children ProductCategory[] @relation("ProductCategoryTree")
-  products Product[]
-
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
-
-  @@unique([orgId, name], map: "product_categories_org_name_key")
-  @@index([orgId, parentId], map: "product_categories_org_parent_idx")
-  @@index([deletedAt])
-  @@map("product_categories")
-}
-
-model Product {
-  id              String   @id @default(uuid()) @db.Uuid
-  orgId           String   @map("org_id") @db.Uuid
-  sku             String
-  name            String
-  categoryId      String?  @map("category_id") @db.Uuid
-  listPriceMicros BigInt   @default(0) @map("list_price_micros")
-  currency        String   @default("CAD") @db.VarChar(3)
-  active          Boolean  @default(true)
-  imageUrl        String?  @map("image_url")
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  org          Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  category     ProductCategory? @relation(fields: [categoryId], references: [id])
-  lines        SalesOrderLine[]
-  invoiceLines InvoiceLine[]
-
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
-
-  @@unique([orgId, sku], map: "products_org_sku_key")
-  @@index([orgId, name], map: "products_org_name_idx")
-  @@index([orgId, categoryId], map: "products_org_category_idx")
-  @@index([deletedAt])
-  @@map("products")
-}
-
-model SalesOrder {
-  id            String     @id @default(uuid()) @db.Uuid
-  orgId         String     @map("org_id") @db.Uuid
-  number        String
-  state         OrderState @default(draft)
-  customerName  String     @map("customer_name")
-  customerId    String?    @map("customer_id") @db.Uuid
-  companyId     String?    @map("company_id") @db.Uuid
-  salespersonId String?    @map("salesperson_id") @db.Uuid
-  countryCode   String?    @map("country_code") @db.VarChar(2)
-  currency      String     @default("CAD") @db.VarChar(3)
-  totalMicros   BigInt     @default(0) @map("total_micros")
-  orderDate     DateTime   @default(now()) @map("order_date") @db.Timestamptz(6)
-  confirmedAt   DateTime?  @map("confirmed_at") @db.Timestamptz(6)
-  createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  org         Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  salesperson User?            @relation(fields: [salespersonId], references: [id])
-  company     Company?         @relation(fields: [companyId], references: [id])
-  lines       SalesOrderLine[]
-  invoices    Invoice[]
-
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
-
-  @@unique([orgId, number], map: "sales_orders_org_number_key")
-  @@index([orgId, state, orderDate(sort: Desc)], map: "sales_orders_org_state_date_idx")
-  // P1 #25: unfiltered list orders by orderDate DESC — the state-prefixed index
-  // above can't satisfy this without a state equality predicate.
-  @@index([orgId, orderDate(sort: Desc)], map: "sales_orders_org_order_date_idx")
-  @@index([orgId, countryCode], map: "sales_orders_org_country_idx")
-  @@index([orgId, customerName], map: "sales_orders_org_customer_idx")
-  @@index([orgId, salespersonId], map: "sales_orders_org_salesperson_idx")
-  @@index([orgId, companyId])
-  @@index([customerId])
-  @@index([deletedAt])
-  @@map("sales_orders")
-}
-
-model SalesOrderLine {
-  id              String   @id @default(uuid()) @db.Uuid
-  orgId           String   @map("org_id") @db.Uuid
-  orderId         String   @map("order_id") @db.Uuid
-  productId       String   @map("product_id") @db.Uuid
-  description     String
-  quantity        Decimal  @default(1) @db.Decimal(12, 3)
-  unitPriceMicros BigInt   @map("unit_price_micros")
-  subtotalMicros  BigInt   @map("subtotal_micros")
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-
-  org     Org        @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  order   SalesOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product Product    @relation(fields: [productId], references: [id])
-
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
-
-  @@index([orgId, orderId], map: "sales_order_lines_org_order_idx")
-  @@index([orgId, productId], map: "sales_order_lines_org_product_idx")
-  @@index([deletedAt])
-  @@map("sales_order_lines")
-}
-
-// ─── Invoicing ────────────────────────────────────────────────────────────
-// Mirrors Odoo's `account.move` (move_type='out_invoice') + `account.payment`.
-// `paidMicros` is the cumulative sum of payment amounts; `state` flips to
-// `paid` when `paidMicros >= totalMicros`. `dueDate` powers the AR aging
-// buckets on the sales dashboard.
-
-enum InvoiceState {
-  draft
-  sent
-  paid
-  overdue
-  cancelled
-
-  @@map("invoice_state")
-}
-
-enum PaymentMethod {
-  bank_transfer
-  credit_card
-  cheque
-  cash
-  other
-
-  @@map("payment_method")
-}
-
-model Invoice {
-  id                  String       @id @default(uuid()) @db.Uuid
-  orgId               String       @map("org_id") @db.Uuid
-  number              String
-  state               InvoiceState @default(draft)
-  salesOrderId        String?      @map("sales_order_id") @db.Uuid
-  customerName        String       @map("customer_name")
-  customerId          String?      @map("customer_id") @db.Uuid
-  companyId           String?      @map("company_id") @db.Uuid
-  salespersonId       String?      @map("salesperson_id") @db.Uuid
-  countryCode         String?      @map("country_code") @db.VarChar(2)
-  currency            String       @default("CAD") @db.VarChar(3)
-  totalMicros         BigInt       @default(0) @map("total_micros")
-  paidMicros          BigInt       @default(0) @map("paid_micros")
-  subtotalMicros      BigInt       @default(0) @map("subtotal_micros")
-  taxMicros           BigInt       @default(0) @map("tax_micros")
-  taxRate             Decimal?     @map("tax_rate") @db.Decimal(5, 4)
-  discountMicros      BigInt       @default(0) @map("discount_micros")
-  shippingMicros      BigInt       @default(0) @map("shipping_micros")
-  billingAddress      Json?        @map("billing_address")
-  shippingAddress     Json?        @map("shipping_address")
-  purchaseOrderNumber String?      @map("purchase_order_number") @db.VarChar(100)
-  terms               String?
-  invoiceDate         DateTime     @default(now()) @map("invoice_date") @db.Timestamptz(6)
-  dueDate             DateTime     @map("due_date") @db.Timestamptz(6)
-  paidAt              DateTime?    @map("paid_at") @db.Timestamptz(6)
-  notes               String?
-  createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt           DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  org         Org           @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  salesOrder  SalesOrder?   @relation(fields: [salesOrderId], references: [id])
-  salesperson User?         @relation(fields: [salespersonId], references: [id])
-  company     Company?      @relation(fields: [companyId], references: [id])
-  lines       InvoiceLine[]
-  payments    Payment[]
-
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
-
-  @@unique([orgId, number], map: "invoices_org_number_key")
-  @@index([orgId, state, dueDate(sort: Asc)], map: "invoices_org_state_due_idx")
-  // P1 #25: invoice list orders by invoiceDate DESC (then createdAt) — without
-  // this the unfiltered-by-state list scans the full org invoice set.
-  @@index([orgId, invoiceDate(sort: Desc)], map: "invoices_org_invoice_date_idx")
-  @@index([orgId, customerName], map: "invoices_org_customer_idx")
-  @@index([orgId, salesOrderId], map: "invoices_org_sales_order_idx")
-  @@index([orgId, companyId])
-  @@index([customerId])
-  @@index([deletedAt])
-  @@map("invoices")
-}
-
-model InvoiceLine {
-  id              String   @id @default(uuid()) @db.Uuid
-  orgId           String   @map("org_id") @db.Uuid
-  invoiceId       String   @map("invoice_id") @db.Uuid
-  productId       String?  @map("product_id") @db.Uuid
-  description     String
-  quantity        Decimal  @default(1) @db.Decimal(12, 3)
-  unitPriceMicros BigInt   @map("unit_price_micros")
-  subtotalMicros  BigInt   @map("subtotal_micros")
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-
-  org     Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  invoice Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  product Product? @relation(fields: [productId], references: [id])
-
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
-
-  @@index([orgId, invoiceId], map: "invoice_lines_org_invoice_idx")
-  @@index([deletedAt])
-  @@map("invoice_lines")
-}
-
-model Payment {
-  id           String        @id @default(uuid()) @db.Uuid
-  orgId        String        @map("org_id") @db.Uuid
-  invoiceId    String        @map("invoice_id") @db.Uuid
-  amountMicros BigInt        @map("amount_micros")
-  currency     String        @default("CAD") @db.VarChar(3)
-  method       PaymentMethod @default(bank_transfer)
-  reference    String?
-  receivedAt   DateTime      @default(now()) @map("received_at") @db.Timestamptz(6)
-  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-
-  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
-
-  @@index([orgId, invoiceId], map: "payments_org_invoice_idx")
-  @@index([orgId, receivedAt(sort: Desc)], map: "payments_org_received_idx")
-  @@index([deletedAt])
-  @@map("payments")
 }
 
 // ─── AI Predictive Engine ─────────────────────────────────────────────────
@@ -3005,111 +2653,6 @@ model BidScore {
   @@index([orgId, recommendation])
   @@index([deletedAt])
   @@map("bid_scores")
-}
-
-// ─── Quotes (Phase 5 — CRM core depth) ────────────────────────────────────
-// First-class quote entity, separate from SalesOrder (Odoo-style draft→order
-// model). Quotes are the formal pricing offer to a prospect; on acceptance
-// they materialise into a SalesOrder (linked via a follow-up migration).
-// Version history is immutable — each PATCH that changes pricing snapshots
-// the full Quote+QuoteLine payload into QuoteVersion.
-
-enum QuoteState {
-  draft
-  sent
-  accepted
-  rejected
-  expired
-
-  @@map("quote_state")
-}
-
-model Quote {
-  id             String     @id @default(uuid()) @db.Uuid
-  orgId          String     @map("org_id") @db.Uuid
-  opportunityId  String?    @map("opportunity_id") @db.Uuid
-  accountId      String?    @map("account_id") @db.Uuid
-  ownerId        String     @map("owner_id") @db.Uuid
-  version        Int        @default(1)
-  state          QuoteState @default(draft)
-  number         String?
-  totalMicros    BigInt     @default(0) @map("total_micros")
-  taxMicros      BigInt     @default(0) @map("tax_micros")
-  currency       String     @default("CAD") @db.VarChar(3)
-  validUntil     DateTime?  @map("valid_until") @db.Timestamptz(6)
-  sentAt         DateTime?  @map("sent_at") @db.Timestamptz(6)
-  acceptedAt     DateTime?  @map("accepted_at") @db.Timestamptz(6)
-  rejectedAt     DateTime?  @map("rejected_at") @db.Timestamptz(6)
-  expiredAt      DateTime?  @map("expired_at") @db.Timestamptz(6)
-  terms          String?
-  notes          String?
-  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  org      Org            @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  lines    QuoteLine[]
-  versions QuoteVersion[]
-
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
-
-  @@unique([orgId, number])
-  @@index([orgId, state, updatedAt(sort: Desc)])
-  @@index([orgId, opportunityId])
-  @@index([orgId, accountId])
-  @@index([orgId, ownerId])
-  @@index([orgId])
-  @@index([deletedAt])
-  @@map("quotes")
-}
-
-model QuoteLine {
-  id               String   @id @default(uuid()) @db.Uuid
-  orgId            String   @map("org_id") @db.Uuid
-  quoteId          String   @map("quote_id") @db.Uuid
-  productId        String?  @map("product_id") @db.Uuid
-  name             String
-  description      String?
-  quantity         Decimal  @default(1) @db.Decimal(12, 3)
-  unitPriceMicros  BigInt   @map("unit_price_micros")
-  discountPct      Decimal? @map("discount_pct") @db.Decimal(5, 2)
-  lineTotalMicros  BigInt   @map("line_total_micros")
-  sortOrder        Int      @default(0) @map("sort_order")
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-
-  org   Org   @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
-
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
-
-  @@index([orgId, quoteId, sortOrder])
-  @@index([orgId, productId])
-  @@index([orgId])
-  @@index([deletedAt])
-  @@map("quote_lines")
-}
-
-model QuoteVersion {
-  id          String   @id @default(uuid()) @db.Uuid
-  orgId       String   @map("org_id") @db.Uuid
-  quoteId     String   @map("quote_id") @db.Uuid
-  version     Int
-  /// Full snapshot of the Quote + QuoteLines at the moment of the version cut.
-  /// Immutable. Keep wire-shape identical to the QuoteDetail Zod schema so
-  /// versions can be rehydrated by the frontend without translation.
-  snapshot    Json
-  createdById String   @map("created_by_id") @db.Uuid
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-
-  org   Org   @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
-
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
-
-  @@unique([orgId, quoteId, version])
-  @@index([orgId, quoteId, createdAt(sort: Desc)])
-  @@index([orgId])
-  @@index([deletedAt])
-  @@map("quote_versions")
 }
 
 // ─── Pipeline / Pipeline Stage (Phase 5 — promote enum to table) ──────────

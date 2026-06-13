@@ -1,17 +1,13 @@
 import { prisma } from '@bidstack/db';
-import type { AgentProvider } from '@bidstack/shared';
 import { decryptSecret } from '@bidstack/shared/server-crypto';
 
 export const AGENT_PROVIDER_CREDENTIAL_PREFIX = 'agent-provider:';
 export const AGENT_PROVIDER_CONFIG_TYPE = 'dust';
 
-export const DIRECT_AGENT_PROVIDERS = [
-  'claude',
-  'openai',
-  'kimi',
-  'nvidia_nim',
-  'gemma',
-] as const satisfies AgentProvider[];
+// Provider ids previously typed by the shared rfp-agent schemas (removed with
+// the RFP Agent cluster). 'dust' is configured via the Dust integration card,
+// so only the direct-LLM providers appear here.
+export const DIRECT_AGENT_PROVIDERS = ['claude', 'openai', 'kimi', 'nvidia_nim', 'gemma'] as const;
 
 export type DirectAgentProvider = (typeof DIRECT_AGENT_PROVIDERS)[number];
 
@@ -32,7 +28,7 @@ function str(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
 }
 
-export function isDirectAgentProvider(provider: AgentProvider): provider is DirectAgentProvider {
+export function isDirectAgentProvider(provider: string): provider is DirectAgentProvider {
   return DIRECT_AGENT_PROVIDERS.includes(provider as DirectAgentProvider);
 }
 

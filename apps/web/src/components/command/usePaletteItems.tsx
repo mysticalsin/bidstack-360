@@ -1,7 +1,7 @@
 /**
  * usePaletteItems — builds the full command-palette item list from all data
  * sources (contextual commands, recents, nav targets, accounts, contacts,
- * tasks, global search, opportunity search, agents).
+ * tasks, global search, opportunity search).
  *
  * Extracted from CommandPalette.tsx to keep the palette shell under the
  * 400-line file cap. Returns items + loading state + selectNavTarget so the
@@ -19,7 +19,6 @@ import { useCrmDashboard } from '@/hooks/useCrmDashboard';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useGlobalSearch } from '@/hooks/useGlobalSearch';
 import { useTasks } from '@/hooks/useTasks';
-import { useAgents } from '@/hooks/useAgents';
 import { api } from '@/lib/api';
 import { getRecents, pushRecent, type RecentEntry } from '@/lib/palette-recents';
 import { useAccountHistory } from '@/stores/accountHistory';
@@ -86,7 +85,6 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
   // inherits cached data without extra fetches.
   const contacts = useContacts();
   const tasks = useTasks();
-  const agents = useAgents();
 
   // Contextual commands registered by the currently mounted page (A3 — Twenty
   // pattern). Appear at the top of the list so page-specific actions are
@@ -259,13 +257,13 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
     for (const g of globalSearch.data?.items ?? []) {
       out.push({
         id: `search:${g.type}:${g.id}`,
-        group: g.type === 'sales_order' ? 'opportunity' : g.type,
+        group: g.type,
         label: g.title,
         hint: g.subtitle,
         onSelect: () => {
           pushRecent({
             id: `search:${g.type}:${g.id}`,
-            group: g.type === 'sales_order' ? 'opportunity' : g.type,
+            group: g.type,
             label: g.title,
             hint: g.subtitle,
             route: g.url,
@@ -297,33 +295,6 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
       });
     }
 
-    for (const a of agents.data?.items ?? []) {
-      if (
-        !q ||
-        a.name.toLowerCase().includes(q) ||
-        (a.description?.toLowerCase().includes(q) ?? false)
-      ) {
-        const route = `/agents`;
-        out.push({
-          id: `agent:${a.id}`,
-          group: 'agent',
-          label: `Run ${a.name}`,
-          hint: a.description ?? 'Agent',
-          onSelect: () => {
-            pushRecent({
-              id: `agent:${a.id}`,
-              group: 'agent',
-              label: `Run ${a.name}`,
-              hint: a.description ?? 'Agent',
-              route,
-            });
-            navigate(route);
-            onClose();
-          },
-        });
-      }
-    }
-
     return out;
   }, [
     query,
@@ -336,7 +307,6 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
     onClose,
     recents,
     accountRecents,
-    agents.data?.items,
     selectNavTarget,
     contextualCommands,
   ]);

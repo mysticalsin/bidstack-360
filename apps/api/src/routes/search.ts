@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { SearchResponse } from '@bidstack/shared';
 
-const VALID_TYPES = ['opportunity', 'contact', 'company', 'task', 'note', 'sales_order'] as const;
+const VALID_TYPES = ['opportunity', 'contact', 'company', 'task', 'note'] as const;
 
 type ValidType = (typeof VALID_TYPES)[number];
 
@@ -185,31 +185,6 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
         })());
       }
 
-      if (requestedTypes.includes('sales_order')) {
-        queries.push((async () => {
-        const orders = await prisma.salesOrder.findMany({
-          where: {
-            orgId: req.auth.orgId,
-            deletedAt: null,
-            OR: [
-              { number: { contains: q, mode: 'insensitive' } },
-              { customerName: { contains: q, mode: 'insensitive' } },
-            ],
-          },
-          take: perTypeLimit,
-        });
-        addResults(
-          orders.map((o) => ({
-            type: 'sales_order' as const,
-            id: o.id,
-            title: o.number,
-            subtitle: o.customerName,
-            url: `/sales/orders/${o.id}`,
-            score: score(o.number, o.customerName),
-          })),
-        );
-        })());
-      }
 
       // All per-type queries run concurrently (was strictly sequential).
       await Promise.all(queries);

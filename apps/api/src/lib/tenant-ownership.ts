@@ -2,17 +2,13 @@ import { prisma } from '@bidstack/db';
 
 type TenantEntityType =
   | 'account'
-  | 'agent'
   | 'company'
   | 'contact'
   | 'document'
   | 'file'
-  | 'invoice'
   | 'lead'
   | 'opportunity'
-  | 'product'
   | 'proposal'
-  | 'sales-order'
   | 'service-case'
   | 'task'
   | 'territory'
@@ -24,8 +20,6 @@ type TenantDb = typeof prisma;
 const ENTITY_ALIASES: Record<string, TenantEntityType> = {
   account: 'account',
   accounts: 'account',
-  agent: 'agent',
-  agents: 'agent',
   company: 'company',
   companies: 'company',
   contact: 'contact',
@@ -34,22 +28,12 @@ const ENTITY_ALIASES: Record<string, TenantEntityType> = {
   documents: 'document',
   file: 'file',
   files: 'file',
-  invoice: 'invoice',
-  invoices: 'invoice',
   lead: 'lead',
   leads: 'lead',
   opportunity: 'opportunity',
   opportunities: 'opportunity',
-  product: 'product',
-  products: 'product',
   proposal: 'proposal',
   proposals: 'proposal',
-  salesorder: 'sales-order',
-  salesorders: 'sales-order',
-  sales_order: 'sales-order',
-  sales_orders: 'sales-order',
-  'sales-order': 'sales-order',
-  'sales-orders': 'sales-order',
   servicecase: 'service-case',
   servicecases: 'service-case',
   service_case: 'service-case',
@@ -100,26 +84,18 @@ export async function tenantEntityBelongsToOrg(
     case 'account':
     case 'company':
       return (await db.company.count({ where: { id, orgId, deletedAt: null } })) > 0;
-    case 'agent':
-      return (await db.agent.count({ where: { id, orgId, deletedAt: null } })) > 0;
     case 'contact':
       return (await db.contact.count({ where: { id, orgId, deletedAt: null } })) > 0;
     case 'document':
       return (await db.document.count({ where: { id, orgId, deletedAt: null } })) > 0;
     case 'file':
       return (await db.fileAttachment.count({ where: { id, orgId, deletedAt: null } })) > 0;
-    case 'invoice':
-      return (await db.invoice.count({ where: { id, orgId, deletedAt: null } })) > 0;
     case 'lead':
       return (await db.lead.count({ where: { id, orgId, deletedAt: null } })) > 0;
     case 'opportunity':
       return (await db.opportunity.count({ where: { id, orgId, deletedAt: null } })) > 0;
-    case 'product':
-      return (await db.product.count({ where: { id, orgId, deletedAt: null } })) > 0;
     case 'proposal':
       return (await db.proposal.count({ where: { id, orgId, deletedAt: null } })) > 0;
-    case 'sales-order':
-      return (await db.salesOrder.count({ where: { id, orgId, deletedAt: null } })) > 0;
     case 'service-case':
       return (await db.serviceCase.count({ where: { id, orgId, deletedAt: null } })) > 0;
     case 'task':

@@ -18,7 +18,6 @@ const ENTITY_TYPES: { value: EntityType; label: string }[] = [
   { value: 'opportunity', label: 'Opportunities' },
   { value: 'lead', label: 'Leads' },
   { value: 'task', label: 'Tasks' },
-  { value: 'invoice', label: 'Invoices' },
 ];
 
 const FIELD_TYPES: { value: FieldType; label: string }[] = [

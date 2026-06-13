@@ -24,7 +24,6 @@ export interface Item {
     | 'action'
     | 'company'
     | 'note'
-    | 'sales_order'
     | 'invoice'
     | 'agent';
   label: string;

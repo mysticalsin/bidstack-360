@@ -20,7 +20,6 @@ export type TargetTypeFilter =
   | 'contact'
   | 'lead'
   | 'task'
-  | 'invoice'
   | 'api_key'
   | 'agent'
   | 'webhook'
@@ -75,7 +74,6 @@ export const TARGET_TYPES: TargetTypeOption[] = [
   { value: 'contact', label: 'Contacts' },
   { value: 'lead', label: 'Leads' },
   { value: 'task', label: 'Tasks' },
-  { value: 'invoice', label: 'Invoices' },
   { value: 'api_key', label: 'API keys' },
   { value: 'agent', label: 'Agents' },
   { value: 'webhook', label: 'Webhooks' },
@@ -111,6 +109,8 @@ export const CRM_TARGETS = new Set([
   'lead',
   'opportunity',
   'pipeline',
+  // 'quote'/'invoice': modules removed; terms retained so HISTORICAL audit
+  // rows still classify as CRM changes.
   'quote',
   'invoice',
   'task',

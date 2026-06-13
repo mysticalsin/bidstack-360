@@ -22,6 +22,7 @@ const QUERY_KEYS: Record<EntityType, string> = {
   opportunity: 'opportunity',
   lead: 'leads',
   task: 'tasks',
+  // Enum value retained for persisted rows; no UI offers it anymore.
   invoice: 'invoice',
 };
 

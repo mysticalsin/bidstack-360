@@ -76,9 +76,6 @@ export const TerritoriesPage = lazy(() =>
 
 // ─── Bid / RFP ────────────────────────────────────────────────────────────────
 
-export const AgentsPage = lazy(() =>
-  import('@/pages/AgentsPage').then((m) => ({ default: m.AgentsPage })),
-);
 export const BidNoBidPage = lazy(() =>
   import('@/pages/BidNoBidPage').then((m) => ({ default: m.BidNoBidPage })),
 );
@@ -94,9 +91,6 @@ export const ProposalsPage = lazy(() =>
 export const ReferencesPage = lazy(() =>
   import('@/pages/ReferencesPage').then((m) => ({ default: m.ReferencesPage })),
 );
-export const RfpAgentsPage = lazy(() =>
-  import('@/pages/RfpAgentsPage').then((m) => ({ default: m.RfpAgentsPage })),
-);
 export const RfpPipelinePage = lazy(() =>
   import('@/pages/RfpPipelinePage').then((m) => ({ default: m.RfpPipelinePage })),
 );
@@ -105,33 +99,6 @@ export const RfpResponseHubPage = lazy(() =>
 );
 export const AgentStudioPage = lazy(() =>
   import('@/pages/AgentStudioPage').then((m) => ({ default: m.AgentStudioPage })),
-);
-
-// ─── Sales & Finance ──────────────────────────────────────────────────────────
-
-export const InvoiceDetailPage = lazy(() =>
-  import('@/pages/InvoiceDetailPage').then((m) => ({ default: m.InvoiceDetailPage })),
-);
-export const InvoicesPage = lazy(() =>
-  import('@/pages/InvoicesPage').then((m) => ({ default: m.InvoicesPage })),
-);
-export const NewInvoicePage = lazy(() =>
-  import('@/pages/NewInvoicePage').then((m) => ({ default: m.NewInvoicePage })),
-);
-export const NewSalesOrderPage = lazy(() =>
-  import('@/pages/NewSalesOrderPage').then((m) => ({ default: m.NewSalesOrderPage })),
-);
-export const ProductsPage = lazy(() =>
-  import('@/pages/ProductsPage').then((m) => ({ default: m.ProductsPage })),
-);
-export const SalesDashboardPage = lazy(() =>
-  import('@/pages/SalesDashboardPage').then((m) => ({ default: m.SalesDashboardPage })),
-);
-export const SalesOrderDetailPage = lazy(() =>
-  import('@/pages/SalesOrderDetailPage').then((m) => ({ default: m.SalesOrderDetailPage })),
-);
-export const SalesOrdersPage = lazy(() =>
-  import('@/pages/SalesOrdersPage').then((m) => ({ default: m.SalesOrdersPage })),
 );
 
 // ─── Tasks & Activities ───────────────────────────────────────────────────────

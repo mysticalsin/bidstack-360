@@ -23,7 +23,6 @@ import { dustCredentialsRoutes } from './routes/dust-credentials.routes.js';
 import { agentProviderCredentialsRoutes } from './routes/agent-provider-credentials.routes.js';
 import { exchangeRatesRoutes } from './routes/exchange-rates.js';
 import { filesRoutes } from './routes/files.js';
-import { invoicesRoutes } from './routes/invoices.js';
 import { leadRoutes } from './routes/leads.js';
 import { notesRoutes } from './routes/notes.js';
 import { opportunityContactsRoutes } from './routes/opportunity-contacts.js';
@@ -38,8 +37,6 @@ import { reportsRoutes } from './routes/reports.js';
 // Analytics report builder (custom reports + dashboards + entity field metadata)
 import { analyticsReportsRoutes } from './routes/analytics-reports.js';
 import { analyticsDashboardsRoutes } from './routes/analytics-dashboards.js';
-import { salesDashboardRoutes } from './routes/sales-dashboard.js';
-import { salesOrdersRoutes } from './routes/sales-orders.js';
 import { tasksRoutes } from './routes/tasks.js';
 import { territoryRoutes } from './routes/territories.js';
 import { accountIntelRoutes } from './routes/account-intel.js';
@@ -50,7 +47,6 @@ import { tagRoutes } from './routes/tags.js';
 import { emailTemplateRoutes } from './routes/email-templates.js';
 import { leadRotRoutes } from './routes/lead-rot.js';
 import { pluginRoutes } from './routes/plugins.js';
-import { productsRoutes } from './routes/products.js';
 import { usersRoutes } from './routes/users.js';
 import { webhookSubscriptionsRoutes } from './routes/webhook-subscriptions.js';
 import { companiesRoutes } from './routes/companies.js';
@@ -60,7 +56,6 @@ import { microsoftRoutes } from './routes/microsoft.js';
 import { pipelineStageRoutes } from './routes/pipeline-stages.js';
 import { accountsRoutes } from './routes/accounts.js';
 import { referencesRoutes } from './routes/references.js';
-import { agentsRoutes } from './routes/agents.js';
 import { bidScoreRoutes } from './routes/bid-scores.js';
 import { proposalRoutes } from './routes/proposals.js';
 import { crewAgentRoutes } from './routes/crew-agents.js';
@@ -72,7 +67,6 @@ import { bidWorkspaceRfpRoutes } from './routes/bid-workspace-rfp.js';
 import { calendarRoutes } from './routes/calendar.js';
 import { bookingsRoutes } from './routes/bookings.js';
 // NocoBase RFP integration
-import { rfpNocobaseRoutes } from './routes/rfp-nocobase.js';
 // Wave 4 — AI assistant
 import { aiAssistantRoutes } from './routes/ai-assistant.js';
 import { documentTemplatesRoutes } from './routes/document-templates.js';
@@ -126,10 +120,6 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(analyticsReportsRoutes, { prefix: '/api/v1' });
   await server.register(analyticsDashboardsRoutes, { prefix: '/api/v1' });
   await server.register(searchRoutes, { prefix: '/api/v1' });
-  await server.register(salesDashboardRoutes, { prefix: '/api/v1' });
-  await server.register(salesOrdersRoutes, { prefix: '/api/v1' });
-  await server.register(invoicesRoutes, { prefix: '/api/v1' });
-  await server.register(productsRoutes, { prefix: '/api/v1' });
   await server.register(auditLogsRoutes, { prefix: '/api/v1' });
   await server.register(crmDashboardRoutes, { prefix: '/api/v1' });
   await server.register(crmCompanyRoutes, { prefix: '/api/v1' });
@@ -179,7 +169,6 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(microsoftRoutes, { prefix: '/api/v1' });
   await server.register(accountsRoutes, { prefix: '/api/v1' });
   await server.register(referencesRoutes, { prefix: '/api/v1' });
-  await server.register(agentsRoutes, { prefix: '/api/v1' });
   await server.register(bidScoreRoutes, { prefix: '/api/v1' });
   await server.register(proposalRoutes, { prefix: '/api/v1' });
   await server.register(crewAgentRoutes, { prefix: '/api/v1' });
@@ -195,7 +184,6 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   // so /book/:slug resolves cleanly for the public page
   await server.register(bookingsRoutes, { prefix: '/api/v1' });
   // NocoBase RFP workspace routes
-  await server.register(rfpNocobaseRoutes, { prefix: '/api/v1' });
 
   // Wave 4 — AI Assistant
   await server.register(aiAssistantRoutes, { prefix: '/api/v1' });

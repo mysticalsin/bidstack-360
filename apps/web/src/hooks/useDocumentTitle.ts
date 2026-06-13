@@ -9,7 +9,6 @@ const ROUTE_TITLES: Record<string, string> = {
   '/tasks': 'Tasks',
   '/reports': 'Reports',
   '/integrations': 'Integrations',
-  '/agents': 'Dust Agents',
   '/settings': 'Settings',
   '/login': 'Sign in',
   '/bid-matrix': 'Bid/No-Bid Matrix',

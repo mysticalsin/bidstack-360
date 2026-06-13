@@ -96,6 +96,24 @@ export const envSchema = z.object({
   // OpenAPI / Swagger UI — enable with OPENAPI_DOCS_ENABLED=true (admin only)
   OPENAPI_DOCS_ENABLED: z.enum(['true', 'false']).default('false'),
 
+  // ─── Feature flags (demo-feedback program) ────────────────────────────
+  // Served to the SPA via GET /api/v1/config/features so a flag flip is a
+  // restart, not a rebuild. Default false: dependent blocks hide entirely
+  // (the brief forbids empty/null states for unavailable data sources).
+  // Win/Loss block — Opportunity Management API does not expose the field yet.
+  WIN_LOSS_DATA_AVAILABLE: z.enum(['true', 'false']).default('false'),
+  // Account revenue + evolution block — ABC revenue API not yet available.
+  SHOW_REVENUE_BLOCK: z.enum(['true', 'false']).default('false'),
+  // InfoSearch lead-intel MCP integration.
+  INFOSEARCH_ENABLED: z.enum(['true', 'false']).default('false'),
+  INFOSEARCH_MCP_URL: z.string().url().optional().or(z.literal('')),
+  INFOSEARCH_API_KEY: z.string().min(1).optional().or(z.literal('')),
+  // 360Learning LMS (Sales Toolkits). Env names cannot start with a digit,
+  // so the brief's 360L_* arrive as LMS_360L_*.
+  LMS_360L_ENABLED: z.enum(['true', 'false']).default('false'),
+  LMS_360L_BASE_URL: z.string().url().optional().or(z.literal('')),
+  LMS_360L_API_KEY: z.string().min(1).optional().or(z.literal('')),
+
   // Observability
   SENTRY_DSN: z.string().optional(),
   SENTRY_ENVIRONMENT: z.string().optional(),
@@ -180,6 +198,16 @@ export function getEnv(): Env {
     if (!env.DEMO_SESSION_SECRET) {
       semanticErrors.push('DEMO_SESSION_SECRET is required when DEMO_MODE=true');
     }
+  }
+  // Flag-gated integrations fail closed: an enabled flag without its
+  // credentials would render a section that can only error.
+  if (env.INFOSEARCH_ENABLED === 'true' && (!env.INFOSEARCH_MCP_URL || !env.INFOSEARCH_API_KEY)) {
+    semanticErrors.push(
+      'INFOSEARCH_ENABLED=true requires INFOSEARCH_MCP_URL and INFOSEARCH_API_KEY',
+    );
+  }
+  if (env.LMS_360L_ENABLED === 'true' && (!env.LMS_360L_BASE_URL || !env.LMS_360L_API_KEY)) {
+    semanticErrors.push('LMS_360L_ENABLED=true requires LMS_360L_BASE_URL and LMS_360L_API_KEY');
   }
   if (semanticErrors.length > 0) {
     throw new Error(`Environment validation failed:\n  Invalid: ${semanticErrors.join(', ')}`);

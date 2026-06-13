@@ -6,7 +6,6 @@ interface NotificationPrefs {
   mentionPush: boolean;
   taskDueSoon: boolean;
   dealStageChange: boolean;
-  invoiceOverdue: boolean;
 }
 
 const STORAGE_KEY = 'bidstack:notifications';
@@ -23,7 +22,6 @@ function loadPrefs(): NotificationPrefs {
     mentionPush: true,
     taskDueSoon: true,
     dealStageChange: false,
-    invoiceOverdue: true,
   };
 }
 
@@ -68,11 +66,6 @@ export function NotificationPrefsSection() {
       key: 'dealStageChange',
       label: 'Deal stage changes',
       desc: 'Notify when an opportunity you own moves to a new stage.',
-    },
-    {
-      key: 'invoiceOverdue',
-      label: 'Invoice overdue alerts',
-      desc: 'Warn when an invoice passes its due date unpaid.',
     },
   ];
 

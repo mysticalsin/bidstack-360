@@ -48,13 +48,7 @@ export const NAV_SECTIONS: NavSection[] = [
     key: 'sales',
     title: 'Sales',
     icon: 'dollar',
-    items: [
-      { to: '/sales', label: 'Sales', icon: 'dollar', end: true },
-      { to: '/sales/orders', label: 'Quotations & Orders', icon: 'briefcase' },
-      { to: '/sales/products', label: 'Products', icon: 'package' },
-      { to: '/sales/invoices', label: 'Invoices', icon: 'receipt' },
-      { to: '/forecasts', label: 'Forecasts', icon: 'growth' },
-    ],
+    items: [{ to: '/forecasts', label: 'Forecasts', icon: 'growth' }],
   },
   {
     key: 'accounts',
@@ -101,7 +95,6 @@ export const NAV_SECTIONS: NavSection[] = [
       { to: '/calls', label: 'Calls', icon: 'phone' },
       { to: '/service-desk', label: 'Service Desk', icon: 'messageCircle' },
       { to: '/workflows', label: 'Workflows', icon: 'git-branch' },
-      { to: '/agents', label: 'Dust Agents', icon: 'sparkle' },
       { to: '/custom-objects', label: 'Custom Objects', icon: 'sliders' },
       { to: '/intake', label: 'Document Intake', icon: 'download' },
       { to: '/reports', label: 'Reports', icon: 'reports' },

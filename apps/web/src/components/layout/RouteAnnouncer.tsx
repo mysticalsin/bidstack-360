@@ -12,10 +12,6 @@ import { useLocation, useParams } from 'react-router-dom';
 
 const ROUTE_TITLES: Record<string, string> = {
   '/dashboard': 'Dashboard',
-  '/sales': 'Sales',
-  '/sales/orders': 'Quotes & Orders',
-  '/sales/products': 'Products',
-  '/sales/invoices': 'Invoices',
   '/accounts': 'Accounts',
   '/accounts/key': 'Key Accounts',
   '/accounts/top': 'Top Accounts',
@@ -32,7 +28,6 @@ const ROUTE_TITLES: Record<string, string> = {
   '/territories': 'Territories',
   '/service-desk': 'Service Desk',
   '/workflows': 'Workflows',
-  '/agents': 'Dust Agents',
   '/intake': 'Document Intake',
   '/reports': 'Reports',
   '/search': 'Search',
@@ -61,12 +56,6 @@ function titleFor(pathname: string, params: Record<string, string | undefined>):
   }
   if (pathname.startsWith('/tasks/') && params.id) {
     return 'Task detail';
-  }
-  if (pathname.startsWith('/sales/invoices/') && params.id) {
-    return 'Invoice detail';
-  }
-  if (pathname.startsWith('/sales/orders/') && params.id) {
-    return 'Quote or order detail';
   }
   if (pathname.startsWith('/service-desk/') && params.id) {
     return 'Service desk case detail';

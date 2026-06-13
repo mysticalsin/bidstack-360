@@ -56,16 +56,3 @@ export type {
   RecoverySuggestResponse,
 } from '../schemas/lead-rot.js';
 
-export type {
-  RfpAgentAssignment,
-  RfpAgentAssignmentStatus,
-  RfpAgentAssignmentWithAgent,
-  RfpAgentAssignmentCreate,
-  RfpAgentAssignmentListResult,
-  RfpAgentOutput,
-  RfpAgentOutputStatus,
-  RfpAgentOutputListResult,
-  RfpAgentTask,
-  RfpAgentTaskStatus,
-  RfpAgentTaskListResult,
-} from '../schemas/rfp-agent-assignment.js';

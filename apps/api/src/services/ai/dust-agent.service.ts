@@ -2,147 +2,24 @@
  * Dust AI agent service.
  *
  * Provides:
- *   - runRfpAgent()       — unified entry point for RFP phase agents (Wave 9)
  *   - defendBidScore()    — @deprecated, kept for existing callers
  *   - draftProposalSection() — @deprecated, kept for existing callers
  *
- * WHY runRfpAgent exists: Wave 9 standardises all RFP phase calls through one
- * function that enforces prompt injection defense, EU AI Act audit logging,
- * and per-template agent ID resolution. Callers should migrate to this.
+ * The RFP Agent squad (runRfpAgent + NocoBase proxy) was removed with the
+ * innovation cluster; only the bid-score and proposal helpers remain.
  */
 
-import { RFP_AGENT_TEMPLATES } from '@bidstack/shared';
 import { buildAgentUserMessage } from '../../lib/prompt-safety.js';
-import { logAiInvocation } from '../../lib/ai-audit.js';
 import { createLogger } from '../../lib/logger.js';
 import { getOrgDust, resolveAgentId } from '../../lib/dust-credentials.js';
 
 const log = createLogger({ name: 'dust-agent' });
 
-// ─── runRfpAgent ─────────────────────────────────────────────────────────────
-
-export interface RunRfpAgentInput {
-  orgId: string;
-  userId?: string;
-  /** Template ID from RFP_AGENT_TEMPLATES, e.g. "rfp-intake-agent". */
-  templateId: string;
-  /** Trusted variables interpolated into the template's userMessageTemplate. */
-  trusted: Record<string, string | number>;
-  /** Untrusted RFP document content — XML-escaped + enveloped before sending. */
-  rfpContent?: string;
-  /** Untrusted user-supplied text — XML-escaped + enveloped before sending. */
-  userText?: string;
-  /** Optional trace ID for Datadog correlation. */
-  traceId?: string;
-}
-
-export interface RunRfpAgentResult {
-  runId: string;
-  output: Record<string, unknown>;
-  tokenCount: number;
-}
-
-/**
- * Unified RFP phase agent runner.
- *
- * WHY this wraps runAgent: prompt injection defense and EU AI Act audit logging
- * are easy to forget at the call site. Centralising them here makes them
- * non-optional for all RFP agent calls.
- *
- * Per-org Dust config: OrgSettings does not currently store Dust credentials
- * (no dustApiKey/dustWorkspaceId column in schema as of Wave 9). All calls
- * fall back to DUST_* env vars. When per-org credentials are added, resolve
- * them here before falling back.
- */
-export async function runRfpAgent(input: RunRfpAgentInput): Promise<RunRfpAgentResult> {
-  const { client, creds } = await getOrgDust(input.orgId, log);
-  if (!client) {
-    throw new Error('Dust not configured: connect a workspace in Settings (or set DUST_* env)');
-  }
-
-  // Resolve agent ID: org config (by templateId, then execBrief) first, then the
-  // per-template / exec-brief env vars. WHY: per-org routing without code changes.
-  const envKey = `DUST_${input.templateId.replace(/-/g, '_').toUpperCase()}_AGENT_ID`;
-  const agentId =
-    resolveAgentId(creds, input.templateId, process.env[envKey]) ??
-    resolveAgentId(creds, 'execBrief', process.env.DUST_AGENT_EXEC_BRIEF) ??
-    '';
-
-  if (!agentId) {
-    throw new Error(
-      `No Dust agent ID configured for templateId "${input.templateId}". ` +
-        `Set ${envKey} or DUST_AGENT_EXEC_BRIEF env var.`,
-    );
-  }
-
-  // Resolve template for system prompt and userMessageTemplate.
-  // WHY lookup by id: RFP_AGENT_TEMPLATES is an array (not a Record) in @bidstack/shared.
-  const template = RFP_AGENT_TEMPLATES.find((t) => t.id === input.templateId);
-  const messageTemplate = template
-    ? (template.defaultConfig.outputContract ?? input.templateId)
-    : input.templateId;
-
-  // Build injection-safe user message.
-  const userMessage = buildAgentUserMessage({
-    template: messageTemplate,
-    trusted: input.trusted,
-    rfpContent: input.rfpContent,
-    userText: input.userText,
-  });
-
-  const model = template?.defaultConfig.model ?? 'dust';
-
-  const startMs = Date.now();
-  let rawOutput = '';
-  let status: 'success' | 'error' | 'timeout' | 'rejected' = 'success';
-  let errorMsg: string | undefined;
-
-  try {
-    const run = await client.runAgent(agentId, userMessage);
-    rawOutput = run.output ?? '';
-  } catch (err) {
-    status = 'error';
-    errorMsg = err instanceof Error ? err.message : String(err);
-    log.error({ err, orgId: input.orgId, templateId: input.templateId }, 'runRfpAgent failed');
-    throw err;
-  } finally {
-    const durationMs = Date.now() - startMs;
-    // Fire-and-forget: audit failure must never block the caller.
-    void logAiInvocation({
-      orgId: input.orgId,
-      userId: input.userId,
-      agentType: input.templateId,
-      model,
-      prompt: userMessage,
-      response: rawOutput,
-      tokenCount: 0, // WHY 0: Dust runAgent does not surface token counts in its current contract
-      durationMs,
-      status,
-      errorMsg,
-      traceId: input.traceId,
-    });
-  }
-
-  // Parse output as JSON if possible; otherwise wrap as plain string.
-  let parsed: Record<string, unknown>;
-  try {
-    // WHY try-parse: most RFP agents are prompted to return JSON objects
-    parsed = JSON.parse(rawOutput) as Record<string, unknown>;
-  } catch {
-    parsed = { text: rawOutput };
-  }
-
-  return {
-    runId: `${input.templateId}-${Date.now()}`,
-    output: parsed,
-    tokenCount: 0,
-  };
-}
 
 // ─── Legacy functions (kept for existing callers) ────────────────────────────
 
 /**
- * @deprecated Use runRfpAgent() instead.
+ * Direct Dust agent call; audit-logged via logAiInvocation.
  * WHY kept: bid-scores and workspace routes call this directly; migrating them
  * is a separate story to avoid a large cross-scope diff.
  */
@@ -212,7 +89,7 @@ export async function defendBidScore(props: {
 }
 
 /**
- * @deprecated Use runRfpAgent() instead.
+ * Direct Dust agent call; audit-logged via logAiInvocation.
  * WHY kept: bid-workspace routes call this directly; migration is a separate story.
  */
 export async function draftProposalSection(props: {

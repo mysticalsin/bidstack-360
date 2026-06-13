@@ -88,9 +88,6 @@ export type {
   ProviderHealth,
   QueueHealth,
   ReleaseScore,
-  Invoice,
-  InvoiceLine,
-  Payment,
   Lead,
 } from '../generated/client/index.js';
 
@@ -104,9 +101,6 @@ export {
   TaskStatus,
   DocumentKind,
   SyncEventStatus,
-  OrderState,
-  InvoiceState,
-  PaymentMethod,
   CasePriority,
   CaseStatus,
   WorkflowTriggerKind,

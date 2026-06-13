@@ -3,7 +3,7 @@ import { api } from '@/lib/api';
 
 export interface SearchResult {
   id: string;
-  type: 'opportunity' | 'contact' | 'company' | 'task' | 'note' | 'sales_order' | 'invoice';
+  type: 'opportunity' | 'contact' | 'company' | 'task' | 'note';
   title: string;
   subtitle: string;
   url: string;

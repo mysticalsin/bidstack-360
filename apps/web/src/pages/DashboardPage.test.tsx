@@ -8,7 +8,6 @@ import { useCrmDashboard } from '@/hooks/useCrmDashboard';
 import { useEnrichCompany } from '@/hooks/useEnrichCompany';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
-import { useSalesIntelligence } from '@/hooks/useSalesIntelligence';
 import { useTasks } from '@/hooks/useTasks';
 import { ApiError } from '@/lib/api';
 import { useIsAdmin } from '@/lib/auth';
@@ -36,7 +35,6 @@ vi.mock('@/components/cockpit', () => ({
   ),
   PipelineByStageCard: () => <div data-testid="pipeline-card" />,
   RecentOpportunitiesCard: () => <div data-testid="recent-opps" />,
-  SalesIntelligencePanel: () => <div data-testid="sales-intel" />,
   TechStackCard: () => <div data-testid="tech-card" />,
   UpsellFilesCard: () => <div data-testid="upsell-files" />,
 }));
@@ -87,7 +85,6 @@ vi.mock('@/hooks/useCrmDashboard', () => ({ useCrmDashboard: vi.fn() }));
 vi.mock('@/hooks/useEnrichCompany', () => ({ useEnrichCompany: vi.fn() }));
 vi.mock('@/hooks/useOpportunities', () => ({ useOpportunities: vi.fn() }));
 vi.mock('@/hooks/usePipelineReport', () => ({ usePipelineReport: vi.fn() }));
-vi.mock('@/hooks/useSalesIntelligence', () => ({ useSalesIntelligence: vi.fn() }));
 vi.mock('@/hooks/useTasks', () => ({ useTasks: vi.fn() }));
 vi.mock('@/lib/auth', () => ({ useIsAdmin: vi.fn() }));
 vi.mock('@/stores/accountHistory', () => ({ useAccountHistory: vi.fn() }));
@@ -183,8 +180,7 @@ describe('DashboardPage account cockpit', () => {
     vi.clearAllMocks();
     sessionStorage.clear();
     vi.mocked(usePipelineReport).mockReturnValue({} as never);
-    vi.mocked(useSalesIntelligence).mockReturnValue({} as never);
-    vi.mocked(useOpportunities).mockReturnValue({
+      vi.mocked(useOpportunities).mockReturnValue({
       data: { items: [] },
       isLoading: false,
     } as never);
@@ -222,7 +218,7 @@ describe('DashboardPage account cockpit', () => {
     expect(screen.getByRole('status').textContent).toContain(
       'showing the last verified snapshot',
     );
-    expect(screen.queryByText("Couldn't load the CRM cockpit")).toBeNull();
+    expect(screen.queryByText("Couldn't load the account cockpit")).toBeNull();
   });
 
   it('shows the fatal cockpit error only when no snapshot exists', () => {
@@ -237,7 +233,7 @@ describe('DashboardPage account cockpit', () => {
     renderAccountRoute();
 
     expect(screen.getByRole('alert')).toBeDefined();
-    expect(screen.getByText("Couldn't load the CRM cockpit")).toBeDefined();
+    expect(screen.getByText("Couldn't load the account cockpit")).toBeDefined();
     expect(screen.queryByTestId('page-head')).toBeNull();
   });
 
@@ -258,7 +254,7 @@ describe('DashboardPage account cockpit', () => {
     expect(screen.getByRole('status').textContent).toContain(
       'last verified snapshot',
     );
-    expect(screen.queryByText("Couldn't load the CRM cockpit")).toBeNull();
+    expect(screen.queryByText("Couldn't load the account cockpit")).toBeNull();
   });
 
   it('does not use the tab-local cockpit snapshot for a real missing account', () => {
@@ -274,7 +270,7 @@ describe('DashboardPage account cockpit', () => {
     renderAccountRoute();
 
     expect(screen.getByRole('alert')).toBeDefined();
-    expect(screen.getByText("Couldn't load the CRM cockpit")).toBeDefined();
+    expect(screen.getByText("Couldn't load the account cockpit")).toBeDefined();
     expect(screen.queryByTestId('page-head')).toBeNull();
   });
 

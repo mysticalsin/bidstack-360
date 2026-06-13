@@ -16,7 +16,6 @@ export interface RecentEntry {
     | 'task'
     | 'company'
     | 'note'
-    | 'sales_order'
     | 'invoice'
     | 'agent';
   label: string;

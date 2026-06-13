@@ -77,7 +77,7 @@ export function AccountsPage() {
         <h1 className="sr-only">Accounts</h1>
         <ErrorState
           title="Couldn't load accounts"
-          message={dashboard.error?.message ?? 'The CRM dashboard endpoint did not respond.'}
+          message={dashboard.error?.message ?? 'The dashboard endpoint did not respond.'}
         />
       </>
     );
@@ -140,7 +140,7 @@ export function AccountsPage() {
             className="btn btn-secondary"
             disabled={autopopulate.isPending}
             onClick={syncErpAccounts}
-            title="Sync top ERP sale.order customers into verified CRM accounts"
+            title="Sync top ERP sale.order customers into verified BidStack accounts"
           >
             {autopopulate.isPending ? (
               <span

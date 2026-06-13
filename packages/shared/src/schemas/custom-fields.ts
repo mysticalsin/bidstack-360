@@ -6,6 +6,8 @@ export const ENTITY_TYPES = [
   'opportunity',
   'lead',
   'task',
+  // Invoicing module removed; value retained so persisted custom_field_defs
+  // rows with entityType='invoice' still validate on read. Not offered in UI.
   'invoice',
 ] as const;
 export const EntityType = z.enum(ENTITY_TYPES);

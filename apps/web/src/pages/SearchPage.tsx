@@ -15,7 +15,6 @@ const TABS = [
   { key: 'company', label: 'Companies' },
   { key: 'task', label: 'Tasks' },
   { key: 'note', label: 'Notes' },
-  { key: 'sales_order', label: 'Orders' },
 ] as const;
 
 type TabKey = (typeof TABS)[number]['key'];
@@ -26,7 +25,6 @@ const TYPE_ICONS: Record<string, string> = {
   company: 'building',
   task: 'tasks',
   note: 'note',
-  sales_order: 'reports',
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -35,7 +33,6 @@ const TYPE_LABELS: Record<string, string> = {
   company: 'Company',
   task: 'Task',
   note: 'Note',
-  sales_order: 'Sales Order',
 };
 
 export function SearchPage() {

@@ -285,8 +285,6 @@ export function recordHref(row: AuditLogEntry) {
       return `/leads/${id}`;
     case 'task':
       return `/tasks/${id}`;
-    case 'invoice':
-      return `/sales/invoices/${id}`;
     case 'service_desk':
     case 'ticket':
       return `/service-desk/${id}`;

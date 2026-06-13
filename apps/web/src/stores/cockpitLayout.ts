@@ -16,7 +16,6 @@ export const COCKPIT_DEFAULTS: CockpitLayoutState = {
     businessSnapshot: true,
     openIssues: true,
     pipelineStage: true,
-    salesIntelligence: true,
     recentOpportunities: true,
     activityTimeline: true,
     healthScore: true,

@@ -12,7 +12,7 @@ test.describe('Navigation accessibility', () => {
 
     // Hover over the Sales button to reveal the flyout menu
     await primaryNav.getByRole('button', { name: 'Sales' }).hover();
-    await expect(primaryNav.getByRole('link', { name: 'Quotations & Orders' })).toBeVisible();
+    await expect(primaryNav.getByRole('link', { name: 'Forecasts' })).toBeVisible();
 
     // Hover over the Pipeline button to reveal the flyout menu
     await primaryNav.getByRole('button', { name: 'Pipeline' }).hover();
