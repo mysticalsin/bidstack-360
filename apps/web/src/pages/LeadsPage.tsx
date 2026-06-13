@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
 import { Button } from '@/components/ui/Button';
@@ -9,6 +9,9 @@ import { confirm } from '@/components/ui/ConfirmDialog';
 import { Icon } from '@/components/ui/Icon';
 import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
 import { SpotlightTable } from '@/components/ui/SpotlightTable';
+import { SortableHeader, getSortableHeaderAriaSort } from '@/components/ui/SortableHeader';
+import type { SortState } from '@/components/ui/SortableHeader';
+import { useTableSort } from '@/hooks/useTableSort';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
@@ -37,12 +40,17 @@ const PRIORITY_OPTIONS: { value: LeadPriority | ''; label: string }[] = [
   { value: 'critical', label: 'Critical' },
 ];
 
+// Module scope so the sort accessor stays referentially stable (low<…<critical
+// ordering, not alphabetical, when sorting by priority).
+const PRIORITY_ORDER: Record<string, number> = { low: 0, medium: 1, high: 2, critical: 3 };
+
 export function LeadsPage() {
   const nav = useNavigate();
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
   const [statusFilter, setStatusFilter] = useState<LeadStatus | ''>('');
   const [priorityFilter, setPriorityFilter] = useState<LeadPriority | ''>('');
+  const [searchParams, setSearchParams] = useSearchParams();
   const pager = useCursorPagination(`${deferredSearch}|${statusFilter}|${priorityFilter}`);
   const { data, isLoading, isError, error, refetch } = useLeads({
     search: deferredSearch.trim() || undefined,
@@ -56,7 +64,44 @@ export function LeadsPage() {
   // across the whole table via optimistic updates keyed to lead id.
   const updateLead = useUpdateLeadById();
 
-  const items = useMemo(() => data?.items ?? [], [data?.items]);
+  const rawItems = useMemo(() => data?.items ?? [], [data?.items]);
+
+  // Column sorting (parity with Opportunities/Contacts). Sorts the current page
+  // client-side; URL-persisted so a sorted view is shareable/back-navigable.
+  type LeadItem = (typeof rawItems)[number];
+  type LeadSortKey = 'name' | 'companyName' | 'status' | 'priority' | 'score' | 'source';
+  const accessors = useMemo(
+    (): Record<LeadSortKey, (l: LeadItem) => string | number | null> => ({
+      name: (l) => `${l.firstName} ${l.lastName}`.trim(),
+      companyName: (l) => l.companyName,
+      status: (l) => l.status,
+      priority: (l) => PRIORITY_ORDER[l.priority] ?? 0,
+      score: (l) => l.score,
+      source: (l) => l.source,
+    }),
+    [],
+  );
+  const parseSortParam = (raw: string | null): SortState<LeadSortKey> => {
+    if (!raw) return { key: null, dir: null };
+    const [k, d] = raw.split('.');
+    if (!k || !(k in accessors) || (d !== 'asc' && d !== 'desc')) return { key: null, dir: null };
+    return { key: k as LeadSortKey, dir: d };
+  };
+  const sortState = parseSortParam(searchParams.get('sort'));
+  const setSortState = (next: SortState<LeadSortKey>) => {
+    const params = new URLSearchParams(searchParams);
+    if (!next.key || !next.dir) params.delete('sort');
+    else params.set('sort', `${next.key}.${next.dir}`);
+    setSearchParams(params, { replace: true });
+  };
+  const { sorted } = useTableSort(rawItems, accessors, {
+    state: sortState,
+    onChange: setSortState,
+  });
+  // useTableSort returns ReadonlyArray; downstream consumers (bulk selection,
+  // stats) take a mutable array. `sorted` is memoized so this keeps a stable
+  // identity — we never mutate it.
+  const items = sorted as LeadItem[];
   const bulk = useBulkSelection(items);
   const leadStats = useMemo(() => {
     const total = items.length;
@@ -310,23 +355,35 @@ export function LeadsPage() {
                     />
                   </label>
                 </th>
-                <th scope="col" className="px-4 py-3 font-medium">
-                  Name
+                <th scope="col" className="px-4 py-3 font-medium" aria-sort={getSortableHeaderAriaSort('name', sortState)}>
+                  <SortableHeader columnKey="name" state={sortState} onChange={setSortState}>
+                    Name
+                  </SortableHeader>
                 </th>
-                <th scope="col" className="px-4 py-3 font-medium">
-                  Company
+                <th scope="col" className="px-4 py-3 font-medium" aria-sort={getSortableHeaderAriaSort('companyName', sortState)}>
+                  <SortableHeader columnKey="companyName" state={sortState} onChange={setSortState}>
+                    Company
+                  </SortableHeader>
                 </th>
-                <th scope="col" className="px-4 py-3 font-medium">
-                  Status
+                <th scope="col" className="px-4 py-3 font-medium" aria-sort={getSortableHeaderAriaSort('status', sortState)}>
+                  <SortableHeader columnKey="status" state={sortState} onChange={setSortState}>
+                    Status
+                  </SortableHeader>
                 </th>
-                <th scope="col" className="px-4 py-3 font-medium">
-                  Priority
+                <th scope="col" className="px-4 py-3 font-medium" aria-sort={getSortableHeaderAriaSort('priority', sortState)}>
+                  <SortableHeader columnKey="priority" state={sortState} onChange={setSortState}>
+                    Priority
+                  </SortableHeader>
                 </th>
-                <th scope="col" className="px-4 py-3 font-medium">
-                  Score
+                <th scope="col" className="px-4 py-3 font-medium" aria-sort={getSortableHeaderAriaSort('score', sortState)}>
+                  <SortableHeader columnKey="score" state={sortState} onChange={setSortState}>
+                    Score
+                  </SortableHeader>
                 </th>
-                <th scope="col" className="px-4 py-3 font-medium">
-                  Source
+                <th scope="col" className="px-4 py-3 font-medium" aria-sort={getSortableHeaderAriaSort('source', sortState)}>
+                  <SortableHeader columnKey="source" state={sortState} onChange={setSortState}>
+                    Source
+                  </SortableHeader>
                 </th>
                 <th scope="col" className="px-4 py-3 font-medium">
                   Owner

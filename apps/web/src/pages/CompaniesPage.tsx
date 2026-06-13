@@ -8,6 +8,9 @@ import { BulkActionBar } from '@/components/ui/BulkActionBar';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
 import { SpotlightTable } from '@/components/ui/SpotlightTable';
+import { SortableHeader, getSortableHeaderAriaSort } from '@/components/ui/SortableHeader';
+import type { SortState } from '@/components/ui/SortableHeader';
+import { useTableSort } from '@/hooks/useTableSort';
 import { confirm as confirmDialog } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/components/ui/Toast';
 import { useCompanies, useCreateCompany, useDeleteCompany } from '@/hooks/useCompanies';
@@ -34,7 +37,38 @@ export function CompaniesPage() {
   const createCompany = useCreateCompany();
   const deleteCompany = useDeleteCompany();
 
-  const items = useMemo(() => companies.data?.items ?? [], [companies.data?.items]);
+  const rawItems = useMemo(() => companies.data?.items ?? [], [companies.data?.items]);
+
+  // Column sorting (parity with Opportunities/Contacts/Leads). Sorts the current
+  // page client-side; URL-persisted so a sorted view is shareable.
+  type CompanyItem = (typeof rawItems)[number];
+  type CompanySortKey = 'name' | 'domain' | 'industry' | 'employeeCount' | 'countryCode';
+  const accessors = useMemo(
+    (): Record<CompanySortKey, (c: CompanyItem) => string | number | null> => ({
+      name: (c) => c.name,
+      domain: (c) => c.domain ?? null,
+      industry: (c) => c.industry ?? null,
+      employeeCount: (c) => c.employeeCount ?? null,
+      countryCode: (c) => c.countryCode ?? null,
+    }),
+    [],
+  );
+  const parseSortParam = (raw: string | null): SortState<CompanySortKey> => {
+    if (!raw) return { key: null, dir: null };
+    const [k, d] = raw.split('.');
+    if (!k || !(k in accessors) || (d !== 'asc' && d !== 'desc')) return { key: null, dir: null };
+    return { key: k as CompanySortKey, dir: d };
+  };
+  const sortState = parseSortParam(params.get('sort'));
+  const setSortState = (next: SortState<CompanySortKey>) => {
+    const p = new URLSearchParams(params);
+    if (!next.key || !next.dir) p.delete('sort');
+    else p.set('sort', `${next.key}.${next.dir}`);
+    setParams(p, { replace: true });
+  };
+  const { sorted } = useTableSort(rawItems, accessors, { state: sortState, onChange: setSortState });
+  // ReadonlyArray -> mutable for the bulk-selection/consumers; identity stable.
+  const items = sorted as CompanyItem[];
   const bulk = useBulkSelection(items);
   const searchTerm = filter.search ?? '';
 
@@ -279,18 +313,38 @@ export function CompaniesPage() {
                     />
                   </label>
                 </th>
-                <th scope="col">Company</th>
-                <th scope="col">Domain</th>
-                <th scope="col">Industry</th>
-                <th scope="col">Employees</th>
-                <th scope="col">Country</th>
+                <th scope="col" aria-sort={getSortableHeaderAriaSort('name', sortState)}>
+                  <SortableHeader columnKey="name" state={sortState} onChange={setSortState}>
+                    Company
+                  </SortableHeader>
+                </th>
+                <th scope="col" aria-sort={getSortableHeaderAriaSort('domain', sortState)}>
+                  <SortableHeader columnKey="domain" state={sortState} onChange={setSortState}>
+                    Domain
+                  </SortableHeader>
+                </th>
+                <th scope="col" aria-sort={getSortableHeaderAriaSort('industry', sortState)}>
+                  <SortableHeader columnKey="industry" state={sortState} onChange={setSortState}>
+                    Industry
+                  </SortableHeader>
+                </th>
+                <th scope="col" aria-sort={getSortableHeaderAriaSort('employeeCount', sortState)}>
+                  <SortableHeader columnKey="employeeCount" state={sortState} onChange={setSortState}>
+                    Employees
+                  </SortableHeader>
+                </th>
+                <th scope="col" aria-sort={getSortableHeaderAriaSort('countryCode', sortState)}>
+                  <SortableHeader columnKey="countryCode" state={sortState} onChange={setSortState}>
+                    Country
+                  </SortableHeader>
+                </th>
                 <th scope="col" className="text-right">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody>
-              {companies.data.items.map((c) => (
+              {items.map((c) => (
                 <CompanyRow
                   key={c.id}
                   company={c}
