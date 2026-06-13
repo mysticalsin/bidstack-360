@@ -15,6 +15,8 @@ import { confirm } from '@/components/ui/ConfirmDialog';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useOpportunities, usePatchOpportunity } from '@/hooks/useOpportunities';
+import { useCursorPagination } from '@/hooks/useCursorPagination';
+import { CursorPager } from '@/components/ui/CursorPager';
 import { useStageMutation } from '@/hooks/useStageMutation';
 import { useTableSort } from '@/hooks/useTableSort';
 import { api, downloadFromApi } from '@/lib/api';
@@ -49,8 +51,11 @@ export function OpportunitiesPage() {
     setSearchParams(params, { replace: true });
   };
 
+  // Cursor pagination — reset to page 1 whenever the search/stage filter changes.
+  const pager = useCursorPagination(`${search}|${stageFilter}`);
   const { data, isLoading, isError, error } = useOpportunities({
-    limit: 100,
+    limit: 50,
+    ...(pager.cursor ? { cursor: pager.cursor } : {}),
     ...(search ? { search } : {}),
     ...(stageFilter
       ? isPipelineStageIdUuid(stageFilter)
@@ -326,6 +331,16 @@ export function OpportunitiesPage() {
                 ))}
               </tbody>
             </table>
+            <CursorPager
+              currentPage={pager.page}
+              hasNext={Boolean(data?.nextCursor)}
+              hasPrevious={pager.hasPrevious}
+              isLoading={isLoading}
+              itemCount={data?.items.length ?? 0}
+              label="opportunities"
+              onNext={() => pager.goNext(data?.nextCursor)}
+              onPrevious={pager.goPrevious}
+            />
           </div>
         )}
       </Card>
