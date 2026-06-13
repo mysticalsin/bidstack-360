@@ -43,6 +43,10 @@ export const ContractAgreement = z.object({
   nextRateReviewAt: z.string().datetime().nullable(),
   status: ContractStatus,
   notes: z.string().max(4000).nullable(),
+  // Hosted source document (uploaded MSA/rate-card) + its name for a view link.
+  sourceFileId: z.string().uuid().nullable(),
+  sourceFileName: z.string().nullable(),
+  sourceExtractionId: z.string().uuid().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -62,6 +66,8 @@ export const ContractAgreementCreate = z.object({
   nextRateReviewAt: z.string().datetime().nullable().optional(),
   status: ContractStatus.default('active'),
   notes: z.string().max(4000).nullable().optional(),
+  sourceFileId: z.string().uuid().nullable().optional(),
+  sourceExtractionId: z.string().uuid().nullable().optional(),
 });
 export type ContractAgreementCreate = z.infer<typeof ContractAgreementCreate>;
 
@@ -79,6 +85,7 @@ export const ContractAgreementPatch = z
     nextRateReviewAt: z.string().datetime().nullable().optional(),
     status: ContractStatus.optional(),
     notes: z.string().max(4000).nullable().optional(),
+    sourceFileId: z.string().uuid().nullable().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, {
     message: 'PATCH body must contain at least one field',

@@ -15,6 +15,7 @@ import {
   useContractAgreements,
   useCreateContractAgreement,
 } from '@/hooks/useContractAgreements';
+import { useUploadFile, downloadFileUrl } from '@/hooks/useFiles';
 import type {
   ContractAgreement,
   ContractKind,
@@ -105,7 +106,19 @@ export function ContractAgreementsCard({ accountKey }: { accountKey: string }) {
                       {a.expiryDate ? ` · expires ${a.expiryDate.slice(0, 10)}` : ''}
                     </p>
                   </div>
-                  <Badge tone={STATUS_TONE[a.status]}>{a.status}</Badge>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <Badge tone={STATUS_TONE[a.status]}>{a.status}</Badge>
+                    {a.sourceFileId && (
+                      <a
+                        href={downloadFileUrl(a.sourceFileId)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-[var(--brand-primary)] hover:underline"
+                      >
+                        View document
+                      </a>
+                    )}
+                  </div>
                 </div>
                 {a.rateCard.length > 0 && (
                   <table className="mt-2 w-full text-xs">
@@ -143,6 +156,9 @@ export function ContractAgreementsCard({ accountKey }: { accountKey: string }) {
 function CreateAgreement({ accountKey }: { accountKey: string }) {
   const [open, setOpen] = useState(false);
   const create = useCreateContractAgreement();
+  const upload = useUploadFile(accountKey);
+  // The hosted source document (uploaded MSA/rate-card PDF) linked to this agreement.
+  const [sourceFile, setSourceFile] = useState<{ id: string; name: string } | null>(null);
   const [form, setForm] = useState({
     kind: 'msa' as ContractKind,
     reference: '',
@@ -189,6 +205,7 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
         globalRebateBps: pct ? Math.round(Number(pct) * 100) : null,
         currency: form.currency.trim().toUpperCase() || 'EUR',
         rateCard,
+        sourceFileId: sourceFile?.id ?? null,
         expiryDate: form.expiryDate ? new Date(form.expiryDate).toISOString() : null,
         rateReviewSchedule: form.rateReviewSchedule,
         status: 'active',
@@ -207,6 +224,7 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
             rateReviewSchedule: 'annual',
           });
           setRateLines([]);
+          setSourceFile(null);
         },
         onError: (err: Error) => toast.error('Could not save', { description: err.message }),
       },
@@ -291,6 +309,46 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
           className={inputCls}
           aria-label="Currency"
         />
+      </div>
+
+      {/* Hosted source document — upload + store the MSA/rate-card PDF */}
+      <div className="space-y-1 border-t border-[var(--border)] pt-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
+          Source document
+        </p>
+        {sourceFile ? (
+          <p className="flex items-center gap-2 text-sm text-[var(--fg-secondary)]">
+            <span className="truncate">{sourceFile.name}</span>
+            <button
+              type="button"
+              onClick={() => setSourceFile(null)}
+              className="text-xs text-[var(--fg-tertiary)] hover:text-[var(--danger)]"
+              aria-label="Remove attached document"
+            >
+              remove
+            </button>
+          </p>
+        ) : (
+          <label className="flex min-h-[44px] cursor-pointer items-center text-sm text-[var(--brand-primary)] hover:underline">
+            {upload.isPending ? 'Uploading…' : 'Attach MSA / rate-card document (PDF, image)'}
+            <input
+              type="file"
+              accept=".pdf,image/png,image/jpeg,image/tiff,image/webp,.doc,.docx"
+              className="sr-only"
+              disabled={upload.isPending}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (!file) return;
+                upload.mutate(file, {
+                  onSuccess: (att) => setSourceFile({ id: att.id, name: att.name }),
+                  onError: (err: Error) =>
+                    toast.error('Upload failed', { description: err.message }),
+                });
+              }}
+            />
+          </label>
+        )}
       </div>
 
       {/* Rate card — negotiated role rates for this MSA/contract */}

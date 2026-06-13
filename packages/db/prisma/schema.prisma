@@ -1176,6 +1176,7 @@ model FileAttachment {
   uploader         User?             @relation(fields: [uploadedByUserId], references: [id])
   company          Company?          @relation(fields: [companyId], references: [id])
   documentVersions DocumentVersion[]
+  contractAgreements ContractAgreement[] @relation("ContractSourceFile")
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -4757,12 +4758,17 @@ model ContractAgreement {
   nextRateReviewAt   DateTime?          @map("next_rate_review_at") @db.Date
   status          ContractStatus        @default(active)
   notes           String?
+  // The hosted source document (uploaded MSA/rate-card PDF) this agreement was
+  // captured from, and the extraction it was prefilled by (provenance).
+  sourceFileId       String?            @map("source_file_id") @db.Uuid
+  sourceExtractionId String?            @map("source_extraction_id") @db.Uuid
   createdById     String                @map("created_by_id") @db.Uuid
   createdAt       DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt       DateTime?             @map("deleted_at") @db.Timestamptz(6)
 
-  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  org        Org             @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  sourceFile FileAttachment? @relation("ContractSourceFile", fields: [sourceFileId], references: [id], onDelete: SetNull)
 
   @@index([orgId, accountKey], map: "contract_agreements_org_account_idx")
   @@index([orgId, status], map: "contract_agreements_org_status_idx")

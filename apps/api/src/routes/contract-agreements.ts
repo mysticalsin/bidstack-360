@@ -32,6 +32,9 @@ interface DbRow {
   nextRateReviewAt: Date | null;
   status: string;
   notes: string | null;
+  sourceFileId: string | null;
+  sourceExtractionId: string | null;
+  sourceFile: { name: string } | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -51,6 +54,9 @@ const SELECT = {
   nextRateReviewAt: true,
   status: true,
   notes: true,
+  sourceFileId: true,
+  sourceExtractionId: true,
+  sourceFile: { select: { name: true } },
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -75,6 +81,9 @@ function serialize(row: DbRow): z.infer<typeof ContractAgreement> {
     nextRateReviewAt: row.nextRateReviewAt?.toISOString() ?? null,
     status: row.status as z.infer<typeof ContractAgreement>['status'],
     notes: row.notes,
+    sourceFileId: row.sourceFileId,
+    sourceFileName: row.sourceFile?.name ?? null,
+    sourceExtractionId: row.sourceExtractionId,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -114,10 +123,20 @@ export const contractAgreementRoutes: FastifyPluginAsyncZod = async (server) => 
       schema: { body: ContractAgreementCreate, response: { 201: ContractAgreement } },
     },
     async (req, reply) => {
+      // If a source document is linked, it must belong to the caller's org.
+      if (req.body.sourceFileId) {
+        const file = await prisma.fileAttachment.findFirst({
+          where: { id: req.body.sourceFileId, orgId: req.auth.orgId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!file) throw server.httpErrors.badRequest('Source document not found in this org');
+      }
       const created = await prisma.contractAgreement.create({
         data: {
           orgId: req.auth.orgId,
           accountKey: normalizeName(req.body.accountKey),
+          sourceFileId: req.body.sourceFileId ?? null,
+          sourceExtractionId: req.body.sourceExtractionId ?? null,
           kind: req.body.kind,
           reference: req.body.reference,
           countries: req.body.countries,
@@ -180,6 +199,7 @@ export const contractAgreementRoutes: FastifyPluginAsyncZod = async (server) => 
             : {}),
           ...(b.status !== undefined ? { status: b.status } : {}),
           ...(b.notes !== undefined ? { notes: b.notes } : {}),
+          ...(b.sourceFileId !== undefined ? { sourceFileId: b.sourceFileId } : {}),
         },
       });
       const updated = await prisma.contractAgreement.findFirstOrThrow({

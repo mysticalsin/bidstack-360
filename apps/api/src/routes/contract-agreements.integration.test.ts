@@ -112,6 +112,50 @@ describe('contract agreement routes', () => {
     expect(audit).not.toBeNull();
   });
 
+  t('links a hosted source document and returns its name; rejects a foreign file', async () => {
+    const file = await prisma.fileAttachment.create({
+      data: {
+        orgId: orgId!,
+        accountId: ACCOUNT,
+        name: 'MSA-Acme.pdf',
+        contentType: 'application/pdf',
+        bytes: 1234,
+        storageKey: `${orgId}/${ACCOUNT}/test-msa.pdf`,
+      },
+    });
+    try {
+      const create = await server.inject({
+        method: 'POST',
+        url: '/api/contract-agreements',
+        payload: {
+          accountKey: ACCOUNT,
+          kind: 'msa',
+          reference: 'MSA-WITH-DOC',
+          sourceFileId: file.id,
+        },
+      });
+      expect(create.statusCode).toBe(201);
+      const body = create.json() as { sourceFileId: string; sourceFileName: string };
+      expect(body.sourceFileId).toBe(file.id);
+      expect(body.sourceFileName).toBe('MSA-Acme.pdf');
+
+      // A random (non-existent / foreign) file id is rejected.
+      const bad = await server.inject({
+        method: 'POST',
+        url: '/api/contract-agreements',
+        payload: {
+          accountKey: ACCOUNT,
+          kind: 'msa',
+          reference: 'MSA-BAD-DOC',
+          sourceFileId: '11111111-1111-4111-8111-111111111111',
+        },
+      });
+      expect(bad.statusCode).toBe(400);
+    } finally {
+      await prisma.fileAttachment.deleteMany({ where: { id: file.id } });
+    }
+  });
+
   t('another org’s contract id 404s on patch and delete (tenant isolation)', async () => {
     const foreignOrg = await prisma.org.create({
       data: { name: 'Contract Foreign', clerkOrg: `org_ctr_${Date.now()}` },
