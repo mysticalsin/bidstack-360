@@ -72,7 +72,9 @@ export const NAV_TARGETS: NavTarget[] = [
   { to: '/workflows', label: 'Go to Workflows', hint: '' },
   { to: '/custom-objects', label: 'Go to Custom Objects', hint: '' },
   { to: '/quick-start', label: 'Go to Quick Start', hint: '' },
-  { to: '/reports', label: 'Go to Reports', hint: 'g r' },
+  { to: '/reports/list', label: 'Go to Reports', hint: 'g r' },
+  { to: '/reports/new', label: 'New report', hint: '' },
+  { to: '/analytics', label: 'Go to Analytics', hint: '' },
   // System
   { to: '/integrations', label: 'Go to Integrations', hint: '' },
   { to: '/audit-log', label: 'Go to Audit log', hint: '' },

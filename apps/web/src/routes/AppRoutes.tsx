@@ -44,6 +44,7 @@ import {
   QuickStartPage,
   ReportsListPage,
   ReportsPage,
+  ReportBuilderPage,
   SearchPage,
   ServiceCaseDetailPage,
   ServiceDeskPage,
@@ -325,15 +326,13 @@ export function AppRoutes() {
               </RequireAuth>
             }
           />
-          {/* New/Edit report routes point at the report workspace so the
-              ReportsList "New report"/"Edit" actions and the Analytics
-              "New report" link land on a real page instead of a 404.
-              (A dedicated report editor is future work.) */}
+          {/* The report builder authors saved analytics reports: pick an
+              entity, compose filters/measures/group-by, preview live, and save. */}
           <Route
             path="/reports/new"
             element={
               <RequireAuth>
-                <ReportsPage />
+                <ReportBuilderPage />
               </RequireAuth>
             }
           />
@@ -341,7 +340,7 @@ export function AppRoutes() {
             path="/reports/:id/edit"
             element={
               <RequireAuth>
-                <ReportsPage />
+                <ReportBuilderPage />
               </RequireAuth>
             }
           />

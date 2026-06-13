@@ -134,6 +134,9 @@ export const ReportsListPage = lazy(() =>
 export const ReportsPage = lazy(() =>
   import('@/pages/ReportsPage').then((m) => ({ default: m.ReportsPage })),
 );
+export const ReportBuilderPage = lazy(() =>
+  import('@/pages/ReportBuilderPage').then((m) => ({ default: m.ReportBuilderPage })),
+);
 
 // ─── Service & Support ────────────────────────────────────────────────────────
 
