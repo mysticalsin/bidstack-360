@@ -626,7 +626,15 @@ export function buildCockpit({
         : []),
     ],
     technicalStack: mergeTechnicalStack(company.technicalStack ?? [], defaultTechnicalStack()),
-    health: computeSignalCoverage({ company, contacts, openDeals, tasks }),
+    // Score on THIS company's contacts/tasks only. The org-wide dashboard path
+    // passes every org row; the single-company path passes pre-filtered rows —
+    // scoping here keeps the score identical across both entry points.
+    health: computeSignalCoverage({
+      company,
+      contacts: contacts.filter((c) => c.customer === company.name),
+      openDeals,
+      tasks: tasks.filter((t) => t.opportunity?.customer === company.name),
+    }),
     keyContacts: contacts
       .filter((contact) => contact.customer === company.name)
       .slice(0, 5)

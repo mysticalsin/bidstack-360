@@ -55,14 +55,19 @@ export async function fetchLmsCourses(sector?: string): Promise<SalesToolkitCour
 
   const base = (env.LMS_360L_BASE_URL ?? '').replace(/\/$/, '');
   const url = new URL(`${base}/api/v2/courses`);
-  url.searchParams.set('apiKey', env.LMS_360L_API_KEY ?? '');
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), LMS_TIMEOUT_MS);
   let payload: unknown;
   try {
     const res = await fetch(url, {
-      headers: { accept: 'application/json' },
+      // Secret rides an Authorization header, never the URL query string
+      // (query strings leak into proxy/CDN/APM logs). TODO(360L): confirm the
+      // exact header against the 360Learning docs when creds are provisioned.
+      headers: {
+        accept: 'application/json',
+        authorization: `Bearer ${env.LMS_360L_API_KEY ?? ''}`,
+      },
       signal: controller.signal,
     });
     if (!res.ok) throw new LmsError(`LMS responded ${res.status}`);
@@ -79,8 +84,10 @@ export async function fetchLmsCourses(sector?: string): Promise<SalesToolkitCour
 
   const wanted = sector?.trim().toLowerCase();
   return rows.data
-    .map((course) => ({
-      id: course._id ?? course.id ?? course.name,
+    .map((course, index) => ({
+      // Index in the fallback so two untitled/id-less courses can't collide on
+      // the same React key (drops/duplicates cards otherwise).
+      id: course._id ?? course.id ?? `${course.name}-${index}`,
       title: course.name,
       description: course.description ?? null,
       sectorTags: course.tags,

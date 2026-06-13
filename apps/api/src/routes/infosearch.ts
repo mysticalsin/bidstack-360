@@ -30,6 +30,9 @@ export const infosearchRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/infosearch/leads',
     {
+      // Lead intel is third-party PII; gate it behind the same read scope as
+      // other account data so not every authenticated user can pull it.
+      preHandler: [server.requirePermission('accounts:read')],
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
       schema: {
         querystring: z.object({ account: z.string().trim().min(1).max(255) }),

@@ -37,7 +37,7 @@ export const orgSettingsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.put(
     '/org-settings/opportunity-filters',
     {
-      preHandler: [server.requirePermission('settings:write')],
+      preHandler: [server.requirePermission('settings:write'), server.requireRole('admin')],
       schema: { body: OpportunityFilterRulesUpdate, response: { 200: OpportunityFilterRules } },
     },
     async (req) => {

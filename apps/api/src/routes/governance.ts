@@ -240,8 +240,15 @@ export const governanceRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: { params: ActionParams, body: GovernanceActionPatch, response: { 200: GovernanceMeeting } },
     },
     async (req) => {
+      // Resolve the live (non-deleted) parent meeting first, mirroring POST
+      // /actions — patching an action on a soft-deleted meeting must 404.
+      const meeting = await prisma.governanceMeeting.findFirst({
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!meeting) throw server.httpErrors.notFound('Meeting not found');
       const action = await prisma.governanceAction.findFirst({
-        where: { id: req.params.actionId, meetingId: req.params.id, orgId: req.auth.orgId },
+        where: { id: req.params.actionId, meetingId: meeting.id, orgId: req.auth.orgId },
         select: { id: true },
       });
       if (!action) throw server.httpErrors.notFound('Action not found');

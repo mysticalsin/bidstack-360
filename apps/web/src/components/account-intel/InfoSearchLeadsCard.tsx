@@ -79,7 +79,7 @@ export function InfoSearchLeadsCard({ account }: { account: string }) {
                 <div className="flex shrink-0 gap-2 text-xs">
                   {lead.email ? (
                     <a
-                      className="flex min-h-[36px] items-center text-[var(--brand-primary)] hover:underline"
+                      className="flex min-h-[44px] items-center text-[var(--brand-primary)] hover:underline"
                       href={`mailto:${lead.email}`}
                     >
                       Email
@@ -87,7 +87,7 @@ export function InfoSearchLeadsCard({ account }: { account: string }) {
                   ) : null}
                   {lead.phone ? (
                     <a
-                      className="flex min-h-[36px] items-center text-[var(--brand-primary)] hover:underline"
+                      className="flex min-h-[44px] items-center text-[var(--brand-primary)] hover:underline"
                       href={`tel:${lead.phone}`}
                     >
                       Call

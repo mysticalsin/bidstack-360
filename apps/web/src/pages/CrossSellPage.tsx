@@ -54,7 +54,7 @@ export default function CrossSellPage() {
             type="button"
             onClick={() => setStatus(s.key)}
             aria-pressed={status === s.key}
-            className={`min-h-[36px] rounded-full border px-3 text-xs font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] ${
+            className={`min-h-[44px] rounded-full border px-3 text-xs font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] ${
               status === s.key
                 ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] text-[var(--brand-primary)]'
                 : 'border-[var(--border)] text-[var(--fg-secondary)]'

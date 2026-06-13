@@ -8,6 +8,8 @@
 // intentionally NOT exposed as a public create route.
 import { prisma } from '@bidstack/db';
 
+import { normalizeName } from './crm/dashboard.utils.js';
+
 export interface IngestProjectReferenceInput {
   orgId: string;
   accountKey: string;
@@ -22,7 +24,9 @@ export async function ingestProjectReference(input: IngestProjectReferenceInput)
   const ref = await prisma.projectReference.create({
     data: {
       orgId: input.orgId,
-      accountKey: input.accountKey,
+      // Normalize on write so the value matches the read route's
+      // normalizeName(accountKey) lookup — otherwise refs never surface.
+      accountKey: normalizeName(input.accountKey),
       title: input.title,
       technicalSummary: input.technicalSummary ?? null,
       businessSummary: input.businessSummary ?? null,

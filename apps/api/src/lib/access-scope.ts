@@ -100,13 +100,18 @@ export function applyOpportunityScope(
   scope: AccessScope,
 ): Prisma.OpportunityWhereInput {
   if (scope.unrestricted) return where;
+  // Group codes are uppercase ISO-2 (CountryCode schema), but opportunity.country
+  // / territory.countryCodes are stored raw — match both cases so a lowercase
+  // record isn't silently hidden from a user who should see it. Prisma `in`
+  // has no case-insensitive mode, so we expand the list.
+  const variants = [...new Set(scope.countries.flatMap((c) => [c.toUpperCase(), c.toLowerCase()]))];
   return {
     AND: [
       where,
       {
         OR: [
-          { country: { in: scope.countries } },
-          { territory: { countryCodes: { hasSome: scope.countries } } },
+          { country: { in: variants } },
+          { territory: { countryCodes: { hasSome: variants } } },
           { ownerId: scope.userId },
         ],
       },

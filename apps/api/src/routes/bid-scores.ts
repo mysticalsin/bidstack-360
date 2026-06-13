@@ -226,7 +226,8 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
           scopeType: 'opportunity',
           scopeId: opportunityId,
           insight: `Opportunity scored ${totalScore}/100 (${recommendation}). ${totalScore >= 90 ? 'Strong bid candidate.' : 'Weak bid candidate.'}`,
-          confidence: totalScore >= 90 ? 8500 : 8500,
+          // Crystallized only for extreme scores, so conviction is uniformly high.
+          confidence: 8500,
           evidence: { totalScore, categoryScores, criteria },
           sourceTraces: [row.id],
         });

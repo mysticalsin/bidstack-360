@@ -156,6 +156,19 @@ function FieldOverrideEditor({ kpi, companyKey }: { kpi: CockpitKpi; companyKey:
     onError: (err: Error) => toast.error('Override failed', { description: err.message }),
   });
 
+  const revert = useMutation({
+    mutationFn: () =>
+      api(
+        `/api/crm/companies/${encodeURIComponent(companyKey)}/field-overrides/${fieldKey}`,
+        { method: 'DELETE' },
+      ),
+    onSuccess: () => {
+      toast.success('Reverted to Apollo', { description: `${kpi.label} uses the Apollo value again.` });
+      void queryClient.invalidateQueries({ queryKey: ['crm-dashboard'] });
+    },
+    onError: (err: Error) => toast.error('Revert failed', { description: err.message }),
+  });
+
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
     const trimmed = draft.trim();
@@ -175,14 +188,27 @@ function FieldOverrideEditor({ kpi, companyKey }: { kpi: CockpitKpi; companyKey:
 
   if (!open) {
     return (
-      <button
-        type="button"
-        className="min-h-[28px] rounded px-1.5 text-[10px] font-medium text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)]"
-        aria-label={`Override ${kpi.label}`}
-        onClick={() => setOpen(true)}
-      >
-        Edit
-      </button>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          className="inline-flex min-h-[44px] items-center rounded px-2 text-[11px] font-medium text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)]"
+          aria-label={`Override ${kpi.label}`}
+          onClick={() => setOpen(true)}
+        >
+          Edit
+        </button>
+        {kpi.overridden ? (
+          <button
+            type="button"
+            disabled={revert.isPending}
+            className="inline-flex min-h-[44px] items-center rounded px-2 text-[11px] font-medium text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] disabled:opacity-50"
+            aria-label={`Revert ${kpi.label} to the Apollo value`}
+            onClick={() => revert.mutate()}
+          >
+            {revert.isPending ? '…' : 'Revert'}
+          </button>
+        ) : null}
+      </div>
     );
   }
   return (
@@ -196,12 +222,12 @@ function FieldOverrideEditor({ kpi, companyKey }: { kpi: CockpitKpi; companyKey:
         }}
         aria-label={`New value for ${kpi.label}`}
         placeholder={fieldKey === 'industry' ? 'Industry' : 'Number'}
-        className="w-24 rounded border border-[var(--border)] bg-[var(--surface)] px-1.5 py-1 text-xs text-[var(--fg-primary)]"
+        className="min-h-[44px] w-24 rounded border border-[var(--border)] bg-[var(--surface)] px-1.5 text-xs text-[var(--fg-primary)]"
       />
       <button
         type="submit"
         disabled={save.isPending}
-        className="min-h-[28px] rounded bg-[var(--brand-primary)] px-2 text-[10px] font-semibold text-[var(--fg-on-brand,white)] disabled:opacity-50"
+        className="inline-flex min-h-[44px] items-center rounded bg-[var(--brand-primary)] px-2.5 text-[11px] font-semibold text-[var(--fg-on-brand,white)] disabled:opacity-50"
       >
         {save.isPending ? '…' : 'Save'}
       </button>

@@ -115,7 +115,7 @@ function SectorChip({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`min-h-[36px] rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] ${
+      className={`min-h-[44px] rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] ${
         active
           ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] text-[var(--brand-primary)]'
           : 'border-[var(--border)] text-[var(--fg-secondary)] hover:border-[var(--fg-tertiary)]'

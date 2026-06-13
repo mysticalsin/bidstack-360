@@ -124,7 +124,7 @@ export const userGroupRoutes: FastifyPluginAsyncZod = async (server) => {
     '/user-groups',
     {
       config: WRITE_RATE_LIMIT,
-      preHandler: server.requirePermission('settings:write'),
+      preHandler: [server.requirePermission('settings:write'), server.requireRole('admin')],
       schema: { body: UserGroupCreate, response: { 201: UserGroup } },
     },
     async (req, reply) => {
@@ -173,7 +173,7 @@ export const userGroupRoutes: FastifyPluginAsyncZod = async (server) => {
     '/user-groups/:id',
     {
       config: WRITE_RATE_LIMIT,
-      preHandler: server.requirePermission('settings:write'),
+      preHandler: [server.requirePermission('settings:write'), server.requireRole('admin')],
       schema: { params: GroupIdParam, body: UserGroupPatch, response: { 200: UserGroup } },
     },
     async (req) => {
@@ -226,7 +226,7 @@ export const userGroupRoutes: FastifyPluginAsyncZod = async (server) => {
     '/user-groups/:id',
     {
       config: WRITE_RATE_LIMIT,
-      preHandler: server.requirePermission('settings:write'),
+      preHandler: [server.requirePermission('settings:write'), server.requireRole('admin')],
       schema: { params: GroupIdParam, response: { 204: z.null() } },
     },
     async (req, reply) => {
@@ -257,7 +257,7 @@ export const userGroupRoutes: FastifyPluginAsyncZod = async (server) => {
     '/user-groups/:id/members',
     {
       config: WRITE_RATE_LIMIT,
-      preHandler: server.requirePermission('settings:write'),
+      preHandler: [server.requirePermission('settings:write'), server.requireRole('admin')],
       schema: {
         params: GroupIdParam,
         body: UserGroupMemberAdd,
@@ -297,7 +297,7 @@ export const userGroupRoutes: FastifyPluginAsyncZod = async (server) => {
     '/user-groups/:id/members/:userId',
     {
       config: WRITE_RATE_LIMIT,
-      preHandler: server.requirePermission('settings:write'),
+      preHandler: [server.requirePermission('settings:write'), server.requireRole('admin')],
       schema: {
         params: z.object({ id: z.string().uuid(), userId: z.string().uuid() }),
         response: { 204: z.null() },
