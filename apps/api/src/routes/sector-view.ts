@@ -42,8 +42,9 @@ export const sectorViewRoutes: FastifyPluginAsyncZod = async (server) => {
       const rows = await prisma.company.findMany({
         where: { orgId: req.auth.orgId, deletedAt: null },
         select: { industry: true, countryCode: true, employeeCount: true },
-        // Bounded read: sector rollup is a strategic overview, not a ledger.
-        take: 5000,
+        // Bounded read: query-guard caps take at 1000; a sector rollup over the
+        // top 1000 accounts is a strategic overview, not a ledger.
+        take: 1000,
         orderBy: { createdAt: 'desc' },
       });
 
