@@ -28,9 +28,10 @@
     },
     {
       "dimension": "reporting-dashboards",
-      "score": 42,
+      "score": 80,
       "currentState": "Strong backend, builder UI absent, scheduling cosmetic, no drill-through.",
-      "gapCount": 2
+      "gapCount": 2,
+      "resolvedNote": "CLOSED 2026-06-13: report builder UI shipped (ReportBuilderPage) wiring the orphaned FilterBuilder/AggregatePicker/GroupByPicker primitives + live preview (POST /reports/run) + create/update/hydrate-on-edit; ReportPreview chart switch w/ derived keys + error boundary; pure reportQuery helpers (prune empty filter groups, dedupe aggregate aliases, drop stale sort -> never 400). /reports/new + /:id/edit now the builder; nav/chord/tour/palette canonicalized to /reports/list + Analytics surfaced. Adversarial review (3 dims, 10 findings) all fixed. Tests: reportQuery.test 12. REMAINING: scheduled report execution (schedule is opaque string, no cron worker); scatter preview adapter."
     },
     {
       "dimension": "ux-polish-states",
