@@ -26,6 +26,15 @@ import { loadEntityTags, suggestTagsLocally, taggableOwnedBy } from './tags.help
 const TagIdParam = z.object({ id: z.string().uuid() });
 
 export const tagRoutes: FastifyPluginAsyncZod = async (server) => {
+  // RBAC: tags were previously ungated — any authenticated user could create,
+  // edit, delete, and apply tags (privilege escalation within a tenant). Gate
+  // reads (list / entity-tags / AI suggest) behind tags:read and every mutation
+  // (create / update / delete / apply / remove) behind tags:write.
+  server.addHook('preHandler', (req) => {
+    const isRead = req.method === 'GET' || req.url.includes('/tags/suggest');
+    return server.requirePermission(isRead ? 'tags:read' : 'tags:write')(req);
+  });
+
   // ─── GET /api/v1/tags ─────────────────────────────────────────────────
   // List every tag in the tenant. Includes a usageCount via subquery so the
   // UI can show "this tag is on 12 records" without a second request.

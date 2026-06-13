@@ -41,6 +41,8 @@ export const PERMISSION_KEYS = [
   'service-desk:write',
   'settings:read',
   'settings:write',
+  'tags:read',
+  'tags:write',
   'tasks:read',
   'tasks:write',
   'territories:read',
