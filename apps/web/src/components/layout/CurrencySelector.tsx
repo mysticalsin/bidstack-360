@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 import { Icon } from '@/components/ui/Icon';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -7,6 +9,7 @@ import { useCurrencyStore, SUPPORTED_CURRENCIES } from '@/stores/currency';
 import { springSnap } from '@/lib/motion';
 
 export function CurrencySelector() {
+  const { t } = useTranslation('crm');
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -44,10 +47,10 @@ export function CurrencySelector() {
   const selectedIndex = SUPPORTED_CURRENCIES.findIndex((c) => c.code === currency);
   const selected = SUPPORTED_CURRENCIES[selectedIndex];
   const statusText = ratesLoading
-    ? 'Updating live rates'
+    ? t('currencySelector.statusUpdating', 'Updating live rates')
     : ratesError
-      ? 'Using cached rates'
-      : formatRateStatus(rates?.date);
+      ? t('currencySelector.statusCached', 'Using cached rates')
+      : formatRateStatus(rates?.date, t);
 
   // WHY useLayoutEffect: syncing visual keyboard-navigation highlight before
   // paint — classic useLayoutEffect use-case. setState-in-effect is flagged
@@ -118,8 +121,12 @@ export function CurrencySelector() {
       <Tooltip
         content={
           ratesError
-            ? `Rates unavailable: ${ratesError}`
-            : `Currency: ${selected?.name ?? currency}`
+            ? t('currencySelector.tooltipRatesUnavailable', 'Rates unavailable: {{error}}', {
+                error: ratesError,
+              })
+            : t('currencySelector.tooltipCurrency', 'Currency: {{name}}', {
+                name: selected?.name ?? currency,
+              })
         }
       >
         <button
@@ -128,7 +135,9 @@ export function CurrencySelector() {
           onClick={() => setOpen((v) => !v)}
           onKeyDown={handleKeyDown}
           className="group flex h-10 items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-2.5 text-xs font-semibold text-[var(--fg-secondary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
-          aria-label={`Select currency, current: ${currency}`}
+          aria-label={t('currencySelector.triggerAriaLabel', 'Select currency, current: {{currency}}', {
+            currency,
+          })}
           aria-haspopup="listbox"
           aria-expanded={open}
         >
@@ -137,7 +146,7 @@ export function CurrencySelector() {
           </span>
           <span className="tb-currency-code leading-none">
             <span className="block text-[10px] font-medium text-[var(--fg-tertiary)]">
-              Currency
+              {t('currencySelector.triggerLabel', 'Currency')}
             </span>
             <span className="block text-xs font-semibold text-[var(--fg-primary)]">{currency}</span>
           </span>
@@ -162,12 +171,12 @@ export function CurrencySelector() {
             transition={springSnap}
             className="absolute right-0 top-[calc(100%+8px)] z-30 w-[min(24rem,calc(100vw-1rem))] rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-3 shadow-[var(--shadow-lg)] focus:outline-none max-md:fixed max-md:left-2 max-md:right-2 max-md:top-14 max-md:w-auto"
             role="listbox"
-            aria-label="Select currency"
+            aria-label={t('currencySelector.listboxAriaLabel', 'Select currency')}
           >
             <div className="mb-3 flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] pb-3">
               <div>
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-                  Display currency
+                  {t('currencySelector.displayCurrencyLabel', 'Display currency')}
                 </span>
                 <p className="mt-1 text-sm font-semibold text-[var(--fg-primary)]">
                   {selected?.name ?? currency}
@@ -176,7 +185,10 @@ export function CurrencySelector() {
               </div>
               <button
                 type="button"
-                title="Auto selects currency from your browser location, then timezone"
+                title={t(
+                  'currencySelector.autoButtonTitle',
+                  'Auto selects currency from your browser location, then timezone',
+                )}
                 onClick={() => {
                   void enableAutoDetect();
                   setOpen(false);
@@ -189,7 +201,7 @@ export function CurrencySelector() {
                 }`}
               >
                 <Icon name="globe" size={13} ariaHidden />
-                Auto
+                {t('currencySelector.autoButton', 'Auto')}
               </button>
             </div>
             <div className="grid grid-cols-2 gap-1.5">
@@ -251,13 +263,15 @@ export function CurrencySelector() {
   );
 }
 
-function formatRateStatus(date: string | undefined): string {
-  if (!date) return 'Live rates';
+function formatRateStatus(date: string | undefined, t: TFunction): string {
+  if (!date) return t('currencySelector.statusLiveRates', 'Live rates');
   const parsed = Date.parse(date);
-  if (!Number.isFinite(parsed)) return 'Live rates';
-  return `Rates updated ${new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  }).format(parsed)}`;
+  if (!Number.isFinite(parsed)) return t('currencySelector.statusLiveRates', 'Live rates');
+  return t('currencySelector.statusRatesUpdated', 'Rates updated {{date}}', {
+    date: new Intl.DateTimeFormat(undefined, {
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    }).format(parsed),
+  });
 }

@@ -8,6 +8,7 @@
  * WCAG 2.2 AA. Dark mode. Keyboard navigable.
  */
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 
 import { confirm } from '@/components/ui/ConfirmDialog';
@@ -22,6 +23,7 @@ import { cn } from '@/lib/cn';
 import { relativeTime } from '@/lib/format';
 
 export function CustomObjectDetailPage() {
+  const { t } = useTranslation('crm');
   const { objectKey = '', recordId = '' } = useParams<{ objectKey: string; recordId: string }>();
 
   const { data: defsData } = useCustomObjectDefs();
@@ -51,15 +53,21 @@ export function CustomObjectDetailPage() {
       await updateRecord.mutateAsync({ values: { [editField]: editValue } });
       setEditField(null);
     } catch (err) {
-      setEditError(err instanceof Error ? err.message : 'Save failed');
+      setEditError(err instanceof Error ? err.message : t('customObjectDetail.saveFailed', 'Save failed'));
     }
   }
 
   async function handleDelete() {
     const ok = await confirm({
-      title: `Delete ${def?.labelSingular ?? 'record'}?`,
-      description: `${record?.recordKey ?? 'This record'} will be soft-deleted. It can be restored via the API.`,
-      confirmLabel: 'Delete',
+      title: t('customObjectDetail.deleteConfirmTitle', 'Delete {{label}}?', {
+        label: def?.labelSingular ?? t('customObjectDetail.recordFallback', 'record'),
+      }),
+      description: t(
+        'customObjectDetail.deleteConfirmDescription',
+        '{{recordKey}} will be soft-deleted. It can be restored via the API.',
+        { recordKey: record?.recordKey ?? t('customObjectDetail.thisRecordFallback', 'This record') },
+      ),
+      confirmLabel: t('customObjectDetail.deleteConfirmLabel', 'Delete'),
       destructive: true,
     });
     if (!ok) return;
@@ -67,8 +75,8 @@ export function CustomObjectDetailPage() {
       await deleteRecord.mutateAsync(recordId);
       window.history.back();
     } catch (err) {
-      toast.error('Delete failed', {
-        description: err instanceof Error ? err.message : 'Delete failed',
+      toast.error(t('customObjectDetail.deleteFailedTitle', 'Delete failed'), {
+        description: err instanceof Error ? err.message : t('customObjectDetail.deleteFailedDescription', 'Delete failed'),
       });
     }
   }
@@ -85,10 +93,10 @@ export function CustomObjectDetailPage() {
   if (!record || !def) {
     return (
       <div className="p-6 text-[var(--fg-secondary)]">
-        Record not found.{' '}
+        {t('customObjectDetail.recordNotFound', 'Record not found.')}{' '}
         {def && (
           <Link to={`/o/${objectKey}`} className="underline text-[var(--brand-primary)]">
-            Back to {def.labelPlural}
+            {t('customObjectDetail.backToPlural', 'Back to {{plural}}', { plural: def.labelPlural })}
           </Link>
         )}
       </div>
@@ -100,7 +108,7 @@ export function CustomObjectDetailPage() {
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       {/* Breadcrumb */}
-      <nav aria-label="Breadcrumb">
+      <nav aria-label={t('customObjectDetail.breadcrumbAriaLabel', 'Breadcrumb')}>
         <ol className="flex items-center gap-2 text-sm text-[var(--fg-secondary)]">
           <li>
             <Link
@@ -146,7 +154,7 @@ export function CustomObjectDetailPage() {
             'transition-colors min-h-[44px]',
           )}
         >
-          Delete
+          {t('customObjectDetail.deleteButton', 'Delete')}
         </button>
       </div>
 
@@ -156,7 +164,7 @@ export function CustomObjectDetailPage() {
         className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-xl overflow-hidden"
       >
         <h2 id="fields-section" className="sr-only">
-          Field values
+          {t('customObjectDetail.fieldValuesHeading', 'Field values')}
         </h2>
         <dl>
           {fieldKeys.map((key, i) => (
@@ -184,7 +192,9 @@ export function CustomObjectDetailPage() {
                         if (e.key === 'Enter') void saveEdit();
                         if (e.key === 'Escape') setEditField(null);
                       }}
-                      aria-label={`Edit ${key.replace(/_/g, ' ')}`}
+                      aria-label={t('customObjectDetail.editFieldAriaLabel', 'Edit {{field}}', {
+                        field: key.replace(/_/g, ' '),
+                      })}
                     />
                     <button
                       type="button"
@@ -194,14 +204,16 @@ export function CustomObjectDetailPage() {
                       disabled={updateRecord.isPending}
                       className="px-3 py-1 rounded-lg bg-[var(--brand-primary)] text-white text-sm hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
                     >
-                      {updateRecord.isPending ? '…' : 'Save'}
+                      {updateRecord.isPending
+                        ? t('customObjectDetail.saving', '…')
+                        : t('customObjectDetail.save', 'Save')}
                     </button>
                     <button
                       type="button"
                       onClick={() => setEditField(null)}
                       className="px-3 py-1 rounded-lg border border-[var(--border-subtle)] text-sm hover:bg-[var(--surface-sunken)] transition-colors min-h-[44px]"
                     >
-                      Cancel
+                      {t('customObjectDetail.cancel', 'Cancel')}
                     </button>
                   </div>
                 ) : (
@@ -214,7 +226,10 @@ export function CustomObjectDetailPage() {
                       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]',
                       'transition-colors min-h-[44px] flex items-center',
                     )}
-                    aria-label={`Edit ${key.replace(/_/g, ' ')}: ${String(values[key] ?? '—')}`}
+                    aria-label={t('customObjectDetail.editFieldValueAriaLabel', 'Edit {{field}}: {{value}}', {
+                      field: key.replace(/_/g, ' '),
+                      value: String(values[key] ?? '—'),
+                    })}
                   >
                     {String(values[key] ?? '—')}
                   </button>
@@ -230,14 +245,14 @@ export function CustomObjectDetailPage() {
 
           {fieldKeys.length === 0 && (
             <div className="px-5 py-8 text-center text-sm text-[var(--fg-secondary)]">
-              No fields defined yet. Add fields in the{' '}
+              {t('customObjectDetail.emptyFields', 'No fields defined yet. Add fields in the')}{' '}
               <Link
                 to={`/settings/custom-objects/${def.id}`}
                 className="underline text-[var(--brand-primary)]"
               >
-                object editor
+                {t('customObjectDetail.objectEditorLink', 'object editor')}
               </Link>
-              .
+              {t('customObjectDetail.emptyFieldsPeriod', '.')}
             </div>
           )}
         </dl>
@@ -245,10 +260,12 @@ export function CustomObjectDetailPage() {
 
       {/* Metadata */}
       <section className="text-xs text-[var(--fg-tertiary)] space-y-1">
-        <p>Created {relativeTime(record.createdAt)}</p>
-        <p>Updated {relativeTime(record.updatedAt)}</p>
+        <p>{t('customObjectDetail.createdAt', 'Created {{time}}', { time: relativeTime(record.createdAt) })}</p>
+        <p>{t('customObjectDetail.updatedAt', 'Updated {{time}}', { time: relativeTime(record.updatedAt) })}</p>
         {record.deletedAt && (
-          <p className="text-red-500">Deleted {relativeTime(record.deletedAt)}</p>
+          <p className="text-red-500">
+            {t('customObjectDetail.deletedAt', 'Deleted {{time}}', { time: relativeTime(record.deletedAt) })}
+          </p>
         )}
       </section>
     </div>

@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { Fragment, memo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 
 import { CompanyLogo } from '@/components/company/CompanyLogo';
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) {
+  const { t } = useTranslation('crm');
   const [briefOpen, setBriefOpen] = useState(false);
   const enrich = useEnrichCompany();
   const reducedMotion = useReducedMotion();
@@ -64,8 +66,11 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
   const subtitle = accountView
     ? subtitleParts.length > 0
       ? subtitleParts.join(' - ')
-      : 'Company profile incomplete'
-    : `Today: ${formatDate(new Date().toISOString())} - ${cockpit.company.name} cockpit`;
+      : t('pageHead.companyProfileIncomplete', 'Company profile incomplete')
+    : t('pageHead.dashboardSubtitle', 'Today: {{date}} - {{company}} cockpit', {
+        date: formatDate(new Date().toISOString()),
+        company: cockpit.company.name,
+      });
   const confidence = Math.round(cockpit.company.confidence * 100);
 
   return (
@@ -88,29 +93,48 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
           brief={<CompanyBrief cockpit={cockpit} />}
         />
         <div style={{ minWidth: 0 }}>
-          <h1 className="page-title">{accountView ? cockpit.company.name : 'Dashboard'}</h1>
+          <h1 className="page-title">
+            {accountView ? cockpit.company.name : t('pageHead.dashboardTitle', 'Dashboard')}
+          </h1>
           <div className="page-sub">{subtitle}</div>
           {accountView ? (
-            <div className="account-meta-chips" aria-label="Account status summary">
+            <div
+              className="account-meta-chips"
+              aria-label={t('pageHead.accountStatusSummaryLabel', 'Account status summary')}
+            >
               <span data-tone="health">{labelForBand(cockpit.health.band)}</span>
-              <span data-tone="confidence">{confidence}% attribution confidence</span>
-              <span data-tone="muted">Refreshed {relativeTime(cockpit.company.updatedAt)}</span>
+              <span data-tone="confidence">
+                {t('pageHead.attributionConfidence', '{{percent}}% attribution confidence', {
+                  percent: confidence,
+                })}
+              </span>
+              <span data-tone="muted">
+                {t('pageHead.refreshed', 'Refreshed {{time}}', {
+                  time: relativeTime(cockpit.company.updatedAt),
+                })}
+              </span>
               {cockpit.company.strategicIntel?.lastSyncedAt ? (
                 <span
                   data-tone={
                     cockpit.company.strategicIntel.freshness === 'fresh' ? 'linked' : 'warning'
                   }
                 >
-                  External {cockpit.company.strategicIntel.freshness} -{' '}
-                  {relativeTime(cockpit.company.strategicIntel.lastSyncedAt)}
+                  {t('pageHead.externalFreshness', 'External {{freshness}} - {{time}}', {
+                    freshness: cockpit.company.strategicIntel.freshness,
+                    time: relativeTime(cockpit.company.strategicIntel.lastSyncedAt),
+                  })}
                 </span>
               ) : (
-                <span data-tone="warning">External source not synced</span>
+                <span data-tone="warning">
+                  {t('pageHead.externalNotSynced', 'External source not synced')}
+                </span>
               )}
               {linkedOpp ? (
-                <span data-tone="linked">Opportunity linked</span>
+                <span data-tone="linked">{t('pageHead.opportunityLinked', 'Opportunity linked')}</span>
               ) : (
-                <span data-tone="warning">No opportunity linked</span>
+                <span data-tone="warning">
+                  {t('pageHead.noOpportunityLinked', 'No opportunity linked')}
+                </span>
               )}
             </div>
           ) : null}
@@ -123,11 +147,15 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
             className="btn btn-secondary"
             onClick={() => toggleFavorite(accountId, cockpit.company.name)}
             aria-pressed={isStarred}
-            title={isStarred ? 'Remove from favorites' : 'Add to favorites'}
+            title={
+              isStarred
+                ? t('pageHead.removeFromFavorites', 'Remove from favorites')
+                : t('pageHead.addToFavorites', 'Add to favorites')
+            }
             style={{ color: isStarred ? 'var(--warning)' : undefined }}
           >
             <Icon name={isStarred ? 'starFilled' : 'star'} size={14} />
-            {isStarred ? 'Starred' : 'Star'}
+            {isStarred ? t('pageHead.starred', 'Starred') : t('pageHead.star', 'Star')}
           </button>
         ) : null}
         <button
@@ -135,7 +163,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
           className="btn btn-secondary"
           onClick={handleEnrich}
           disabled={enrich.isPending}
-          title="Refresh available data sources"
+          title={t('pageHead.enrichTitle', 'Refresh available data sources')}
         >
           {enrich.isPending ? (
             <span
@@ -145,7 +173,9 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
           ) : (
             <Icon name="download" size={14} />
           )}
-          {enrich.isPending ? 'Enriching…' : 'Enrich now'}
+          {enrich.isPending
+            ? t('pageHead.enriching', 'Enriching…')
+            : t('pageHead.enrichNow', 'Enrich now')}
           <SavedFlash trigger={enrichSavedAt} />
         </button>
         {accountView ? (
@@ -153,10 +183,10 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
             type="button"
             className="btn btn-secondary"
             onClick={() => window.print()}
-            title="Print the cockpit as a one-page brief"
+            title={t('pageHead.printTitle', 'Print the cockpit as a one-page brief')}
           >
             <Icon name="print" size={14} />
-            Print
+            {t('pageHead.print', 'Print')}
           </button>
         ) : null}
         {linkedOpp ? (
@@ -164,10 +194,12 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
             type="button"
             className="btn btn-primary"
             onClick={() => setBriefOpen(true)}
-            title={`Generate brief for ${linkedOpp.name}`}
+            title={t('pageHead.generateBriefTitle', 'Generate brief for {{name}}', {
+              name: linkedOpp.name,
+            })}
           >
             <Icon name="sparkle" size={14} />
-            Generate brief
+            {t('pageHead.generateBrief', 'Generate brief')}
           </button>
         ) : accountView ? (
           <CreateOpportunityDialog
@@ -176,10 +208,12 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
               <button
                 type="button"
                 className="btn btn-primary"
-                title={`Create an opportunity for ${cockpit.company.name}`}
+                title={t('pageHead.createOpportunityTitle', 'Create an opportunity for {{name}}', {
+                  name: cockpit.company.name,
+                })}
               >
                 <Icon name="plus" size={14} />
-                Create opportunity
+                {t('pageHead.createOpportunity', 'Create opportunity')}
               </button>
             }
           />
@@ -202,13 +236,17 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
 // from whichever fields the CRM data verification surfaced; nullable fields are
 // quietly skipped rather than rendered as "Unknown" placeholders.
 function CompanyBrief({ cockpit }: { cockpit: AccountCockpitSnapshot }) {
+  const { t } = useTranslation('crm');
   const c = cockpit.company;
   const rows: Array<[string, string]> = [];
-  if (c.industry) rows.push(['Industry', c.industry]);
-  if (c.employeeCount) rows.push(['Headcount', c.employeeCount.toLocaleString()]);
-  if (c.domain) rows.push(['Domain', c.domain]);
-  if (c.legalName && c.legalName !== c.name) rows.push(['Legal name', c.legalName]);
-  if (c.incorporationDate) rows.push(['Founded', c.incorporationDate.slice(0, 4)]);
+  if (c.industry) rows.push([t('pageHead.briefIndustry', 'Industry'), c.industry]);
+  if (c.employeeCount)
+    rows.push([t('pageHead.briefHeadcount', 'Headcount'), c.employeeCount.toLocaleString()]);
+  if (c.domain) rows.push([t('pageHead.briefDomain', 'Domain'), c.domain]);
+  if (c.legalName && c.legalName !== c.name)
+    rows.push([t('pageHead.briefLegalName', 'Legal name'), c.legalName]);
+  if (c.incorporationDate)
+    rows.push([t('pageHead.briefFounded', 'Founded'), c.incorporationDate.slice(0, 4)]);
   return (
     <div>
       {c.imageUrl ? (
@@ -242,7 +280,9 @@ function CompanyBrief({ cockpit }: { cockpit: AccountCockpitSnapshot }) {
         </dl>
       ) : null}
       <div className="mt-3 text-[10px] uppercase tracking-wider text-[var(--fg-tertiary)]">
-        Confidence: {Math.round(c.confidence * 100)}%
+        {t('pageHead.briefConfidence', 'Confidence: {{percent}}%', {
+          percent: Math.round(c.confidence * 100),
+        })}
       </div>
     </div>
   );

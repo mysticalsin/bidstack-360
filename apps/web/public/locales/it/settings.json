@@ -326,5 +326,86 @@
     "typeToSearch": "Digita per cercare nel tuo portafoglio.",
     "resultsAriaLabel": "Risultati della ricerca aziende",
     "add": "Aggiungi"
+  },
+  "customFields": {
+    "heading": "Campi personalizzati",
+    "caption": "Definisci campi aggiuntivi per ogni tipo di entità.",
+    "entityType": {
+      "company": "Aziende",
+      "contact": "Contatti",
+      "opportunity": "Opportunità",
+      "lead": "Lead",
+      "task": "Attività"
+    },
+    "addField": "+ Aggiungi campo",
+    "empty": {
+      "title": "Nessun campo personalizzato",
+      "message": "Aggiungi campi per acquisire dati aggiuntivi."
+    },
+    "required": "Obbligatorio",
+    "meta": "Chiave: {{fieldKey}} · Ordine: {{orderIndex}}",
+    "edit": "Modifica",
+    "deleteConfirm": "Eliminare il campo \"{{label}}\"?",
+    "delete": "Elimina",
+    "fieldType": {
+      "text": "Testo",
+      "number": "Numero",
+      "date": "Data",
+      "boolean": "Booleano",
+      "select": "Selezione",
+      "multi_select": "Selezione multipla",
+      "currency": "Valuta",
+      "url": "URL",
+      "email": "Email",
+      "phone": "Telefono"
+    },
+    "form": {
+      "label": "Etichetta",
+      "labelPlaceholder": "Etichetta del campo",
+      "key": "Chiave",
+      "type": "Tipo",
+      "required": "Obbligatorio",
+      "options": "Opzioni (una per riga)",
+      "cancel": "Annulla",
+      "saving": "Salvataggio…",
+      "save": "Salva"
+    }
+  },
+  "emailTemplates": {
+    "toast": {
+      "updated": "Modello aggiornato",
+      "created": "Modello creato",
+      "saveFailed": "Salvataggio non riuscito",
+      "deleted": "Modello eliminato"
+    },
+    "confirmDelete": "Eliminare \"{{name}}\"? Le esecuzioni di flussi di lavoro esistenti che lo referenziano continueranno a funzionare.",
+    "listHeading": "Modelli",
+    "newTemplateAria": "Nuovo modello",
+    "listAria": "Modelli di email",
+    "loading": "Caricamento…",
+    "emptyList": {
+      "title": "Nessun modello ancora"
+    },
+    "field": {
+      "name": "Nome",
+      "namePlaceholder": "Riattivazione — generico",
+      "category": "Categoria (facoltativa)",
+      "categoryPlaceholder": "Recupero / Scoperta / …",
+      "subject": "Oggetto",
+      "subjectPlaceholder": "Follow-up rapido su {{account.name}}",
+      "body": "Corpo (HTML consentito)"
+    },
+    "availablePlaceholders": "Segnaposto disponibili",
+    "placeholderTitle": "{{label}} — esempio: {{sample}}",
+    "action": {
+      "delete": "Elimina",
+      "cancel": "Annulla",
+      "save": "Salva",
+      "create": "Crea modello"
+    },
+    "emptyEditor": {
+      "title": "Scegli un modello da modificare",
+      "message": "Oppure creane uno nuovo. I modelli compilano segnaposto come {{lead.firstName}} dal record corrente."
+    }
   }
 }

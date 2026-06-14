@@ -10,6 +10,7 @@
 // from useState initializers.
 
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/Dialog';
@@ -43,6 +44,7 @@ export function ContactDialog({
   open: controlledOpen,
   onOpenChange,
 }: Props) {
+  const { t } = useTranslation('crm');
   const isControlled = controlledOpen !== undefined;
   const [internalOpen, setInternalOpen] = useState(false);
   const open = isControlled ? controlledOpen : internalOpen;
@@ -57,18 +59,22 @@ export function ContactDialog({
         <DialogTrigger asChild>
           {trigger ?? (
             <button type="button" className="btn btn-primary">
-              + New contact
+              {t('contact.newContactTrigger', '+ New contact')}
             </button>
           )}
         </DialogTrigger>
       ) : null}
       {open ? (
         <DialogContent
-          title={contact ? `Edit ${contact.name}` : 'New contact'}
+          title={
+            contact
+              ? t('contact.editTitle', 'Edit {{name}}', { name: contact.name })
+              : t('contact.newTitle', 'New contact')
+          }
           description={
             contact
-              ? 'Patch updates the record and writes an audit entry.'
-              : 'Add a person to the decision unit.'
+              ? t('contact.editDescription', 'Patch updates the record and writes an audit entry.')
+              : t('contact.newDescription', 'Add a person to the decision unit.')
           }
         >
           <ContactForm
@@ -92,6 +98,7 @@ function ContactForm({
   defaultCustomer?: string;
   onDone: () => void;
 }) {
+  const { t } = useTranslation('crm');
   const create = useCreateContact();
   const update = useUpdateContact();
 
@@ -112,7 +119,7 @@ function ContactForm({
     e.preventDefault();
     setError(null);
     if (!customer.trim() || !name.trim()) {
-      setError('Customer and name are required');
+      setError(t('contact.errorRequired', 'Customer and name are required'));
       return;
     }
     const influenceNum = influence ? Math.min(5, Math.max(1, Number(influence))) : null;
@@ -133,14 +140,14 @@ function ContactForm({
       }
       onDone();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save failed');
+      setError(err instanceof Error ? err.message : t('contact.errorSaveFailed', 'Save failed'));
     }
   };
 
   return (
     <form onSubmit={submit} className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Customer / account" htmlFor="contact-customer" required>
+        <Field label={t('contact.fieldCustomer', 'Customer / account')} htmlFor="contact-customer" required>
           <input
             id="contact-customer"
             value={customer}
@@ -149,7 +156,7 @@ function ContactForm({
             className="dialog-input"
           />
         </Field>
-        <Field label="Name" htmlFor="contact-name" required>
+        <Field label={t('contact.fieldName', 'Name')} htmlFor="contact-name" required>
           <input
             id="contact-name"
             value={name}
@@ -160,18 +167,18 @@ function ContactForm({
         </Field>
       </div>
 
-      <Field label="Role" htmlFor="contact-role">
+      <Field label={t('contact.fieldRole', 'Role')} htmlFor="contact-role">
         <input
           id="contact-role"
           value={role}
           onChange={(e) => setRole(e.target.value)}
-          placeholder="e.g. CTO, Director of Infrastructure"
+          placeholder={t('contact.rolePlaceholder', 'e.g. CTO, Director of Infrastructure')}
           className="dialog-input"
         />
       </Field>
 
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Email" htmlFor="contact-email">
+        <Field label={t('contact.fieldEmail', 'Email')} htmlFor="contact-email">
           <input
             id="contact-email"
             type="email"
@@ -180,7 +187,7 @@ function ContactForm({
             className="dialog-input"
           />
         </Field>
-        <Field label="Phone" htmlFor="contact-phone">
+        <Field label={t('contact.fieldPhone', 'Phone')} htmlFor="contact-phone">
           <input
             id="contact-phone"
             type="tel"
@@ -192,7 +199,7 @@ function ContactForm({
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Influence (1–5)" htmlFor="contact-influence">
+        <Field label={t('contact.fieldInfluence', 'Influence (1–5)')} htmlFor="contact-influence">
           <input
             id="contact-influence"
             type="number"
@@ -203,7 +210,7 @@ function ContactForm({
             className="dialog-input"
           />
         </Field>
-        <Field label="Sentiment" htmlFor="contact-sentiment">
+        <Field label={t('contact.fieldSentiment', 'Sentiment')} htmlFor="contact-sentiment">
           <select
             id="contact-sentiment"
             value={sentiment}
@@ -212,7 +219,9 @@ function ContactForm({
           >
             {SENTIMENT_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
-                {o.label}
+                {o.value === ''
+                  ? o.label
+                  : t(`contact.sentiment.${o.value}`, o.label)}
               </option>
             ))}
           </select>
@@ -227,10 +236,14 @@ function ContactForm({
 
       <div className="flex items-center justify-end gap-2 pt-1">
         <Button type="button" size="sm" variant="secondary" onClick={onDone} disabled={isPending}>
-          Cancel
+          {t('contact.cancel', 'Cancel')}
         </Button>
         <Button type="submit" size="sm" disabled={isPending}>
-          {isPending ? 'Saving…' : contact ? 'Save changes' : 'Create contact'}
+          {isPending
+            ? t('contact.saving', 'Saving…')
+            : contact
+              ? t('contact.saveChanges', 'Save changes')
+              : t('contact.createContact', 'Create contact')}
         </Button>
       </div>
     </form>

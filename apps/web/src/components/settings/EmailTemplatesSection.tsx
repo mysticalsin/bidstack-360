@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -23,6 +24,7 @@ import { PLACEHOLDER_CATALOG, type EmailTemplate } from '@bidstack/shared';
  * dedicated preview pane is a Sprint 2 follow-up).
  */
 export function EmailTemplatesSection() {
+  const { t } = useTranslation('settings');
   const { data, isLoading } = useEmailTemplates({ includeArchived: false });
   const create = useCreateEmailTemplate();
   const update = useUpdateEmailTemplate();
@@ -83,7 +85,7 @@ export function EmailTemplatesSection() {
             category: draft.category || undefined,
           },
         });
-        toast.success('Template updated');
+        toast.success(t('emailTemplates.toast.updated', 'Template updated'));
       } else {
         const created = await create.mutateAsync({
           name: draft.name,
@@ -92,20 +94,28 @@ export function EmailTemplatesSection() {
           category: draft.category || undefined,
         });
         setSelectedId(created.id);
-        toast.success('Template created');
+        toast.success(t('emailTemplates.toast.created', 'Template created'));
       }
     } catch {
-      toast.error('Save failed');
+      toast.error(t('emailTemplates.toast.saveFailed', 'Save failed'));
     }
   };
 
-  const remove = async (t: EmailTemplate) => {
-    if (!confirm(`Delete "${t.name}"? Existing workflow runs that reference it will still work.`)) {
+  const remove = async (tmpl: EmailTemplate) => {
+    if (
+      !confirm(
+        t(
+          'emailTemplates.confirmDelete',
+          'Delete "{{name}}"? Existing workflow runs that reference it will still work.',
+          { name: tmpl.name },
+        ),
+      )
+    ) {
       return;
     }
-    await del.mutateAsync(t.id);
-    if (selectedId === t.id) cancelEdit();
-    toast.success('Template deleted');
+    await del.mutateAsync(tmpl.id);
+    if (selectedId === tmpl.id) cancelEdit();
+    toast.success(t('emailTemplates.toast.deleted', 'Template deleted'));
   };
 
   const insertToken = (token: string) => {
@@ -117,17 +127,29 @@ export function EmailTemplatesSection() {
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px,1fr]">
       <Card>
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-3 py-2">
-          <h3 className="text-sm font-semibold text-[var(--fg-primary)]">Templates</h3>
-          <Button size="sm" variant="ghost" onClick={startNew} aria-label="New template">
+          <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
+            {t('emailTemplates.listHeading', 'Templates')}
+          </h3>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={startNew}
+            aria-label={t('emailTemplates.newTemplateAria', 'New template')}
+          >
             <Icon name="plus" size={14} />
           </Button>
         </div>
-        <ul className="max-h-[60vh] overflow-y-auto" aria-label="Email templates">
+        <ul
+          className="max-h-[60vh] overflow-y-auto"
+          aria-label={t('emailTemplates.listAria', 'Email templates')}
+        >
           {isLoading ? (
-            <li className="px-3 py-4 text-sm text-[var(--fg-secondary)]">Loading…</li>
+            <li className="px-3 py-4 text-sm text-[var(--fg-secondary)]">
+              {t('emailTemplates.loading', 'Loading…')}
+            </li>
           ) : templates.length === 0 ? (
             <li className="px-3 py-6">
-              <EmptyState title="No templates yet" />
+              <EmptyState title={t('emailTemplates.emptyList.title', 'No templates yet')} />
             </li>
           ) : (
             templates.map((t) => (
@@ -153,38 +175,41 @@ export function EmailTemplatesSection() {
         {draft ? (
           <div className="space-y-3 p-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Name">
+              <Field label={t('emailTemplates.field.name', 'Name')}>
                 <input
                   type="text"
                   value={draft.name}
                   maxLength={80}
                   onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                   className={inputClass}
-                  placeholder="Re-engagement — generic"
+                  placeholder={t('emailTemplates.field.namePlaceholder', 'Re-engagement — generic')}
                 />
               </Field>
-              <Field label="Category (optional)">
+              <Field label={t('emailTemplates.field.category', 'Category (optional)')}>
                 <input
                   type="text"
                   value={draft.category}
                   maxLength={40}
                   onChange={(e) => setDraft({ ...draft, category: e.target.value })}
                   className={inputClass}
-                  placeholder="Recovery / Discovery / …"
+                  placeholder={t('emailTemplates.field.categoryPlaceholder', 'Recovery / Discovery / …')}
                 />
               </Field>
             </div>
-            <Field label="Subject">
+            <Field label={t('emailTemplates.field.subject', 'Subject')}>
               <input
                 type="text"
                 value={draft.subject}
                 maxLength={200}
                 onChange={(e) => setDraft({ ...draft, subject: e.target.value })}
                 className={inputClass}
-                placeholder="Quick follow-up on {{account.name}}"
+                placeholder={t(
+                  'emailTemplates.field.subjectPlaceholder',
+                  'Quick follow-up on {{account.name}}',
+                )}
               />
             </Field>
-            <Field label="Body (HTML allowed)">
+            <Field label={t('emailTemplates.field.body', 'Body (HTML allowed)')}>
               <textarea
                 value={draft.bodyHtml}
                 maxLength={50000}
@@ -197,7 +222,7 @@ export function EmailTemplatesSection() {
 
             <div id="placeholder-palette" className="border-t border-[var(--border-subtle)] pt-3">
               <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-                Available placeholders
+                {t('emailTemplates.availablePlaceholders', 'Available placeholders')}
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {PLACEHOLDER_CATALOG.map((p) => (
@@ -205,7 +230,10 @@ export function EmailTemplatesSection() {
                     key={p.token}
                     type="button"
                     onClick={() => insertToken(p.token)}
-                    title={`${p.label} — sample: ${p.sample}`}
+                    title={t('emailTemplates.placeholderTitle', '{{label}} — sample: {{sample}}', {
+                      label: p.label,
+                      sample: p.sample,
+                    })}
                     className="inline-flex h-6 items-center rounded-full border border-[var(--border-default)] bg-[var(--surface-sunken)] px-2.5 text-[11px] font-mono text-[var(--brand-primary)] hover:border-[var(--brand-primary)]"
                   >
                     {`{{${p.token}}}`}
@@ -218,16 +246,18 @@ export function EmailTemplatesSection() {
               <div>
                 {selected ? (
                   <Button variant="ghost" onClick={() => void remove(selected)}>
-                    Delete
+                    {t('emailTemplates.action.delete', 'Delete')}
                   </Button>
                 ) : null}
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="ghost" onClick={cancelEdit}>
-                  Cancel
+                  {t('emailTemplates.action.cancel', 'Cancel')}
                 </Button>
                 <Button onClick={() => void save()} disabled={!draft.name || !draft.subject}>
-                  {selected ? 'Save' : 'Create template'}
+                  {selected
+                    ? t('emailTemplates.action.save', 'Save')
+                    : t('emailTemplates.action.create', 'Create template')}
                 </Button>
               </div>
             </div>
@@ -235,8 +265,11 @@ export function EmailTemplatesSection() {
         ) : (
           <div className="p-8">
             <EmptyState
-              title="Pick a template to edit"
-              message="Or start a new one. Templates fill placeholders like {{lead.firstName}} from the current record."
+              title={t('emailTemplates.emptyEditor.title', 'Pick a template to edit')}
+              message={t(
+                'emailTemplates.emptyEditor.message',
+                'Or start a new one. Templates fill placeholders like {{lead.firstName}} from the current record.',
+              )}
             />
           </div>
         )}

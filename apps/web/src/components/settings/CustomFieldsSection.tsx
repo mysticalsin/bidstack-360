@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -34,6 +35,7 @@ const FIELD_TYPES: { value: FieldType; label: string }[] = [
 ];
 
 export function CustomFieldsSection() {
+  const { t } = useTranslation('settings');
   const [entityType, setEntityType] = useState<EntityType>('company');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -47,7 +49,10 @@ export function CustomFieldsSection() {
 
   return (
     <Card>
-      <SectionHeader title="Custom Fields" caption="Define extra fields for each entity type." />
+      <SectionHeader
+        title={t('customFields.heading', 'Custom Fields')}
+        caption={t('customFields.caption', 'Define extra fields for each entity type.')}
+      />
       <div className="p-5 space-y-4">
         <div className="flex flex-wrap items-center gap-3">
           <select
@@ -57,7 +62,7 @@ export function CustomFieldsSection() {
           >
             {ENTITY_TYPES.map((et) => (
               <option key={et.value} value={et.value}>
-                {et.label}
+                {t(`customFields.entityType.${et.value}`, et.label)}
               </option>
             ))}
           </select>
@@ -68,7 +73,7 @@ export function CustomFieldsSection() {
               setShowForm(true);
             }}
           >
-            + Add field
+            {t('customFields.addField', '+ Add field')}
           </Button>
         </div>
 
@@ -94,7 +99,10 @@ export function CustomFieldsSection() {
         )}
 
         {activeItems.length === 0 ? (
-          <EmptyState title="No custom fields" message="Add fields to capture extra data." />
+          <EmptyState
+            title={t('customFields.empty.title', 'No custom fields')}
+            message={t('customFields.empty.message', 'Add fields to capture extra data.')}
+          />
         ) : (
           <ul className="divide-y divide-[var(--border-subtle)]">
             {activeItems.map((d) => (
@@ -103,10 +111,13 @@ export function CustomFieldsSection() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-[var(--fg-primary)]">{d.label}</span>
                     <Badge tone="gray">{d.fieldType}</Badge>
-                    {d.required && <Badge tone="tomato">Required</Badge>}
+                    {d.required && <Badge tone="tomato">{t('customFields.required', 'Required')}</Badge>}
                   </div>
                   <div className="text-xs text-[var(--fg-tertiary)]">
-                    Key: {d.fieldKey} · Order: {d.orderIndex}
+                    {t('customFields.meta', 'Key: {{fieldKey}} · Order: {{orderIndex}}', {
+                      fieldKey: d.fieldKey,
+                      orderIndex: d.orderIndex,
+                    })}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -118,17 +129,23 @@ export function CustomFieldsSection() {
                       setShowForm(true);
                     }}
                   >
-                    Edit
+                    {t('customFields.edit', 'Edit')}
                   </Button>
                   <Button
                     variant="destructive"
                     size="sm"
                     onClick={() => {
-                      if (confirm(`Delete field "${d.label}"?`))
+                      if (
+                        confirm(
+                          t('customFields.deleteConfirm', 'Delete field "{{label}}"?', {
+                            label: d.label,
+                          }),
+                        )
+                      )
                         remove.mutate({ id: d.id, entityType });
                     }}
                   >
-                    Delete
+                    {t('customFields.delete', 'Delete')}
                   </Button>
                 </div>
               </li>
@@ -163,6 +180,7 @@ function FieldForm({
   onCancel: () => void;
   isPending: boolean;
 }) {
+  const { t } = useTranslation('settings');
   const [label, setLabel] = useState(initial?.label ?? '');
   const [fieldKey, setFieldKey] = useState(initial?.fieldKey ?? '');
   const [fieldType, setFieldType] = useState<FieldType>(initial?.fieldType ?? 'text');
@@ -190,17 +208,21 @@ function FieldForm({
     >
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1">Label</label>
+          <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1">
+            {t('customFields.form.label', 'Label')}
+          </label>
           <input
             className="input w-full text-sm"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
-            placeholder="Field label"
+            placeholder={t('customFields.form.labelPlaceholder', 'Field label')}
             required
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1">Key</label>
+          <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1">
+            {t('customFields.form.key', 'Key')}
+          </label>
           <input
             className="input w-full text-sm"
             value={fieldKey}
@@ -212,7 +234,9 @@ function FieldForm({
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1">Type</label>
+          <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1">
+            {t('customFields.form.type', 'Type')}
+          </label>
           <select
             className="input w-full text-sm"
             value={fieldType}
@@ -220,7 +244,7 @@ function FieldForm({
           >
             {FIELD_TYPES.map((ft) => (
               <option key={ft.value} value={ft.value}>
-                {ft.label}
+                {t(`customFields.fieldType.${ft.value}`, ft.label)}
               </option>
             ))}
           </select>
@@ -233,14 +257,14 @@ function FieldForm({
             onChange={(e) => setRequired(e.target.checked)}
           />
           <label htmlFor="req" className="text-sm text-[var(--fg-secondary)]">
-            Required
+            {t('customFields.form.required', 'Required')}
           </label>
         </div>
       </div>
       {(fieldType === 'select' || fieldType === 'multi_select') && (
         <div>
           <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1">
-            Options (one per line)
+            {t('customFields.form.options', 'Options (one per line)')}
           </label>
           <textarea
             className="input w-full text-sm min-h-[60px]"
@@ -251,10 +275,10 @@ function FieldForm({
       )}
       <div className="flex justify-end gap-2">
         <button type="button" className="btn btn-secondary btn-sm" onClick={onCancel}>
-          Cancel
+          {t('customFields.form.cancel', 'Cancel')}
         </button>
         <button type="submit" className="btn btn-primary btn-sm" disabled={isPending}>
-          {isPending ? 'Saving…' : 'Save'}
+          {isPending ? t('customFields.form.saving', 'Saving…') : t('customFields.form.save', 'Save')}
         </button>
       </div>
     </form>

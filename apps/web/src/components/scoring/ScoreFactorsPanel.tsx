@@ -16,8 +16,11 @@
  * Dark mode: all colors via CSS variables + Tailwind dark: prefix.
  */
 
+import { useTranslation } from 'react-i18next';
 import { useLeadScore, useOppScore } from '@/hooks/usePredictiveScore';
 import type { ScoreFactor } from '@/hooks/usePredictiveScore';
+
+type TFunc = ReturnType<typeof useTranslation>['t'];
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -28,28 +31,28 @@ interface ScoreFactorsPanelProps {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
-function featureLabel(feature: string): string {
+function featureLabel(feature: string, t: TFunc): string {
   const map: Record<string, string> = {
-    log_value_micros: 'Deal Value',
-    stage_probability: 'Pipeline Stage',
-    days_in_current_stage: 'Days in Stage',
-    total_age_days: 'Deal Age',
-    days_to_expected_close: 'Days to Close',
-    num_contacts_on_account: 'Contact Count',
-    num_meetings_held: 'Meetings Held',
-    num_emails_sent_received: 'Emails Exchanged',
-    last_activity_days_ago: 'Last Activity',
-    owner_close_rate_last_90d: 'Owner Win Rate (90d)',
-    qualification_score_norm: 'Qualification Score',
-    title_seniority: 'Contact Seniority',
-    engagement_count_30d: 'Engagement (30d)',
-    email_domain_age_bucket: 'Email Domain',
-    company_size_bucket: 'Company Size',
-    activity_recency_days: 'Activity Recency',
-    bant_budget: 'Budget',
-    bant_authority: 'Authority',
-    bant_need: 'Need',
-    bant_timeline: 'Timeline',
+    log_value_micros: t('scoreFactors.featureLabel.dealValue', 'Deal Value'),
+    stage_probability: t('scoreFactors.featureLabel.pipelineStage', 'Pipeline Stage'),
+    days_in_current_stage: t('scoreFactors.featureLabel.daysInStage', 'Days in Stage'),
+    total_age_days: t('scoreFactors.featureLabel.dealAge', 'Deal Age'),
+    days_to_expected_close: t('scoreFactors.featureLabel.daysToClose', 'Days to Close'),
+    num_contacts_on_account: t('scoreFactors.featureLabel.contactCount', 'Contact Count'),
+    num_meetings_held: t('scoreFactors.featureLabel.meetingsHeld', 'Meetings Held'),
+    num_emails_sent_received: t('scoreFactors.featureLabel.emailsExchanged', 'Emails Exchanged'),
+    last_activity_days_ago: t('scoreFactors.featureLabel.lastActivity', 'Last Activity'),
+    owner_close_rate_last_90d: t('scoreFactors.featureLabel.ownerWinRate90d', 'Owner Win Rate (90d)'),
+    qualification_score_norm: t('scoreFactors.featureLabel.qualificationScore', 'Qualification Score'),
+    title_seniority: t('scoreFactors.featureLabel.contactSeniority', 'Contact Seniority'),
+    engagement_count_30d: t('scoreFactors.featureLabel.engagement30d', 'Engagement (30d)'),
+    email_domain_age_bucket: t('scoreFactors.featureLabel.emailDomain', 'Email Domain'),
+    company_size_bucket: t('scoreFactors.featureLabel.companySize', 'Company Size'),
+    activity_recency_days: t('scoreFactors.featureLabel.activityRecency', 'Activity Recency'),
+    bant_budget: t('scoreFactors.featureLabel.budget', 'Budget'),
+    bant_authority: t('scoreFactors.featureLabel.authority', 'Authority'),
+    bant_need: t('scoreFactors.featureLabel.need', 'Need'),
+    bant_timeline: t('scoreFactors.featureLabel.timeline', 'Timeline'),
   };
   return (
     map[feature] ??
@@ -60,6 +63,7 @@ function featureLabel(feature: string): string {
 // ─── Bar chart ────────────────────────────────────────────────────────────
 
 function FactorBar({ factor, maxAbs }: { factor: ScoreFactor; maxAbs: number }) {
+  const { t } = useTranslation('crm');
   const pct = maxAbs > 0 ? Math.abs(factor.contribution) / maxAbs : 0;
   const widthPct = Math.round(pct * 100);
   const positive = factor.contribution >= 0;
@@ -69,9 +73,9 @@ function FactorBar({ factor, maxAbs }: { factor: ScoreFactor; maxAbs: number }) 
       {/* Label */}
       <span
         className="w-40 flex-shrink-0 text-right text-[var(--color-neutral-700)] dark:text-[var(--color-neutral-300)] truncate"
-        title={featureLabel(factor.feature)}
+        title={featureLabel(factor.feature, t)}
       >
-        {featureLabel(factor.feature)}
+        {featureLabel(factor.feature, t)}
       </span>
 
       {/* Bidirectional bar */}
@@ -95,7 +99,9 @@ function FactorBar({ factor, maxAbs }: { factor: ScoreFactor; maxAbs: number }) 
       {/* Value */}
       <span
         aria-valuenow={factor.contribution}
-        aria-label={`Contribution: ${factor.contribution > 0 ? '+' : ''}${(factor.contribution * 100).toFixed(1)}`}
+        aria-label={t('scoreFactors.contributionAria', 'Contribution: {{value}}', {
+          value: `${factor.contribution > 0 ? '+' : ''}${(factor.contribution * 100).toFixed(1)}`,
+        })}
         className={[
           'w-12 text-right tabular-nums font-mono text-xs flex-shrink-0',
           positive
@@ -112,8 +118,13 @@ function FactorBar({ factor, maxAbs }: { factor: ScoreFactor; maxAbs: number }) 
 // ─── Skeleton ─────────────────────────────────────────────────────────────
 
 function PanelSkeleton() {
+  const { t } = useTranslation('crm');
   return (
-    <div className="animate-pulse space-y-3" aria-label="Loading score factors" aria-busy="true">
+    <div
+      className="animate-pulse space-y-3"
+      aria-label={t('scoreFactors.loadingAria', 'Loading score factors')}
+      aria-busy="true"
+    >
       {Array.from({ length: 5 }).map((_, i) => (
         <div key={i} className="flex items-center gap-3">
           <div className="h-4 w-36 bg-[var(--color-neutral-200)] dark:bg-[var(--color-neutral-700)] rounded" />
@@ -128,19 +139,20 @@ function PanelSkeleton() {
 // ─── Data table for screen readers ────────────────────────────────────────
 
 function FactorTable({ factors }: { factors: ScoreFactor[] }) {
+  const { t } = useTranslation('crm');
   return (
     <table className="sr-only" id="score-factors-table">
-      <caption>Score contributing factors</caption>
+      <caption>{t('scoreFactors.tableCaption', 'Score contributing factors')}</caption>
       <thead>
         <tr>
-          <th scope="col">Factor</th>
-          <th scope="col">Contribution</th>
+          <th scope="col">{t('scoreFactors.tableHeaderFactor', 'Factor')}</th>
+          <th scope="col">{t('scoreFactors.tableHeaderContribution', 'Contribution')}</th>
         </tr>
       </thead>
       <tbody>
         {factors.map((f) => (
           <tr key={f.feature}>
-            <td>{featureLabel(f.feature)}</td>
+            <td>{featureLabel(f.feature, t)}</td>
             <td>
               {f.contribution > 0 ? '+' : ''}
               {(f.contribution * 100).toFixed(1)}
@@ -167,6 +179,7 @@ function PanelContent({
   modelVersion: string;
   label: string;
 }) {
+  const { t } = useTranslation('crm');
   const top5 = factors.slice(0, 5);
   const maxAbs = top5.reduce((m, f) => Math.max(m, Math.abs(f.contribution)), 0.01);
 
@@ -175,7 +188,7 @@ function PanelContent({
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-sm text-[var(--color-neutral-900)] dark:text-[var(--color-neutral-100)]">
-          ML Score Analysis
+          {t('scoreFactors.title', 'ML Score Analysis')}
         </h3>
         <span className="text-xs text-[var(--color-neutral-500)]">{label}: {score}</span>
       </div>
@@ -192,7 +205,10 @@ function PanelContent({
       {/* Bar chart */}
       <div
         role="img"
-        aria-label={`Top ${top5.length} factors influencing the ${label.toLowerCase()}`}
+        aria-label={t('scoreFactors.chartAria', 'Top {{count}} factors influencing the {{label}}', {
+          count: top5.length,
+          label: label.toLowerCase(),
+        })}
         aria-details="score-factors-table"
       >
         <ul className="space-y-0.5">
@@ -207,7 +223,9 @@ function PanelContent({
 
       {/* Footer */}
       <p className="mt-3 text-[10px] text-[var(--color-neutral-400)] text-right">
-        Model v{modelVersion} · Logistic regression · Updated hourly
+        {t('scoreFactors.footer', 'Model v{{modelVersion}} · Logistic regression · Updated hourly', {
+          modelVersion,
+        })}
       </p>
     </section>
   );
@@ -216,6 +234,7 @@ function PanelContent({
 // ─── Main component ────────────────────────────────────────────────────────
 
 export function ScoreFactorsPanel({ entityType, entityId }: ScoreFactorsPanelProps) {
+  const { t } = useTranslation('crm');
   const leadQuery = useLeadScore(entityType === 'lead' ? entityId : undefined);
   const oppQuery = useOppScore(entityType === 'opportunity' ? entityId : undefined);
 
@@ -232,7 +251,7 @@ export function ScoreFactorsPanel({ entityType, entityId }: ScoreFactorsPanelPro
         score={score}
         factors={factors}
         modelVersion={modelVersion}
-        label="Lead Score"
+        label={t('scoreFactors.labelLeadScore', 'Lead Score')}
       />
     );
   }
@@ -245,7 +264,7 @@ export function ScoreFactorsPanel({ entityType, entityId }: ScoreFactorsPanelPro
         factors={factors}
         recommendation={recommendation}
         modelVersion={modelVersion}
-        label="Win Probability"
+        label={t('scoreFactors.labelWinProbability', 'Win Probability')}
       />
     );
   }

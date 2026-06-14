@@ -326,5 +326,86 @@
     "typeToSearch": "Saisissez pour rechercher dans votre portefeuille.",
     "resultsAriaLabel": "Résultats de la recherche d'entreprises",
     "add": "Ajouter"
+  },
+  "customFields": {
+    "heading": "Champs personnalisés",
+    "caption": "Définissez des champs supplémentaires pour chaque type d'entité.",
+    "entityType": {
+      "company": "Entreprises",
+      "contact": "Contacts",
+      "opportunity": "Opportunités",
+      "lead": "Prospects",
+      "task": "Tâches"
+    },
+    "addField": "+ Ajouter un champ",
+    "empty": {
+      "title": "Aucun champ personnalisé",
+      "message": "Ajoutez des champs pour collecter des données supplémentaires."
+    },
+    "required": "Requis",
+    "meta": "Clé : {{fieldKey}} · Ordre : {{orderIndex}}",
+    "edit": "Modifier",
+    "deleteConfirm": "Supprimer le champ « {{label}} » ?",
+    "delete": "Supprimer",
+    "fieldType": {
+      "text": "Texte",
+      "number": "Nombre",
+      "date": "Date",
+      "boolean": "Booléen",
+      "select": "Sélection",
+      "multi_select": "Sélection multiple",
+      "currency": "Devise",
+      "url": "URL",
+      "email": "E-mail",
+      "phone": "Téléphone"
+    },
+    "form": {
+      "label": "Libellé",
+      "labelPlaceholder": "Libellé du champ",
+      "key": "Clé",
+      "type": "Type",
+      "required": "Requis",
+      "options": "Options (une par ligne)",
+      "cancel": "Annuler",
+      "saving": "Enregistrement…",
+      "save": "Enregistrer"
+    }
+  },
+  "emailTemplates": {
+    "toast": {
+      "updated": "Modèle mis à jour",
+      "created": "Modèle créé",
+      "saveFailed": "Échec de l'enregistrement",
+      "deleted": "Modèle supprimé"
+    },
+    "confirmDelete": "Supprimer \"{{name}}\" ? Les exécutions de flux de travail existantes qui y font référence continueront de fonctionner.",
+    "listHeading": "Modèles",
+    "newTemplateAria": "Nouveau modèle",
+    "listAria": "Modèles d'e-mail",
+    "loading": "Chargement…",
+    "emptyList": {
+      "title": "Aucun modèle pour l'instant"
+    },
+    "field": {
+      "name": "Nom",
+      "namePlaceholder": "Réengagement — générique",
+      "category": "Catégorie (facultatif)",
+      "categoryPlaceholder": "Récupération / Découverte / …",
+      "subject": "Objet",
+      "subjectPlaceholder": "Suivi rapide concernant {{account.name}}",
+      "body": "Corps (HTML autorisé)"
+    },
+    "availablePlaceholders": "Espaces réservés disponibles",
+    "placeholderTitle": "{{label}} — exemple : {{sample}}",
+    "action": {
+      "delete": "Supprimer",
+      "cancel": "Annuler",
+      "save": "Enregistrer",
+      "create": "Créer un modèle"
+    },
+    "emptyEditor": {
+      "title": "Choisissez un modèle à modifier",
+      "message": "Ou créez-en un nouveau. Les modèles remplissent les espaces réservés comme {{lead.firstName}} à partir de l'enregistrement actuel."
+    }
   }
 }

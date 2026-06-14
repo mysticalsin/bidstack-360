@@ -326,5 +326,86 @@
     "typeToSearch": "输入以搜索您的客户组合。",
     "resultsAriaLabel": "公司搜索结果",
     "add": "添加"
+  },
+  "customFields": {
+    "heading": "自定义字段",
+    "caption": "为每种实体类型定义额外的字段。",
+    "entityType": {
+      "company": "公司",
+      "contact": "联系人",
+      "opportunity": "商机",
+      "lead": "潜在客户",
+      "task": "任务"
+    },
+    "addField": "+ 添加字段",
+    "empty": {
+      "title": "暂无自定义字段",
+      "message": "添加字段以采集额外数据。"
+    },
+    "required": "必填",
+    "meta": "键：{{fieldKey}} · 顺序：{{orderIndex}}",
+    "edit": "编辑",
+    "deleteConfirm": "删除字段“{{label}}”？",
+    "delete": "删除",
+    "fieldType": {
+      "text": "文本",
+      "number": "数字",
+      "date": "日期",
+      "boolean": "布尔值",
+      "select": "单选",
+      "multi_select": "多选",
+      "currency": "货币",
+      "url": "网址",
+      "email": "电子邮件",
+      "phone": "电话"
+    },
+    "form": {
+      "label": "标签",
+      "labelPlaceholder": "字段标签",
+      "key": "键",
+      "type": "类型",
+      "required": "必填",
+      "options": "选项（每行一个）",
+      "cancel": "取消",
+      "saving": "保存中…",
+      "save": "保存"
+    }
+  },
+  "emailTemplates": {
+    "toast": {
+      "updated": "模板已更新",
+      "created": "模板已创建",
+      "saveFailed": "保存失败",
+      "deleted": "模板已删除"
+    },
+    "confirmDelete": "删除\"{{name}}\"？引用它的现有工作流运行仍将正常工作。",
+    "listHeading": "模板",
+    "newTemplateAria": "新建模板",
+    "listAria": "电子邮件模板",
+    "loading": "加载中…",
+    "emptyList": {
+      "title": "暂无模板"
+    },
+    "field": {
+      "name": "名称",
+      "namePlaceholder": "重新互动 — 通用",
+      "category": "类别（可选）",
+      "categoryPlaceholder": "恢复 / 发现 / …",
+      "subject": "主题",
+      "subjectPlaceholder": "关于 {{account.name}} 的快速跟进",
+      "body": "正文（允许 HTML）"
+    },
+    "availablePlaceholders": "可用占位符",
+    "placeholderTitle": "{{label}} — 示例：{{sample}}",
+    "action": {
+      "delete": "删除",
+      "cancel": "取消",
+      "save": "保存",
+      "create": "创建模板"
+    },
+    "emptyEditor": {
+      "title": "选择要编辑的模板",
+      "message": "或新建一个。模板会用当前记录中的值填充 {{lead.firstName}} 之类的占位符。"
+    }
   }
 }

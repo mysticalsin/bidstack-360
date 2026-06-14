@@ -329,5 +329,86 @@
     "typeToSearch": "Escriba para buscar en su cartera.",
     "resultsAriaLabel": "Resultados de la búsqueda de empresas",
     "add": "Agregar"
+  },
+  "customFields": {
+    "heading": "Campos personalizados",
+    "caption": "Define campos adicionales para cada tipo de entidad.",
+    "entityType": {
+      "company": "Empresas",
+      "contact": "Contactos",
+      "opportunity": "Oportunidades",
+      "lead": "Prospectos",
+      "task": "Tareas"
+    },
+    "addField": "+ Agregar campo",
+    "empty": {
+      "title": "Sin campos personalizados",
+      "message": "Agrega campos para capturar datos adicionales."
+    },
+    "required": "Obligatorio",
+    "meta": "Clave: {{fieldKey}} · Orden: {{orderIndex}}",
+    "edit": "Editar",
+    "deleteConfirm": "¿Eliminar el campo \"{{label}}\"?",
+    "delete": "Eliminar",
+    "fieldType": {
+      "text": "Texto",
+      "number": "Número",
+      "date": "Fecha",
+      "boolean": "Booleano",
+      "select": "Selección",
+      "multi_select": "Selección múltiple",
+      "currency": "Moneda",
+      "url": "URL",
+      "email": "Correo electrónico",
+      "phone": "Teléfono"
+    },
+    "form": {
+      "label": "Etiqueta",
+      "labelPlaceholder": "Etiqueta del campo",
+      "key": "Clave",
+      "type": "Tipo",
+      "required": "Obligatorio",
+      "options": "Opciones (una por línea)",
+      "cancel": "Cancelar",
+      "saving": "Guardando…",
+      "save": "Guardar"
+    }
+  },
+  "emailTemplates": {
+    "toast": {
+      "updated": "Plantilla actualizada",
+      "created": "Plantilla creada",
+      "saveFailed": "Error al guardar",
+      "deleted": "Plantilla eliminada"
+    },
+    "confirmDelete": "¿Eliminar \"{{name}}\"? Las ejecuciones de flujo de trabajo existentes que lo referencian seguirán funcionando.",
+    "listHeading": "Plantillas",
+    "newTemplateAria": "Nueva plantilla",
+    "listAria": "Plantillas de correo electrónico",
+    "loading": "Cargando…",
+    "emptyList": {
+      "title": "Aún no hay plantillas"
+    },
+    "field": {
+      "name": "Nombre",
+      "namePlaceholder": "Reactivación — genérico",
+      "category": "Categoría (opcional)",
+      "categoryPlaceholder": "Recuperación / Descubrimiento / …",
+      "subject": "Asunto",
+      "subjectPlaceholder": "Seguimiento rápido sobre {{account.name}}",
+      "body": "Cuerpo (se permite HTML)"
+    },
+    "availablePlaceholders": "Marcadores disponibles",
+    "placeholderTitle": "{{label}} — ejemplo: {{sample}}",
+    "action": {
+      "delete": "Eliminar",
+      "cancel": "Cancelar",
+      "save": "Guardar",
+      "create": "Crear plantilla"
+    },
+    "emptyEditor": {
+      "title": "Elige una plantilla para editar",
+      "message": "O crea uno nuevo. Las plantillas rellenan marcadores como {{lead.firstName}} a partir del registro actual."
+    }
   }
 }

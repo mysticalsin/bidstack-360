@@ -303,5 +303,86 @@
     "typeToSearch": "Type to search your portfolio.",
     "resultsAriaLabel": "Company search results",
     "add": "Add"
+  },
+  "customFields": {
+    "heading": "Custom Fields",
+    "caption": "Define extra fields for each entity type.",
+    "entityType": {
+      "company": "Companies",
+      "contact": "Contacts",
+      "opportunity": "Opportunities",
+      "lead": "Leads",
+      "task": "Tasks"
+    },
+    "addField": "+ Add field",
+    "empty": {
+      "title": "No custom fields",
+      "message": "Add fields to capture extra data."
+    },
+    "required": "Required",
+    "meta": "Key: {{fieldKey}} · Order: {{orderIndex}}",
+    "edit": "Edit",
+    "deleteConfirm": "Delete field \"{{label}}\"?",
+    "delete": "Delete",
+    "fieldType": {
+      "text": "Text",
+      "number": "Number",
+      "date": "Date",
+      "boolean": "Boolean",
+      "select": "Select",
+      "multi_select": "Multi-select",
+      "currency": "Currency",
+      "url": "URL",
+      "email": "Email",
+      "phone": "Phone"
+    },
+    "form": {
+      "label": "Label",
+      "labelPlaceholder": "Field label",
+      "key": "Key",
+      "type": "Type",
+      "required": "Required",
+      "options": "Options (one per line)",
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "save": "Save"
+    }
+  },
+  "emailTemplates": {
+    "toast": {
+      "updated": "Template updated",
+      "created": "Template created",
+      "saveFailed": "Save failed",
+      "deleted": "Template deleted"
+    },
+    "confirmDelete": "Delete \"{{name}}\"? Existing workflow runs that reference it will still work.",
+    "listHeading": "Templates",
+    "newTemplateAria": "New template",
+    "listAria": "Email templates",
+    "loading": "Loading…",
+    "emptyList": {
+      "title": "No templates yet"
+    },
+    "field": {
+      "name": "Name",
+      "namePlaceholder": "Re-engagement — generic",
+      "category": "Category (optional)",
+      "categoryPlaceholder": "Recovery / Discovery / …",
+      "subject": "Subject",
+      "subjectPlaceholder": "Quick follow-up on {{account.name}}",
+      "body": "Body (HTML allowed)"
+    },
+    "availablePlaceholders": "Available placeholders",
+    "placeholderTitle": "{{label}} — sample: {{sample}}",
+    "action": {
+      "delete": "Delete",
+      "cancel": "Cancel",
+      "save": "Save",
+      "create": "Create template"
+    },
+    "emptyEditor": {
+      "title": "Pick a template to edit",
+      "message": "Or start a new one. Templates fill placeholders like {{lead.firstName}} from the current record."
+    }
   }
 }

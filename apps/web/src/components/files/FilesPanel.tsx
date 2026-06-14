@@ -2,6 +2,7 @@
 // Used inside the cockpit aside on the dashboard.
 
 import { useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -20,6 +21,7 @@ interface FilesPanelProps {
 }
 
 export function FilesPanel({ accountId }: FilesPanelProps) {
+  const { t } = useTranslation('crm');
   const list = useFiles(accountId);
   const upload = useUploadFile(accountId);
   const remove = useDeleteFile(accountId);
@@ -35,7 +37,11 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
       // Why client-side type check: gives instant feedback before round-tripping
       // a multi-MB file. Server still re-validates via Zod (defense in depth).
       if (!inferAllowedFileContentType(file.name, file.type)) {
-        setUploadError(`Unsupported file type: ${file.type || file.name || 'unknown'}`);
+        setUploadError(
+          t('files.unsupportedType', 'Unsupported file type: {{type}}', {
+            type: file.type || file.name || t('files.unknownType', 'unknown'),
+          }),
+        );
         return;
       }
       upload.mutate(file, {
@@ -62,10 +68,16 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
   }
 
   return (
-    <Card aria-label="Files">
+    <Card aria-label={t('files.cardLabel', 'Files')}>
       <SectionHeader
-        title="Files"
-        caption={list.data ? `${list.data.items.length} attachment(s)` : undefined}
+        title={t('files.heading', 'Files')}
+        caption={
+          list.data
+            ? t('files.attachmentCount', '{{count}} attachment(s)', {
+                count: list.data.items.length,
+              })
+            : undefined
+        }
         action={
           <Button
             variant="secondary"
@@ -73,7 +85,7 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
             onClick={() => inputRef.current?.click()}
             disabled={upload.isPending}
           >
-            {upload.isPending ? 'Uploading…' : 'Upload'}
+            {upload.isPending ? t('files.uploading', 'Uploading…') : t('files.upload', 'Upload')}
           </Button>
         }
       />
@@ -81,7 +93,7 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
       <div
         role="button"
         tabIndex={0}
-        aria-label="Drag files here to upload"
+        aria-label={t('files.dropzoneLabel', 'Drag files here to upload')}
         className={`m-4 rounded-lg border-2 border-dashed p-6 text-center transition-colors cursor-pointer min-h-11 ${
           dragActive
             ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)]'
@@ -100,10 +112,10 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
       >
         <FileGlyph aria-hidden />
         <p className="mt-2 text-xs font-medium text-[var(--fg-primary)]">
-          Drop files or click to browse
+          {t('files.dropPrompt', 'Drop files or click to browse')}
         </p>
         <p className="mt-0.5 text-[11px] text-[var(--fg-tertiary)]">
-          PDF, DOCX, XLSX, images — up to 50&nbsp;MB
+          {t('files.acceptedFormats', 'PDF, DOCX, XLSX, images — up to 50 MB')}
         </p>
         <input
           ref={inputRef}
@@ -127,9 +139,15 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
       {list.isLoading ? (
         <LoadingSkeleton rows={3} />
       ) : list.isError ? (
-        <ErrorState title="Couldn't load files" message={list.error?.message ?? 'Unknown error'} />
+        <ErrorState
+          title={t('files.loadErrorTitle', "Couldn't load files")}
+          message={list.error?.message ?? t('files.unknownError', 'Unknown error')}
+        />
       ) : list.data && list.data.items.length === 0 ? (
-        <EmptyState title="No files yet" message="Upload to attach documents to this account." />
+        <EmptyState
+          title={t('files.emptyTitle', 'No files yet')}
+          message={t('files.emptyMessage', 'Upload to attach documents to this account.')}
+        />
       ) : (
         <ul className="divide-y divide-[var(--border-subtle)]">
           {list.data?.items.map((file) => (
@@ -141,12 +159,16 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
       <Dialog open={!!pendingDelete} onOpenChange={(open) => !open && setPendingDelete(null)}>
         {pendingDelete ? (
           <DialogContent
-            title="Delete file?"
-            description={`This permanently removes "${pendingDelete.name}". This cannot be undone.`}
+            title={t('files.deleteTitle', 'Delete file?')}
+            description={t(
+              'files.deleteDescription',
+              'This permanently removes "{{name}}". This cannot be undone.',
+              { name: pendingDelete.name },
+            )}
           >
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="secondary" size="sm" onClick={() => setPendingDelete(null)}>
-                Cancel
+                {t('files.cancel', 'Cancel')}
               </Button>
               <Button
                 variant="destructive"
@@ -157,7 +179,7 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
                 }}
                 disabled={remove.isPending}
               >
-                {remove.isPending ? 'Deleting…' : 'Delete'}
+                {remove.isPending ? t('files.deleting', 'Deleting…') : t('files.delete', 'Delete')}
               </Button>
             </div>
           </DialogContent>
@@ -168,25 +190,26 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
 }
 
 function FileRow({ file, onDelete }: { file: FileAttachment; onDelete: () => void }) {
+  const { t } = useTranslation('crm');
   return (
     <li className="flex items-center gap-3 px-5 py-3 hover:bg-[var(--surface-sunken)] transition-colors">
       <FileGlyph contentType={file.contentType} />
       <a
         href={downloadFileUrl(file.id)}
         className="min-w-0 flex-1 group"
-        title={`Download ${file.name}`}
+        title={t('files.downloadTitle', 'Download {{name}}', { name: file.name })}
       >
         <div className="truncate text-sm font-medium text-[var(--fg-primary)] group-hover:underline">
           {file.name}
         </div>
         <div className="text-[11px] text-[var(--fg-tertiary)]">
-          {humanizeBytes(file.bytes)} · {file.uploadedByEmail ?? 'unknown'} ·{' '}
+          {humanizeBytes(file.bytes)} · {file.uploadedByEmail ?? t('files.unknownUploader', 'unknown')} ·{' '}
           {relativeTime(file.createdAt)}
         </div>
       </a>
       <button
         type="button"
-        aria-label={`Delete ${file.name}`}
+        aria-label={t('files.deleteAria', 'Delete {{name}}', { name: file.name })}
         onClick={onDelete}
         className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--danger-tint)] hover:text-[var(--danger)] focus:outline-none focus:ring-2 focus:ring-border-focus pointer-coarse:min-h-11 pointer-coarse:min-w-11"
       >

@@ -16,17 +16,18 @@
  */
 
 import { useState, useRef, useEffect, useCallback, useId } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/Button';
 import { useStartCall, type CallProvider, type CallEntityType } from '@/hooks/useCalls';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const PROVIDERS: { value: CallProvider; label: string; icon: string }[] = [
-  { value: 'ZOOM', label: 'Start Zoom', icon: '📹' },
-  { value: 'TEAMS', label: 'Start Teams', icon: '💼' },
-  { value: 'GOOGLE_MEET', label: 'Start Google Meet', icon: '🎥' },
-  { value: 'TWILIO_VOICE', label: 'Call via Twilio', icon: '📞' },
+const PROVIDERS: { value: CallProvider; labelKey: string; labelDefault: string; icon: string }[] = [
+  { value: 'ZOOM', labelKey: 'callButton.providerZoom', labelDefault: 'Start Zoom', icon: '📹' },
+  { value: 'TEAMS', labelKey: 'callButton.providerTeams', labelDefault: 'Start Teams', icon: '💼' },
+  { value: 'GOOGLE_MEET', labelKey: 'callButton.providerGoogleMeet', labelDefault: 'Start Google Meet', icon: '🎥' },
+  { value: 'TWILIO_VOICE', labelKey: 'callButton.providerTwilio', labelDefault: 'Call via Twilio', icon: '📞' },
 ];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -54,6 +55,7 @@ interface PhoneDialProps {
 }
 
 function PhoneDial({ defaultPhone, onDial, onCancel, loading }: PhoneDialProps) {
+  const { t } = useTranslation('crm');
   const [phone, setPhone] = useState(defaultPhone ?? '');
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -68,14 +70,14 @@ function PhoneDial({ defaultPhone, onDial, onCancel, loading }: PhoneDialProps) 
 
   return (
     <div
-      aria-label="Enter phone number"
+      aria-label={t('callButton.phoneDialAriaLabel', 'Enter phone number')}
       className="mt-1 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] p-3 shadow-[var(--shadow-md)] dark:bg-[var(--surface-glass)] dark:border-[var(--border-glow-strong)]"
     >
       <label
         htmlFor={inputId}
         className="mb-1.5 block text-xs font-medium text-[var(--fg-primary)]"
       >
-        Phone number (E.164)
+        {t('callButton.phoneLabel', 'Phone number (E.164)')}
       </label>
       <input
         ref={inputRef}
@@ -87,8 +89,8 @@ function PhoneDial({ defaultPhone, onDial, onCancel, loading }: PhoneDialProps) 
           if (e.key === 'Enter') submit();
           if (e.key === 'Escape') onCancel();
         }}
-        placeholder="+1 555 000 0000"
-        aria-label="E.164 phone number"
+        placeholder={t('callButton.phonePlaceholder', '+1 555 000 0000')}
+        aria-label={t('callButton.phoneInputAriaLabel', 'E.164 phone number')}
         className={cn(
           'block w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--fg-primary)] placeholder:text-[var(--fg-tertiary)]',
           'focus:border-[var(--border-focus)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] focus:ring-offset-1',
@@ -103,10 +105,10 @@ function PhoneDial({ defaultPhone, onDial, onCancel, loading }: PhoneDialProps) 
           aria-busy={loading}
           className="min-h-[44px] flex-1"
         >
-          {loading ? 'Dialling…' : 'Dial'}
+          {loading ? t('callButton.dialling', 'Dialling…') : t('callButton.dial', 'Dial')}
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel} className="min-h-[44px]">
-          Cancel
+          {t('callButton.cancel', 'Cancel')}
         </Button>
       </div>
     </div>
@@ -124,6 +126,7 @@ export function CallButton({
   disabled,
   className,
 }: CallButtonProps) {
+  const { t } = useTranslation('crm');
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<CallProvider | null>(null);
   const menuId = useId();
@@ -190,7 +193,7 @@ export function CallButton({
         className="min-h-[44px] gap-2"
       >
         <span aria-hidden>📞</span>
-        {isLoading ? 'Starting…' : 'Start Call'}
+        {isLoading ? t('callButton.starting', 'Starting…') : t('callButton.startCall', 'Start Call')}
         <span
           aria-hidden
           className={cn('ml-1 text-xs transition-transform duration-150', open && 'rotate-180')}
@@ -204,7 +207,7 @@ export function CallButton({
         <div
           id={menuId}
           role="listbox"
-          aria-label="Choose call provider"
+          aria-label={t('callButton.menuAriaLabel', 'Choose call provider')}
           className={cn(
             'absolute right-0 top-full z-20 mt-1 w-52 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] py-1 shadow-[var(--shadow-lg)]',
             'dark:bg-[var(--surface-glass)] dark:backdrop-blur-xl dark:border-[var(--border-glow-strong)]',
@@ -227,7 +230,7 @@ export function CallButton({
               <span aria-hidden className="text-base">
                 {p.icon}
               </span>
-              <span>{p.label}</span>
+              <span>{t(p.labelKey, p.labelDefault)}</span>
             </button>
           ))}
         </div>

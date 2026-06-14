@@ -5,6 +5,7 @@
 // what's already in the bundle: framer-motion handles smooth reordering).
 
 import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion, Reorder } from 'framer-motion';
 import { Plus, ChevronDown, BarChart2, LayoutDashboard, Settings2 } from 'lucide-react';
@@ -23,6 +24,7 @@ import {
 } from '@/hooks/useDashboards';
 
 export function AnalyticsDashboardPage() {
+  const { t } = useTranslation('crm');
   const [searchParams] = useSearchParams();
   const { data: dashboards = [], isLoading: dashLoading } = useDashboards();
   // Initialise from ?id= so deep-links and the Dashboards list (which links
@@ -58,10 +60,10 @@ export function AnalyticsDashboardPage() {
   const handleDeleteWidget = useCallback(
     (widgetId: string) => {
       if (!activeDash) return;
-      if (!confirm('Remove this widget?')) return;
+      if (!confirm(t('analyticsDashboard.confirmRemoveWidget', 'Remove this widget?'))) return;
       deleteWidgetMutation.mutate(widgetId);
     },
-    [activeDash, deleteWidgetMutation],
+    [activeDash, deleteWidgetMutation, t],
   );
 
   if (dashLoading) {
@@ -82,7 +84,7 @@ export function AnalyticsDashboardPage() {
       {/* Topbar */}
       <div className="flex items-center gap-3 px-6 py-3 border-b border-[var(--border-subtle)] bg-[var(--surface-card)] dark:bg-[var(--surface-glass)]">
         <BarChart2 size={18} className="text-[var(--brand-primary)]" aria-hidden />
-        <h1 className="text-sm font-semibold text-[var(--fg-primary)]">Analytics</h1>
+        <h1 className="text-sm font-semibold text-[var(--fg-primary)]">{t('analyticsDashboard.title', 'Analytics')}</h1>
 
         {/* Dashboard switcher */}
         <div className="relative ml-2">
@@ -90,7 +92,7 @@ export function AnalyticsDashboardPage() {
             onClick={() => setDropdownOpen((p) => !p)}
             aria-haspopup="listbox"
             aria-expanded={dropdownOpen}
-            aria-label="Switch dashboard"
+            aria-label={t('analyticsDashboard.switchDashboardAria', 'Switch dashboard')}
             className={cn(
               'flex items-center gap-1.5 rounded-lg border border-[var(--border-default)]',
               'px-3 py-1.5 text-sm text-[var(--fg-primary)] hover:bg-[var(--surface-sunken)]',
@@ -98,7 +100,7 @@ export function AnalyticsDashboardPage() {
             )}
           >
             <LayoutDashboard size={14} className="text-[var(--fg-tertiary)]" />
-            <span className="max-w-[140px] truncate">{activeDash?.name ?? 'Select dashboard'}</span>
+            <span className="max-w-[140px] truncate">{activeDash?.name ?? t('analyticsDashboard.selectDashboard', 'Select dashboard')}</span>
             <ChevronDown size={12} className="text-[var(--fg-tertiary)]" />
           </button>
           {dropdownOpen && (
@@ -139,7 +141,7 @@ export function AnalyticsDashboardPage() {
                   onClick={() => setDropdownOpen(false)}
                 >
                   <Settings2 size={12} />
-                  Manage dashboards
+                  {t('analyticsDashboard.manageDashboards', 'Manage dashboards')}
                 </Link>
               </div>
             </motion.div>
@@ -151,13 +153,13 @@ export function AnalyticsDashboardPage() {
             to="/reports/list"
             className="text-xs text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)] px-2 min-h-[44px] flex items-center"
           >
-            Reports
+            {t('analyticsDashboard.reportsLink', 'Reports')}
           </Link>
           <Link
             to="/reports/new"
             className="text-xs text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)] px-2 min-h-[44px] flex items-center"
           >
-            New report
+            {t('analyticsDashboard.newReportLink', 'New report')}
           </Link>
           {activeDash && (
             <button
@@ -169,7 +171,7 @@ export function AnalyticsDashboardPage() {
               )}
             >
               <Plus size={14} />
-              Add widget
+              {t('analyticsDashboard.addWidget', 'Add widget')}
             </button>
           )}
         </div>
@@ -179,8 +181,11 @@ export function AnalyticsDashboardPage() {
       <div className="flex-1 overflow-y-auto p-6">
         {!activeDash ? (
           <EmptyState
-            title="No dashboards"
-            message="Create your first dashboard to start visualising your data."
+            title={t('analyticsDashboard.noDashboardsTitle', 'No dashboards')}
+            message={t(
+              'analyticsDashboard.noDashboardsMessage',
+              'Create your first dashboard to start visualising your data.',
+            )}
             action={
               <Link
                 to="/dashboards"
@@ -189,16 +194,22 @@ export function AnalyticsDashboardPage() {
                   'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)]',
                 )}
               >
-                Create dashboard
+                {t('analyticsDashboard.createDashboard', 'Create dashboard')}
               </Link>
             }
           />
         ) : widgetsError ? (
-          <ErrorState title="Failed to load widgets" message={(widgetsError as Error).message} />
+          <ErrorState
+            title={t('analyticsDashboard.loadWidgetsError', 'Failed to load widgets')}
+            message={(widgetsError as Error).message}
+          />
         ) : !widgetsLoading && widgets.length === 0 ? (
           <EmptyState
-            title="Empty dashboard"
-            message="Add your first widget to start visualising data."
+            title={t('analyticsDashboard.emptyDashboardTitle', 'Empty dashboard')}
+            message={t(
+              'analyticsDashboard.emptyDashboardMessage',
+              'Add your first widget to start visualising data.',
+            )}
             action={
               <button
                 onClick={() => setAddingWidget(true)}
@@ -208,7 +219,7 @@ export function AnalyticsDashboardPage() {
                 )}
               >
                 <Plus size={16} />
-                Add widget
+                {t('analyticsDashboard.addWidget', 'Add widget')}
               </button>
             }
           />

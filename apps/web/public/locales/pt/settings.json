@@ -326,5 +326,86 @@
     "typeToSearch": "Digite para pesquisar em seu portfólio.",
     "resultsAriaLabel": "Resultados da pesquisa de empresas",
     "add": "Adicionar"
+  },
+  "customFields": {
+    "heading": "Campos personalizados",
+    "caption": "Defina campos extras para cada tipo de entidade.",
+    "entityType": {
+      "company": "Empresas",
+      "contact": "Contatos",
+      "opportunity": "Oportunidades",
+      "lead": "Leads",
+      "task": "Tarefas"
+    },
+    "addField": "+ Adicionar campo",
+    "empty": {
+      "title": "Sem campos personalizados",
+      "message": "Adicione campos para capturar dados extras."
+    },
+    "required": "Obrigatório",
+    "meta": "Chave: {{fieldKey}} · Ordem: {{orderIndex}}",
+    "edit": "Editar",
+    "deleteConfirm": "Excluir o campo \"{{label}}\"?",
+    "delete": "Excluir",
+    "fieldType": {
+      "text": "Texto",
+      "number": "Número",
+      "date": "Data",
+      "boolean": "Booleano",
+      "select": "Seleção",
+      "multi_select": "Seleção múltipla",
+      "currency": "Moeda",
+      "url": "URL",
+      "email": "E-mail",
+      "phone": "Telefone"
+    },
+    "form": {
+      "label": "Rótulo",
+      "labelPlaceholder": "Rótulo do campo",
+      "key": "Chave",
+      "type": "Tipo",
+      "required": "Obrigatório",
+      "options": "Opções (uma por linha)",
+      "cancel": "Cancelar",
+      "saving": "Salvando…",
+      "save": "Salvar"
+    }
+  },
+  "emailTemplates": {
+    "toast": {
+      "updated": "Modelo atualizado",
+      "created": "Modelo criado",
+      "saveFailed": "Falha ao salvar",
+      "deleted": "Modelo excluído"
+    },
+    "confirmDelete": "Excluir \"{{name}}\"? As execuções de fluxo de trabalho existentes que o referenciam continuarão funcionando.",
+    "listHeading": "Modelos",
+    "newTemplateAria": "Novo modelo",
+    "listAria": "Modelos de e-mail",
+    "loading": "Carregando…",
+    "emptyList": {
+      "title": "Ainda não há modelos"
+    },
+    "field": {
+      "name": "Nome",
+      "namePlaceholder": "Reengajamento — genérico",
+      "category": "Categoria (opcional)",
+      "categoryPlaceholder": "Recuperação / Descoberta / …",
+      "subject": "Assunto",
+      "subjectPlaceholder": "Acompanhamento rápido sobre {{account.name}}",
+      "body": "Corpo (HTML permitido)"
+    },
+    "availablePlaceholders": "Espaços reservados disponíveis",
+    "placeholderTitle": "{{label}} — exemplo: {{sample}}",
+    "action": {
+      "delete": "Excluir",
+      "cancel": "Cancelar",
+      "save": "Salvar",
+      "create": "Criar modelo"
+    },
+    "emptyEditor": {
+      "title": "Escolha um modelo para editar",
+      "message": "Ou crie um novo. Os modelos preenchem espaços reservados como {{lead.firstName}} a partir do registro atual."
+    }
   }
 }

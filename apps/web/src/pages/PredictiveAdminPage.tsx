@@ -15,6 +15,7 @@
  */
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   usePredictiveModels,
   useRetrainModel,
@@ -51,6 +52,7 @@ function MetricPill({ label, value }: { label: string; value: number }) {
 // ─── Model table ──────────────────────────────────────────────────────────
 
 function ModelTable({ filter }: { filter: 'lead' | 'opportunity' }) {
+  const { t } = useTranslation('crm');
   const { data, isLoading } = usePredictiveModels(filter);
   const models = data?.items ?? [];
 
@@ -59,7 +61,7 @@ function ModelTable({ filter }: { filter: 'lead' | 'opportunity' }) {
       <div
         className="animate-pulse h-24 rounded-lg bg-[var(--color-neutral-200)] dark:bg-[var(--color-neutral-700)]"
         aria-busy="true"
-        aria-label="Loading models..."
+        aria-label={t('predictiveAdmin.modelTableLoadingLabel', 'Loading models...')}
       />
     );
   }
@@ -67,7 +69,11 @@ function ModelTable({ filter }: { filter: 'lead' | 'opportunity' }) {
   if (models.length === 0) {
     return (
       <p className="text-sm text-[var(--color-neutral-500)] py-4">
-        No {filter} models trained yet. Click &quot;Retrain Now&quot; to train the first model.
+        {t(
+          'predictiveAdmin.modelTableEmpty',
+          'No {{entityType}} models trained yet. Click "Retrain Now" to train the first model.',
+          { entityType: filter },
+        )}
       </p>
     );
   }
@@ -75,23 +81,27 @@ function ModelTable({ filter }: { filter: 'lead' | 'opportunity' }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm border-collapse">
-        <caption className="sr-only">{filter} predictive model history</caption>
+        <caption className="sr-only">
+          {t('predictiveAdmin.modelTableCaption', '{{entityType}} predictive model history', {
+            entityType: filter,
+          })}
+        </caption>
         <thead>
           <tr className="border-b border-[var(--color-border)] dark:border-[var(--color-border-dark)]">
             <th scope="col" className="py-2 pr-4 text-left text-xs font-semibold text-[var(--color-neutral-500)] uppercase tracking-wide">
-              Version
+              {t('predictiveAdmin.colVersion', 'Version')}
             </th>
             <th scope="col" className="py-2 pr-4 text-left text-xs font-semibold text-[var(--color-neutral-500)] uppercase tracking-wide">
-              Accuracy Metrics
+              {t('predictiveAdmin.colAccuracyMetrics', 'Accuracy Metrics')}
             </th>
             <th scope="col" className="py-2 pr-4 text-right text-xs font-semibold text-[var(--color-neutral-500)] uppercase tracking-wide">
-              Samples
+              {t('predictiveAdmin.colSamples', 'Samples')}
             </th>
             <th scope="col" className="py-2 pr-4 text-left text-xs font-semibold text-[var(--color-neutral-500)] uppercase tracking-wide">
-              Trained
+              {t('predictiveAdmin.colTrained', 'Trained')}
             </th>
             <th scope="col" className="py-2 text-center text-xs font-semibold text-[var(--color-neutral-500)] uppercase tracking-wide">
-              Active
+              {t('predictiveAdmin.colActive', 'Active')}
             </th>
           </tr>
         </thead>
@@ -109,10 +119,10 @@ function ModelTable({ filter }: { filter: 'lead' | 'opportunity' }) {
               </td>
               <td className="py-3 pr-4">
                 <div className="flex flex-wrap gap-1">
-                  <MetricPill label="AUC" value={m.accuracyMetrics.auc} />
-                  <MetricPill label="F1" value={m.accuracyMetrics.f1} />
-                  <MetricPill label="Prec" value={m.accuracyMetrics.precision} />
-                  <MetricPill label="Rec" value={m.accuracyMetrics.recall} />
+                  <MetricPill label={t('predictiveAdmin.metricAuc', 'AUC')} value={m.accuracyMetrics.auc} />
+                  <MetricPill label={t('predictiveAdmin.metricF1', 'F1')} value={m.accuracyMetrics.f1} />
+                  <MetricPill label={t('predictiveAdmin.metricPrecision', 'Prec')} value={m.accuracyMetrics.precision} />
+                  <MetricPill label={t('predictiveAdmin.metricRecall', 'Rec')} value={m.accuracyMetrics.recall} />
                 </div>
               </td>
               <td className="py-3 pr-4 text-right tabular-nums text-[var(--color-neutral-700)] dark:text-[var(--color-neutral-300)]">
@@ -125,12 +135,12 @@ function ModelTable({ filter }: { filter: 'lead' | 'opportunity' }) {
                 {m.isActive ? (
                   <span
                     className="inline-block w-2 h-2 rounded-full bg-emerald-500"
-                    aria-label="Active model"
+                    aria-label={t('predictiveAdmin.activeModelLabel', 'Active model')}
                   />
                 ) : (
                   <span
                     className="inline-block w-2 h-2 rounded-full bg-[var(--color-neutral-300)]"
-                    aria-label="Inactive"
+                    aria-label={t('predictiveAdmin.inactiveModelLabel', 'Inactive')}
                   />
                 )}
               </td>
@@ -145,6 +155,7 @@ function ModelTable({ filter }: { filter: 'lead' | 'opportunity' }) {
 // ─── Entity section ────────────────────────────────────────────────────────
 
 function EntitySection({ entityType }: { entityType: 'lead' | 'opportunity' }) {
+  const { t } = useTranslation('crm');
   const retrain = useRetrainModel();
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -163,16 +174,18 @@ function EntitySection({ entityType }: { entityType: 'lead' | 'opportunity' }) {
       <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
         <div>
           <h2 className="font-semibold text-[var(--color-neutral-900)] dark:text-[var(--color-neutral-100)] capitalize">
-            {entityType} Scoring Model
+            {t('predictiveAdmin.sectionHeading', '{{entityType}} Scoring Model', { entityType })}
           </h2>
           <p className="text-xs text-[var(--color-neutral-500)] mt-0.5">
-            Logistic regression · per-org · retrained weekly
+            {t('predictiveAdmin.sectionSubtitle', 'Logistic regression · per-org · retrained weekly')}
           </p>
         </div>
 
         <button
           type="button"
-          aria-label={`Retrain ${entityType} model now`}
+          aria-label={t('predictiveAdmin.retrainButtonLabel', 'Retrain {{entityType}} model now', {
+            entityType,
+          })}
           onClick={handleRetrain}
           disabled={retrain.isPending}
           className={[
@@ -191,10 +204,10 @@ function EntitySection({ entityType }: { entityType: 'lead' | 'opportunity' }) {
                 className="inline-block h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin motion-reduce:animate-none"
                 aria-hidden="true"
               />
-              Queuing…
+              {t('predictiveAdmin.retrainPending', 'Queuing…')}
             </>
           ) : (
-            'Retrain Now'
+            t('predictiveAdmin.retrainButton', 'Retrain Now')
           )}
         </button>
       </div>
@@ -214,7 +227,7 @@ function EntitySection({ entityType }: { entityType: 'lead' | 'opportunity' }) {
           role="alert"
           className="mb-4 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 text-sm"
         >
-          Retrain failed. Please try again.
+          {t('predictiveAdmin.retrainError', 'Retrain failed. Please try again.')}
         </div>
       )}
 
@@ -226,25 +239,30 @@ function EntitySection({ entityType }: { entityType: 'lead' | 'opportunity' }) {
 // ─── Page ────────────────────────────────────────────────────────────────
 
 export default function PredictiveAdminPage() {
+  const { t } = useTranslation('crm');
   return (
     <main className="max-w-4xl mx-auto px-4 py-8 space-y-8">
       {/* Page header */}
       <div>
         <h1 className="text-2xl font-bold text-[var(--color-neutral-900)] dark:text-[var(--color-neutral-100)]">
-          Predictive Scoring
+          {t('predictiveAdmin.pageTitle', 'Predictive Scoring')}
         </h1>
         <p className="text-sm text-[var(--color-neutral-500)] mt-1">
-          ML-based lead and opportunity scoring — trained on your org&apos;s closed deal history.
-          Models are automatically retrained every Sunday at 02:00 UTC.
+          {t(
+            'predictiveAdmin.pageSubtitle',
+            "ML-based lead and opportunity scoring — trained on your org's closed deal history. Models are automatically retrained every Sunday at 02:00 UTC.",
+          )}
         </p>
       </div>
 
       {/* Info banner */}
       <div className="rounded-xl border border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-neutral-50)] dark:bg-[var(--color-neutral-800)]/50 p-4">
         <p className="text-sm text-[var(--color-neutral-700)] dark:text-[var(--color-neutral-300)]">
-          <strong>Data privacy:</strong> Model artifacts contain only learned weights — no raw
-          deal data, names, or emails. Each org trains its own isolated model.
-          Scores are cached for 1 hour in Redis and invalidated on record updates.
+          <strong>{t('predictiveAdmin.dataPrivacyLabel', 'Data privacy:')}</strong>{' '}
+          {t(
+            'predictiveAdmin.dataPrivacyBody',
+            'Model artifacts contain only learned weights — no raw deal data, names, or emails. Each org trains its own isolated model. Scores are cached for 1 hour in Redis and invalidated on record updates.',
+          )}
         </p>
       </div>
 
