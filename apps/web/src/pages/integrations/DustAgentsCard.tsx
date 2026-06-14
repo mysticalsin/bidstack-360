@@ -17,7 +17,7 @@ export function DustAgentsCard({ data, isLoading }: { data?: DustStatus; isLoadi
     <Card>
       <SectionHeader
         title="Dust agents"
-        caption="Workspace agents available for CRM data verification workflows"
+        caption="Workspace agents available for account data verification workflows"
         action={
           data?.agentsError ? (
             <Badge tone="tomato">degraded</Badge>

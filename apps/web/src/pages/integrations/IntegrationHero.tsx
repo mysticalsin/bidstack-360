@@ -88,7 +88,7 @@ export function IntegrationHero({
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">
               Connect agents, APIs, ERP systems and event streams with clear setup paths, scoped
-              credentials and live health checks that fit the rest of the CRM.
+              credentials and live health checks that fit the rest of the platform.
             </p>
           </div>
         </div>

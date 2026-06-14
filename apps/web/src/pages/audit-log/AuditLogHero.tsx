@@ -47,7 +47,7 @@ export function AuditHero({
               Audit Log
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">
-              Review security, agent, workflow and CRM mutations with enough context to explain who
+              Review security, agent, workflow and data mutations with enough context to explain who
               changed what, when it happened and where to investigate next.
             </p>
           </div>
@@ -89,7 +89,7 @@ export function AuditHero({
         />
         <AuditMetricCard
           icon="building"
-          label="CRM changes"
+          label="Data changes"
           value={<AnimatedMetric value={String(stats.crm)} />}
           tone="teal"
           helper="Revenue record edits"

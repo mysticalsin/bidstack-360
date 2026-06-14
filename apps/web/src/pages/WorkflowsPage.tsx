@@ -110,7 +110,7 @@ export function WorkflowsPage() {
       ) : items.length === 0 ? (
         <EmptyState
           title="No workflows yet"
-          message="Automate your CRM with workflows."
+          message="Automate your pre-sales workflows."
           action={<Button onClick={() => setShowCreate(true)}>New workflow</Button>}
         />
       ) : (

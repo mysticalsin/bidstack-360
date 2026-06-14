@@ -52,7 +52,7 @@ export function WebhooksSection() {
               Admin webhook control plane
             </div>
             <h3 className="mt-4 text-xl font-semibold tracking-tight text-[var(--fg-primary)]">
-              Deliver trusted CRM events to every downstream system.
+              Deliver trusted platform events to every downstream system.
             </h3>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--fg-secondary)]">
               Create signed outbound subscriptions for Dust, MCP workflows, data warehouses, Slack
@@ -154,7 +154,7 @@ export function WebhooksSection() {
           <div className="p-5">
             <EmptyState
               title="No subscriptions yet"
-              message="Create a subscription to start sending signed CRM events to your systems."
+              message="Create a subscription to start sending signed platform events to your systems."
               action={
                 <Button size="sm" onClick={() => setShowCreate(true)}>
                   <Icon name="plus" size={14} className="mr-1.5" />
@@ -213,7 +213,7 @@ function AdminOnlyNotice() {
             Webhooks are limited to administrators
           </h3>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--fg-secondary)]">
-            Webhook subscriptions can push sensitive CRM data to external systems, so only admins
+            Webhook subscriptions can push sensitive platform data to external systems, so only admins
             can view, create, test, pause, or delete them.
           </p>
         </div>

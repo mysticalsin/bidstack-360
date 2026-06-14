@@ -71,7 +71,7 @@ export function SettingsPage() {
       <header>
         <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">Settings</h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          Manage your account, workspace controls, CRM data model, and developer access.
+          Manage your account, workspace controls, data model, and developer access.
         </p>
       </header>
 
