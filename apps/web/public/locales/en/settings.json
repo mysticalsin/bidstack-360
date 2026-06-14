@@ -575,5 +575,31 @@
     "deleteButton": "Delete",
     "colorGroupAriaLabel": "Tag colour",
     "colorSwatchAriaLabel": "Colour {{color}}"
+  },
+  "auditLog": {
+    "liveRegionCount": "{{count}} event",
+    "liveRegionMatching": " matching \"{{search}}\"",
+    "errorTitle": "Failed to load audit entries",
+    "emptyTitle": "No audit entries",
+    "emptyMessage": "No audit entries match this range."
+  },
+  "pipelineStages": {
+    "sectionTitle": "Pipeline stages",
+    "sectionCaption": "Tenant-scoped stages used by opportunities, pipeline boards, reports, and forecasts.",
+    "errorTitle": "Could not load pipeline stages",
+    "errorMessage": "Refresh and try again.",
+    "emptyTitle": "No pipeline stages",
+    "emptyMessage": "The API will create the default pipeline for this workspace on refresh.",
+    "toastSaved": "Pipeline stage saved",
+    "toastSaveFailed": "Save failed",
+    "toastSaveFailedDescription": "The server rejected the change.",
+    "protectedNote": "Closed-won and closed-lost semantics are protected. Rename, recolor, and adjust default probabilities here; opportunity records use these values immediately.",
+    "stageNameLabel": "Stage name",
+    "wonStageBadge": "Won stage",
+    "lostStageBadge": "Lost stage",
+    "probabilityLabel": "Probability",
+    "colorLabel": "Color",
+    "savingButton": "Saving...",
+    "saveButton": "Save"
   }
 }

@@ -33,7 +33,13 @@
     "weightedPipeline": "Weighted pipeline",
     "winRate": "Win rate",
     "averageDealSize": "Average deal size",
-    "newThisWeek": "New this week"
+    "newThisWeek": "New this week",
+    "deltaPeriodDefault": "vs last period",
+    "loadingAriaLabel": "Loading KPI",
+    "valueAriaLabel": "{{title}}: {{value}}",
+    "trendUpAriaLabel": "Up",
+    "trendDownAriaLabel": "Down",
+    "trendFlatAriaLabel": "Flat"
   },
   "fields": {
     "name": "Name",
@@ -2653,7 +2659,25 @@
       "saving": "Saving…",
       "save": "Save",
       "cancel": "Cancel"
-    }
+    },
+    "subtitle": "Cross-country and cross-team sales actions on shared accounts. Owned by pre-sales.",
+    "filterGroupLabel": "Filter by status",
+    "filterAll": "All",
+    "filterOpen": "Open",
+    "filterInProgress": "In progress",
+    "filterDone": "Done",
+    "errorMessage": "Try again shortly.",
+    "emptyTitle": "No cross-sell actions",
+    "emptyMessage": "Log cross-team actions from any account's cockpit — they appear here for the whole org.",
+    "colAccount": "Account",
+    "colAction": "Action",
+    "colRoute": "Route",
+    "colAssignee": "Assignee",
+    "colDue": "Due",
+    "colStatus": "Status",
+    "updateFailed": "Update failed",
+    "advanceStatusAria": "Advance status of {{description}}",
+    "updating": "updating…"
   },
   "auditLogFilters": {
     "chipSearch": "Search: {{value}}",
@@ -3051,5 +3075,109 @@
     "cancel": "Cancel",
     "creating": "Creating…",
     "create": "Create reference"
+  },
+  "bidScore": {
+    "title": "Bid/No-Bid Score",
+    "criteriaBreakdownLabel": "Criteria breakdown",
+    "criterionPoints": "{{points}}/{{weight}} pts",
+    "categoryScoresLabel": "Category scores",
+    "recBid": "Bid",
+    "recNoBid": "No-Bid",
+    "recConditionalBid": "Conditional Bid",
+    "loadError": "Could not load the bid score. Refresh to try again.",
+    "overallScore": "overall score",
+    "overridden": "Overridden",
+    "detailsButton": "Details",
+    "emptyState": "No bid evaluation score has been recorded for this opportunity yet.",
+    "evaluateButton": "Evaluate Now"
+  },
+  "salesToolkits": {
+    "pageTitle": "Sales Toolkits",
+    "pageSubtitle": "Industry playbooks and courses from Mantu Academy — pulled live, filtered by sector.",
+    "errorTitle": "Mantu Academy is unreachable",
+    "errorMessage": "The LMS did not respond. Try again shortly.",
+    "emptyFilteredTitle": "No courses tagged \"{{sector}}\"",
+    "emptyTitle": "No courses published yet",
+    "emptyMessage": "Courses appear here as soon as Mantu Academy publishes them with sector tags.",
+    "resultCount": "{{count}} course",
+    "resultCountInSector": "{{count}} course in {{sector}}",
+    "filterGroupLabel": "Filter by sector",
+    "allSectors": "All sectors",
+    "openInAcademy": "Open in Mantu Academy",
+    "sampleDataLabel": "Sample data.",
+    "sampleDataIntro": "These are illustrative toolkits. Set",
+    "sampleDataOutro": "+ credentials to pull live courses from Mantu Academy."
+  },
+  "reviewStep": {
+    "toastRemoved": "Removed \"{{name}}\"",
+    "toastRemoveFailed": "Failed to remove \"{{name}}\"",
+    "heading": "Review extracted data",
+    "refresh": "Refresh",
+    "loading": "Loading…",
+    "groupSolutions": "Solutions",
+    "groupProducts": "Products",
+    "back": "← Back",
+    "publish": "Publish →",
+    "groupHeading": "{{title}} ({{count}})",
+    "empty": "No {{label}} extracted.",
+    "removeAria": "Remove {{name}}"
+  },
+  "kpiRow": {
+    "workspaceMetricsAriaLabel": "Workspace metrics",
+    "noLiveSignalTitle": "No live signal yet"
+  },
+  "taskDetail": {
+    "errorTitle": "Failed to load task",
+    "errorMessage": "Something went wrong",
+    "notFoundTitle": "Task not found",
+    "notFoundMessage": "This task may have been deleted.",
+    "titleAriaLabel": "Task title",
+    "opportunityLink": "Opportunity",
+    "assignedTo": "Assigned to {{assignee}}",
+    "due": "Due {{date}}",
+    "noDate": "no date",
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "statusLabel": "Status",
+    "statusAriaLabel": "Status",
+    "statusOpen": "Open",
+    "statusInProgress": "In Progress",
+    "statusBlocked": "Blocked",
+    "statusDone": "Done",
+    "idLabel": "ID",
+    "createdLabel": "Created"
+  },
+  "auditLogHero": {
+    "badge": "Governance console",
+    "eyebrow": "Read-only evidence trail",
+    "title": "Audit Log",
+    "subtitle": "Review security, agent, workflow and data mutations with enough context to explain who changed what, when it happened and where to investigate next.",
+    "refreshing": "Refreshing evidence...",
+    "visibleOnPage": "{{count}} visible on page {{page}}",
+    "refreshedSuffix": "refreshed {{time}}",
+    "metric": {
+      "eventsLoaded": {
+        "label": "Events loaded",
+        "helper": "Current server page"
+      },
+      "security": {
+        "label": "Security/API",
+        "helper": "Keys, MCP, auth, webhooks"
+      },
+      "destructive": {
+        "label": "Destructive",
+        "helper": "Deletes, revokes, cancels"
+      },
+      "dataChanges": {
+        "label": "Data changes",
+        "helper": "Revenue record edits"
+      },
+      "latestEvent": {
+        "label": "Latest event",
+        "none": "None",
+        "noEvents": "No events in range"
+      }
+    }
   }
 }

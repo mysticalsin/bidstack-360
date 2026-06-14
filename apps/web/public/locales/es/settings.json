@@ -597,5 +597,31 @@
     "deleteButton": "Eliminar",
     "colorGroupAriaLabel": "Color de la etiqueta",
     "colorSwatchAriaLabel": "Color {{color}}"
+  },
+  "auditLog": {
+    "liveRegionCount": "{{count}} evento",
+    "liveRegionMatching": " que coinciden con \"{{search}}\"",
+    "errorTitle": "No se pudieron cargar las entradas de auditoría",
+    "emptyTitle": "Sin entradas de auditoría",
+    "emptyMessage": "Ninguna entrada de auditoría coincide con este rango."
+  },
+  "pipelineStages": {
+    "sectionTitle": "Etapas del embudo",
+    "sectionCaption": "Etapas con alcance de inquilino usadas por oportunidades, tableros de embudo, informes y previsiones.",
+    "errorTitle": "No se pudieron cargar las etapas del embudo",
+    "errorMessage": "Actualiza e inténtalo de nuevo.",
+    "emptyTitle": "Sin etapas del embudo",
+    "emptyMessage": "La API creará el embudo predeterminado para este espacio de trabajo al actualizar.",
+    "toastSaved": "Etapa del embudo guardada",
+    "toastSaveFailed": "Error al guardar",
+    "toastSaveFailedDescription": "El servidor rechazó el cambio.",
+    "protectedNote": "La semántica de ganado y perdido está protegida. Cambia el nombre, el color y ajusta las probabilidades predeterminadas aquí; los registros de oportunidad usan estos valores de inmediato.",
+    "stageNameLabel": "Nombre de la etapa",
+    "wonStageBadge": "Etapa ganada",
+    "lostStageBadge": "Etapa perdida",
+    "probabilityLabel": "Probabilidad",
+    "colorLabel": "Color",
+    "savingButton": "Guardando...",
+    "saveButton": "Guardar"
   }
 }

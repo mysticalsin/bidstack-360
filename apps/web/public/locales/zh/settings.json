@@ -594,5 +594,31 @@
     "deleteButton": "删除",
     "colorGroupAriaLabel": "标签颜色",
     "colorSwatchAriaLabel": "颜色 {{color}}"
+  },
+  "auditLog": {
+    "liveRegionCount": "{{count}} 个事件",
+    "liveRegionMatching": "，匹配 \"{{search}}\"",
+    "errorTitle": "无法加载审计记录",
+    "emptyTitle": "无审计记录",
+    "emptyMessage": "没有审计记录与此范围匹配。"
+  },
+  "pipelineStages": {
+    "sectionTitle": "管道阶段",
+    "sectionCaption": "由商机、管道看板、报告和预测使用的租户范围阶段。",
+    "errorTitle": "无法加载管道阶段",
+    "errorMessage": "请刷新后重试。",
+    "emptyTitle": "没有管道阶段",
+    "emptyMessage": "刷新时,API 将为此工作区创建默认管道。",
+    "toastSaved": "管道阶段已保存",
+    "toastSaveFailed": "保存失败",
+    "toastSaveFailedDescription": "服务器拒绝了此更改。",
+    "protectedNote": "赢单和输单语义受保护。可在此处重命名、更改颜色并调整默认概率;商机记录会立即使用这些值。",
+    "stageNameLabel": "阶段名称",
+    "wonStageBadge": "赢单阶段",
+    "lostStageBadge": "输单阶段",
+    "probabilityLabel": "概率",
+    "colorLabel": "颜色",
+    "savingButton": "保存中...",
+    "saveButton": "保存"
   }
 }

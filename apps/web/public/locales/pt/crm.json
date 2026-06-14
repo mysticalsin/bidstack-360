@@ -33,7 +33,13 @@
     "weightedPipeline": "Pipeline ponderado",
     "winRate": "Taxa de sucesso",
     "averageDealSize": "Valor médio dos negócios",
-    "newThisWeek": "Novos esta semana"
+    "newThisWeek": "Novos esta semana",
+    "deltaPeriodDefault": "vs o periodo anterior",
+    "loadingAriaLabel": "Carregando KPI",
+    "valueAriaLabel": "{{title}}: {{value}}",
+    "trendUpAriaLabel": "Em alta",
+    "trendDownAriaLabel": "Em baixa",
+    "trendFlatAriaLabel": "Estavel"
   },
   "fields": {
     "name": "Nome",
@@ -2653,7 +2659,25 @@
       "saving": "Salvando…",
       "save": "Salvar",
       "cancel": "Cancelar"
-    }
+    },
+    "subtitle": "Ações de venda entre países e equipes em contas compartilhadas. Gerido pela pré-venda.",
+    "filterGroupLabel": "Filtrar por estado",
+    "filterAll": "Todos",
+    "filterOpen": "Aberto",
+    "filterInProgress": "Em andamento",
+    "filterDone": "Concluído",
+    "errorMessage": "Tente novamente em breve.",
+    "emptyTitle": "Nenhuma ação de venda cruzada",
+    "emptyMessage": "Registe ações entre equipas a partir do painel de qualquer conta — aparecem aqui para toda a organização.",
+    "colAccount": "Conta",
+    "colAction": "Ação",
+    "colRoute": "Rota",
+    "colAssignee": "Responsável",
+    "colDue": "Prazo",
+    "colStatus": "Estado",
+    "updateFailed": "Falha na atualização",
+    "advanceStatusAria": "Avançar o estado de {{description}}",
+    "updating": "a atualizar…"
   },
   "auditLogFilters": {
     "chipSearch": "Pesquisar: {{value}}",
@@ -3051,5 +3075,109 @@
     "cancel": "Cancelar",
     "creating": "Criando…",
     "create": "Criar referência"
+  },
+  "bidScore": {
+    "title": "Pontuação de licitação/não licitação",
+    "criteriaBreakdownLabel": "Detalhamento dos critérios",
+    "criterionPoints": "{{points}}/{{weight}} pts",
+    "categoryScoresLabel": "Pontuações por categoria",
+    "recBid": "Licitar",
+    "recNoBid": "Não licitar",
+    "recConditionalBid": "Licitação condicional",
+    "loadError": "Não foi possível carregar a pontuação da licitação. Atualize para tentar novamente.",
+    "overallScore": "pontuação geral",
+    "overridden": "Substituído",
+    "detailsButton": "Detalhes",
+    "emptyState": "Ainda não foi registrada nenhuma pontuação de avaliação de licitação para esta oportunidade.",
+    "evaluateButton": "Avaliar agora"
+  },
+  "salesToolkits": {
+    "pageTitle": "Kits de vendas",
+    "pageSubtitle": "Manuais de setor e cursos da Mantu Academy — obtidos ao vivo, filtrados por setor.",
+    "errorTitle": "A Mantu Academy está inacessível",
+    "errorMessage": "O LMS não respondeu. Tente novamente em breve.",
+    "emptyFilteredTitle": "Nenhum curso marcado como \"{{sector}}\"",
+    "emptyTitle": "Nenhum curso publicado ainda",
+    "emptyMessage": "Os cursos aparecem aqui assim que a Mantu Academy os publica com etiquetas de setor.",
+    "resultCount": "{{count}} curso",
+    "resultCountInSector": "{{count}} curso em {{sector}}",
+    "filterGroupLabel": "Filtrar por setor",
+    "allSectors": "Todos os setores",
+    "openInAcademy": "Abrir na Mantu Academy",
+    "sampleDataLabel": "Dados de exemplo.",
+    "sampleDataIntro": "Estes são kits ilustrativos. Defina",
+    "sampleDataOutro": "+ credenciais para obter cursos ao vivo da Mantu Academy."
+  },
+  "reviewStep": {
+    "toastRemoved": "\"{{name}}\" removido",
+    "toastRemoveFailed": "Falha ao remover \"{{name}}\"",
+    "heading": "Revisar dados extraídos",
+    "refresh": "Atualizar",
+    "loading": "Carregando…",
+    "groupSolutions": "Soluções",
+    "groupProducts": "Produtos",
+    "back": "← Voltar",
+    "publish": "Publicar →",
+    "groupHeading": "{{title}} ({{count}})",
+    "empty": "Nenhum {{label}} extraído.",
+    "removeAria": "Remover {{name}}"
+  },
+  "kpiRow": {
+    "workspaceMetricsAriaLabel": "Métricas do espaço de trabalho",
+    "noLiveSignalTitle": "Ainda sem sinal ao vivo"
+  },
+  "taskDetail": {
+    "errorTitle": "Falha ao carregar a tarefa",
+    "errorMessage": "Algo deu errado",
+    "notFoundTitle": "Tarefa não encontrada",
+    "notFoundMessage": "Esta tarefa pode ter sido excluída.",
+    "titleAriaLabel": "Título da tarefa",
+    "opportunityLink": "Oportunidade",
+    "assignedTo": "Atribuído a {{assignee}}",
+    "due": "Vencimento {{date}}",
+    "noDate": "sem data",
+    "cancel": "Cancelar",
+    "save": "Salvar",
+    "edit": "Editar",
+    "statusLabel": "Status",
+    "statusAriaLabel": "Status",
+    "statusOpen": "Aberta",
+    "statusInProgress": "Em andamento",
+    "statusBlocked": "Bloqueada",
+    "statusDone": "Concluída",
+    "idLabel": "ID",
+    "createdLabel": "Criada"
+  },
+  "auditLogHero": {
+    "badge": "Console de governança",
+    "eyebrow": "Trilha de evidências somente leitura",
+    "title": "Registro de auditoria",
+    "subtitle": "Revise as alterações de segurança, agente, fluxo de trabalho e dados com contexto suficiente para explicar quem mudou o quê, quando aconteceu e onde investigar a seguir.",
+    "refreshing": "Atualizando evidências...",
+    "visibleOnPage": "{{count}} visíveis na página {{page}}",
+    "refreshedSuffix": "atualizado {{time}}",
+    "metric": {
+      "eventsLoaded": {
+        "label": "Eventos carregados",
+        "helper": "Página atual do servidor"
+      },
+      "security": {
+        "label": "Segurança/API",
+        "helper": "Chaves, MCP, autenticação, webhooks"
+      },
+      "destructive": {
+        "label": "Destrutivas",
+        "helper": "Exclusões, revogações, cancelamentos"
+      },
+      "dataChanges": {
+        "label": "Alterações de dados",
+        "helper": "Edições de registros de receita"
+      },
+      "latestEvent": {
+        "label": "Último evento",
+        "none": "Nenhum",
+        "noEvents": "Nenhum evento no intervalo"
+      }
+    }
   }
 }

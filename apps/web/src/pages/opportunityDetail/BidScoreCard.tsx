@@ -5,6 +5,7 @@
 // versions render with their legacy label and stored rating instead of
 // crashing or disappearing.
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { bidCriterionById, bidCriterionLabel } from '@bidstack/shared';
 
 import { Badge } from '@/components/ui/Badge';
@@ -16,20 +17,16 @@ import { useBidScoreLatest } from '@/hooks/useBidScore';
 import { CATEGORY_INFO } from '../bidNoBid/bidNoBidTypes';
 
 const REC_TONE = { bid: 'jade', no_bid: 'tomato', proceed_with_caution: 'amber' } as const;
-const REC_LABEL = {
-  bid: 'Bid',
-  no_bid: 'No-Bid',
-  proceed_with_caution: 'Conditional Bid',
-} as const;
 
 function CriteriaBreakdown({ criteria }: { criteria: Record<string, number> }) {
+  const { t } = useTranslation('crm');
   const rows = Object.entries(criteria)
     .filter(([, rating]) => rating > 0)
     .sort(([a], [b]) => bidCriterionLabel(a).localeCompare(bidCriterionLabel(b)));
   if (rows.length === 0) return null;
 
   return (
-    <ul className="space-y-1" aria-label="Criteria breakdown">
+    <ul className="space-y-1" aria-label={t('bidScore.criteriaBreakdownLabel', 'Criteria breakdown')}>
       {rows.map(([id, rating]) => {
         const def = bidCriterionById(id);
         const points = def ? ((rating / 5) * def.weight).toFixed(1) : null;
@@ -39,7 +36,12 @@ function CriteriaBreakdown({ criteria }: { criteria: Record<string, number> }) {
             <span className="flex shrink-0 items-baseline gap-2 tabular-nums">
               <span className="text-[var(--fg-primary)]">{rating}/5</span>
               <span className="w-14 text-right text-[var(--fg-tertiary)]">
-                {points !== null ? `${points}/${def?.weight} pts` : '—'}
+                {points !== null
+                  ? t('bidScore.criterionPoints', '{{points}}/{{weight}} pts', {
+                      points,
+                      weight: def?.weight,
+                    })
+                  : '—'}
               </span>
             </span>
           </li>
@@ -50,10 +52,11 @@ function CriteriaBreakdown({ criteria }: { criteria: Record<string, number> }) {
 }
 
 function CategoryScores({ categoryScores }: { categoryScores: Record<string, number> }) {
+  const { t } = useTranslation('crm');
   const entries = Object.entries(categoryScores);
   if (entries.length === 0) return null;
   return (
-    <div className="grid grid-cols-2 gap-x-3 gap-y-1" aria-label="Category scores">
+    <div className="grid grid-cols-2 gap-x-3 gap-y-1" aria-label={t('bidScore.categoryScoresLabel', 'Category scores')}>
       {entries.map(([cat, value]) => (
         <div key={cat} className="flex items-center justify-between gap-2 text-[11px]">
           <span className="truncate text-[var(--fg-tertiary)]">
@@ -72,13 +75,20 @@ function CategoryScores({ categoryScores }: { categoryScores: Record<string, num
 }
 
 export function BidScoreCard({ opportunityId }: { opportunityId: string }) {
+  const { t } = useTranslation('crm');
   const { data, isLoading, isError, error } = useBidScoreLatest(opportunityId);
   // 404 = "not scored yet" (empty state); anything else is a real failure.
   const notFound = (error as { status?: number } | null)?.status === 404;
 
+  const REC_LABEL = {
+    bid: t('bidScore.recBid', 'Bid'),
+    no_bid: t('bidScore.recNoBid', 'No-Bid'),
+    proceed_with_caution: t('bidScore.recConditionalBid', 'Conditional Bid'),
+  } as const;
+
   return (
     <Card>
-      <SectionHeader title="Bid/No-Bid Score" />
+      <SectionHeader title={t('bidScore.title', 'Bid/No-Bid Score')} />
       <div className="p-5 flex flex-col justify-between h-[calc(100%-48px)] min-h-[140px]">
         {isLoading ? (
           <div className="space-y-3">
@@ -88,7 +98,7 @@ export function BidScoreCard({ opportunityId }: { opportunityId: string }) {
           </div>
         ) : isError && !notFound ? (
           <p role="alert" className="text-xs text-[var(--danger)]">
-            Could not load the bid score. Refresh to try again.
+            {t('bidScore.loadError', 'Could not load the bid score. Refresh to try again.')}
           </p>
         ) : data ? (
           <div className="space-y-4 flex flex-col justify-between h-full">
@@ -97,7 +107,9 @@ export function BidScoreCard({ opportunityId }: { opportunityId: string }) {
                 <div className="text-4xl font-bold tabular-nums text-[var(--fg-primary)]">
                   {data.totalScore.toFixed(0)}%
                 </div>
-                <div className="text-xs text-[var(--fg-tertiary)]">overall score</div>
+                <div className="text-xs text-[var(--fg-tertiary)]">
+                  {t('bidScore.overallScore', 'overall score')}
+                </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Badge
@@ -116,7 +128,7 @@ export function BidScoreCard({ opportunityId }: { opportunityId: string }) {
                         tone="amber"
                         className="px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider"
                       >
-                        Overridden
+                        {t('bidScore.overridden', 'Overridden')}
                       </Badge>
                     </span>
                   </Tooltip>
@@ -128,7 +140,7 @@ export function BidScoreCard({ opportunityId }: { opportunityId: string }) {
             <div className="pt-2">
               <Link to={`/bid-matrix?opportunityId=${opportunityId}`} className="block">
                 <Button variant="secondary" size="sm" className="w-full text-xs">
-                  Details
+                  {t('bidScore.detailsButton', 'Details')}
                 </Button>
               </Link>
             </div>
@@ -136,12 +148,15 @@ export function BidScoreCard({ opportunityId }: { opportunityId: string }) {
         ) : (
           <div className="space-y-4 flex flex-col justify-between h-full">
             <p className="text-xs text-[var(--fg-tertiary)]">
-              No bid evaluation score has been recorded for this opportunity yet.
+              {t(
+                'bidScore.emptyState',
+                'No bid evaluation score has been recorded for this opportunity yet.',
+              )}
             </p>
             <div>
               <Link to={`/bid-matrix?opportunityId=${opportunityId}`} className="block">
                 <Button variant="secondary" size="sm" className="w-full text-xs">
-                  Evaluate Now
+                  {t('bidScore.evaluateButton', 'Evaluate Now')}
                 </Button>
               </Link>
             </div>

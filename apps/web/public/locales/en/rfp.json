@@ -170,5 +170,13 @@
     "viewProposal": "View proposal: {{name}}",
     "version": "v{{version}}",
     "due": "Due {{date}}"
+  },
+  "rfpCrew": {
+    "statusWaiting": "Waiting",
+    "statusWorking": "Working",
+    "statusDone": "Done",
+    "statusOverseeing": "Overseeing",
+    "viewRoleDetailsAria": "{{role}} — view role details",
+    "moveToStageAria": "Move {{role}} to another stage. Use left and right arrow keys."
   }
 }

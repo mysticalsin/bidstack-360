@@ -43,5 +43,13 @@
     "viewProposal": "查看提案：{{name}}",
     "version": "v{{version}}",
     "due": "截止 {{date}}"
+  },
+  "rfpCrew": {
+    "statusWaiting": "等待中",
+    "statusWorking": "处理中",
+    "statusDone": "已完成",
+    "statusOverseeing": "监督中",
+    "viewRoleDetailsAria": "{{role}} — 查看角色详情",
+    "moveToStageAria": "将 {{role}} 移至其他阶段。使用左右方向键。"
   }
 }

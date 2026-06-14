@@ -594,5 +594,31 @@
     "deleteButton": "Elimina",
     "colorGroupAriaLabel": "Colore del tag",
     "colorSwatchAriaLabel": "Colore {{color}}"
+  },
+  "auditLog": {
+    "liveRegionCount": "{{count}} evento",
+    "liveRegionMatching": " corrispondenti a \"{{search}}\"",
+    "errorTitle": "Impossibile caricare le voci di audit",
+    "emptyTitle": "Nessuna voce di audit",
+    "emptyMessage": "Nessuna voce di audit corrisponde a questo intervallo."
+  },
+  "pipelineStages": {
+    "sectionTitle": "Fasi della pipeline",
+    "sectionCaption": "Fasi con ambito tenant utilizzate da opportunità, bacheche pipeline, report e previsioni.",
+    "errorTitle": "Impossibile caricare le fasi della pipeline",
+    "errorMessage": "Aggiorna e riprova.",
+    "emptyTitle": "Nessuna fase della pipeline",
+    "emptyMessage": "L'API creerà la pipeline predefinita per questo spazio di lavoro all'aggiornamento.",
+    "toastSaved": "Fase della pipeline salvata",
+    "toastSaveFailed": "Salvataggio non riuscito",
+    "toastSaveFailedDescription": "Il server ha rifiutato la modifica.",
+    "protectedNote": "La semantica di vinto e perso è protetta. Rinomina, ricolora e regola le probabilità predefinite qui; i record delle opportunità usano subito questi valori.",
+    "stageNameLabel": "Nome della fase",
+    "wonStageBadge": "Fase vinta",
+    "lostStageBadge": "Fase persa",
+    "probabilityLabel": "Probabilità",
+    "colorLabel": "Colore",
+    "savingButton": "Salvataggio...",
+    "saveButton": "Salva"
   }
 }

@@ -4,6 +4,7 @@
  * on each account cockpit (CrossSellCard).
  */
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/Badge';
@@ -20,6 +21,12 @@ const STATUSES: { key: GovernanceStatus | 'all'; label: string }[] = [
   { key: 'in_progress', label: 'In progress' },
   { key: 'done', label: 'Done' },
 ];
+const STATUS_FILTER_I18N_KEY: Record<GovernanceStatus | 'all', string> = {
+  all: 'crossSell.filterAll',
+  open: 'crossSell.filterOpen',
+  in_progress: 'crossSell.filterInProgress',
+  done: 'crossSell.filterDone',
+};
 const STATUS_TONE: Record<GovernanceStatus, 'gray' | 'amber' | 'jade'> = {
   open: 'gray',
   in_progress: 'amber',
@@ -32,6 +39,7 @@ const NEXT_STATUS: Record<GovernanceStatus, GovernanceStatus> = {
 };
 
 export default function CrossSellPage() {
+  const { t } = useTranslation('crm');
   const [status, setStatus] = useState<GovernanceStatus | 'all'>('all');
   const actions = useCrossSellActions(status === 'all' ? {} : { status });
   const patch = usePatchCrossSellAction();
@@ -41,14 +49,17 @@ export default function CrossSellPage() {
     <div className="space-y-5">
       <div className="page-head">
         <div>
-          <h1 className="page-title">Cross-sell actions</h1>
+          <h1 className="page-title">{t('crossSell.title', 'Cross-sell actions')}</h1>
           <div className="page-sub">
-            Cross-country and cross-team sales actions on shared accounts. Owned by pre-sales.
+            {t(
+              'crossSell.subtitle',
+              'Cross-country and cross-team sales actions on shared accounts. Owned by pre-sales.',
+            )}
           </div>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status">
+      <div className="flex flex-wrap gap-2" role="group" aria-label={t('crossSell.filterGroupLabel', 'Filter by status')}>
         {STATUSES.map((s) => (
           <button
             key={s.key}
@@ -61,7 +72,7 @@ export default function CrossSellPage() {
                 : 'border-[var(--border)] text-[var(--fg-secondary)]'
             }`}
           >
-            {s.label}
+            {t(STATUS_FILTER_I18N_KEY[s.key], s.label)}
           </button>
         ))}
       </div>
@@ -70,25 +81,28 @@ export default function CrossSellPage() {
         <LoadingSkeleton rows={6} />
       ) : actions.isError ? (
         <ErrorState
-          title="Could not load cross-sell actions"
-          message={actions.error?.message ?? 'Try again shortly.'}
+          title={t('crossSell.errorTitle', 'Could not load cross-sell actions')}
+          message={actions.error?.message ?? t('crossSell.errorMessage', 'Try again shortly.')}
         />
       ) : (actions.data?.items.length ?? 0) === 0 ? (
         <EmptyState
-          title="No cross-sell actions"
-          message="Log cross-team actions from any account's cockpit — they appear here for the whole org."
+          title={t('crossSell.emptyTitle', 'No cross-sell actions')}
+          message={t(
+            'crossSell.emptyMessage',
+            "Log cross-team actions from any account's cockpit — they appear here for the whole org.",
+          )}
         />
       ) : (
         <Card>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--border)] text-left text-xs uppercase tracking-wider text-[var(--fg-tertiary)]">
-                <th className="px-4 py-2 font-medium">Account</th>
-                <th className="px-4 py-2 font-medium">Action</th>
-                <th className="px-4 py-2 font-medium">Route</th>
-                <th className="px-4 py-2 font-medium">Assignee</th>
-                <th className="px-4 py-2 font-medium">Due</th>
-                <th className="px-4 py-2 text-right font-medium">Status</th>
+                <th className="px-4 py-2 font-medium">{t('crossSell.colAccount', 'Account')}</th>
+                <th className="px-4 py-2 font-medium">{t('crossSell.colAction', 'Action')}</th>
+                <th className="px-4 py-2 font-medium">{t('crossSell.colRoute', 'Route')}</th>
+                <th className="px-4 py-2 font-medium">{t('crossSell.colAssignee', 'Assignee')}</th>
+                <th className="px-4 py-2 font-medium">{t('crossSell.colDue', 'Due')}</th>
+                <th className="px-4 py-2 text-right font-medium">{t('crossSell.colStatus', 'Status')}</th>
               </tr>
             </thead>
             <tbody>
@@ -124,17 +138,19 @@ export default function CrossSellPage() {
                       onClick={() =>
                         patch.mutate(
                           { id: a.id, body: { status: NEXT_STATUS[a.status] } },
-                          { onError: (err: Error) => toast.error('Update failed', { description: err.message }) },
+                          { onError: (err: Error) => toast.error(t('crossSell.updateFailed', 'Update failed'), { description: err.message }) },
                         )
                       }
                       className="min-h-[28px] rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] disabled:opacity-60"
-                      aria-label={`Advance status of ${a.description}`}
+                      aria-label={t('crossSell.advanceStatusAria', 'Advance status of {{description}}', {
+                        description: a.description,
+                      })}
                     >
                       {/* Per-row pending label so a slow PATCH shows WHICH row is
                           updating instead of the whole table looking frozen. */}
                       <Badge tone={STATUS_TONE[a.status]}>
                         {patch.isPending && patch.variables?.id === a.id
-                          ? 'updating…'
+                          ? t('crossSell.updating', 'updating…')
                           : a.status.replace('_', ' ')}
                       </Badge>
                     </button>

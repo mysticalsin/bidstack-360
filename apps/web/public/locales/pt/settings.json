@@ -594,5 +594,31 @@
     "deleteButton": "Excluir",
     "colorGroupAriaLabel": "Cor da etiqueta",
     "colorSwatchAriaLabel": "Cor {{color}}"
+  },
+  "auditLog": {
+    "liveRegionCount": "{{count}} evento",
+    "liveRegionMatching": " correspondentes a \"{{search}}\"",
+    "errorTitle": "Falha ao carregar os registros de auditoria",
+    "emptyTitle": "Nenhum registro de auditoria",
+    "emptyMessage": "Nenhum registro de auditoria corresponde a este intervalo."
+  },
+  "pipelineStages": {
+    "sectionTitle": "Etapas do funil",
+    "sectionCaption": "Etapas com escopo de locatário usadas por oportunidades, quadros de funil, relatórios e previsões.",
+    "errorTitle": "Não foi possível carregar as etapas do funil",
+    "errorMessage": "Atualize e tente novamente.",
+    "emptyTitle": "Sem etapas do funil",
+    "emptyMessage": "A API criará o funil padrão para este espaço de trabalho ao atualizar.",
+    "toastSaved": "Etapa do funil salva",
+    "toastSaveFailed": "Falha ao salvar",
+    "toastSaveFailedDescription": "O servidor rejeitou a alteração.",
+    "protectedNote": "A semântica de ganho e perda está protegida. Renomeie, mude a cor e ajuste as probabilidades padrão aqui; os registros de oportunidade usam esses valores imediatamente.",
+    "stageNameLabel": "Nome da etapa",
+    "wonStageBadge": "Etapa ganha",
+    "lostStageBadge": "Etapa perdida",
+    "probabilityLabel": "Probabilidade",
+    "colorLabel": "Cor",
+    "savingButton": "Salvando...",
+    "saveButton": "Salvar"
   }
 }

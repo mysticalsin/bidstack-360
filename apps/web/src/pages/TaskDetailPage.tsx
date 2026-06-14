@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -10,6 +11,7 @@ import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection'
 import { formatDate } from '@/lib/format';
 
 export function TaskDetailPage() {
+  const { t } = useTranslation('crm');
   const { id } = useParams<{ id: string }>();
   const tasks = useTasks();
   const update = useUpdateTask();
@@ -23,12 +25,21 @@ export function TaskDetailPage() {
   if (tasks.isError)
     return (
       <ErrorState
-        title="Failed to load task"
-        message={tasks.error instanceof Error ? tasks.error.message : 'Something went wrong'}
+        title={t('taskDetail.errorTitle', 'Failed to load task')}
+        message={
+          tasks.error instanceof Error
+            ? tasks.error.message
+            : t('taskDetail.errorMessage', 'Something went wrong')
+        }
       />
     );
   if (!task)
-    return <EmptyState title="Task not found" message="This task may have been deleted." />;
+    return (
+      <EmptyState
+        title={t('taskDetail.notFoundTitle', 'Task not found')}
+        message={t('taskDetail.notFoundMessage', 'This task may have been deleted.')}
+      />
+    );
 
   const startEdit = () => {
     setTitle(task.title);
@@ -54,7 +65,7 @@ export function TaskDetailPage() {
           {editing ? (
             <input
               className="input text-xl font-bold w-full"
-              aria-label="Task title"
+              aria-label={t('taskDetail.titleAriaLabel', 'Task title')}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               autoFocus
@@ -70,26 +81,38 @@ export function TaskDetailPage() {
                 to={`/opportunities/${task.oppId}`}
                 className="hover:text-[var(--brand-primary)]"
               >
-                Opportunity
+                {t('taskDetail.opportunityLink', 'Opportunity')}
               </Link>
             )}
-            {task.assignee && <span>Assigned to {task.assignee}</span>}
-            <span>Due {task.dueDate ? formatDate(task.dueDate) : 'no date'}</span>
+            {task.assignee && (
+              <span>
+                {t('taskDetail.assignedTo', 'Assigned to {{assignee}}', {
+                  assignee: task.assignee,
+                })}
+              </span>
+            )}
+            <span>
+              {t('taskDetail.due', 'Due {{date}}', {
+                date: task.dueDate
+                  ? formatDate(task.dueDate)
+                  : t('taskDetail.noDate', 'no date'),
+              })}
+            </span>
           </div>
         </div>
         <div className="flex gap-2">
           {editing ? (
             <>
               <Button variant="secondary" size="sm" onClick={() => setEditing(false)}>
-                Cancel
+                {t('taskDetail.cancel', 'Cancel')}
               </Button>
               <Button size="sm" onClick={save} disabled={update.isPending}>
-                Save
+                {t('taskDetail.save', 'Save')}
               </Button>
             </>
           ) : (
             <Button variant="secondary" size="sm" onClick={startEdit}>
-              Edit
+              {t('taskDetail.edit', 'Edit')}
             </Button>
           )}
         </div>
@@ -100,18 +123,22 @@ export function TaskDetailPage() {
       <Card className="p-5">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-[var(--fg-secondary)]">Status</span>
+            <span className="text-sm text-[var(--fg-secondary)]">
+              {t('taskDetail.statusLabel', 'Status')}
+            </span>
             {editing ? (
               <select
                 className="input text-sm"
-                aria-label="Status"
+                aria-label={t('taskDetail.statusAriaLabel', 'Status')}
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
               >
-                <option value="open">Open</option>
-                <option value="in_progress">In Progress</option>
-                <option value="blocked">Blocked</option>
-                <option value="done">Done</option>
+                <option value="open">{t('taskDetail.statusOpen', 'Open')}</option>
+                <option value="in_progress">
+                  {t('taskDetail.statusInProgress', 'In Progress')}
+                </option>
+                <option value="blocked">{t('taskDetail.statusBlocked', 'Blocked')}</option>
+                <option value="done">{t('taskDetail.statusDone', 'Done')}</option>
               </select>
             ) : (
               <Badge
@@ -130,13 +157,17 @@ export function TaskDetailPage() {
             )}
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm text-[var(--fg-secondary)]">ID</span>
+            <span className="text-sm text-[var(--fg-secondary)]">
+              {t('taskDetail.idLabel', 'ID')}
+            </span>
             <span className="text-sm text-[var(--fg-primary)] font-mono">
               {task.id.slice(0, 8)}
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm text-[var(--fg-secondary)]">Created</span>
+            <span className="text-sm text-[var(--fg-secondary)]">
+              {t('taskDetail.createdLabel', 'Created')}
+            </span>
             <span className="text-sm text-[var(--fg-primary)]">{formatDate(task.createdAt)}</span>
           </div>
         </div>

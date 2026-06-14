@@ -33,7 +33,13 @@
     "weightedPipeline": "加权管道",
     "winRate": "赢单率",
     "averageDealSize": "平均成交金额",
-    "newThisWeek": "本周新增"
+    "newThisWeek": "本周新增",
+    "deltaPeriodDefault": "相比上一周期",
+    "loadingAriaLabel": "正在加载 KPI",
+    "valueAriaLabel": "{{title}}：{{value}}",
+    "trendUpAriaLabel": "上升",
+    "trendDownAriaLabel": "下降",
+    "trendFlatAriaLabel": "持平"
   },
   "fields": {
     "name": "名称",
@@ -2653,7 +2659,25 @@
       "saving": "保存中…",
       "save": "保存",
       "cancel": "取消"
-    }
+    },
+    "subtitle": "共享客户上的跨国和跨团队销售行动，由售前团队负责。",
+    "filterGroupLabel": "按状态筛选",
+    "filterAll": "全部",
+    "filterOpen": "待处理",
+    "filterInProgress": "进行中",
+    "filterDone": "已完成",
+    "errorMessage": "请稍后重试。",
+    "emptyTitle": "暂无交叉销售行动",
+    "emptyMessage": "从任意客户的工作台记录跨团队行动——它们会在此处对整个组织显示。",
+    "colAccount": "客户",
+    "colAction": "行动",
+    "colRoute": "路由",
+    "colAssignee": "负责人",
+    "colDue": "截止",
+    "colStatus": "状态",
+    "updateFailed": "更新失败",
+    "advanceStatusAria": "推进 {{description}} 的状态",
+    "updating": "更新中…"
   },
   "auditLogFilters": {
     "chipSearch": "搜索：{{value}}",
@@ -3051,5 +3075,109 @@
     "cancel": "取消",
     "creating": "创建中……",
     "create": "创建参考"
+  },
+  "bidScore": {
+    "title": "投标/不投标评分",
+    "criteriaBreakdownLabel": "标准明细",
+    "criterionPoints": "{{points}}/{{weight}} 分",
+    "categoryScoresLabel": "类别评分",
+    "recBid": "投标",
+    "recNoBid": "不投标",
+    "recConditionalBid": "有条件投标",
+    "loadError": "无法加载投标评分。请刷新后重试。",
+    "overallScore": "总体评分",
+    "overridden": "已覆盖",
+    "detailsButton": "详情",
+    "emptyState": "尚未为此商机记录任何投标评估评分。",
+    "evaluateButton": "立即评估"
+  },
+  "salesToolkits": {
+    "pageTitle": "销售工具包",
+    "pageSubtitle": "来自 Mantu Academy 的行业手册和课程——实时获取，按行业筛选。",
+    "errorTitle": "无法连接 Mantu Academy",
+    "errorMessage": "LMS 未响应。请稍后重试。",
+    "emptyFilteredTitle": "没有标记为“{{sector}}”的课程",
+    "emptyTitle": "尚未发布课程",
+    "emptyMessage": "Mantu Academy 发布带有行业标签的课程后，课程将显示在此处。",
+    "resultCount": "{{count}} 门课程",
+    "resultCountInSector": "{{sector}} 中有 {{count}} 门课程",
+    "filterGroupLabel": "按行业筛选",
+    "allSectors": "所有行业",
+    "openInAcademy": "在 Mantu Academy 中打开",
+    "sampleDataLabel": "示例数据。",
+    "sampleDataIntro": "这些是示例工具包。请设置",
+    "sampleDataOutro": "+ 凭据，以便从 Mantu Academy 获取实时课程。"
+  },
+  "reviewStep": {
+    "toastRemoved": "已移除“{{name}}”",
+    "toastRemoveFailed": "移除“{{name}}”失败",
+    "heading": "审核提取的数据",
+    "refresh": "刷新",
+    "loading": "加载中…",
+    "groupSolutions": "解决方案",
+    "groupProducts": "产品",
+    "back": "← 返回",
+    "publish": "发布 →",
+    "groupHeading": "{{title}}（{{count}}）",
+    "empty": "未提取到{{label}}。",
+    "removeAria": "移除 {{name}}"
+  },
+  "kpiRow": {
+    "workspaceMetricsAriaLabel": "工作区指标",
+    "noLiveSignalTitle": "暂无实时信号"
+  },
+  "taskDetail": {
+    "errorTitle": "加载任务失败",
+    "errorMessage": "出了点问题",
+    "notFoundTitle": "未找到任务",
+    "notFoundMessage": "此任务可能已被删除。",
+    "titleAriaLabel": "任务标题",
+    "opportunityLink": "商机",
+    "assignedTo": "分配给 {{assignee}}",
+    "due": "截止 {{date}}",
+    "noDate": "无日期",
+    "cancel": "取消",
+    "save": "保存",
+    "edit": "编辑",
+    "statusLabel": "状态",
+    "statusAriaLabel": "状态",
+    "statusOpen": "未开始",
+    "statusInProgress": "进行中",
+    "statusBlocked": "已阻塞",
+    "statusDone": "已完成",
+    "idLabel": "ID",
+    "createdLabel": "创建时间"
+  },
+  "auditLogHero": {
+    "badge": "治理控制台",
+    "eyebrow": "只读证据轨迹",
+    "title": "审计日志",
+    "subtitle": "查看安全、代理、工作流和数据变更，并提供足够的上下文，以说明谁更改了什么、何时发生以及接下来在哪里调查。",
+    "refreshing": "正在刷新证据...",
+    "visibleOnPage": "第 {{page}} 页显示 {{count}} 条",
+    "refreshedSuffix": "已刷新 {{time}}",
+    "metric": {
+      "eventsLoaded": {
+        "label": "已加载事件",
+        "helper": "当前服务器页面"
+      },
+      "security": {
+        "label": "安全/API",
+        "helper": "密钥、MCP、认证、Webhook"
+      },
+      "destructive": {
+        "label": "破坏性操作",
+        "helper": "删除、撤销、取消"
+      },
+      "dataChanges": {
+        "label": "数据变更",
+        "helper": "收入记录编辑"
+      },
+      "latestEvent": {
+        "label": "最新事件",
+        "none": "无",
+        "noEvents": "范围内无事件"
+      }
+    }
   }
 }

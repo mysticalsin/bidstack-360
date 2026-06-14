@@ -43,5 +43,13 @@
     "viewProposal": "Ver proposta: {{name}}",
     "version": "v{{version}}",
     "due": "Vencimento {{date}}"
+  },
+  "rfpCrew": {
+    "statusWaiting": "Aguardando",
+    "statusWorking": "Trabalhando",
+    "statusDone": "Concluído",
+    "statusOverseeing": "Supervisionando",
+    "viewRoleDetailsAria": "{{role}} — ver detalhes da função",
+    "moveToStageAria": "Mover {{role}} para outra etapa. Use as teclas de seta esquerda e direita."
   }
 }

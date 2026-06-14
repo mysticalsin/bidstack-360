@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
@@ -20,6 +21,7 @@ import { AuditFilterBar } from '@/pages/audit-log/AuditLogFilters';
 import { AuditTable } from '@/pages/audit-log/AuditLogTable';
 
 export function AuditLogSection() {
+  const { t } = useTranslation('settings');
   const [searchParams, setSearchParams] = useSearchParams();
   const [cursorStack, setCursorStack] = useState<string[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -112,7 +114,7 @@ export function AuditLogSection() {
       {/* sr-only live region — announces filter result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {!query.isLoading && query.data
-          ? `${visibleRows.length} event${visibleRows.length === 1 ? '' : 's'}${search ? ` matching "${search}"` : ''}${quickFilter !== 'all' ? ` · ${quickFilter}` : ''}`
+          ? `${t('auditLog.liveRegionCount', '{{count}} event', { count: visibleRows.length })}${search ? t('auditLog.liveRegionMatching', ' matching "{{search}}"', { search }) : ''}${quickFilter !== 'all' ? ` · ${quickFilter}` : ''}`
           : ''}
       </p>
 
@@ -120,10 +122,16 @@ export function AuditLogSection() {
 
       {query.isLoading && <LoadingSkeleton rows={8} />}
       {query.error && (
-        <ErrorState title="Failed to load audit entries" message={String(query.error)} />
+        <ErrorState
+          title={t('auditLog.errorTitle', 'Failed to load audit entries')}
+          message={String(query.error)}
+        />
       )}
       {!query.isLoading && rows.length === 0 && (
-        <EmptyState title="No audit entries" message="No audit entries match this range." />
+        <EmptyState
+          title={t('auditLog.emptyTitle', 'No audit entries')}
+          message={t('auditLog.emptyMessage', 'No audit entries match this range.')}
+        />
       )}
 
       {query.data && (

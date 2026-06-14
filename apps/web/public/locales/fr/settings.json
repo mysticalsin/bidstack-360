@@ -594,5 +594,31 @@
     "deleteButton": "Supprimer",
     "colorGroupAriaLabel": "Couleur de l'étiquette",
     "colorSwatchAriaLabel": "Couleur {{color}}"
+  },
+  "auditLog": {
+    "liveRegionCount": "{{count}} événement",
+    "liveRegionMatching": " correspondant à « {{search}} »",
+    "errorTitle": "Échec du chargement des entrées d'audit",
+    "emptyTitle": "Aucune entrée d'audit",
+    "emptyMessage": "Aucune entrée d'audit ne correspond à cette plage."
+  },
+  "pipelineStages": {
+    "sectionTitle": "Étapes du pipeline",
+    "sectionCaption": "Étapes limitées au locataire utilisées par les opportunités, les tableaux de pipeline, les rapports et les prévisions.",
+    "errorTitle": "Impossible de charger les étapes du pipeline",
+    "errorMessage": "Actualisez et réessayez.",
+    "emptyTitle": "Aucune étape de pipeline",
+    "emptyMessage": "L'API créera le pipeline par défaut pour cet espace de travail lors de l'actualisation.",
+    "toastSaved": "Étape du pipeline enregistrée",
+    "toastSaveFailed": "Échec de l'enregistrement",
+    "toastSaveFailedDescription": "Le serveur a rejeté la modification.",
+    "protectedNote": "La sémantique gagné et perdu est protégée. Renommez, recolorez et ajustez les probabilités par défaut ici ; les enregistrements d'opportunité utilisent ces valeurs immédiatement.",
+    "stageNameLabel": "Nom de l'étape",
+    "wonStageBadge": "Étape gagnée",
+    "lostStageBadge": "Étape perdue",
+    "probabilityLabel": "Probabilité",
+    "colorLabel": "Couleur",
+    "savingButton": "Enregistrement...",
+    "saveButton": "Enregistrer"
   }
 }

@@ -9,6 +9,7 @@
 import { type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Icon } from '@/components/ui/Icon';
@@ -27,10 +28,11 @@ import {
 // ─── KpiRow ─────────────────────────────────────────────────────────────────
 
 export function KpiRow({ kpis, reduced }: { kpis: OrgKpi[]; reduced: boolean | null }) {
+  const { t } = useTranslation('crm');
   return (
     <motion.section
       className="kpi-grid cols-6"
-      aria-label="Workspace metrics"
+      aria-label={t('kpiRow.workspaceMetricsAriaLabel', 'Workspace metrics')}
       variants={reduced ? undefined : staggerParent}
       initial="initial"
       animate="animate"
@@ -101,13 +103,17 @@ function KpiSignal({
   reduced: boolean | null;
   delay?: number;
 }) {
+  const { t } = useTranslation('crm');
   const visible = points
     .filter((point) => Number.isFinite(point.value) && point.value > 0)
     .slice(0, 5);
 
   if (visible.length === 0) {
     return (
-      <div className="kpi-signal kpi-signal-empty" title="No live signal yet">
+      <div
+        className="kpi-signal kpi-signal-empty"
+        title={t('kpiRow.noLiveSignalTitle', 'No live signal yet')}
+      >
         <span />
         <span />
         <span />

@@ -5,6 +5,7 @@
 import { useEffect, useRef } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { TrendingDown, TrendingUp, Minus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/cn';
 import { springSoft } from '@/lib/motion';
@@ -34,14 +35,16 @@ export function KpiCard({
   value,
   unit,
   deltaPercent,
-  deltaPeriod = 'vs last period',
+  deltaPeriod,
   sparklineData,
   format = defaultFormat,
   loading = false,
   className,
 }: Props) {
+  const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
   const numRef = useRef<HTMLSpanElement>(null);
+  const deltaPeriodLabel = deltaPeriod ?? t('kpi.deltaPeriodDefault', 'vs last period');
 
   // Count-up animation: use requestAnimationFrame for smooth interpolation.
   // If reduced motion is set, immediately display final value.
@@ -78,7 +81,7 @@ export function KpiCard({
           className,
         )}
         role="status"
-        aria-label="Loading KPI"
+        aria-label={t('kpi.loadingAriaLabel', 'Loading KPI')}
       >
         <div className="h-3 w-24 rounded bg-[var(--border-subtle)] mb-3" />
         <div className="h-8 w-32 rounded bg-[var(--border-subtle)] mb-2" />
@@ -108,7 +111,10 @@ export function KpiCard({
             <span
               ref={numRef}
               className="text-3xl font-bold text-[var(--fg-primary)] tabular-nums"
-              aria-label={`${title}: ${format(value)}`}
+              aria-label={t('kpi.valueAriaLabel', '{{title}}: {{value}}', {
+                title,
+                value: format(value),
+              })}
             >
               {reduced ? format(value) : '0'}
             </span>
@@ -126,15 +132,15 @@ export function KpiCard({
               )}
             >
               {deltaSign > 0 ? (
-                <TrendingUp size={12} aria-label="Up" />
+                <TrendingUp size={12} aria-label={t('kpi.trendUpAriaLabel', 'Up')} />
               ) : deltaSign < 0 ? (
-                <TrendingDown size={12} aria-label="Down" />
+                <TrendingDown size={12} aria-label={t('kpi.trendDownAriaLabel', 'Down')} />
               ) : (
-                <Minus size={12} aria-label="Flat" />
+                <Minus size={12} aria-label={t('kpi.trendFlatAriaLabel', 'Flat')} />
               )}
               <span>
                 {deltaSign > 0 ? '+' : ''}
-                {deltaPercent.toFixed(1)}% {deltaPeriod}
+                {deltaPercent.toFixed(1)}% {deltaPeriodLabel}
               </span>
             </div>
           )}

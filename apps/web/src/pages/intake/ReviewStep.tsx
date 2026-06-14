@@ -2,6 +2,8 @@
  * ReviewStep — human-in-the-loop approval of extracted solutions and products.
  * Step 3: user reviews and optionally removes items before publishing.
  */
+import { useTranslation } from 'react-i18next';
+
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
@@ -17,6 +19,7 @@ interface ReviewStepProps {
 }
 
 export function ReviewStep({ accountId, onNext, onBack }: ReviewStepProps) {
+  const { t } = useTranslation('crm');
   const intel = useAccountIntel(accountId || undefined);
   const solutions = (intel.data?.solutions ?? []) as ExtractedItem[];
   const products = (intel.data?.products ?? []) as ExtractedItem[];
@@ -25,42 +28,46 @@ export function ReviewStep({ accountId, onNext, onBack }: ReviewStepProps) {
 
   const handleDeleteSolution = (id: string, name: string) => {
     deleteSolution.mutate(id, {
-      onSuccess: () => toast.success(`Removed "${name}"`),
-      onError: () => toast.error(`Failed to remove "${name}"`),
+      onSuccess: () => toast.success(t('reviewStep.toastRemoved', 'Removed "{{name}}"', { name })),
+      onError: () =>
+        toast.error(t('reviewStep.toastRemoveFailed', 'Failed to remove "{{name}}"', { name })),
     });
   };
 
   const handleDeleteProduct = (id: string, name: string) => {
     deleteProduct.mutate(id, {
-      onSuccess: () => toast.success(`Removed "${name}"`),
-      onError: () => toast.error(`Failed to remove "${name}"`),
+      onSuccess: () => toast.success(t('reviewStep.toastRemoved', 'Removed "{{name}}"', { name })),
+      onError: () =>
+        toast.error(t('reviewStep.toastRemoveFailed', 'Failed to remove "{{name}}"', { name })),
     });
   };
 
   return (
     <Card className="p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-[var(--fg-primary)]">Review extracted data</h2>
+        <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
+          {t('reviewStep.heading', 'Review extracted data')}
+        </h2>
         <Button variant="ghost" size="sm" onClick={() => intel.refetch()}>
           <Icon name="refresh" size={14} />
-          Refresh
+          {t('reviewStep.refresh', 'Refresh')}
         </Button>
       </div>
 
       {intel.isLoading ? (
         <div className="h-32 flex items-center justify-center text-xs text-[var(--fg-tertiary)]">
-          Loading…
+          {t('reviewStep.loading', 'Loading…')}
         </div>
       ) : (
         <>
           <ExtractedGroup
-            title="Solutions"
+            title={t('reviewStep.groupSolutions', 'Solutions')}
             items={solutions}
             onDelete={handleDeleteSolution}
             isDeleting={deleteSolution.isPending}
           />
           <ExtractedGroup
-            title="Products"
+            title={t('reviewStep.groupProducts', 'Products')}
             items={products}
             onDelete={handleDeleteProduct}
             isDeleting={deleteProduct.isPending}
@@ -70,9 +77,9 @@ export function ReviewStep({ accountId, onNext, onBack }: ReviewStepProps) {
 
       <div className="flex items-center gap-2">
         <Button variant="secondary" onClick={onBack}>
-          ← Back
+          {t('reviewStep.back', '← Back')}
         </Button>
-        <Button onClick={onNext}>Publish →</Button>
+        <Button onClick={onNext}>{t('reviewStep.publish', 'Publish →')}</Button>
       </div>
     </Card>
   );
@@ -91,13 +98,16 @@ function ExtractedGroup({
   onDelete: (id: string, name: string) => void;
   isDeleting: boolean;
 }) {
+  const { t } = useTranslation('crm');
   return (
     <div>
       <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-        {title} ({items.length})
+        {t('reviewStep.groupHeading', '{{title}} ({{count}})', { title, count: items.length })}
       </h3>
       {items.length === 0 ? (
-        <p className="text-xs text-[var(--fg-tertiary)]">No {title.toLowerCase()} extracted.</p>
+        <p className="text-xs text-[var(--fg-tertiary)]">
+          {t('reviewStep.empty', 'No {{label}} extracted.', { label: title.toLowerCase() })}
+        </p>
       ) : (
         <div className="space-y-2">
           {items.map((item) => (
@@ -114,7 +124,7 @@ function ExtractedGroup({
               </div>
               <button
                 type="button"
-                aria-label={`Remove ${item.name}`}
+                aria-label={t('reviewStep.removeAria', 'Remove {{name}}', { name: item.name })}
                 onClick={() => onDelete(item.id, item.name)}
                 disabled={isDeleting}
                 className="opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100 focus:opacity-100 shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-red-50 hover:text-red-600 focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"

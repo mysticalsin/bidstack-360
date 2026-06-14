@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -12,24 +13,34 @@ import {
 } from '@/hooks/usePipelineStages';
 
 export function PipelineStagesSection() {
+  const { t } = useTranslation('settings');
   const stages = usePipelineStages();
   const patch = usePatchPipelineStage();
 
   return (
     <Card>
       <SectionHeader
-        title="Pipeline stages"
-        caption="Tenant-scoped stages used by opportunities, pipeline boards, reports, and forecasts."
+        title={t('pipelineStages.sectionTitle', 'Pipeline stages')}
+        caption={t(
+          'pipelineStages.sectionCaption',
+          'Tenant-scoped stages used by opportunities, pipeline boards, reports, and forecasts.',
+        )}
       />
       <div className="p-5">
         {stages.isLoading ? (
           <LoadingSkeleton rows={5} />
         ) : stages.isError ? (
-          <EmptyState title="Could not load pipeline stages" message="Refresh and try again." />
+          <EmptyState
+            title={t('pipelineStages.errorTitle', 'Could not load pipeline stages')}
+            message={t('pipelineStages.errorMessage', 'Refresh and try again.')}
+          />
         ) : !stages.data?.items.length ? (
           <EmptyState
-            title="No pipeline stages"
-            message="The API will create the default pipeline for this workspace on refresh."
+            title={t('pipelineStages.emptyTitle', 'No pipeline stages')}
+            message={t(
+              'pipelineStages.emptyMessage',
+              'The API will create the default pipeline for this workspace on refresh.',
+            )}
           />
         ) : (
           <div className="space-y-2">
@@ -41,11 +52,16 @@ export function PipelineStagesSection() {
                 onSave={async (id, body) => {
                   try {
                     await patch.mutateAsync({ id, body });
-                    toast.success('Pipeline stage saved');
+                    toast.success(t('pipelineStages.toastSaved', 'Pipeline stage saved'));
                   } catch (err) {
-                    toast.error('Save failed', {
+                    toast.error(t('pipelineStages.toastSaveFailed', 'Save failed'), {
                       description:
-                        err instanceof Error ? err.message : 'The server rejected the change.',
+                        err instanceof Error
+                          ? err.message
+                          : t(
+                              'pipelineStages.toastSaveFailedDescription',
+                              'The server rejected the change.',
+                            ),
                     });
                   }
                 }}
@@ -54,8 +70,10 @@ export function PipelineStagesSection() {
           </div>
         )}
         <p className="mt-3 text-xs text-[var(--fg-tertiary)]">
-          Closed-won and closed-lost semantics are protected. Rename, recolor, and adjust default
-          probabilities here; opportunity records use these values immediately.
+          {t(
+            'pipelineStages.protectedNote',
+            'Closed-won and closed-lost semantics are protected. Rename, recolor, and adjust default probabilities here; opportunity records use these values immediately.',
+          )}
         </p>
       </div>
     </Card>
@@ -74,6 +92,7 @@ function StageRow({
     body: { name: string; probability: number; color: string | null },
   ) => Promise<void>;
 }) {
+  const { t } = useTranslation('settings');
   const [name, setName] = useState(stage.name);
   const [probability, setProbability] = useState(String(stage.probability));
   const [color, setColor] = useState(stage.color ?? '#64748b');
@@ -105,7 +124,7 @@ function StageRow({
         aria-hidden
       />
       <label className="min-w-0">
-        <span className="sr-only">Stage name</span>
+        <span className="sr-only">{t('pipelineStages.stageNameLabel', 'Stage name')}</span>
         <input
           className="input w-full text-sm font-medium"
           value={name}
@@ -113,15 +132,15 @@ function StageRow({
           onChange={(e) => setName(e.target.value)}
         />
         <span className="mt-1 flex flex-wrap gap-1.5">
-          {stage.isWon ? <Badge tone="jade">Won stage</Badge> : null}
-          {stage.isLost ? <Badge tone="tomato">Lost stage</Badge> : null}
+          {stage.isWon ? <Badge tone="jade">{t('pipelineStages.wonStageBadge', 'Won stage')}</Badge> : null}
+          {stage.isLost ? <Badge tone="tomato">{t('pipelineStages.lostStageBadge', 'Lost stage')}</Badge> : null}
           {!stage.isWon && !stage.isLost ? (
             <Badge tone="gray">{stage.forecastCategory}</Badge>
           ) : null}
         </span>
       </label>
       <label className="text-xs text-[var(--fg-secondary)]">
-        Probability
+        {t('pipelineStages.probabilityLabel', 'Probability')}
         <input
           className="input mt-1 w-full text-sm"
           type="number"
@@ -132,7 +151,7 @@ function StageRow({
         />
       </label>
       <label className="text-xs text-[var(--fg-secondary)]">
-        Color
+        {t('pipelineStages.colorLabel', 'Color')}
         <input
           className="mt-1 h-10 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-input)]"
           type="color"
@@ -142,7 +161,7 @@ function StageRow({
       </label>
       <div className="flex items-end">
         <Button type="submit" size="sm" disabled={!dirty || isSaving || !name.trim()}>
-          {isSaving ? 'Saving...' : 'Save'}
+          {isSaving ? t('pipelineStages.savingButton', 'Saving...') : t('pipelineStages.saveButton', 'Save')}
         </Button>
       </div>
     </form>

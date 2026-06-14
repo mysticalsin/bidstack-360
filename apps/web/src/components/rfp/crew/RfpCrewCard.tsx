@@ -4,6 +4,7 @@
 // oversight members (Bid Director master, Executive Sponsor) read "overseeing".
 
 import { useDraggable } from '@dnd-kit/core';
+import { useTranslation } from 'react-i18next';
 
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
@@ -12,16 +13,14 @@ import type { RfpCrewMember } from './rfpCrew';
 
 export type CrewStatus = 'waiting' | 'working' | 'done' | 'overseeing';
 
-const STATUS_META: Record<CrewStatus, { label: string; dot: string; text: string }> = {
-  waiting: { label: 'Waiting', dot: 'bg-[var(--fg-tertiary)]', text: 'text-[var(--fg-tertiary)]' },
+const STATUS_META: Record<CrewStatus, { dot: string; text: string }> = {
+  waiting: { dot: 'bg-[var(--fg-tertiary)]', text: 'text-[var(--fg-tertiary)]' },
   working: {
-    label: 'Working',
     dot: 'bg-[var(--brand-primary)]',
     text: 'text-[var(--brand-primary)]',
   },
-  done: { label: 'Done', dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' },
+  done: { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' },
   overseeing: {
-    label: 'Overseeing',
     dot: 'bg-amber-500',
     text: 'text-amber-600 dark:text-amber-400',
   },
@@ -45,11 +44,18 @@ export function RfpCrewCard({
   onSelect,
   onMove,
 }: Props) {
+  const { t } = useTranslation('rfp');
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: member.key,
     disabled: !draggable,
   });
   const meta = STATUS_META[status];
+  const statusLabel: Record<CrewStatus, string> = {
+    waiting: t('rfpCrew.statusWaiting', 'Waiting'),
+    working: t('rfpCrew.statusWorking', 'Working'),
+    done: t('rfpCrew.statusDone', 'Done'),
+    overseeing: t('rfpCrew.statusOverseeing', 'Overseeing'),
+  };
 
   return (
     <article
@@ -82,7 +88,9 @@ export function RfpCrewCard({
             type="button"
             onClick={() => onSelect(member)}
             className="block w-full truncate rounded-sm text-left text-sm font-semibold text-[var(--fg-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)]"
-            aria-label={`${member.role} — view role details`}
+            aria-label={t('rfpCrew.viewRoleDetailsAria', '{{role}} — view role details', {
+              role: member.role,
+            })}
           >
             {member.role}
           </button>
@@ -100,7 +108,7 @@ export function RfpCrewCard({
                   status === 'working' && 'animate-pulse',
                 )}
               />
-              {meta.label}
+              {statusLabel[status]}
             </span>
           </div>
         </div>
@@ -112,7 +120,11 @@ export function RfpCrewCard({
             {...attributes}
             role="button"
             tabIndex={0}
-            aria-label={`Move ${member.role} to another stage. Use left and right arrow keys.`}
+            aria-label={t(
+              'rfpCrew.moveToStageAria',
+              'Move {{role}} to another stage. Use left and right arrow keys.',
+              { role: member.role },
+            )}
             onKeyDown={(e) => {
               if (!onMove) return;
               if (e.key === 'ArrowRight') {

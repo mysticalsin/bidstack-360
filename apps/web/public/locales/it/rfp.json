@@ -43,5 +43,13 @@
     "viewProposal": "Visualizza proposta: {{name}}",
     "version": "v{{version}}",
     "due": "Scadenza {{date}}"
+  },
+  "rfpCrew": {
+    "statusWaiting": "In attesa",
+    "statusWorking": "In corso",
+    "statusDone": "Completato",
+    "statusOverseeing": "Supervisione",
+    "viewRoleDetailsAria": "{{role}} — visualizza i dettagli del ruolo",
+    "moveToStageAria": "Sposta {{role}} a un'altra fase. Usa i tasti freccia sinistra e destra."
   }
 }
