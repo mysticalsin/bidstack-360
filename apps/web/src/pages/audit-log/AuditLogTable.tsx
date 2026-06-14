@@ -8,6 +8,7 @@
  * independent of the filter bar and insight panels.
  */
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 import type { AuditLogEntry } from '@bidstack/shared';
 
@@ -53,13 +54,20 @@ export function AuditTable({
   onOlder: () => void;
   onNewer: () => void;
 }) {
+  const { t } = useTranslation('crm');
   return (
     <Card className="overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-primary)]">
       <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-base font-semibold text-[var(--text-primary)]">Evidence stream</h2>
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">
+            {t('auditLogTable.evidenceStreamTitle', 'Evidence stream')}
+          </h2>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Showing {rows.length} filtered events from {rawRowCount} loaded records.
+            {t(
+              'auditLogTable.evidenceStreamSummary',
+              'Showing {{count}} filtered events from {{total}} loaded records.',
+              { count: rows.length, total: rawRowCount },
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -69,10 +77,10 @@ export function AuditTable({
             disabled={!canGoNewer}
             className="inline-flex h-10 items-center justify-center rounded-xl border border-[var(--border-subtle)] px-3 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--accent-primary)]/15 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            Newer
+            {t('auditLogTable.newer', 'Newer')}
           </button>
           <span className="rounded-xl bg-[var(--surface-secondary)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)]">
-            Page {page}
+            {t('auditLogTable.page', 'Page {{page}}', { page })}
           </span>
           <button
             type="button"
@@ -80,7 +88,7 @@ export function AuditTable({
             disabled={!canGoOlder}
             className="inline-flex h-10 items-center justify-center rounded-xl border border-[var(--border-subtle)] px-3 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--accent-primary)]/15 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            Older
+            {t('auditLogTable.older', 'Older')}
           </button>
         </div>
       </div>
@@ -92,10 +100,13 @@ export function AuditTable({
               <Icon name="search" className="size-5" />
             </span>
             <h3 className="mt-4 text-lg font-semibold text-[var(--text-primary)]">
-              No matching evidence
+              {t('auditLogTable.emptyTitle', 'No matching evidence')}
             </h3>
             <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
-              Adjust the category, record type or search terms to widen the audit trail.
+              {t(
+                'auditLogTable.emptyDescription',
+                'Adjust the category, record type or search terms to widen the audit trail.',
+              )}
             </p>
           </div>
         </div>
@@ -103,27 +114,29 @@ export function AuditTable({
         <div
           className="overflow-x-auto"
           role="region"
-          aria-label="Audit evidence table"
+          aria-label={t('auditLogTable.tableRegionLabel', 'Audit evidence table')}
           tabIndex={0}
         >
           <table className="w-full min-w-[980px] border-collapse text-left text-sm">
-            <caption className="sr-only">Audit log entries, newest first</caption>
+            <caption className="sr-only">
+              {t('auditLogTable.tableCaption', 'Audit log entries, newest first')}
+            </caption>
             <thead className="sticky top-0 z-10 bg-[var(--surface-secondary)] text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
               <tr>
                 <th scope="col" className="px-4 py-3 font-semibold">
-                  Event
+                  {t('auditLogTable.columnEvent', 'Event')}
                 </th>
                 <th scope="col" className="px-4 py-3 font-semibold">
-                  Actor
+                  {t('auditLogTable.columnActor', 'Actor')}
                 </th>
                 <th scope="col" className="px-4 py-3 font-semibold">
-                  Target
+                  {t('auditLogTable.columnTarget', 'Target')}
                 </th>
                 <th scope="col" className="px-4 py-3 font-semibold">
-                  Time
+                  {t('auditLogTable.columnTime', 'Time')}
                 </th>
                 <th scope="col" className="px-4 py-3 text-right font-semibold">
-                  Details
+                  {t('auditLogTable.columnDetails', 'Details')}
                 </th>
               </tr>
             </thead>
@@ -155,6 +168,7 @@ function AuditRow({
   isOpen: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useTranslation('crm');
   const classification = classifyAudit(row);
   const detailsId = `audit-log-details-${row.id}`;
   const fields = summarizeDiff(row.diff);
@@ -176,7 +190,7 @@ function AuditRow({
                 </span>
                 <Badge tone={classification.tone}>{classification.label}</Badge>
                 <Badge tone={risk >= 80 ? 'tomato' : risk >= 55 ? 'amber' : 'jade'}>
-                  Risk {risk}
+                  {t('auditLogTable.riskBadge', 'Risk {{risk}}', { risk })}
                 </Badge>
               </div>
               <div className="mt-1 truncate font-mono text-xs text-[var(--text-muted)]">
@@ -194,7 +208,9 @@ function AuditRow({
                   ))}
                   {fields.length > 3 && (
                     <span className="rounded-full bg-[var(--surface-secondary)] px-2 py-1 text-[11px] text-[var(--text-muted)]">
-                      +{fields.length - 3} more
+                      {t('auditLogTable.moreFields', '+{{count}} more', {
+                        count: fields.length - 3,
+                      })}
                     </span>
                   )}
                 </div>
@@ -216,7 +232,7 @@ function AuditRow({
                 {actorLabel(row)}
               </div>
               <div className="truncate text-xs text-[var(--text-muted)]">
-                {row.userEmail || 'System generated'}
+                {row.userEmail || t('auditLogTable.systemGenerated', 'System generated')}
               </div>
             </div>
           </div>
@@ -224,13 +240,21 @@ function AuditRow({
 
         <td className="px-4 py-4">
           <div className="space-y-1">
-            <Badge tone="gray">{row.targetType || 'system'}</Badge>
+            <Badge tone="gray">
+              {row.targetType || t('auditLogTable.targetTypeSystem', 'system')}
+            </Badge>
             <div
               className="font-mono text-xs text-[var(--text-muted)]"
               title={row.targetId ?? undefined}
-              aria-label={row.targetId ? `Target id ${row.targetId}` : 'No record reference'}
+              aria-label={
+                row.targetId
+                  ? t('auditLogTable.targetIdLabel', 'Target id {{id}}', { id: row.targetId })
+                  : t('auditLogTable.noRecordReference', 'No record reference')
+              }
             >
-              {row.targetId ? truncateId(row.targetId) : 'No record reference'}
+              {row.targetId
+                ? truncateId(row.targetId)
+                : t('auditLogTable.noRecordReference', 'No record reference')}
             </div>
             {row.targetId && (
               <div className="flex flex-wrap gap-1.5">
@@ -240,7 +264,7 @@ function AuditRow({
                     className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-[var(--border-subtle)] px-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-4 focus:ring-[var(--accent-primary)]/15"
                   >
                     <Icon name="arrow" className="size-3" />
-                    Open
+                    {t('auditLogTable.open', 'Open')}
                   </Link>
                 )}
                 <button
@@ -249,7 +273,7 @@ function AuditRow({
                   className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-[var(--border-subtle)] px-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-4 focus:ring-[var(--accent-primary)]/15"
                 >
                   <Icon name="link" className="size-3" />
-                  Copy ID
+                  {t('auditLogTable.copyId', 'Copy ID')}
                 </button>
               </div>
             )}
@@ -274,11 +298,22 @@ function AuditRow({
             type="button"
             aria-expanded={isOpen}
             aria-controls={detailsId}
-            aria-label={`${isOpen ? 'Hide' : 'Inspect'} diff payload for ${formatAction(row.action)} by ${actorLabel(row)}`}
+            aria-label={
+              isOpen
+                ? t('auditLogTable.hideDiffLabel', 'Hide diff payload for {{action}} by {{actor}}', {
+                    action: formatAction(row.action),
+                    actor: actorLabel(row),
+                  })
+                : t(
+                    'auditLogTable.inspectDiffLabel',
+                    'Inspect diff payload for {{action}} by {{actor}}',
+                    { action: formatAction(row.action), actor: actorLabel(row) },
+                  )
+            }
             onClick={onToggle}
             className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--border-subtle)] px-3 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--accent-primary)]/15"
           >
-            {isOpen ? 'Hide' : 'Inspect'}
+            {isOpen ? t('auditLogTable.hide', 'Hide') : t('auditLogTable.inspect', 'Inspect')}
             <Icon name="caret" className={cn('size-3 transition', isOpen && 'rotate-180')} />
           </button>
         </td>
@@ -290,12 +325,14 @@ function AuditRow({
             <div
               id={detailsId}
               role="region"
-              aria-label={`Diff payload for ${formatAction(row.action)}`}
+              aria-label={t('auditLogTable.diffPayloadLabel', 'Diff payload for {{action}}', {
+                action: formatAction(row.action),
+              })}
               className="grid gap-3 lg:grid-cols-[320px,1fr]"
             >
               <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-4">
                 <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                  Change summary
+                  {t('auditLogTable.changeSummary', 'Change summary')}
                 </div>
                 {fields.length > 0 ? (
                   <ul className="mt-3 space-y-2 text-sm text-[var(--text-secondary)]">
@@ -308,15 +345,17 @@ function AuditRow({
                   </ul>
                 ) : (
                   <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">
-                    No structured diff was captured for this event. Use the raw payload when
-                    forensic detail is required.
+                    {t(
+                      'auditLogTable.noStructuredDiff',
+                      'No structured diff was captured for this event. Use the raw payload when forensic detail is required.',
+                    )}
                   </p>
                 )}
               </div>
               <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                    Raw evidence payload
+                    {t('auditLogTable.rawPayloadTitle', 'Raw evidence payload')}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -324,9 +363,9 @@ function AuditRow({
                       onClick={() => writeClipboard(JSON.stringify(row.diff ?? {}, null, 2))}
                       className="inline-flex min-h-8 items-center rounded-lg border border-[var(--border-subtle)] px-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-4 focus:ring-[var(--accent-primary)]/15"
                     >
-                      Copy JSON
+                      {t('auditLogTable.copyJson', 'Copy JSON')}
                     </button>
-                    <Badge tone="gray">Immutable</Badge>
+                    <Badge tone="gray">{t('auditLogTable.immutable', 'Immutable')}</Badge>
                   </div>
                 </div>
                 <pre className="max-h-[360px] overflow-auto rounded-xl bg-[var(--code-bg)] p-4 text-xs leading-6 text-[var(--code-fg)]">

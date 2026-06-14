@@ -149,5 +149,70 @@
     "removeGroupAriaLabel": "删除分组",
     "addCondition": "条件",
     "addGroup": "分组"
+  },
+  "reports": {
+    "heading": "报告",
+    "subtitle": "涵盖管道、潜在客户、服务台和任务的分析。",
+    "tab": {
+      "pipeline": "管道",
+      "leads": "潜在客户",
+      "service-desk": "服务台",
+      "tasks": "任务"
+    },
+    "tabAriaLabel": "{{label}}报告标签页",
+    "error": {
+      "title": "无法加载报告"
+    },
+    "byStatus": "按状态",
+    "pipeline": {
+      "byStage": "按阶段的管道",
+      "weighted": "加权管道",
+      "totalOpen": "未结总数",
+      "closedThisQuarter": "本季度已关闭"
+    },
+    "leads": {
+      "total": "潜在客户总数",
+      "converted": "已转化",
+      "conversionRate": "转化率",
+      "avgScore": "平均分",
+      "bySource": "按来源"
+    },
+    "serviceDesk": {
+      "totalCases": "案例总数",
+      "open": "未结",
+      "resolvedThisMonth": "本月已解决",
+      "avgSatisfaction": "平均满意度",
+      "byPriority": "按优先级"
+    },
+    "tasks": {
+      "total": "任务总数",
+      "completed": "已完成",
+      "overdue": "逾期",
+      "completionRate": "完成率"
+    }
+  },
+  "reportsList": {
+    "errorTitle": "加载报告失败",
+    "heading": "报告",
+    "savedCount": "{{count}} 个已保存的报告",
+    "newReport": "新建报告",
+    "searchPlaceholder": "搜索报告…",
+    "searchAriaLabel": "搜索报告",
+    "resultsCountMatching": "{{count}} 个与“{{search}}”匹配的报告",
+    "resultsCount": "{{count}} 个报告",
+    "emptyTitle": "未找到报告",
+    "emptySearchMessage": "请尝试其他搜索。",
+    "emptyMessage": "创建您的第一个分析报告。",
+    "tableAriaLabel": "报告",
+    "columnName": "名称",
+    "columnEntity": "实体",
+    "columnLastRun": "上次运行",
+    "columnSchedule": "计划",
+    "columnActions": "操作",
+    "runAriaLabel": "运行报告 {{name}}",
+    "editAriaLabel": "编辑报告 {{name}}",
+    "duplicateAriaLabel": "复制报告 {{name}}",
+    "deleteConfirm": "删除“{{name}}”？",
+    "deleteAriaLabel": "删除报告 {{name}}"
   }
 }

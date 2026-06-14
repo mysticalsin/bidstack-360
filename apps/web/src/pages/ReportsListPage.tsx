@@ -4,6 +4,7 @@
 // The legacy page is preserved at its import path; this is the new analytics entry.
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -32,6 +33,7 @@ import {
 type SortKey = 'name' | 'lastRunAt' | 'createdAt';
 
 export function ReportsListPage() {
+  const { t } = useTranslation('reports');
   const { data: reports = [], isLoading, error } = useAnalyticsReportsList();
   const runMutation = useRunReport();
   const duplicateMutation = useDuplicateReport();
@@ -88,7 +90,10 @@ export function ReportsListPage() {
   if (error) {
     return (
       <div className="p-8">
-        <ErrorState title="Failed to load reports" message={(error as Error).message} />
+        <ErrorState
+          title={t('reportsList.errorTitle', 'Failed to load reports')}
+          message={(error as Error).message}
+        />
       </div>
     );
   }
@@ -110,9 +115,11 @@ export function ReportsListPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">Reports</h1>
+          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
+            {t('reportsList.heading', 'Reports')}
+          </h1>
           <p className="text-sm text-[var(--fg-tertiary)] mt-0.5">
-            {reports.length} saved report{reports.length !== 1 ? 's' : ''}
+            {t('reportsList.savedCount', '{{count}} saved reports', { count: reports.length })}
           </p>
         </div>
         <Link
@@ -125,7 +132,7 @@ export function ReportsListPage() {
           )}
         >
           <Plus size={16} />
-          New report
+          {t('reportsList.newReport', 'New report')}
         </Link>
       </div>
 
@@ -139,8 +146,8 @@ export function ReportsListPage() {
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search reports…"
-          aria-label="Search reports"
+          placeholder={t('reportsList.searchPlaceholder', 'Search reports…')}
+          aria-label={t('reportsList.searchAriaLabel', 'Search reports')}
           className={cn(
             'w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)]',
             'pl-9 pr-3 py-2 text-sm text-[var(--fg-primary)] placeholder:text-[var(--fg-tertiary)]',
@@ -153,13 +160,22 @@ export function ReportsListPage() {
       {/* sr-only live region — announces search result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {!isLoading &&
-          `${filtered.length} report${filtered.length === 1 ? '' : 's'}${search ? ` matching "${search}"` : ''}`}
+          (search
+            ? t('reportsList.resultsCountMatching', '{{count}} reports matching "{{search}}"', {
+                count: filtered.length,
+                search,
+              })
+            : t('reportsList.resultsCount', '{{count}} reports', { count: filtered.length }))}
       </p>
 
       {filtered.length === 0 ? (
         <EmptyState
-          title="No reports found"
-          message={search ? 'Try a different search.' : 'Create your first analytical report.'}
+          title={t('reportsList.emptyTitle', 'No reports found')}
+          message={
+            search
+              ? t('reportsList.emptySearchMessage', 'Try a different search.')
+              : t('reportsList.emptyMessage', 'Create your first analytical report.')
+          }
           action={
             !search ? (
               <Link
@@ -170,14 +186,14 @@ export function ReportsListPage() {
                 )}
               >
                 <Plus size={16} />
-                New report
+                {t('reportsList.newReport', 'New report')}
               </Link>
             ) : undefined
           }
         />
       ) : (
         <div className="rounded-xl border border-[var(--border-subtle)] overflow-hidden">
-          <table className="w-full" role="grid" aria-label="Reports">
+          <table className="w-full" role="grid" aria-label={t('reportsList.tableAriaLabel', 'Reports')}>
             <thead className="bg-[var(--surface-sunken)]">
               <tr>
                 <th
@@ -187,9 +203,9 @@ export function ReportsListPage() {
                     sortKey === 'name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'
                   }
                 >
-                  Name {renderSortIcon('name')}
+                  {t('reportsList.columnName', 'Name')} {renderSortIcon('name')}
                 </th>
-                <th className={thCls}>Entity</th>
+                <th className={thCls}>{t('reportsList.columnEntity', 'Entity')}</th>
                 <th
                   className={thCls}
                   onClick={() => handleSort('lastRunAt')}
@@ -201,11 +217,11 @@ export function ReportsListPage() {
                       : 'none'
                   }
                 >
-                  Last run {renderSortIcon('lastRunAt')}
+                  {t('reportsList.columnLastRun', 'Last run')} {renderSortIcon('lastRunAt')}
                 </th>
-                <th className={thCls}>Schedule</th>
+                <th className={thCls}>{t('reportsList.columnSchedule', 'Schedule')}</th>
                 <th className="px-3 py-2.5 text-right text-xs font-semibold text-[var(--fg-secondary)] uppercase tracking-wide">
-                  Actions
+                  {t('reportsList.columnActions', 'Actions')}
                 </th>
               </tr>
             </thead>
@@ -265,7 +281,9 @@ export function ReportsListPage() {
                       <button
                         onClick={() => handleRun(r)}
                         disabled={runningIds.has(r.id)}
-                        aria-label={`Run report ${r.name}`}
+                        aria-label={t('reportsList.runAriaLabel', 'Run report {{name}}', {
+                          name: r.name,
+                        })}
                         className={cn(
                           'flex items-center justify-center w-8 h-8 rounded-lg transition-colors min-w-[44px] min-h-[44px]',
                           'text-[var(--fg-tertiary)] hover:text-[var(--success)] hover:bg-[var(--success-tint)]',
@@ -277,7 +295,9 @@ export function ReportsListPage() {
                       {/* Edit */}
                       <Link
                         to={`/reports/${r.id}/edit`}
-                        aria-label={`Edit report ${r.name}`}
+                        aria-label={t('reportsList.editAriaLabel', 'Edit report {{name}}', {
+                          name: r.name,
+                        })}
                         className={cn(
                           'flex items-center justify-center w-8 h-8 rounded-lg transition-colors min-w-[44px] min-h-[44px]',
                           'text-[var(--fg-tertiary)] hover:text-[var(--brand-primary)] hover:bg-[var(--brand-primary-tint)]',
@@ -288,7 +308,9 @@ export function ReportsListPage() {
                       {/* Duplicate */}
                       <button
                         onClick={() => duplicateMutation.mutate(r.id)}
-                        aria-label={`Duplicate report ${r.name}`}
+                        aria-label={t('reportsList.duplicateAriaLabel', 'Duplicate report {{name}}', {
+                          name: r.name,
+                        })}
                         className={cn(
                           'flex items-center justify-center w-8 h-8 rounded-lg transition-colors min-w-[44px] min-h-[44px]',
                           'text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)] hover:bg-[var(--surface-sunken)]',
@@ -299,9 +321,12 @@ export function ReportsListPage() {
                       {/* Delete */}
                       <button
                         onClick={() => {
-                          if (confirm(`Delete "${r.name}"?`)) deleteMutation.mutate(r.id);
+                          if (confirm(t('reportsList.deleteConfirm', 'Delete "{{name}}"?', { name: r.name })))
+                            deleteMutation.mutate(r.id);
                         }}
-                        aria-label={`Delete report ${r.name}`}
+                        aria-label={t('reportsList.deleteAriaLabel', 'Delete report {{name}}', {
+                          name: r.name,
+                        })}
                         className={cn(
                           'flex items-center justify-center w-8 h-8 rounded-lg transition-colors min-w-[44px] min-h-[44px]',
                           'text-[var(--fg-tertiary)] hover:text-[var(--danger)] hover:bg-[var(--danger-tint)]',

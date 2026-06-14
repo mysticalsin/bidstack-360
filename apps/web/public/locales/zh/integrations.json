@@ -194,5 +194,59 @@
       "down": "中断",
       "disabled": "已禁用"
     }
+  },
+  "erpConnector": {
+    "title": "ERP MCP",
+    "caption": "设置 ERP_MCP_URL + ERP_DB 以启用",
+    "status": {
+      "error": "错误",
+      "checking": "检查中",
+      "notConfigured": "未配置",
+      "live": "在线",
+      "unreachable": "无法访问"
+    },
+    "error": {
+      "title": "无法连接到 ERP 状态端点",
+      "message": "这是连接问题，而非配置缺失。请重试。",
+      "retry": "重试"
+    },
+    "notConfigured": {
+      "set": "设置",
+      "andOptionally": "并可选地设置",
+      "tail": "以连接 ERP MCP sidecar。在此之前，BidStack 使用本地已验证数据和已验证数据连接器。"
+    },
+    "stat": {
+      "endpoint": "端点",
+      "database": "数据库",
+      "mcpTools": "MCP 工具",
+      "status": "状态"
+    },
+    "value": {
+      "na": "无",
+      "reachable": "可访问",
+      "unreachable": "无法访问"
+    },
+    "kit": {
+      "title": "ERP 投标操作工具包",
+      "subtitle": "为 BidStack 售前调整的合作伙伴、商机、报价、活动、文档和交接模式。",
+      "badge": {
+        "sidecar": "sidecar",
+        "fixSidecar": "修复 sidecar",
+        "local": "本地"
+      }
+    },
+    "autocomplete": {
+      "title": "合作伙伴自动补全",
+      "subtitle": "ERP 风格的法律实体查找，带 BidStack 回退。",
+      "ariaLabel": "公司自动补全查询",
+      "placeholder": "名称、域名、增值税号或 DUNS",
+      "check": "检查",
+      "empty": "暂无公司建议。请添加 ERP MCP 凭据或在 BidStack 中验证此账户。"
+    },
+    "item": {
+      "vat": "增值税号 {{value}}",
+      "duns": "DUNS {{value}}",
+      "noRegistryKeys": "尚无注册标识"
+    }
   }
 }

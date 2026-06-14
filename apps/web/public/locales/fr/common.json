@@ -299,5 +299,12 @@
   "select": {
     "placeholder": "—",
     "noOptions": "Aucune option"
+  },
+  "lookupFieldPicker": {
+    "placeholder": "Rechercher…",
+    "clearSelection": "Effacer la sélection",
+    "searching": "Recherche…",
+    "noResults": "Aucun résultat.",
+    "typeToSearch": "Saisissez pour rechercher…"
   }
 }

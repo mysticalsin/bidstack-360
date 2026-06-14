@@ -194,5 +194,59 @@
       "down": "down",
       "disabled": "disabled"
     }
+  },
+  "erpConnector": {
+    "title": "ERP MCP",
+    "caption": "set ERP_MCP_URL + ERP_DB to enable",
+    "status": {
+      "error": "error",
+      "checking": "checking",
+      "notConfigured": "not configured",
+      "live": "live",
+      "unreachable": "unreachable"
+    },
+    "error": {
+      "title": "Couldn't reach the ERP status endpoint",
+      "message": "This is a connection problem, not a missing configuration. Please retry.",
+      "retry": "Retry"
+    },
+    "notConfigured": {
+      "set": "Set",
+      "andOptionally": "and optionally",
+      "tail": "to reach the ERP MCP sidecar. Until then, BidStack uses local verified data and verified data connectors."
+    },
+    "stat": {
+      "endpoint": "Endpoint",
+      "database": "Database",
+      "mcpTools": "MCP tools",
+      "status": "Status"
+    },
+    "value": {
+      "na": "n/a",
+      "reachable": "reachable",
+      "unreachable": "unreachable"
+    },
+    "kit": {
+      "title": "ERP bid operating kit",
+      "subtitle": "Partner, opportunity, quote, activity, document, and handoff patterns adapted for BidStack presales.",
+      "badge": {
+        "sidecar": "sidecar",
+        "fixSidecar": "fix sidecar",
+        "local": "local"
+      }
+    },
+    "autocomplete": {
+      "title": "Partner autocomplete",
+      "subtitle": "ERP-style legal entity lookup with BidStack fallback.",
+      "ariaLabel": "Company autocomplete query",
+      "placeholder": "Name, domain, VAT, or DUNS",
+      "check": "Check",
+      "empty": "No company suggestions yet. Add ERP MCP credentials or verify this account in BidStack."
+    },
+    "item": {
+      "vat": "VAT {{value}}",
+      "duns": "DUNS {{value}}",
+      "noRegistryKeys": "No registry keys yet"
+    }
   }
 }

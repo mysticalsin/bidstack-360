@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { ConnectorsSection } from '@/components/integrations/ConnectorsSection';
 import { DataQualitySection } from '@/components/integrations/DataQualitySection';
@@ -32,6 +33,7 @@ import { MCP_TOOLS } from '@/pages/integrations/types';
 import type { DustStatus, IntegrationSetupGuide, WebhookEvent } from '@/pages/integrations/types';
 
 export function IntegrationsSection() {
+  const { t } = useTranslation('settings');
   const isAdmin = useIsAdmin();
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -73,8 +75,11 @@ export function IntegrationsSection() {
 
       {isError ? (
         <ErrorState
-          title="Could not load integrations"
-          message="Some integration data failed to load. Please try again."
+          title={t('integrations.errorTitle', 'Could not load integrations')}
+          message={t(
+            'integrations.errorMessage',
+            'Some integration data failed to load. Please try again.',
+          )}
           action={
             <button
               type="button"
@@ -85,7 +90,7 @@ export function IntegrationsSection() {
               }}
               className="inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-medium text-fg-on-brand hover:bg-brand-hover"
             >
-              Retry
+              {t('integrations.retry', 'Retry')}
             </button>
           }
         />
@@ -97,19 +102,19 @@ export function IntegrationsSection() {
         <TabsList className="flex flex-wrap items-center gap-1 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-1 shadow-[var(--shadow-xs)]">
           <TabsTrigger value="overview" className="gap-2">
             <Icon name="sliders" size={14} />
-            <span>Overview & Health</span>
+            <span>{t('integrations.tabOverview', 'Overview & Health')}</span>
           </TabsTrigger>
           <TabsTrigger value="agents" className="gap-2">
             <Icon name="sparkle" size={14} />
-            <span>AI & Agents</span>
+            <span>{t('integrations.tabAgents', 'AI & Agents')}</span>
           </TabsTrigger>
           <TabsTrigger value="connectors" className="gap-2">
             <Icon name="globe" size={14} />
-            <span>ERP & Connectors</span>
+            <span>{t('integrations.tabConnectors', 'ERP & Connectors')}</span>
           </TabsTrigger>
           <TabsTrigger value="developer" className="gap-2">
             <Icon name="settings" size={14} />
-            <span>Developer Tools</span>
+            <span>{t('integrations.tabDeveloper', 'Developer Tools')}</span>
           </TabsTrigger>
         </TabsList>
 
@@ -133,13 +138,15 @@ export function IntegrationsSection() {
 
           <Card>
             <SectionHeader
-              title="Dust workspace"
+              title={t('integrations.dustWorkspaceTitle', 'Dust workspace')}
               caption={status.data?.workspace}
               action={
                 <div className="flex items-center gap-2">
                   {status.data ? (
                     <Badge tone={status.data.configured ? 'jade' : 'amber'}>
-                      {status.data.configured ? 'Configured' : 'Not configured'}
+                      {status.data.configured
+                        ? t('integrations.statusConfigured', 'Configured')
+                        : t('integrations.statusNotConfigured', 'Not configured')}
                     </Badge>
                   ) : null}
                   {isAdmin ? (
@@ -152,7 +159,7 @@ export function IntegrationsSection() {
                         );
                       }}
                     >
-                      Run sync now
+                      {t('integrations.runSyncNow', 'Run sync now')}
                     </LiquidGlassButton>
                   ) : null}
                 </div>
@@ -160,15 +167,29 @@ export function IntegrationsSection() {
             />
             <div className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-4">
               <Stat
-                label="Last sync"
-                value={status.data?.lastSyncAt ? formatDate(status.data.lastSyncAt) : 'n/a'}
+                label={t('integrations.statLastSync', 'Last sync')}
+                value={
+                  status.data?.lastSyncAt
+                    ? formatDate(status.data.lastSyncAt)
+                    : t('integrations.notAvailable', 'n/a')
+                }
               />
               <Stat
-                label="Next sync"
-                value={status.data?.nextSyncAt ? formatDate(status.data.nextSyncAt) : 'n/a'}
+                label={t('integrations.statNextSync', 'Next sync')}
+                value={
+                  status.data?.nextSyncAt
+                    ? formatDate(status.data.nextSyncAt)
+                    : t('integrations.notAvailable', 'n/a')
+                }
               />
-              <Stat label="Pulled 24h" value={status.data?.pulled24h.toString() ?? 'n/a'} />
-              <Stat label="Pushed 24h" value={status.data?.pushed24h.toString() ?? 'n/a'} />
+              <Stat
+                label={t('integrations.statPulled24h', 'Pulled 24h')}
+                value={status.data?.pulled24h.toString() ?? t('integrations.notAvailable', 'n/a')}
+              />
+              <Stat
+                label={t('integrations.statPushed24h', 'Pushed 24h')}
+                value={status.data?.pushed24h.toString() ?? t('integrations.notAvailable', 'n/a')}
+              />
             </div>
             {status.data?.lastError ? (
               <div className="mx-5 mb-5 rounded-md bg-[var(--danger-tint)] px-3 py-2 text-xs text-[var(--danger)]">
@@ -185,8 +206,11 @@ export function IntegrationsSection() {
 
           <Card>
             <SectionHeader
-              title="MCP tools"
-              caption="Canonical crm_* names are consumed by Dust; legacy dotted names remain for v0.1 clients."
+              title={t('integrations.mcpToolsTitle', 'MCP tools')}
+              caption={t(
+                'integrations.mcpToolsCaption',
+                'Canonical crm_* names are consumed by Dust; legacy dotted names remain for v0.1 clients.',
+              )}
             />
             <ul className="divide-y divide-[var(--border-subtle)]">
               {MCP_TOOLS.map((tool) => (
@@ -198,7 +222,9 @@ export function IntegrationsSection() {
                     <p className="mt-0.5 text-xs text-[var(--fg-secondary)]">{tool.desc}</p>
                   </div>
                   <Badge tone={tool.group === 'crm' ? 'jade' : 'gray'}>
-                    {tool.group === 'crm' ? 'active' : 'legacy'}
+                    {tool.group === 'crm'
+                      ? t('integrations.mcpToolActive', 'active')
+                      : t('integrations.mcpToolLegacy', 'legacy')}
                   </Badge>
                 </li>
               ))}
@@ -239,6 +265,7 @@ function ApolloAccountIntelCard({
     | undefined;
   isLoading: boolean;
 }) {
+  const { t } = useTranslation('settings');
   const configured = status?.status === 'healthy' || status?.status === 'degraded';
   const healthTone = configured ? 'jade' : 'amber';
   const envSnippet = [
@@ -252,12 +279,19 @@ function ApolloAccountIntelCard({
   return (
     <Card>
       <SectionHeader
-        title="Apollo account intelligence"
-        caption="Feeds account cockpit fields: industry, employees, revenue, intent, hiring movement, leadership changes, technologies, and last sync freshness."
+        title={t('integrations.apolloTitle', 'Apollo account intelligence')}
+        caption={t(
+          'integrations.apolloCaption',
+          'Feeds account cockpit fields: industry, employees, revenue, intent, hiring movement, leadership changes, technologies, and last sync freshness.',
+        )}
         action={
           <div className="flex items-center gap-2">
             <Badge tone={healthTone}>
-              {isLoading ? 'Checking' : configured ? 'Configured' : 'Not connected'}
+              {isLoading
+                ? t('integrations.statusChecking', 'Checking')
+                : configured
+                  ? t('integrations.statusConfigured', 'Configured')
+                  : t('integrations.statusNotConnected', 'Not connected')}
             </Badge>
             <a
               href={
@@ -268,7 +302,7 @@ function ApolloAccountIntelCard({
               className="btn btn-secondary"
             >
               <Icon name="link" size={14} />
-              Apollo docs
+              {t('integrations.apolloDocs', 'Apollo docs')}
             </a>
           </div>
         }
@@ -276,16 +310,32 @@ function ApolloAccountIntelCard({
       <div className="grid gap-4 p-5 lg:grid-cols-[1fr_1fr]">
         <div className="space-y-3">
           <p className="text-sm text-[var(--fg-secondary)]">
-            Connect Apollo MCP first for company search and get-company. Keep REST People Search on
-            for C-level discovery; it is no-credit and does not return email or phone fields. Keep
-            People Enrichment off unless an admin intentionally accepts credit usage.
+            {t(
+              'integrations.apolloDescription',
+              'Connect Apollo MCP first for company search and get-company. Keep REST People Search on for C-level discovery; it is no-credit and does not return email or phone fields. Keep People Enrichment off unless an admin intentionally accepts credit usage.',
+            )}
           </p>
           <div className="grid gap-2 sm:grid-cols-2">
             {[
-              ['Account fields', 'Industry, employees, revenue, tech stack'],
-              ['Signals', 'Intent topics, hiring, C-level movement'],
-              ['Safety', 'Emails and phones stripped before storage'],
-              ['Freshness', 'Every account shows last Apollo sync'],
+              [
+                t('integrations.featureAccountFieldsLabel', 'Account fields'),
+                t(
+                  'integrations.featureAccountFieldsValue',
+                  'Industry, employees, revenue, tech stack',
+                ),
+              ],
+              [
+                t('integrations.featureSignalsLabel', 'Signals'),
+                t('integrations.featureSignalsValue', 'Intent topics, hiring, C-level movement'),
+              ],
+              [
+                t('integrations.featureSafetyLabel', 'Safety'),
+                t('integrations.featureSafetyValue', 'Emails and phones stripped before storage'),
+              ],
+              [
+                t('integrations.featureFreshnessLabel', 'Freshness'),
+                t('integrations.featureFreshnessValue', 'Every account shows last Apollo sync'),
+              ],
             ].map(([label, value]) => (
               <div
                 key={label}
@@ -308,13 +358,16 @@ function ApolloAccountIntelCard({
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-                MCP/API environment
+                {t('integrations.mcpApiEnvironment', 'MCP/API environment')}
               </div>
               <p className="mt-1 text-xs text-[var(--fg-secondary)]">
-                Secrets stay server-side. Add them to local/production env, then restart worker/API.
+                {t(
+                  'integrations.mcpApiEnvironmentHint',
+                  'Secrets stay server-side. Add them to local/production env, then restart worker/API.',
+                )}
               </p>
             </div>
-            <Badge tone="gray">server-side</Badge>
+            <Badge tone="gray">{t('integrations.badgeServerSide', 'server-side')}</Badge>
           </div>
           <pre className="mt-3 max-h-44 overflow-auto rounded-lg bg-[var(--surface-card)] p-3 text-xs text-[var(--fg-primary)]">
             <code>{envSnippet}</code>
@@ -322,11 +375,11 @@ function ApolloAccountIntelCard({
           <div className="mt-3 flex flex-wrap gap-1.5">
             {(
               status?.capabilities ?? [
-                'company search',
-                'firmographics',
-                'buying intent',
-                'hiring signals',
-                'leadership signals',
+                t('integrations.capabilityCompanySearch', 'company search'),
+                t('integrations.capabilityFirmographics', 'firmographics'),
+                t('integrations.capabilityBuyingIntent', 'buying intent'),
+                t('integrations.capabilityHiringSignals', 'hiring signals'),
+                t('integrations.capabilityLeadershipSignals', 'leadership signals'),
               ]
             ).map((capability) => (
               <Badge key={capability} tone="blue">

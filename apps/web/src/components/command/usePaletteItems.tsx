@@ -10,6 +10,7 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { CompanyLogo } from '@/components/company/CompanyLogo';
@@ -47,6 +48,7 @@ export interface UsePaletteItemsResult {
 
 export function usePaletteItems(query: string, onClose: () => void): UsePaletteItemsResult {
   const navigate = useNavigate();
+  const { t } = useTranslation('crm');
 
   // Snapshot recents at mount — stable while palette is open so items don't
   // shift as the user types (could change their index mid-selection).
@@ -139,7 +141,7 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
           id: `recent:${r.id}`,
           group: r.group,
           label: r.label,
-          hint: r.hint ?? 'Recently visited',
+          hint: r.hint ?? t('usePaletteItems.recentlyVisited', 'Recently visited'),
           onSelect: () => {
             navigate(r.route);
             onClose();
@@ -158,7 +160,7 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
           id: `recent-account:${acc.slug}`,
           group: 'account',
           label: acc.name,
-          hint: 'Recently visited',
+          hint: t('usePaletteItems.recentlyVisited', 'Recently visited'),
           leading: company ? (
             <CompanyLogo
               name={company.name}
@@ -309,6 +311,7 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
     accountRecents,
     selectNavTarget,
     contextualCommands,
+    t,
   ]);
 
   return { items, isFetching: oppSearch.isFetching, selectNavTarget };

@@ -194,5 +194,59 @@
       "down": "hors service",
       "disabled": "désactivé"
     }
+  },
+  "erpConnector": {
+    "title": "ERP MCP",
+    "caption": "définissez ERP_MCP_URL + ERP_DB pour activer",
+    "status": {
+      "error": "erreur",
+      "checking": "vérification",
+      "notConfigured": "non configuré",
+      "live": "actif",
+      "unreachable": "inaccessible"
+    },
+    "error": {
+      "title": "Impossible d'atteindre le point de terminaison de statut ERP",
+      "message": "Il s'agit d'un problème de connexion, pas d'une configuration manquante. Veuillez réessayer.",
+      "retry": "Réessayer"
+    },
+    "notConfigured": {
+      "set": "Définissez",
+      "andOptionally": "et éventuellement",
+      "tail": "pour atteindre le sidecar ERP MCP. En attendant, BidStack utilise des données vérifiées locales et des connecteurs de données vérifiées."
+    },
+    "stat": {
+      "endpoint": "Point de terminaison",
+      "database": "Base de données",
+      "mcpTools": "Outils MCP",
+      "status": "Statut"
+    },
+    "value": {
+      "na": "n/d",
+      "reachable": "accessible",
+      "unreachable": "inaccessible"
+    },
+    "kit": {
+      "title": "Kit opérationnel d'offre ERP",
+      "subtitle": "Modèles de partenaire, opportunité, devis, activité, document et transfert adaptés à l'avant-vente BidStack.",
+      "badge": {
+        "sidecar": "sidecar",
+        "fixSidecar": "corriger le sidecar",
+        "local": "local"
+      }
+    },
+    "autocomplete": {
+      "title": "Saisie semi-automatique de partenaire",
+      "subtitle": "Recherche d'entité juridique de style ERP avec repli BidStack.",
+      "ariaLabel": "Requête de saisie semi-automatique d'entreprise",
+      "placeholder": "Nom, domaine, TVA ou DUNS",
+      "check": "Vérifier",
+      "empty": "Aucune suggestion d'entreprise pour l'instant. Ajoutez des identifiants ERP MCP ou vérifiez ce compte dans BidStack."
+    },
+    "item": {
+      "vat": "TVA {{value}}",
+      "duns": "DUNS {{value}}",
+      "noRegistryKeys": "Pas encore de clés de registre"
+    }
   }
 }

@@ -16,6 +16,8 @@
 //     text is white — checked at ≥ 4.5:1 for the default palette).
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useReducedMotion } from 'framer-motion';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -76,6 +78,7 @@ export function CollaborativeRichTextEditor({
   className = '',
   readOnly = false,
 }: CollaborativeRichTextEditorProps) {
+  const { t } = useTranslation('crm');
   const reducedMotion = useReducedMotion();
 
   const localColor = useMemo(
@@ -137,7 +140,11 @@ export function CollaborativeRichTextEditor({
     // 2-second debounce — avoids announcing every keypress from collaborators.
     announcementTimer.current = setTimeout(() => {
       const names = remoteCursors.map((c) => c.name).join(', ');
-      setLiveRegionText(`${names} ${remoteCursors.length === 1 ? 'is' : 'are'} editing`);
+      setLiveRegionText(
+        remoteCursors.length === 1
+          ? t('collaborativeRichTextEditor.editingAnnouncementOne', '{{names}} is editing', { names })
+          : t('collaborativeRichTextEditor.editingAnnouncementOther', '{{names}} are editing', { names }),
+      );
     }, 2_000);
 
     return () => {
@@ -147,7 +154,7 @@ export function CollaborativeRichTextEditor({
 
   // ─── Connection status badge ───────────────────────────────────────────
 
-  const statusLabel = statusBadgeLabel(connectionState);
+  const statusLabel = statusBadgeLabel(connectionState, t);
 
   return (
     <div
@@ -195,7 +202,7 @@ export function CollaborativeRichTextEditor({
         {!yText && (
           // Placeholder shown while Y.Doc is loading.
           <p className="text-[var(--text-muted)] text-sm pointer-events-none select-none">
-            {placeholder ?? 'Loading…'}
+            {placeholder ?? t('collaborativeRichTextEditor.loading', 'Loading…')}
           </p>
         )}
         {yText && <EditorContent editor={editor} />}
@@ -260,12 +267,12 @@ function ConnectionBadge({
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
-function statusBadgeLabel(state: ConnectionState): string {
+function statusBadgeLabel(state: ConnectionState, t: TFunction): string {
   switch (state) {
-    case 'connected': return 'Live';
-    case 'connecting': return 'Connecting…';
-    case 'disconnected': return 'Offline';
-    case 'error': return 'Error';
+    case 'connected': return t('collaborativeRichTextEditor.statusLive', 'Live');
+    case 'connecting': return t('collaborativeRichTextEditor.statusConnecting', 'Connecting…');
+    case 'disconnected': return t('collaborativeRichTextEditor.statusOffline', 'Offline');
+    case 'error': return t('collaborativeRichTextEditor.statusError', 'Error');
   }
 }
 

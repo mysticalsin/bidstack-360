@@ -4,6 +4,7 @@
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/Badge';
@@ -36,6 +37,7 @@ export const TaskRow = memo(function TaskRow({
   onMoveUp?: () => void;
   onMoveDown?: () => void;
 }) {
+  const { t } = useTranslation('crm');
   const update = useUpdateTask();
   const d = daysUntil(task.dueDate);
   const overdue = d !== null && d < 0;
@@ -72,11 +74,15 @@ export const TaskRow = memo(function TaskRow({
       { id: task.id, patch: { status: next } },
       {
         onSuccess: () => {
-          if (next === 'done') toast.success(`Marked "${task.title}" done`);
+          if (next === 'done')
+            toast.success(t('taskRow.toast.markedDone', 'Marked "{{title}}" done', { title: task.title }));
         },
         onError: (err) =>
-          toast.error('Could not update task', {
-            description: err instanceof Error ? err.message : 'The server rejected the request.',
+          toast.error(t('taskRow.toast.updateFailedTitle', 'Could not update task'), {
+            description:
+              err instanceof Error
+                ? err.message
+                : t('taskRow.toast.serverRejected', 'The server rejected the request.'),
           }),
       },
     );
@@ -91,10 +97,20 @@ export const TaskRow = memo(function TaskRow({
     update.mutate(
       { id: task.id, patch: { dueDate: isoDate } },
       {
-        onSuccess: () => toast.success(`Snoozed "${task.title}" to ${label}`, { duration: 2200 }),
+        onSuccess: () =>
+          toast.success(
+            t('taskRow.toast.snoozed', 'Snoozed "{{title}}" to {{label}}', {
+              title: task.title,
+              label,
+            }),
+            { duration: 2200 },
+          ),
         onError: (err) =>
-          toast.error('Snooze failed', {
-            description: err instanceof Error ? err.message : 'The server rejected the request.',
+          toast.error(t('taskRow.toast.snoozeFailedTitle', 'Snooze failed'), {
+            description:
+              err instanceof Error
+                ? err.message
+                : t('taskRow.toast.serverRejected', 'The server rejected the request.'),
           }),
       },
     );
@@ -108,9 +124,12 @@ export const TaskRow = memo(function TaskRow({
     nextWeek.setDate(now.getDate() + 7);
     const iso = (d: Date) => d.toISOString().slice(0, 10);
     return [
-      { label: 'Tomorrow', value: iso(tomorrow) },
-      { label: 'In 3 days', value: iso(new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)) },
-      { label: 'Next week', value: iso(nextWeek) },
+      { label: t('taskRow.snooze.tomorrow', 'Tomorrow'), value: iso(tomorrow) },
+      {
+        label: t('taskRow.snooze.inThreeDays', 'In 3 days'),
+        value: iso(new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)),
+      },
+      { label: t('taskRow.snooze.nextWeek', 'Next week'), value: iso(nextWeek) },
     ];
   };
 
@@ -177,11 +196,11 @@ export const TaskRow = memo(function TaskRow({
       className="group flex items-center justify-between gap-4 px-5 py-3"
     >
       {draggable ? (
-        <div className="flex shrink-0 items-center gap-1" aria-label="Reorder task">
+        <div className="flex shrink-0 items-center gap-1" aria-label={t('taskRow.reorderTask', 'Reorder task')}>
           <span
             aria-hidden
             className="select-none text-[var(--fg-tertiary)]"
-            title="Drag to reorder"
+            title={t('taskRow.dragToReorder', 'Drag to reorder')}
           >
             ::
           </span>
@@ -190,18 +209,18 @@ export const TaskRow = memo(function TaskRow({
             onClick={onMoveUp}
             disabled={!canMoveUp}
             className="rounded-md border border-[var(--border-subtle)] px-1.5 py-1 text-[10px] font-medium text-[var(--fg-secondary)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] disabled:cursor-not-allowed disabled:opacity-40"
-            aria-label={`Move ${task.title} up`}
+            aria-label={t('taskRow.moveUp', 'Move {{title}} up', { title: task.title })}
           >
-            Up
+            {t('taskRow.up', 'Up')}
           </button>
           <button
             type="button"
             onClick={onMoveDown}
             disabled={!canMoveDown}
             className="rounded-md border border-[var(--border-subtle)] px-1.5 py-1 text-[10px] font-medium text-[var(--fg-secondary)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] disabled:cursor-not-allowed disabled:opacity-40"
-            aria-label={`Move ${task.title} down`}
+            aria-label={t('taskRow.moveDown', 'Move {{title}} down', { title: task.title })}
           >
-            Down
+            {t('taskRow.down', 'Down')}
           </button>
         </div>
       ) : null}
@@ -219,7 +238,7 @@ export const TaskRow = memo(function TaskRow({
           </Link>
         </div>
         <div className="text-xs text-[var(--fg-tertiary)]">
-          Due {formatDate(task.dueDate)}
+          {t('taskRow.due', 'Due {{date}}', { date: formatDate(task.dueDate) })}
           {d !== null && task.status !== 'done' ? (
             <span
               className={
@@ -230,13 +249,13 @@ export const TaskRow = memo(function TaskRow({
             >
               {overdue ? (
                 <>
-                  <span role="img" aria-label="warning">
+                  <span role="img" aria-label={t('taskRow.warning', 'warning')}>
                     ⚠️
                   </span>
-                  Overdue: {Math.abs(d)}d late
+                  {t('taskRow.overdue', 'Overdue: {{count}}d late', { count: Math.abs(d) })}
                 </>
               ) : (
-                `in ${d}d`
+                t('taskRow.dueIn', 'in {{count}}d', { count: d })
               )}
             </span>
           ) : null}
@@ -250,7 +269,7 @@ export const TaskRow = memo(function TaskRow({
               type="button"
               onClick={() => setSnoozeOpen((v) => !v)}
               onKeyDown={handleSnoozeKeyDown}
-              aria-label={`Snooze ${task.title}`}
+              aria-label={t('taskRow.snoozeTask', 'Snooze {{title}}', { title: task.title })}
               aria-haspopup="listbox"
               aria-expanded={snoozeOpen}
               className={cn(
@@ -261,7 +280,7 @@ export const TaskRow = memo(function TaskRow({
               )}
             >
               <Icon name="clock" size={10} ariaHidden />
-              <span>Snooze…</span>
+              <span>{t('taskRow.snooze.button', 'Snooze…')}</span>
             </button>
 
             <AnimatePresence>
@@ -273,7 +292,7 @@ export const TaskRow = memo(function TaskRow({
                   transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
                   className="absolute right-0 top-[calc(100%+6px)] z-30 w-36 rounded-lg glass-menu p-1.5 focus:outline-none"
                   role="listbox"
-                  aria-label="Snooze presets"
+                  aria-label={t('taskRow.snooze.presets', 'Snooze presets')}
                 >
                   <div className="flex flex-col gap-0.5">
                     {snoozeOptions().map((o, index) => {
@@ -313,10 +332,17 @@ export const TaskRow = memo(function TaskRow({
           disabled={update.isPending}
           whileTap={{ scale: 0.94 }}
           className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] disabled:cursor-not-allowed disabled:opacity-60"
-          aria-label={`Status: ${task.status.replace('_', ' ')}. Activate to change to ${STATUS_CYCLE[
-            task.status
-          ].replace('_', ' ')}.`}
-          title={`Activate to change status to ${STATUS_CYCLE[task.status].replace('_', ' ')}`}
+          aria-label={t(
+            'taskRow.statusAction',
+            'Status: {{status}}. Activate to change to {{next}}.',
+            {
+              status: task.status.replace('_', ' '),
+              next: STATUS_CYCLE[task.status].replace('_', ' '),
+            },
+          )}
+          title={t('taskRow.statusTitle', 'Activate to change status to {{next}}', {
+            next: STATUS_CYCLE[task.status].replace('_', ' '),
+          })}
         >
           <Badge
             tone={

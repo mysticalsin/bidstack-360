@@ -23,6 +23,7 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/cn';
 
@@ -67,12 +68,14 @@ export function LookupFieldPicker({
   onChange,
   onSearch,
   recentOptions = [],
-  placeholder = 'Search…',
+  placeholder: placeholderProp,
   label,
   disabled = false,
   className,
   debounceMs = DEBOUNCE_DEFAULT,
 }: LookupFieldPickerProps) {
+  const { t } = useTranslation('common');
+  const placeholder = placeholderProp ?? t('lookupFieldPicker.placeholder', 'Search…');
   const uid = useId();
   const listboxId = `${uid}-listbox`;
 
@@ -210,7 +213,7 @@ export function LookupFieldPicker({
         {value && !disabled ? (
           <button
             type="button"
-            aria-label="Clear selection"
+            aria-label={t('lookupFieldPicker.clearSelection', 'Clear selection')}
             onClick={clear}
             // min 44px touch target fulfilled by the absolute positioning wrapper
             className="absolute right-2 flex h-5 w-5 items-center justify-center rounded text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]"
@@ -242,11 +245,13 @@ export function LookupFieldPicker({
           >
             {loading ? (
               <li className="px-3 py-2 text-xs text-[var(--fg-tertiary)]" aria-live="polite">
-                Searching…
+                {t('lookupFieldPicker.searching', 'Searching…')}
               </li>
             ) : options.length === 0 ? (
               <li className="px-3 py-2 text-xs text-[var(--fg-tertiary)]">
-                {query.length >= MIN_QUERY_LEN ? 'No results.' : 'Type to search…'}
+                {query.length >= MIN_QUERY_LEN
+                  ? t('lookupFieldPicker.noResults', 'No results.')
+                  : t('lookupFieldPicker.typeToSearch', 'Type to search…')}
               </li>
             ) : (
               options.map((opt, i) => {

@@ -149,5 +149,70 @@
     "removeGroupAriaLabel": "Supprimer le groupe",
     "addCondition": "Condition",
     "addGroup": "Groupe"
+  },
+  "reports": {
+    "heading": "Rapports",
+    "subtitle": "Analyses sur le pipeline, les leads, le service desk et les tâches.",
+    "tab": {
+      "pipeline": "Pipeline",
+      "leads": "Leads",
+      "service-desk": "Service desk",
+      "tasks": "Tâches"
+    },
+    "tabAriaLabel": "Onglet de rapport {{label}}",
+    "error": {
+      "title": "Impossible de charger le rapport"
+    },
+    "byStatus": "Par statut",
+    "pipeline": {
+      "byStage": "Pipeline par étape",
+      "weighted": "Pipeline pondéré",
+      "totalOpen": "Total ouverts",
+      "closedThisQuarter": "Clôturés ce trimestre"
+    },
+    "leads": {
+      "total": "Total des leads",
+      "converted": "Convertis",
+      "conversionRate": "Taux de conversion",
+      "avgScore": "Score moyen",
+      "bySource": "Par source"
+    },
+    "serviceDesk": {
+      "totalCases": "Total des cas",
+      "open": "Ouverts",
+      "resolvedThisMonth": "Résolus ce mois-ci",
+      "avgSatisfaction": "Satisfaction moyenne",
+      "byPriority": "Par priorité"
+    },
+    "tasks": {
+      "total": "Total des tâches",
+      "completed": "Terminées",
+      "overdue": "En retard",
+      "completionRate": "Taux d'achèvement"
+    }
+  },
+  "reportsList": {
+    "errorTitle": "Échec du chargement des rapports",
+    "heading": "Rapports",
+    "savedCount": "{{count}} rapports enregistrés",
+    "newReport": "Nouveau rapport",
+    "searchPlaceholder": "Rechercher des rapports…",
+    "searchAriaLabel": "Rechercher des rapports",
+    "resultsCountMatching": "{{count}} rapports correspondant à \"{{search}}\"",
+    "resultsCount": "{{count}} rapports",
+    "emptyTitle": "Aucun rapport trouvé",
+    "emptySearchMessage": "Essayez une autre recherche.",
+    "emptyMessage": "Créez votre premier rapport analytique.",
+    "tableAriaLabel": "Rapports",
+    "columnName": "Nom",
+    "columnEntity": "Entité",
+    "columnLastRun": "Dernière exécution",
+    "columnSchedule": "Planification",
+    "columnActions": "Actions",
+    "runAriaLabel": "Exécuter le rapport {{name}}",
+    "editAriaLabel": "Modifier le rapport {{name}}",
+    "duplicateAriaLabel": "Dupliquer le rapport {{name}}",
+    "deleteConfirm": "Supprimer \"{{name}}\" ?",
+    "deleteAriaLabel": "Supprimer le rapport {{name}}"
   }
 }

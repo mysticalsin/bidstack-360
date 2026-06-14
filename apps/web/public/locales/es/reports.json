@@ -129,5 +129,70 @@
     "removeGroupAriaLabel": "Eliminar grupo",
     "addCondition": "Condición",
     "addGroup": "Grupo"
+  },
+  "reports": {
+    "heading": "Informes",
+    "subtitle": "Análisis de pipeline, leads, centro de servicio y tareas.",
+    "tab": {
+      "pipeline": "Pipeline",
+      "leads": "Leads",
+      "service-desk": "Centro de servicio",
+      "tasks": "Tareas"
+    },
+    "tabAriaLabel": "Pestaña de informe {{label}}",
+    "error": {
+      "title": "No se pudo cargar el informe"
+    },
+    "byStatus": "Por estado",
+    "pipeline": {
+      "byStage": "Pipeline por etapa",
+      "weighted": "Pipeline ponderado",
+      "totalOpen": "Total abiertos",
+      "closedThisQuarter": "Cerrados este trimestre"
+    },
+    "leads": {
+      "total": "Total de leads",
+      "converted": "Convertidos",
+      "conversionRate": "Tasa de conversión",
+      "avgScore": "Puntuación media",
+      "bySource": "Por origen"
+    },
+    "serviceDesk": {
+      "totalCases": "Total de casos",
+      "open": "Abiertos",
+      "resolvedThisMonth": "Resueltos este mes",
+      "avgSatisfaction": "Satisfacción media",
+      "byPriority": "Por prioridad"
+    },
+    "tasks": {
+      "total": "Total de tareas",
+      "completed": "Completadas",
+      "overdue": "Vencidas",
+      "completionRate": "Tasa de finalización"
+    }
+  },
+  "reportsList": {
+    "errorTitle": "Error al cargar los informes",
+    "heading": "Informes",
+    "savedCount": "{{count}} informes guardados",
+    "newReport": "Nuevo informe",
+    "searchPlaceholder": "Buscar informes…",
+    "searchAriaLabel": "Buscar informes",
+    "resultsCountMatching": "{{count}} informes que coinciden con \"{{search}}\"",
+    "resultsCount": "{{count}} informes",
+    "emptyTitle": "No se encontraron informes",
+    "emptySearchMessage": "Prueba con otra búsqueda.",
+    "emptyMessage": "Crea tu primer informe analítico.",
+    "tableAriaLabel": "Informes",
+    "columnName": "Nombre",
+    "columnEntity": "Entidad",
+    "columnLastRun": "Última ejecución",
+    "columnSchedule": "Programación",
+    "columnActions": "Acciones",
+    "runAriaLabel": "Ejecutar informe {{name}}",
+    "editAriaLabel": "Editar informe {{name}}",
+    "duplicateAriaLabel": "Duplicar informe {{name}}",
+    "deleteConfirm": "¿Eliminar \"{{name}}\"?",
+    "deleteAriaLabel": "Eliminar informe {{name}}"
   }
 }

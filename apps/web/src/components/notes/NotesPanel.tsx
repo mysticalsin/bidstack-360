@@ -8,6 +8,7 @@
 // to avoid HTML injection from a note body.
 
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export function NotesPanel({ accountId, companyName, domain }: Props) {
+  const { t } = useTranslation('crm');
   const list = useNotes(accountId);
   const [composing, setComposing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -43,7 +45,7 @@ export function NotesPanel({ accountId, companyName, domain }: Props) {
   return (
     <Card>
       <SectionHeader
-        title="Notes"
+        title={t('notes.panelTitle', 'Notes')}
         action={
           accountId && !composing ? (
             <div className="flex flex-wrap items-center justify-end gap-2">
@@ -60,7 +62,7 @@ export function NotesPanel({ accountId, companyName, domain }: Props) {
                   setEditingId(null);
                 }}
               >
-                + Add
+                {t('notes.addButton', '+ Add')}
               </Button>
             </div>
           ) : null
@@ -78,18 +80,25 @@ export function NotesPanel({ accountId, companyName, domain }: Props) {
 
         {!accountId ? (
           <EmptyState
-            title="Select an account to view notes"
-            message="Notes are attached to a customer account."
+            title={t('notes.noAccountTitle', 'Select an account to view notes')}
+            message={t('notes.noAccountMessage', 'Notes are attached to a customer account.')}
           />
         ) : list.isLoading ? (
           <LoadingSkeleton rows={3} />
         ) : list.isError ? (
           <ErrorState
-            title="Couldn't load notes"
-            message={list.error instanceof Error ? list.error.message : 'Unknown error'}
+            title={t('notes.loadErrorTitle', "Couldn't load notes")}
+            message={
+              list.error instanceof Error
+                ? list.error.message
+                : t('notes.unknownError', 'Unknown error')
+            }
           />
         ) : filteredNotes.length === 0 ? (
-          <EmptyState title="No notes yet" message="Capture a meeting summary or context." />
+          <EmptyState
+            title={t('notes.emptyTitle', 'No notes yet')}
+            message={t('notes.emptyMessage', 'Capture a meeting summary or context.')}
+          />
         ) : (
           <ul className="divide-y divide-[var(--border-subtle)]">
             {filteredNotes.map((note) =>
@@ -125,6 +134,7 @@ interface RowProps {
 }
 
 function NoteRow({ note, accountId, onEdit }: RowProps) {
+  const { t } = useTranslation('crm');
   const update = useUpdateNote(accountId);
   const remove = useDeleteNote(accountId);
   const togglePin = () => update.mutate({ id: note.id, patch: { pinned: !note.pinned } });
@@ -133,18 +143,23 @@ function NoteRow({ note, accountId, onEdit }: RowProps) {
     // confirm dialog also gives a destructive-styled action and keyboard
     // dismiss, both of which window.confirm cannot.
     const ok = await confirm({
-      title: 'Delete this note?',
-      description:
+      title: t('notes.deleteConfirmTitle', 'Delete this note?'),
+      description: t(
+        'notes.deleteConfirmDescription',
         'The note will be removed from this account. The audit log keeps a record of the deletion.',
-      confirmLabel: 'Delete',
+      ),
+      confirmLabel: t('notes.deleteConfirmLabel', 'Delete'),
       destructive: true,
     });
     if (!ok) return;
     remove.mutate(note.id, {
-      onSuccess: () => toast.success('Note deleted'),
+      onSuccess: () => toast.success(t('notes.deleteSuccess', 'Note deleted')),
       onError: (err) =>
-        toast.error('Delete failed', {
-          description: err instanceof Error ? err.message : 'The server rejected the request.',
+        toast.error(t('notes.deleteErrorTitle', 'Delete failed'), {
+          description:
+            err instanceof Error
+              ? err.message
+              : t('notes.serverRejected', 'The server rejected the request.'),
         }),
     });
   };
@@ -157,13 +172,14 @@ function NoteRow({ note, accountId, onEdit }: RowProps) {
             <h4 className="text-sm font-semibold text-[var(--fg-primary)] truncate">
               {note.title}
             </h4>
-            {note.pinned ? <Badge tone="amber">Pinned</Badge> : null}
+            {note.pinned ? <Badge tone="amber">{t('notes.pinnedBadge', 'Pinned')}</Badge> : null}
           </div>
           <div className="mt-1 text-xs text-[var(--fg-secondary)] line-clamp-3">
             <SafeMarkdownPreview text={note.bodyMd} />
           </div>
           <div className="mt-1.5 text-[11px] text-[var(--fg-tertiary)]">
-            {note.authorEmail ?? 'Unknown'} · {relativeTime(note.createdAt)}
+            {note.authorEmail ?? t('notes.unknownAuthor', 'Unknown')} ·{' '}
+            {relativeTime(note.createdAt)}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
@@ -172,24 +188,34 @@ function NoteRow({ note, accountId, onEdit }: RowProps) {
             variant="ghost"
             onClick={togglePin}
             disabled={update.isPending}
-            aria-label={note.pinned ? 'Unpin note' : 'Pin note'}
-            title={note.pinned ? 'Unpin' : 'Pin'}
+            aria-label={
+              note.pinned
+                ? t('notes.unpinAriaLabel', 'Unpin note')
+                : t('notes.pinAriaLabel', 'Pin note')
+            }
+            title={note.pinned ? t('notes.unpinTitle', 'Unpin') : t('notes.pinTitle', 'Pin')}
           >
-            {note.pinned ? 'Unpin' : 'Pin'}
+            {note.pinned ? t('notes.unpinAction', 'Unpin') : t('notes.pinAction', 'Pin')}
           </Button>
-          <Button size="sm" variant="ghost" onClick={onEdit} aria-label="Edit note" title="Edit">
-            Edit
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onEdit}
+            aria-label={t('notes.editAriaLabel', 'Edit note')}
+            title={t('notes.editTitle', 'Edit')}
+          >
+            {t('notes.editAction', 'Edit')}
           </Button>
           <Button
             size="sm"
             variant="ghost"
             onClick={onDelete}
             disabled={remove.isPending}
-            aria-label="Delete note"
-            title="Delete"
+            aria-label={t('notes.deleteAriaLabel', 'Delete note')}
+            title={t('notes.deleteTitle', 'Delete')}
             className="text-[var(--danger)]"
           >
-            Delete
+            {t('notes.deleteAction', 'Delete')}
           </Button>
         </div>
       </div>
@@ -205,6 +231,7 @@ interface EditorProps {
 }
 
 function NoteEditor({ accountId, initial, onDone, onCancel }: EditorProps) {
+  const { t } = useTranslation('crm');
   const create = useCreateNote(accountId);
   const update = useUpdateNote(accountId);
   const [title, setTitle] = useState(initial?.title ?? '');
@@ -216,7 +243,7 @@ function NoteEditor({ accountId, initial, onDone, onCancel }: EditorProps) {
     setError(null);
     const cleanTitle = title.trim();
     if (!cleanTitle) {
-      setError('Title is required');
+      setError(t('notes.titleRequired', 'Title is required'));
       return;
     }
     try {
@@ -227,7 +254,7 @@ function NoteEditor({ accountId, initial, onDone, onCancel }: EditorProps) {
       }
       onDone();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save failed');
+      setError(err instanceof Error ? err.message : t('notes.saveFailed', 'Save failed'));
     }
   };
 
@@ -239,19 +266,19 @@ function NoteEditor({ accountId, initial, onDone, onCancel }: EditorProps) {
         type="text"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="Title"
+        placeholder={t('notes.titlePlaceholder', 'Title')}
         maxLength={200}
         required
-        aria-label="Note title"
+        aria-label={t('notes.titleAriaLabel', 'Note title')}
         className="w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-3 py-2 text-sm text-[var(--fg-primary)] placeholder:text-[var(--fg-tertiary)] focus:outline-none focus:ring-2 focus:ring-border-focus"
       />
       <textarea
         value={bodyMd}
         onChange={(e) => setBodyMd(e.target.value)}
-        placeholder="Markdown supports **bold** and *italic*"
+        placeholder={t('notes.bodyPlaceholder', 'Markdown supports **bold** and *italic*')}
         rows={4}
         maxLength={32_000}
-        aria-label="Note body"
+        aria-label={t('notes.bodyAriaLabel', 'Note body')}
         className="w-full resize-y rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-3 py-2 text-sm text-[var(--fg-primary)] placeholder:text-[var(--fg-tertiary)] focus:outline-none focus:ring-2 focus:ring-border-focus"
       />
       {error ? (
@@ -261,10 +288,14 @@ function NoteEditor({ accountId, initial, onDone, onCancel }: EditorProps) {
       ) : null}
       <div className="flex items-center justify-end gap-2">
         <Button type="button" size="sm" variant="ghost" onClick={onCancel} disabled={isPending}>
-          Cancel
+          {t('notes.cancelAction', 'Cancel')}
         </Button>
         <Button type="submit" size="sm" disabled={isPending}>
-          {isPending ? 'Saving…' : initial ? 'Save' : 'Add note'}
+          {isPending
+            ? t('notes.savingAction', 'Saving…')
+            : initial
+              ? t('notes.saveAction', 'Save')
+              : t('notes.addNoteAction', 'Add note')}
         </Button>
       </div>
     </form>

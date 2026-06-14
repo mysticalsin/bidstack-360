@@ -149,5 +149,70 @@
     "removeGroupAriaLabel": "Rimuovi gruppo",
     "addCondition": "Condizione",
     "addGroup": "Gruppo"
+  },
+  "reports": {
+    "heading": "Report",
+    "subtitle": "Analisi su pipeline, lead, service desk e attività.",
+    "tab": {
+      "pipeline": "Pipeline",
+      "leads": "Lead",
+      "service-desk": "Service desk",
+      "tasks": "Attività"
+    },
+    "tabAriaLabel": "Scheda report {{label}}",
+    "error": {
+      "title": "Impossibile caricare il report"
+    },
+    "byStatus": "Per stato",
+    "pipeline": {
+      "byStage": "Pipeline per fase",
+      "weighted": "Pipeline ponderata",
+      "totalOpen": "Totale aperti",
+      "closedThisQuarter": "Chiusi questo trimestre"
+    },
+    "leads": {
+      "total": "Lead totali",
+      "converted": "Convertiti",
+      "conversionRate": "Tasso di conversione",
+      "avgScore": "Punteggio medio",
+      "bySource": "Per origine"
+    },
+    "serviceDesk": {
+      "totalCases": "Casi totali",
+      "open": "Aperti",
+      "resolvedThisMonth": "Risolti questo mese",
+      "avgSatisfaction": "Soddisfazione media",
+      "byPriority": "Per priorità"
+    },
+    "tasks": {
+      "total": "Attività totali",
+      "completed": "Completate",
+      "overdue": "In ritardo",
+      "completionRate": "Tasso di completamento"
+    }
+  },
+  "reportsList": {
+    "errorTitle": "Impossibile caricare i report",
+    "heading": "Report",
+    "savedCount": "{{count}} report salvati",
+    "newReport": "Nuovo report",
+    "searchPlaceholder": "Cerca report…",
+    "searchAriaLabel": "Cerca report",
+    "resultsCountMatching": "{{count}} report corrispondenti a \"{{search}}\"",
+    "resultsCount": "{{count}} report",
+    "emptyTitle": "Nessun report trovato",
+    "emptySearchMessage": "Prova una ricerca diversa.",
+    "emptyMessage": "Crea il tuo primo report analitico.",
+    "tableAriaLabel": "Report",
+    "columnName": "Nome",
+    "columnEntity": "Entità",
+    "columnLastRun": "Ultima esecuzione",
+    "columnSchedule": "Pianificazione",
+    "columnActions": "Azioni",
+    "runAriaLabel": "Esegui il report {{name}}",
+    "editAriaLabel": "Modifica il report {{name}}",
+    "duplicateAriaLabel": "Duplica il report {{name}}",
+    "deleteConfirm": "Eliminare \"{{name}}\"?",
+    "deleteAriaLabel": "Elimina il report {{name}}"
   }
 }

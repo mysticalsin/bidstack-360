@@ -149,5 +149,70 @@
     "removeGroupAriaLabel": "Remove group",
     "addCondition": "Condition",
     "addGroup": "Group"
+  },
+  "reports": {
+    "heading": "Reports",
+    "subtitle": "Analytics across pipeline, leads, service desk, and tasks.",
+    "tab": {
+      "pipeline": "Pipeline",
+      "leads": "Leads",
+      "service-desk": "Service Desk",
+      "tasks": "Tasks"
+    },
+    "tabAriaLabel": "{{label}} report tab",
+    "error": {
+      "title": "Could not load report"
+    },
+    "byStatus": "By status",
+    "pipeline": {
+      "byStage": "Pipeline by stage",
+      "weighted": "Weighted pipeline",
+      "totalOpen": "Total open",
+      "closedThisQuarter": "Closed this quarter"
+    },
+    "leads": {
+      "total": "Total leads",
+      "converted": "Converted",
+      "conversionRate": "Conversion rate",
+      "avgScore": "Avg score",
+      "bySource": "By source"
+    },
+    "serviceDesk": {
+      "totalCases": "Total cases",
+      "open": "Open",
+      "resolvedThisMonth": "Resolved this month",
+      "avgSatisfaction": "Avg satisfaction",
+      "byPriority": "By priority"
+    },
+    "tasks": {
+      "total": "Total tasks",
+      "completed": "Completed",
+      "overdue": "Overdue",
+      "completionRate": "Completion rate"
+    }
+  },
+  "reportsList": {
+    "errorTitle": "Failed to load reports",
+    "heading": "Reports",
+    "savedCount": "{{count}} saved reports",
+    "newReport": "New report",
+    "searchPlaceholder": "Search reports…",
+    "searchAriaLabel": "Search reports",
+    "resultsCountMatching": "{{count}} reports matching \"{{search}}\"",
+    "resultsCount": "{{count}} reports",
+    "emptyTitle": "No reports found",
+    "emptySearchMessage": "Try a different search.",
+    "emptyMessage": "Create your first analytical report.",
+    "tableAriaLabel": "Reports",
+    "columnName": "Name",
+    "columnEntity": "Entity",
+    "columnLastRun": "Last run",
+    "columnSchedule": "Schedule",
+    "columnActions": "Actions",
+    "runAriaLabel": "Run report {{name}}",
+    "editAriaLabel": "Edit report {{name}}",
+    "duplicateAriaLabel": "Duplicate report {{name}}",
+    "deleteConfirm": "Delete \"{{name}}\"?",
+    "deleteAriaLabel": "Delete report {{name}}"
   }
 }

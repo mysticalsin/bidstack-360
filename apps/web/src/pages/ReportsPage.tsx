@@ -1,4 +1,5 @@
 import { memo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge, stageTone } from '@/components/ui/Badge';
@@ -22,7 +23,11 @@ const TABS: { key: ReportTab; label: string }[] = [
 ];
 
 export function ReportsPage() {
+  const { t } = useTranslation('reports');
   const [tab, setTab] = useState<ReportTab>('pipeline');
+
+  const tabLabel = (key: ReportTab, label: string) =>
+    t(`reports.tab.${key}`, label);
 
   return (
     <div className="space-y-6">
@@ -32,28 +37,32 @@ export function ReportsPage() {
           fixed operational dashboards and is still reachable by URL. */}
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">Reports</h1>
+          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
+            {t('reports.heading', 'Reports')}
+          </h1>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            Analytics across pipeline, leads, service desk, and tasks.
+            {t('reports.subtitle', 'Analytics across pipeline, leads, service desk, and tasks.')}
           </p>
         </div>
       </header>
 
       <div className="flex flex-wrap items-center gap-1" data-tour="reports-new">
-        {TABS.map((t) => (
+        {TABS.map((tabItem) => (
           <button
-            key={t.key}
+            key={tabItem.key}
             type="button"
-            aria-label={`${t.label} report tab`}
-            aria-pressed={tab === t.key}
-            onClick={() => setTab(t.key)}
+            aria-label={t('reports.tabAriaLabel', '{{label}} report tab', {
+              label: tabLabel(tabItem.key, tabItem.label),
+            })}
+            aria-pressed={tab === tabItem.key}
+            onClick={() => setTab(tabItem.key)}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px] ${
-              tab === t.key
+              tab === tabItem.key
                 ? 'bg-[var(--fg-primary)] text-[var(--surface-page)]'
                 : 'bg-[var(--surface-sunken)] text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
-            {t.label}
+            {tabLabel(tabItem.key, tabItem.label)}
           </button>
         ))}
       </div>
@@ -67,15 +76,22 @@ export function ReportsPage() {
 }
 
 function PipelineReport() {
+  const { t } = useTranslation('reports');
   const { formatMoney } = useFormatMoney();
   const { data, isLoading, isError, error } = usePipelineReport();
 
-  if (isError) return <ErrorState title="Could not load report" message={error?.message} />;
+  if (isError)
+    return (
+      <ErrorState
+        title={t('reports.error.title', 'Could not load report')}
+        message={error?.message}
+      />
+    );
 
   return (
     <div className="space-y-4">
       <Card>
-        <SectionHeader title="Pipeline by stage" />
+        <SectionHeader title={t('reports.pipeline.byStage', 'Pipeline by stage')} />
         {isLoading ? (
           <LoadingSkeleton />
         ) : (
@@ -108,12 +124,15 @@ function PipelineReport() {
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
         <KpiCard
-          label="Weighted pipeline"
+          label={t('reports.pipeline.weighted', 'Weighted pipeline')}
           value={data ? formatMoney(data.weightedPipeline, 'EUR') : '—'}
         />
-        <KpiCard label="Total open" value={data ? data.totalOpen.toString() : '—'} />
         <KpiCard
-          label="Closed this quarter"
+          label={t('reports.pipeline.totalOpen', 'Total open')}
+          value={data ? data.totalOpen.toString() : '—'}
+        />
+        <KpiCard
+          label={t('reports.pipeline.closedThisQuarter', 'Closed this quarter')}
           value={data ? data.velocity.closedThisQuarter.toString() : '—'}
         />
       </div>
@@ -122,22 +141,29 @@ function PipelineReport() {
 }
 
 function LeadReport() {
+  const { t } = useTranslation('reports');
   const { data, isLoading, isError, error } = useLeadReport();
 
-  if (isError) return <ErrorState title="Could not load report" message={error?.message} />;
+  if (isError)
+    return (
+      <ErrorState
+        title={t('reports.error.title', 'Could not load report')}
+        message={error?.message}
+      />
+    );
 
   return (
     <div className="space-y-4">
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-4">
-        <KpiCard label="Total leads" value={data?.total.toString() ?? '—'} />
-        <KpiCard label="Converted" value={data?.converted.toString() ?? '—'} />
-        <KpiCard label="Conversion rate" value={data ? `${data.conversionRate}%` : '—'} />
-        <KpiCard label="Avg score" value={data ? `${data.avgScore}` : '—'} />
+        <KpiCard label={t('reports.leads.total', 'Total leads')} value={data?.total.toString() ?? '—'} />
+        <KpiCard label={t('reports.leads.converted', 'Converted')} value={data?.converted.toString() ?? '—'} />
+        <KpiCard label={t('reports.leads.conversionRate', 'Conversion rate')} value={data ? `${data.conversionRate}%` : '—'} />
+        <KpiCard label={t('reports.leads.avgScore', 'Avg score')} value={data ? `${data.avgScore}` : '—'} />
       </div>
 
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
         <Card>
-          <SectionHeader title="By status" />
+          <SectionHeader title={t('reports.byStatus', 'By status')} />
           {isLoading ? (
             <LoadingSkeleton />
           ) : (
@@ -167,7 +193,7 @@ function LeadReport() {
         </Card>
 
         <Card>
-          <SectionHeader title="By source" />
+          <SectionHeader title={t('reports.leads.bySource', 'By source')} />
           {isLoading ? (
             <LoadingSkeleton />
           ) : (
@@ -201,25 +227,32 @@ function LeadReport() {
 }
 
 function ServiceDeskReport() {
+  const { t } = useTranslation('reports');
   const { data, isLoading, isError, error } = useServiceDeskReport();
 
-  if (isError) return <ErrorState title="Could not load report" message={error?.message} />;
+  if (isError)
+    return (
+      <ErrorState
+        title={t('reports.error.title', 'Could not load report')}
+        message={error?.message}
+      />
+    );
 
   return (
     <div className="space-y-4">
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-4">
-        <KpiCard label="Total cases" value={data?.total.toString() ?? '—'} />
-        <KpiCard label="Open" value={data?.open.toString() ?? '—'} />
-        <KpiCard label="Resolved this month" value={data?.resolvedThisMonth.toString() ?? '—'} />
+        <KpiCard label={t('reports.serviceDesk.totalCases', 'Total cases')} value={data?.total.toString() ?? '—'} />
+        <KpiCard label={t('reports.serviceDesk.open', 'Open')} value={data?.open.toString() ?? '—'} />
+        <KpiCard label={t('reports.serviceDesk.resolvedThisMonth', 'Resolved this month')} value={data?.resolvedThisMonth.toString() ?? '—'} />
         <KpiCard
-          label="Avg satisfaction"
+          label={t('reports.serviceDesk.avgSatisfaction', 'Avg satisfaction')}
           value={data?.avgSatisfaction ? `${data.avgSatisfaction}/5` : '—'}
         />
       </div>
 
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
         <Card>
-          <SectionHeader title="By status" />
+          <SectionHeader title={t('reports.byStatus', 'By status')} />
           {isLoading ? (
             <LoadingSkeleton />
           ) : (
@@ -249,7 +282,7 @@ function ServiceDeskReport() {
         </Card>
 
         <Card>
-          <SectionHeader title="By priority" />
+          <SectionHeader title={t('reports.serviceDesk.byPriority', 'By priority')} />
           {isLoading ? (
             <LoadingSkeleton />
           ) : (
@@ -283,21 +316,28 @@ function ServiceDeskReport() {
 }
 
 function TaskReport() {
+  const { t } = useTranslation('reports');
   const { data, isLoading, isError, error } = useTaskReport();
 
-  if (isError) return <ErrorState title="Could not load report" message={error?.message} />;
+  if (isError)
+    return (
+      <ErrorState
+        title={t('reports.error.title', 'Could not load report')}
+        message={error?.message}
+      />
+    );
 
   return (
     <div className="space-y-4">
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-4">
-        <KpiCard label="Total tasks" value={data?.total.toString() ?? '—'} />
-        <KpiCard label="Completed" value={data?.completed.toString() ?? '—'} />
-        <KpiCard label="Overdue" value={data?.overdue.toString() ?? '—'} />
-        <KpiCard label="Completion rate" value={data ? `${data.completionRate}%` : '—'} />
+        <KpiCard label={t('reports.tasks.total', 'Total tasks')} value={data?.total.toString() ?? '—'} />
+        <KpiCard label={t('reports.tasks.completed', 'Completed')} value={data?.completed.toString() ?? '—'} />
+        <KpiCard label={t('reports.tasks.overdue', 'Overdue')} value={data?.overdue.toString() ?? '—'} />
+        <KpiCard label={t('reports.tasks.completionRate', 'Completion rate')} value={data ? `${data.completionRate}%` : '—'} />
       </div>
 
       <Card>
-        <SectionHeader title="By status" />
+        <SectionHeader title={t('reports.byStatus', 'By status')} />
         {isLoading ? (
           <LoadingSkeleton />
         ) : (

@@ -299,5 +299,12 @@
   "select": {
     "placeholder": "—",
     "noOptions": "无选项"
+  },
+  "lookupFieldPicker": {
+    "placeholder": "搜索…",
+    "clearSelection": "清除选择",
+    "searching": "搜索中…",
+    "noResults": "无结果。",
+    "typeToSearch": "输入以搜索…"
   }
 }

@@ -184,5 +184,59 @@
       "down": "caído",
       "disabled": "deshabilitado"
     }
+  },
+  "erpConnector": {
+    "title": "ERP MCP",
+    "caption": "configura ERP_MCP_URL + ERP_DB para activar",
+    "status": {
+      "error": "error",
+      "checking": "comprobando",
+      "notConfigured": "no configurado",
+      "live": "activo",
+      "unreachable": "inaccesible"
+    },
+    "error": {
+      "title": "No se pudo acceder al endpoint de estado del ERP",
+      "message": "Es un problema de conexión, no una configuración faltante. Vuelve a intentarlo.",
+      "retry": "Reintentar"
+    },
+    "notConfigured": {
+      "set": "Configura",
+      "andOptionally": "y opcionalmente",
+      "tail": "para alcanzar el sidecar ERP MCP. Hasta entonces, BidStack usa datos verificados locales y conectores de datos verificados."
+    },
+    "stat": {
+      "endpoint": "Endpoint",
+      "database": "Base de datos",
+      "mcpTools": "Herramientas MCP",
+      "status": "Estado"
+    },
+    "value": {
+      "na": "n/d",
+      "reachable": "accesible",
+      "unreachable": "inaccesible"
+    },
+    "kit": {
+      "title": "Kit operativo de licitación ERP",
+      "subtitle": "Patrones de socio, oportunidad, presupuesto, actividad, documento y traspaso adaptados para preventa de BidStack.",
+      "badge": {
+        "sidecar": "sidecar",
+        "fixSidecar": "corregir sidecar",
+        "local": "local"
+      }
+    },
+    "autocomplete": {
+      "title": "Autocompletar socio",
+      "subtitle": "Búsqueda de entidad legal estilo ERP con respaldo de BidStack.",
+      "ariaLabel": "Consulta de autocompletar empresa",
+      "placeholder": "Nombre, dominio, NIF/IVA o DUNS",
+      "check": "Comprobar",
+      "empty": "Aún no hay sugerencias de empresas. Añade credenciales de ERP MCP o verifica esta cuenta en BidStack."
+    },
+    "item": {
+      "vat": "NIF/IVA {{value}}",
+      "duns": "DUNS {{value}}",
+      "noRegistryKeys": "Aún no hay claves de registro"
+    }
   }
 }

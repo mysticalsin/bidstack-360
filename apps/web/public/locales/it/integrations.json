@@ -194,5 +194,59 @@
       "down": "inattivo",
       "disabled": "disabilitato"
     }
+  },
+  "erpConnector": {
+    "title": "ERP MCP",
+    "caption": "imposta ERP_MCP_URL + ERP_DB per abilitare",
+    "status": {
+      "error": "errore",
+      "checking": "verifica in corso",
+      "notConfigured": "non configurato",
+      "live": "attivo",
+      "unreachable": "irraggiungibile"
+    },
+    "error": {
+      "title": "Impossibile raggiungere l'endpoint di stato dell'ERP",
+      "message": "È un problema di connessione, non una configurazione mancante. Riprova.",
+      "retry": "Riprova"
+    },
+    "notConfigured": {
+      "set": "Imposta",
+      "andOptionally": "e facoltativamente",
+      "tail": "per raggiungere il sidecar ERP MCP. Fino ad allora, BidStack usa dati verificati locali e connettori di dati verificati."
+    },
+    "stat": {
+      "endpoint": "Endpoint",
+      "database": "Database",
+      "mcpTools": "Strumenti MCP",
+      "status": "Stato"
+    },
+    "value": {
+      "na": "n/d",
+      "reachable": "raggiungibile",
+      "unreachable": "irraggiungibile"
+    },
+    "kit": {
+      "title": "Kit operativo di offerta ERP",
+      "subtitle": "Modelli di partner, opportunità, preventivo, attività, documento e passaggio di consegne adattati per la prevendita BidStack.",
+      "badge": {
+        "sidecar": "sidecar",
+        "fixSidecar": "correggi sidecar",
+        "local": "locale"
+      }
+    },
+    "autocomplete": {
+      "title": "Completamento automatico partner",
+      "subtitle": "Ricerca di entità legale in stile ERP con fallback BidStack.",
+      "ariaLabel": "Query di completamento automatico azienda",
+      "placeholder": "Nome, dominio, partita IVA o DUNS",
+      "check": "Verifica",
+      "empty": "Nessun suggerimento di azienda ancora. Aggiungi credenziali ERP MCP o verifica questo account in BidStack."
+    },
+    "item": {
+      "vat": "P.IVA {{value}}",
+      "duns": "DUNS {{value}}",
+      "noRegistryKeys": "Nessuna chiave di registro ancora"
+    }
   }
 }

@@ -149,5 +149,70 @@
     "removeGroupAriaLabel": "Remover grupo",
     "addCondition": "Condição",
     "addGroup": "Grupo"
+  },
+  "reports": {
+    "heading": "Relatórios",
+    "subtitle": "Análises de pipeline, leads, central de serviços e tarefas.",
+    "tab": {
+      "pipeline": "Pipeline",
+      "leads": "Leads",
+      "service-desk": "Central de serviços",
+      "tasks": "Tarefas"
+    },
+    "tabAriaLabel": "Aba de relatório {{label}}",
+    "error": {
+      "title": "Não foi possível carregar o relatório"
+    },
+    "byStatus": "Por status",
+    "pipeline": {
+      "byStage": "Pipeline por estágio",
+      "weighted": "Pipeline ponderado",
+      "totalOpen": "Total abertos",
+      "closedThisQuarter": "Fechados neste trimestre"
+    },
+    "leads": {
+      "total": "Total de leads",
+      "converted": "Convertidos",
+      "conversionRate": "Taxa de conversão",
+      "avgScore": "Pontuação média",
+      "bySource": "Por origem"
+    },
+    "serviceDesk": {
+      "totalCases": "Total de casos",
+      "open": "Abertos",
+      "resolvedThisMonth": "Resolvidos este mês",
+      "avgSatisfaction": "Satisfação média",
+      "byPriority": "Por prioridade"
+    },
+    "tasks": {
+      "total": "Total de tarefas",
+      "completed": "Concluídas",
+      "overdue": "Atrasadas",
+      "completionRate": "Taxa de conclusão"
+    }
+  },
+  "reportsList": {
+    "errorTitle": "Falha ao carregar os relatórios",
+    "heading": "Relatórios",
+    "savedCount": "{{count}} relatórios salvos",
+    "newReport": "Novo relatório",
+    "searchPlaceholder": "Pesquisar relatórios…",
+    "searchAriaLabel": "Pesquisar relatórios",
+    "resultsCountMatching": "{{count}} relatórios correspondentes a \"{{search}}\"",
+    "resultsCount": "{{count}} relatórios",
+    "emptyTitle": "Nenhum relatório encontrado",
+    "emptySearchMessage": "Tente uma pesquisa diferente.",
+    "emptyMessage": "Crie seu primeiro relatório analítico.",
+    "tableAriaLabel": "Relatórios",
+    "columnName": "Nome",
+    "columnEntity": "Entidade",
+    "columnLastRun": "Última execução",
+    "columnSchedule": "Agendamento",
+    "columnActions": "Ações",
+    "runAriaLabel": "Executar relatório {{name}}",
+    "editAriaLabel": "Editar relatório {{name}}",
+    "duplicateAriaLabel": "Duplicar relatório {{name}}",
+    "deleteConfirm": "Excluir \"{{name}}\"?",
+    "deleteAriaLabel": "Excluir relatório {{name}}"
   }
 }

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -63,6 +64,7 @@ interface ErpCompanyAutocomplete {
 }
 
 export function ErpConnectorCard() {
+  const { t } = useTranslation('integrations');
   const [query, setQuery] = useState('Mantu');
   const status = useQuery({
     queryKey: ['erp:status'],
@@ -93,20 +95,23 @@ export function ErpConnectorCard() {
           ? 'jade'
           : 'tomato';
   const label = status.isError
-    ? 'error'
+    ? t('erpConnector.status.error', 'error')
     : !status.data
-      ? 'checking'
+      ? t('erpConnector.status.checking', 'checking')
       : !status.data.configured
-        ? 'not configured'
+        ? t('erpConnector.status.notConfigured', 'not configured')
         : status.data.reachable
-          ? 'live'
-          : 'unreachable';
+          ? t('erpConnector.status.live', 'live')
+          : t('erpConnector.status.unreachable', 'unreachable');
 
   return (
     <Card>
       <SectionHeader
-        title="ERP MCP"
-        caption={status.data?.database ?? 'set ERP_MCP_URL + ERP_DB to enable'}
+        title={t('erpConnector.title', 'ERP MCP')}
+        caption={
+          status.data?.database ??
+          t('erpConnector.caption', 'set ERP_MCP_URL + ERP_DB to enable')
+        }
         action={<Badge tone={tone}>{label}</Badge>}
       />
       {status.isLoading ? (
@@ -116,31 +121,56 @@ export function ErpConnectorCard() {
       ) : status.isError ? (
         <div className="p-5">
           <ErrorState
-            title="Couldn't reach the ERP status endpoint"
-            message="This is a connection problem, not a missing configuration. Please retry."
+            title={t('erpConnector.error.title', "Couldn't reach the ERP status endpoint")}
+            message={t(
+              'erpConnector.error.message',
+              'This is a connection problem, not a missing configuration. Please retry.',
+            )}
             action={
               <Button size="sm" variant="secondary" onClick={() => void status.refetch()}>
-                Retry
+                {t('erpConnector.error.retry', 'Retry')}
               </Button>
             }
           />
         </div>
       ) : !status.data?.configured ? (
         <div className="px-5 py-6 text-sm text-[var(--fg-secondary)]">
-          Set <code className="font-mono text-xs">ERP_MCP_URL</code> and optionally{' '}
-          <code className="font-mono text-xs">ERP_DB</code> to reach the ERP MCP sidecar. Until
-          then, BidStack uses local verified data and verified data connectors.
+          {t('erpConnector.notConfigured.set', 'Set')}{' '}
+          <code className="font-mono text-xs">ERP_MCP_URL</code>{' '}
+          {t('erpConnector.notConfigured.andOptionally', 'and optionally')}{' '}
+          <code className="font-mono text-xs">ERP_DB</code>{' '}
+          {t(
+            'erpConnector.notConfigured.tail',
+            'to reach the ERP MCP sidecar. Until then, BidStack uses local verified data and verified data connectors.',
+          )}
         </div>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-4">
-            <Stat label="Endpoint" value={hostOf(status.data.url)} />
-            <Stat label="Database" value={status.data.database ?? 'n/a'} />
             <Stat
-              label="MCP tools"
-              value={status.data.toolCount !== null ? status.data.toolCount.toString() : 'n/a'}
+              label={t('erpConnector.stat.endpoint', 'Endpoint')}
+              value={hostOf(status.data.url, t('erpConnector.value.na', 'n/a'))}
             />
-            <Stat label="Status" value={status.data.reachable ? 'reachable' : 'unreachable'} />
+            <Stat
+              label={t('erpConnector.stat.database', 'Database')}
+              value={status.data.database ?? t('erpConnector.value.na', 'n/a')}
+            />
+            <Stat
+              label={t('erpConnector.stat.mcpTools', 'MCP tools')}
+              value={
+                status.data.toolCount !== null
+                  ? status.data.toolCount.toString()
+                  : t('erpConnector.value.na', 'n/a')
+              }
+            />
+            <Stat
+              label={t('erpConnector.stat.status', 'Status')}
+              value={
+                status.data.reachable
+                  ? t('erpConnector.value.reachable', 'reachable')
+                  : t('erpConnector.value.unreachable', 'unreachable')
+              }
+            />
           </div>
           {status.data.lastError ? (
             <div className="mx-5 mb-5 rounded-md bg-[var(--danger-tint)] px-3 py-2 text-xs text-[var(--danger)]">
@@ -156,17 +186,23 @@ export function ErpConnectorCard() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
-                  ERP bid operating kit
+                  {t('erpConnector.kit.title', 'ERP bid operating kit')}
                 </h3>
                 <p className="mt-1 text-xs text-[var(--fg-secondary)]">
-                  Partner, opportunity, quote, activity, document, and handoff patterns adapted for
-                  BidStack presales.
+                  {t(
+                    'erpConnector.kit.subtitle',
+                    'Partner, opportunity, quote, activity, document, and handoff patterns adapted for BidStack presales.',
+                  )}
                 </p>
               </div>
               <Badge
                 tone={kit.data?.reachable ? 'jade' : kit.data?.configured ? 'tomato' : 'amber'}
               >
-                {kit.data?.reachable ? 'sidecar' : kit.data?.configured ? 'fix sidecar' : 'local'}
+                {kit.data?.reachable
+                  ? t('erpConnector.kit.badge.sidecar', 'sidecar')
+                  : kit.data?.configured
+                    ? t('erpConnector.kit.badge.fixSidecar', 'fix sidecar')
+                    : t('erpConnector.kit.badge.local', 'local')}
               </Badge>
             </div>
             {kit.isLoading ? (
@@ -213,10 +249,13 @@ export function ErpConnectorCard() {
               <div className="flex items-center justify-between gap-2">
                 <div>
                   <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
-                    Partner autocomplete
+                    {t('erpConnector.autocomplete.title', 'Partner autocomplete')}
                   </h3>
                   <p className="mt-1 text-xs text-[var(--fg-secondary)]">
-                    ERP-style legal entity lookup with BidStack fallback.
+                    {t(
+                      'erpConnector.autocomplete.subtitle',
+                      'ERP-style legal entity lookup with BidStack fallback.',
+                    )}
                   </p>
                 </div>
                 <Badge
@@ -228,7 +267,7 @@ export function ErpConnectorCard() {
                         : 'amber'
                   }
                 >
-                  {autocomplete.data?.source ?? 'checking'}
+                  {autocomplete.data?.source ?? t('erpConnector.status.checking', 'checking')}
                 </Badge>
               </div>
               <div className="mt-3 flex gap-2">
@@ -236,11 +275,11 @@ export function ErpConnectorCard() {
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   className="min-h-10 flex-1 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 text-sm text-[var(--fg-primary)] outline-none focus:ring-2 focus:ring-[var(--brand-primary)]"
-                  aria-label="Company autocomplete query"
-                  placeholder="Name, domain, VAT, or DUNS"
+                  aria-label={t('erpConnector.autocomplete.ariaLabel', 'Company autocomplete query')}
+                  placeholder={t('erpConnector.autocomplete.placeholder', 'Name, domain, VAT, or DUNS')}
                 />
                 <Button size="sm" variant="secondary" onClick={() => autocomplete.refetch()}>
-                  Check
+                  {t('erpConnector.autocomplete.check', 'Check')}
                 </Button>
               </div>
             </div>
@@ -260,11 +299,16 @@ export function ErpConnectorCard() {
                         <div className="mt-0.5 text-xs text-[var(--fg-secondary)]">
                           {[
                             item.domain,
-                            item.vat ? `VAT ${item.vat}` : null,
-                            item.duns ? `DUNS ${item.duns}` : null,
+                            item.vat
+                              ? t('erpConnector.item.vat', 'VAT {{value}}', { value: item.vat })
+                              : null,
+                            item.duns
+                              ? t('erpConnector.item.duns', 'DUNS {{value}}', { value: item.duns })
+                              : null,
                           ]
                             .filter(Boolean)
-                            .join(' / ') || 'No registry keys yet'}
+                            .join(' / ') ||
+                            t('erpConnector.item.noRegistryKeys', 'No registry keys yet')}
                         </div>
                       </div>
                       <Badge tone={item.source === 'external_erp' ? 'jade' : 'blue'}>
@@ -285,8 +329,10 @@ export function ErpConnectorCard() {
                 ))}
                 {autocomplete.data?.items.length === 0 ? (
                   <li className="p-4 text-sm text-[var(--fg-secondary)]">
-                    No company suggestions yet. Add ERP MCP credentials or verify this account in
-                    BidStack.
+                    {t(
+                      'erpConnector.autocomplete.empty',
+                      'No company suggestions yet. Add ERP MCP credentials or verify this account in BidStack.',
+                    )}
                   </li>
                 ) : null}
               </ul>
@@ -321,8 +367,8 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function hostOf(raw: string | null): string {
-  if (!raw) return 'n/a';
+function hostOf(raw: string | null, fallback: string): string {
+  if (!raw) return fallback;
   try {
     const u = new URL(raw);
     return u.host || raw;
