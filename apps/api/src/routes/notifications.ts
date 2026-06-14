@@ -4,7 +4,13 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
-import { Notification, NotificationPage, type NotificationType } from '@bidstack/shared';
+import {
+  DEFAULT_NOTIFICATION_PREFS,
+  Notification,
+  NotificationPage,
+  NotificationPrefs,
+  type NotificationType,
+} from '@bidstack/shared';
 
 interface DbRow {
   id: string;
@@ -90,6 +96,52 @@ export const notificationsRoutes: FastifyPluginAsyncZod = async (server) => {
         data: { readAt: new Date() },
       });
       return { updated: result.count };
+    },
+  );
+
+  // ── Per-user notification preferences ──────────────────────────────────────
+  // Replaces the old localStorage-only toggles. One row per user; absent row =
+  // defaults. mentionPush/dealStageChange are enforced in createNotification.
+  server.get(
+    '/notifications/prefs',
+    { schema: { response: { 200: NotificationPrefs } } },
+    async (req) => {
+      const row = await prisma.notificationPref.findUnique({
+        where: { userId: req.auth.userId },
+      });
+      if (!row) return DEFAULT_NOTIFICATION_PREFS;
+      return {
+        emailDigest: row.emailDigest,
+        mentionPush: row.mentionPush,
+        taskDueSoon: row.taskDueSoon,
+        dealStageChange: row.dealStageChange,
+      };
+    },
+  );
+
+  server.put(
+    '/notifications/prefs',
+    { schema: { body: NotificationPrefs, response: { 200: NotificationPrefs } } },
+    async (req) => {
+      const { emailDigest, mentionPush, taskDueSoon, dealStageChange } = req.body;
+      const row = await prisma.notificationPref.upsert({
+        where: { userId: req.auth.userId },
+        create: {
+          orgId: req.auth.orgId,
+          userId: req.auth.userId,
+          emailDigest,
+          mentionPush,
+          taskDueSoon,
+          dealStageChange,
+        },
+        update: { emailDigest, mentionPush, taskDueSoon, dealStageChange },
+      });
+      return {
+        emailDigest: row.emailDigest,
+        mentionPush: row.mentionPush,
+        taskDueSoon: row.taskDueSoon,
+        dealStageChange: row.dealStageChange,
+      };
     },
   );
 };

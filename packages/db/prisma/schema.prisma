@@ -194,6 +194,7 @@ model Org {
   contractAgreements ContractAgreement[]
   winLossRecords     WinLossRecord[]
   notifications      Notification[]
+  notificationPrefs  NotificationPref[]
 
   @@index([deletedAt])
   @@map("orgs")
@@ -250,6 +251,8 @@ model User {
   callSessions      CallSession[]
   // Wave 8 — real-time presence (one-to-one; userId @unique on UserPresence)
   presence          UserPresence?
+  // Notification preferences (one-to-one; userId @unique on NotificationPref)
+  notificationPref  NotificationPref?
 
   // Sprint 1 — Krayin import
   createdTags       Tag[]              @relation("TagCreatedBy")
@@ -4940,4 +4943,25 @@ model Notification {
 
   @@index([orgId, userId, readAt, createdAt(sort: Desc)], map: "notifications_org_user_read_created_idx")
   @@map("notifications")
+}
+
+// Per-user notification preferences (one row per user). mentionPush gates
+// `mention` notifications and dealStageChange gates `stage_change` in
+// createNotification; taskDueSoon + emailDigest persist for features that emit
+// them. Replaces the old localStorage-only toggles so prefs follow the user.
+model NotificationPref {
+  id              String   @id @default(uuid()) @db.Uuid
+  orgId           String   @map("org_id") @db.Uuid
+  userId          String   @unique @map("user_id") @db.Uuid
+  emailDigest     Boolean  @default(true) @map("email_digest")
+  mentionPush     Boolean  @default(true) @map("mention_push")
+  taskDueSoon     Boolean  @default(true) @map("task_due_soon")
+  dealStageChange Boolean  @default(false) @map("deal_stage_change")
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("notification_prefs")
 }

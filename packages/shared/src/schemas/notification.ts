@@ -28,3 +28,22 @@ export const NotificationPage = z.object({
   unread: z.number().int().nonnegative(),
 });
 export type NotificationPage = z.infer<typeof NotificationPage>;
+
+// Per-user notification preferences, persisted server-side (one row per user).
+// mentionPush gates `mention` notifications; dealStageChange gates
+// `stage_change`. taskDueSoon + emailDigest persist for features that emit them
+// (task reminders, the email digest) and are honoured as those land.
+export const NotificationPrefs = z.object({
+  emailDigest: z.boolean(),
+  mentionPush: z.boolean(),
+  taskDueSoon: z.boolean(),
+  dealStageChange: z.boolean(),
+});
+export type NotificationPrefs = z.infer<typeof NotificationPrefs>;
+
+export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
+  emailDigest: true,
+  mentionPush: true,
+  taskDueSoon: true,
+  dealStageChange: false,
+};

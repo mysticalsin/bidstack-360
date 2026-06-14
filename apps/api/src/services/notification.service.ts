@@ -11,6 +11,14 @@ import { createLogger } from '../lib/logger.js';
 
 const log = createLogger({ name: 'notification' });
 
+// Notification types a user can switch off in Settings. assignment/bid_override/
+// system are operationally important and always delivered. taskDueSoon +
+// emailDigest gate features that don't emit in-app notifications (yet).
+const GATED_BY_PREF: Partial<Record<NotificationType, 'mentionPush' | 'dealStageChange'>> = {
+  mention: 'mentionPush',
+  stage_change: 'dealStageChange',
+};
+
 export interface CreateNotificationInput {
   orgId: string;
   userId: string;
@@ -24,6 +32,16 @@ export interface CreateNotificationInput {
 
 /** Create one notification + push it on the user's realtime channel. */
 export async function createNotification(input: CreateNotificationInput): Promise<void> {
+  // Respect the user's notification preferences for the gateable types. Absent
+  // a prefs row the default is to deliver (matching prior behaviour); only an
+  // explicit opt-out (flag === false) suppresses the notification.
+  const prefKey = GATED_BY_PREF[input.type];
+  if (prefKey) {
+    const pref = await prisma.notificationPref.findUnique({
+      where: { userId: input.userId },
+    });
+    if (pref && pref[prefKey] === false) return;
+  }
   const row = await prisma.notification.create({
     data: {
       orgId: input.orgId,
