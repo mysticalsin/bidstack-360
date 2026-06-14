@@ -148,6 +148,12 @@ export function AnalyticsDashboardPage() {
 
         <div className="ml-auto flex items-center gap-2">
           <Link
+            to="/reports/list"
+            className="text-xs text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)] px-2 min-h-[44px] flex items-center"
+          >
+            Reports
+          </Link>
+          <Link
             to="/reports/new"
             className="text-xs text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)] px-2 min-h-[44px] flex items-center"
           >

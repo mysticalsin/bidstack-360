@@ -104,8 +104,10 @@ export const NAV_SECTIONS: NavSection[] = [
       { to: '/workflows', label: 'Workflows', icon: 'git-branch' },
       { to: '/custom-objects', label: 'Custom Objects', icon: 'sliders' },
       { to: '/intake', label: 'Document Intake', icon: 'download' },
-      { to: '/reports/list', label: 'Reports', icon: 'reports' },
-      { to: '/analytics', label: 'Analytics', icon: 'dashboard' },
+      // Reports + dashboards live under one Insights surface (Analytics): the
+      // page hosts the dashboard switcher, "Manage dashboards", and links to
+      // saved Reports + the report builder. No separate Reports rail door.
+      { to: '/analytics', label: 'Analytics & Reports', icon: 'dashboard' },
     ],
   },
 ];
