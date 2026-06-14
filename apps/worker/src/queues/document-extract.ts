@@ -24,6 +24,7 @@ import type { DustClient } from '@bidstack/dust-client';
 // HIGH-2 for the threat model.
 import { extractTextFromBufferSandboxed } from '../lib/extract-text-sandbox.js';
 import { readStoredDocument } from '../lib/storage-read.js';
+import { extractContractFields } from '../lib/contract-extract-fields.js';
 import { getOrgDust, resolveAgentId } from '../lib/dust-credentials.js';
 
 import { deterministicExtract } from './document-extract-analysis.js';
@@ -67,6 +68,9 @@ const JobData = z.object({
   bidDocumentId: z.string().uuid().optional(),
   documentVersionId: z.string().uuid().optional(),
   prompt: z.string().optional(),
+  // 'contract' routes to the MSA/rate-card extractor and parks a reviewable
+  // draft on the DocumentExtraction instead of upserting solutions/products.
+  extractionKind: z.enum(['intel', 'contract']).optional(),
 });
 type JobData = z.infer<typeof JobData>;
 
@@ -144,6 +148,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
     bidDocumentId,
     documentVersionId,
     prompt,
+    extractionKind,
   } = JobData.parse(job.data);
 
   // Mark as running
@@ -173,6 +178,26 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
     sourcePath: stored.sourcePath,
   });
   const text = extractedText.length > 100_000 ? extractedText.slice(0, 100_000) : extractedText;
+
+  // Contract lane: extract MSA/rate-card fields and park a reviewable draft on
+  // the extraction row (the user confirms before a ContractAgreement is created).
+  // No solutions/products writeback. LLM upgrade is a future step; the
+  // deterministic extractor is the always-available baseline.
+  if (extractionKind === 'contract') {
+    const draft = extractContractFields(text);
+    const done = await prisma.documentExtraction.updateMany({
+      where: { id: extractionId, orgId, documentId, deletedAt: null },
+      data: {
+        status: 'done',
+        extractedData: draft as unknown as Prisma.InputJsonValue,
+      },
+    });
+    if (done.count !== 1) {
+      throw new Error('Contract extraction does not match an active tenant-scoped extraction');
+    }
+    log.info({ jobId: job.id, documentId }, 'contract extraction completed');
+    return;
+  }
 
   let result: ExtractionResult;
   let dustRunId: string | null = null;

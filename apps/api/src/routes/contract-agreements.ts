@@ -12,10 +12,14 @@ import {
   ContractAgreementPage,
   ContractAgreementPatch,
   RateCardLine,
+  ContractExtractionDraft,
+  ContractExtractionResult,
+  type ContractExtractionStatus,
 } from '@bidstack/shared';
 import { z as zod } from 'zod';
 
 import { normalizeName } from '../services/crm/dashboard.utils.js';
+import { enqueueDocumentExtract } from '../queues/document-extract.js';
 
 interface DbRow {
   id: string;
@@ -249,6 +253,75 @@ export const contractAgreementRoutes: FastifyPluginAsyncZod = async (server) => 
         }),
       ]);
       return reply.code(204).send(null);
+    },
+  );
+
+  // ─── OCR + extraction (upload doc → reviewable draft) ────────────────────
+  // POST queues a contract-extraction job for an already-uploaded document;
+  // GET polls it. Heavy OCR/LLM work stays out of the request path (worker).
+  server.post(
+    '/contract-agreements/extract',
+    {
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      preHandler: [server.requirePermission('accounts:write')],
+      schema: {
+        body: zod.object({ fileId: zod.string().uuid() }),
+        response: { 200: ContractExtractionResult },
+      },
+    },
+    async (req) => {
+      const file = await prisma.fileAttachment.findFirst({
+        where: { id: req.body.fileId, orgId: req.auth.orgId, deletedAt: null },
+        select: { id: true, accountId: true, storageKey: true, contentType: true, name: true },
+      });
+      if (!file) throw server.httpErrors.notFound('Document not found');
+      const extraction = await prisma.documentExtraction.create({
+        data: {
+          orgId: req.auth.orgId,
+          documentId: file.id,
+          accountId: file.accountId ?? '',
+          status: 'pending',
+          extractedData: {},
+        },
+      });
+      await enqueueDocumentExtract({
+        orgId: req.auth.orgId,
+        accountId: file.accountId ?? '',
+        documentId: file.id,
+        extractionId: extraction.id,
+        storageKey: file.storageKey,
+        contentType: file.contentType,
+        name: file.name,
+        extractionKind: 'contract',
+      });
+      return { id: extraction.id, fileId: file.id, status: 'pending' as const, draft: null, error: null };
+    },
+  );
+
+  server.get(
+    '/contract-agreements/extractions/:id',
+    {
+      preHandler: [server.requirePermission('accounts:read')],
+      schema: { params: IdParam, response: { 200: ContractExtractionResult } },
+    },
+    async (req) => {
+      const row = await prisma.documentExtraction.findFirst({
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        select: { id: true, documentId: true, status: true, extractedData: true, error: true },
+      });
+      if (!row) throw server.httpErrors.notFound('Extraction not found');
+      // Map the worker's status vocabulary to the contract-extraction states.
+      const status: ContractExtractionStatus =
+        row.status === 'done'
+          ? 'done'
+          : row.status === 'error' || row.status === 'failed'
+            ? 'error'
+            : row.status === 'pending'
+              ? 'pending'
+              : 'running';
+      const draft =
+        status === 'done' ? (ContractExtractionDraft.safeParse(row.extractedData).data ?? null) : null;
+      return { id: row.id, fileId: row.documentId, status, draft, error: row.error };
     },
   );
 };

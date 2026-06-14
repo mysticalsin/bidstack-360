@@ -6,6 +6,7 @@ import type {
   ContractAgreementCreate,
   ContractAgreementPage,
   ContractAgreementPatch,
+  ContractExtractionResult,
 } from '@bidstack/shared';
 
 export function useContractAgreements(accountKey: string) {
@@ -45,5 +46,30 @@ export function useDeleteContractAgreement() {
     mutationFn: (id: string) =>
       api(`/api/contract-agreements/${id}`, { method: 'DELETE' }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['contract-agreements'] }),
+  });
+}
+
+// Queue an OCR/extraction job for an uploaded contract document.
+export function useExtractContract() {
+  return useMutation({
+    mutationFn: (fileId: string) =>
+      api<ContractExtractionResult>('/api/contract-agreements/extract', {
+        method: 'POST',
+        body: { fileId },
+      }),
+  });
+}
+
+// Poll an extraction until it reaches a terminal state (done | error).
+export function useContractExtraction(id: string | null) {
+  return useQuery({
+    queryKey: ['contract-extraction', id],
+    queryFn: ({ signal }) =>
+      api<ContractExtractionResult>(`/api/contract-agreements/extractions/${id}`, { signal }),
+    enabled: id !== null,
+    refetchInterval: (query) => {
+      const s = query.state.data?.status;
+      return s === 'done' || s === 'error' ? false : 2000;
+    },
   });
 }

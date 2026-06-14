@@ -156,6 +156,52 @@ describe('contract agreement routes', () => {
     }
   });
 
+  t('queues an extraction for an uploaded doc and polls it (worker skipped in test)', async () => {
+    const file = await prisma.fileAttachment.create({
+      data: {
+        orgId: orgId!,
+        accountId: ACCOUNT,
+        name: 'MSA-extract.pdf',
+        contentType: 'application/pdf',
+        bytes: 2048,
+        storageKey: `${orgId}/${ACCOUNT}/extract-msa.pdf`,
+      },
+    });
+    let extractionId: string | null = null;
+    try {
+      const start = await server.inject({
+        method: 'POST',
+        url: '/api/contract-agreements/extract',
+        payload: { fileId: file.id },
+      });
+      expect(start.statusCode).toBe(200);
+      const res = start.json() as { id: string; fileId: string; status: string; draft: unknown };
+      expect(res.fileId).toBe(file.id);
+      // enqueue is skipped in test mode → the row stays pending, no worker run.
+      expect(res.status).toBe('pending');
+      expect(res.draft).toBeNull();
+      extractionId = res.id;
+
+      const poll = await server.inject({
+        method: 'GET',
+        url: `/api/contract-agreements/extractions/${extractionId}`,
+      });
+      expect(poll.statusCode).toBe(200);
+      expect((poll.json() as { status: string }).status).toBe('pending');
+
+      // A non-existent / foreign file id is rejected.
+      const bad = await server.inject({
+        method: 'POST',
+        url: '/api/contract-agreements/extract',
+        payload: { fileId: '11111111-1111-4111-8111-111111111111' },
+      });
+      expect(bad.statusCode).toBe(404);
+    } finally {
+      if (extractionId) await prisma.documentExtraction.deleteMany({ where: { id: extractionId } });
+      await prisma.fileAttachment.deleteMany({ where: { id: file.id } });
+    }
+  });
+
   t('another org’s contract id 404s on patch and delete (tenant isolation)', async () => {
     const foreignOrg = await prisma.org.create({
       data: { name: 'Contract Foreign', clerkOrg: `org_ctr_${Date.now()}` },

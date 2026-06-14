@@ -14,6 +14,8 @@ import { useIsAdmin } from '@/lib/auth';
 import {
   useContractAgreements,
   useCreateContractAgreement,
+  useExtractContract,
+  useContractExtraction,
 } from '@/hooks/useContractAgreements';
 import { useUploadFile, downloadFileUrl } from '@/hooks/useFiles';
 import type {
@@ -157,8 +159,38 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
   const [open, setOpen] = useState(false);
   const create = useCreateContractAgreement();
   const upload = useUploadFile(accountKey);
+  const extract = useExtractContract();
   // The hosted source document (uploaded MSA/rate-card PDF) linked to this agreement.
   const [sourceFile, setSourceFile] = useState<{ id: string; name: string } | null>(null);
+  const [extractionId, setExtractionId] = useState<string | null>(null);
+  const extraction = useContractExtraction(extractionId);
+
+  // OCR/extraction is best-effort — the user explicitly APPLIES the draft into
+  // the editable form, then reviews/edits before saving (never auto-committed).
+  function applyDraft() {
+    const d = extraction.data?.draft;
+    if (!d) return;
+    setForm((f) => ({
+      ...f,
+      kind: d.kind ?? f.kind,
+      reference: d.reference ?? f.reference,
+      countries: d.countries.length ? d.countries.join(', ') : f.countries,
+      globalRebatePct: d.globalRebateBps != null ? String(d.globalRebateBps / 100) : f.globalRebatePct,
+      currency: d.currency ?? f.currency,
+      expiryDate: d.expiryDate ? d.expiryDate.slice(0, 10) : f.expiryDate,
+      rateReviewSchedule: d.rateReviewSchedule ?? f.rateReviewSchedule,
+    }));
+    if (d.rateCard.length) {
+      setRateLines(
+        d.rateCard.map((l) => ({
+          role: l.role,
+          rate: String(l.rateMicros / 1_000_000),
+          unit: l.unit,
+        })),
+      );
+    }
+    toast.success('Extracted fields applied — review before saving');
+  }
   const [form, setForm] = useState({
     kind: 'msa' as ContractKind,
     reference: '',
@@ -225,6 +257,7 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
           });
           setRateLines([]);
           setSourceFile(null);
+          setExtractionId(null);
         },
         onError: (err: Error) => toast.error('Could not save', { description: err.message }),
       },
@@ -317,17 +350,61 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
           Source document
         </p>
         {sourceFile ? (
-          <p className="flex items-center gap-2 text-sm text-[var(--fg-secondary)]">
-            <span className="truncate">{sourceFile.name}</span>
-            <button
-              type="button"
-              onClick={() => setSourceFile(null)}
-              className="text-xs text-[var(--fg-tertiary)] hover:text-[var(--danger)]"
-              aria-label="Remove attached document"
-            >
-              remove
-            </button>
-          </p>
+          <div className="space-y-1">
+            <p className="flex items-center gap-2 text-sm text-[var(--fg-secondary)]">
+              <span className="truncate">{sourceFile.name}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setSourceFile(null);
+                  setExtractionId(null);
+                }}
+                className="text-xs text-[var(--fg-tertiary)] hover:text-[var(--danger)]"
+                aria-label="Remove attached document"
+              >
+                remove
+              </button>
+            </p>
+            {/* OCR + extraction → reviewable prefill */}
+            {!extractionId ? (
+              <button
+                type="button"
+                className="min-h-[44px] rounded px-2 text-xs text-[var(--brand-primary)] hover:underline disabled:opacity-50"
+                disabled={extract.isPending}
+                onClick={() =>
+                  extract.mutate(sourceFile.id, {
+                    onSuccess: (r) => setExtractionId(r.id),
+                    onError: (err: Error) =>
+                      toast.error('Could not start extraction', { description: err.message }),
+                  })
+                }
+              >
+                {extract.isPending ? 'Starting…' : 'Extract fields from document'}
+              </button>
+            ) : extraction.data?.status === 'done' && extraction.data.draft ? (
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  className="min-h-[44px] rounded px-2 text-xs font-medium text-[var(--brand-primary)] hover:underline"
+                  onClick={applyDraft}
+                >
+                  Apply extracted fields (review before saving)
+                </button>
+                {extraction.data.draft.warnings.slice(0, 2).map((w, i) => (
+                  <p key={i} className="text-[11px] text-[var(--fg-tertiary)]">
+                    {w}
+                  </p>
+                ))}
+              </div>
+            ) : extraction.data?.status === 'error' ? (
+              <p className="text-xs text-[var(--danger)]">
+                Extraction failed{extraction.data.error ? `: ${extraction.data.error}` : ''}. Enter
+                fields manually.
+              </p>
+            ) : (
+              <p className="text-xs text-[var(--fg-tertiary)]">Extracting… (OCR + parsing)</p>
+            )}
+          </div>
         ) : (
           <label className="flex min-h-[44px] cursor-pointer items-center text-sm text-[var(--brand-primary)] hover:underline">
             {upload.isPending ? 'Uploading…' : 'Attach MSA / rate-card document (PDF, image)'}

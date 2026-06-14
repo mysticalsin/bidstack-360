@@ -26,6 +26,8 @@ export interface DocumentExtractJob {
   documentVersionId?: string;
   /** Optional custom prompt override. */
   prompt?: string;
+  /** 'contract' routes to the MSA/rate-card extractor + parks a review draft. */
+  extractionKind?: 'intel' | 'contract';
 }
 
 let queueSingleton: Queue | null = null;
