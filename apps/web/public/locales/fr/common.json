@@ -44,7 +44,19 @@
     "agents": "Agents Dust",
     "search": "Recherche",
     "references": "Bibliothèque de références",
-    "settingsPage": "Paramètres"
+    "settingsPage": "Paramètres",
+    "home": "Accueil",
+    "bidsRfp": "Appels d'offres & RFP",
+    "quickStart": "Démarrage rapide",
+    "salesToolkits": "Kits de vente",
+    "keyAccounts": "Comptes clés",
+    "topAccounts": "Comptes principaux",
+    "sectorView": "Vue par secteur",
+    "crossSell": "Vente croisée",
+    "agentStudio": "Studio d'agents",
+    "calendar": "Calendrier",
+    "customObjects": "Objets personnalisés",
+    "analyticsReports": "Analyses & rapports"
   },
   "crumbs": {
     "portfolio": "Portefeuille",
@@ -140,9 +152,15 @@
     "dustSynced": "synchronisé {{when}}"
   },
   "pages": {
-    "dashboard": { "title": "Tableau de bord" },
-    "opportunities": { "title": "Opportunités" },
-    "contacts": { "title": "Contacts" },
+    "dashboard": {
+      "title": "Tableau de bord"
+    },
+    "opportunities": {
+      "title": "Opportunités"
+    },
+    "contacts": {
+      "title": "Contacts"
+    },
     "rfpHub": {
       "title": "Centre de réponse aux AO",
       "subtitle": "Qualifier, rédiger, évaluer et soumettre — tout le processus AO en un seul endroit.",
@@ -230,7 +248,9 @@
         "title": "Aucun prospect pour l'instant",
         "message": "Créez votre premier prospect pour commencer à suivre les opportunités."
       },
-      "error": { "title": "Échec du chargement des prospects" },
+      "error": {
+        "title": "Échec du chargement des prospects"
+      },
       "view": {
         "list": "Liste",
         "kanban": "Kanban",

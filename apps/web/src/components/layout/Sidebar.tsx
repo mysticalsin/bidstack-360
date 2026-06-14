@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 import { TooltipBare, TooltipProvider } from '@/components/ui/Tooltip';
 import { Icon, type IconName } from '@/components/ui/Icon';
@@ -31,6 +32,7 @@ export function Sidebar() {
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
   const toggle = useUiStore((s) => s.toggleSidebar);
   const isAdmin = useIsAdmin();
+  const { t } = useTranslation('common');
 
   const dustQuery = useQuery({
     queryKey: ['dust:status'],
@@ -61,7 +63,6 @@ export function Sidebar() {
         className={cn('sidebar', collapsed && 'is-collapsed')}
         aria-label="Primary navigation"
         data-tour="nav-sidebar"
-        style={{ position: 'relative' }}
       >
         <button
           type="button"
@@ -95,6 +96,11 @@ export function Sidebar() {
           </div>
         </div>
 
+        {/* Scrollable nav region: the brand (above) and footer (below) stay
+            pinned; only this list scrolls when every group is expanded, so the
+            hamburger/collapse toggle never scrolls out of reach. min-h-0 lets a
+            flex child actually overflow instead of growing the whole sidebar. */}
+        <div className="sb-scroll flex-1 min-h-0 overflow-y-auto">
         {NAV_SECTIONS.map((section) => (
           <SidebarSection
             key={section.key}
@@ -108,7 +114,7 @@ export function Sidebar() {
             self-hide when empty so a brand-new user doesn't see two
             confusing empty headers. */}
         {favorites.length > 0 ? (
-          <SidebarGroup title="Starred">
+          <SidebarGroup title={t('nav.starred', 'Starred')}>
             {favorites.slice(0, collapsed ? 3 : MAX_STARRED).map((acc) => (
               <AccountShortcut key={acc.slug} acc={acc} icon="starFilled" collapsed={collapsed} />
             ))}
@@ -116,20 +122,20 @@ export function Sidebar() {
         ) : null}
 
         {recents.length > 0 ? (
-          <SidebarGroup title="Recent">
+          <SidebarGroup title={t('nav.recent', 'Recent')}>
             {recents.slice(0, collapsed ? 3 : 5).map((acc) => (
               <AccountShortcut key={acc.slug} acc={acc} icon="clock" collapsed={collapsed} />
             ))}
           </SidebarGroup>
         ) : null}
 
-        <SidebarGroup title="Settings">
+        <SidebarGroup title={t('nav.settings', 'Settings')}>
           {settings.map((item) => (
             <SidebarItem key={item.to} item={item} badges={badges} collapsed={collapsed} />
           ))}
         </SidebarGroup>
 
-        <div style={{ flex: 1 }} />
+        </div>
 
         <div className="sb-foot">
           <div className="sb-sync">
@@ -177,6 +183,8 @@ function SidebarSection({
 }) {
   const sectionCollapsed = useUiStore((s) => Boolean(s.collapsedSections[section.key]));
   const toggleSection = useUiStore((s) => s.toggleSection);
+  const { t } = useTranslation('common');
+  const sectionTitle = t(section.titleKey, section.title);
 
   if (collapsed) {
     if (section.key === 'home') {
@@ -199,21 +207,21 @@ function SidebarSection({
         <button
           type="button"
           className="sb-item sb-parent-trigger"
-          aria-label={section.title}
-          title={section.title}
+          aria-label={sectionTitle}
+          title={sectionTitle}
         >
           <Icon name={section.icon} size={16} />
           {totalBadge > 0 && <span className="sb-badge-dot" />}
         </button>
         {/* Flyout menu */}
         <div className="sb-flyout">
-          <div className="sb-flyout-header">{section.title}</div>
+          <div className="sb-flyout-header">{sectionTitle}</div>
           <div className="sb-flyout-content">
             {section.items.map((item) => {
               const badge = item.badgeKey ? badges[item.badgeKey] : 0;
               return (
                 <NavLink key={item.to} to={item.to} end={item.end} className="sb-flyout-item">
-                  <span>{item.label}</span>
+                  <span>{t(item.labelKey, item.label)}</span>
                   {badge > 0 && <span className="sb-badge">{badge}</span>}
                 </NavLink>
               );
@@ -245,7 +253,7 @@ function SidebarSection({
         aria-expanded={!sectionCollapsed}
         aria-controls={bodyId}
       >
-        <span>{section.title}</span>
+        <span>{sectionTitle}</span>
         <Icon
           name="chevron-down"
           size={12}
@@ -284,6 +292,8 @@ function SidebarItem({
   collapsed: boolean;
 }) {
   const location = useLocation();
+  const { t } = useTranslation('common');
+  const label = t(item.labelKey, item.label);
   const badge = item.badgeKey ? badges[item.badgeKey] : 0;
   const prefetch = () => prefetchRoute(item.to);
 
@@ -313,14 +323,14 @@ function SidebarItem({
       end={item.end}
       aria-current={isActive ? 'page' : undefined}
       className={cn('sb-item', isActive && 'is-active')}
-      aria-label={item.label}
-      title={collapsed ? undefined : item.label}
+      aria-label={label}
+      title={collapsed ? undefined : label}
       onMouseEnter={prefetch}
       onFocus={prefetch}
       onTouchStart={prefetch}
     >
       <Icon name={item.icon} size={16} />
-      <span>{item.label}</span>
+      <span>{label}</span>
       {badge > 0 && <span className="sb-badge">{badge}</span>}
     </NavLink>
   );
@@ -332,7 +342,7 @@ function SidebarItem({
         side="right"
         content={
           <span className="flex items-center gap-2">
-            <span>{item.label}</span>
+            <span>{label}</span>
             {badge > 0 ? (
               <span className="rounded bg-[var(--brand-primary-tint)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--brand-primary)]">
                 {badge}

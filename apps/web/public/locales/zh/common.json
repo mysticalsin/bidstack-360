@@ -44,7 +44,19 @@
     "agents": "Dust 智能体",
     "search": "搜索",
     "references": "参考资料库",
-    "settingsPage": "设置"
+    "settingsPage": "设置",
+    "home": "主页",
+    "bidsRfp": "投标与 RFP",
+    "quickStart": "快速开始",
+    "salesToolkits": "销售工具包",
+    "keyAccounts": "关键客户",
+    "topAccounts": "重点客户",
+    "sectorView": "行业视图",
+    "crossSell": "交叉销售",
+    "agentStudio": "智能体工作室",
+    "calendar": "日历",
+    "customObjects": "自定义对象",
+    "analyticsReports": "分析与报告"
   },
   "crumbs": {
     "portfolio": "投资组合",
@@ -140,9 +152,15 @@
     "dustSynced": "已同步 {{when}}"
   },
   "pages": {
-    "dashboard": { "title": "仪表盘" },
-    "opportunities": { "title": "商机" },
-    "contacts": { "title": "联系人" },
+    "dashboard": {
+      "title": "仪表盘"
+    },
+    "opportunities": {
+      "title": "商机"
+    },
+    "contacts": {
+      "title": "联系人"
+    },
     "rfpHub": {
       "title": "投标响应中心",
       "subtitle": "资格审查、起草、评分、提交 — 整个 RFP 流程一站完成。",
@@ -230,7 +248,9 @@
         "title": "暂无潜在客户",
         "message": "创建您的第一个潜在客户以开始跟踪商机。"
       },
-      "error": { "title": "加载潜在客户失败" },
+      "error": {
+        "title": "加载潜在客户失败"
+      },
       "view": {
         "list": "列表",
         "kanban": "看板",

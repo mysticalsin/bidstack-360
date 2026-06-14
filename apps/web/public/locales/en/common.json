@@ -44,7 +44,19 @@
     "agents": "Dust Agents",
     "search": "Search",
     "references": "Reference Library",
-    "settingsPage": "Settings"
+    "settingsPage": "Settings",
+    "home": "Home",
+    "bidsRfp": "Bids & RFP",
+    "quickStart": "Quick Start",
+    "salesToolkits": "Sales Toolkits",
+    "keyAccounts": "Key Accounts",
+    "topAccounts": "Top Accounts",
+    "sectorView": "Sector View",
+    "crossSell": "Cross-sell",
+    "agentStudio": "Agent Studio",
+    "calendar": "Calendar",
+    "customObjects": "Custom Objects",
+    "analyticsReports": "Analytics & Reports"
   },
   "crumbs": {
     "portfolio": "Portfolio",
@@ -140,9 +152,15 @@
     "dustSynced": "synced {{when}}"
   },
   "pages": {
-    "dashboard": { "title": "Dashboard" },
-    "opportunities": { "title": "Opportunities" },
-    "contacts": { "title": "Contacts" },
+    "dashboard": {
+      "title": "Dashboard"
+    },
+    "opportunities": {
+      "title": "Opportunities"
+    },
+    "contacts": {
+      "title": "Contacts"
+    },
     "rfpHub": {
       "title": "Bid response hub",
       "subtitle": "Qualify, draft, score, and submit — the whole RFP workflow in one place.",
@@ -230,7 +248,9 @@
         "title": "No leads yet",
         "message": "Create your first lead to start tracking prospects."
       },
-      "error": { "title": "Failed to load leads" },
+      "error": {
+        "title": "Failed to load leads"
+      },
       "view": {
         "list": "List",
         "kanban": "Kanban",

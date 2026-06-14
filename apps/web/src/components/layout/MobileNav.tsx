@@ -6,6 +6,7 @@ import * as RadixDialog from '@radix-ui/react-dialog';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 import { useUiStore } from '@/stores/ui';
 import { useAccountHistory } from '@/stores/accountHistory';
@@ -72,6 +73,7 @@ export function MobileNav() {
 }
 
 function MobileNavContent({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation('common');
   const oppsCount = useOpportunityCount({ excludeClosed: true });
   const taskSummary = useTaskSummary();
   const isAdmin = useIsAdmin();
@@ -108,7 +110,7 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
       {/* Scrollable nav */}
       <nav aria-label="Primary navigation" className="flex-1 overflow-y-auto px-2 py-2">
         {NAV_SECTIONS.map((section) => (
-          <NavGroup key={section.key} title={section.title}>
+          <NavGroup key={section.key} title={t(section.titleKey, section.title)}>
             {section.items.map((item) => (
               <MobileNavItem key={item.to} item={item} badges={badges} onNavigate={onClose} />
             ))}
@@ -116,7 +118,7 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
         ))}
 
         {favorites.length > 0 && (
-          <NavGroup title="Starred">
+          <NavGroup title={t('nav.starred', 'Starred')}>
             {favorites.map((acc) => (
               <MobileAccountItem key={acc.slug} acc={acc} onNavigate={onClose} />
             ))}
@@ -124,14 +126,14 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
         )}
 
         {recents.length > 0 && (
-          <NavGroup title="Recent">
+          <NavGroup title={t('nav.recent', 'Recent')}>
             {recents.slice(0, 5).map((acc) => (
               <MobileAccountItem key={acc.slug} acc={acc} onNavigate={onClose} />
             ))}
           </NavGroup>
         )}
 
-        <NavGroup title="Settings">
+        <NavGroup title={t('nav.settings', 'Settings')}>
           {(isAdmin ? ADMIN_SETTINGS : MEMBER_SETTINGS).map((item) => (
             <MobileNavItem key={item.to} item={item} badges={badges} onNavigate={onClose} />
           ))}
@@ -161,6 +163,8 @@ function MobileNavItem({
   badges: { openBids: number; overdueTasks: number };
   onNavigate: () => void;
 }) {
+  const { t } = useTranslation('common');
+  const label = t(item.labelKey, item.label);
   const badge = item.badgeKey ? badges[item.badgeKey] : 0;
   const location = useLocation();
 
@@ -198,7 +202,7 @@ function MobileNavItem({
       onMouseEnter={() => prefetchRoute(item.to)}
     >
       <Icon name={item.icon} size={16} />
-      <span className="flex-1">{item.label}</span>
+      <span className="flex-1">{label}</span>
       {badge > 0 && (
         <span className="rounded-full bg-[var(--surface-sunken)] px-2 py-0.5 text-[11px] font-semibold text-[var(--fg-tertiary)]">
           {badge}
