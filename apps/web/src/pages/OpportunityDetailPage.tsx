@@ -17,6 +17,7 @@ import { OpportunityAccountIntel } from '@/components/opportunity/OpportunityAcc
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';
 import { CreateTaskDialog } from '@/components/task/CreateTaskDialog';
+import { ScheduleReviewDialog } from '@/components/calls/ScheduleReviewDialog';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Icon } from '@/components/ui/Icon';
 import { MagneticButton } from '@/components/ui/MagneticButton';
@@ -186,6 +187,17 @@ export function OpportunityDetailPage() {
                     RFP Pipeline
                   </Button>
                 </Link>
+                <ScheduleReviewDialog
+                  entityType="OPPORTUNITY"
+                  entityId={data.id}
+                  defaultTopic={`Go/No-Go review — ${data.name}`}
+                  trigger={
+                    <Button variant="ghost" size="sm" className="rounded-full">
+                      <Icon name="clock" size={12} className="text-[var(--brand-primary)] mr-1" />
+                      Schedule review
+                    </Button>
+                  }
+                />
                 <MagneticButton
                   onClick={() => setBriefOpen(true)}
                   className="h-8 px-4 text-xs shadow-none"
