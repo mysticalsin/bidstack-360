@@ -107,6 +107,26 @@ function serializeRequest(
 // ─── Route plugin ─────────────────────────────────────────────────────────────
 
 export const signaturesRoutes: FastifyPluginAsyncZod = async (server) => {
+  // Capture the raw JSON bytes for HMAC verification on the DocuSign webhook.
+  // Content-type parsers are ENCAPSULATED to the registering plugin, so this is
+  // scoped to the signatures routes and does not affect the rest of the API. The
+  // default Fastify parser discards raw bytes, which silently broke webhook HMAC
+  // validation in production (the re-serialized JSON never byte-matches the
+  // payload DocuSign signed). Mirrors the webhooks plugin's own raw parser.
+  server.addContentTypeParser(
+    'application/json',
+    { parseAs: 'buffer' },
+    (_req, body, done) => {
+      const buf = body as Buffer;
+      (_req as unknown as { rawBody: Buffer }).rawBody = buf;
+      try {
+        done(null, buf.length ? JSON.parse(buf.toString('utf8')) : {});
+      } catch (err) {
+        done(err as Error);
+      }
+    },
+  );
+
   // ── GET /signatures/requests ──────────────────────────────────────────────
   server.get(
     '/signatures/requests',
@@ -271,10 +291,9 @@ export const signaturesRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req, reply) => {
-      // Fastify doesn't expose rawBody by default — we access it via the buffer
-      // that @fastify/raw-body or our content-type parser provides.
-      // The server.ts registers addContentTypeParser for 'application/json' to
-      // capture raw bytes for HMAC verification on webhook routes.
+      // req.rawBody is populated by the plugin-scoped content-type parser above,
+      // so HMAC runs over the exact bytes DocuSign signed. The fallback only
+      // applies to a genuinely empty body.
       const rawBody =
         (req as unknown as { rawBody?: Buffer }).rawBody ?? Buffer.from(JSON.stringify(req.body));
       const signatureHeader = req.headers['x-docusign-signature-1'] as string | undefined;

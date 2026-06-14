@@ -86,7 +86,7 @@ export const realtimeRoutes: FastifyPluginAsync = async (server) => {
       });
 
       // Broadcast lock acquisition to entity channel.
-      await publish(`entity:${entityType}:${entityId}:edits`, 'lock.acquired', {
+      await publish(`entity:${orgId}:${entityType}:${entityId}:edits`, 'lock.acquired', {
         entityType,
         entityId,
         userId,
@@ -135,7 +135,7 @@ export const realtimeRoutes: FastifyPluginAsync = async (server) => {
       });
 
       // Broadcast lock release.
-      await publish(`entity:${entityType}:${entityId}:edits`, 'lock.released', {
+      await publish(`entity:${orgId}:${entityType}:${entityId}:edits`, 'lock.released', {
         entityType,
         entityId,
         userId,

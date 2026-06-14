@@ -38,7 +38,7 @@ import { pino } from 'pino';
 import { fromUint8Array, toUint8Array } from 'js-base64';
 import { prisma } from '@bidstack/db';
 import { publish, subscribe } from '../services/realtime.service.js';
-import { loadYDoc, persistUpdate } from '../services/yjs-persistence.service.js';
+import { loadYDoc, loadYDocById, persistUpdate } from '../services/yjs-persistence.service.js';
 
 const logger = pino({ name: 'yjs-collab.plugin' });
 
@@ -219,12 +219,14 @@ const yjsCollabPluginImpl: FastifyPluginAsync = async (server) => {
           return;
         }
 
-        const { doc } = await loadYDoc({
-          orgId: auth.orgId,
-          entityType: '', // ydocId uniquely identifies; entityType not needed here
-          entityId: '',
-          fieldKey: '',
-        }).catch(() => ({ doc: new Y.Doc(), ydocId: msg.ydocId }));
+        // Load the ACTUAL doc by its id. The previous blank-composite-key load
+        // missed the row, created a phantom empty doc, and returned an empty
+        // (wrong) sync delta. The session check above already proves org scope.
+        const doc = await loadYDocById(msg.ydocId, auth.orgId);
+        if (!doc) {
+          sendError('NOT_FOUND', 'Document not found');
+          return;
+        }
 
         // Compute the diff between the client's state and the server's state.
         const clientStateVector = toUint8Array(msg.stateVector);

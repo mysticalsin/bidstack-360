@@ -4065,6 +4065,9 @@ model YjsUpdate {
   @@index([ydocId, createdAt])
   @@index([orgId, createdAt])
   @@index([deletedAt])
+  // Cross-org retention prune filters on created_at alone; the composite indexes
+  // above lead with ydoc_id/org_id and can't serve it, forcing a seq scan.
+  @@index([createdAt])
   @@map("yjs_updates")
 }
 

@@ -6,9 +6,9 @@
 // server-push only; we'd need a separate REST leg for client→server signals.
 //
 // Channel naming convention (MUST match frontend):
-//   presence:org:<orgId>          — org-level presence updates
-//   entity:<type>:<id>:edits      — field-level live edits
-//   notification:user:<userId>    — per-user inbox notifications
+//   presence:org:<orgId>             — org-level presence updates
+//   entity:<orgId>:<type>:<id>:edits — field-level live edits (org-scoped)
+//   notification:user:<userId>       — per-user inbox notifications
 //
 // Security model:
 //   - Auth is verified on the HTTP Upgrade request (cookie OR Authorization).
@@ -80,18 +80,19 @@ type ClientMessage =
  * WHY strict: multi-tenancy — a user from org A must never receive
  * org B's presence or edit events, even via crafted channel names.
  */
-function validateChannel(channel: string, auth: { orgId: string; userId: string }): boolean {
+export function validateChannel(channel: string, auth: { orgId: string; userId: string }): boolean {
   // presence:org:<orgId>
   const presenceMatch = channel.match(/^presence:org:([^:]+)$/);
   if (presenceMatch) {
     return presenceMatch[1] === auth.orgId;
   }
 
-  // entity:<type>:<id>:edits — entity channels include orgId as a scope check
-  // enforced on the server before publishing, so channel itself doesn't embed orgId.
-  // We allow any entity channel when the user is authenticated (org check is on publish).
-  const entityMatch = channel.match(/^entity:[a-z_]+:[0-9a-f-]+:edits$/);
-  if (entityMatch) return true;
+  // entity:<orgId>:<type>:<id>:edits — the orgId is embedded in the channel and
+  // MUST match the caller's org. Previously this branch returned true for ANY
+  // authenticated user, letting a tenant subscribe to another tenant's live-edit
+  // channel by guessing an entity UUID (cross-tenant leak). Scope it here.
+  const entityMatch = channel.match(/^entity:([^:]+):[a-z_]+:[0-9a-f-]+:edits$/);
+  if (entityMatch) return entityMatch[1] === auth.orgId;
 
   // notification:user:<userId>
   const notifMatch = channel.match(/^notification:user:([^:]+)$/);
@@ -215,7 +216,7 @@ const realtimePluginImpl: FastifyPluginAsync = async (server) => {
             // WHY orgId embedded in data: downstream consumers (frontend hooks)
             // validate orgId before applying the update.
             const { entityType, entityId } = msg;
-            const channel = `entity:${entityType}:${entityId}:edits`;
+            const channel = `entity:${auth.orgId}:${entityType}:${entityId}:edits`;
             const { publish } = await import('../services/realtime.service.js');
             await publish(channel, msg.type, {
               ...msg,

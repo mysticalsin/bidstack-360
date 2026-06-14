@@ -110,6 +110,27 @@ export async function loadYDoc(key: DocKey): Promise<{ doc: Y.Doc; ydocId: strin
 }
 
 /**
+ * Load an EXISTING Y.Doc by its ydocId (org-scoped). Unlike {@link loadYDoc},
+ * this never creates a row — it returns null when the doc does not exist, so a
+ * sync against an unknown id fails cleanly instead of silently hydrating an
+ * empty document. Used by the yjs:sync handler, which already knows the ydocId.
+ */
+export async function loadYDocById(ydocId: string, orgId: string): Promise<Y.Doc | null> {
+  const existing = await prisma.yjsDocument.findFirst({
+    where: { id: ydocId, orgId },
+    include: { updates: { orderBy: { createdAt: 'asc' } } },
+  });
+  if (!existing) return null;
+
+  const doc = new Y.Doc();
+  Y.applyUpdate(doc, new Uint8Array(decrypt(Buffer.from(existing.ydocBinary))));
+  for (const row of existing.updates) {
+    Y.applyUpdate(doc, new Uint8Array(decrypt(Buffer.from(row.update))));
+  }
+  return doc;
+}
+
+/**
  * Persist a single incremental Y.js update to the append-only log.
  * Also checks if compaction threshold (100 updates) is exceeded and
  * triggers inline compaction in that case to bound table growth.

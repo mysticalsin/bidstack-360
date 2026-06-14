@@ -89,12 +89,28 @@ async function runCompactionPass(log: pino.Logger): Promise<CompactionResult> {
     }
   }
 
-  // Prune old update rows across all docs.
+  // Prune old update rows across all docs in BOUNDED batches. A single
+  // table-wide deleteMany takes ROW EXCLUSIVE locks on every matching row for
+  // the whole statement — on this high-churn table that means a long lock window
+  // and heavy WAL contending with live inserts. Each batch is its own short
+  // transaction that releases locks before the next slice. The qualifying set
+  // only shrinks (new rows have createdAt > cutoff), so the loop terminates.
   const cutoff = new Date(Date.now() - PRUNE_DAYS * 24 * 60 * 60 * 1_000);
-  const pruned = await prisma.yjsUpdate.deleteMany({
-    where: { createdAt: { lt: cutoff } },
-  });
-  result.updatesPruned = pruned.count;
+  const PRUNE_BATCH = 5_000;
+  let totalPruned = 0;
+  for (;;) {
+    const deleted = await prisma.$executeRaw`
+      DELETE FROM yjs_updates
+      WHERE ctid IN (
+        SELECT ctid FROM yjs_updates
+        WHERE created_at < ${cutoff}
+        LIMIT ${PRUNE_BATCH}
+      )
+    `;
+    totalPruned += deleted;
+    if (deleted < PRUNE_BATCH) break;
+  }
+  result.updatesPruned = totalPruned;
 
   return result;
 }
