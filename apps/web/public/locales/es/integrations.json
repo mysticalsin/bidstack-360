@@ -19,6 +19,7 @@
   "gmail": {
     "name": "Gmail",
     "description": "Sincroniza tus correos y actividades de Gmail con BidStack.",
+    "permissionsRequired": "Read-access to emails required",
     "connectViaGoogle": "Conectar con Google"
   },
   "microsoft": {
@@ -29,13 +30,22 @@
   "slack": {
     "name": "Slack",
     "description": "Recibe notificaciones y comparte actualizaciones en Slack.",
-    "connectViaSlack": "Conectar con Slack"
+    "workspace": "Slack workspace",
+    "connectViaSlack": "Conectar con Slack",
+    "notifyChannel": "Notification channel"
+  },
+  "zapier": {
+    "name": "Zapier",
+    "description": "Automate BidStack with thousands of apps via Zapier.",
+    "apiKey": "Zapier API key",
+    "viewZaps": "View my Zaps"
   },
   "dust": {
     "name": "Dust",
     "description": "Conecta tu espacio de trabajo Dust para activar los agentes IA.",
     "workspace": "Espacio de trabajo Dust",
-    "apiKey": "Clave API Dust"
+    "apiKey": "Clave API Dust",
+    "status": "Dust connection status"
   },
   "errors": {
     "connectFailed": "La conexión falló. Comprueba tus credenciales.",
