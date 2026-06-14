@@ -143,12 +143,27 @@ export const OrgDashboard = memo(function OrgDashboard() {
     ] satisfies OrgKpi[];
   }, [closedLost, closedWon, pipelineStages, s]);
 
+  // Compute the greeting once per render instead of calling new Date() three
+  // times inline in the JSX below.
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  }, []);
+
   if (summary.isLoading) return <DashboardSkeleton />;
   if (summary.isError) {
     return (
       <ErrorState
         title="Could not load dashboard"
         message={summary.error?.message ?? 'The workspace summary endpoint did not respond.'}
+        action={
+          <button type="button" className="btn btn-secondary" onClick={() => void summary.refetch()}>
+            <Icon name="refresh" size={14} />
+            Retry
+          </button>
+        }
       />
     );
   }
@@ -163,13 +178,7 @@ export const OrgDashboard = memo(function OrgDashboard() {
         transition={springSoft}
       >
         <div>
-          <div className="text-xs font-medium text-[var(--brand-primary)] mb-1">
-            {new Date().getHours() < 12
-              ? 'Good morning'
-              : new Date().getHours() < 18
-                ? 'Good afternoon'
-                : 'Good evening'}
-          </div>
+          <div className="text-xs font-medium text-[var(--brand-primary)] mb-1">{greeting}</div>
           <h1 className="page-title gradient-text">Workspace Command Center</h1>
           <div className="page-sub">
             {s?.companies ?? 0} companies · {s?.openOpportunities ?? 0} open deals ·{' '}

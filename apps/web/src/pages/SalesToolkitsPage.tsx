@@ -49,6 +49,12 @@ export default function SalesToolkitsPage() {
       ) : (
         <>
           {toolkits.data?.preview ? <SampleBanner /> : null}
+          {/* Announce the filtered result count to assistive tech when a sector chip changes. */}
+          <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+            {`${toolkits.data?.items.length ?? 0} course${
+              (toolkits.data?.items.length ?? 0) === 1 ? '' : 's'
+            }${sector ? ` in ${sector}` : ''}`}
+          </p>
           {sectors.length > 0 ? (
             <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter by sector">
               <SectorChip label="All sectors" active={sector === ''} onClick={() => setSector('')} />
@@ -129,7 +135,7 @@ function SampleBanner() {
   return (
     <div
       role="status"
-      className="flex items-start gap-3 rounded-lg border border-[var(--warning)] bg-[var(--warning-tint)] p-3 text-sm text-[var(--fg-primary)]"
+      className="flex items-start gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-sunken)] p-3 text-sm text-[var(--fg-primary)]"
     >
       <Icon name="info" size={16} aria-hidden />
       <div>

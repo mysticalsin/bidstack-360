@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
+import { confirm } from '@/components/ui/ConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useIsAdmin } from '@/lib/auth';
 import { api } from '@/lib/api';
@@ -131,12 +132,10 @@ function AgentsSection({
 }) {
   const qc = useQueryClient();
   const [creating, setCreating] = useState(false);
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   const del = useMutation({
     mutationFn: (id: string) => api(`/api/v1/crew-agents/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
-      setConfirmingId(null);
       toast.success('Agent deleted');
       return qc.invalidateQueries({ queryKey: ['crew-agents'] });
     },
@@ -214,17 +213,21 @@ function AgentsSection({
               {isAdmin && (
                 <div className="mt-auto flex justify-end pt-2">
                   <button
-                    onClick={() =>
-                      confirmingId === a.id ? del.mutate(a.id) : setConfirmingId(a.id)
-                    }
-                    onBlur={() => confirmingId === a.id && setConfirmingId(null)}
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: `Delete ${a.role}?`,
+                        description:
+                          'This removes the agent from every crew that uses it. This cannot be undone.',
+                        confirmLabel: 'Delete',
+                        destructive: true,
+                      });
+                      if (ok) del.mutate(a.id);
+                    }}
                     disabled={del.isPending && del.variables === a.id}
-                    aria-label={
-                      confirmingId === a.id ? `Confirm delete ${a.role}` : `Delete ${a.role}`
-                    }
+                    aria-label={`Delete ${a.role}`}
                     className="inline-flex h-9 items-center gap-1 rounded-md px-2 text-xs text-[var(--fg-tertiary)] hover:text-[var(--danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] pointer-coarse:min-h-11"
                   >
-                    <Icon name="trash" size={13} /> {confirmingId === a.id ? 'Confirm?' : 'Delete'}
+                    <Icon name="trash" size={13} /> Delete
                   </button>
                 </div>
               )}

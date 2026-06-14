@@ -55,11 +55,14 @@ export function ForecastsPage() {
     [chartData],
   );
 
-  // _ownerId is passed by ForecastList but not needed by the upsert mutation.
+  // ownerId identifies the row being edited — the grid shows every owner's
+  // forecasts, so the write MUST carry it through or it silently overwrites the
+  // signed-in user's own row instead.
   const handleSaveCell = useCallback(
-    async (_ownerId: string, period: string, category: Forecast['category'], micros: number) => {
+    async (ownerId: string, period: string, category: Forecast['category'], micros: number) => {
       try {
         await createForecast.mutateAsync({
+          ownerId,
           period,
           category,
           amountMicros: micros,
@@ -116,7 +119,8 @@ export function ForecastsPage() {
             Revenue Forecasts
           </h1>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            Track pipeline, best case, commit, and closed revenue by period.
+            Will the bids we&apos;re piloting hit the number? Pipeline, best case, commit, and
+            closed by period.
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -136,6 +140,7 @@ export function ForecastsPage() {
                     .filter(([, amount]) => amount > 0)
                     .map(([category, amount]) =>
                       createForecast.mutateAsync({
+                        ownerId: body.ownerId,
                         period: body.period,
                         category,
                         amountMicros: amount,

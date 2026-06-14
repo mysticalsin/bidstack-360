@@ -68,23 +68,45 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
           amountMicros: z.number().int().nonnegative().max(1_000_000_000_000_000),
           currency: z.string().length(3).default('EUR'),
           note: z.string().max(2000).optional(),
+          // The Forecasts grid lists every owner's rows and edits them inline,
+          // so a write must target the row's owner — not whoever is signed in.
+          // Optional: absent ownerId = self-service edit (writes the caller's row).
+          ownerId: z.string().uuid().optional(),
         }),
         response: { 201: Forecast },
       },
     },
     async (req, reply) => {
+      // Resolve the forecast's owner. Default to the caller; if an explicit
+      // ownerId is supplied (editing another rep's row), confirm that user
+      // belongs to THIS org before writing — an authorized editor must never be
+      // able to re-target a forecast onto a foreign-org user. Without this the
+      // upsert silently keyed on req.auth.userId, so every peer-cell edit wrote
+      // the editor's own row instead of the row on screen.
+      const targetOwnerId = req.body.ownerId ?? req.auth.userId;
+      if (targetOwnerId !== req.auth.userId) {
+        const member = await prisma.user.findFirst({
+          where: { id: targetOwnerId, orgId: req.auth.orgId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!member) {
+          throw server.httpErrors.badRequest(
+            'Forecast owner must be a member of this organization',
+          );
+        }
+      }
       const created = await prisma.forecast.upsert({
         where: {
           orgId_ownerId_period_category: {
             orgId: req.auth.orgId,
-            ownerId: req.auth.userId,
+            ownerId: targetOwnerId,
             period: req.body.period,
             category: req.body.category,
           },
         },
         create: {
           orgId: req.auth.orgId,
-          ownerId: req.auth.userId,
+          ownerId: targetOwnerId,
           period: req.body.period,
           category: req.body.category,
           amountMicros: BigInt(req.body.amountMicros),
@@ -111,6 +133,28 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
         createdAt: created.createdAt.toISOString(),
         updatedAt: created.updatedAt.toISOString(),
       });
+    },
+  );
+
+  // DELETE /api/forecasts/:id — remove a forecast row. Org-scoped so a row can
+  // never be deleted across tenants; the grid's row-delete fans this out over
+  // each category id for a period+owner. (The web Delete button previously 404'd
+  // because no delete route existed.)
+  server.delete(
+    '/forecasts/:id',
+    {
+      preHandler: server.requirePermission('territories:write'),
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: { 200: z.object({ deleted: z.boolean() }) },
+      },
+    },
+    async (req) => {
+      const result = await prisma.forecast.deleteMany({
+        where: { id: req.params.id, orgId: req.auth.orgId },
+      });
+      if (result.count === 0) throw server.httpErrors.notFound('Forecast not found');
+      return { deleted: true };
     },
   );
 

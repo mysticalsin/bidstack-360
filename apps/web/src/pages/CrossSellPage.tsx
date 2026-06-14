@@ -102,7 +102,11 @@ export default function CrossSellPage() {
                       {a.accountKey}
                     </Link>
                   </td>
-                  <td className="px-4 py-2.5 text-[var(--fg-secondary)]">{a.description}</td>
+                  <td className="px-4 py-2.5 text-[var(--fg-secondary)]">
+                    <span className="line-clamp-2" title={a.description}>
+                      {a.description}
+                    </span>
+                  </td>
                   <td className="px-4 py-2.5 text-xs text-[var(--fg-tertiary)]">
                     {a.requestingUnit} → {a.assignedUnit}
                   </td>

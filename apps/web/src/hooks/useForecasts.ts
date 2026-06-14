@@ -23,6 +23,9 @@ export function useCreateForecast() {
       amountMicros: number;
       currency?: string;
       note?: string;
+      // Target a specific owner's row (the grid edits org-wide rows). Omit to
+      // write the caller's own forecast.
+      ownerId?: string;
     }) => api<Forecast>('/api/forecasts', { method: 'POST', body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['forecasts'] }),
   });

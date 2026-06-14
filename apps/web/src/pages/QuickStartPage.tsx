@@ -54,16 +54,17 @@ export function QuickStartPage() {
       action: () => launchTourAt(TOUR_STEPS.findIndex((s) => s.id === 'activity-timeline')),
     },
     {
+      // key is a stable legacy id; the step now frames the actual product job.
       key: 'first_email',
-      label: 'Send your first email',
-      description: 'Use AI-drafted email sequences right inside BidStack.',
-      action: () => navigate('/contacts'),
+      label: 'Run your first bid/no-bid',
+      description: 'Score an opportunity on fit, value, and win probability before you commit.',
+      action: () => navigate('/bid-matrix'),
     },
     {
       key: 'connect_email',
-      label: 'Connect Gmail or Outlook',
-      description: 'Sync your inbox so every email lands on the contact timeline automatically.',
-      action: () => navigate('/integrations'),
+      label: 'Start your first RFP response',
+      description: 'Spin up a structured response and let the agents draft the first pass.',
+      action: () => navigate('/rfp-response'),
     },
     {
       key: 'first_deal',
@@ -88,7 +89,7 @@ export function QuickStartPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-[var(--fg-primary)]">Quick Start</h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          Complete these steps to get the most out of BidStack 360°.
+          Get from zero to piloting your first bid.
         </p>
       </div>
 
@@ -193,12 +194,15 @@ export function QuickStartPage() {
       {/* Completion state */}
       {completedCount === ITEMS.length && (
         <div className="mt-8 rounded-xl bg-[var(--brand)]/10 p-6 text-center">
-          <div className="mb-2 text-2xl" aria-hidden>
-            🎉
-          </div>
+          <Icon
+            name="sparkle"
+            size={28}
+            className="mx-auto mb-2 text-[var(--brand)]"
+            ariaHidden
+          />
           <p className="font-semibold text-[var(--fg-primary)]">You&apos;re all set!</p>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            Your workspace is fully configured.
+            Your workspace is ready to pilot bids.
           </p>
         </div>
       )}

@@ -83,7 +83,7 @@ export function ReferencesPage() {
             Reference Library
           </h1>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            Customer references, case studies, and testimonials for proposals and bids.
+            Proof that wins bids — the right case study and testimonial for every proposal.
           </p>
         </div>
         <Button onClick={() => setShowCreate(true)}>New reference</Button>

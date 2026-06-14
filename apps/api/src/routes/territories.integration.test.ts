@@ -103,6 +103,61 @@ describe('forecast input validation', () => {
   });
 });
 
+describe('forecast owner scoping', () => {
+  // WHY: the Forecasts grid lists every owner's rows and edits them inline, so
+  // POST /forecasts must write the row's owner — and only if that owner is in
+  // the caller's org. Regression guard for the bug where the upsert silently
+  // keyed on req.auth.userId, overwriting the editor's own row on every edit.
+  skipIfNoDb('POST /api/forecasts writes the target in-tenant owner row', async () => {
+    const period = `2099-${randomUUID().slice(0, 2)}`;
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/forecasts',
+      payload: { period, category: 'commit', amountMicros: 1_000_000, ownerId: seedUserId },
+    });
+    // 201 when the caller holds territories:write (seed admin does); 403 otherwise.
+    expect([201, 403]).toContain(res.statusCode);
+    if (res.statusCode === 201) {
+      const body = res.json() as { ownerId: string };
+      expect(body.ownerId).toBe(seedUserId);
+      await prisma.forecast.deleteMany({ where: { orgId: orgId!, ownerId: seedUserId!, period } });
+    }
+  });
+
+  skipIfNoDb('POST /api/forecasts rejects an owner id outside the tenant scope', async () => {
+    const foreignUser = await createForeignUser();
+    const period = `2099-${randomUUID().slice(0, 2)}`;
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/forecasts',
+      payload: { period, category: 'commit', amountMicros: 2_000_000, ownerId: foreignUser.id },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const leaked = await prisma.forecast.findFirst({
+      where: { ownerId: foreignUser.id, period },
+    });
+    expect(leaked).toBeNull();
+  });
+
+  skipIfNoDb('DELETE /api/forecasts/:id removes the row and 404s on a repeat', async () => {
+    const period = `2099-${randomUUID().slice(0, 2)}`;
+    const created = await server.inject({
+      method: 'POST',
+      url: '/api/forecasts',
+      payload: { period, category: 'best_case', amountMicros: 500_000 },
+    });
+    if (created.statusCode === 403) return; // caller lacks territories:write
+    expect(created.statusCode).toBe(201);
+    const id = (created.json() as { id: string }).id;
+
+    const del1 = await server.inject({ method: 'DELETE', url: `/api/forecasts/${id}` });
+    expect(del1.statusCode).toBe(200);
+    const del2 = await server.inject({ method: 'DELETE', url: `/api/forecasts/${id}` });
+    expect(del2.statusCode).toBe(404);
+  });
+});
+
 describe('territory routes', () => {
   skipIfNoDb(
     'POST /api/territories creates a territory for an owner in the caller org',
