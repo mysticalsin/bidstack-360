@@ -1,64 +1,26 @@
-// Multi-provider LLM client for the RFP pipeline.
+// Env-side resolver for the worker's direct LLM provider, plus a re-export of
+// the shared provider-agnostic client.
 //
-// Lets a deployment run RFP AI steps on a direct chat-completion provider —
-// OpenAI (GPT), Anthropic (Claude), Moonshot (Kimi), NVIDIA NIM, or local Gemma — instead of (or
-// alongside) a Dust workspace. Selection is per-deployment via env so it works
-// immediately without a schema migration; the existing per-org Dust path is
-// unchanged and remains the fallback. Per-org provider config via the Settings
-// UI (mirroring the Dust IntegrationConfig pattern) is a follow-up.
+// The wire-level client (completeChat/coerceJsonObject/ResolvedLlm) now lives in
+// `@bidstack/shared/llm` so the API can run the same call for the live "test
+// provider" ping. This module keeps the worker-only ENV resolution path — a
+// deployment-wide provider set via RFP_LLM_PROVIDER — which is the fallback when
+// no per-org provider is configured. Per-org provider selection (the Settings
+// UI) is resolved in `org-llm.ts` and takes precedence over env.
 //
 // Security: the API key is read from env and sent only in the provider request
 // header. It is NEVER logged — callers log `${kind}:${model}`, never the key.
-//
-// Dependency-free on purpose: uses global fetch (Node 18+) so we don't pull the
-// OpenAI / Anthropic SDKs into the worker bundle. OpenAI, Moonshot, NVIDIA NIM,
-// and Gemma share the OpenAI-compatible /chat/completions shape; Anthropic uses /v1/messages.
 
-export type LlmProviderKind = 'openai' | 'anthropic' | 'moonshot' | 'nim' | 'gemma';
+import {
+  completeChat,
+  coerceJsonObject,
+  type ChatInput,
+  type LlmProviderKind,
+  type ResolvedLlm,
+} from '@bidstack/shared/llm';
 
-export interface ResolvedLlm {
-  kind: LlmProviderKind;
-  apiKey: string;
-  model: string;
-  baseUrl: string;
-  /** Extra OpenAI-compatible payload fields, provider-specific and never logged. */
-  extraBody?: Record<string, unknown>;
-}
-
-export interface ChatInput {
-  system?: string;
-  user: string;
-  maxTokens?: number;
-  /** Force JSON (OpenAI-compatible providers: OpenAI/Moonshot/Gemma). Omit for Markdown/prose steps. */
-  responseFormat?: 'json_object' | 'text';
-  /** Per-call abort timeout in ms (default 120s). */
-  timeoutMs?: number;
-  /** Cooperative cancellation from queue-backed jobs. */
-  signal?: AbortSignal;
-}
-
-function withTimeoutSignal(timeoutMs: number, external?: AbortSignal): {
-  signal: AbortSignal;
-  cleanup: () => void;
-} {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  const abortFromExternal = () => controller.abort(external?.reason);
-
-  if (external?.aborted) {
-    abortFromExternal();
-  } else {
-    external?.addEventListener('abort', abortFromExternal, { once: true });
-  }
-
-  return {
-    signal: controller.signal,
-    cleanup: () => {
-      clearTimeout(timeout);
-      external?.removeEventListener('abort', abortFromExternal);
-    },
-  };
-}
+export { completeChat, coerceJsonObject };
+export type { ChatInput, LlmProviderKind, ResolvedLlm };
 
 function assertHostedProviderBaseUrl(
   rawBaseUrl: string | undefined,
@@ -175,96 +137,4 @@ export function resolveLlmFromEnv(env: NodeJS.ProcessEnv = process.env): Resolve
     };
   }
   return null;
-}
-
-/**
- * Pull a JSON object out of a model response that may be wrapped in markdown
- * fences or surrounded by prose (common with Anthropic). Returns the original
- * string if no object is found so the caller's JSON.parse fails loudly.
- */
-export function coerceJsonObject(raw: string): string {
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const body = (fenced?.[1] ?? raw).trim();
-  const start = body.indexOf('{');
-  const end = body.lastIndexOf('}');
-  return start >= 0 && end > start ? body.slice(start, end + 1) : body;
-}
-
-/** Provider-agnostic chat completion. Returns the assistant text (possibly JSON). */
-export async function completeChat(llm: ResolvedLlm, input: ChatInput): Promise<string> {
-  const maxTokens = input.maxTokens ?? 4096;
-  // Bound every provider call: a hung provider must not pin a worker concurrency
-  // slot forever (BullMQ keeps renewing the lock while we await fetch, so the job
-  // is never declared stalled). On timeout fetch throws → caller's fail-open path.
-  // 120s default suits fast hosted APIs; raise RFP_LLM_TIMEOUT_MS for slow LOCAL
-  // inference (a full Markdown section on local Gemma can exceed 120s and would
-  // otherwise fail-open to a placeholder).
-  const defaultTimeoutMs = Number(process.env.RFP_LLM_TIMEOUT_MS) || 120_000;
-  const { signal, cleanup } = withTimeoutSignal(
-    input.timeoutMs ?? defaultTimeoutMs,
-    input.signal,
-  );
-  try {
-    if (llm.kind === 'anthropic') {
-      const res = await fetch(`${llm.baseUrl}/v1/messages`, {
-        method: 'POST',
-        signal,
-        headers: {
-          'content-type': 'application/json',
-          'x-api-key': llm.apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: llm.model,
-          max_tokens: maxTokens,
-          ...(input.system ? { system: input.system } : {}),
-          messages: [{ role: 'user', content: input.user }],
-        }),
-      });
-      if (!res.ok) {
-        throw new Error(`anthropic completion failed: HTTP ${res.status}`);
-      }
-      const data = (await res.json()) as { content?: Array<{ text?: string }> };
-      return data.content?.[0]?.text ?? '';
-    }
-
-    // OpenAI-compatible /chat/completions providers.
-    const res = await fetch(`${llm.baseUrl}/chat/completions`, {
-      method: 'POST',
-      signal,
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${llm.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: llm.model,
-        messages: [
-          ...(input.system ? [{ role: 'system', content: input.system }] : []),
-          { role: 'user', content: input.user },
-        ],
-        max_tokens: maxTokens,
-        temperature: 0.2,
-        // Only force JSON when the caller asks. Markdown steps (section-draft,
-        // review crew) must NOT get json_object — it makes the model emit JSON (or
-        // 400) and the step silently degrades to a placeholder.
-        ...(input.responseFormat === 'json_object'
-          ? { response_format: { type: 'json_object' as const } }
-          : {}),
-        ...(llm.extraBody ?? {}),
-      }),
-    });
-    if (res.status !== 200) {
-      throw new Error(`${llm.kind} completion failed: HTTP ${res.status}`);
-    }
-    const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const content = data.choices?.[0]?.message?.content ?? '';
-    if (!content.trim()) {
-      throw new Error(`${llm.kind} completion returned empty content`);
-    }
-    return content;
-  } finally {
-    cleanup();
-  }
 }

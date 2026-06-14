@@ -3,12 +3,16 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 import { encryptSecret } from '@bidstack/shared/server-crypto';
+import { completeChat } from '@bidstack/shared/llm';
 
 import {
   agentProviderCredentialName,
+  AGENT_PROVIDER_ACTIVE_NAME,
   AGENT_PROVIDER_CONFIG_TYPE,
   DIRECT_AGENT_PROVIDERS,
   type DirectAgentProvider,
+  credentialToResolvedLlm,
+  getOrgActiveAgentProvider,
   listOrgAgentProviderCredentials,
   resolveOrgAgentProviderCredential,
 } from '../lib/agent-provider-credentials.js';
@@ -31,6 +35,21 @@ const ProviderCredentialSummary = z.object({
 
 const ProviderCredentialList = z.object({
   items: z.array(ProviderCredentialSummary),
+  // The org's active default provider (drives every AI step), or null if none.
+  active: z.enum(DIRECT_AGENT_PROVIDERS).nullable(),
+});
+
+const SetActiveBody = z.object({
+  // null clears the selection (falls back to deployment env provider, then Dust).
+  provider: z.enum(DIRECT_AGENT_PROVIDERS).nullable(),
+});
+
+const ProviderTestResult = z.object({
+  provider: z.enum(DIRECT_AGENT_PROVIDERS),
+  ok: z.boolean(),
+  model: z.string().nullable(),
+  latencyMs: z.number().int().nonnegative(),
+  error: z.string().nullable(),
 });
 
 const PutProviderCredentialBody = z.object({
@@ -97,12 +116,16 @@ function toSummary(
 }
 
 async function listSummaries(orgId: string): Promise<z.infer<typeof ProviderCredentialList>> {
-  const rows = await listOrgAgentProviderCredentials(orgId);
+  const [rows, active] = await Promise.all([
+    listOrgAgentProviderCredentials(orgId),
+    getOrgActiveAgentProvider(orgId),
+  ]);
   const byProvider = new Map(rows.map((row) => [row.provider, row]));
   return {
     items: DIRECT_AGENT_PROVIDERS.map((provider) =>
       toSummary(provider, byProvider.get(provider) ?? null),
     ),
+    active,
   };
 }
 
@@ -230,7 +253,143 @@ export const agentProviderCredentialsRoutes: FastifyPluginAsyncZod = async (serv
           diff: { provider },
         },
       });
+      // Clearing a provider that is currently active leaves a dangling selector.
+      // Drop the active selector too so execution falls back cleanly to env/Dust.
+      if ((await getOrgActiveAgentProvider(req.auth.orgId)) === provider) {
+        await prisma.$executeRaw`
+          UPDATE integration_configs
+          SET is_active = false, deleted_at = now(), updated_at = now()
+          WHERE org_id = ${req.auth.orgId}::uuid
+            AND type::text = ${AGENT_PROVIDER_CONFIG_TYPE}
+            AND name = ${AGENT_PROVIDER_ACTIVE_NAME}
+            AND deleted_at IS NULL
+        `;
+      }
       return reply.code(204).send(null);
+    },
+  );
+
+  // ── Active-provider selector (vendor switch, no redeploy) ──────────────────
+  // Picks which configured provider drives every AI step for this org. Switching
+  // is a single-row rewrite; null clears it (falls back to env provider → Dust).
+  server.put(
+    '/agent-providers/active',
+    {
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+      preHandler: server.requireRole('admin'),
+      schema: { body: SetActiveBody, response: { 200: ProviderCredentialList } },
+    },
+    async (req) => {
+      const provider = req.body.provider;
+      if (provider) {
+        // Can only activate a provider that actually has stored credentials.
+        const cred = await resolveOrgAgentProviderCredential(req.auth.orgId, provider);
+        if (!cred) {
+          throw server.httpErrors.badRequest(
+            'Configure this provider (save its key) before making it active.',
+          );
+        }
+      }
+
+      const name = AGENT_PROVIDER_ACTIVE_NAME;
+      await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`
+          SELECT pg_advisory_xact_lock(hashtext(${`${req.auth.orgId}:${AGENT_PROVIDER_CONFIG_TYPE}:${name}`}))
+        `;
+        if (provider === null) {
+          await tx.$executeRaw`
+            UPDATE integration_configs
+            SET is_active = false, deleted_at = now(), updated_at = now()
+            WHERE org_id = ${req.auth.orgId}::uuid
+              AND type::text = ${AGENT_PROVIDER_CONFIG_TYPE}
+              AND name = ${name}
+              AND deleted_at IS NULL
+          `;
+        } else {
+          const config = JSON.stringify({ provider });
+          const affected = await tx.$executeRaw`
+            UPDATE integration_configs
+            SET config = ${config}::jsonb, is_active = true, deleted_at = NULL, updated_at = now()
+            WHERE org_id = ${req.auth.orgId}::uuid
+              AND type::text = ${AGENT_PROVIDER_CONFIG_TYPE}
+              AND name = ${name}
+          `;
+          if (affected === 0) {
+            await tx.$executeRaw`
+              INSERT INTO integration_configs
+                (id, org_id, type, name, config, credentials, is_active, created_at, updated_at)
+              VALUES
+                (gen_random_uuid(), ${req.auth.orgId}::uuid, ${AGENT_PROVIDER_CONFIG_TYPE}::integration_type,
+                 ${name}, ${config}::jsonb, '{}'::jsonb, true, now(), now())
+            `;
+          }
+        }
+
+        await tx.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'agent_provider.active.set',
+            targetType: 'IntegrationConfig',
+            targetId: null,
+            diff: { provider },
+          },
+        });
+      });
+
+      return listSummaries(req.auth.orgId);
+    },
+  );
+
+  // ── Live "is it alive?" test call ──────────────────────────────────────────
+  // Sends a minimal completion to the org's stored credentials so an admin can
+  // confirm the key + endpoint actually work RIGHT NOW. The key is never logged
+  // or returned. Errors come back as a structured result (ok:false), not a 5xx.
+  server.post(
+    '/agent-providers/credentials/:provider/test',
+    {
+      config: { rateLimit: { max: 6, timeWindow: '1 minute' } },
+      preHandler: [server.requirePermission('integrations:read'), server.requireRole('admin')],
+      schema: { params: ProviderParam, response: { 200: ProviderTestResult } },
+    },
+    async (req) => {
+      const provider = req.params.provider;
+      const cred = await resolveOrgAgentProviderCredential(req.auth.orgId, provider);
+      const llm = cred ? credentialToResolvedLlm(cred) : null;
+      if (!llm) {
+        return {
+          provider,
+          ok: false,
+          model: cred?.model ?? null,
+          latencyMs: 0,
+          error: 'No usable credentials configured for this provider.',
+        };
+      }
+      const startedAt = Date.now();
+      try {
+        const text = await completeChat(llm, {
+          system: 'You are a connectivity probe. Reply with the single word OK.',
+          user: 'Reply with the single word OK.',
+          maxTokens: 16,
+          timeoutMs: 12_000,
+        });
+        return {
+          provider,
+          ok: text.trim().length > 0,
+          model: llm.model,
+          latencyMs: Date.now() - startedAt,
+          error: null,
+        };
+      } catch (err) {
+        return {
+          provider,
+          ok: false,
+          model: llm.model,
+          latencyMs: Date.now() - startedAt,
+          // completeChat throws HTTP-status / timeout messages — no secret material.
+          error: (err as Error).message?.slice(0, 300) ?? 'Provider call failed.',
+        };
+      }
     },
   );
 };

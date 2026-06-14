@@ -16,6 +16,7 @@ import type { DustClient } from '@bidstack/dust-client';
 
 import { logAiInvocation } from './ai-audit-worker.js';
 import { resolveLlmFromEnv, completeChat } from './llm-provider.js';
+import { resolveOrgLlm } from './org-llm.js';
 
 export interface RfpCompletionOpts {
   orgId: string;
@@ -68,13 +69,15 @@ export async function runRfpCompletion(
     maxTokens,
     signal,
   } = opts;
-  const envLlm = resolveLlmFromEnv();
+  // Per-org provider (chosen in Settings) wins over the deployment-wide env
+  // provider, so a tenant can switch vendors without a redeploy.
+  const directLlm = (await resolveOrgLlm(orgId)) ?? resolveLlmFromEnv();
 
-  // ── Tier 1: direct LLM provider (GPT / Claude / Kimi) ───────────────────────
-  if (envLlm) {
+  // ── Tier 1: direct LLM provider (GPT / Claude / Kimi / NIM / Gemma) ──────────
+  if (directLlm) {
     const t0 = Date.now();
     try {
-      const text = await completeChat(envLlm, {
+      const text = await completeChat(directLlm, {
         system,
         user: userMessage,
         responseFormat,
@@ -85,7 +88,7 @@ export async function runRfpCompletion(
         {
           orgId,
           agentType,
-          model: `${envLlm.kind}:${envLlm.model}`,
+          model: `${directLlm.kind}:${directLlm.model}`,
           prompt: userMessage,
           response: text,
           tokenCount: 0,
@@ -95,18 +98,18 @@ export async function runRfpCompletion(
         },
         log,
       );
-      return { text, provider: envLlm.kind };
+      return { text, provider: directLlm.kind };
     } catch (err) {
       if (signal?.aborted) throw err;
       log.warn(
-        { err, provider: envLlm.kind, agentType },
+        { err, provider: directLlm.kind, agentType },
         'rfp-llm: provider call failed, falling back',
       );
       await logAiInvocation(
         {
           orgId,
           agentType,
-          model: `${envLlm.kind}:${envLlm.model}`,
+          model: `${directLlm.kind}:${directLlm.model}`,
           prompt: userMessage,
           response: '',
           tokenCount: 0,

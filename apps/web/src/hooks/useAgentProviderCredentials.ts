@@ -21,16 +21,26 @@ export interface AgentProviderCredentialInput {
   baseUrl?: string;
 }
 
+export interface AgentProviderList {
+  items: AgentProviderCredentialSummary[];
+  active: DirectAgentProvider | null;
+}
+
+export interface AgentProviderTestResult {
+  provider: DirectAgentProvider;
+  ok: boolean;
+  model: string | null;
+  latencyMs: number;
+  error: string | null;
+}
+
 const KEY = ['agent-provider-credentials'];
 
 export function useAgentProviderCredentials() {
   return useQuery({
     queryKey: KEY,
     queryFn: ({ signal }) =>
-      api<{ items: AgentProviderCredentialSummary[] }>(
-        '/api/integrations/agent-providers/credentials',
-        { signal },
-      ),
+      api<AgentProviderList>('/api/integrations/agent-providers/credentials', { signal }),
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -61,5 +71,33 @@ export function useRemoveAgentProviderCredential() {
         method: 'DELETE',
       }),
     onSuccess: () => invalidate(qc),
+  });
+}
+
+// Switch the org's active default provider (or null to clear). Returns the full
+// refreshed list so the cache updates active badges in one round-trip.
+export function useSetActiveAgentProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (provider: DirectAgentProvider | null) =>
+      api<AgentProviderList>('/api/integrations/agent-providers/active', {
+        method: 'PUT',
+        body: { provider },
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(KEY, data);
+      invalidate(qc);
+    },
+  });
+}
+
+// Live "is it alive?" probe — sends a minimal completion to the stored key.
+export function useTestAgentProvider() {
+  return useMutation({
+    mutationFn: (provider: DirectAgentProvider) =>
+      api<AgentProviderTestResult>(
+        `/api/integrations/agent-providers/credentials/${provider}/test`,
+        { method: 'POST' },
+      ),
   });
 }

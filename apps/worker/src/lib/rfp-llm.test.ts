@@ -6,12 +6,17 @@ import type { DustClient } from '@bidstack/dust-client';
 // exercises only the tiering/fail-open contract, not real network or Prisma.
 vi.mock('./ai-audit-worker.js', () => ({ logAiInvocation: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('./llm-provider.js', () => ({ resolveLlmFromEnv: vi.fn(), completeChat: vi.fn() }));
+// Per-org provider resolution is exercised in org-llm.test.ts; here it defaults
+// to null so the env-tier path is what these tiering assertions observe.
+vi.mock('./org-llm.js', () => ({ resolveOrgLlm: vi.fn().mockResolvedValue(null) }));
 
 import { runRfpCompletion } from './rfp-llm.js';
 import { resolveLlmFromEnv, completeChat } from './llm-provider.js';
+import { resolveOrgLlm } from './org-llm.js';
 import { logAiInvocation } from './ai-audit-worker.js';
 
 const mockResolve = vi.mocked(resolveLlmFromEnv);
+const mockResolveOrg = vi.mocked(resolveOrgLlm);
 const mockComplete = vi.mocked(completeChat);
 const mockLogAiInvocation = vi.mocked(logAiInvocation);
 const log = { warn: vi.fn(), info: vi.fn(), error: vi.fn() } as unknown as pino.Logger;
@@ -26,6 +31,7 @@ const base = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockResolveOrg.mockResolvedValue(null);
 });
 
 describe('runRfpCompletion tiering', () => {
@@ -46,6 +52,23 @@ describe('runRfpCompletion tiering', () => {
     expect(
       (dust as unknown as { runAgent: ReturnType<typeof vi.fn> }).runAgent,
     ).not.toHaveBeenCalled();
+  });
+
+  it('tier 0: the per-org provider takes precedence over the env provider', async () => {
+    mockResolveOrg.mockResolvedValue({
+      kind: 'moonshot',
+      apiKey: 'org-k',
+      model: 'kimi-x',
+      baseUrl: 'https://api.moonshot.ai/v1',
+    });
+    // An env provider is also configured — the org one must win.
+    mockResolve.mockReturnValue({ kind: 'openai', apiKey: 'env-k', model: 'm', baseUrl: 'b' });
+    mockComplete.mockResolvedValue('org answer');
+
+    const r = await runRfpCompletion({ ...base, dust: null });
+
+    expect(r).toEqual({ text: 'org answer', provider: 'moonshot' });
+    expect(mockResolve).not.toHaveBeenCalled(); // env never consulted once org resolves
   });
 
   it('tier 2: falls through to the Dust agent when no direct provider is set', async () => {

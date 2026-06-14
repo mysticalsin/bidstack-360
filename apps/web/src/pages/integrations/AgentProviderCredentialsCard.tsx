@@ -11,7 +11,10 @@ import {
   useAgentProviderCredentials,
   useRemoveAgentProviderCredential,
   useSaveAgentProviderCredential,
+  useSetActiveAgentProvider,
+  useTestAgentProvider,
   type AgentProviderCredentialSummary,
+  type AgentProviderTestResult,
   type DirectAgentProvider,
 } from '@/hooks/useAgentProviderCredentials';
 import { useIsAdmin } from '@/lib/auth';
@@ -65,12 +68,54 @@ export function AgentProviderCredentialsCard() {
   const credentials = useAgentProviderCredentials();
   const save = useSaveAgentProviderCredential();
   const remove = useRemoveAgentProviderCredential();
+  const setActive = useSetActiveAgentProvider();
+  const test = useTestAgentProvider();
   const [editing, setEditing] = useState<AgentProviderCredentialSummary | null>(null);
   const [draftProvider, setDraftProvider] = useState<DirectAgentProvider>('openai');
   const [error, setError] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, AgentProviderTestResult>>({});
+  const [testingProvider, setTestingProvider] = useState<DirectAgentProvider | null>(null);
 
   const items = credentials.data?.items ?? [];
+  const active = credentials.data?.active ?? null;
   const configuredCount = items.filter((item) => item.configured).length;
+
+  const onSetActive = async (provider: DirectAgentProvider | null) => {
+    try {
+      await setActive.mutateAsync(provider);
+      toast.success(
+        provider ? `${providerMeta(provider).label} is now the active model` : 'Active model cleared',
+        { description: 'Every AI step uses this provider until you switch again — no redeploy.' },
+      );
+    } catch (err) {
+      toast.error('Could not switch provider', {
+        description: err instanceof Error ? err.message : 'The server rejected the request.',
+      });
+    }
+  };
+
+  const onTest = async (provider: DirectAgentProvider) => {
+    setTestingProvider(provider);
+    try {
+      const result = await test.mutateAsync(provider);
+      setTestResults((prev) => ({ ...prev, [provider]: result }));
+      if (result.ok) {
+        toast.success(`${providerMeta(provider).label} is alive`, {
+          description: `${result.model ?? 'model'} responded in ${result.latencyMs} ms.`,
+        });
+      } else {
+        toast.error(`${providerMeta(provider).label} did not respond`, {
+          description: result.error ?? 'No response from the provider.',
+        });
+      }
+    } catch (err) {
+      toast.error('Test failed', {
+        description: err instanceof Error ? err.message : 'The server rejected the request.',
+      });
+    } finally {
+      setTestingProvider(null);
+    }
+  };
 
   const openNew = () => {
     setError(null);
@@ -146,8 +191,8 @@ export function AgentProviderCredentialsCard() {
   return (
     <Card>
       <SectionHeader
-        title="Direct model provider keys"
-        caption="Store org-owned keys for GPT, Claude, Kimi, NVIDIA NIM, and local Gemma. Keys are encrypted at rest and never shown again."
+        title="Model providers"
+        caption="Stay vendor-independent: store org-owned keys for GPT, Claude, Kimi, NVIDIA NIM, or local Gemma, then pick the active one. Switching the active provider takes effect on the next AI step — no redeploy. Keys are encrypted at rest and never shown again."
         action={
           isAdmin ? (
             <Button size="sm" onClick={openNew}>
@@ -181,6 +226,11 @@ export function AgentProviderCredentialsCard() {
               <Badge tone={configuredCount > 0 ? 'jade' : 'amber'}>
                 {configuredCount} org provider{configuredCount === 1 ? '' : 's'} saved
               </Badge>
+              {active ? (
+                <Badge tone="purple">Active · {providerMeta(active).label}</Badge>
+              ) : (
+                <Badge tone="gray">No active provider — using platform default</Badge>
+              )}
               <span>Platform env providers remain available as fallback when configured.</span>
             </div>
             <ul className="grid gap-3 lg:grid-cols-2">
@@ -189,12 +239,18 @@ export function AgentProviderCredentialsCard() {
                   key={item.provider}
                   item={item}
                   isAdmin={isAdmin}
+                  isActive={active === item.provider}
+                  testResult={testResults[item.provider] ?? null}
+                  testPending={test.isPending && testingProvider === item.provider}
+                  setActivePending={setActive.isPending}
                   onEdit={() => {
                     setError(null);
                     setDraftProvider(item.provider);
                     setEditing(item);
                   }}
                   onRemove={() => void onRemove(item.provider)}
+                  onSetActive={() => void onSetActive(item.provider)}
+                  onTest={() => void onTest(item.provider)}
                   removePending={remove.isPending}
                 />
               ))}
@@ -222,31 +278,50 @@ export function AgentProviderCredentialsCard() {
 function ProviderRow({
   item,
   isAdmin,
+  isActive,
+  testResult,
+  testPending,
+  setActivePending,
   onEdit,
   onRemove,
+  onSetActive,
+  onTest,
   removePending,
 }: {
   item: AgentProviderCredentialSummary;
   isAdmin: boolean;
+  isActive: boolean;
+  testResult: AgentProviderTestResult | null;
+  testPending: boolean;
+  setActivePending: boolean;
   onEdit: () => void;
   onRemove: () => void;
+  onSetActive: () => void;
+  onTest: () => void;
   removePending: boolean;
 }) {
   const meta = providerMeta(item.provider);
   return (
-    <li className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4">
+    <li
+      className={`rounded-xl border bg-[var(--surface-card)] p-4 ${
+        isActive ? 'border-[var(--accent)]' : 'border-[var(--border-subtle)]'
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-semibold text-[var(--fg-primary)]">{meta.label}</h3>
+            {isActive ? <Badge tone="purple">Active</Badge> : null}
             <Badge tone={item.configured ? 'jade' : 'gray'}>
               {item.configured ? 'Org key saved' : 'No org key'}
             </Badge>
           </div>
           <p className="mt-1 text-xs text-[var(--fg-secondary)]">
-            {item.configured
-              ? 'This tenant uses its own encrypted provider settings.'
-              : 'Uses platform env fallback if configured.'}
+            {isActive
+              ? 'Drives every AI step for this tenant right now.'
+              : item.configured
+                ? 'Saved and ready — set it active to route AI through it.'
+                : 'Uses platform env fallback if configured.'}
           </p>
         </div>
         {isAdmin ? (
@@ -274,6 +349,30 @@ function ProviderRow({
         <Detail label="Key" value={item.apiKeyMasked ?? (meta.keyOptional ? 'Optional' : 'Not saved')} />
         <Detail label="Updated" value={item.updatedAt ? new Date(item.updatedAt).toLocaleString() : 'Never'} />
       </dl>
+      {isAdmin && item.configured ? (
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)] pt-3">
+          {isActive ? (
+            <Badge tone="purple">In use</Badge>
+          ) : (
+            <Button size="sm" onClick={onSetActive} disabled={setActivePending}>
+              Set active
+            </Button>
+          )}
+          <Button size="sm" variant="secondary" onClick={onTest} disabled={testPending}>
+            {testPending ? 'Testing…' : 'Test'}
+          </Button>
+          {testResult ? (
+            <span
+              role="status"
+              className={`text-xs ${testResult.ok ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}
+            >
+              {testResult.ok
+                ? `Alive · ${testResult.latencyMs} ms`
+                : `Failed · ${testResult.error ?? 'no response'}`}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
     </li>
   );
 }

@@ -26,6 +26,10 @@
       "types": "./dist/server/index.d.ts",
       "default": "./dist/server/index.js"
     },
+    "./llm": {
+      "types": "./dist/llm/index.d.ts",
+      "default": "./dist/llm/index.js"
+    },
     "./token-crypto": {
       "types": "./dist/crypto/index.d.ts",
       "default": "./dist/crypto/index.js"

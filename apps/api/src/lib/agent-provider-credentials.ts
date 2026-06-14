@@ -1,15 +1,30 @@
 import { prisma } from '@bidstack/db';
 import { decryptSecret } from '@bidstack/shared/server-crypto';
+import {
+  AGENT_PROVIDER_ACTIVE_NAME,
+  AGENT_PROVIDER_CONFIG_TYPE,
+  AGENT_PROVIDER_CREDENTIAL_PREFIX,
+  DIRECT_AGENT_PROVIDERS,
+  agentProviderCredentialName,
+  buildResolvedLlm,
+  isDirectAgentProvider,
+  type DirectAgentProviderId,
+  type ResolvedLlm,
+} from '@bidstack/shared/llm';
 
-export const AGENT_PROVIDER_CREDENTIAL_PREFIX = 'agent-provider:';
-export const AGENT_PROVIDER_CONFIG_TYPE = 'dust';
+// Storage-key constants + provider id list now live in @bidstack/shared/llm so
+// the worker reads the same keys it writes. Re-exported here for back-compat
+// with the existing routes/imports.
+export {
+  AGENT_PROVIDER_CREDENTIAL_PREFIX,
+  AGENT_PROVIDER_CONFIG_TYPE,
+  AGENT_PROVIDER_ACTIVE_NAME,
+  DIRECT_AGENT_PROVIDERS,
+  agentProviderCredentialName,
+  isDirectAgentProvider,
+};
 
-// Provider ids previously typed by the shared rfp-agent schemas (removed with
-// the RFP Agent cluster). 'dust' is configured via the Dust integration card,
-// so only the direct-LLM providers appear here.
-export const DIRECT_AGENT_PROVIDERS = ['claude', 'openai', 'kimi', 'nvidia_nim', 'gemma'] as const;
-
-export type DirectAgentProvider = (typeof DIRECT_AGENT_PROVIDERS)[number];
+export type DirectAgentProvider = DirectAgentProviderId;
 
 export type OrgAgentProviderCredential = {
   provider: DirectAgentProvider;
@@ -26,14 +41,6 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function str(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
-}
-
-export function isDirectAgentProvider(provider: string): provider is DirectAgentProvider {
-  return DIRECT_AGENT_PROVIDERS.includes(provider as DirectAgentProvider);
-}
-
-export function agentProviderCredentialName(provider: DirectAgentProvider): string {
-  return `${AGENT_PROVIDER_CREDENTIAL_PREFIX}${provider}`;
 }
 
 function providerFromCredentialName(name: string): DirectAgentProvider | null {
@@ -115,4 +122,41 @@ export async function listOrgAgentProviderCredentials(
   return rows
     .map((row) => credentialFromRow(row))
     .filter((row): row is OrgAgentProviderCredential => row !== null);
+}
+
+/**
+ * The org's active default provider, or null if none is selected. Stored as the
+ * `agent-provider:__active__` selector row's `config.provider`. Vendor switching
+ * is just rewriting this one value — no redeploy.
+ */
+export async function getOrgActiveAgentProvider(
+  orgId: string,
+): Promise<DirectAgentProvider | null> {
+  const rows = await prisma.$queryRaw<{ config: unknown }[]>`
+    SELECT config
+    FROM integration_configs
+    WHERE org_id = ${orgId}::uuid
+      AND type::text = ${AGENT_PROVIDER_CONFIG_TYPE}
+      AND name = ${AGENT_PROVIDER_ACTIVE_NAME}
+      AND is_active = true
+      AND deleted_at IS NULL
+    LIMIT 1
+  `;
+  const provider = str(asRecord(rows[0]?.config).provider);
+  return provider && isDirectAgentProvider(provider) ? provider : null;
+}
+
+/**
+ * Map a stored org credential to a runnable {@link ResolvedLlm}. Returns null
+ * when a non-Gemma provider has no key (can't call it). Used by the live
+ * "test provider" ping; the worker has its own equivalent resolver.
+ */
+export function credentialToResolvedLlm(cred: OrgAgentProviderCredential): ResolvedLlm | null {
+  if (cred.provider !== 'gemma' && !cred.apiKey) return null;
+  return buildResolvedLlm({
+    provider: cred.provider,
+    apiKey: cred.apiKey,
+    model: cred.model,
+    baseUrl: cred.baseUrl,
+  });
 }
