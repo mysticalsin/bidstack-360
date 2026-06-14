@@ -102,3 +102,35 @@ export const ContractAgreementPage = z.object({
   items: z.array(ContractAgreement),
 });
 export type ContractAgreementPage = z.infer<typeof ContractAgreementPage>;
+
+// ── Document extraction (OCR/LLM → reviewable prefill) ───────────────────────
+// A best-effort extraction of a contract document. Every field is nullable —
+// the user reviews/edits before it becomes a ContractAgreement. confidenceBps
+// mirrors the repo convention (8500 = LLM, 5200 = deterministic regex), so the
+// UI can flag low-confidence drafts and never auto-commit.
+export const ContractExtractionDraft = z.object({
+  reference: z.string().max(255).nullable(),
+  kind: ContractKind.nullable(),
+  countries: z.array(CountryCode).max(100),
+  currency: z.string().length(3).nullable(),
+  globalRebateBps: z.number().int().min(0).max(100_000).nullable(),
+  effectiveDate: z.string().datetime().nullable(),
+  expiryDate: z.string().datetime().nullable(),
+  rateReviewSchedule: ContractRateSchedule.nullable(),
+  rateCard: z.array(RateCardLine).max(200),
+  confidenceBps: z.number().int().min(0).max(10_000),
+  warnings: z.array(z.string()).max(50),
+});
+export type ContractExtractionDraft = z.infer<typeof ContractExtractionDraft>;
+
+export const ContractExtractionStatus = z.enum(['pending', 'running', 'done', 'error']);
+export type ContractExtractionStatus = z.infer<typeof ContractExtractionStatus>;
+
+export const ContractExtractionResult = z.object({
+  id: z.string().uuid(),
+  fileId: z.string().uuid(),
+  status: ContractExtractionStatus,
+  draft: ContractExtractionDraft.nullable(),
+  error: z.string().nullable(),
+});
+export type ContractExtractionResult = z.infer<typeof ContractExtractionResult>;
