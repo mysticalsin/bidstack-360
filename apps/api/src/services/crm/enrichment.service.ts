@@ -6,6 +6,7 @@ import {
   faviconProfile,
   fetchOpenCompanyProfile,
 } from '../../providers/company-open-enrichment.js';
+import { fetchSeamlessCompany } from '../../providers/company-seamless-enrichment.js';
 import { enqueueApolloEnrich } from '../../queues/company-enrich-apollo.js';
 import {
   attribution,
@@ -51,8 +52,24 @@ export async function upsertVerifiedCompanyEnrichment({
   const now = new Date();
   const requestedDomain = normalizeDomain(inputDomain ?? domainFor(name));
   const requestedWebsite = inputWebsite ?? (requestedDomain ? `https://${requestedDomain}/` : null);
+  // Preferred EXTERNAL source: Seamless.AI (paid, verified) when a key is set.
+  // Falls back to the keyless open (Wikidata/Wikipedia) path otherwise. Both are
+  // source-attributed so the account view keeps the External/Internal split.
+  const seamlessProfile =
+    process.env.NODE_ENV === 'test' || !process.env.SEAMLESS_API_KEY
+      ? null
+      : await fetchSeamlessCompany({
+          name,
+          domain: requestedDomain,
+          website: requestedWebsite,
+          now,
+        }).catch((err) => {
+          log.warn({ err, company: name }, 'seamless enrichment failed');
+          return null;
+        });
   const openProfile =
-    process.env.NODE_ENV === 'test' || process.env.BIDSTACK_OPEN_ENRICHMENT_DISABLED === '1'
+    seamlessProfile ??
+    (process.env.NODE_ENV === 'test' || process.env.BIDSTACK_OPEN_ENRICHMENT_DISABLED === '1'
       ? null
       : await fetchOpenCompanyProfile({
           name,
@@ -62,7 +79,7 @@ export async function upsertVerifiedCompanyEnrichment({
         }).catch((err) => {
           log.warn({ err, company: name }, 'open company data verification failed');
           return null;
-        });
+        }));
   const favicon = faviconProfile({
     name,
     domain: openProfile?.domain ?? requestedDomain,
