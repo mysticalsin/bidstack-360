@@ -393,5 +393,56 @@
       "medium": "moyenne",
       "low": "faible"
     }
+  },
+  "connectionTester": {
+    "title": "Testeur de connexion",
+    "caption": "Sondez un point de terminaison depuis le service API avant de l'enregistrer. Les secrets et les jetons bearer ne sont jamais envoyés.",
+    "status": {
+      "reachable": "accessible",
+      "needsAttention": "attention requise",
+      "ready": "prêt à tester"
+    },
+    "probeOption": {
+      "mcp": {
+        "label": "MCP",
+        "description": "Points de terminaison des outils d'agent"
+      },
+      "rest": {
+        "label": "API REST",
+        "description": "Points de terminaison de synchronisation des données"
+      },
+      "webhook": {
+        "label": "Webhook",
+        "description": "Récepteurs d'événements"
+      }
+    },
+    "endpointUrlLabel": "URL du point de terminaison",
+    "placeholder": {
+      "loading": "Chargement du contrat de configuration..."
+    },
+    "useDefault": "Utiliser la valeur par défaut",
+    "testing": "Test en cours...",
+    "testEndpoint": "Tester le point de terminaison",
+    "hint": {
+      "noSecrets": {
+        "title": "Aucun secret envoyé",
+        "body": "L'API ne teste que l'accessibilité. Elle supprime les chaînes de requête, les fragments, les noms d'utilisateur et les mots de passe."
+      },
+      "ssrf": {
+        "title": "Protégé contre le SSRF",
+        "body": "Les réseaux privés et les hôtes internes sont bloqués en dehors du développement local avant toute requête."
+      },
+      "timeout": {
+        "title": "Délai d'expiration rapide",
+        "body": "Le sondage s'arrête après 5 secondes et enregistre un événement d'audit délimité pour la traçabilité de l'administrateur."
+      }
+    },
+    "toast": {
+      "missingUrl": "Ajoutez d'abord une URL de point de terminaison",
+      "reachedTitle": "Point de terminaison atteint",
+      "warningTitle": "Sondage terminé avec un avertissement",
+      "probeFailed": "Le sondage du point de terminaison a échoué.",
+      "blockedTitle": "Sondage bloqué"
+    }
   }
 }

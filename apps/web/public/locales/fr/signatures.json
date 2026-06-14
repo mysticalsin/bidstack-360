@@ -66,5 +66,17 @@
     "clearButton": "Effacer",
     "undoButtonLabel": "Annuler le dernier tracé",
     "undoButton": "Annuler"
+  },
+  "sendForSignature": {
+    "stepsNavLabel": "Étapes d'envoi",
+    "step": {
+      "template": "Modèle",
+      "recipients": "Destinataires",
+      "reviewSend": "Vérifier et envoyer"
+    },
+    "dialogTitle": "Envoyer pour signature",
+    "successTitle": "Demande de signature envoyée !",
+    "successMessage": "Les destinataires recevront un e-mail pour signer le document.",
+    "doneButton": "Terminé"
   }
 }

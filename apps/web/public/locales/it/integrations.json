@@ -393,5 +393,56 @@
       "medium": "media",
       "low": "bassa"
     }
+  },
+  "connectionTester": {
+    "title": "Tester di connessione",
+    "caption": "Sonda un endpoint dal servizio API prima di salvarlo. Segreti e token bearer non vengono mai inviati.",
+    "status": {
+      "reachable": "raggiungibile",
+      "needsAttention": "richiede attenzione",
+      "ready": "pronto per il test"
+    },
+    "probeOption": {
+      "mcp": {
+        "label": "MCP",
+        "description": "Endpoint degli strumenti agente"
+      },
+      "rest": {
+        "label": "API REST",
+        "description": "Endpoint di sincronizzazione dati"
+      },
+      "webhook": {
+        "label": "Webhook",
+        "description": "Ricevitori di eventi"
+      }
+    },
+    "endpointUrlLabel": "URL endpoint",
+    "placeholder": {
+      "loading": "Caricamento del contratto di configurazione..."
+    },
+    "useDefault": "Usa predefinito",
+    "testing": "Test in corso...",
+    "testEndpoint": "Testa endpoint",
+    "hint": {
+      "noSecrets": {
+        "title": "Nessun segreto inviato",
+        "body": "L'API verifica solo la raggiungibilità. Rimuove stringhe di query, frammenti, nomi utente e password."
+      },
+      "ssrf": {
+        "title": "Protetto da SSRF",
+        "body": "Le reti private e gli host interni vengono bloccati al di fuori dello sviluppo locale prima di qualsiasi richiesta."
+      },
+      "timeout": {
+        "title": "Timeout rapido",
+        "body": "La sonda si arresta dopo 5 secondi e registra un evento di audit con ambito per la tracciabilità dell'amministratore."
+      }
+    },
+    "toast": {
+      "missingUrl": "Aggiungi prima un URL dell'endpoint",
+      "reachedTitle": "Endpoint raggiunto",
+      "warningTitle": "Sonda completata con un avviso",
+      "probeFailed": "La sonda dell'endpoint non è riuscita.",
+      "blockedTitle": "Sonda bloccata"
+    }
   }
 }

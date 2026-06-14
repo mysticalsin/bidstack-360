@@ -3,6 +3,7 @@
  * actions across countries/teams on a shared account — pre-sales owns it.
  */
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -38,12 +39,26 @@ export function CrossSellCard({ accountKey }: { accountKey: string }) {
   const actions = useCrossSellActions({ accountKey });
   const patch = usePatchCrossSellAction();
   const canWrite = useIsAdmin();
+  const { t } = useTranslation('crm');
+
+  const statusLabel = (status: GovernanceStatus): string => {
+    switch (status) {
+      case 'open':
+        return t('crossSell.status.open', 'Open');
+      case 'in_progress':
+        return t('crossSell.status.inProgress', 'In progress');
+      case 'done':
+        return t('crossSell.status.done', 'Done');
+      default:
+        return STATUS_LABEL[status];
+    }
+  };
 
   return (
-    <Card role="region" aria-label="Cross-sell actions">
+    <Card role="region" aria-label={t('crossSell.regionLabel', 'Cross-sell actions')}>
       <SectionHeader
-        title="Cross-sell actions"
-        caption="Cross-country / cross-team sales actions on this account"
+        title={t('crossSell.title', 'Cross-sell actions')}
+        caption={t('crossSell.caption', 'Cross-country / cross-team sales actions on this account')}
         action={canWrite ? <CreateAction accountKey={accountKey} /> : undefined}
       />
       <div className="px-5 pb-5">
@@ -51,12 +66,12 @@ export function CrossSellCard({ accountKey }: { accountKey: string }) {
           <LoadingSkeleton rows={3} />
         ) : actions.isError ? (
           <ErrorState
-            title="Could not load cross-sell actions"
-            message={actions.error?.message ?? 'Try again shortly.'}
+            title={t('crossSell.errorTitle', 'Could not load cross-sell actions')}
+            message={actions.error?.message ?? t('crossSell.errorRetry', 'Try again shortly.')}
           />
         ) : (actions.data?.items.length ?? 0) === 0 ? (
           <p className="text-sm text-[var(--fg-tertiary)]">
-            No cross-sell actions logged for this account yet.
+            {t('crossSell.empty', 'No cross-sell actions logged for this account yet.')}
           </p>
         ) : (
           <ul className="divide-y divide-[var(--border)]">
@@ -78,10 +93,12 @@ export function CrossSellCard({ accountKey }: { accountKey: string }) {
                       patch.mutate({ id: action.id, body: { status: NEXT_STATUS[action.status] } })
                     }
                     className="min-h-[28px] shrink-0 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] disabled:opacity-60"
-                    aria-label={`Advance status of ${action.description}`}
-                    title={canWrite ? 'Click to advance status' : undefined}
+                    aria-label={t('crossSell.advanceStatusLabel', 'Advance status of {{description}}', {
+                      description: action.description,
+                    })}
+                    title={canWrite ? t('crossSell.advanceStatusHint', 'Click to advance status') : undefined}
                   >
-                    <Badge tone={STATUS_TONE[action.status]}>{STATUS_LABEL[action.status]}</Badge>
+                    <Badge tone={STATUS_TONE[action.status]}>{statusLabel(action.status)}</Badge>
                   </button>
                 </div>
               </li>
@@ -97,6 +114,7 @@ function CreateAction({ accountKey }: { accountKey: string }) {
   const [open, setOpen] = useState(false);
   const users = useUsers();
   const create = useCreateCrossSellAction();
+  const { t } = useTranslation('crm');
   const [form, setForm] = useState({
     description: '',
     requestingUnit: '',
@@ -108,7 +126,9 @@ function CreateAction({ accountKey }: { accountKey: string }) {
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (!form.description.trim() || !form.requestingUnit.trim() || !form.assignedUnit.trim()) {
-      toast.error('Missing fields', { description: 'Description and both units are required.' });
+      toast.error(t('crossSell.toast.missingFieldsTitle', 'Missing fields'), {
+        description: t('crossSell.toast.missingFieldsBody', 'Description and both units are required.'),
+      });
       return;
     }
     create.mutate(
@@ -123,11 +143,12 @@ function CreateAction({ accountKey }: { accountKey: string }) {
       },
       {
         onSuccess: () => {
-          toast.success('Cross-sell action logged');
+          toast.success(t('crossSell.toast.logged', 'Cross-sell action logged'));
           setOpen(false);
           setForm({ description: '', requestingUnit: '', assignedUnit: '', assigneeId: '', dueDate: '' });
         },
-        onError: (err: Error) => toast.error('Could not save', { description: err.message }),
+        onError: (err: Error) =>
+          toast.error(t('crossSell.toast.saveError', 'Could not save'), { description: err.message }),
       },
     );
   };
@@ -135,7 +156,7 @@ function CreateAction({ accountKey }: { accountKey: string }) {
   if (!open) {
     return (
       <Button variant="secondary" onClick={() => setOpen(true)}>
-        Log action
+        {t('crossSell.logAction', 'Log action')}
       </Button>
     );
   }
@@ -146,7 +167,7 @@ function CreateAction({ accountKey }: { accountKey: string }) {
         required
         value={form.description}
         onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-        placeholder="What needs to happen?"
+        placeholder={t('crossSell.form.descriptionPlaceholder', 'What needs to happen?')}
         className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
         rows={2}
       />
@@ -155,23 +176,23 @@ function CreateAction({ accountKey }: { accountKey: string }) {
           required
           value={form.requestingUnit}
           onChange={(e) => setForm((f) => ({ ...f, requestingUnit: e.target.value }))}
-          placeholder="Requesting country/team"
+          placeholder={t('crossSell.form.requestingUnitPlaceholder', 'Requesting country/team')}
           className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
         />
         <input
           required
           value={form.assignedUnit}
           onChange={(e) => setForm((f) => ({ ...f, assignedUnit: e.target.value }))}
-          placeholder="Assigned country/team"
+          placeholder={t('crossSell.form.assignedUnitPlaceholder', 'Assigned country/team')}
           className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
         />
         <select
           value={form.assigneeId}
           onChange={(e) => setForm((f) => ({ ...f, assigneeId: e.target.value }))}
           className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
-          aria-label="Assignee"
+          aria-label={t('crossSell.form.assigneeLabel', 'Assignee')}
         >
-          <option value="">Unassigned</option>
+          <option value="">{t('crossSell.form.unassigned', 'Unassigned')}</option>
           {(users.data ?? []).map((u) => (
             <option key={u.id} value={u.id}>
               {u.name ?? u.email}
@@ -183,15 +204,15 @@ function CreateAction({ accountKey }: { accountKey: string }) {
           value={form.dueDate}
           onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))}
           className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
-          aria-label="Due date"
+          aria-label={t('crossSell.form.dueDateLabel', 'Due date')}
         />
       </div>
       <div className="flex gap-2">
         <Button type="submit" disabled={create.isPending}>
-          {create.isPending ? 'Saving…' : 'Save'}
+          {create.isPending ? t('crossSell.form.saving', 'Saving…') : t('crossSell.form.save', 'Save')}
         </Button>
         <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-          Cancel
+          {t('crossSell.form.cancel', 'Cancel')}
         </Button>
       </div>
     </form>

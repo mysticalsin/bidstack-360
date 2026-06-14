@@ -7,6 +7,7 @@
  * layout-focused while this component owns the probe lifecycle end-to-end.
  */
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -32,6 +33,19 @@ const PROBE_OPTIONS: Array<{
   { key: 'webhook', label: 'Webhook', icon: 'bell', description: 'Event receivers' },
 ];
 
+// Stable i18n key suffix per probe kind; the English source lives in PROBE_OPTIONS
+// and is passed as the t() default so the UI never shows a raw key.
+const PROBE_OPTION_LABEL_KEY: Record<ProbeKind, string> = {
+  mcp: 'connectionTester.probeOption.mcp.label',
+  rest: 'connectionTester.probeOption.rest.label',
+  webhook: 'connectionTester.probeOption.webhook.label',
+};
+const PROBE_OPTION_DESCRIPTION_KEY: Record<ProbeKind, string> = {
+  mcp: 'connectionTester.probeOption.mcp.description',
+  rest: 'connectionTester.probeOption.rest.description',
+  webhook: 'connectionTester.probeOption.webhook.description',
+};
+
 // ─── ConnectionTester ──────────────────────────────────────────────────────────
 
 export function ConnectionTester({
@@ -41,6 +55,7 @@ export function ConnectionTester({
   guide?: IntegrationSetupGuide;
   isLoading: boolean;
 }) {
+  const { t } = useTranslation('integrations');
   const [kind, setKind] = useState<ProbeKind>('mcp');
   const [urlInput, setUrlInput] = useState<string | null>(null);
   const [isTesting, setIsTesting] = useState(false);
@@ -56,7 +71,7 @@ export function ConnectionTester({
   const runProbe = async () => {
     const nextUrl = resolvedUrl.trim();
     if (!nextUrl) {
-      toast.error('Add an endpoint URL first');
+      toast.error(t('connectionTester.toast.missingUrl', 'Add an endpoint URL first'));
       return;
     }
     setIsTesting(true);
@@ -68,12 +83,20 @@ export function ConnectionTester({
       });
       setResult(response);
       if (response.ok) {
-        toast.success('Endpoint reached', { description: response.message });
+        toast.success(t('connectionTester.toast.reachedTitle', 'Endpoint reached'), {
+          description: response.message,
+        });
       } else {
-        toast.error('Probe completed with a warning', { description: response.message });
+        toast.error(
+          t('connectionTester.toast.warningTitle', 'Probe completed with a warning'),
+          { description: response.message },
+        );
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Endpoint probe failed.';
+      const message =
+        err instanceof Error
+          ? err.message
+          : t('connectionTester.toast.probeFailed', 'Endpoint probe failed.');
       setResult({
         ok: false,
         status: null,
@@ -82,7 +105,9 @@ export function ConnectionTester({
         message,
         warnings: [],
       });
-      toast.error('Probe blocked', { description: message });
+      toast.error(t('connectionTester.toast.blockedTitle', 'Probe blocked'), {
+        description: message,
+      });
     } finally {
       setIsTesting(false);
     }
@@ -91,11 +116,18 @@ export function ConnectionTester({
   return (
     <Card>
       <SectionHeader
-        title="Connection tester"
-        caption="Probe an endpoint from the API service before saving it. Secrets and bearer tokens are never sent."
+        title={t('connectionTester.title', 'Connection tester')}
+        caption={t(
+          'connectionTester.caption',
+          'Probe an endpoint from the API service before saving it. Secrets and bearer tokens are never sent.',
+        )}
         action={
           <Badge tone={result?.ok ? 'jade' : result ? 'amber' : 'gray'}>
-            {result?.ok ? 'reachable' : result ? 'needs attention' : 'ready to test'}
+            {result?.ok
+              ? t('connectionTester.status.reachable', 'reachable')
+              : result
+                ? t('connectionTester.status.needsAttention', 'needs attention')
+                : t('connectionTester.status.ready', 'ready to test')}
           </Badge>
         }
       />
@@ -118,10 +150,10 @@ export function ConnectionTester({
               </span>
               <span>
                 <span className="block text-sm font-semibold text-[var(--fg-primary)]">
-                  {option.label}
+                  {t(PROBE_OPTION_LABEL_KEY[option.key], option.label)}
                 </span>
                 <span className="mt-0.5 block text-xs text-[var(--fg-secondary)]">
-                  {option.description}
+                  {t(PROBE_OPTION_DESCRIPTION_KEY[option.key], option.description)}
                 </span>
               </span>
             </button>
@@ -131,7 +163,7 @@ export function ConnectionTester({
         <div className="space-y-3">
           <label className="block">
             <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-              Endpoint URL
+              {t('connectionTester.endpointUrlLabel', 'Endpoint URL')}
             </span>
             <div className="flex flex-col gap-2 lg:flex-row">
               <input
@@ -141,7 +173,9 @@ export function ConnectionTester({
                   setResult(null);
                 }}
                 placeholder={
-                  isLoading ? 'Loading setup contract...' : 'https://api.example.com/mcp'
+                  isLoading
+                    ? t('connectionTester.placeholder.loading', 'Loading setup contract...')
+                    : 'https://api.example.com/mcp'
                 }
                 className="min-h-11 flex-1 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] px-3 font-mono text-sm text-[var(--fg-primary)] shadow-[var(--shadow-xs)] outline-none transition focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
               />
@@ -156,7 +190,7 @@ export function ConnectionTester({
                   }}
                   disabled={!guide || isTesting}
                 >
-                  Use default
+                  {t('connectionTester.useDefault', 'Use default')}
                 </Button>
                 <Button
                   type="button"
@@ -164,7 +198,9 @@ export function ConnectionTester({
                   disabled={isTesting || !resolvedUrl.trim()}
                 >
                   <Icon name={isTesting ? 'clock' : 'shield'} size={15} />
-                  {isTesting ? 'Testing...' : 'Test endpoint'}
+                  {isTesting
+                    ? t('connectionTester.testing', 'Testing...')
+                    : t('connectionTester.testEndpoint', 'Test endpoint')}
                 </Button>
               </div>
             </div>
@@ -173,18 +209,27 @@ export function ConnectionTester({
           <div className="grid gap-3 lg:grid-cols-3">
             <ProbeHint
               icon="shield"
-              title="No secrets sent"
-              body="The API probes reachability only. It strips query strings, fragments, usernames, and passwords."
+              title={t('connectionTester.hint.noSecrets.title', 'No secrets sent')}
+              body={t(
+                'connectionTester.hint.noSecrets.body',
+                'The API probes reachability only. It strips query strings, fragments, usernames, and passwords.',
+              )}
             />
             <ProbeHint
               icon="warning"
-              title="SSRF guarded"
-              body="Private networks and internal hosts are blocked outside local development before any request is made."
+              title={t('connectionTester.hint.ssrf.title', 'SSRF guarded')}
+              body={t(
+                'connectionTester.hint.ssrf.body',
+                'Private networks and internal hosts are blocked outside local development before any request is made.',
+              )}
             />
             <ProbeHint
               icon="clock"
-              title="Fast timeout"
-              body="The probe stops after 5 seconds and records a scoped audit event for administrator traceability."
+              title={t('connectionTester.hint.timeout.title', 'Fast timeout')}
+              body={t(
+                'connectionTester.hint.timeout.body',
+                'The probe stops after 5 seconds and records a scoped audit event for administrator traceability.',
+              )}
             />
           </div>
 

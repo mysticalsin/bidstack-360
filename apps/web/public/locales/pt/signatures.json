@@ -66,5 +66,17 @@
     "clearButton": "Limpar",
     "undoButtonLabel": "Desfazer último traço",
     "undoButton": "Desfazer"
+  },
+  "sendForSignature": {
+    "stepsNavLabel": "Etapas de envio",
+    "step": {
+      "template": "Modelo",
+      "recipients": "Destinatários",
+      "reviewSend": "Revisar e enviar"
+    },
+    "dialogTitle": "Enviar para assinatura",
+    "successTitle": "Solicitação de assinatura enviada!",
+    "successMessage": "Os destinatários receberão um e-mail para assinar o documento.",
+    "doneButton": "Concluído"
   }
 }

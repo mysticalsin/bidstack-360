@@ -14,6 +14,8 @@
  */
 
 import { useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import type { ScoreFactor } from '@/hooks/usePredictiveScore';
 import { useOppScore } from '@/hooks/usePredictiveScore';
 
@@ -34,30 +36,37 @@ function probColorClasses(prob: number): string {
   return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
 }
 
-function probLabel(prob: number): string {
-  if (prob >= 70) return 'Likely';
-  if (prob >= 40) return 'Possible';
-  return 'At risk';
+function probLabel(prob: number, t: TFunction): string {
+  if (prob >= 70) return t('oppWinProbabilityBadge.labelLikely', 'Likely');
+  if (prob >= 40) return t('oppWinProbabilityBadge.labelPossible', 'Possible');
+  return t('oppWinProbabilityBadge.labelAtRisk', 'At risk');
 }
 
-function featureLabel(feature: string): string {
+function featureLabel(feature: string, t: TFunction): string {
   return feature
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase())
-    .replace('Log Value Micros', 'Deal Value')
-    .replace('Owner Close Rate Last 90d', 'Owner Win Rate')
-    .replace('Stage Probability', 'Pipeline Stage')
-    .replace('Qualification Score Norm', 'Qualification Score');
+    .replace('Log Value Micros', t('oppWinProbabilityBadge.featureDealValue', 'Deal Value'))
+    .replace(
+      'Owner Close Rate Last 90d',
+      t('oppWinProbabilityBadge.featureOwnerWinRate', 'Owner Win Rate')
+    )
+    .replace('Stage Probability', t('oppWinProbabilityBadge.featurePipelineStage', 'Pipeline Stage'))
+    .replace(
+      'Qualification Score Norm',
+      t('oppWinProbabilityBadge.featureQualificationScore', 'Qualification Score')
+    );
 }
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────
 
 function ProbSkeleton({ size = 'md' }: { size?: 'sm' | 'md' }) {
+  const { t } = useTranslation('crm');
   const h = size === 'sm' ? 'h-5 w-14' : 'h-6 w-18';
   return (
     <span
       className={`inline-block rounded-full animate-pulse bg-[var(--color-neutral-200)] dark:bg-[var(--color-neutral-700)] ${h}`}
-      aria-label="Loading probability..."
+      aria-label={t('oppWinProbabilityBadge.loading', 'Loading probability...')}
       aria-busy="true"
     />
   );
@@ -74,10 +83,11 @@ function FactorPopover({
   recommendation: string;
   prob: number;
 }) {
+  const { t } = useTranslation('crm');
   const top3 = factors.slice(0, 3);
   return (
     <div
-      aria-label="Win probability factors"
+      aria-label={t('oppWinProbabilityBadge.factorsAriaLabel', 'Win probability factors')}
       className={[
         'absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50',
         'w-64 rounded-lg border p-3 shadow-lg',
@@ -86,7 +96,7 @@ function FactorPopover({
       ].join(' ')}
     >
       <p className="text-xs font-semibold text-[var(--color-neutral-900)] dark:text-[var(--color-neutral-100)] mb-1">
-        Win probability: {prob}%
+        {t('oppWinProbabilityBadge.popoverTitle', 'Win probability: {{prob}}%', { prob })}
       </p>
       {recommendation && (
         <p className="text-xs text-[var(--color-neutral-600)] dark:text-[var(--color-neutral-400)] mb-2 leading-relaxed">
@@ -96,7 +106,7 @@ function FactorPopover({
       {top3.length > 0 && (
         <>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-neutral-500)] mb-1">
-            Key factors
+            {t('oppWinProbabilityBadge.keyFactors', 'Key factors')}
           </p>
           <ul className="space-y-1">
             {top3.map((f) => (
@@ -111,7 +121,7 @@ function FactorPopover({
                   aria-hidden="true"
                 />
                 <span className="text-[var(--color-neutral-700)] dark:text-[var(--color-neutral-300)] flex-1">
-                  {featureLabel(f.feature)}
+                  {featureLabel(f.feature, t)}
                 </span>
                 <span
                   className={[
@@ -140,6 +150,7 @@ export function OppWinProbabilityBadge({
   prefetched,
   size = 'md',
 }: OppWinProbabilityBadgeProps) {
+  const { t } = useTranslation('crm');
   const { data, isLoading, isError } = useOppScore(prefetched ? undefined : oppId);
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -152,7 +163,7 @@ export function OppWinProbabilityBadge({
   if (isError || prob === undefined) return null;
 
   const colorClasses = probColorClasses(prob);
-  const label = probLabel(prob);
+  const label = probLabel(prob, t);
   const padding = size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-xs';
 
   return (
@@ -160,7 +171,10 @@ export function OppWinProbabilityBadge({
       <button
         ref={triggerRef}
         type="button"
-        aria-label={`Win probability: ${prob}% — ${label}`}
+        aria-label={t('oppWinProbabilityBadge.badgeAriaLabel', 'Win probability: {{prob}}% — {{label}}', {
+          prob,
+          label,
+        })}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         onFocus={() => setOpen(true)}

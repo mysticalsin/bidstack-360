@@ -2649,5 +2649,123 @@
     "regionLabel": "Gráfico",
     "actionsLabel": "Acciones del gráfico",
     "loadingLabel": "Cargando gráfico"
+  },
+  "crossSell": {
+    "regionLabel": "Acciones de venta cruzada",
+    "title": "Acciones de venta cruzada",
+    "caption": "Acciones de venta entre países y equipos en esta cuenta",
+    "errorTitle": "No se pudieron cargar las acciones de venta cruzada",
+    "errorRetry": "Inténtalo de nuevo en breve.",
+    "empty": "Aún no hay acciones de venta cruzada registradas para esta cuenta.",
+    "advanceStatusLabel": "Avanzar el estado de {{description}}",
+    "advanceStatusHint": "Haz clic para avanzar el estado",
+    "status": {
+      "open": "Abierto",
+      "inProgress": "En curso",
+      "done": "Hecho"
+    },
+    "logAction": "Registrar acción",
+    "toast": {
+      "missingFieldsTitle": "Campos faltantes",
+      "missingFieldsBody": "La descripción y ambas unidades son obligatorias.",
+      "logged": "Acción de venta cruzada registrada",
+      "saveError": "No se pudo guardar"
+    },
+    "form": {
+      "descriptionPlaceholder": "¿Qué hay que hacer?",
+      "requestingUnitPlaceholder": "País/equipo solicitante",
+      "assignedUnitPlaceholder": "País/equipo asignado",
+      "assigneeLabel": "Responsable",
+      "unassigned": "Sin asignar",
+      "dueDateLabel": "Fecha de vencimiento",
+      "saving": "Guardando…",
+      "save": "Guardar",
+      "cancel": "Cancelar"
+    }
+  },
+  "auditLogFilters": {
+    "chipSearch": "Buscar: {{value}}",
+    "chipRange": "Rango: {{value}}",
+    "chipTarget": "Objetivo: {{value}}",
+    "chipCategory": "Categoría: {{value}}",
+    "barAriaLabel": "Filtros del registro de auditoría",
+    "searchLabel": "Buscar en la página de auditoría actual",
+    "searchPlaceholder": "Buscar en la página actual por acción, actor, objetivo o diferencia...",
+    "dateRangeLabel": "Rango de fechas",
+    "targetTypeLabel": "Tipo de objetivo",
+    "exportVisible": "Exportar visibles",
+    "copyViewLink": "Copiar enlace de vista",
+    "refreshing": "Actualizando",
+    "refresh": "Actualizar",
+    "categoryFiltersAriaLabel": "Filtros de categoría de eventos de auditoría",
+    "activeView": "Vista activa",
+    "clearFilters": "Borrar filtros"
+  },
+  "createTask": {
+    "errorTitleRequired": "El título es obligatorio",
+    "errorSaveFailed": "Error al guardar",
+    "triggerButton": "+ Nueva tarea",
+    "dialogTitle": "Nueva tarea",
+    "dialogDescription": "Crea un seguimiento, vinculado opcionalmente a una oportunidad.",
+    "fieldTitle": "Título",
+    "fieldOpportunity": "Oportunidad",
+    "opportunityNone": "— Ninguna —",
+    "fieldStatus": "Estado",
+    "statusOpen": "Abierta",
+    "statusInProgress": "En curso",
+    "statusBlocked": "Bloqueada",
+    "statusDone": "Completada",
+    "fieldDueDate": "Fecha de vencimiento",
+    "cancelButton": "Cancelar",
+    "savingButton": "Guardando…",
+    "submitButton": "Crear tarea"
+  },
+  "oppWinProbabilityBadge": {
+    "loading": "Cargando probabilidad...",
+    "labelLikely": "Probable",
+    "labelPossible": "Posible",
+    "labelAtRisk": "En riesgo",
+    "featureDealValue": "Valor del trato",
+    "featureOwnerWinRate": "Tasa de éxito del propietario",
+    "featurePipelineStage": "Etapa del embudo",
+    "featureQualificationScore": "Puntuación de calificación",
+    "factorsAriaLabel": "Factores de probabilidad de ganar",
+    "popoverTitle": "Probabilidad de ganar: {{prob}}%",
+    "keyFactors": "Factores clave",
+    "badgeAriaLabel": "Probabilidad de ganar: {{prob}}% — {{label}}"
+  },
+  "intelCards": {
+    "dataFreshness": "Inteligencia actualizada {{date}} · Fuentes: Crunchbase, LinkedIn, registro de la UE",
+    "financial": {
+      "title": "Salud financiera",
+      "private": "Privada",
+      "marketCap": "Capitalización de mercado",
+      "revenueTtm": "Ingresos (12 meses)",
+      "growth": "Crecimiento",
+      "ebitdaMargin": "Margen EBITDA",
+      "creditRating": "Calificación crediticia",
+      "headcount": "Plantilla"
+    },
+    "winPrediction": {
+      "title": "Predicción de victoria",
+      "empty": "No hay predicción disponible.",
+      "modelCaption": "Modelo {{version}}",
+      "probability": "probabilidad"
+    },
+    "triggers": {
+      "title": "Detonantes de compra",
+      "caption": "Señales ponderadas",
+      "unknownSource": "desconocido",
+      "weightAria": "Peso {{weight}}/10",
+      "empty": "Aún no se han detectado detonantes."
+    },
+    "competitors": {
+      "title": "Panorama competitivo",
+      "empty": "No hay competidores mapeados."
+    },
+    "news": {
+      "title": "Noticias recientes",
+      "empty": "No se han obtenido noticias."
+    }
   }
 }

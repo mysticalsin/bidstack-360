@@ -13,6 +13,7 @@
  */
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Dialog, DialogContent, DialogClose } from '@/components/ui/Dialog';
 import { useSendForSignature } from '@/hooks/useSignatureRequests';
@@ -26,13 +27,21 @@ import { ReviewStep } from './sendForSignature/ReviewStep';
 
 // ─── Step indicator (only used here — kept inline intentionally) ──────────────
 
-const STEPS = ['Template', 'Recipients', 'Review & Send'] as const;
+const STEPS = [
+  { key: 'template', label: 'Template' },
+  { key: 'recipients', label: 'Recipients' },
+  { key: 'reviewSend', label: 'Review & Send' },
+] as const;
 
 function StepIndicator({ current }: { current: number }) {
+  const { t } = useTranslation('signatures');
   return (
-    <nav aria-label="Sending steps" className="mb-6 flex items-center gap-2">
-      {STEPS.map((label, i) => (
-        <div key={label} className="flex items-center gap-2">
+    <nav
+      aria-label={t('sendForSignature.stepsNavLabel', 'Sending steps')}
+      className="mb-6 flex items-center gap-2"
+    >
+      {STEPS.map(({ key, label }, i) => (
+        <div key={key} className="flex items-center gap-2">
           <div
             aria-current={i === current ? 'step' : undefined}
             className={cn(
@@ -52,7 +61,7 @@ function StepIndicator({ current }: { current: number }) {
               i <= current ? 'text-[var(--fg-primary)]' : 'text-[var(--fg-tertiary)]',
             )}
           >
-            {label}
+            {t(`sendForSignature.step.${key}`, label)}
           </span>
           {i < STEPS.length - 1 && (
             <span aria-hidden="true" className="mx-1 h-px w-6 bg-[var(--border-subtle)]" />
@@ -77,6 +86,7 @@ export function SendForSignatureModal({
   onOpenChange,
   documentId,
 }: SendForSignatureModalProps) {
+  const { t } = useTranslation('signatures');
   const [step, setStep] = useState(0);
   const [templateId, setTemplateId] = useState('');
   const [variables, setVariables] = useState<Record<string, string>>({});
@@ -126,7 +136,10 @@ export function SendForSignatureModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent title="Send for Signature" className="max-w-2xl">
+      <DialogContent
+        title={t('sendForSignature.dialogTitle', 'Send for Signature')}
+        className="max-w-2xl"
+      >
         {sent ? (
           <div className="flex flex-col items-center gap-4 py-8 text-center">
             <div
@@ -137,10 +150,13 @@ export function SendForSignatureModal({
             </div>
             <div>
               <p className="text-base font-semibold text-[var(--fg-primary)]">
-                Signature request sent!
+                {t('sendForSignature.successTitle', 'Signature request sent!')}
               </p>
               <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-                Recipients will receive an email to sign the document.
+                {t(
+                  'sendForSignature.successMessage',
+                  'Recipients will receive an email to sign the document.',
+                )}
               </p>
             </div>
             <DialogClose asChild>
@@ -152,7 +168,7 @@ export function SendForSignatureModal({
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)] focus-visible:ring-offset-1',
                 )}
               >
-                Done
+                {t('sendForSignature.doneButton', 'Done')}
               </button>
             </DialogClose>
           </div>

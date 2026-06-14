@@ -393,5 +393,56 @@
       "medium": "média",
       "low": "baixa"
     }
+  },
+  "connectionTester": {
+    "title": "Testador de conexão",
+    "caption": "Teste um endpoint a partir do serviço de API antes de salvá-lo. Segredos e tokens de portador nunca são enviados.",
+    "status": {
+      "reachable": "acessível",
+      "needsAttention": "requer atenção",
+      "ready": "pronto para testar"
+    },
+    "probeOption": {
+      "mcp": {
+        "label": "MCP",
+        "description": "Endpoints de ferramentas do agente"
+      },
+      "rest": {
+        "label": "API REST",
+        "description": "Endpoints de sincronização de dados"
+      },
+      "webhook": {
+        "label": "Webhook",
+        "description": "Receptores de eventos"
+      }
+    },
+    "endpointUrlLabel": "URL do endpoint",
+    "placeholder": {
+      "loading": "Carregando contrato de configuração..."
+    },
+    "useDefault": "Usar padrão",
+    "testing": "Testando...",
+    "testEndpoint": "Testar endpoint",
+    "hint": {
+      "noSecrets": {
+        "title": "Nenhum segredo enviado",
+        "body": "A API testa apenas a acessibilidade. Ela remove strings de consulta, fragmentos, nomes de usuário e senhas."
+      },
+      "ssrf": {
+        "title": "Protegido contra SSRF",
+        "body": "Redes privadas e hosts internos são bloqueados fora do desenvolvimento local antes de qualquer solicitação."
+      },
+      "timeout": {
+        "title": "Tempo limite rápido",
+        "body": "A sondagem para após 5 segundos e registra um evento de auditoria com escopo para rastreabilidade do administrador."
+      }
+    },
+    "toast": {
+      "missingUrl": "Adicione primeiro uma URL de endpoint",
+      "reachedTitle": "Endpoint alcançado",
+      "warningTitle": "Sondagem concluída com um aviso",
+      "probeFailed": "A sondagem do endpoint falhou.",
+      "blockedTitle": "Sondagem bloqueada"
+    }
   }
 }

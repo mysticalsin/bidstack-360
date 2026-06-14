@@ -66,5 +66,17 @@
     "clearButton": "Cancella",
     "undoButtonLabel": "Annulla ultimo tratto",
     "undoButton": "Annulla"
+  },
+  "sendForSignature": {
+    "stepsNavLabel": "Passaggi di invio",
+    "step": {
+      "template": "Modello",
+      "recipients": "Destinatari",
+      "reviewSend": "Rivedi e invia"
+    },
+    "dialogTitle": "Invia per la firma",
+    "successTitle": "Richiesta di firma inviata!",
+    "successMessage": "I destinatari riceveranno un'e-mail per firmare il documento.",
+    "doneButton": "Fatto"
   }
 }

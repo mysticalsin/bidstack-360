@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'motion/react';
 import { ArrowRight, Sparkles } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { api, ApiError } from '@/lib/api';
 import { DEMO_TOKEN_KEY, DEMO_EMAIL_KEY, useSignInAction } from '@/lib/auth';
@@ -29,6 +30,7 @@ export function DemoSignIn() {
   const navigate = useNavigate();
   const { signIn } = useSignInAction();
   const reduceMotion = useReducedMotion();
+  const { t } = useTranslation('auth');
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +53,10 @@ export function DemoSignIn() {
       setError(
         err instanceof ApiError
           ? err.message
-          : 'Could not start the demo. Please try again in a moment.',
+          : t(
+              'demoSignIn.error.generic',
+              'Could not start the demo. Please try again in a moment.',
+            ),
       );
       setLoading(false);
     }
@@ -86,7 +91,7 @@ export function DemoSignIn() {
           <header className="flex items-center justify-between gap-4 px-6 py-5 md:px-10">
             <img
               src="/brand/bidstack360-logo.png"
-              alt="BidStack 360"
+              alt={t('demoSignIn.logoAlt', 'BidStack 360')}
               className="h-12 w-auto drop-shadow-sm sm:h-14 md:h-16 lg:h-20"
               width={1170}
               height={315}
@@ -98,8 +103,10 @@ export function DemoSignIn() {
               className="group inline-flex items-center gap-2 rounded-full bg-white/55 px-3.5 py-2 text-[13px] font-medium text-[rgba(30,50,90,0.85)] ring-1 ring-white/50 backdrop-blur-md transition hover:bg-white/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/50"
             >
               <LinkedInIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Built by Tony Walteur</span>
-              <span className="sm:hidden">Tony Walteur</span>
+              <span className="hidden sm:inline">
+                {t('demoSignIn.builtBy', 'Built by Tony Walteur')}
+              </span>
+              <span className="sm:hidden">{t('demoSignIn.authorName', 'Tony Walteur')}</span>
             </a>
           </header>
 
@@ -112,7 +119,7 @@ export function DemoSignIn() {
             >
               <Sparkles className="h-4 w-4 text-[var(--brand-primary)]" aria-hidden="true" />
               <span className="text-sm font-medium text-[rgba(30,50,90,0.9)]">
-                Live demo · no signup
+                {t('demoSignIn.badge', 'Live demo · no signup')}
               </span>
             </motion.div>
 
@@ -121,7 +128,7 @@ export function DemoSignIn() {
               transition={{ duration: 0.6, delay: 0.05 }}
               className="mb-4 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-tight text-[#34405a] sm:text-5xl md:text-6xl"
             >
-              Explore BidStack 360°
+              {t('demoSignIn.heading', 'Explore BidStack 360°')}
             </motion.h1>
 
             <motion.p
@@ -129,8 +136,10 @@ export function DemoSignIn() {
               transition={{ duration: 0.6, delay: 0.1 }}
               className="mb-8 max-w-xl text-base leading-relaxed text-[#4a5266] md:text-lg"
             >
-              Step inside a working pre-sales bid piloting workspace with real accounts, live pipeline, and an
-              RFP response engine. Enter your email to open a private workspace.
+              {t(
+                'demoSignIn.subtitle',
+                'Step inside a working pre-sales bid piloting workspace with real accounts, live pipeline, and an RFP response engine. Enter your email to open a private workspace.',
+              )}
             </motion.p>
 
             <motion.form
@@ -141,7 +150,7 @@ export function DemoSignIn() {
               className="w-full max-w-md rounded-2xl bg-white/75 p-2 shadow-[0_8px_40px_rgba(30,50,90,0.14)] ring-1 ring-white/60 backdrop-blur-xl sm:flex sm:items-center sm:gap-2"
             >
               <label htmlFor="demo-email" className="sr-only">
-                Work email
+                {t('demoSignIn.emailLabel', 'Work email')}
               </label>
               <input
                 id="demo-email"
@@ -151,7 +160,7 @@ export function DemoSignIn() {
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@company.com"
+                placeholder={t('demoSignIn.emailPlaceholder', 'you@company.com')}
                 disabled={loading}
                 aria-invalid={error ? true : undefined}
                 aria-describedby={error ? 'demo-error' : undefined}
@@ -163,10 +172,10 @@ export function DemoSignIn() {
                 className="mt-2 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--brand-primary)] px-6 font-medium text-white transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/50 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-0 sm:w-auto"
               >
                 {loading ? (
-                  'Setting up…'
+                  t('demoSignIn.submitLoading', 'Setting up…')
                 ) : (
                   <>
-                    Enter the demo
+                    {t('demoSignIn.submit', 'Enter the demo')}
                     <ArrowRight className="h-4 w-4" aria-hidden="true" />
                   </>
                 )}
@@ -184,7 +193,10 @@ export function DemoSignIn() {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="mt-5 text-xs text-[#4a5266]/75"
             >
-              Passwordless · your own isolated sandbox · resets periodically
+              {t(
+                'demoSignIn.footnote',
+                'Passwordless · your own isolated sandbox · resets periodically',
+              )}
             </motion.p>
           </div>
         </div>

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -30,6 +31,7 @@ interface OverviewTileModel {
 }
 
 export function SettingsOverviewSection({ onNavigate }: Props) {
+  const { t } = useTranslation('settings');
   const isAdmin = useIsAdmin();
   const users = useUsers();
   const roles = useRoles();
@@ -43,40 +45,63 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
 
   const tiles: OverviewTileModel[] = [
     {
-      title: 'Workspace governance',
-      detail: `${formatCount(users.data?.length)} users / ${formatCount(roles.data?.length)} roles`,
+      title: t('settingsOverview.tileWorkspaceTitle', 'Workspace governance'),
+      detail: t('settingsOverview.tileWorkspaceDetail', '{{users}} users / {{roles}} roles', {
+        users: formatCount(users.data?.length),
+        roles: formatCount(roles.data?.length),
+      }),
       tone: users.isError || roles.isError ? 'tomato' : 'jade',
       icon: 'building' as const,
       section: 'workspace' as const,
       adminOnly: false,
     },
     {
-      title: 'Data model',
-      detail: `${formatCount(pipelineStages.data?.items.length)} stages / ${formatCount(customFields.data?.items.length)} company fields`,
+      title: t('settingsOverview.tileDataModelTitle', 'Data model'),
+      detail: t(
+        'settingsOverview.tileDataModelDetail',
+        '{{stages}} stages / {{fields}} company fields',
+        {
+          stages: formatCount(pipelineStages.data?.items.length),
+          fields: formatCount(customFields.data?.items.length),
+        },
+      ),
       tone: pipelineStages.isError || customFields.isError ? 'tomato' : 'blue',
       icon: 'sliders' as const,
       section: 'crm' as const,
       adminOnly: true,
     },
     {
-      title: 'Automation library',
-      detail: `${formatCount(tags.data?.items.length)} tags / ${formatCount(templates.data?.items.length)} templates / ${formatCount(leadRot.data?.items.length)} rot rules`,
+      title: t('settingsOverview.tileAutomationTitle', 'Automation library'),
+      detail: t(
+        'settingsOverview.tileAutomationDetail',
+        '{{tags}} tags / {{templates}} templates / {{rules}} rot rules',
+        {
+          tags: formatCount(tags.data?.items.length),
+          templates: formatCount(templates.data?.items.length),
+          rules: formatCount(leadRot.data?.items.length),
+        },
+      ),
       tone: tags.isError || templates.isError || leadRot.isError ? 'tomato' : 'purple',
       icon: 'sparkle' as const,
       section: 'crm' as const,
       adminOnly: true,
     },
     {
-      title: 'Developer access',
-      detail: `${formatCount(apiKeys.data?.items.length)} API keys`,
+      title: t('settingsOverview.tileDeveloperTitle', 'Developer access'),
+      detail: t('settingsOverview.tileDeveloperDetail', '{{value}} API keys', {
+        value: formatCount(apiKeys.data?.items.length),
+      }),
       tone: apiKeys.isError ? 'tomato' : 'teal',
       icon: 'zap' as const,
       section: 'developer' as const,
       adminOnly: true,
     },
     {
-      title: 'Webhook delivery',
-      detail: `${formatCount((webhooks.data ?? []).filter((w) => w.active).length)} active / ${formatCount((webhooks.data ?? []).filter((w) => w.failureCount > 0).length)} failing`,
+      title: t('settingsOverview.tileWebhookTitle', 'Webhook delivery'),
+      detail: t('settingsOverview.tileWebhookDetail', '{{active}} active / {{failing}} failing', {
+        active: formatCount((webhooks.data ?? []).filter((w) => w.active).length),
+        failing: formatCount((webhooks.data ?? []).filter((w) => w.failureCount > 0).length),
+      }),
       tone: webhooks.isError ? 'tomato' : 'purple',
       icon: 'webhook' as const,
       section: 'webhooks' as const,
@@ -91,26 +116,42 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-primary-tint)] px-3 py-1 text-xs font-medium text-[var(--brand-primary)]">
               <Icon name="checkCircle" size={14} ariaHidden />
-              Enterprise settings command center
+              {t('settingsOverview.heroBadge', 'Enterprise settings command center')}
             </div>
             <h3 className="mt-4 text-xl font-semibold tracking-tight text-[var(--fg-primary)]">
-              Configure BidStack once. Make every team move the same way.
+              {t(
+                'settingsOverview.heroTitle',
+                'Configure BidStack once. Make every team move the same way.',
+              )}
             </h3>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--fg-secondary)]">
-              Settings now surfaces the working controls that affect BidStack across the app:
-              workspace membership, roles, currencies, pipeline stages, lead recovery rules, tags,
-              email templates, custom fields, API keys, and webhooks.
+              {t(
+                'settingsOverview.heroSubtitle',
+                'Settings now surfaces the working controls that affect BidStack across the app: workspace membership, roles, currencies, pipeline stages, lead recovery rules, tags, email templates, custom fields, API keys, and webhooks.',
+              )}
             </p>
           </div>
           <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-4">
             <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-              Readiness
+              {t('settingsOverview.readinessHeading', 'Readiness')}
             </div>
             <div className="mt-3 space-y-2 text-sm text-[var(--fg-secondary)]">
-              <ReadinessRow label="Personal preferences" complete />
-              <ReadinessRow label="Workspace controls" complete={isAdmin} />
-              <ReadinessRow label="Data configuration" complete={isAdmin} />
-              <ReadinessRow label="API and MCP access" complete={isAdmin} />
+              <ReadinessRow
+                label={t('settingsOverview.readinessPersonal', 'Personal preferences')}
+                complete
+              />
+              <ReadinessRow
+                label={t('settingsOverview.readinessWorkspace', 'Workspace controls')}
+                complete={isAdmin}
+              />
+              <ReadinessRow
+                label={t('settingsOverview.readinessData', 'Data configuration')}
+                complete={isAdmin}
+              />
+              <ReadinessRow
+                label={t('settingsOverview.readinessApi', 'API and MCP access')}
+                complete={isAdmin}
+              />
             </div>
           </div>
         </div>
@@ -134,8 +175,10 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
       {!isAdmin ? (
         <Card>
           <div className="p-5 text-sm text-[var(--fg-secondary)]">
-            You can manage your personal settings here. Workspace, data, and developer controls are
-            limited to administrators.
+            {t(
+              'settingsOverview.nonAdminNotice',
+              'You can manage your personal settings here. Workspace, data, and developer controls are limited to administrators.',
+            )}
           </div>
         </Card>
       ) : null}
@@ -144,10 +187,15 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
 }
 
 function ReadinessRow({ label, complete }: { label: string; complete: boolean }) {
+  const { t } = useTranslation('settings');
   return (
     <div className="flex items-center justify-between gap-3">
       <span>{label}</span>
-      <Badge tone={complete ? 'jade' : 'amber'}>{complete ? 'Ready' : 'Admin only'}</Badge>
+      <Badge tone={complete ? 'jade' : 'amber'}>
+        {complete
+          ? t('settingsOverview.statusReady', 'Ready')
+          : t('settingsOverview.statusAdminOnly', 'Admin only')}
+      </Badge>
     </div>
   );
 }
@@ -165,6 +213,7 @@ function OverviewTile({
   tone: TileTone;
   onOpen: () => void;
 }) {
+  const { t } = useTranslation('settings');
   return (
     <Card className="p-5">
       <div className="flex items-start gap-4">
@@ -174,12 +223,16 @@ function OverviewTile({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-semibold text-[var(--fg-primary)]">{title}</h3>
-            <Badge tone={tone}>{tone === 'tomato' ? 'Needs attention' : 'Live'}</Badge>
+            <Badge tone={tone}>
+              {tone === 'tomato'
+                ? t('settingsOverview.badgeNeedsAttention', 'Needs attention')
+                : t('settingsOverview.badgeLive', 'Live')}
+            </Badge>
           </div>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">{detail}</p>
         </div>
         <Button variant="secondary" size="sm" onClick={onOpen}>
-          Open
+          {t('settingsOverview.openButton', 'Open')}
         </Button>
       </div>
     </Card>

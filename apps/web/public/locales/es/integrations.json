@@ -383,5 +383,56 @@
       "medium": "media",
       "low": "baja"
     }
+  },
+  "connectionTester": {
+    "title": "Probador de conexión",
+    "caption": "Comprueba un endpoint desde el servicio de API antes de guardarlo. Nunca se envían secretos ni tokens de portador.",
+    "status": {
+      "reachable": "accesible",
+      "needsAttention": "requiere atención",
+      "ready": "listo para probar"
+    },
+    "probeOption": {
+      "mcp": {
+        "label": "MCP",
+        "description": "Endpoints de herramientas del agente"
+      },
+      "rest": {
+        "label": "API REST",
+        "description": "Endpoints de sincronización de datos"
+      },
+      "webhook": {
+        "label": "Webhook",
+        "description": "Receptores de eventos"
+      }
+    },
+    "endpointUrlLabel": "URL del endpoint",
+    "placeholder": {
+      "loading": "Cargando contrato de configuración..."
+    },
+    "useDefault": "Usar predeterminado",
+    "testing": "Probando...",
+    "testEndpoint": "Probar endpoint",
+    "hint": {
+      "noSecrets": {
+        "title": "No se envían secretos",
+        "body": "La API solo comprueba la accesibilidad. Elimina cadenas de consulta, fragmentos, nombres de usuario y contraseñas."
+      },
+      "ssrf": {
+        "title": "Protegido contra SSRF",
+        "body": "Las redes privadas y los hosts internos se bloquean fuera del desarrollo local antes de realizar cualquier solicitud."
+      },
+      "timeout": {
+        "title": "Tiempo de espera rápido",
+        "body": "La comprobación se detiene tras 5 segundos y registra un evento de auditoría delimitado para la trazabilidad del administrador."
+      }
+    },
+    "toast": {
+      "missingUrl": "Añade primero una URL de endpoint",
+      "reachedTitle": "Endpoint alcanzado",
+      "warningTitle": "Comprobación completada con una advertencia",
+      "probeFailed": "La comprobación del endpoint falló.",
+      "blockedTitle": "Comprobación bloqueada"
+    }
   }
 }

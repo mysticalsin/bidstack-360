@@ -66,5 +66,17 @@
     "clearButton": "Borrar",
     "undoButtonLabel": "Deshacer último trazo",
     "undoButton": "Deshacer"
+  },
+  "sendForSignature": {
+    "stepsNavLabel": "Pasos de envío",
+    "step": {
+      "template": "Plantilla",
+      "recipients": "Destinatarios",
+      "reviewSend": "Revisar y enviar"
+    },
+    "dialogTitle": "Enviar para firma",
+    "successTitle": "¡Solicitud de firma enviada!",
+    "successMessage": "Los destinatarios recibirán un correo electrónico para firmar el documento.",
+    "doneButton": "Listo"
   }
 }

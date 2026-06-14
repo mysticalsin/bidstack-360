@@ -393,5 +393,56 @@
       "medium": "medium",
       "low": "low"
     }
+  },
+  "connectionTester": {
+    "title": "Connection tester",
+    "caption": "Probe an endpoint from the API service before saving it. Secrets and bearer tokens are never sent.",
+    "status": {
+      "reachable": "reachable",
+      "needsAttention": "needs attention",
+      "ready": "ready to test"
+    },
+    "probeOption": {
+      "mcp": {
+        "label": "MCP",
+        "description": "Agent tool endpoints"
+      },
+      "rest": {
+        "label": "REST API",
+        "description": "Data sync endpoints"
+      },
+      "webhook": {
+        "label": "Webhook",
+        "description": "Event receivers"
+      }
+    },
+    "endpointUrlLabel": "Endpoint URL",
+    "placeholder": {
+      "loading": "Loading setup contract..."
+    },
+    "useDefault": "Use default",
+    "testing": "Testing...",
+    "testEndpoint": "Test endpoint",
+    "hint": {
+      "noSecrets": {
+        "title": "No secrets sent",
+        "body": "The API probes reachability only. It strips query strings, fragments, usernames, and passwords."
+      },
+      "ssrf": {
+        "title": "SSRF guarded",
+        "body": "Private networks and internal hosts are blocked outside local development before any request is made."
+      },
+      "timeout": {
+        "title": "Fast timeout",
+        "body": "The probe stops after 5 seconds and records a scoped audit event for administrator traceability."
+      }
+    },
+    "toast": {
+      "missingUrl": "Add an endpoint URL first",
+      "reachedTitle": "Endpoint reached",
+      "warningTitle": "Probe completed with a warning",
+      "probeFailed": "Endpoint probe failed.",
+      "blockedTitle": "Probe blocked"
+    }
   }
 }

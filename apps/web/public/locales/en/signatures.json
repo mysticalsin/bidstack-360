@@ -66,5 +66,17 @@
     "clearButton": "Clear",
     "undoButtonLabel": "Undo last stroke",
     "undoButton": "Undo"
+  },
+  "sendForSignature": {
+    "stepsNavLabel": "Sending steps",
+    "step": {
+      "template": "Template",
+      "recipients": "Recipients",
+      "reviewSend": "Review & Send"
+    },
+    "dialogTitle": "Send for Signature",
+    "successTitle": "Signature request sent!",
+    "successMessage": "Recipients will receive an email to sign the document.",
+    "doneButton": "Done"
   }
 }

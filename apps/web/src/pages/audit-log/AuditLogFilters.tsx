@@ -7,6 +7,7 @@
  * independently testable.
  */
 import type { AuditLogEntry } from '@bidstack/shared';
+import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
@@ -45,26 +46,40 @@ export function AuditFilterBar({
   onRefresh: () => void;
   isRefreshing: boolean;
 }) {
+  const { t } = useTranslation('crm');
+
   const activeFilters = [
-    search ? { key: 'q', label: `Search: ${search}`, onRemove: () => setSearch('') } : undefined,
+    search
+      ? {
+          key: 'q',
+          label: t('auditLogFilters.chipSearch', 'Search: {{value}}', { value: search }),
+          onRemove: () => setSearch(''),
+        }
+      : undefined,
     range !== '7d'
       ? {
           key: 'range',
-          label: `Range: ${DATE_RANGES.find((option) => option.value === range)?.label ?? range}`,
+          label: t('auditLogFilters.chipRange', 'Range: {{value}}', {
+            value: DATE_RANGES.find((option) => option.value === range)?.label ?? range,
+          }),
           onRemove: () => setRange('7d'),
         }
       : undefined,
     targetType !== 'all'
       ? {
           key: 'target',
-          label: `Target: ${TARGET_TYPES.find((option) => option.value === targetType)?.label ?? targetType}`,
+          label: t('auditLogFilters.chipTarget', 'Target: {{value}}', {
+            value: TARGET_TYPES.find((option) => option.value === targetType)?.label ?? targetType,
+          }),
           onRemove: () => setTargetType('all'),
         }
       : undefined,
     quickFilter !== 'all'
       ? {
           key: 'category',
-          label: `Category: ${QUICK_FILTERS.find((option) => option.value === quickFilter)?.label ?? quickFilter}`,
+          label: t('auditLogFilters.chipCategory', 'Category: {{value}}', {
+            value: QUICK_FILTERS.find((option) => option.value === quickFilter)?.label ?? quickFilter,
+          }),
           onRemove: () => setQuickFilter('all'),
         }
       : undefined,
@@ -73,12 +88,12 @@ export function AuditFilterBar({
   return (
     <Card
       role="search"
-      aria-label="Audit log filters"
+      aria-label={t('auditLogFilters.barAriaLabel', 'Audit log filters')}
       className="space-y-4 border-[var(--border-subtle)] bg-[var(--surface-primary)] p-4"
     >
       <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_180px_220px]">
         <label className="group relative block">
-          <span className="sr-only">Search current audit page</span>
+          <span className="sr-only">{t('auditLogFilters.searchLabel', 'Search current audit page')}</span>
           <Icon
             name="search"
             className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-muted)]"
@@ -86,13 +101,16 @@ export function AuditFilterBar({
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search current page by action, actor, target or diff..."
+            placeholder={t(
+              'auditLogFilters.searchPlaceholder',
+              'Search current page by action, actor, target or diff...',
+            )}
             className="h-11 w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] pl-10 pr-4 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-primary)] focus:ring-4 focus:ring-[var(--accent-primary)]/15"
           />
         </label>
 
         <label className="block">
-          <span className="sr-only">Date range</span>
+          <span className="sr-only">{t('auditLogFilters.dateRangeLabel', 'Date range')}</span>
           <select
             value={range}
             onChange={(event) => setRange(event.target.value as DateRange)}
@@ -107,7 +125,7 @@ export function AuditFilterBar({
         </label>
 
         <label className="block">
-          <span className="sr-only">Target type</span>
+          <span className="sr-only">{t('auditLogFilters.targetTypeLabel', 'Target type')}</span>
           <select
             value={targetType}
             onChange={(event) => setTargetType(event.target.value as TargetTypeFilter)}
@@ -130,7 +148,7 @@ export function AuditFilterBar({
           className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-4 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-tertiary)] focus:outline-none focus:ring-4 focus:ring-[var(--accent-primary)]/15 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Icon name="download" className="size-4" />
-          Export visible
+          {t('auditLogFilters.exportVisible', 'Export visible')}
         </button>
         <button
           type="button"
@@ -138,7 +156,7 @@ export function AuditFilterBar({
           className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-4 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-tertiary)] focus:outline-none focus:ring-4 focus:ring-[var(--accent-primary)]/15"
         >
           <Icon name="link" className="size-4" />
-          Copy view link
+          {t('auditLogFilters.copyViewLink', 'Copy view link')}
         </button>
         <button
           type="button"
@@ -147,11 +165,16 @@ export function AuditFilterBar({
           className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-4 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-tertiary)] focus:outline-none focus:ring-4 focus:ring-[var(--accent-primary)]/15 disabled:cursor-wait disabled:opacity-60"
         >
           <Icon name="clock" className={cn('size-4', isRefreshing && 'animate-spin')} />
-          {isRefreshing ? 'Refreshing' : 'Refresh'}
+          {isRefreshing
+            ? t('auditLogFilters.refreshing', 'Refreshing')
+            : t('auditLogFilters.refresh', 'Refresh')}
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-2" aria-label="Audit event category filters">
+      <div
+        className="flex flex-wrap gap-2"
+        aria-label={t('auditLogFilters.categoryFiltersAriaLabel', 'Audit event category filters')}
+      >
         {QUICK_FILTERS.map((option) => (
           <button
             key={option.value}
@@ -174,7 +197,7 @@ export function AuditFilterBar({
       {activeFilters.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)] pt-3">
           <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-            Active view
+            {t('auditLogFilters.activeView', 'Active view')}
           </span>
           {activeFilters.map((filter) => (
             <button
@@ -192,7 +215,7 @@ export function AuditFilterBar({
             onClick={onClear}
             className="ml-auto inline-flex min-h-9 items-center justify-center rounded-xl border border-[var(--border-subtle)] px-3 text-xs font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--accent-primary)]/15"
           >
-            Clear filters
+            {t('auditLogFilters.clearFilters', 'Clear filters')}
           </button>
         </div>
       )}

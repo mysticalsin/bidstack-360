@@ -66,5 +66,17 @@
     "clearButton": "清除",
     "undoButtonLabel": "撤销上一笔",
     "undoButton": "撤销"
+  },
+  "sendForSignature": {
+    "stepsNavLabel": "发送步骤",
+    "step": {
+      "template": "模板",
+      "recipients": "收件人",
+      "reviewSend": "审阅并发送"
+    },
+    "dialogTitle": "发送以供签名",
+    "successTitle": "签名请求已发送！",
+    "successMessage": "收件人将收到一封电子邮件以签署文档。",
+    "doneButton": "完成"
   }
 }

@@ -2616,5 +2616,123 @@
     "regionLabel": "Chart",
     "actionsLabel": "Chart actions",
     "loadingLabel": "Loading chart"
+  },
+  "crossSell": {
+    "regionLabel": "Cross-sell actions",
+    "title": "Cross-sell actions",
+    "caption": "Cross-country / cross-team sales actions on this account",
+    "errorTitle": "Could not load cross-sell actions",
+    "errorRetry": "Try again shortly.",
+    "empty": "No cross-sell actions logged for this account yet.",
+    "advanceStatusLabel": "Advance status of {{description}}",
+    "advanceStatusHint": "Click to advance status",
+    "status": {
+      "open": "Open",
+      "inProgress": "In progress",
+      "done": "Done"
+    },
+    "logAction": "Log action",
+    "toast": {
+      "missingFieldsTitle": "Missing fields",
+      "missingFieldsBody": "Description and both units are required.",
+      "logged": "Cross-sell action logged",
+      "saveError": "Could not save"
+    },
+    "form": {
+      "descriptionPlaceholder": "What needs to happen?",
+      "requestingUnitPlaceholder": "Requesting country/team",
+      "assignedUnitPlaceholder": "Assigned country/team",
+      "assigneeLabel": "Assignee",
+      "unassigned": "Unassigned",
+      "dueDateLabel": "Due date",
+      "saving": "Saving…",
+      "save": "Save",
+      "cancel": "Cancel"
+    }
+  },
+  "auditLogFilters": {
+    "chipSearch": "Search: {{value}}",
+    "chipRange": "Range: {{value}}",
+    "chipTarget": "Target: {{value}}",
+    "chipCategory": "Category: {{value}}",
+    "barAriaLabel": "Audit log filters",
+    "searchLabel": "Search current audit page",
+    "searchPlaceholder": "Search current page by action, actor, target or diff...",
+    "dateRangeLabel": "Date range",
+    "targetTypeLabel": "Target type",
+    "exportVisible": "Export visible",
+    "copyViewLink": "Copy view link",
+    "refreshing": "Refreshing",
+    "refresh": "Refresh",
+    "categoryFiltersAriaLabel": "Audit event category filters",
+    "activeView": "Active view",
+    "clearFilters": "Clear filters"
+  },
+  "createTask": {
+    "errorTitleRequired": "Title is required",
+    "errorSaveFailed": "Save failed",
+    "triggerButton": "+ New task",
+    "dialogTitle": "New task",
+    "dialogDescription": "Create a follow-up — optionally linked to an opportunity.",
+    "fieldTitle": "Title",
+    "fieldOpportunity": "Opportunity",
+    "opportunityNone": "— None —",
+    "fieldStatus": "Status",
+    "statusOpen": "Open",
+    "statusInProgress": "In progress",
+    "statusBlocked": "Blocked",
+    "statusDone": "Done",
+    "fieldDueDate": "Due date",
+    "cancelButton": "Cancel",
+    "savingButton": "Saving…",
+    "submitButton": "Create task"
+  },
+  "oppWinProbabilityBadge": {
+    "loading": "Loading probability...",
+    "labelLikely": "Likely",
+    "labelPossible": "Possible",
+    "labelAtRisk": "At risk",
+    "featureDealValue": "Deal Value",
+    "featureOwnerWinRate": "Owner Win Rate",
+    "featurePipelineStage": "Pipeline Stage",
+    "featureQualificationScore": "Qualification Score",
+    "factorsAriaLabel": "Win probability factors",
+    "popoverTitle": "Win probability: {{prob}}%",
+    "keyFactors": "Key factors",
+    "badgeAriaLabel": "Win probability: {{prob}}% — {{label}}"
+  },
+  "intelCards": {
+    "dataFreshness": "Intel refreshed {{date}} · Sources: Crunchbase, LinkedIn, EU register",
+    "financial": {
+      "title": "Financial health",
+      "private": "Private",
+      "marketCap": "Market cap",
+      "revenueTtm": "Revenue (TTM)",
+      "growth": "Growth",
+      "ebitdaMargin": "EBITDA margin",
+      "creditRating": "Credit rating",
+      "headcount": "Headcount"
+    },
+    "winPrediction": {
+      "title": "Win prediction",
+      "empty": "No prediction available.",
+      "modelCaption": "Model {{version}}",
+      "probability": "probability"
+    },
+    "triggers": {
+      "title": "Buying triggers",
+      "caption": "Weighted signals",
+      "unknownSource": "unknown",
+      "weightAria": "Weight {{weight}}/10",
+      "empty": "No triggers detected yet."
+    },
+    "competitors": {
+      "title": "Competitor landscape",
+      "empty": "No competitors mapped."
+    },
+    "news": {
+      "title": "Recent news",
+      "empty": "No news pulled."
+    }
   }
 }

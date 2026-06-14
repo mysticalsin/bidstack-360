@@ -3,6 +3,7 @@
 // before round-tripping to /api/tasks; the server re-validates via Zod.
 
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/Dialog';
@@ -25,6 +26,7 @@ interface Props {
 }
 
 export function CreateTaskDialog({ oppId, trigger, open: controlledOpen, onOpenChange }: Props) {
+  const { t } = useTranslation('crm');
   const [internalOpen, setInternalOpen] = useState(false);
   // Support both controlled (command palette) and uncontrolled (trigger button) modes.
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
@@ -51,7 +53,7 @@ export function CreateTaskDialog({ oppId, trigger, open: controlledOpen, onOpenC
     setError(null);
     const cleanTitle = title.trim();
     if (!cleanTitle) {
-      setError('Title is required');
+      setError(t('createTask.errorTitleRequired', 'Title is required'));
       return;
     }
     try {
@@ -65,7 +67,7 @@ export function CreateTaskDialog({ oppId, trigger, open: controlledOpen, onOpenC
       setOpen(false);
       reset();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save failed');
+      setError(err instanceof Error ? err.message : t('createTask.errorSaveFailed', 'Save failed'));
     }
   };
 
@@ -80,17 +82,20 @@ export function CreateTaskDialog({ oppId, trigger, open: controlledOpen, onOpenC
       <DialogTrigger asChild>
         {trigger ?? (
           <button type="button" className="btn btn-primary">
-            + New task
+            {t('createTask.triggerButton', '+ New task')}
           </button>
         )}
       </DialogTrigger>
       {open ? (
         <DialogContent
-          title="New task"
-          description="Create a follow-up — optionally linked to an opportunity."
+          title={t('createTask.dialogTitle', 'New task')}
+          description={t(
+            'createTask.dialogDescription',
+            'Create a follow-up — optionally linked to an opportunity.',
+          )}
         >
           <form onSubmit={submit} className="space-y-3">
-            <Field label="Title" htmlFor="task-title" required>
+            <Field label={t('createTask.fieldTitle', 'Title')} htmlFor="task-title" required>
               <input
                 id="task-title"
                 type="text"
@@ -104,13 +109,13 @@ export function CreateTaskDialog({ oppId, trigger, open: controlledOpen, onOpenC
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Opportunity" htmlFor="task-opp">
+              <Field label={t('createTask.fieldOpportunity', 'Opportunity')} htmlFor="task-opp">
                 <Select
                   id="task-opp"
                   value={linkedOppId}
                   onChange={(e) => setLinkedOppId(e.target.value)}
                 >
-                  <option value="">— None —</option>
+                  <option value="">{t('createTask.opportunityNone', '— None —')}</option>
                   {opps.data?.items.map((o) => (
                     <option key={o.id} value={o.id}>
                       {o.code} · {o.name}
@@ -118,21 +123,23 @@ export function CreateTaskDialog({ oppId, trigger, open: controlledOpen, onOpenC
                   ))}
                 </Select>
               </Field>
-              <Field label="Status" htmlFor="task-status">
+              <Field label={t('createTask.fieldStatus', 'Status')} htmlFor="task-status">
                 <Select
                   id="task-status"
                   value={status}
                   onChange={(e) => setStatus(e.target.value as TaskStatus)}
                 >
-                  <option value="open">Open</option>
-                  <option value="in_progress">In progress</option>
-                  <option value="blocked">Blocked</option>
-                  <option value="done">Done</option>
+                  <option value="open">{t('createTask.statusOpen', 'Open')}</option>
+                  <option value="in_progress">
+                    {t('createTask.statusInProgress', 'In progress')}
+                  </option>
+                  <option value="blocked">{t('createTask.statusBlocked', 'Blocked')}</option>
+                  <option value="done">{t('createTask.statusDone', 'Done')}</option>
                 </Select>
               </Field>
             </div>
 
-            <Field label="Due date" htmlFor="task-due">
+            <Field label={t('createTask.fieldDueDate', 'Due date')} htmlFor="task-due">
               <input
                 id="task-due"
                 type="date"
@@ -156,10 +163,12 @@ export function CreateTaskDialog({ oppId, trigger, open: controlledOpen, onOpenC
                 onClick={() => setOpen(false)}
                 disabled={create.isPending}
               >
-                Cancel
+                {t('createTask.cancelButton', 'Cancel')}
               </Button>
               <Button type="submit" size="sm" disabled={create.isPending}>
-                {create.isPending ? 'Saving…' : 'Create task'}
+                {create.isPending
+                  ? t('createTask.savingButton', 'Saving…')
+                  : t('createTask.submitButton', 'Create task')}
               </Button>
             </div>
           </form>

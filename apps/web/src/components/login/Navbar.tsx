@@ -2,6 +2,7 @@ import { Suspense, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ChevronRight, Info } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { EmailSignIn, GoogleSignInButton, MicrosoftSignInButton } from '@/components/auth';
 
@@ -17,18 +18,22 @@ import { useSignInAction } from '@/lib/auth';
 export function Navbar() {
   const navigate = useNavigate();
   const { signIn } = useSignInAction();
+  const { t } = useTranslation('auth');
   const [showEmail, setShowEmail] = useState(false);
 
   const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
   const microsoftEnabled = import.meta.env.VITE_SSO_MICROSOFT_ENABLED === 'true';
   const googleEnabled = import.meta.env.VITE_SSO_GOOGLE_ENABLED === 'true';
-  const microsoftLabel = import.meta.env.VITE_SSO_MICROSOFT_LABEL ?? 'Sign in with Microsoft';
-  const googleLabel = import.meta.env.VITE_SSO_GOOGLE_LABEL ?? 'Sign in with Google';
+  const microsoftLabel =
+    import.meta.env.VITE_SSO_MICROSOFT_LABEL ??
+    t('navbar.signInMicrosoft', 'Sign in with Microsoft');
+  const googleLabel =
+    import.meta.env.VITE_SSO_GOOGLE_LABEL ?? t('navbar.signInGoogle', 'Sign in with Google');
   const isStub = !clerkKey;
 
   return (
     <nav
-      aria-label="Site navigation"
+      aria-label={t('navbar.ariaSiteNavigation', 'Site navigation')}
       className="flex items-center justify-between py-6 px-6 md:px-10 w-full relative z-10"
     >
       {/* Left Side (logo) */}
@@ -72,7 +77,7 @@ export function Navbar() {
             <button
               type="button"
               onClick={() => signIn(() => navigate('/dashboard', { replace: true }))}
-              aria-label="Sign in with Microsoft"
+              aria-label={t('navbar.signInMicrosoft', 'Sign in with Microsoft')}
               className="flex items-center bg-[rgba(30,50,90,0.8)] text-white rounded-full px-3 md:px-5 py-1.5 md:py-2 gap-2 text-xs md:text-sm font-normal cursor-pointer hover:bg-[rgba(30,50,90,0.9)] active:scale-[0.98] transition-all"
             >
               <MicrosoftLogo />
@@ -81,7 +86,7 @@ export function Navbar() {
             <button
               type="button"
               onClick={() => signIn(() => navigate('/dashboard', { replace: true }))}
-              aria-label="Sign in with Google"
+              aria-label={t('navbar.signInGoogle', 'Sign in with Google')}
               className="flex items-center bg-white text-[rgba(30,50,90,0.8)] rounded-full px-3 md:px-5 py-1.5 md:py-2 gap-2 text-xs md:text-sm font-normal border border-[rgba(30,50,90,0.1)] cursor-pointer hover:bg-gray-50 active:scale-[0.98] transition-all"
             >
               <GoogleLogo />
@@ -103,7 +108,7 @@ export function Navbar() {
           onClick={() => setShowEmail((v) => !v)}
           className="ml-3 text-[12px] font-normal underline underline-offset-4 text-[rgba(30,50,90,0.4)] hover:text-[rgba(30,50,90,0.7)] transition-colors cursor-pointer hidden md:block"
         >
-          {showEmail ? 'Hide email' : 'Email'}
+          {showEmail ? t('navbar.hideEmail', 'Hide email') : t('navbar.email', 'Email')}
         </button>
       )}
 
@@ -112,14 +117,14 @@ export function Navbar() {
         <motion.button
           type="button"
           onClick={() => signIn(() => navigate('/dashboard', { replace: true }))}
-          aria-label="Dev bypass — enter dashboard without auth"
+          aria-label={t('navbar.devBypass', 'Dev bypass — enter dashboard without auth')}
           className="ml-2 md:ml-3 flex items-center gap-1 text-[11px] font-normal text-amber-600/80 hover:text-amber-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/50 rounded-sm"
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
         >
           <Info className="w-3 h-3" aria-hidden="true" />
           <span className="hidden sm:inline" aria-hidden="true">
-            Dashboard
+            {t('navbar.dashboard', 'Dashboard')}
           </span>
         </motion.button>
       )}
@@ -130,7 +135,7 @@ export function Navbar() {
           <Suspense
             fallback={
               <div className="w-full rounded-xl bg-white/60 backdrop-blur-md border border-white/20 py-3 text-center text-xs text-[rgba(30,50,90,0.5)] font-normal animate-pulse">
-                Loading form…
+                {t('navbar.loadingForm', 'Loading form…')}
               </div>
             }
           >

@@ -1,6 +1,7 @@
 // Intel display cards for the opportunity detail page. All read from
 // IntelPayload and render — no mutations, no hooks other than useReducedMotion.
 import { useReducedMotion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
@@ -22,6 +23,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 export function DataFreshnessRibbon({ refreshedAt }: { refreshedAt?: string }) {
   const reduced = useReducedMotion();
+  const { t } = useTranslation('crm');
   return (
     <div className="flex items-center gap-2 text-xs text-[var(--fg-tertiary)]">
       <span
@@ -29,8 +31,9 @@ export function DataFreshnessRibbon({ refreshedAt }: { refreshedAt?: string }) {
         aria-hidden
       />
       <span>
-        Intel refreshed {refreshedAt ? formatDate(refreshedAt) : '—'} · Sources: Crunchbase,
-        LinkedIn, EU register
+        {t('intelCards.dataFreshness', 'Intel refreshed {{date}} · Sources: Crunchbase, LinkedIn, EU register', {
+          date: refreshedAt ? formatDate(refreshedAt) : '—',
+        })}
       </span>
     </div>
   );
@@ -38,25 +41,32 @@ export function DataFreshnessRibbon({ refreshedAt }: { refreshedAt?: string }) {
 
 export function FinancialHealthCard({ intel }: { intel: IntelPayload }) {
   const f = intel.financial;
+  const { t } = useTranslation('crm');
   return (
     <Card>
-      <SectionHeader title="Financial health" caption={f?.ticker ?? 'Private'} />
+      <SectionHeader
+        title={t('intelCards.financial.title', 'Financial health')}
+        caption={f?.ticker ?? t('intelCards.financial.private', 'Private')}
+      />
       <div className="p-5 space-y-3 text-sm">
-        <Row label="Market cap" value={f?.marketCap ? formatMoney(f.marketCap, 'USD') : '—'} />
         <Row
-          label="Revenue (TTM)"
+          label={t('intelCards.financial.marketCap', 'Market cap')}
+          value={f?.marketCap ? formatMoney(f.marketCap, 'USD') : '—'}
+        />
+        <Row
+          label={t('intelCards.financial.revenueTtm', 'Revenue (TTM)')}
           value={f?.revenueAnnual ? formatMoney(f.revenueAnnual, 'USD') : '—'}
         />
         <Row
-          label="Growth"
+          label={t('intelCards.financial.growth', 'Growth')}
           value={f?.revenueGrowth != null ? `${(f.revenueGrowth * 100).toFixed(1)}%` : '—'}
         />
         <Row
-          label="EBITDA margin"
+          label={t('intelCards.financial.ebitdaMargin', 'EBITDA margin')}
           value={f?.ebitdaMargin != null ? `${(f.ebitdaMargin * 100).toFixed(1)}%` : '—'}
         />
-        <Row label="Credit rating" value={f?.creditRating ?? '—'} />
-        <Row label="Headcount" value={f?.headcount?.toLocaleString() ?? '—'} />
+        <Row label={t('intelCards.financial.creditRating', 'Credit rating')} value={f?.creditRating ?? '—'} />
+        <Row label={t('intelCards.financial.headcount', 'Headcount')} value={f?.headcount?.toLocaleString() ?? '—'} />
       </div>
     </Card>
   );
@@ -64,22 +74,30 @@ export function FinancialHealthCard({ intel }: { intel: IntelPayload }) {
 
 export function WinPredictionCard({ intel }: { intel: IntelPayload }) {
   const wp = intel.winPrediction;
+  const { t } = useTranslation('crm');
   if (!wp)
     return (
       <Card>
-        <SectionHeader title="Win prediction" />
-        <div className="p-5 text-xs text-[var(--fg-tertiary)]">No prediction available.</div>
+        <SectionHeader title={t('intelCards.winPrediction.title', 'Win prediction')} />
+        <div className="p-5 text-xs text-[var(--fg-tertiary)]">
+          {t('intelCards.winPrediction.empty', 'No prediction available.')}
+        </div>
       </Card>
     );
   return (
     <Card>
-      <SectionHeader title="Win prediction" caption={`Model ${wp.modelVersion}`} />
+      <SectionHeader
+        title={t('intelCards.winPrediction.title', 'Win prediction')}
+        caption={t('intelCards.winPrediction.modelCaption', 'Model {{version}}', { version: wp.modelVersion })}
+      />
       <div className="p-5 space-y-3">
         <div className="flex items-baseline gap-2">
           <div className="text-4xl font-bold tabular-nums text-[var(--fg-primary)]">
             {wp.probability}%
           </div>
-          <div className="text-xs text-[var(--fg-tertiary)]">probability</div>
+          <div className="text-xs text-[var(--fg-tertiary)]">
+            {t('intelCards.winPrediction.probability', 'probability')}
+          </div>
         </div>
         <ul className="space-y-1.5">
           {wp.drivers.map((d) => (
@@ -100,28 +118,35 @@ export function WinPredictionCard({ intel }: { intel: IntelPayload }) {
 }
 
 export function TriggersCard({ intel }: { intel: IntelPayload }) {
+  const { t } = useTranslation('crm');
   return (
     <Card>
-      <SectionHeader title="Buying triggers" caption="Weighted signals" />
+      <SectionHeader
+        title={t('intelCards.triggers.title', 'Buying triggers')}
+        caption={t('intelCards.triggers.caption', 'Weighted signals')}
+      />
       <ul className="divide-y divide-[var(--border-subtle)]">
-        {(intel.triggers ?? []).map((t) => (
-          <li key={t.id} className="flex items-center justify-between gap-3 px-5 py-3">
+        {(intel.triggers ?? []).map((trigger) => (
+          <li key={trigger.id} className="flex items-center justify-between gap-3 px-5 py-3">
             <div className="min-w-0">
-              <div className="text-sm text-[var(--fg-primary)]">{t.label}</div>
+              <div className="text-sm text-[var(--fg-primary)]">{trigger.label}</div>
               <div className="text-xs text-[var(--fg-tertiary)]">
-                {t.kind} · {t.source ?? 'unknown'} · {formatDate(t.observedAt)}
+                {trigger.kind} · {trigger.source ?? t('intelCards.triggers.unknownSource', 'unknown')} ·{' '}
+                {formatDate(trigger.observedAt)}
               </div>
             </div>
             <div
               className="rounded-md bg-[var(--brand-primary-tint)] px-2 py-1 text-xs font-semibold text-[var(--brand-primary)] tabular-nums"
-              aria-label={`Weight ${t.weight}/10`}
+              aria-label={t('intelCards.triggers.weightAria', 'Weight {{weight}}/10', { weight: trigger.weight })}
             >
-              {t.weight}/10
+              {trigger.weight}/10
             </div>
           </li>
         ))}
         {!intel.triggers?.length ? (
-          <li className="px-5 py-6 text-xs text-[var(--fg-tertiary)]">No triggers detected yet.</li>
+          <li className="px-5 py-6 text-xs text-[var(--fg-tertiary)]">
+            {t('intelCards.triggers.empty', 'No triggers detected yet.')}
+          </li>
         ) : null}
       </ul>
     </Card>
@@ -129,9 +154,10 @@ export function TriggersCard({ intel }: { intel: IntelPayload }) {
 }
 
 export function CompetitorRadarCard({ intel }: { intel: IntelPayload }) {
+  const { t } = useTranslation('crm');
   return (
     <Card>
-      <SectionHeader title="Competitor landscape" />
+      <SectionHeader title={t('intelCards.competitors.title', 'Competitor landscape')} />
       <ul className="divide-y divide-[var(--border-subtle)]">
         {(intel.competitors ?? []).map((c) => (
           <li key={c.vendor} className="px-5 py-3">
@@ -148,7 +174,9 @@ export function CompetitorRadarCard({ intel }: { intel: IntelPayload }) {
           </li>
         ))}
         {!intel.competitors?.length ? (
-          <li className="px-5 py-6 text-xs text-[var(--fg-tertiary)]">No competitors mapped.</li>
+          <li className="px-5 py-6 text-xs text-[var(--fg-tertiary)]">
+            {t('intelCards.competitors.empty', 'No competitors mapped.')}
+          </li>
         ) : null}
       </ul>
     </Card>
@@ -156,9 +184,10 @@ export function CompetitorRadarCard({ intel }: { intel: IntelPayload }) {
 }
 
 export function NewsCard({ intel }: { intel: IntelPayload }) {
+  const { t } = useTranslation('crm');
   return (
     <Card>
-      <SectionHeader title="Recent news" />
+      <SectionHeader title={t('intelCards.news.title', 'Recent news')} />
       <ul className="divide-y divide-[var(--border-subtle)]">
         {(intel.news ?? []).map((n) => (
           <li key={n.id} className="px-5 py-3">
@@ -182,7 +211,9 @@ export function NewsCard({ intel }: { intel: IntelPayload }) {
           </li>
         ))}
         {!intel.news?.length ? (
-          <li className="px-5 py-6 text-xs text-[var(--fg-tertiary)]">No news pulled.</li>
+          <li className="px-5 py-6 text-xs text-[var(--fg-tertiary)]">
+            {t('intelCards.news.empty', 'No news pulled.')}
+          </li>
         ) : null}
       </ul>
     </Card>

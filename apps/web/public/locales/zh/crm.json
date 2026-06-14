@@ -2616,5 +2616,123 @@
     "regionLabel": "图表",
     "actionsLabel": "图表操作",
     "loadingLabel": "正在加载图表"
+  },
+  "crossSell": {
+    "regionLabel": "交叉销售行动",
+    "title": "交叉销售行动",
+    "caption": "此客户的跨国家/跨团队销售行动",
+    "errorTitle": "无法加载交叉销售行动",
+    "errorRetry": "请稍后重试。",
+    "empty": "此客户尚未记录交叉销售行动。",
+    "advanceStatusLabel": "推进 {{description}} 的状态",
+    "advanceStatusHint": "点击以推进状态",
+    "status": {
+      "open": "待处理",
+      "inProgress": "进行中",
+      "done": "已完成"
+    },
+    "logAction": "记录行动",
+    "toast": {
+      "missingFieldsTitle": "缺少字段",
+      "missingFieldsBody": "必须填写描述和两个单位。",
+      "logged": "交叉销售行动已记录",
+      "saveError": "无法保存"
+    },
+    "form": {
+      "descriptionPlaceholder": "需要做什么？",
+      "requestingUnitPlaceholder": "请求方国家/团队",
+      "assignedUnitPlaceholder": "指派方国家/团队",
+      "assigneeLabel": "负责人",
+      "unassigned": "未指派",
+      "dueDateLabel": "截止日期",
+      "saving": "保存中…",
+      "save": "保存",
+      "cancel": "取消"
+    }
+  },
+  "auditLogFilters": {
+    "chipSearch": "搜索：{{value}}",
+    "chipRange": "范围：{{value}}",
+    "chipTarget": "目标：{{value}}",
+    "chipCategory": "类别：{{value}}",
+    "barAriaLabel": "审计日志筛选器",
+    "searchLabel": "搜索当前审计页面",
+    "searchPlaceholder": "按操作、操作者、目标或差异搜索当前页面...",
+    "dateRangeLabel": "日期范围",
+    "targetTypeLabel": "目标类型",
+    "exportVisible": "导出可见项",
+    "copyViewLink": "复制视图链接",
+    "refreshing": "正在刷新",
+    "refresh": "刷新",
+    "categoryFiltersAriaLabel": "审计事件类别筛选器",
+    "activeView": "当前视图",
+    "clearFilters": "清除筛选条件"
+  },
+  "createTask": {
+    "errorTitleRequired": "标题为必填项",
+    "errorSaveFailed": "保存失败",
+    "triggerButton": "+ 新建任务",
+    "dialogTitle": "新建任务",
+    "dialogDescription": "创建一个跟进事项——可选择关联到商机。",
+    "fieldTitle": "标题",
+    "fieldOpportunity": "商机",
+    "opportunityNone": "— 无 —",
+    "fieldStatus": "状态",
+    "statusOpen": "待办",
+    "statusInProgress": "进行中",
+    "statusBlocked": "已阻塞",
+    "statusDone": "已完成",
+    "fieldDueDate": "截止日期",
+    "cancelButton": "取消",
+    "savingButton": "保存中…",
+    "submitButton": "创建任务"
+  },
+  "oppWinProbabilityBadge": {
+    "loading": "正在加载概率...",
+    "labelLikely": "很可能",
+    "labelPossible": "有可能",
+    "labelAtRisk": "有风险",
+    "featureDealValue": "交易金额",
+    "featureOwnerWinRate": "负责人赢单率",
+    "featurePipelineStage": "管道阶段",
+    "featureQualificationScore": "资格评分",
+    "factorsAriaLabel": "赢单概率因素",
+    "popoverTitle": "赢单概率：{{prob}}%",
+    "keyFactors": "关键因素",
+    "badgeAriaLabel": "赢单概率：{{prob}}% — {{label}}"
+  },
+  "intelCards": {
+    "dataFreshness": "情报更新于 {{date}} · 来源：Crunchbase、LinkedIn、欧盟注册处",
+    "financial": {
+      "title": "财务状况",
+      "private": "未上市",
+      "marketCap": "市值",
+      "revenueTtm": "营收（过去12个月）",
+      "growth": "增长率",
+      "ebitdaMargin": "EBITDA 利润率",
+      "creditRating": "信用评级",
+      "headcount": "员工人数"
+    },
+    "winPrediction": {
+      "title": "赢单预测",
+      "empty": "暂无预测。",
+      "modelCaption": "模型 {{version}}",
+      "probability": "概率"
+    },
+    "triggers": {
+      "title": "采购触发因素",
+      "caption": "加权信号",
+      "unknownSource": "未知",
+      "weightAria": "权重 {{weight}}/10",
+      "empty": "尚未检测到触发因素。"
+    },
+    "competitors": {
+      "title": "竞争格局",
+      "empty": "尚未识别竞争对手。"
+    },
+    "news": {
+      "title": "最新动态",
+      "empty": "未获取到动态。"
+    }
   }
 }

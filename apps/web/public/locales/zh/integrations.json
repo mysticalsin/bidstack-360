@@ -393,5 +393,56 @@
       "medium": "中",
       "low": "低"
     }
+  },
+  "connectionTester": {
+    "title": "连接测试器",
+    "caption": "保存前从 API 服务探测端点。绝不会发送密钥和 bearer 令牌。",
+    "status": {
+      "reachable": "可访问",
+      "needsAttention": "需要关注",
+      "ready": "准备测试"
+    },
+    "probeOption": {
+      "mcp": {
+        "label": "MCP",
+        "description": "代理工具端点"
+      },
+      "rest": {
+        "label": "REST API",
+        "description": "数据同步端点"
+      },
+      "webhook": {
+        "label": "Webhook",
+        "description": "事件接收器"
+      }
+    },
+    "endpointUrlLabel": "端点 URL",
+    "placeholder": {
+      "loading": "正在加载设置契约..."
+    },
+    "useDefault": "使用默认值",
+    "testing": "测试中...",
+    "testEndpoint": "测试端点",
+    "hint": {
+      "noSecrets": {
+        "title": "不发送密钥",
+        "body": "API 仅探测可达性。它会去除查询字符串、片段、用户名和密码。"
+      },
+      "ssrf": {
+        "title": "SSRF 防护",
+        "body": "在发出任何请求之前，本地开发环境之外的专用网络和内部主机会被阻止。"
+      },
+      "timeout": {
+        "title": "快速超时",
+        "body": "探测在 5 秒后停止，并记录一个限定范围的审计事件以供管理员追溯。"
+      }
+    },
+    "toast": {
+      "missingUrl": "请先添加端点 URL",
+      "reachedTitle": "已连接到端点",
+      "warningTitle": "探测已完成，但有警告",
+      "probeFailed": "端点探测失败。",
+      "blockedTitle": "探测被阻止"
+    }
   }
 }
