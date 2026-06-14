@@ -15,6 +15,7 @@ import { confirm } from '@/components/ui/ConfirmDialog';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useOpportunities, usePatchOpportunity } from '@/hooks/useOpportunities';
+import { usePipelineStages } from '@/hooks/usePipelineStages';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { CursorPager } from '@/components/ui/CursorPager';
 import { useStageMutation } from '@/hooks/useStageMutation';
@@ -27,11 +28,12 @@ import {
   resolvePipelineStage,
 } from '@/lib/pipeline-stages';
 
-import type { Opportunity } from '@bidstack/shared';
+import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
 import { Row } from './opportunities/OpportunityRow';
 import { OpportunitiesTableHead } from './opportunities/OpportunitiesTableHead';
 import { OppBulkBar, OppKpiBar, OppPageHeader, OppStageChips } from './opportunities/OppToolbar';
+import { OppIndustryBreakdown } from './opportunities/OppIndustryBreakdown';
 
 export function OpportunitiesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -65,12 +67,28 @@ export function OpportunitiesPage() {
           : {}
       : {}),
   });
+  const configuredStages = usePipelineStages();
+  const configuredStageOptions = useMemo<PipelineStage[]>(
+    () =>
+      configuredStages.data?.items.map((stage) => ({
+        id: stage.id,
+        name: stage.name,
+        probability: stage.probability,
+        color: stage.color,
+        isWon: stage.isWon,
+        isLost: stage.isLost,
+      })) ?? [],
+    [configuredStages.data?.items],
+  );
 
   // Sortable. Default = none (server returns by recent activity); user clicks
   // a column header to override. Stage sorts by canonical funnel order rather
   // than alphabetically — that's what users mean when they sort by stage.
   const rawItems = useMemo(() => data?.items ?? [], [data?.items]);
-  const stageOptions = useMemo(() => getPipelineStages(rawItems), [rawItems]);
+  const stageOptions = useMemo(
+    () => getPipelineStages(rawItems, configuredStageOptions),
+    [configuredStageOptions, rawItems],
+  );
   const accessors = useMemo(
     () => ({
       code: (o: Opportunity) => o.code,
@@ -277,6 +295,9 @@ export function OpportunitiesPage() {
           onSetStageFilter={setStageFilter}
         />
       )}
+
+      {/* Industry visibility — the bids we're working on, split by sector. */}
+      <OppIndustryBreakdown />
 
       {selectedOpps.length > 0 && (
         <OppBulkBar
