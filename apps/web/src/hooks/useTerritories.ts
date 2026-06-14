@@ -109,3 +109,38 @@ export function useTerritoryAnalytics() {
     staleTime: 60_000,
   });
 }
+
+// ── Segment breakdown (opps per industry / account, not just region) ──────────
+export type SegmentDimension = 'industry' | 'account' | 'country';
+
+export interface TerritorySegment {
+  key: string;
+  label: string;
+  opportunityCount: number;
+  totalValueMicros: number;
+  avgProbability: number;
+  ownerNames: string[];
+}
+
+export interface TerritorySegments {
+  dimension: SegmentDimension;
+  items: TerritorySegment[];
+  totals: {
+    totalSegments: number;
+    totalValueMicros: number;
+    totalOpportunities: number;
+    avgProbability: number;
+  };
+}
+
+export function useTerritorySegments(dimension: SegmentDimension) {
+  return useQuery<TerritorySegments>({
+    queryKey: ['territories', 'segments', dimension],
+    queryFn: ({ signal }) =>
+      api(`/api/territories/segments?dimension=${dimension}`, { signal }),
+    staleTime: 60_000,
+    // 'region' uses the world map (useTerritoryAnalytics); segments only fetch
+    // for the industry/account dimensions.
+    enabled: dimension !== 'country',
+  });
+}

@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 
 import { WorldMap } from '@/components/territories/WorldMap';
+import { TerritorySegmentBreakdown } from '@/components/territories/TerritorySegmentBreakdown';
 import { TerritoryDialog } from '@/components/territories/TerritoryDialog';
 import { RoutingRuleDialog } from '@/components/territories/RoutingRuleDialog';
 import { Card, SectionHeader } from '@/components/ui/Card';
@@ -29,6 +30,7 @@ import {
   useCreateLeadRoutingRule,
   useUpdateLeadRoutingRule,
   useDeleteLeadRoutingRule,
+  useTerritorySegments,
   type TerritoryAnalyticsItem,
 } from '@/hooks/useTerritories';
 
@@ -48,6 +50,10 @@ export function TerritoriesPage() {
   const analytics = useTerritoryAnalytics();
   const reducedMotion = useReducedMotion();
   const [selected, setSelected] = useState<TerritoryAnalyticsItem | null>(null);
+  // Which dimension the main panel breaks opportunities down by. 'region' keeps
+  // the world map; 'industry'/'account' swap in the segment breakdown.
+  const [view, setView] = useState<'region' | 'industry' | 'account'>('region');
+  const segments = useTerritorySegments(view === 'region' ? 'country' : view);
 
   // Dialog state
   const [territoryDialogOpen, setTerritoryDialogOpen] = useState(false);
@@ -203,50 +209,102 @@ export function TerritoriesPage() {
         </motion.section>
       )}
 
-      {/* World Map */}
+      {/* Opportunity breakdown — region map, or industry/account segments */}
       <motion.div variants={reducedMotion ? undefined : staggerChild}>
         <Card className="overflow-hidden">
           <SectionHeader
-            title="Global Opportunity Map"
-            caption="Heat intensity = total pipeline value. Click a country for details."
+            title={
+              view === 'region'
+                ? 'Global Opportunity Map'
+                : view === 'industry'
+                  ? 'Opportunities by Industry'
+                  : 'Opportunities by Account'
+            }
+            caption={
+              view === 'region'
+                ? 'Heat intensity = total pipeline value. Click a country for details.'
+                : 'Ranked by total pipeline value across all opportunities.'
+            }
+            action={
+              <div
+                role="tablist"
+                aria-label="Breakdown dimension"
+                className="inline-flex rounded-lg border border-[var(--border-default)] p-0.5"
+              >
+                {(
+                  [
+                    ['region', 'Region'],
+                    ['industry', 'Industry'],
+                    ['account', 'Account'],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    role="tab"
+                    aria-selected={view === key}
+                    onClick={() => setView(key)}
+                    className={`min-h-9 rounded-md px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] ${
+                      view === key
+                        ? 'bg-[var(--brand-primary)] text-white'
+                        : 'text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            }
           />
-          {isError ? (
-            <ErrorState
-              title="Failed to load map data"
-              message={analytics.error?.message ?? territories.error?.message}
-              action={
-                <Button
-                  onClick={() => {
-                    analytics.refetch();
-                    territories.refetch();
-                  }}
-                >
-                  Retry
-                </Button>
-              }
-            />
-          ) : isLoading ? (
-            <div className="h-[420px] flex items-center justify-center">
-              <TableSkeleton rows={6} columns={4} headless />
-            </div>
-          ) : aItems.length === 0 ? (
-            <div className="h-[420px] flex items-center justify-center">
-              <EmptyState
-                title="No geographic data"
-                message="Opportunities need a country or territory assignment to appear on the map."
-              />
-            </div>
-          ) : (
-            <div className="h-[480px] w-full">
-              <WorldMap
-                data={aItems}
-                onCountryClick={(item) =>
-                  setSelected((prev) => (prev?.countryCode === item.countryCode ? null : item))
+          {view === 'region' ? (
+            isError ? (
+              <ErrorState
+                title="Failed to load map data"
+                message={analytics.error?.message ?? territories.error?.message}
+                action={
+                  <Button
+                    onClick={() => {
+                      analytics.refetch();
+                      territories.refetch();
+                    }}
+                  >
+                    Retry
+                  </Button>
                 }
-                selectedCountryCode={selected?.countryCode}
-                className="h-full w-full"
               />
-            </div>
+            ) : isLoading ? (
+              <div className="h-[420px] flex items-center justify-center">
+                <TableSkeleton rows={6} columns={4} headless />
+              </div>
+            ) : aItems.length === 0 ? (
+              <div className="h-[420px] flex items-center justify-center">
+                <EmptyState
+                  title="No geographic data"
+                  message="Opportunities need a country or territory assignment to appear on the map."
+                />
+              </div>
+            ) : (
+              <div className="h-[480px] w-full">
+                <WorldMap
+                  data={aItems}
+                  onCountryClick={(item) =>
+                    setSelected((prev) => (prev?.countryCode === item.countryCode ? null : item))
+                  }
+                  selectedCountryCode={selected?.countryCode}
+                  className="h-full w-full"
+                />
+              </div>
+            )
+          ) : (
+            <TerritorySegmentBreakdown
+              dimension={view}
+              segments={segments.data?.items ?? []}
+              isLoading={segments.isLoading}
+              isError={segments.isError}
+              errorMessage={segments.error?.message}
+              onRetry={() => void segments.refetch()}
+              formatMoneyMicros={formatMoneyMicros}
+            />
           )}
         </Card>
       </motion.div>

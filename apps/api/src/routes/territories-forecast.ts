@@ -243,4 +243,124 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
       };
     },
   );
+
+  // GET /api/territories/segments?dimension=industry|account|country
+  // Generalised opportunity breakdown: the same count/value/avg-probability
+  // aggregation as /analytics, but grouped by ANY business dimension instead of
+  // only geography. Lets the territories view answer "opps per industry" and
+  // "opps per account", not just per region.
+  const SegmentDimension = z.enum(['industry', 'account', 'country']);
+  server.get(
+    '/territories/segments',
+    {
+      preHandler: server.requirePermission('territories:read'),
+      schema: {
+        querystring: z.object({ dimension: SegmentDimension.default('industry') }),
+        response: {
+          200: z.object({
+            dimension: SegmentDimension,
+            items: z.array(
+              z.object({
+                key: z.string(),
+                label: z.string(),
+                opportunityCount: z.number().int(),
+                totalValueMicros: z.number(),
+                avgProbability: z.number(),
+                ownerNames: z.array(z.string()),
+              }),
+            ),
+            totals: z.object({
+              totalSegments: z.number().int(),
+              totalValueMicros: z.number(),
+              totalOpportunities: z.number().int(),
+              avgProbability: z.number(),
+            }),
+          }),
+        },
+      },
+    },
+    async (req) => {
+      const dimension = req.query.dimension;
+      const rows = await prisma.opportunity.findMany({
+        where: { orgId: req.auth.orgId },
+        select: {
+          valueMicros: true,
+          probability: true,
+          industry: true,
+          country: true,
+          customer: true,
+          owner: { select: { name: true } },
+          company: { select: { name: true, industry: true } },
+        },
+        take: 1000,
+      });
+
+      // Resolve the grouping key for a row by the chosen dimension. Industry
+      // falls back from the opp to its company; account prefers the linked
+      // company name over the free-text customer label.
+      const keyFor = (row: (typeof rows)[number]): string => {
+        if (dimension === 'industry') return row.industry ?? row.company?.industry ?? 'Unspecified';
+        if (dimension === 'account') return row.company?.name ?? row.customer ?? 'Unknown';
+        return row.country ?? 'Unknown';
+      };
+
+      const groups = new Map<
+        string,
+        { totalValueMicros: bigint; count: number; probabilities: number[]; owners: Set<string> }
+      >();
+      for (const row of rows) {
+        const key = keyFor(row);
+        const g = groups.get(key) ?? {
+          totalValueMicros: BigInt(0),
+          count: 0,
+          probabilities: [],
+          owners: new Set<string>(),
+        };
+        g.totalValueMicros += row.valueMicros ?? BigInt(0);
+        g.count += 1;
+        g.probabilities.push(row.probability ?? 0);
+        if (row.owner?.name) g.owners.add(row.owner.name);
+        groups.set(key, g);
+      }
+
+      // Sort on BigInt before Number conversion (precision-safe above ~$9B).
+      const items = [...groups.entries()]
+        .sort((a, b) =>
+          a[1].totalValueMicros > b[1].totalValueMicros
+            ? -1
+            : a[1].totalValueMicros < b[1].totalValueMicros
+              ? 1
+              : 0,
+        )
+        .map(([key, g]) => ({
+          key,
+          label: key,
+          opportunityCount: g.count,
+          totalValueMicros: Number(g.totalValueMicros),
+          avgProbability:
+            g.probabilities.length > 0
+              ? Math.round(
+                  (g.probabilities.reduce((s, p) => s + p, 0) / g.probabilities.length) * 10,
+                ) / 10
+              : 0,
+          ownerNames: [...g.owners],
+        }));
+
+      const totalOpportunities = items.reduce((s, i) => s + i.opportunityCount, 0);
+      return {
+        dimension,
+        items,
+        totals: {
+          totalSegments: items.length,
+          totalValueMicros: items.reduce((s, i) => s + i.totalValueMicros, 0),
+          totalOpportunities,
+          avgProbability:
+            rows.length > 0
+              ? Math.round((rows.reduce((s, r) => s + (r.probability ?? 0), 0) / rows.length) * 10) /
+                10
+              : 0,
+        },
+      };
+    },
+  );
 };
