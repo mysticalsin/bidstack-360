@@ -140,9 +140,15 @@
     "dustSynced": "sincronizado {{when}}"
   },
   "pages": {
-    "dashboard": { "title": "Panel de control" },
-    "opportunities": { "title": "Oportunidades" },
-    "contacts": { "title": "Contactos" },
+    "dashboard": {
+      "title": "Panel de control"
+    },
+    "opportunities": {
+      "title": "Oportunidades"
+    },
+    "contacts": {
+      "title": "Contactos"
+    },
     "rfpHub": {
       "title": "Centro de respuesta a licitaciones",
       "subtitle": "Califica, redacta, evalúa y presenta — todo el proceso de licitación en un solo lugar.",
@@ -230,7 +236,9 @@
         "title": "Sin prospectos aún",
         "message": "Crea tu primer prospecto para comenzar a rastrear posibles clientes."
       },
-      "error": { "title": "No se pudieron cargar los prospectos" },
+      "error": {
+        "title": "No se pudieron cargar los prospectos"
+      },
       "view": {
         "list": "Lista",
         "kanban": "Kanban",
