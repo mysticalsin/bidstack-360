@@ -33,17 +33,17 @@ const GROUPS: Group[] = [
     items: [{ id: 'overview', label: 'Overview', icon: 'dashboard' }],
   },
   {
+    // Profile folds into Security; Language folds into Appearance — fewer,
+    // clearer personal tabs.
     label: 'Personal',
     items: [
-      { id: 'profile', label: 'Profile', icon: 'user' },
-      { id: 'appearance', label: 'Appearance', icon: 'palette' },
-      { id: 'language', label: 'Language', icon: 'globe' },
+      { id: 'appearance', label: 'Appearance & Language', icon: 'palette' },
       { id: 'notifications', label: 'Notifications', icon: 'bell' },
-      { id: 'security', label: 'Security', icon: 'shield' },
+      { id: 'security', label: 'Profile & Security', icon: 'shield' },
     ],
   },
   {
-    label: 'Enterprise controls',
+    label: 'Workspace',
     items: [
       { id: 'workspace', label: 'Workspace', icon: 'settings' },
       { id: 'crm', label: 'Data configuration', icon: 'sliders', admin: true },
@@ -52,10 +52,16 @@ const GROUPS: Group[] = [
       { id: 'groups', label: 'Access groups', icon: 'contacts', admin: true },
       { id: 'opportunity-filters', label: 'Opportunity filters', icon: 'sliders', admin: true },
       { id: 'rfp-analytics', label: 'RFP Analytics', icon: 'trophy', admin: true },
+    ],
+  },
+  {
+    // One home for the developer surfaces that were three separate doors.
+    label: 'Developer tools',
+    items: [
       { id: 'integrations', label: 'Integrations', icon: 'link' },
       { id: 'webhooks', label: 'Webhooks', icon: 'webhook', admin: true },
-      { id: 'audit-log', label: 'Audit log', icon: 'shield', admin: true },
       { id: 'developer', label: 'Developer access', icon: 'zap', admin: true },
+      { id: 'audit-log', label: 'Audit log', icon: 'shield', admin: true },
     ],
   },
 ];

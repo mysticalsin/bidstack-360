@@ -21,10 +21,10 @@ import { OpportunityFiltersSection } from '@/components/settings/OpportunityFilt
 const SECTION_TITLES: Record<SettingsSection, string> = {
   overview: 'Overview',
   profile: 'Profile',
-  appearance: 'Appearance',
+  appearance: 'Appearance & Language',
   language: 'Language',
   notifications: 'Notifications',
-  security: 'Security',
+  security: 'Profile & Security',
   workspace: 'Workspace',
   crm: 'Data configuration',
   'data-import': 'Data import',
@@ -48,11 +48,24 @@ export function SettingsPage() {
 
   const sections: Record<SettingsSection, React.ReactNode> = {
     overview: <SettingsOverviewSection onNavigate={setActive} />,
+    // Profile + Language no longer have their own tabs — they fold into
+    // Security and Appearance. The standalone keys stay so deep links still
+    // resolve.
     profile: <ProfileSection />,
-    appearance: <AppearanceSection />,
+    appearance: (
+      <div className="space-y-6">
+        <AppearanceSection />
+        <LanguageSwitcher />
+      </div>
+    ),
     language: <LanguageSwitcher />,
     notifications: <NotificationPrefsSection />,
-    security: <SecuritySection />,
+    security: (
+      <div className="space-y-6">
+        <ProfileSection />
+        <SecuritySection />
+      </div>
+    ),
     workspace: <WorkspaceSection />,
     crm: <CrmConfigurationSection />,
     'data-import': <DataImportSection />,
