@@ -11,6 +11,8 @@
 
 import { prisma, type Prisma } from '@bidstack/db';
 
+import { validateFieldValue } from '../lib/custom-field-validation.js';
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface DefineObjectInput {
@@ -125,7 +127,14 @@ export async function validateValues(
       entityType: { in: customObjectFieldEntityTypes(defId) },
       active: true,
     },
-    select: { fieldKey: true, required: true, defaultValue: true },
+    select: {
+      fieldKey: true,
+      required: true,
+      defaultValue: true,
+      fieldType: true,
+      options: true,
+    },
+    take: 500,
   });
 
   const allowed = new Set(fields.map((f) => f.fieldKey));
@@ -145,7 +154,22 @@ export async function validateValues(
     }
   }
 
-  // Check required fields on create
+  // Validate/coerce every present value against its field type. A bad value
+  // (string in a number, off-list select, malformed email) is rejected here
+  // rather than stored as opaque JSON. Runs on both create and update.
+  for (const f of fields) {
+    if (f.fieldKey in sanitized && sanitized[f.fieldKey] !== null && sanitized[f.fieldKey] !== undefined) {
+      sanitized[f.fieldKey] = validateFieldValue(
+        f.fieldKey,
+        f.fieldType,
+        (f.options as string[] | null) ?? [],
+        sanitized[f.fieldKey],
+      );
+    }
+  }
+
+  // Required-field enforcement: full check on create; on update, reject an
+  // explicit null/blank on a required field that was provided in the payload.
   if (isCreate) {
     const missing = fields.filter(
       (f) => f.required && (sanitized[f.fieldKey] === undefined || sanitized[f.fieldKey] === null),
@@ -153,6 +177,16 @@ export async function validateValues(
     if (missing.length > 0) {
       throw Object.assign(
         new Error(`Required fields missing: ${missing.map((f) => f.fieldKey).join(', ')}`),
+        { statusCode: 400 },
+      );
+    }
+  } else {
+    const cleared = fields.filter(
+      (f) => f.required && f.fieldKey in values && sanitized[f.fieldKey] == null,
+    );
+    if (cleared.length > 0) {
+      throw Object.assign(
+        new Error(`Required fields cannot be cleared: ${cleared.map((f) => f.fieldKey).join(', ')}`),
         { statusCode: 400 },
       );
     }
@@ -178,6 +212,7 @@ export async function applyDefaults(
       active: true,
     },
     select: { fieldKey: true, defaultValue: true },
+    take: 500,
   });
 
   const result = { ...valuesJson };

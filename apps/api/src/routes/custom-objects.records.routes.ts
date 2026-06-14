@@ -29,6 +29,7 @@ export const customObjectRecordRoutes: FastifyPluginAsyncZod = async (server) =>
   server.get(
     '/custom-objects/:id/records',
     {
+      preHandler: server.requirePermission('customObjects:read'),
       schema: {
         params: IdParam,
         querystring: CustomObjectRecordListQuery,
@@ -41,7 +42,8 @@ export const customObjectRecordRoutes: FastifyPluginAsyncZod = async (server) =>
         try {
           filter = JSON.parse(req.query.filter) as Record<string, unknown>;
         } catch {
-          filter = undefined;
+          // Don't silently return everything when the client sent a bad filter.
+          throw server.httpErrors.badRequest('Invalid filter JSON');
         }
       }
 
@@ -77,6 +79,7 @@ export const customObjectRecordRoutes: FastifyPluginAsyncZod = async (server) =>
   server.get(
     '/custom-objects/:id/records/search',
     {
+      preHandler: server.requirePermission('customObjects:read'),
       schema: {
         params: IdParam,
         querystring: CustomObjectRecordSearchQuery,
@@ -96,6 +99,7 @@ export const customObjectRecordRoutes: FastifyPluginAsyncZod = async (server) =>
   server.post(
     '/custom-objects/:id/records',
     {
+      preHandler: server.requirePermission('customObjects:write'),
       schema: {
         params: IdParam,
         body: CustomObjectRecordCreate,
@@ -121,6 +125,7 @@ export const customObjectRecordRoutes: FastifyPluginAsyncZod = async (server) =>
   server.get(
     '/custom-objects/:id/records/:rid',
     {
+      preHandler: server.requirePermission('customObjects:read'),
       schema: {
         params: IdAndRecordParam,
         response: { 200: CustomObjectRecord },
@@ -141,6 +146,7 @@ export const customObjectRecordRoutes: FastifyPluginAsyncZod = async (server) =>
   server.put(
     '/custom-objects/:id/records/:rid',
     {
+      preHandler: server.requirePermission('customObjects:write'),
       schema: {
         params: IdAndRecordParam,
         body: CustomObjectRecordPatch,
@@ -165,6 +171,7 @@ export const customObjectRecordRoutes: FastifyPluginAsyncZod = async (server) =>
   server.delete(
     '/custom-objects/:id/records/:rid',
     {
+      preHandler: server.requirePermission('customObjects:write'),
       schema: {
         params: IdAndRecordParam,
         response: { 200: CustomObjectRecord },

@@ -39,7 +39,10 @@ export const customObjectDefRoutes: FastifyPluginAsyncZod = async (server) => {
   // GET /custom-objects
   server.get(
     '/custom-objects',
-    { schema: { response: { 200: CustomObjectDefList } } },
+    {
+      preHandler: server.requirePermission('customObjects:read'),
+      schema: { response: { 200: CustomObjectDefList } },
+    },
     async (req) => {
       const defs = await svc.listObjectDefs(req.auth.orgId);
       return { items: defs.map(serializeDef).filter(isSerializedDef) };
@@ -51,6 +54,7 @@ export const customObjectDefRoutes: FastifyPluginAsyncZod = async (server) => {
     '/custom-objects',
     {
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      preHandler: [server.requirePermission('customObjects:write'), server.requireRole('admin')],
       schema: {
         body: CustomObjectDefCreate,
         response: { 201: CustomObjectDef },
@@ -68,6 +72,7 @@ export const customObjectDefRoutes: FastifyPluginAsyncZod = async (server) => {
   server.put(
     '/custom-objects/:id',
     {
+      preHandler: [server.requirePermission('customObjects:write'), server.requireRole('admin')],
       schema: {
         params: IdParam,
         body: CustomObjectDefPatch,
@@ -90,6 +95,7 @@ export const customObjectDefRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/custom-objects/:id',
     {
+      preHandler: [server.requirePermission('customObjects:write'), server.requireRole('admin')],
       schema: {
         params: IdParam,
         response: { 200: CustomObjectDef },
@@ -110,6 +116,7 @@ export const customObjectDefRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/custom-objects/:id/fields',
     {
+      preHandler: server.requirePermission('customObjects:read'),
       schema: {
         params: IdParam,
         response: { 200: CustomObjectFieldList },
@@ -142,6 +149,7 @@ export const customObjectDefRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/custom-objects/:id/fields',
     {
+      preHandler: [server.requirePermission('customObjects:write'), server.requireRole('admin')],
       schema: {
         params: IdParam,
         body: CustomObjectFieldCreate,
@@ -197,6 +205,7 @@ export const customObjectDefRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/custom-objects/:id/relations',
     {
+      preHandler: server.requirePermission('customObjects:read'),
       schema: {
         params: IdParam,
         response: { 200: CustomObjectRelationList },
@@ -212,6 +221,7 @@ export const customObjectDefRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/custom-objects/:id/relations',
     {
+      preHandler: [server.requirePermission('customObjects:write'), server.requireRole('admin')],
       schema: {
         params: IdParam,
         body: CustomObjectRelationCreate,

@@ -8,6 +8,8 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma, Prisma } from '@bidstack/db';
+
+import { validateFieldValue } from '../lib/custom-field-validation.js';
 import {
   CustomFieldDefinition,
   CustomFieldDefinitionCreate,
@@ -28,6 +30,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/custom-fields/definitions',
     {
+      preHandler: server.requirePermission('customFields:read'),
       schema: {
         querystring: z.object({
           entityType: EntityType,
@@ -71,6 +74,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
     '/custom-fields/definitions',
     {
       config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
+      preHandler: [server.requirePermission('customFields:write'), server.requireRole('admin')],
       schema: {
         body: CustomFieldDefinitionCreate,
         response: { 201: CustomFieldDefinition },
@@ -113,6 +117,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.patch(
     '/custom-fields/definitions/:id',
     {
+      preHandler: [server.requirePermission('customFields:write'), server.requireRole('admin')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: CustomFieldDefinitionPatch,
@@ -167,6 +172,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/custom-fields/definitions/:id',
     {
+      preHandler: [server.requirePermission('customFields:write'), server.requireRole('admin')],
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 200: CustomFieldDefinition },
@@ -206,6 +212,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/custom-fields/values',
     {
+      preHandler: server.requirePermission('customFields:read'),
       schema: {
         querystring: z.object({
           entityType: EntityType,
@@ -244,6 +251,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/custom-fields/values/bulk',
     {
+      preHandler: server.requirePermission('customFields:read'),
       schema: {
         querystring: z.object({
           entityType: EntityType,
@@ -287,6 +295,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.patch(
     '/custom-fields/values',
     {
+      preHandler: server.requirePermission('customFields:write'),
       schema: {
         body: CustomFieldValueBulkUpsert,
         response: { 200: CustomFieldValueList },
@@ -306,10 +315,10 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
           entityType,
           active: true,
         },
-        select: { id: true },
+        select: { id: true, fieldKey: true, fieldType: true, options: true },
         take: 500,
       });
-      const allowedIds = new Set(defs.map((d) => d.id));
+      const defById = new Map(defs.map((d) => [d.id, d]));
 
       const results: Array<{
         id: string;
@@ -322,8 +331,16 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
         updatedAt: Date;
       }> = [];
 
-      for (const [definitionId, value] of Object.entries(values)) {
-        if (!allowedIds.has(definitionId)) continue;
+      for (const [definitionId, rawValue] of Object.entries(values)) {
+        const def = defById.get(definitionId);
+        if (!def) continue;
+        // Type-validate the value against its definition before persisting.
+        const value = validateFieldValue(
+          def.fieldKey,
+          def.fieldType,
+          (def.options as string[] | null) ?? [],
+          rawValue,
+        );
         const upserted = await prisma.customFieldValue.upsert({
           where: {
             orgId_entityType_entityId_definitionId: {

@@ -277,5 +277,6 @@ export async function listRelations(orgId: string, objectId: string) {
   return prisma.customObjectRelation.findMany({
     where: { orgId, customObjectDefId: objectId },
     orderBy: { createdAt: 'asc' },
+    take: 500,
   });
 }

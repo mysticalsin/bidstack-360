@@ -41,6 +41,18 @@ const PERMISSION_SEEDS = [
   permission('companies:write', 'Manage companies', 'Create and update company records.'),
   permission('contacts:read', 'Read contacts', 'View contact records.'),
   permission('contacts:write', 'Manage contacts', 'Create and update contact records.'),
+  permission('customFields:read', 'Read custom fields', 'View custom field definitions and values.'),
+  permission(
+    'customFields:write',
+    'Manage custom fields',
+    'Define custom fields and set their values on records.',
+  ),
+  permission('customObjects:read', 'Read custom objects', 'View custom object definitions and records.'),
+  permission(
+    'customObjects:write',
+    'Manage custom objects',
+    'Define custom objects, fields, relations, and manage their records.',
+  ),
   permission('documents:read', 'Read documents', 'View bid and account documents.'),
   permission('documents:write', 'Manage documents', 'Upload and update bid and account documents.'),
   permission('files:read', 'Read files', 'View uploaded files and attachments.'),
