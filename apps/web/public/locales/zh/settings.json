@@ -70,30 +70,5 @@
     "GBP": "GBP — 英镑",
     "AUD": "AUD — 澳大利亚元",
     "JPY": "JPY — 日元"
-  },
-  "apiKeys": {
-    "create": "创建密钥",
-    "revoke": "撤销",
-    "name": "密钥名称",
-    "created": "创建时间",
-    "lastUsed": "上次使用",
-    "never": "从未使用",
-    "copyKey": "复制密钥",
-    "confirmRevoke": "确定要撤销此密钥吗？此操作不可逆。",
-    "noKeys": "暂无 API 密钥。",
-    "keyCreated": "API 密钥已创建，请立即复制，此后将不再显示。",
-    "scopes": "权限范围"
-  },
-  "webhooks": {
-    "create": "添加 Webhook",
-    "endpoint": "端点 URL",
-    "events": "事件",
-    "secret": "签名密钥",
-    "active": "已启用",
-    "inactive": "已禁用",
-    "testWebhook": "测试",
-    "delete": "删除",
-    "noWebhooks": "暂无已配置的 Webhook。",
-    "confirmDelete": "删除此 Webhook？"
   }
 }

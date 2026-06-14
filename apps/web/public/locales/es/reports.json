@@ -14,15 +14,29 @@
     "filter": "Filtro",
     "groupBy": "Agrupar por",
     "orderBy": "Ordenar por",
+    "limit": "Limit",
     "addFilter": "Añadir filtro",
     "addMetric": "Añadir métrica",
     "run": "Ejecutar informe",
     "running": "Ejecutando…",
     "save": "Guardar informe",
+    "export": "Export",
     "exportCsv": "Exportar como CSV",
     "exportXlsx": "Exportar como Excel",
+    "schedule": "Schedule",
     "noData": "Sin datos para esta selección",
     "error": "Error al ejecutar el informe"
+  },
+  "charts": {
+    "bar": "Bar",
+    "line": "Line",
+    "pie": "Pie",
+    "donut": "Donut",
+    "area": "Area",
+    "scatter": "Scatter",
+    "funnel": "Funnel",
+    "heatmap": "Heat map",
+    "table": "Table"
   },
   "periods": {
     "today": "Hoy",
@@ -32,7 +46,9 @@
     "thisMonth": "Este mes",
     "lastMonth": "Mes pasado",
     "thisQuarter": "Este trimestre",
+    "lastQuarter": "Last quarter",
     "thisYear": "Este año",
+    "lastYear": "Last year",
     "custom": "Personalizado"
   },
   "metrics": {
@@ -40,8 +56,12 @@
     "deals": "Negocios",
     "winRate": "Tasa de éxito",
     "avgDealSize": "Valor promedio",
+    "salesCycle": "Sales cycle duration",
     "leads": "Prospectos",
     "conversionRate": "Tasa de conversión",
-    "activities": "Actividades"
+    "activities": "Actividades",
+    "calls": "Calls",
+    "emails": "Emails",
+    "meetings": "Meetings"
   }
 }

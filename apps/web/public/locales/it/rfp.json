@@ -1,1 +1,129 @@
-{}
+{
+  "nav": {
+    "rfpSection": "RFP Automation"
+  },
+  "states": {
+    "error": "Something went wrong. Please try again."
+  },
+  "upload": {
+    "title": "Upload RFP Document",
+    "dropzone": "Drop an RFP document, text file, spreadsheet or image here",
+    "or": "or",
+    "browse": "Browse files",
+    "dropzoneLabel": "File upload drop zone",
+    "progressLabel": "Upload progress",
+    "uploading": "Uploading document…",
+    "processingUpload": "Processing upload…",
+    "cancel": "Cancel upload",
+    "errorType": "Upload a supported RFP source: PDF, Office, text, CSV, JSON, HTML, RTF or image.",
+    "errorSize": "File exceeds the maximum size of {{max}} MB."
+  },
+  "pipeline": {
+    "title": "RFP Pipeline",
+    "subtitle": "Automated extraction, story matching, drafting, compliance and approval.",
+    "processing": "Pipeline running…",
+    "overallProgress": "Overall pipeline progress",
+    "eventLog": "Pipeline event log",
+    "progressLabel": "Pipeline stage progress",
+    "breadcrumbLabel": "Page breadcrumb",
+    "breadcrumbOpportunities": "Opportunities",
+    "errorTitle": "Pipeline failed",
+    "errorRetry": "Retry",
+    "errorReset": "Restart pipeline",
+    "stages": {
+      "uploading": "Upload",
+      "queued": "Queued",
+      "extraction": "Extract",
+      "extracting": "Extract",
+      "story_matching": "Match Stories",
+      "section_drafting": "Draft",
+      "compliance_fill": "Compliance",
+      "legal_scan": "Legal",
+      "qa_review": "QA Review",
+      "awaiting_approval": "Awaiting Approval",
+      "approved": "Approved",
+      "completed": "Completed",
+      "rejected": "Rejected",
+      "timeout": "Timed Out"
+    }
+  },
+  "requirements": {
+    "heading": "Extracted Requirements",
+    "count": "{{count}} requirement(s) extracted",
+    "listLabel": "Requirements list",
+    "emptyTitle": "No requirements yet",
+    "emptyMessage": "Requirements will appear here once extraction is complete."
+  },
+  "stories": {
+    "heading": "Matched Success Stories",
+    "count": "{{count}} stories matched",
+    "listLabel": "Story matches",
+    "emptyTitle": "No stories matched",
+    "emptyMessage": "Relevant success stories will appear here after story matching.",
+    "matchedRequirements": "{{count}} requirements covered",
+    "viewStory": "View story"
+  },
+  "draft": {
+    "heading": "Draft Sections",
+    "sectionNav": "Draft section navigation",
+    "selectSection": "Select a section above to review and edit it.",
+    "emptyTitle": "No draft yet",
+    "emptyMessage": "Draft sections will appear here once section drafting is complete."
+  },
+  "compliance": {
+    "heading": "Compliance Matrix",
+    "matrixLabel": "Compliance matrix",
+    "summary": "{{compliant}} / {{total}} compliant · {{pending}} pending",
+    "noResponse": "No response — pending review",
+    "colRequirement": "Requirement",
+    "colStatus": "Status",
+    "edit": "Edit",
+    "done": "Done",
+    "emptyTitle": "No compliance data yet",
+    "emptyMessage": "Compliance rows will appear here after the compliance fill stage."
+  },
+  "approval": {
+    "title": "Review & Approve",
+    "checklist": "Review checklist (complete in order)",
+    "notesLabel": "Review notes (optional)",
+    "notesPlaceholder": "Add any reviewer comments or caveats…",
+    "requiresAdmin": "Only admins and owners can approve proposals. Contact your administrator.",
+    "waitingForStage": "Proposal is not yet ready for approval. Complete all pipeline stages first.",
+    "checklistIncomplete": "Complete all review steps before approving.",
+    "approve": "Approve & Submit",
+    "approving": "Approving…",
+    "approved": "Approved",
+    "approvedMessage": "The proposal has been approved and submitted.",
+    "errorGeneric": "Approval failed. Please try again.",
+    "steps": {
+      "executiveSummary": "I have reviewed the executive summary",
+      "requirementsMapping": "I have verified requirements mapping",
+      "complianceMatrix": "I have checked the compliance matrix",
+      "draftSections": "I have reviewed all draft sections",
+      "legalClearance": "Legal scan findings addressed"
+    }
+  },
+  "crew": {
+    "title": "Bid Crew",
+    "subtitle": "Your role-based agents working this RFP, stage by stage. Drag an agent to re-assign its stage.",
+    "dropHere": "Drop an agent here",
+    "closeBrief": "Close role brief",
+    "responsibilities": "Responsibilities"
+  },
+  "competitor": {
+    "heading": "Competitor intelligence",
+    "subtitle": "Grounded in public sources — every finding links to where it came from. Nothing is invented.",
+    "selectLabel": "Competitor to research",
+    "selectPlaceholder": "Choose a competitor",
+    "research": "Research",
+    "researching": "Researching…",
+    "addPlaceholder": "Add a competitor by name",
+    "add": "Add",
+    "queued": "Research queued — cited findings will appear here shortly.",
+    "listLabel": "Cited competitor findings",
+    "sourceNewTab": "(opens in a new tab)",
+    "emptyTitle": "No competitor findings yet",
+    "emptyMessage": "Pick a competitor and run research. We only surface claims we can link to a public source — including real federal award pricing from USASpending.",
+    "error": "Couldn't load competitor findings."
+  }
+}

@@ -11,6 +11,8 @@
     "copyResponse": "Copiar respuesta",
     "newConversation": "Nueva conversación",
     "selectAgent": "Seleccionar agente",
+    "sources": "Sources",
+    "confidence": "Confidence",
     "regenerate": "Regenerar"
   },
   "meetingPrep": {
@@ -22,11 +24,14 @@
     "context": "Contexto de cuenta",
     "keyTopics": "Puntos clave a tratar",
     "recentActivity": "Actividad reciente",
+    "risks": "Identified risks",
+    "opportunities": "Opportunities",
     "noMeetingSelected": "Selecciona una reunión para generar la ficha."
   },
   "feedback": {
     "helpful": "Útil",
     "notHelpful": "No útil",
+    "reportIssue": "Report an issue",
     "thanks": "Gracias por tu opinión"
   },
   "intel": {
@@ -34,6 +39,13 @@
     "loading": "Analizando…",
     "lastUpdated": "Actualizado {{when}}",
     "refresh": "Actualizar",
-    "noData": "Sin datos de inteligencia disponibles"
+    "noData": "Sin datos de inteligencia disponibles",
+    "signals": {
+      "hiring": "Recent hires",
+      "funding": "Funding rounds",
+      "news": "News",
+      "technographics": "Technologies in use",
+      "executives": "Executives"
+    }
   }
 }

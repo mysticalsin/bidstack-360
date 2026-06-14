@@ -58,8 +58,8 @@
     "ar": "العربية"
   },
   "languageSwitcher": {
-    "ariaLabel": "Elegir idioma de la interfaz",
-    "label": "Cambiar a",
+    "ariaLabel": "Cambiar el idioma de la interfaz",
+    "label": "Idioma",
     "currentLanguage": "Idioma actual: {{lang}}",
     "changeSuccess": "Idioma cambiado a {{lang}}"
   },
@@ -70,39 +70,5 @@
     "GBP": "GBP — Libra esterlina",
     "AUD": "AUD — Dólar australiano",
     "JPY": "JPY — Yen japonés"
-  },
-  "languageSwitcher": {
-    "label": "Idioma",
-    "ariaLabel": "Cambiar el idioma de la interfaz",
-    "currentLanguage": "Idioma actual: {{lang}}",
-    "changeSuccess": "Idioma cambiado a {{lang}}",
-    "en": "Inglés",
-    "fr": "Francés",
-    "es": "Español"
-  },
-  "apiKeys": {
-    "create": "Crear clave",
-    "revoke": "Revocar",
-    "name": "Nombre de la clave",
-    "created": "Creada el",
-    "lastUsed": "Último uso",
-    "never": "Nunca usada",
-    "copyKey": "Copiar clave",
-    "confirmRevoke": "¿Seguro que quieres revocar esta clave? Esta acción es irreversible.",
-    "noKeys": "Sin claves API por ahora.",
-    "keyCreated": "Clave API creada. Cópiala ahora; no se mostrará de nuevo.",
-    "scopes": "Alcances"
-  },
-  "webhooks": {
-    "create": "Añadir webhook",
-    "endpoint": "URL del endpoint",
-    "events": "Eventos",
-    "secret": "Secreto de firma",
-    "active": "Activo",
-    "inactive": "Inactivo",
-    "testWebhook": "Probar",
-    "delete": "Eliminar",
-    "noWebhooks": "Sin webhooks configurados.",
-    "confirmDelete": "¿Eliminar este webhook?"
   }
 }

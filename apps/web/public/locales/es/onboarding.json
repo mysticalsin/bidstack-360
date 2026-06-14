@@ -61,6 +61,14 @@
     "completedBody": "Ya dominas lo esencial de BidStack 360°. Mucha suerte con tus licitaciones.",
     "dismiss": "Ocultar"
   },
+  "templates": {
+    "title": "Templates",
+    "subtitle": "Choose a template to get started quickly",
+    "use": "Use this template",
+    "preview": "Preview",
+    "blank": "Blank",
+    "blankDesc": "Start from scratch"
+  },
   "sampleData": {
     "banner": "Estás viendo datos de demostración.",
     "clear": "Eliminar datos de demo",

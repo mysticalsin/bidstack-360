@@ -140,9 +140,15 @@
     "dustSynced": "synchronisé {{when}}"
   },
   "pages": {
-    "dashboard": { "title": "Tableau de bord" },
-    "opportunities": { "title": "Opportunités" },
-    "contacts": { "title": "Contacts" },
+    "dashboard": {
+      "title": "Tableau de bord"
+    },
+    "opportunities": {
+      "title": "Opportunités"
+    },
+    "contacts": {
+      "title": "Contacts"
+    },
     "rfpHub": {
       "title": "Centre de réponse aux AO",
       "subtitle": "Qualifier, rédiger, évaluer et soumettre — tout le processus AO en un seul endroit.",
@@ -230,7 +236,9 @@
         "title": "Aucun prospect pour l'instant",
         "message": "Créez votre premier prospect pour commencer à suivre les opportunités."
       },
-      "error": { "title": "Échec du chargement des prospects" },
+      "error": {
+        "title": "Échec du chargement des prospects"
+      },
       "view": {
         "list": "Liste",
         "kanban": "Kanban",

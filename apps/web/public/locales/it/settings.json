@@ -70,30 +70,5 @@
     "GBP": "GBP — Sterlina britannica",
     "AUD": "AUD — Dollaro australiano",
     "JPY": "JPY — Yen giapponese"
-  },
-  "apiKeys": {
-    "create": "Crea chiave",
-    "revoke": "Revoca",
-    "name": "Nome chiave",
-    "created": "Creata il",
-    "lastUsed": "Ultimo utilizzo",
-    "never": "Mai utilizzata",
-    "copyKey": "Copia chiave",
-    "confirmRevoke": "Sei sicuro di voler revocare questa chiave? L'azione è irreversibile.",
-    "noKeys": "Nessuna chiave API al momento.",
-    "keyCreated": "Chiave API creata. Copiala ora, non sarà mostrata di nuovo.",
-    "scopes": "Ambiti"
-  },
-  "webhooks": {
-    "create": "Aggiungi webhook",
-    "endpoint": "URL endpoint",
-    "events": "Eventi",
-    "secret": "Segreto di firma",
-    "active": "Attivo",
-    "inactive": "Inattivo",
-    "testWebhook": "Testa",
-    "delete": "Elimina",
-    "noWebhooks": "Nessun webhook configurato.",
-    "confirmDelete": "Eliminare questo webhook?"
   }
 }

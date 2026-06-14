@@ -140,9 +140,15 @@
     "dustSynced": "已同步 {{when}}"
   },
   "pages": {
-    "dashboard": { "title": "仪表盘" },
-    "opportunities": { "title": "商机" },
-    "contacts": { "title": "联系人" },
+    "dashboard": {
+      "title": "仪表盘"
+    },
+    "opportunities": {
+      "title": "商机"
+    },
+    "contacts": {
+      "title": "联系人"
+    },
     "rfpHub": {
       "title": "投标响应中心",
       "subtitle": "资格审查、起草、评分、提交 — 整个 RFP 流程一站完成。",
@@ -230,7 +236,9 @@
         "title": "暂无潜在客户",
         "message": "创建您的第一个潜在客户以开始跟踪商机。"
       },
-      "error": { "title": "加载潜在客户失败" },
+      "error": {
+        "title": "加载潜在客户失败"
+      },
       "view": {
         "list": "列表",
         "kanban": "看板",

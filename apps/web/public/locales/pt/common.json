@@ -140,9 +140,15 @@
     "dustSynced": "sincronizado {{when}}"
   },
   "pages": {
-    "dashboard": { "title": "Painel de controlo" },
-    "opportunities": { "title": "Oportunidades" },
-    "contacts": { "title": "Contactos" },
+    "dashboard": {
+      "title": "Painel de controlo"
+    },
+    "opportunities": {
+      "title": "Oportunidades"
+    },
+    "contacts": {
+      "title": "Contactos"
+    },
     "rfpHub": {
       "title": "Hub de resposta a concursos",
       "subtitle": "Qualifique, redija, pontue e submeta — todo o fluxo de concurso num só lugar.",
@@ -230,7 +236,9 @@
         "title": "Sem leads ainda",
         "message": "Crie o seu primeiro lead para começar a acompanhar os prospectos."
       },
-      "error": { "title": "Falha ao carregar leads" },
+      "error": {
+        "title": "Falha ao carregar leads"
+      },
       "view": {
         "list": "Lista",
         "kanban": "Kanban",
