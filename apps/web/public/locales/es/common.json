@@ -290,5 +290,14 @@
     "signOut": "Cerrar sesión",
     "portfolio": "Cartera",
     "detail": "Detalle"
+  },
+  "appRoutes": {
+    "notFoundTitle": "Página no encontrada",
+    "notFoundMessage": "La página que busca no existe.",
+    "goToDashboard": "Ir al panel"
+  },
+  "select": {
+    "placeholder": "—",
+    "noOptions": "Sin opciones"
   }
 }

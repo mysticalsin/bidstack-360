@@ -15,6 +15,7 @@
  */
 
 import { useState, useCallback, useId } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -58,12 +59,18 @@ function statusTone(status: string): BadgeTone {
 // ─── Sentiment badge ──────────────────────────────────────────────────────────
 
 function SentimentBadge({ score }: { score: number | null }) {
+  const { t } = useTranslation('crm');
   if (score === null) return null;
   const pct = Math.round(score * 100);
   const tone: BadgeTone = pct >= 70 ? 'jade' : pct >= 40 ? 'amber' : 'tomato';
-  const label = pct >= 70 ? 'Positive' : pct >= 40 ? 'Neutral' : 'Negative';
+  const label =
+    pct >= 70
+      ? t('callTimeline.sentimentPositive', 'Positive')
+      : pct >= 40
+        ? t('callTimeline.sentimentNeutral', 'Neutral')
+        : t('callTimeline.sentimentNegative', 'Negative');
   return (
-    <Badge tone={tone} title={`Sentiment score: ${pct}%`}>
+    <Badge tone={tone} title={t('callTimeline.sentimentScoreTitle', 'Sentiment score: {{pct}}%', { pct })}>
       {label} {pct}%
     </Badge>
   );
@@ -81,6 +88,7 @@ function formatDuration(sec: number | null): string {
 // ─── Action items list ────────────────────────────────────────────────────────
 
 function ActionItemsList({ items }: { items: string[] }) {
+  const { t } = useTranslation('crm');
   const [checked, setChecked] = useState<Set<number>>(new Set());
   const toggle = (i: number) =>
     setChecked((prev) => {
@@ -89,9 +97,14 @@ function ActionItemsList({ items }: { items: string[] }) {
       else next.add(i);
       return next;
     });
-  if (items.length === 0) return <p className="text-sm text-[var(--fg-tertiary)]">No action items.</p>;
+  if (items.length === 0)
+    return (
+      <p className="text-sm text-[var(--fg-tertiary)]">
+        {t('callTimeline.noActionItems', 'No action items.')}
+      </p>
+    );
   return (
-    <ul className="space-y-1.5" role="list" aria-label="Action items">
+    <ul className="space-y-1.5" role="list" aria-label={t('callTimeline.actionItemsAriaLabel', 'Action items')}>
       {items.map((item, i) => (
         <li key={i} className="flex items-start gap-2.5">
           <button
@@ -105,7 +118,7 @@ function ActionItemsList({ items }: { items: string[] }) {
               'min-h-[44px] min-w-[44px]',
               checked.has(i) && 'border-[var(--brand-primary)] bg-[var(--brand-primary)]',
             )}
-            aria-label={`Mark "${item}" as complete`}
+            aria-label={t('callTimeline.markItemComplete', 'Mark "{{item}}" as complete', { item })}
           />
           <span
             className={cn(
@@ -129,6 +142,7 @@ interface ExpandedDetailProps {
 }
 
 function ExpandedDetail({ callSessionId, onOpenTranscript }: ExpandedDetailProps) {
+  const { t } = useTranslation('crm');
   const { data: call, isLoading, isError } = useCall(callSessionId);
   const extractInsights = useExtractInsights(callSessionId);
 
@@ -144,7 +158,9 @@ function ExpandedDetail({ callSessionId, onOpenTranscript }: ExpandedDetailProps
 
   if (isError || !call) {
     return (
-      <p className="mt-3 text-xs text-[var(--danger)]">Failed to load call details.</p>
+      <p className="mt-3 text-xs text-[var(--danger)]">
+        {t('callTimeline.loadError', 'Failed to load call details.')}
+      </p>
     );
   }
 
@@ -154,25 +170,25 @@ function ExpandedDetail({ callSessionId, onOpenTranscript }: ExpandedDetailProps
     <div className="mt-3 space-y-4">
       {/* Audio player */}
       {call.signedRecordingUrl && (
-        <section aria-label="Call recording">
+        <section aria-label={t('callTimeline.recordingSectionAriaLabel', 'Call recording')}>
           <p className="mb-1 text-xs font-medium text-[var(--fg-tertiary)] uppercase tracking-wide">
-            Recording
+            {t('callTimeline.recordingLabel', 'Recording')}
           </p>
           {/* WHY controls attr: provides browser-native keyboard shortcuts (Space=play, arrows=seek) */}
           <audio
             src={call.signedRecordingUrl}
             controls
             className="w-full rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
-            aria-label="Call recording audio"
+            aria-label={t('callTimeline.recordingAudioAriaLabel', 'Call recording audio')}
           />
         </section>
       )}
 
       {/* AI summary */}
       {call.summary && (
-        <section aria-label="Call summary">
+        <section aria-label={t('callTimeline.summarySectionAriaLabel', 'Call summary')}>
           <p className="mb-1 text-xs font-medium text-[var(--fg-tertiary)] uppercase tracking-wide">
-            AI Summary
+            {t('callTimeline.summaryLabel', 'AI Summary')}
           </p>
           <p className="text-sm leading-relaxed text-[var(--fg-primary)]">{call.summary}</p>
         </section>
@@ -180,9 +196,9 @@ function ExpandedDetail({ callSessionId, onOpenTranscript }: ExpandedDetailProps
 
       {/* Action items */}
       {actionItems.length > 0 && (
-        <section aria-label="Action items from this call">
+        <section aria-label={t('callTimeline.actionItemsSectionAriaLabel', 'Action items from this call')}>
           <p className="mb-2 text-xs font-medium text-[var(--fg-tertiary)] uppercase tracking-wide">
-            Action Items
+            {t('callTimeline.actionItemsLabel', 'Action Items')}
           </p>
           <ActionItemsList items={actionItems} />
         </section>
@@ -192,7 +208,7 @@ function ExpandedDetail({ callSessionId, onOpenTranscript }: ExpandedDetailProps
       <div className="flex flex-wrap gap-2">
         {call.transcriptText && (
           <Button size="sm" variant="secondary" onClick={onOpenTranscript}>
-            View transcript
+            {t('callTimeline.viewTranscript', 'View transcript')}
           </Button>
         )}
         <Button
@@ -202,7 +218,9 @@ function ExpandedDetail({ callSessionId, onOpenTranscript }: ExpandedDetailProps
           disabled={extractInsights.isPending || !call.transcriptText}
           aria-busy={extractInsights.isPending}
         >
-          {extractInsights.isPending ? 'Analysing…' : 'Re-extract insights'}
+          {extractInsights.isPending
+            ? t('callTimeline.analysing', 'Analysing…')
+            : t('callTimeline.reExtractInsights', 'Re-extract insights')}
         </Button>
       </div>
     </div>
@@ -218,6 +236,7 @@ export interface CallTimelineCardProps {
 }
 
 export function CallTimelineCard({ call, onOpenTranscript }: CallTimelineCardProps) {
+  const { t } = useTranslation('crm');
   const [expanded, setExpanded] = useState(false);
   const sectionId = useId();
   const headerId = `${sectionId}-header`;
@@ -231,7 +250,10 @@ export function CallTimelineCard({ call, onOpenTranscript }: CallTimelineCardPro
 
   return (
     <article
-      aria-label={`${providerLabel} call — ${call.status}`}
+      aria-label={t('callTimeline.cardAriaLabel', '{{provider}} call — {{status}}', {
+        provider: providerLabel,
+        status: call.status,
+      })}
       className={cn(
         'rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] transition-colors',
         'dark:bg-[var(--surface-glass)] dark:border-[var(--border-subtle)]',
@@ -326,16 +348,19 @@ export function CallTimeline({
   isFetchingNextPage,
   onOpenTranscript,
 }: CallTimelineProps) {
+  const { t } = useTranslation('crm');
   if (calls.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-[var(--border-default)] px-6 py-8 text-center">
-        <p className="text-sm text-[var(--fg-tertiary)]">No calls recorded yet.</p>
+        <p className="text-sm text-[var(--fg-tertiary)]">
+          {t('callTimeline.emptyState', 'No calls recorded yet.')}
+        </p>
       </div>
     );
   }
 
   return (
-    <section aria-label="Call history">
+    <section aria-label={t('callTimeline.historyAriaLabel', 'Call history')}>
       <ul className="space-y-2" role="list">
         {calls.map((call) => (
           <li key={call.id}>
@@ -353,7 +378,9 @@ export function CallTimeline({
             disabled={isFetchingNextPage}
             aria-busy={isFetchingNextPage}
           >
-            {isFetchingNextPage ? 'Loading…' : 'Load more calls'}
+            {isFetchingNextPage
+              ? t('callTimeline.loadingMore', 'Loading…')
+              : t('callTimeline.loadMore', 'Load more calls')}
           </Button>
         </div>
       )}

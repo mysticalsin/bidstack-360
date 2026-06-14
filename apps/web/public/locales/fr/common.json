@@ -290,5 +290,14 @@
     "signOut": "Se déconnecter",
     "portfolio": "Portefeuille",
     "detail": "Détail"
+  },
+  "appRoutes": {
+    "notFoundTitle": "Page introuvable",
+    "notFoundMessage": "La page que vous recherchez n'existe pas.",
+    "goToDashboard": "Aller au tableau de bord"
+  },
+  "select": {
+    "placeholder": "—",
+    "noOptions": "Aucune option"
   }
 }

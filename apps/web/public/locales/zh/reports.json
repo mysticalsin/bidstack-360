@@ -63,5 +63,91 @@
     "calls": "电话",
     "emails": "邮件",
     "meetings": "会议"
+  },
+  "reportBuilder": {
+    "toast": {
+      "previewFailed": "预览失败",
+      "nameRequired": "保存前请为报表命名。",
+      "updated": "报表已更新",
+      "created": "报表已创建",
+      "saveFailed": "无法保存"
+    },
+    "backToReports": "返回报表",
+    "title": {
+      "edit": "编辑报表",
+      "new": "新建报表"
+    },
+    "subtitle": "构建查询，实时预览，然后保存。",
+    "saveButton": {
+      "saving": "正在保存…",
+      "saveChanges": "保存更改",
+      "create": "创建报表"
+    },
+    "details": {
+      "title": "报表详情",
+      "nameLabel": "名称",
+      "namePlaceholder": "例如：每月赢得的交易",
+      "nameAria": "报表名称",
+      "descriptionLabel": "描述",
+      "descriptionPlaceholder": "可选",
+      "descriptionAria": "报表描述",
+      "dataSourceLabel": "数据源",
+      "dataSourceAria": "报表实体"
+    },
+    "filters": {
+      "title": "筛选器",
+      "caption": "限制包含哪些记录。"
+    },
+    "measures": {
+      "title": "度量",
+      "caption": "聚合值（留空则按行列出）。"
+    },
+    "groupBy": {
+      "title": "分组依据",
+      "caption": "按维度细分度量。"
+    },
+    "sortLimit": {
+      "title": "排序与限制",
+      "rowLimitLabel": "行数限制",
+      "rowLimitAria": "行数限制"
+    },
+    "visualization": {
+      "title": "可视化",
+      "chartTypeAria": "图表类型"
+    },
+    "preview": {
+      "running": "正在运行…",
+      "run": "运行预览"
+    },
+    "sort": {
+      "label": "排序",
+      "fieldAria": "排序字段",
+      "pickColumn": "选择列…",
+      "directionAria": "排序方向",
+      "ascending": "升序",
+      "descending": "降序",
+      "removeAria": "移除排序",
+      "add": "+ 添加排序"
+    },
+    "error": {
+      "notFoundTitle": "未找到报表",
+      "notFoundMessage": "它可能已被删除。"
+    }
+  },
+  "filterBuilder": {
+    "valueAriaLabel": "筛选值",
+    "pickOption": "— 选择 —",
+    "dateValueAriaLabel": "筛选日期值",
+    "numericValueAriaLabel": "筛选数值",
+    "valuePlaceholder": "值",
+    "fieldPlaceholder": "字段…",
+    "operatorAriaLabel": "运算符",
+    "removeConditionAriaLabel": "删除条件",
+    "toggleLogicAriaLabel": "切换逻辑 — 当前为 {{logic}}",
+    "noConditions": "暂无条件",
+    "conditionCount": "{{count}} 个条件",
+    "removeGroupAriaLabel": "删除分组",
+    "addCondition": "条件",
+    "addGroup": "分组"
   }
 }

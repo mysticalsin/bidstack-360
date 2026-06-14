@@ -63,5 +63,91 @@
     "calls": "Calls",
     "emails": "Emails",
     "meetings": "Meetings"
+  },
+  "reportBuilder": {
+    "toast": {
+      "previewFailed": "Preview failed",
+      "nameRequired": "Name your report before saving.",
+      "updated": "Report updated",
+      "created": "Report created",
+      "saveFailed": "Could not save"
+    },
+    "backToReports": "Back to reports",
+    "title": {
+      "edit": "Edit report",
+      "new": "New report"
+    },
+    "subtitle": "Compose a query, preview it live, then save.",
+    "saveButton": {
+      "saving": "Saving…",
+      "saveChanges": "Save changes",
+      "create": "Create report"
+    },
+    "details": {
+      "title": "Report details",
+      "nameLabel": "Name",
+      "namePlaceholder": "e.g. Won deals by month",
+      "nameAria": "Report name",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Optional",
+      "descriptionAria": "Report description",
+      "dataSourceLabel": "Data source",
+      "dataSourceAria": "Report entity"
+    },
+    "filters": {
+      "title": "Filters",
+      "caption": "Limit which records are included."
+    },
+    "measures": {
+      "title": "Measures",
+      "caption": "Aggregate values (leave empty to list rows)."
+    },
+    "groupBy": {
+      "title": "Group by",
+      "caption": "Break measures down by dimension."
+    },
+    "sortLimit": {
+      "title": "Sort & limit",
+      "rowLimitLabel": "Row limit",
+      "rowLimitAria": "Row limit"
+    },
+    "visualization": {
+      "title": "Visualization",
+      "chartTypeAria": "Chart type"
+    },
+    "preview": {
+      "running": "Running…",
+      "run": "Run preview"
+    },
+    "sort": {
+      "label": "Sort",
+      "fieldAria": "Sort field",
+      "pickColumn": "Pick column…",
+      "directionAria": "Sort direction",
+      "ascending": "Ascending",
+      "descending": "Descending",
+      "removeAria": "Remove sort",
+      "add": "+ Add sort"
+    },
+    "error": {
+      "notFoundTitle": "Report not found",
+      "notFoundMessage": "It may have been deleted."
+    }
+  },
+  "filterBuilder": {
+    "valueAriaLabel": "Filter value",
+    "pickOption": "— Pick —",
+    "dateValueAriaLabel": "Filter date value",
+    "numericValueAriaLabel": "Filter numeric value",
+    "valuePlaceholder": "Value",
+    "fieldPlaceholder": "Field…",
+    "operatorAriaLabel": "Operator",
+    "removeConditionAriaLabel": "Remove condition",
+    "toggleLogicAriaLabel": "Toggle logic — currently {{logic}}",
+    "noConditions": "No conditions yet",
+    "conditionCount": "{{count}} condition",
+    "removeGroupAriaLabel": "Remove group",
+    "addCondition": "Condition",
+    "addGroup": "Group"
   }
 }

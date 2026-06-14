@@ -169,6 +169,12 @@ const PATHS: Record<string, JSX.Element> = {
     </>
   ),
   download: <path d="M12 3v13M6 11l6 6 6-6M5 21h14" />,
+  logOut: (
+    <>
+      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+      <path d="M16 17l5-5-5-5M21 12H9" />
+    </>
+  ),
   copy: (
     <>
       <rect x="8" y="8" width="12" height="12" rx="2" />

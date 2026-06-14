@@ -10,6 +10,7 @@
 
 import { useRef, useState, type FormEvent, type RefObject } from 'react';
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { CheckCircle, ChevronRight, Download, Pen, Type } from 'lucide-react';
 import type { PublicSignatureRequest } from '@bidstack/shared';
 
@@ -29,6 +30,7 @@ export function PublicSignPage() {
   const { token = '' } = useParams<{ token: string }>();
   const { data, isLoading, error } = usePublicSignatureRequest(token);
   const submitMutation = useSubmitSignature(token);
+  const { t } = useTranslation('crm');
 
   const [step, setStep] = useState<Step>('welcome');
   const [sigMode, setSigMode] = useState<'draw' | 'type'>('draw');
@@ -49,10 +51,10 @@ export function PublicSignPage() {
     setStep(next);
     setValidationError('');
     const labels: Record<Step, string> = {
-      welcome: 'Step 1: Review document',
-      sign: 'Step 2: Sign',
-      submit: 'Step 3: Review and submit',
-      confirm: 'Signature submitted successfully',
+      welcome: t('publicSign.announceWelcome', 'Step 1: Review document'),
+      sign: t('publicSign.announceSign', 'Step 2: Sign'),
+      submit: t('publicSign.announceSubmit', 'Step 3: Review and submit'),
+      confirm: t('publicSign.announceConfirm', 'Signature submitted successfully'),
     };
     setAnnouncement(labels[next]);
     // Move focus to the main content area on step transition
@@ -68,13 +70,17 @@ export function PublicSignPage() {
       const pad = padRef.current;
       const dataUrl = pad?.getDataUrl();
       if (!dataUrl) {
-        setValidationError('Please draw or type your signature before continuing.');
+        setValidationError(
+          t('publicSign.errorDrawOrType', 'Please draw or type your signature before continuing.'),
+        );
         return;
       }
       setSignatureDataUrl(dataUrl);
     } else {
       if (!typedName.trim()) {
-        setValidationError('Please type your name to create a signature.');
+        setValidationError(
+          t('publicSign.errorTypeName', 'Please type your name to create a signature.'),
+        );
         return;
       }
       setSignatureDataUrl(renderTypedSignatureToDataUrl(typedName));
@@ -85,18 +91,24 @@ export function PublicSignPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!acceptedTerms) {
-      setValidationError('You must accept the terms to proceed.');
+      setValidationError(t('publicSign.errorAcceptTerms', 'You must accept the terms to proceed.'));
       return;
     }
 
     // The signature step unmounts before submit, so persist the image before transition.
     if (!signatureDataUrl) {
-      setValidationError('Signature is missing. Please go back and sign again.');
+      setValidationError(
+        t('publicSign.errorSignatureMissing', 'Signature is missing. Please go back and sign again.'),
+      );
       return;
     }
 
     submitMutation.mutate(
-      { typedName: typedName || 'Signer', signatureDataUrl, acceptedTerms: true },
+      {
+        typedName: typedName || t('publicSign.signerFallback', 'Signer'),
+        signatureDataUrl,
+        acceptedTerms: true,
+      },
       {
         onSuccess: (result) => {
           setDownloadUrl(result.downloadUrl ?? '');
@@ -104,7 +116,9 @@ export function PublicSignPage() {
         },
         onError: (err) => {
           setValidationError(
-            err instanceof Error ? err.message : 'Submission failed. Please try again.',
+            err instanceof Error
+              ? err.message
+              : t('publicSign.errorSubmitFailed', 'Submission failed. Please try again.'),
           );
         },
       },
@@ -127,7 +141,7 @@ export function PublicSignPage() {
           'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
         )}
       >
-        Skip to main content
+        {t('publicSign.skipToMain', 'Skip to main content')}
       </a>
 
       {/* aria-live region for step announcements */}
@@ -148,7 +162,7 @@ export function PublicSignPage() {
                 <Pen size={14} className="text-white" />
               </div>
               <span className="text-sm font-semibold text-[var(--fg-primary)]">
-                Secure Signature
+                {t('publicSign.brandSecureSignature', 'Secure Signature')}
               </span>
             </div>
             <StepIndicator step={step} />
@@ -161,7 +175,7 @@ export function PublicSignPage() {
           ref={mainRef}
           tabIndex={-1}
           className="mx-auto max-w-2xl px-4 py-8 outline-none print:py-4"
-          aria-label="Document signing"
+          aria-label={t('publicSign.mainAriaLabel', 'Document signing')}
         >
           {isLoading && <LoadingState />}
           {error && <ErrorState error={error} />}
@@ -208,7 +222,10 @@ export function PublicSignPage() {
 
         {/* Footer — privacy note; no tracking pixels */}
         <footer className="mt-auto border-t border-[var(--border-subtle)] py-4 text-center text-xs text-[var(--fg-muted)] print:hidden">
-          Your signature is legally binding. This page contains no tracking technologies.
+          {t(
+            'publicSign.footerLegalNote',
+            'Your signature is legally binding. This page contains no tracking technologies.',
+          )}
         </footer>
       </div>
     </>
@@ -218,10 +235,16 @@ export function PublicSignPage() {
 // ─── Step indicator ───────────────────────────────────────────────────────────
 
 function StepIndicator({ step }: { step: Step }) {
+  const { t } = useTranslation('crm');
   const idx = STEP_ORDER.indexOf(step);
-  const labels = ['Review', 'Sign', 'Submit', 'Done'];
+  const labels = [
+    t('publicSign.stepReview', 'Review'),
+    t('publicSign.stepSign', 'Sign'),
+    t('publicSign.stepSubmit', 'Submit'),
+    t('publicSign.stepDone', 'Done'),
+  ];
   return (
-    <ol className="flex items-center gap-1 text-xs print:hidden" aria-label="Progress">
+    <ol className="flex items-center gap-1 text-xs print:hidden" aria-label={t('publicSign.progressAriaLabel', 'Progress')}>
       {labels.slice(0, 3).map((label, i) => (
         <li key={label} className="flex items-center gap-1">
           <span
@@ -261,14 +284,16 @@ interface WelcomeStepProps {
 }
 
 function WelcomeStep({ data, onContinue }: WelcomeStepProps) {
+  const { t } = useTranslation('crm');
   return (
     <section aria-labelledby="welcome-heading" className="space-y-6">
       <div>
         <h1 id="welcome-heading" className="text-2xl font-bold text-[var(--fg-primary)]">
-          You have a document to sign
+          {t('publicSign.welcomeHeading', 'You have a document to sign')}
         </h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          <strong>{data.senderName}</strong> has requested your signature on{' '}
+          <strong>{data.senderName}</strong>{' '}
+          {t('publicSign.welcomeRequestedOn', 'has requested your signature on')}{' '}
           <strong>{data.templateName}</strong>.
         </p>
         {data.message && (
@@ -278,7 +303,7 @@ function WelcomeStep({ data, onContinue }: WelcomeStepProps) {
         )}
         {data.expiresAt && (
           <p className="mt-2 text-xs text-[var(--fg-tertiary)]">
-            Expires:{' '}
+            {t('publicSign.expiresLabel', 'Expires:')}{' '}
             {new Date(data.expiresAt).toLocaleDateString(undefined, {
               dateStyle: 'long',
             })}
@@ -293,16 +318,16 @@ function WelcomeStep({ data, onContinue }: WelcomeStepProps) {
           data-testid="document-viewer"
         >
           <p className="border-b border-[var(--border-subtle)] px-4 py-2 text-xs font-medium text-[var(--fg-secondary)]">
-            Document preview
+            {t('publicSign.documentPreviewLabel', 'Document preview')}
           </p>
           <iframe
             src={data.documentPreviewUrl}
-            title="Document to sign"
+            title={t('publicSign.documentIframeTitle', 'Document to sign')}
             className="h-[480px] w-full"
             // WHY sandbox: restrict the preview iframe to prevent script injection
             // from the document source while still allowing PDF viewer scripts.
             sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-            aria-label="Document preview"
+            aria-label={t('publicSign.documentPreviewLabel', 'Document preview')}
           />
         </div>
       )}
@@ -312,7 +337,10 @@ function WelcomeStep({ data, onContinue }: WelcomeStepProps) {
           className="rounded-xl border border-dashed border-[var(--border-default)] p-8 text-center text-sm text-[var(--fg-tertiary)]"
           data-testid="document-viewer"
         >
-          Document preview not available — you will sign below.
+          {t(
+            'publicSign.documentPreviewUnavailable',
+            'Document preview not available — you will sign below.',
+          )}
         </div>
       )}
 
@@ -327,7 +355,7 @@ function WelcomeStep({ data, onContinue }: WelcomeStepProps) {
           'print:hidden',
         )}
       >
-        Review and sign
+        {t('publicSign.reviewAndSignButton', 'Review and sign')}
       </button>
     </section>
   );
@@ -357,23 +385,28 @@ function SignStep({
   onBack,
   onContinue,
 }: SignStepProps) {
+  const { t } = useTranslation('crm');
   return (
     <section aria-labelledby="sign-heading" className="space-y-6">
       <div>
         <h1 id="sign-heading" className="text-2xl font-bold text-[var(--fg-primary)]">
-          Add your signature
+          {t('publicSign.signHeading', 'Add your signature')}
         </h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          Draw your signature or type your name.
+          {t('publicSign.signSubtitle', 'Draw your signature or type your name.')}
         </p>
       </div>
 
       {/* Mode toggle */}
-      <div role="group" aria-label="Signature mode" className="flex gap-2">
+      <div
+        role="group"
+        aria-label={t('publicSign.signatureModeAriaLabel', 'Signature mode')}
+        className="flex gap-2"
+      >
         {(
           [
-            ['draw', 'Draw', Pen],
-            ['type', 'Type name', Type],
+            ['draw', t('publicSign.modeDraw', 'Draw'), Pen],
+            ['type', t('publicSign.modeTypeName', 'Type name'), Type],
           ] as const
         ).map(([mode, label, Icon]) => (
           <button
@@ -406,7 +439,7 @@ function SignStep({
             htmlFor="typed-name"
             className="mb-1.5 block text-xs font-medium text-[var(--fg-secondary)]"
           >
-            Full name
+            {t('publicSign.fullNameLabel', 'Full name')}
           </label>
           <input
             id="typed-name"
@@ -414,7 +447,7 @@ function SignStep({
             value={typedName}
             onChange={(e) => onTypedNameChange(e.target.value)}
             maxLength={200}
-            placeholder="Your full name"
+            placeholder={t('publicSign.fullNamePlaceholder', 'Your full name')}
             className={cn(
               'w-full min-h-[44px] rounded-lg border border-[var(--border-default)] bg-white dark:bg-[var(--surface-sunken)]',
               'px-3 py-2 text-2xl text-[var(--fg-primary)] placeholder:text-[var(--fg-muted)]',
@@ -429,7 +462,9 @@ function SignStep({
             <div
               className="mt-3 rounded-lg border border-dashed border-[var(--border-subtle)] p-4 text-center text-2xl italic text-[var(--fg-primary)]"
               style={{ fontFamily: 'cursive' }}
-              aria-label={`Signature preview: ${typedName}`}
+              aria-label={t('publicSign.signaturePreviewAriaLabel', 'Signature preview: {{name}}', {
+                name: typedName,
+              })}
             >
               {typedName}
             </div>
@@ -454,7 +489,7 @@ function SignStep({
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)] focus-visible:ring-offset-2',
           )}
         >
-          Back
+          {t('publicSign.back', 'Back')}
         </button>
         <button
           type="button"
@@ -466,7 +501,7 @@ function SignStep({
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)] focus-visible:ring-offset-2',
           )}
         >
-          Continue
+          {t('publicSign.continue', 'Continue')}
         </button>
       </div>
     </section>
@@ -494,14 +529,16 @@ function SubmitStep({
   onBack,
   onSubmit,
 }: SubmitStepProps) {
+  const { t } = useTranslation('crm');
   return (
     <section aria-labelledby="submit-heading" className="space-y-6">
       <div>
         <h1 id="submit-heading" className="text-2xl font-bold text-[var(--fg-primary)]">
-          Review and submit
+          {t('publicSign.submitHeading', 'Review and submit')}
         </h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          By submitting, you legally sign <strong>{data.templateName}</strong>.
+          {t('publicSign.submitLegalIntro', 'By submitting, you legally sign')}{' '}
+          <strong>{data.templateName}</strong>.
         </p>
       </div>
 
@@ -529,8 +566,10 @@ function SubmitStep({
             )}
           />
           <span className="text-sm text-[var(--fg-secondary)] leading-relaxed">
-            I agree that this electronic signature is legally binding and represents my intent to
-            sign this document. I have had the opportunity to review its contents.
+            {t(
+              'publicSign.termsAgreement',
+              'I agree that this electronic signature is legally binding and represents my intent to sign this document. I have had the opportunity to review its contents.',
+            )}
           </span>
         </label>
 
@@ -552,7 +591,7 @@ function SubmitStep({
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)] focus-visible:ring-offset-2',
             )}
           >
-            Back
+            {t('publicSign.back', 'Back')}
           </button>
           <button
             type="submit"
@@ -569,10 +608,10 @@ function SubmitStep({
             {isPending ? (
               <span className="inline-flex items-center gap-2">
                 <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
-                Submitting…
+                {t('publicSign.submitting', 'Submitting…')}
               </span>
             ) : (
-              'Submit signature'
+              t('publicSign.submitSignatureButton', 'Submit signature')
             )}
           </button>
         </div>
@@ -584,6 +623,7 @@ function SubmitStep({
 // ─── Step: Confirmation ───────────────────────────────────────────────────────
 
 function ConfirmStep({ downloadUrl, senderName }: { downloadUrl: string; senderName: string }) {
+  const { t } = useTranslation('crm');
   return (
     <section
       aria-labelledby="confirm-heading"
@@ -594,11 +634,14 @@ function ConfirmStep({ downloadUrl, senderName }: { downloadUrl: string; senderN
       </div>
       <div>
         <h1 id="confirm-heading" className="text-2xl font-bold text-[var(--fg-primary)]">
-          Signature submitted
+          {t('publicSign.confirmHeading', 'Signature submitted')}
         </h1>
         <p className="mt-2 text-sm text-[var(--fg-secondary)]">
-          {senderName} has been notified. A copy of the signed document will be sent to your email
-          address.
+          {t(
+            'publicSign.confirmNotified',
+            '{{senderName}} has been notified. A copy of the signed document will be sent to your email address.',
+            { senderName },
+          )}
         </p>
       </div>
 
@@ -615,12 +658,13 @@ function ConfirmStep({ downloadUrl, senderName }: { downloadUrl: string; senderN
           )}
         >
           <Download size={16} aria-hidden />
-          Download signed copy
+          {t('publicSign.downloadSignedCopy', 'Download signed copy')}
         </a>
       )}
 
       <p className="text-xs text-[var(--fg-muted)] print:block hidden">
-        Printed: {new Date().toLocaleDateString(undefined, { dateStyle: 'full' })}
+        {t('publicSign.printedLabel', 'Printed:')}{' '}
+        {new Date().toLocaleDateString(undefined, { dateStyle: 'full' })}
       </p>
     </section>
   );
@@ -629,8 +673,13 @@ function ConfirmStep({ downloadUrl, senderName }: { downloadUrl: string; senderN
 // ─── Loading / Error states ───────────────────────────────────────────────────
 
 function LoadingState() {
+  const { t } = useTranslation('crm');
   return (
-    <div className="space-y-4 animate-pulse" aria-label="Loading document" aria-live="polite">
+    <div
+      className="space-y-4 animate-pulse"
+      aria-label={t('publicSign.loadingAriaLabel', 'Loading document')}
+      aria-live="polite"
+    >
       <div className="h-8 w-2/3 rounded-lg bg-[var(--border-subtle)]" />
       <div className="h-4 w-1/2 rounded bg-[var(--border-subtle)]" />
       <div className="h-64 w-full rounded-xl bg-[var(--border-subtle)]" />
@@ -640,12 +689,21 @@ function LoadingState() {
 }
 
 function ErrorState({ error }: { error: unknown }) {
+  const { t } = useTranslation('crm');
   const msg =
-    error instanceof Error ? error.message : 'This signing link is invalid or has expired.';
+    error instanceof Error
+      ? error.message
+      : t('publicSign.errorLinkInvalidShort', 'This signing link is invalid or has expired.');
   const isExpired = msg.toLowerCase().includes('expir') || msg.toLowerCase().includes('token');
   const publicMessage = isExpired
-    ? 'This signing link has expired. Please contact the sender to resend the request.'
-    : 'This signing link is invalid or has expired. Please contact the sender to resend the request.';
+    ? t(
+        'publicSign.errorLinkExpiredDetail',
+        'This signing link has expired. Please contact the sender to resend the request.',
+      )
+    : t(
+        'publicSign.errorLinkInvalidDetail',
+        'This signing link is invalid or has expired. Please contact the sender to resend the request.',
+      );
   return (
     <div
       className="flex flex-col items-center gap-4 py-12 text-center"
@@ -658,7 +716,9 @@ function ErrorState({ error }: { error: unknown }) {
         </span>
       </div>
       <h1 className="text-xl font-bold text-[var(--fg-primary)]">
-        {isExpired ? 'Link expired' : 'Invalid signing link'}
+        {isExpired
+          ? t('publicSign.errorLinkExpiredTitle', 'Link expired')
+          : t('publicSign.errorLinkInvalidTitle', 'Invalid signing link')}
       </h1>
       <p className="max-w-sm text-sm text-[var(--fg-secondary)]">{publicMessage}</p>
     </div>

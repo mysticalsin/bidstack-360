@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Icon } from '@/components/ui/Icon';
 import { parseCsv, type ParsedCsv } from '@/lib/csv-parse';
@@ -20,6 +21,7 @@ type Dedup = 'skip' | 'update' | 'duplicate';
 const MAX_ROWS = 10_000;
 
 export function CsvImportWizard() {
+  const { t } = useTranslation('crm');
   const [step, setStep] = useState<Step>('upload');
   const [entity, setEntity] = useState<ImportEntity>('company');
   const [parsed, setParsed] = useState<ParsedCsv | null>(null);
@@ -45,11 +47,16 @@ export function CsvImportWizard() {
       const text = await file.text();
       const result = parseCsv(text);
       if (result.headers.length === 0 || result.rows.length === 0) {
-        setParseError('That file has no data rows.');
+        setParseError(t('csvImport.error.noDataRows', 'That file has no data rows.'));
         return;
       }
       if (result.rows.length > MAX_ROWS) {
-        setParseError(`That file has ${result.rows.length} rows — the limit is ${MAX_ROWS}.`);
+        setParseError(
+          t('csvImport.error.tooManyRows', 'That file has {{count}} rows — the limit is {{limit}}.', {
+            count: result.rows.length,
+            limit: MAX_ROWS,
+          }),
+        );
         return;
       }
       setParsed(result);
@@ -57,7 +64,9 @@ export function CsvImportWizard() {
       setMappings(autoMap(result.headers, TARGET_FIELDS[entity]));
       setStep('map');
     } catch {
-      setParseError('Could not read that file. Make sure it is a UTF-8 CSV.');
+      setParseError(
+        t('csvImport.error.unreadable', 'Could not read that file. Make sure it is a UTF-8 CSV.'),
+      );
     }
   }
 
@@ -102,7 +111,7 @@ export function CsvImportWizard() {
         <div className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-[var(--fg-primary)]">
-              What are you importing?
+              {t('csvImport.upload.entityLabel', 'What are you importing?')}
             </label>
             <select
               className="input max-w-xs"
@@ -123,9 +132,13 @@ export function CsvImportWizard() {
             className="flex w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-[var(--border-strong)] py-10 text-[var(--fg-secondary)] transition-colors hover:border-[var(--brand-primary)] hover:text-[var(--fg-primary)]"
           >
             <Icon name="upload" size={24} ariaHidden />
-            <span className="text-sm font-medium">Choose a CSV file</span>
+            <span className="text-sm font-medium">
+              {t('csvImport.upload.chooseFile', 'Choose a CSV file')}
+            </span>
             <span className="text-xs text-[var(--fg-tertiary)]">
-              Up to {MAX_ROWS.toLocaleString()} rows
+              {t('csvImport.upload.maxRows', 'Up to {{rows}} rows', {
+                rows: MAX_ROWS.toLocaleString(),
+              })}
             </span>
           </button>
           <input
@@ -147,8 +160,11 @@ export function CsvImportWizard() {
         <div className="space-y-4">
           <p className="text-sm text-[var(--fg-secondary)]">
             <span className="font-medium text-[var(--fg-primary)]">{fileName}</span> —{' '}
-            {parsed.rows.length.toLocaleString()} rows. Match each column to a field, or leave it
-            as <em>Don&rsquo;t import</em>.
+            {t(
+              'csvImport.map.summary',
+              '{{rows}} rows. Match each column to a field, or leave it as Don’t import.',
+              { rows: parsed.rows.length.toLocaleString() },
+            )}
           </p>
 
           <div className="overflow-hidden rounded-lg border border-[var(--border-subtle)]">
@@ -156,13 +172,13 @@ export function CsvImportWizard() {
               <thead className="bg-[var(--surface-sunken)] text-left text-[var(--fg-tertiary)]">
                 <tr>
                   <th scope="col" className="px-3 py-2 font-medium">
-                    CSV column
+                    {t('csvImport.map.colCsvColumn', 'CSV column')}
                   </th>
                   <th scope="col" className="px-3 py-2 font-medium">
-                    Sample
+                    {t('csvImport.map.colSample', 'Sample')}
                   </th>
                   <th scope="col" className="px-3 py-2 font-medium">
-                    Maps to
+                    {t('csvImport.map.colMapsTo', 'Maps to')}
                   </th>
                 </tr>
               </thead>
@@ -176,13 +192,15 @@ export function CsvImportWizard() {
                     <td className="px-3 py-2">
                       <select
                         className="input"
-                        aria-label={`Map column ${header}`}
+                        aria-label={t('csvImport.map.mapColumnAria', 'Map column {{header}}', {
+                          header,
+                        })}
                         value={mappings[header] ?? ''}
                         onChange={(e) =>
                           setMappings((m) => ({ ...m, [header]: e.target.value || null }))
                         }
                       >
-                        <option value="">Don&rsquo;t import</option>
+                        <option value="">{t('csvImport.map.dontImport', 'Don’t import')}</option>
                         {fields.map((f) => (
                           <option key={f.key} value={f.key}>
                             {f.label}
@@ -199,33 +217,42 @@ export function CsvImportWizard() {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-[var(--fg-primary)]">
-              If a record already exists
+              {t('csvImport.map.dedupLabel', 'If a record already exists')}
             </label>
             <select
               className="input max-w-xs"
               value={dedup}
               onChange={(e) => setDedup(e.target.value as Dedup)}
             >
-              <option value="update">Update it with the new values</option>
-              <option value="skip">Skip the row</option>
-              <option value="duplicate">Always create a new record</option>
+              <option value="update">
+                {t('csvImport.map.dedupUpdate', 'Update it with the new values')}
+              </option>
+              <option value="skip">{t('csvImport.map.dedupSkip', 'Skip the row')}</option>
+              <option value="duplicate">
+                {t('csvImport.map.dedupDuplicate', 'Always create a new record')}
+              </option>
             </select>
           </div>
 
           {requiredMissing.length > 0 && (
             <p className="text-sm text-[var(--danger)]">
-              Map a column to: {requiredMissing.join(', ')}.
+              {t('csvImport.map.requiredMissing', 'Map a column to: {{fields}}.', {
+                fields: requiredMissing.join(', '),
+              })}
             </p>
           )}
           {start.isError && (
             <p className="text-sm text-[var(--danger)]">
-              Could not start the import. Check your mappings and try again.
+              {t(
+                'csvImport.map.startError',
+                'Could not start the import. Check your mappings and try again.',
+              )}
             </p>
           )}
 
           <div className="flex items-center gap-2">
             <button type="button" className="btn btn-ghost" onClick={reset}>
-              Start over
+              {t('csvImport.map.startOver', 'Start over')}
             </button>
             <button
               type="button"
@@ -233,7 +260,11 @@ export function CsvImportWizard() {
               disabled={requiredMissing.length > 0 || start.isPending}
               onClick={runImport}
             >
-              {start.isPending ? 'Starting…' : `Import ${parsed.rows.length.toLocaleString()} rows`}
+              {start.isPending
+                ? t('csvImport.map.starting', 'Starting…')
+                : t('csvImport.map.importRows', 'Import {{rows}} rows', {
+                    rows: parsed.rows.length.toLocaleString(),
+                  })}
             </button>
           </div>
         </div>
@@ -251,10 +282,11 @@ export function CsvImportWizard() {
 }
 
 function StepHeader({ step }: { step: Step }) {
+  const { t } = useTranslation('crm');
   const labels: { key: Step; label: string }[] = [
-    { key: 'upload', label: 'Upload' },
-    { key: 'map', label: 'Map columns' },
-    { key: 'run', label: 'Import' },
+    { key: 'upload', label: t('csvImport.stepHeader.upload', 'Upload') },
+    { key: 'map', label: t('csvImport.stepHeader.map', 'Map columns') },
+    { key: 'run', label: t('csvImport.stepHeader.run', 'Import') },
   ];
   const activeIndex = labels.findIndex((l) => l.key === step);
   return (
@@ -289,8 +321,13 @@ function ImportProgress({
   isLoading: boolean;
   onDone: () => void;
 }) {
+  const { t } = useTranslation('crm');
   if (isLoading || !job) {
-    return <p className="text-sm text-[var(--fg-secondary)]">Starting import…</p>;
+    return (
+      <p className="text-sm text-[var(--fg-secondary)]">
+        {t('csvImport.progress.starting', 'Starting import…')}
+      </p>
+    );
   }
 
   const done = job.status === 'COMPLETE' || job.status === 'FAILED' || job.status === 'CANCELLED';
@@ -303,12 +340,12 @@ function ImportProgress({
         <div className="mb-1 flex items-center justify-between text-sm">
           <span className="font-medium text-[var(--fg-primary)]">
             {job.status === 'COMPLETE'
-              ? 'Import complete'
+              ? t('csvImport.progress.statusComplete', 'Import complete')
               : job.status === 'RUNNING' || job.status === 'PENDING'
-                ? 'Importing…'
+                ? t('csvImport.progress.statusImporting', 'Importing…')
                 : job.status === 'CANCELLED'
-                  ? 'Import cancelled'
-                  : 'Import failed'}
+                  ? t('csvImport.progress.statusCancelled', 'Import cancelled')
+                  : t('csvImport.progress.statusFailed', 'Import failed')}
           </span>
           <span className="text-[var(--fg-tertiary)]">
             {job.processedRows.toLocaleString()} / {job.totalRows.toLocaleString()}
@@ -329,22 +366,24 @@ function ImportProgress({
       {job.errorRows > 0 && (
         <div className="rounded-md bg-[var(--surface-sunken)] p-3 text-sm">
           <p className="text-[var(--fg-primary)]">
-            {job.errorRows.toLocaleString()} row{job.errorRows === 1 ? '' : 's'} could not be
-            imported.
+            {t('csvImport.progress.errorRows', '{{formattedCount}} rows could not be imported.', {
+              count: job.errorRows,
+              formattedCount: job.errorRows.toLocaleString(),
+            })}
           </p>
           <button
             type="button"
             className="mt-1 text-[var(--brand-primary)] hover:underline"
             onClick={() => downloadMigrationErrors(job.id)}
           >
-            Download error report (CSV)
+            {t('csvImport.progress.downloadErrors', 'Download error report (CSV)')}
           </button>
         </div>
       )}
 
       {done && (
         <button type="button" className="btn btn-secondary" onClick={onDone}>
-          Import another file
+          {t('csvImport.progress.importAnother', 'Import another file')}
         </button>
       )}
     </div>

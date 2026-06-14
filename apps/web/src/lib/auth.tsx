@@ -59,31 +59,42 @@ const STUB_USER: AuthUser = {
   primaryEmailAddress: { emailAddress: 'jane@mantu.com' },
 };
 
+const STUB_SESSION_KEY = 'bidstack:session';
+const STUB_SIGNED_OUT_KEY = 'bidstack:stub-signed-out';
+
 function StubAuthProvider({ children }: { children: ReactNode }) {
   const [signedIn, setSignedIn] = useState(() => {
-    return localStorage.getItem('bidstack:session') !== null;
+    return (
+      localStorage.getItem(STUB_SESSION_KEY) !== null ||
+      localStorage.getItem(STUB_SIGNED_OUT_KEY) === null
+    );
   });
 
   useEffect(() => {
     setApiTokenProvider(null);
+    if (signedIn && localStorage.getItem(STUB_SESSION_KEY) === null) {
+      localStorage.setItem(STUB_SESSION_KEY, 'stub');
+    }
     return () => setApiTokenProvider(null);
-  }, []);
+  }, [signedIn]);
 
   const signIn = useCallback((cb?: () => void) => {
     setSignedIn(true);
-    localStorage.setItem('bidstack:session', 'stub');
+    localStorage.removeItem(STUB_SIGNED_OUT_KEY);
+    localStorage.setItem(STUB_SESSION_KEY, 'stub');
     cb?.();
   }, []);
 
   const signOut = useCallback((cb?: () => void) => {
     setSignedIn(false);
+    localStorage.setItem(STUB_SIGNED_OUT_KEY, 'true');
     // Remove the key and fire a synthetic storage event — native storage events
     // don't fire on the originating tab, so the same-tab cache-clear handler
     // in watchAuthForCacheClear would never trigger otherwise.
-    localStorage.removeItem('bidstack:session');
+    localStorage.removeItem(STUB_SESSION_KEY);
     window.dispatchEvent(
       new StorageEvent('storage', {
-        key: 'bidstack:session',
+        key: STUB_SESSION_KEY,
         newValue: null,
         storageArea: localStorage,
       }),
@@ -134,11 +145,11 @@ function DemoAuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback((cb?: () => void) => {
     localStorage.removeItem(DEMO_TOKEN_KEY);
     localStorage.removeItem(DEMO_EMAIL_KEY);
-    localStorage.removeItem('bidstack:session');
+    localStorage.removeItem(STUB_SESSION_KEY);
     setSignedIn(false);
     window.dispatchEvent(
       new StorageEvent('storage', {
-        key: 'bidstack:session',
+        key: STUB_SESSION_KEY,
         newValue: null,
         storageArea: localStorage,
       }),
@@ -196,14 +207,16 @@ const LazyClerkBranch = lazy(async () => {
     const clerk = useClerk();
 
     useEffect(() => {
-      setApiTokenProvider(() => auth.getToken());
+      setApiTokenProvider(({ forceRefresh } = {}) =>
+        auth.getToken(forceRefresh ? { skipCache: true } : undefined),
+      );
       // Keep bidstack:session in sync with Clerk auth state so
       // watchAuthForCacheClear can detect sign-out on any tab.
       if (auth.isLoaded) {
         if (auth.isSignedIn && auth.userId) {
-          localStorage.setItem('bidstack:session', auth.userId);
+          localStorage.setItem(STUB_SESSION_KEY, auth.userId);
         } else if (!auth.isSignedIn) {
-          localStorage.removeItem('bidstack:session');
+          localStorage.removeItem(STUB_SESSION_KEY);
         }
       }
       return () => setApiTokenProvider(null);
@@ -233,10 +246,10 @@ const LazyClerkBranch = lazy(async () => {
             void clerk.signOut().then(() => {
               // Remove session key and fire a synthetic storage event so the
               // same-tab watchAuthForCacheClear handler fires immediately.
-              localStorage.removeItem('bidstack:session');
+              localStorage.removeItem(STUB_SESSION_KEY);
               window.dispatchEvent(
                 new StorageEvent('storage', {
-                  key: 'bidstack:session',
+                  key: STUB_SESSION_KEY,
                   newValue: null,
                   storageArea: localStorage,
                 }),
@@ -360,7 +373,7 @@ function useAuthCtx(): AuthCtx {
 export function useAuth(): { isLoaded: boolean; isSignedIn: boolean } {
   const ctx = useAuthCtx();
   const hasSession =
-    typeof window !== 'undefined' && localStorage.getItem('bidstack:session') !== null;
+    typeof window !== 'undefined' && localStorage.getItem(STUB_SESSION_KEY) !== null;
   return { isLoaded: ctx.isLoaded, isSignedIn: ctx.isSignedIn || hasSession };
 }
 

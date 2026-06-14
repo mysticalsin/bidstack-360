@@ -53,5 +53,18 @@
     "cancel": "Annuler la demande",
     "viewCertificate": "Voir le certificat",
     "confirmCancel": "Annuler cette demande de signature ? Les signataires en seront informés."
+  },
+  "signaturePad": {
+    "modeTablistLabel": "Méthode de signature",
+    "modeDraw": "Dessiner",
+    "modeType": "Saisir",
+    "drawPlaceholder": "Signez ici",
+    "canvasLabel": "Zone de dessin de la signature. Utilisez la souris ou le toucher pour dessiner votre signature.",
+    "typedNameLabel": "Saisissez votre nom complet",
+    "typedNamePlaceholder": "Votre nom",
+    "clearButtonLabel": "Effacer la signature",
+    "clearButton": "Effacer",
+    "undoButtonLabel": "Annuler le dernier tracé",
+    "undoButton": "Annuler"
   }
 }

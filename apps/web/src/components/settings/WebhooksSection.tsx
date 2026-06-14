@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -29,6 +30,7 @@ interface CreatedSecret {
 }
 
 export function WebhooksSection() {
+  const { t } = useTranslation('settings');
   const isAdmin = useIsAdmin();
   const subs = useWebhookSubscriptions({ enabled: isAdmin });
   const create = useCreateWebhookSubscription();
@@ -49,20 +51,21 @@ export function WebhooksSection() {
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-primary-tint)] px-3 py-1 text-xs font-medium text-[var(--brand-primary)]">
               <Icon name="webhook" size={14} ariaHidden />
-              Admin webhook control plane
+              {t('webhooks.controlPlaneBadge', 'Admin webhook control plane')}
             </div>
             <h3 className="mt-4 text-xl font-semibold tracking-tight text-[var(--fg-primary)]">
-              Deliver trusted platform events to every downstream system.
+              {t('webhooks.heroTitle', 'Deliver trusted platform events to every downstream system.')}
             </h3>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--fg-secondary)]">
-              Create signed outbound subscriptions for Dust, MCP workflows, data warehouses, Slack
-              automations, and customer systems. Every endpoint is HTTPS-only, HMAC-signed,
-              rate-limited for tests, and tracked with delivery history.
+              {t(
+                'webhooks.heroBody',
+                'Create signed outbound subscriptions for Dust, MCP workflows, data warehouses, Slack automations, and customer systems. Every endpoint is HTTPS-only, HMAC-signed, rate-limited for tests, and tracked with delivery history.',
+              )}
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Button size="sm" onClick={() => setShowCreate(true)}>
                 <Icon name="plus" size={14} className="mr-1.5" />
-                Add subscription
+                {t('webhooks.addSubscription', 'Add subscription')}
               </Button>
               <Button
                 size="sm"
@@ -75,16 +78,36 @@ export function WebhooksSection() {
                   size={14}
                   className={cn('mr-1.5', subs.isFetching && 'animate-spin')}
                 />
-                Refresh
+                {t('webhooks.refresh', 'Refresh')}
               </Button>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <MetricCard label="Total" value={metrics.total} icon="webhook" tone="blue" />
-            <MetricCard label="Active" value={metrics.active} icon="checkCircle" tone="jade" />
-            <MetricCard label="Failing" value={metrics.failing} icon="warning" tone="tomato" />
-            <MetricCard label="Events" value={metrics.eventCount} icon="list" tone="purple" />
+            <MetricCard
+              label={t('webhooks.metricTotal', 'Total')}
+              value={metrics.total}
+              icon="webhook"
+              tone="blue"
+            />
+            <MetricCard
+              label={t('webhooks.metricActive', 'Active')}
+              value={metrics.active}
+              icon="checkCircle"
+              tone="jade"
+            />
+            <MetricCard
+              label={t('webhooks.metricFailing', 'Failing')}
+              value={metrics.failing}
+              icon="warning"
+              tone="tomato"
+            />
+            <MetricCard
+              label={t('webhooks.metricEvents', 'Events')}
+              value={metrics.eventCount}
+              icon="list"
+              tone="purple"
+            />
           </div>
         </div>
       </Card>
@@ -92,23 +115,32 @@ export function WebhooksSection() {
       <div className="grid gap-4 lg:grid-cols-3">
         <ReadinessCard
           icon="shield"
-          title="Signed by default"
-          body="Every delivery includes X-BidStack-Signature with a timestamped HMAC."
-          status="Required"
+          title={t('webhooks.readinessSignedTitle', 'Signed by default')}
+          body={t(
+            'webhooks.readinessSignedBody',
+            'Every delivery includes X-BidStack-Signature with a timestamped HMAC.',
+          )}
+          status={t('webhooks.readinessStatusRequired', 'Required')}
           tone="jade"
         />
         <ReadinessCard
           icon="clock"
-          title="10 second receiver budget"
-          body="Acknowledge fast, then process asynchronously. Non-2xx responses are retried."
-          status="Operational"
+          title={t('webhooks.readinessBudgetTitle', '10 second receiver budget')}
+          body={t(
+            'webhooks.readinessBudgetBody',
+            'Acknowledge fast, then process asynchronously. Non-2xx responses are retried.',
+          )}
+          status={t('webhooks.readinessStatusOperational', 'Operational')}
           tone="blue"
         />
         <ReadinessCard
           icon="warning"
-          title="Private networks blocked"
-          body="HTTPS is enforced and internal hostnames, localhost, and private IP ranges are rejected."
-          status="Protected"
+          title={t('webhooks.readinessPrivateTitle', 'Private networks blocked')}
+          body={t(
+            'webhooks.readinessPrivateBody',
+            'HTTPS is enforced and internal hostnames, localhost, and private IP ranges are rejected.',
+          )}
+          status={t('webhooks.readinessStatusProtected', 'Protected')}
           tone="purple"
         />
       </div>
@@ -121,16 +153,20 @@ export function WebhooksSection() {
         <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
-              Webhook subscriptions
+              {t('webhooks.subscriptionsTitle', 'Webhook subscriptions')}
             </h2>
             <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
               {metrics.lastActivity
-                ? `Last activity ${relativeTime(metrics.lastActivity)}`
-                : 'No delivery activity recorded yet.'}
+                ? t('webhooks.lastActivity', 'Last activity {{time}}', {
+                    time: relativeTime(metrics.lastActivity),
+                  })
+                : t('webhooks.noActivity', 'No delivery activity recorded yet.')}
             </p>
           </div>
           <Badge tone={metrics.failing > 0 ? 'tomato' : 'jade'}>
-            {metrics.failing > 0 ? `${metrics.failing} need attention` : 'All clear'}
+            {metrics.failing > 0
+              ? t('webhooks.needAttention', '{{count}} need attention', { count: metrics.failing })
+              : t('webhooks.allClear', 'All clear')}
           </Badge>
         </div>
 
@@ -141,11 +177,14 @@ export function WebhooksSection() {
         ) : subs.isError ? (
           <div className="p-5">
             <ErrorState
-              title="Failed to load webhooks"
-              message="Could not load webhook subscriptions. Check your admin permissions or refresh."
+              title={t('webhooks.errorTitle', 'Failed to load webhooks')}
+              message={t(
+                'webhooks.errorMessage',
+                'Could not load webhook subscriptions. Check your admin permissions or refresh.',
+              )}
               action={
                 <Button variant="secondary" size="sm" onClick={() => void subs.refetch()}>
-                  Retry
+                  {t('webhooks.retry', 'Retry')}
                 </Button>
               }
             />
@@ -153,12 +192,15 @@ export function WebhooksSection() {
         ) : !subs.data || subs.data.length === 0 ? (
           <div className="p-5">
             <EmptyState
-              title="No subscriptions yet"
-              message="Create a subscription to start sending signed platform events to your systems."
+              title={t('webhooks.emptyTitle', 'No subscriptions yet')}
+              message={t(
+                'webhooks.emptyMessage',
+                'Create a subscription to start sending signed platform events to your systems.',
+              )}
               action={
                 <Button size="sm" onClick={() => setShowCreate(true)}>
                   <Icon name="plus" size={14} className="mr-1.5" />
-                  Add subscription
+                  {t('webhooks.addSubscription', 'Add subscription')}
                 </Button>
               }
             />
@@ -186,11 +228,12 @@ export function WebhooksSection() {
             try {
               const created = await create.mutateAsync(body);
               setCreatedSecret({ url: created.url, secret: created.signingSecret });
-              toast.success('Webhook subscription created');
+              toast.success(t('webhooks.toastCreated', 'Webhook subscription created'));
               setShowCreate(false);
             } catch (err) {
-              toast.error('Failed to create subscription', {
-                description: err instanceof Error ? err.message : 'Server error',
+              toast.error(t('webhooks.toastCreateFailed', 'Failed to create subscription'), {
+                description:
+                  err instanceof Error ? err.message : t('webhooks.serverError', 'Server error'),
               });
             }
           }}
@@ -202,6 +245,7 @@ export function WebhooksSection() {
 }
 
 function AdminOnlyNotice() {
+  const { t } = useTranslation('settings');
   return (
     <Card className="p-5">
       <div className="flex items-start gap-4">
@@ -210,11 +254,13 @@ function AdminOnlyNotice() {
         </div>
         <div>
           <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
-            Webhooks are limited to administrators
+            {t('webhooks.adminOnlyTitle', 'Webhooks are limited to administrators')}
           </h3>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--fg-secondary)]">
-            Webhook subscriptions can push sensitive platform data to external systems, so only admins
-            can view, create, test, pause, or delete them.
+            {t(
+              'webhooks.adminOnlyBody',
+              'Webhook subscriptions can push sensitive platform data to external systems, so only admins can view, create, test, pause, or delete them.',
+            )}
           </p>
         </div>
       </div>
@@ -233,6 +279,7 @@ function MetricCard({
   icon: IconName;
   tone: BadgeTone;
 }) {
+  const { t } = useTranslation('settings');
   return (
     <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-4">
       <div className="flex items-center justify-between gap-2">
@@ -245,7 +292,9 @@ function MetricCard({
         <span className="text-2xl font-semibold tabular-nums text-[var(--fg-primary)]">
           {value}
         </span>
-        <Badge tone={tone}>{value === 0 ? 'None' : 'Live'}</Badge>
+        <Badge tone={tone}>
+          {value === 0 ? t('webhooks.metricNone', 'None') : t('webhooks.metricLive', 'Live')}
+        </Badge>
       </div>
     </div>
   );
@@ -283,6 +332,7 @@ function ReadinessCard({
 }
 
 function SigningSecretCard({ secret, url }: { secret: string; url: string }) {
+  const { t } = useTranslation('settings');
   return (
     <Card className="border-[var(--brand-primary)]/35 p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -290,13 +340,14 @@ function SigningSecretCard({ secret, url }: { secret: string; url: string }) {
           <div className="flex flex-wrap items-center gap-2">
             <Icon name="shield" size={16} className="text-[var(--brand-primary)]" />
             <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
-              Copy the signing secret now
+              {t('webhooks.signingSecretTitle', 'Copy the signing secret now')}
             </h3>
-            <Badge tone="amber">Shown once</Badge>
+            <Badge tone="amber">{t('webhooks.shownOnce', 'Shown once')}</Badge>
           </div>
           <p className="mt-2 text-sm leading-6 text-[var(--fg-secondary)]">
-            Store this secret in the receiver for <span className="font-mono"> {url}</span>. It will
-            not be shown again.
+            {t('webhooks.signingSecretBodyBefore', 'Store this secret in the receiver for')}{' '}
+            <span className="font-mono"> {url}</span>.{' '}
+            {t('webhooks.signingSecretBodyAfter', 'It will not be shown again.')}
           </p>
           <code className="mt-3 block overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 font-mono text-xs text-[var(--fg-primary)]">
             {secret}
@@ -308,14 +359,16 @@ function SigningSecretCard({ secret, url }: { secret: string; url: string }) {
           onClick={async () => {
             try {
               await navigator.clipboard.writeText(secret);
-              toast.success('Signing secret copied');
+              toast.success(t('webhooks.toastSecretCopied', 'Signing secret copied'));
             } catch {
-              toast.error('Copy failed', { description: 'Clipboard access was not available.' });
+              toast.error(t('webhooks.toastCopyFailed', 'Copy failed'), {
+                description: t('webhooks.copyFailedDescription', 'Clipboard access was not available.'),
+              });
             }
           }}
         >
           <Icon name="copy" size={14} className="mr-1.5" />
-          Copy secret
+          {t('webhooks.copySecret', 'Copy secret')}
         </Button>
       </div>
     </Card>
@@ -331,6 +384,7 @@ function SubscriptionRow({
   expanded: boolean;
   onToggleExpand: () => void;
 }) {
+  const { t } = useTranslation('settings');
   const update = useUpdateWebhookSubscription(subscription.id);
   const del = useDeleteWebhookSubscription();
   const ping = useTestWebhookPing();
@@ -340,26 +394,32 @@ function SubscriptionRow({
   const handleToggleActive = async () => {
     try {
       await update.mutateAsync({ active: !subscription.active });
-      toast.success(subscription.active ? 'Subscription paused' : 'Subscription resumed');
+      toast.success(
+        subscription.active
+          ? t('webhooks.toastPaused', 'Subscription paused')
+          : t('webhooks.toastResumed', 'Subscription resumed'),
+      );
     } catch {
-      toast.error('Failed to update subscription');
+      toast.error(t('webhooks.toastUpdateFailed', 'Failed to update subscription'));
     }
   };
 
   const handleDelete = async () => {
     const ok = await confirm({
-      title: 'Delete webhook subscription?',
-      description:
+      title: t('webhooks.deleteConfirmTitle', 'Delete webhook subscription?'),
+      description: t(
+        'webhooks.deleteConfirmDescription',
         'The endpoint will stop receiving BidStack events immediately. Delivery history is retained.',
-      confirmLabel: 'Delete',
+      ),
+      confirmLabel: t('webhooks.deleteConfirmLabel', 'Delete'),
       destructive: true,
     });
     if (!ok) return;
     try {
       await del.mutateAsync(subscription.id);
-      toast.success('Webhook subscription deleted');
+      toast.success(t('webhooks.toastDeleted', 'Webhook subscription deleted'));
     } catch {
-      toast.error('Failed to delete subscription');
+      toast.error(t('webhooks.toastDeleteFailed', 'Failed to delete subscription'));
     }
   };
 
@@ -369,15 +429,22 @@ function SubscriptionRow({
       const result = await ping.mutateAsync(subscription.id);
       setPingResult(result);
       if (result.success) {
-        toast.success(`Ping delivered - ${result.statusCode} in ${result.durationMs}ms`);
+        toast.success(
+          t('webhooks.toastPingDelivered', 'Ping delivered - {{statusCode}} in {{durationMs}}ms', {
+            statusCode: result.statusCode,
+            durationMs: result.durationMs,
+          }),
+        );
       } else {
-        toast.error('Ping failed', {
-          description: result.error ?? `HTTP ${result.statusCode}`,
+        toast.error(t('webhooks.toastPingFailed', 'Ping failed'), {
+          description:
+            result.error ??
+            t('webhooks.httpStatus', 'HTTP {{statusCode}}', { statusCode: result.statusCode }),
         });
       }
     } catch (err) {
-      toast.error('Ping error', {
-        description: err instanceof Error ? err.message : 'Unknown error',
+      toast.error(t('webhooks.toastPingError', 'Ping error'), {
+        description: err instanceof Error ? err.message : t('webhooks.unknownError', 'Unknown error'),
       });
     }
   };
@@ -399,11 +466,19 @@ function SubscriptionRow({
               {subscription.url}
             </span>
             <Badge tone={subscription.active ? 'jade' : 'gray'}>
-              {subscription.active ? 'Active' : 'Paused'}
+              {subscription.active
+                ? t('webhooks.statusActive', 'Active')
+                : t('webhooks.statusPaused', 'Paused')}
             </Badge>
             {subscription.failureCount > 0 ? (
               <Badge tone="tomato">
-                {subscription.failureCount} failure{subscription.failureCount !== 1 ? 's' : ''}
+                {subscription.failureCount === 1
+                  ? t('webhooks.failureCount.one', '{{count}} failure', {
+                      count: subscription.failureCount,
+                    })
+                  : t('webhooks.failureCount.other', '{{count}} failures', {
+                      count: subscription.failureCount,
+                    })}
               </Badge>
             ) : null}
           </div>
@@ -417,13 +492,23 @@ function SubscriptionRow({
           </div>
 
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--fg-tertiary)]">
-            <span>Created {relativeTime(subscription.createdAt)}</span>
+            <span>
+              {t('webhooks.createdAt', 'Created {{time}}', {
+                time: relativeTime(subscription.createdAt),
+              })}
+            </span>
             {subscription.lastDeliveryAt ? (
-              <span>Last delivery {relativeTime(subscription.lastDeliveryAt)}</span>
+              <span>
+                {t('webhooks.lastDelivery', 'Last delivery {{time}}', {
+                  time: relativeTime(subscription.lastDeliveryAt),
+                })}
+              </span>
             ) : null}
             {subscription.lastFailureAt ? (
               <span className="text-[var(--warning-fg)]">
-                Last failure {relativeTime(subscription.lastFailureAt)}
+                {t('webhooks.lastFailure', 'Last failure {{time}}', {
+                  time: relativeTime(subscription.lastFailureAt),
+                })}
               </span>
             ) : null}
           </div>
@@ -440,8 +525,14 @@ function SubscriptionRow({
             >
               <Icon name={pingResult.success ? 'check' : 'x'} size={12} />
               {pingResult.success
-                ? `HTTP ${pingResult.statusCode} - ${pingResult.durationMs}ms`
-                : (pingResult.error ?? `HTTP ${pingResult.statusCode ?? 'timeout'}`)}
+                ? t('webhooks.pingResultSuccess', 'HTTP {{statusCode}} - {{durationMs}}ms', {
+                    statusCode: pingResult.statusCode,
+                    durationMs: pingResult.durationMs,
+                  })
+                : (pingResult.error ??
+                  t('webhooks.pingResultFailure', 'HTTP {{statusCode}}', {
+                    statusCode: pingResult.statusCode ?? t('webhooks.timeout', 'timeout'),
+                  }))}
             </div>
           ) : null}
         </div>
@@ -452,15 +543,15 @@ function SubscriptionRow({
             size="sm"
             onClick={handlePing}
             disabled={ping.isPending || !subscription.active}
-            aria-label="Send test ping"
-            title="Send test ping"
+            aria-label={t('webhooks.pingAriaLabel', 'Send test ping')}
+            title={t('webhooks.pingAriaLabel', 'Send test ping')}
           >
             <Icon
               name={ping.isPending ? 'loader' : 'zap'}
               size={14}
               className={cn(ping.isPending && 'animate-spin')}
             />
-            <span className="ml-1.5">Ping</span>
+            <span className="ml-1.5">{t('webhooks.ping', 'Ping')}</span>
           </Button>
 
           <Button
@@ -471,7 +562,7 @@ function SubscriptionRow({
             aria-controls={`deliveries-${subscription.id}`}
           >
             <Icon name="list" size={14} />
-            <span className="ml-1.5">History</span>
+            <span className="ml-1.5">{t('webhooks.history', 'History')}</span>
             <Icon
               name="chevron-down"
               size={12}
@@ -481,7 +572,7 @@ function SubscriptionRow({
 
           <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
             <Icon name="pencil" size={14} />
-            <span className="ml-1.5">Edit</span>
+            <span className="ml-1.5">{t('webhooks.edit', 'Edit')}</span>
           </Button>
 
           <Button
@@ -489,7 +580,11 @@ function SubscriptionRow({
             size="sm"
             onClick={handleToggleActive}
             disabled={update.isPending}
-            aria-label={subscription.active ? 'Pause subscription' : 'Resume subscription'}
+            aria-label={
+              subscription.active
+                ? t('webhooks.pauseAriaLabel', 'Pause subscription')
+                : t('webhooks.resumeAriaLabel', 'Resume subscription')
+            }
           >
             <Icon name={subscription.active ? 'pause' : 'play'} size={14} />
           </Button>
@@ -499,7 +594,7 @@ function SubscriptionRow({
             size="sm"
             onClick={handleDelete}
             disabled={del.isPending}
-            aria-label="Delete subscription"
+            aria-label={t('webhooks.deleteAriaLabel', 'Delete subscription')}
           >
             <Icon name="trash" size={14} />
           </Button>
@@ -522,11 +617,12 @@ function SubscriptionRow({
           onSubmit={async (body) => {
             try {
               await update.mutateAsync(body);
-              toast.success('Webhook subscription updated');
+              toast.success(t('webhooks.toastUpdated', 'Webhook subscription updated'));
               setEditing(false);
             } catch (err) {
-              toast.error('Failed to update subscription', {
-                description: err instanceof Error ? err.message : 'Server error',
+              toast.error(t('webhooks.toastUpdateFailed', 'Failed to update subscription'), {
+                description:
+                  err instanceof Error ? err.message : t('webhooks.serverError', 'Server error'),
               });
             }
           }}
@@ -538,6 +634,7 @@ function SubscriptionRow({
 }
 
 function HealthDot({ health }: { health: 'healthy' | 'warning' | 'critical' }) {
+  const { t } = useTranslation('settings');
   return (
     <span
       className={cn(
@@ -546,7 +643,7 @@ function HealthDot({ health }: { health: 'healthy' | 'warning' | 'critical' }) {
         health === 'warning' && 'bg-[var(--warning-fg)]',
         health === 'critical' && 'bg-[var(--error-fg)]',
       )}
-      aria-label={`Health: ${health}`}
+      aria-label={t('webhooks.healthLabel', 'Health: {{health}}', { health })}
     />
   );
 }

@@ -51,5 +51,148 @@
     "connectFailed": "Ligação falhada. Verifique as suas credenciais.",
     "syncFailed": "Sincronização falhada.",
     "disconnectFailed": "Desligamento falhado."
+  },
+  "agentProviderCredentials": {
+    "toast": {
+      "activeSet": "{{label}} agora é o modelo ativo",
+      "activeCleared": "Modelo ativo limpo",
+      "activeSetDescription": "Cada etapa de IA usa este provedor até você trocar de novo, sem reimplantação.",
+      "switchFailedTitle": "Não foi possível trocar o provedor",
+      "serverRejected": "O servidor rejeitou a solicitação.",
+      "testAliveTitle": "{{label}} está ativo",
+      "testAliveDescription": "{{model}} respondeu em {{latencyMs}} ms.",
+      "testNoResponseTitle": "{{label}} não respondeu",
+      "testNoResponseDescription": "Sem resposta do provedor.",
+      "testFailedTitle": "Falha no teste",
+      "savedTitle": "{{label}} salvo",
+      "savedDescription": "O status do provedor e a prontidão do Agent Studio foram atualizados.",
+      "removedTitle": "Credenciais de {{label}} removidas",
+      "removeFailedTitle": "Falha ao remover"
+    },
+    "error": {
+      "apiKeyRequired": "É necessária uma chave de API para este provedor.",
+      "claudeModelRequired": "O Claude requer um modelo, por exemplo claude-sonnet-4-5.",
+      "saveFailed": "Não foi possível salvar as credenciais do provedor."
+    },
+    "remove": {
+      "confirmTitle": "Remover as credenciais de {{label}}?",
+      "confirmDescription": "Os agentes recorrerão às credenciais de ambiente da plataforma, se disponíveis. As definições de agentes existentes permanecem intactas.",
+      "confirmLabel": "Remover"
+    },
+    "header": {
+      "title": "Provedores de modelos",
+      "caption": "Mantenha-se independente de fornecedores: armazene chaves da organização para GPT, Claude, Kimi, NVIDIA NIM ou Gemma local e escolha a ativa. Trocar o provedor ativo passa a valer na próxima etapa de IA, sem reimplantação. As chaves são criptografadas em repouso e nunca mais são exibidas.",
+      "addProvider": "Adicionar provedor"
+    },
+    "errorState": {
+      "title": "Não foi possível carregar as chaves do provedor",
+      "message": "A prontidão do provedor ainda usa o fallback de ambiente do servidor, mas as chaves salvas da organização não puderam ser carregadas.",
+      "retry": "Tentar novamente"
+    },
+    "emptyState": {
+      "title": "Nenhuma lista de provedores retornada",
+      "message": "A API deve sempre retornar os provedores diretos suportados."
+    },
+    "summary": {
+      "savedCountOne": "{{count}} provedor da organização salvo",
+      "savedCountOther": "{{count}} provedores da organização salvos",
+      "activeBadge": "Ativo · {{label}}",
+      "noActiveBadge": "Nenhum provedor ativo — usando o padrão da plataforma",
+      "fallbackNote": "Os provedores de ambiente da plataforma permanecem disponíveis como fallback quando configurados."
+    },
+    "row": {
+      "activeBadge": "Ativo",
+      "orgKeySaved": "Chave da organização salva",
+      "noOrgKey": "Sem chave da organização",
+      "activeDescription": "Conduz cada etapa de IA deste inquilino neste momento.",
+      "readyDescription": "Salvo e pronto — defina-o como ativo para rotear a IA por ele.",
+      "fallbackDescription": "Usa o fallback de ambiente da plataforma, se configurado.",
+      "edit": "Editar",
+      "connect": "Conectar",
+      "remove": "Remover",
+      "inUse": "Em uso",
+      "setActive": "Definir como ativo",
+      "testing": "Testando…",
+      "test": "Testar",
+      "testAlive": "Ativo · {{latencyMs}} ms",
+      "testFailed": "Falhou · {{error}}",
+      "testNoResponse": "sem resposta"
+    },
+    "detail": {
+      "model": "Modelo",
+      "endpoint": "Endpoint",
+      "key": "Chave",
+      "keyOptional": "Opcional",
+      "keyNotSaved": "Não salva",
+      "updated": "Atualizado",
+      "updatedNever": "Nunca"
+    },
+    "dialog": {
+      "updateTitle": "Atualizar {{label}}",
+      "addTitle": "Adicionar provedor de modelos",
+      "description": "A chave de API é criptografada antes do armazenamento e nunca é devolvida ao navegador. Deixe a chave em branco ao editar para manter a chave salva.",
+      "providerLabel": "Provedor",
+      "apiKeyLabelOptional": "Chave de API (opcional)",
+      "apiKeyLabel": "Chave de API",
+      "apiKeyPlaceholderKeep": "Deixe em branco para manter a chave salva",
+      "apiKeyPlaceholderOptional": "Opcional para runtimes locais",
+      "apiKeyPlaceholder": "Cole a chave do provedor",
+      "modelLabel": "Modelo",
+      "baseUrlLabel": "URL base",
+      "baseUrlHintLocal": "Localhost só é aceito em desenvolvimento local. Produção exige https público.",
+      "baseUrlHint": "Deve ser um endpoint https público.",
+      "cancel": "Cancelar",
+      "saving": "Salvando...",
+      "save": "Salvar provedor"
+    }
+  },
+  "connectors": {
+    "category": {
+      "company": "Dados da empresa",
+      "market": "Mercado e dados abertos",
+      "procurement": "Compras e licitações",
+      "logo": "Logotipos e marca",
+      "people": "Pessoas e contatos",
+      "ai": "IA e agentes"
+    },
+    "header": {
+      "title": "Catálogo de conectores",
+      "caption": "Fontes de dados externas que o BidStack pode acessar. Os feeds abertos funcionam sem chaves; os feeds licenciados precisam de credenciais.",
+      "sourcesBadge": "{{count}} fontes"
+    },
+    "error": {
+      "title": "Não foi possível carregar os conectores",
+      "retry": "Tentar novamente"
+    },
+    "stat": {
+      "totalSources": "Total de fontes",
+      "healthy": "Saudáveis",
+      "needsKey": "Requer chave",
+      "degradedDown": "Degradados/inativos",
+      "catalogBadge": "catálogo"
+    },
+    "filter": {
+      "groupLabel": "Filtrar conectores por categoria",
+      "all": "Todos"
+    },
+    "empty": {
+      "title": "Nenhum conector nesta categoria"
+    },
+    "row": {
+      "checkedAt": "Verificado {{time}}",
+      "docsLink": "Docs ↗",
+      "disconnecting": "Desconectando...",
+      "disconnect": "Desconectar",
+      "connecting": "Conectando...",
+      "connect": "Conectar",
+      "requiresKey": "requer chave",
+      "open": "aberto"
+    },
+    "status": {
+      "healthy": "saudável",
+      "degraded": "degradado",
+      "down": "inativo",
+      "disabled": "desativado"
+    }
   }
 }

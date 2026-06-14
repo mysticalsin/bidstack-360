@@ -5,6 +5,7 @@
 // page is open to members; every authoring control is gated behind useIsAdmin().
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { Card } from '@/components/ui/Card';
@@ -51,6 +52,7 @@ const RUNNING = new Set(['queued', 'running']);
 
 export function AgentStudioPage() {
   useDocumentTitle();
+  const { t } = useTranslation('crm');
   const isAdmin = useIsAdmin();
   const qc = useQueryClient();
 
@@ -68,9 +70,10 @@ export function AgentStudioPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['crew-agents'] });
       qc.invalidateQueries({ queryKey: ['crews'] });
-      toast.success('Standard agents + RFP crew loaded');
+      toast.success(t('agentStudio.toastStandardLoaded', 'Standard agents + RFP crew loaded'));
     },
-    onError: () => toast.error('Could not load the standard agents'),
+    onError: () =>
+      toast.error(t('agentStudio.toastStandardLoadError', 'Could not load the standard agents')),
   });
 
   const isEmpty = !agents.isLoading && (agents.data?.items.length ?? 0) === 0;
@@ -80,12 +83,14 @@ export function AgentStudioPage() {
       <header className="page-head">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-[var(--brand-primary)]">
-            Bids &amp; RFP
+            {t('agentStudio.eyebrow', 'Bids & RFP')}
           </p>
-          <h1 className="page-title">Agent Studio</h1>
+          <h1 className="page-title">{t('agentStudio.title', 'Agent Studio')}</h1>
           <p className="page-sub">
-            Role-based AI agents that answer each step of an RFP.{' '}
-            {isAdmin ? 'Author them here.' : 'Run a crew and review the result.'}
+            {t('agentStudio.subtitle', 'Role-based AI agents that answer each step of an RFP.')}{' '}
+            {isAdmin
+              ? t('agentStudio.subtitleAdmin', 'Author them here.')
+              : t('agentStudio.subtitleMember', 'Run a crew and review the result.')}
           </p>
         </div>
         {isAdmin && (
@@ -95,7 +100,9 @@ export function AgentStudioPage() {
             disabled={seedStandard.isPending}
           >
             <Icon name="sparkle" size={14} />
-            {seedStandard.isPending ? 'Loading…' : 'Load standard agents'}
+            {seedStandard.isPending
+              ? t('agentStudio.loading', 'Loading…')
+              : t('agentStudio.loadStandardAgents', 'Load standard agents')}
           </LiquidGlassButton>
         )}
       </header>
@@ -130,25 +137,28 @@ function AgentsSection({
   onSeed: () => void;
   seedPending: boolean;
 }) {
+  const { t } = useTranslation('crm');
   const qc = useQueryClient();
   const [creating, setCreating] = useState(false);
 
   const del = useMutation({
     mutationFn: (id: string) => api(`/api/v1/crew-agents/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
-      toast.success('Agent deleted');
+      toast.success(t('agentStudio.toastAgentDeleted', 'Agent deleted'));
       return qc.invalidateQueries({ queryKey: ['crew-agents'] });
     },
-    onError: () => toast.error('Could not delete the agent'),
+    onError: () => toast.error(t('agentStudio.toastAgentDeleteError', 'Could not delete the agent')),
   });
 
   return (
     <Card>
       <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2">
-        <h2 className="text-sm font-semibold text-[var(--fg-primary)]">Agents</h2>
+        <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
+          {t('agentStudio.agentsHeading', 'Agents')}
+        </h2>
         {isAdmin && (agents.data?.items.length ?? 0) > 0 && (
           <Button variant="secondary" size="sm" onClick={() => setCreating((v) => !v)}>
-            {creating ? 'Cancel' : 'New agent'}
+            {creating ? t('agentStudio.cancel', 'Cancel') : t('agentStudio.newAgent', 'New agent')}
           </Button>
         )}
       </div>
@@ -162,11 +172,15 @@ function AgentsSection({
       ) : agents.isError ? (
         <div className="p-4">
           <ErrorState
-            title="Couldn’t load agents"
-            message={agents.error instanceof Error ? agents.error.message : 'Please retry.'}
+            title={t('agentStudio.agentsLoadErrorTitle', 'Couldn’t load agents')}
+            message={
+              agents.error instanceof Error
+                ? agents.error.message
+                : t('agentStudio.pleaseRetry', 'Please retry.')
+            }
             action={
               <Button variant="secondary" size="sm" onClick={() => agents.refetch()}>
-                Retry
+                {t('agentStudio.retry', 'Retry')}
               </Button>
             }
           />
@@ -174,16 +188,21 @@ function AgentsSection({
       ) : isEmpty ? (
         <div className="p-6">
           <EmptyState
-            title="No agents yet"
+            title={t('agentStudio.agentsEmptyTitle', 'No agents yet')}
             message={
               isAdmin
-                ? 'Load the standard legal / finance / marketing / sales agents to get started, or create your own.'
-                : 'An admin hasn’t set up any agents yet.'
+                ? t(
+                    'agentStudio.agentsEmptyAdmin',
+                    'Load the standard legal / finance / marketing / sales agents to get started, or create your own.',
+                  )
+                : t('agentStudio.agentsEmptyMember', 'An admin hasn’t set up any agents yet.')
             }
             action={
               isAdmin ? (
                 <Button onClick={onSeed} disabled={seedPending}>
-                  {seedPending ? 'Loading…' : 'Load standard agents'}
+                  {seedPending
+                    ? t('agentStudio.loading', 'Loading…')
+                    : t('agentStudio.loadStandardAgents', 'Load standard agents')}
                 </Button>
               ) : undefined
             }
@@ -205,7 +224,9 @@ function AgentsSection({
                       : 'bg-[var(--tag-jade-bg)] text-[var(--tag-jade-fg)]'
                   }`}
                 >
-                  {a.isStandard ? 'STANDARD' : 'CUSTOM'}
+                  {a.isStandard
+                    ? t('agentStudio.badgeStandard', 'STANDARD')
+                    : t('agentStudio.badgeCustom', 'CUSTOM')}
                 </span>
               </div>
               <p className="mt-1 text-xs text-[var(--fg-secondary)]">{a.goal}</p>
@@ -215,19 +236,25 @@ function AgentsSection({
                   <button
                     onClick={async () => {
                       const ok = await confirm({
-                        title: `Delete ${a.role}?`,
-                        description:
+                        title: t('agentStudio.deleteAgentConfirmTitle', 'Delete {{role}}?', {
+                          role: a.role,
+                        }),
+                        description: t(
+                          'agentStudio.deleteAgentConfirmDescription',
                           'This removes the agent from every crew that uses it. This cannot be undone.',
-                        confirmLabel: 'Delete',
+                        ),
+                        confirmLabel: t('agentStudio.delete', 'Delete'),
                         destructive: true,
                       });
                       if (ok) del.mutate(a.id);
                     }}
                     disabled={del.isPending && del.variables === a.id}
-                    aria-label={`Delete ${a.role}`}
+                    aria-label={t('agentStudio.deleteAgentAriaLabel', 'Delete {{role}}', {
+                      role: a.role,
+                    })}
                     className="inline-flex h-9 items-center gap-1 rounded-md px-2 text-xs text-[var(--fg-tertiary)] hover:text-[var(--danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] pointer-coarse:min-h-11"
                   >
-                    <Icon name="trash" size={13} /> Delete
+                    <Icon name="trash" size={13} /> {t('agentStudio.delete', 'Delete')}
                   </button>
                 </div>
               )}
@@ -240,6 +267,7 @@ function AgentsSection({
 }
 
 function NewAgentForm({ onDone }: { onDone: () => void }) {
+  const { t } = useTranslation('crm');
   const qc = useQueryClient();
   const [form, setForm] = useState({ agentKey: '', role: '', goal: '', backstory: '' });
   const create = useMutation({
@@ -255,8 +283,8 @@ function NewAgentForm({ onDone }: { onDone: () => void }) {
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <input
           className="dialog-input"
-          placeholder="Key (e.g. security_lead)"
-          aria-label="Agent key"
+          placeholder={t('agentStudio.agentKeyPlaceholder', 'Key (e.g. security_lead)')}
+          aria-label={t('agentStudio.agentKeyAriaLabel', 'Agent key')}
           value={form.agentKey}
           onChange={(e) =>
             setForm({ ...form, agentKey: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '') })
@@ -264,37 +292,44 @@ function NewAgentForm({ onDone }: { onDone: () => void }) {
         />
         <input
           className="dialog-input"
-          placeholder="Role (e.g. Security Lead)"
-          aria-label="Role"
+          placeholder={t('agentStudio.rolePlaceholder', 'Role (e.g. Security Lead)')}
+          aria-label={t('agentStudio.roleAriaLabel', 'Role')}
           value={form.role}
           onChange={(e) => setForm({ ...form, role: e.target.value })}
         />
       </div>
       <input
         className="dialog-input w-full"
-        placeholder="Goal — what this agent is responsible for"
-        aria-label="Goal"
+        placeholder={t('agentStudio.goalPlaceholder', 'Goal — what this agent is responsible for')}
+        aria-label={t('agentStudio.goalAriaLabel', 'Goal')}
         value={form.goal}
         onChange={(e) => setForm({ ...form, goal: e.target.value })}
       />
       <textarea
         className="dialog-input min-h-[64px] w-full"
-        placeholder="Backstory — the expertise + voice that shapes its answers"
-        aria-label="Backstory"
+        placeholder={t(
+          'agentStudio.backstoryPlaceholder',
+          'Backstory — the expertise + voice that shapes its answers',
+        )}
+        aria-label={t('agentStudio.backstoryAriaLabel', 'Backstory')}
         value={form.backstory}
         onChange={(e) => setForm({ ...form, backstory: e.target.value })}
       />
       {create.isError && (
         <p role="alert" className="text-xs text-[var(--danger)]">
-          {create.error instanceof Error ? create.error.message : 'Failed to create agent.'}
+          {create.error instanceof Error
+            ? create.error.message
+            : t('agentStudio.createAgentError', 'Failed to create agent.')}
         </p>
       )}
       <div className="flex justify-end gap-2">
         <Button variant="secondary" size="sm" onClick={onDone}>
-          Cancel
+          {t('agentStudio.cancel', 'Cancel')}
         </Button>
         <Button size="sm" onClick={() => create.mutate()} disabled={!valid || create.isPending}>
-          {create.isPending ? 'Creating…' : 'Create agent'}
+          {create.isPending
+            ? t('agentStudio.creating', 'Creating…')
+            : t('agentStudio.createAgent', 'Create agent')}
         </Button>
       </div>
     </div>
@@ -310,14 +345,17 @@ function CrewsSection({
   crews: ReturnType<typeof useQuery<{ items: CrewListItem[] }>>;
   agents: CrewAgent[];
 }) {
+  const { t } = useTranslation('crm');
   const [runCrewId, setRunCrewId] = useState<string | null>(null);
 
   return (
     <Card>
       <div className="border-b border-[var(--border-subtle)] px-4 py-2">
-        <h2 className="text-sm font-semibold text-[var(--fg-primary)]">Crews</h2>
+        <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
+          {t('agentStudio.crewsHeading', 'Crews')}
+        </h2>
         <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
-          A crew runs its agents over your RFP, step by step.
+          {t('agentStudio.crewsSubtitle', 'A crew runs its agents over your RFP, step by step.')}
         </p>
       </div>
       {crews.isLoading ? (
@@ -327,11 +365,15 @@ function CrewsSection({
       ) : crews.isError ? (
         <div className="p-4">
           <ErrorState
-            title="Couldn’t load crews"
-            message={crews.error instanceof Error ? crews.error.message : 'Please retry.'}
+            title={t('agentStudio.crewsLoadErrorTitle', 'Couldn’t load crews')}
+            message={
+              crews.error instanceof Error
+                ? crews.error.message
+                : t('agentStudio.pleaseRetry', 'Please retry.')
+            }
             action={
               <Button variant="secondary" size="sm" onClick={() => crews.refetch()}>
-                Retry
+                {t('agentStudio.retry', 'Retry')}
               </Button>
             }
           />
@@ -339,8 +381,11 @@ function CrewsSection({
       ) : (crews.data?.items.length ?? 0) === 0 ? (
         <div className="p-6">
           <EmptyState
-            title="No crews yet"
-            message="Once agents exist, an admin can assemble them into a crew. The standard set ships with a ready-to-run RFP Response Crew."
+            title={t('agentStudio.crewsEmptyTitle', 'No crews yet')}
+            message={t(
+              'agentStudio.crewsEmptyMessage',
+              'Once agents exist, an admin can assemble them into a crew. The standard set ships with a ready-to-run RFP Response Crew.',
+            )}
           />
         </div>
       ) : (
@@ -351,7 +396,8 @@ function CrewsSection({
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-[var(--fg-primary)]">{c.name}</div>
                   <div className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
-                    {c.process} · {c.taskCount} step{c.taskCount === 1 ? '' : 's'}
+                    {c.process} ·{' '}
+                    {t('agentStudio.stepCount', '{{count}} step', { count: c.taskCount })}
                   </div>
                 </div>
                 <Button
@@ -359,7 +405,9 @@ function CrewsSection({
                   onClick={() => setRunCrewId(runCrewId === c.id ? null : c.id)}
                   aria-expanded={runCrewId === c.id}
                 >
-                  {runCrewId === c.id ? 'Close' : 'Run'}
+                  {runCrewId === c.id
+                    ? t('agentStudio.close', 'Close')
+                    : t('agentStudio.run', 'Run')}
                 </Button>
               </div>
               {runCrewId === c.id && <RunPanel crewId={c.id} agents={agents} />}
@@ -372,6 +420,7 @@ function CrewsSection({
 }
 
 function RunPanel({ crewId, agents }: { crewId: string; agents: CrewAgent[] }) {
+  const { t } = useTranslation('crm');
   const [rfp, setRfp] = useState('');
   const [runId, setRunId] = useState<string | null>(null);
 
@@ -382,7 +431,7 @@ function RunPanel({ crewId, agents }: { crewId: string; agents: CrewAgent[] }) {
         body: { inputs: { rfp } },
       }),
     onSuccess: (data) => setRunId(data.runId),
-    onError: () => toast.error('Could not start the run'),
+    onError: () => toast.error(t('agentStudio.toastRunStartError', 'Could not start the run')),
   });
 
   const run = useQuery<CrewRun>({
@@ -398,8 +447,8 @@ function RunPanel({ crewId, agents }: { crewId: string; agents: CrewAgent[] }) {
     <div className="space-y-3 bg-[var(--surface-sunken)] px-4 py-3">
       <textarea
         className="dialog-input min-h-[96px] w-full"
-        placeholder="Paste the RFP text here…"
-        aria-label="RFP text"
+        placeholder={t('agentStudio.rfpPlaceholder', 'Paste the RFP text here…')}
+        aria-label={t('agentStudio.rfpAriaLabel', 'RFP text')}
         value={rfp}
         onChange={(e) => setRfp(e.target.value)}
         disabled={start.isPending || Boolean(runId)}
@@ -411,13 +460,17 @@ function RunPanel({ crewId, agents }: { crewId: string; agents: CrewAgent[] }) {
             onClick={() => start.mutate()}
             disabled={!rfp.trim() || start.isPending}
           >
-            {start.isPending ? 'Starting…' : 'Run crew'}
+            {start.isPending
+              ? t('agentStudio.starting', 'Starting…')
+              : t('agentStudio.runCrew', 'Run crew')}
           </Button>
         </div>
       )}
       {start.isError && (
         <p role="alert" className="text-xs text-[var(--danger)]">
-          {start.error instanceof Error ? start.error.message : 'Failed to start the run.'}
+          {start.error instanceof Error
+            ? start.error.message
+            : t('agentStudio.runStartError', 'Failed to start the run.')}
         </p>
       )}
 
@@ -432,7 +485,8 @@ function RunPanel({ crewId, agents }: { crewId: string; agents: CrewAgent[] }) {
               {run.data && RUNNING.has(run.data.status) ? (
                 <Icon name="loader" size={13} className="animate-spin" />
               ) : null}
-              Status: <span className="font-medium">{run.data?.status ?? 'queued'}</span>
+              {t('agentStudio.statusLabel', 'Status:')}{' '}
+              <span className="font-medium">{run.data?.status ?? 'queued'}</span>
             </div>
             {(run.isError || (run.data && !RUNNING.has(run.data.status))) && (
               <Button
@@ -443,19 +497,19 @@ function RunPanel({ crewId, agents }: { crewId: string; agents: CrewAgent[] }) {
                   start.reset();
                 }}
               >
-                Run another
+                {t('agentStudio.runAnother', 'Run another')}
               </Button>
             )}
           </div>
 
           {run.isError && (
             <p role="alert" className="text-xs text-[var(--danger)]">
-              Couldn’t load the run status — reconnecting…
+              {t('agentStudio.runStatusError', 'Couldn’t load the run status — reconnecting…')}
             </p>
           )}
           {run.data?.status === 'failed' && (
             <p role="alert" className="text-xs text-[var(--danger)]">
-              {run.data.error ?? 'The run failed.'}
+              {run.data.error ?? t('agentStudio.runFailed', 'The run failed.')}
             </p>
           )}
 
@@ -469,7 +523,11 @@ function RunPanel({ crewId, agents }: { crewId: string; agents: CrewAgent[] }) {
               <div className="flex items-center gap-2 text-xs font-semibold text-[var(--fg-primary)]">
                 {roleByKey.get(s.agentId) ?? s.agentId}
                 <span className="text-[var(--fg-tertiary)]">· {s.taskId}</span>
-                {!s.ok && <span className="text-[var(--tag-amber-fg)]">· fallback</span>}
+                {!s.ok && (
+                  <span className="text-[var(--tag-amber-fg)]">
+                    · {t('agentStudio.fallback', 'fallback')}
+                  </span>
+                )}
               </div>
               <p className="mt-1 whitespace-pre-wrap text-xs text-[var(--fg-secondary)]">
                 {s.output}
@@ -493,8 +551,11 @@ function RunPanel({ crewId, agents }: { crewId: string; agents: CrewAgent[] }) {
                 }`}
               >
                 {run.data.status === 'partial'
-                  ? 'Final response (some steps used a fallback)'
-                  : 'Final response'}
+                  ? t(
+                      'agentStudio.finalResponsePartial',
+                      'Final response (some steps used a fallback)',
+                    )
+                  : t('agentStudio.finalResponse', 'Final response')}
               </div>
               <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--fg-primary)]">
                 {run.data.finalOutput}

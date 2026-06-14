@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -64,6 +65,7 @@ function providerMeta(provider: DirectAgentProvider) {
 }
 
 export function AgentProviderCredentialsCard() {
+  const { t } = useTranslation('integrations');
   const isAdmin = useIsAdmin();
   const credentials = useAgentProviderCredentials();
   const save = useSaveAgentProviderCredential();
@@ -84,12 +86,24 @@ export function AgentProviderCredentialsCard() {
     try {
       await setActive.mutateAsync(provider);
       toast.success(
-        provider ? `${providerMeta(provider).label} is now the active model` : 'Active model cleared',
-        { description: 'Every AI step uses this provider until you switch again — no redeploy.' },
+        provider
+          ? t('agentProviderCredentials.toast.activeSet', '{{label}} is now the active model', {
+              label: providerMeta(provider).label,
+            })
+          : t('agentProviderCredentials.toast.activeCleared', 'Active model cleared'),
+        {
+          description: t(
+            'agentProviderCredentials.toast.activeSetDescription',
+            'Every AI step uses this provider until you switch again — no redeploy.',
+          ),
+        },
       );
     } catch (err) {
-      toast.error('Could not switch provider', {
-        description: err instanceof Error ? err.message : 'The server rejected the request.',
+      toast.error(t('agentProviderCredentials.toast.switchFailedTitle', 'Could not switch provider'), {
+        description:
+          err instanceof Error
+            ? err.message
+            : t('agentProviderCredentials.toast.serverRejected', 'The server rejected the request.'),
       });
     }
   };
@@ -100,17 +114,36 @@ export function AgentProviderCredentialsCard() {
       const result = await test.mutateAsync(provider);
       setTestResults((prev) => ({ ...prev, [provider]: result }));
       if (result.ok) {
-        toast.success(`${providerMeta(provider).label} is alive`, {
-          description: `${result.model ?? 'model'} responded in ${result.latencyMs} ms.`,
-        });
+        toast.success(
+          t('agentProviderCredentials.toast.testAliveTitle', '{{label}} is alive', {
+            label: providerMeta(provider).label,
+          }),
+          {
+            description: t(
+              'agentProviderCredentials.toast.testAliveDescription',
+              '{{model}} responded in {{latencyMs}} ms.',
+              { model: result.model ?? 'model', latencyMs: result.latencyMs },
+            ),
+          },
+        );
       } else {
-        toast.error(`${providerMeta(provider).label} did not respond`, {
-          description: result.error ?? 'No response from the provider.',
-        });
+        toast.error(
+          t('agentProviderCredentials.toast.testNoResponseTitle', '{{label}} did not respond', {
+            label: providerMeta(provider).label,
+          }),
+          {
+            description:
+              result.error ??
+              t('agentProviderCredentials.toast.testNoResponseDescription', 'No response from the provider.'),
+          },
+        );
       }
     } catch (err) {
-      toast.error('Test failed', {
-        description: err instanceof Error ? err.message : 'The server rejected the request.',
+      toast.error(t('agentProviderCredentials.toast.testFailedTitle', 'Test failed'), {
+        description:
+          err instanceof Error
+            ? err.message
+            : t('agentProviderCredentials.toast.serverRejected', 'The server rejected the request.'),
       });
     } finally {
       setTestingProvider(null);
@@ -144,11 +177,18 @@ export function AgentProviderCredentialsCard() {
     const baseUrl = String(fd.get('baseUrl') ?? '').trim();
 
     if (!meta.keyOptional && !apiKey && !editing.configured) {
-      setError('API key is required for this provider.');
+      setError(
+        t('agentProviderCredentials.error.apiKeyRequired', 'API key is required for this provider.'),
+      );
       return;
     }
     if (provider === 'claude' && !model && !editing.model) {
-      setError('Claude requires a model, for example claude-sonnet-4-5.');
+      setError(
+        t(
+          'agentProviderCredentials.error.claudeModelRequired',
+          'Claude requires a model, for example claude-sonnet-4-5.',
+        ),
+      );
       return;
     }
 
@@ -160,30 +200,51 @@ export function AgentProviderCredentialsCard() {
         baseUrl: baseUrl || undefined,
       });
       setEditing(null);
-      toast.success(`${meta.label} saved`, {
-        description: 'Provider status and Agent Studio readiness were refreshed.',
-      });
+      toast.success(
+        t('agentProviderCredentials.toast.savedTitle', '{{label}} saved', { label: meta.label }),
+        {
+          description: t(
+            'agentProviderCredentials.toast.savedDescription',
+            'Provider status and Agent Studio readiness were refreshed.',
+          ),
+        },
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save provider credentials.');
+      setError(
+        err instanceof Error
+          ? err.message
+          : t('agentProviderCredentials.error.saveFailed', 'Could not save provider credentials.'),
+      );
     }
   };
 
   const onRemove = async (provider: DirectAgentProvider) => {
     const meta = providerMeta(provider);
     const ok = await confirm({
-      title: `Remove ${meta.label} credentials?`,
-      description:
+      title: t('agentProviderCredentials.remove.confirmTitle', 'Remove {{label}} credentials?', {
+        label: meta.label,
+      }),
+      description: t(
+        'agentProviderCredentials.remove.confirmDescription',
         'Agents will fall back to platform env credentials if available. Existing agent definitions stay intact.',
-      confirmLabel: 'Remove',
+      ),
+      confirmLabel: t('agentProviderCredentials.remove.confirmLabel', 'Remove'),
       destructive: true,
     });
     if (!ok) return;
     try {
       await remove.mutateAsync(provider);
-      toast.success(`${meta.label} credentials removed`);
+      toast.success(
+        t('agentProviderCredentials.toast.removedTitle', '{{label}} credentials removed', {
+          label: meta.label,
+        }),
+      );
     } catch (err) {
-      toast.error('Remove failed', {
-        description: err instanceof Error ? err.message : 'The server rejected the request.',
+      toast.error(t('agentProviderCredentials.toast.removeFailedTitle', 'Remove failed'), {
+        description:
+          err instanceof Error
+            ? err.message
+            : t('agentProviderCredentials.toast.serverRejected', 'The server rejected the request.'),
       });
     }
   };
@@ -191,12 +252,15 @@ export function AgentProviderCredentialsCard() {
   return (
     <Card>
       <SectionHeader
-        title="Model providers"
-        caption="Stay vendor-independent: store org-owned keys for GPT, Claude, Kimi, NVIDIA NIM, or local Gemma, then pick the active one. Switching the active provider takes effect on the next AI step — no redeploy. Keys are encrypted at rest and never shown again."
+        title={t('agentProviderCredentials.header.title', 'Model providers')}
+        caption={t(
+          'agentProviderCredentials.header.caption',
+          'Stay vendor-independent: store org-owned keys for GPT, Claude, Kimi, NVIDIA NIM, or local Gemma, then pick the active one. Switching the active provider takes effect on the next AI step — no redeploy. Keys are encrypted at rest and never shown again.',
+        )}
         action={
           isAdmin ? (
             <Button size="sm" onClick={openNew}>
-              Add provider
+              {t('agentProviderCredentials.header.addProvider', 'Add provider')}
             </Button>
           ) : null
         }
@@ -207,31 +271,57 @@ export function AgentProviderCredentialsCard() {
           <LoadingSkeleton rows={3} />
         ) : credentials.isError ? (
           <ErrorState
-            title="Could not load provider keys"
-            message="Provider readiness still uses server env fallback, but saved org keys could not be loaded."
+            title={t('agentProviderCredentials.errorState.title', 'Could not load provider keys')}
+            message={t(
+              'agentProviderCredentials.errorState.message',
+              'Provider readiness still uses server env fallback, but saved org keys could not be loaded.',
+            )}
             action={
               <Button size="sm" variant="secondary" onClick={() => void credentials.refetch()}>
-                Retry
+                {t('agentProviderCredentials.errorState.retry', 'Retry')}
               </Button>
             }
           />
         ) : items.length === 0 ? (
           <EmptyState
-            title="No provider list returned"
-            message="The API should always return the supported direct providers."
+            title={t('agentProviderCredentials.emptyState.title', 'No provider list returned')}
+            message={t(
+              'agentProviderCredentials.emptyState.message',
+              'The API should always return the supported direct providers.',
+            )}
           />
         ) : (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--fg-secondary)]">
               <Badge tone={configuredCount > 0 ? 'jade' : 'amber'}>
-                {configuredCount} org provider{configuredCount === 1 ? '' : 's'} saved
+                {configuredCount === 1
+                  ? t('agentProviderCredentials.summary.savedCountOne', '{{count}} org provider saved', {
+                      count: configuredCount,
+                    })
+                  : t('agentProviderCredentials.summary.savedCountOther', '{{count}} org providers saved', {
+                      count: configuredCount,
+                    })}
               </Badge>
               {active ? (
-                <Badge tone="purple">Active · {providerMeta(active).label}</Badge>
+                <Badge tone="purple">
+                  {t('agentProviderCredentials.summary.activeBadge', 'Active · {{label}}', {
+                    label: providerMeta(active).label,
+                  })}
+                </Badge>
               ) : (
-                <Badge tone="gray">No active provider — using platform default</Badge>
+                <Badge tone="gray">
+                  {t(
+                    'agentProviderCredentials.summary.noActiveBadge',
+                    'No active provider — using platform default',
+                  )}
+                </Badge>
               )}
-              <span>Platform env providers remain available as fallback when configured.</span>
+              <span>
+                {t(
+                  'agentProviderCredentials.summary.fallbackNote',
+                  'Platform env providers remain available as fallback when configured.',
+                )}
+              </span>
             </div>
             <ul className="grid gap-3 lg:grid-cols-2">
               {items.map((item) => (
@@ -300,6 +390,7 @@ function ProviderRow({
   onTest: () => void;
   removePending: boolean;
 }) {
+  const { t } = useTranslation('integrations');
   const meta = providerMeta(item.provider);
   return (
     <li
@@ -311,23 +402,32 @@ function ProviderRow({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-semibold text-[var(--fg-primary)]">{meta.label}</h3>
-            {isActive ? <Badge tone="purple">Active</Badge> : null}
+            {isActive ? (
+              <Badge tone="purple">{t('agentProviderCredentials.row.activeBadge', 'Active')}</Badge>
+            ) : null}
             <Badge tone={item.configured ? 'jade' : 'gray'}>
-              {item.configured ? 'Org key saved' : 'No org key'}
+              {item.configured
+                ? t('agentProviderCredentials.row.orgKeySaved', 'Org key saved')
+                : t('agentProviderCredentials.row.noOrgKey', 'No org key')}
             </Badge>
           </div>
           <p className="mt-1 text-xs text-[var(--fg-secondary)]">
             {isActive
-              ? 'Drives every AI step for this tenant right now.'
+              ? t('agentProviderCredentials.row.activeDescription', 'Drives every AI step for this tenant right now.')
               : item.configured
-                ? 'Saved and ready — set it active to route AI through it.'
-                : 'Uses platform env fallback if configured.'}
+                ? t(
+                    'agentProviderCredentials.row.readyDescription',
+                    'Saved and ready — set it active to route AI through it.',
+                  )
+                : t('agentProviderCredentials.row.fallbackDescription', 'Uses platform env fallback if configured.')}
           </p>
         </div>
         {isAdmin ? (
           <div className="flex shrink-0 items-center gap-1">
             <Button size="sm" variant="secondary" onClick={onEdit}>
-              {item.configured ? 'Edit' : 'Connect'}
+              {item.configured
+                ? t('agentProviderCredentials.row.edit', 'Edit')
+                : t('agentProviderCredentials.row.connect', 'Connect')}
             </Button>
             {item.configured ? (
               <Button
@@ -337,29 +437,49 @@ function ProviderRow({
                 onClick={onRemove}
                 disabled={removePending}
               >
-                Remove
+                {t('agentProviderCredentials.row.remove', 'Remove')}
               </Button>
             ) : null}
           </div>
         ) : null}
       </div>
       <dl className="mt-4 grid gap-3 text-xs sm:grid-cols-2">
-        <Detail label="Model" value={item.model ?? meta.placeholderModel} />
-        <Detail label="Endpoint" value={item.baseUrl ?? meta.placeholderBaseUrl} />
-        <Detail label="Key" value={item.apiKeyMasked ?? (meta.keyOptional ? 'Optional' : 'Not saved')} />
-        <Detail label="Updated" value={item.updatedAt ? new Date(item.updatedAt).toLocaleString() : 'Never'} />
+        <Detail label={t('agentProviderCredentials.detail.model', 'Model')} value={item.model ?? meta.placeholderModel} />
+        <Detail
+          label={t('agentProviderCredentials.detail.endpoint', 'Endpoint')}
+          value={item.baseUrl ?? meta.placeholderBaseUrl}
+        />
+        <Detail
+          label={t('agentProviderCredentials.detail.key', 'Key')}
+          value={
+            item.apiKeyMasked ??
+            (meta.keyOptional
+              ? t('agentProviderCredentials.detail.keyOptional', 'Optional')
+              : t('agentProviderCredentials.detail.keyNotSaved', 'Not saved'))
+          }
+        />
+        <Detail
+          label={t('agentProviderCredentials.detail.updated', 'Updated')}
+          value={
+            item.updatedAt
+              ? new Date(item.updatedAt).toLocaleString()
+              : t('agentProviderCredentials.detail.updatedNever', 'Never')
+          }
+        />
       </dl>
       {isAdmin && item.configured ? (
         <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)] pt-3">
           {isActive ? (
-            <Badge tone="purple">In use</Badge>
+            <Badge tone="purple">{t('agentProviderCredentials.row.inUse', 'In use')}</Badge>
           ) : (
             <Button size="sm" onClick={onSetActive} disabled={setActivePending}>
-              Set active
+              {t('agentProviderCredentials.row.setActive', 'Set active')}
             </Button>
           )}
           <Button size="sm" variant="secondary" onClick={onTest} disabled={testPending}>
-            {testPending ? 'Testing…' : 'Test'}
+            {testPending
+              ? t('agentProviderCredentials.row.testing', 'Testing…')
+              : t('agentProviderCredentials.row.test', 'Test')}
           </Button>
           {testResult ? (
             <span
@@ -367,8 +487,14 @@ function ProviderRow({
               className={`text-xs ${testResult.ok ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}
             >
               {testResult.ok
-                ? `Alive · ${testResult.latencyMs} ms`
-                : `Failed · ${testResult.error ?? 'no response'}`}
+                ? t('agentProviderCredentials.row.testAlive', 'Alive · {{latencyMs}} ms', {
+                    latencyMs: testResult.latencyMs,
+                  })
+                : t('agentProviderCredentials.row.testFailed', 'Failed · {{error}}', {
+                    error:
+                      testResult.error ??
+                      t('agentProviderCredentials.row.testNoResponse', 'no response'),
+                  })}
             </span>
           ) : null}
         </div>
@@ -394,17 +520,25 @@ function ProviderDialog({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation('integrations');
   const meta = providerMeta(draftProvider);
   return (
     <Dialog open={Boolean(editing)} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        title={editing?.configured ? `Update ${meta.label}` : 'Add model provider'}
-        description="The API key is encrypted before storage and never returned to the browser. Leave the key blank when editing to keep the saved key."
+        title={
+          editing?.configured
+            ? t('agentProviderCredentials.dialog.updateTitle', 'Update {{label}}', { label: meta.label })
+            : t('agentProviderCredentials.dialog.addTitle', 'Add model provider')
+        }
+        description={t(
+          'agentProviderCredentials.dialog.description',
+          'The API key is encrypted before storage and never returned to the browser. Leave the key blank when editing to keep the saved key.',
+        )}
       >
         {editing ? (
           <form onSubmit={onSubmit} className="space-y-4">
             <label className="block text-xs font-medium text-[var(--fg-secondary)]">
-              Provider
+              {t('agentProviderCredentials.dialog.providerLabel', 'Provider')}
               <select
                 name="provider"
                 value={draftProvider}
@@ -420,32 +554,45 @@ function ProviderDialog({
               </select>
             </label>
             <Field
-              label={meta.keyOptional ? 'API key (optional)' : 'API key'}
+              label={
+                meta.keyOptional
+                  ? t('agentProviderCredentials.dialog.apiKeyLabelOptional', 'API key (optional)')
+                  : t('agentProviderCredentials.dialog.apiKeyLabel', 'API key')
+              }
               name="apiKey"
               type="password"
               placeholder={
                 editing.configured
-                  ? 'Leave blank to keep the saved key'
+                  ? t(
+                      'agentProviderCredentials.dialog.apiKeyPlaceholderKeep',
+                      'Leave blank to keep the saved key',
+                    )
                   : meta.keyOptional
-                    ? 'Optional for local runtimes'
-                    : 'Paste provider key'
+                    ? t(
+                        'agentProviderCredentials.dialog.apiKeyPlaceholderOptional',
+                        'Optional for local runtimes',
+                      )
+                    : t('agentProviderCredentials.dialog.apiKeyPlaceholder', 'Paste provider key')
               }
             />
             <Field
-              label="Model"
+              label={t('agentProviderCredentials.dialog.modelLabel', 'Model')}
               name="model"
               defaultValue={editing.model ?? ''}
               placeholder={meta.placeholderModel}
             />
             <Field
-              label="Base URL"
+              label={t('agentProviderCredentials.dialog.baseUrlLabel', 'Base URL')}
               name="baseUrl"
               defaultValue={editing.baseUrl ?? ''}
               placeholder={meta.placeholderBaseUrl}
               hint={
                 draftProvider === 'gemma'
-                  ? 'Localhost is accepted only in local development. Production requires public https.'
-                  : 'Must be a public https endpoint.'
+                  ? t(
+                      'agentProviderCredentials.dialog.baseUrlHintLocal',
+                      'Localhost is accepted only in local development. Production requires public https.',
+                    )
+                  : t('agentProviderCredentials.dialog.baseUrlHint', 'Must be a public https endpoint.')
               }
             />
             {error ? (
@@ -459,11 +606,13 @@ function ProviderDialog({
             <div className="flex items-center justify-end gap-2 pt-1">
               <DialogClose asChild>
                 <Button type="button" variant="secondary" size="sm">
-                  Cancel
+                  {t('agentProviderCredentials.dialog.cancel', 'Cancel')}
                 </Button>
               </DialogClose>
               <Button type="submit" size="sm" disabled={savePending}>
-                {savePending ? 'Saving...' : 'Save provider'}
+                {savePending
+                  ? t('agentProviderCredentials.dialog.saving', 'Saving...')
+                  : t('agentProviderCredentials.dialog.save', 'Save provider')}
               </Button>
             </div>
           </form>

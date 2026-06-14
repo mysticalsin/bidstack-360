@@ -19,6 +19,7 @@
  */
 
 import { useState, useRef, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -40,37 +41,6 @@ import { cn } from '@/lib/cn';
 import type { BadgeTone } from '@/components/ui/Badge';
 
 // ─── Constants / maps ─────────────────────────────────────────────────────────
-
-const PROVIDER_OPTIONS: { value: CallProvider | ''; label: string }[] = [
-  { value: '', label: 'All providers' },
-  { value: 'ZOOM', label: 'Zoom' },
-  { value: 'TEAMS', label: 'Teams' },
-  { value: 'GOOGLE_MEET', label: 'Google Meet' },
-  { value: 'TWILIO_VOICE', label: 'Twilio Voice' },
-];
-
-const ENTITY_OPTIONS: { value: CallEntityType | ''; label: string }[] = [
-  { value: '', label: 'All types' },
-  { value: 'DEAL', label: 'Deal' },
-  { value: 'CONTACT', label: 'Contact' },
-  { value: 'OPPORTUNITY', label: 'Opportunity' },
-  { value: 'LEAD', label: 'Lead' },
-];
-
-const STATUS_OPTIONS: { value: CallStatus | ''; label: string }[] = [
-  { value: '', label: 'All statuses' },
-  { value: 'SCHEDULED', label: 'Scheduled' },
-  { value: 'LIVE', label: 'Live' },
-  { value: 'COMPLETED', label: 'Completed' },
-  { value: 'FAILED', label: 'Failed' },
-  { value: 'CANCELLED', label: 'Cancelled' },
-];
-
-const DATE_OPTIONS = [
-  { value: 'all', label: 'All time' },
-  { value: 'week', label: 'This week' },
-  { value: 'month', label: 'This month' },
-];
 
 const PROVIDER_ICON: Record<string, string> = {
   ZOOM: '📹',
@@ -128,10 +98,11 @@ function DetailPanel({ callSessionId, open, onOpenChange }: DetailPanelProps) {
   const [tab, setTab] = useState<DetailTab>('summary');
   const audioRef = useRef<HTMLAudioElement>(null);
   const { data: call } = useCall(callSessionId);
+  const { t } = useTranslation('crm');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent title="Call detail" className="w-[min(720px,96vw)] max-h-[90vh]">
+      <DialogContent title={t('calls.detail.title', 'Call detail')} className="w-[min(720px,96vw)] max-h-[90vh]">
         {/* Tab bar */}
         <div className="flex gap-1 border-b border-[var(--border-subtle)] px-5 pb-0 pt-3">
           {(['summary', 'transcript'] as DetailTab[]).map((t) => (
@@ -164,7 +135,7 @@ function DetailPanel({ callSessionId, open, onOpenChange }: DetailPanelProps) {
                 src={call.signedRecordingUrl}
                 controls
                 className="w-full rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
-                aria-label="Call recording"
+                aria-label={t('calls.detail.recordingAria', 'Call recording')}
               />
             </div>
           )}
@@ -188,11 +159,67 @@ function DetailPanel({ callSessionId, open, onOpenChange }: DetailPanelProps) {
 // ─── CallsPage ────────────────────────────────────────────────────────────────
 
 export default function CallsPage() {
+  const { t } = useTranslation('crm');
   const [entityType, setEntityType] = useState<CallEntityType | ''>('');
   const [provider, setProvider] = useState<CallProvider | ''>('');
   const [status, setStatus] = useState<CallStatus | ''>('');
   const [dateRange, setDateRange] = useState('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const entityOptions = useMemo(
+    () => [
+      { value: '' as const, label: t('calls.filter.entity.all', 'All types') },
+      { value: 'DEAL' as const, label: t('calls.filter.entity.deal', 'Deal') },
+      { value: 'CONTACT' as const, label: t('calls.filter.entity.contact', 'Contact') },
+      { value: 'OPPORTUNITY' as const, label: t('calls.filter.entity.opportunity', 'Opportunity') },
+      { value: 'LEAD' as const, label: t('calls.filter.entity.lead', 'Lead') },
+    ],
+    [t],
+  );
+
+  const providerOptions = useMemo(
+    () => [
+      { value: '' as const, label: t('calls.filter.provider.all', 'All providers') },
+      { value: 'ZOOM' as const, label: t('calls.filter.provider.zoom', 'Zoom') },
+      { value: 'TEAMS' as const, label: t('calls.filter.provider.teams', 'Teams') },
+      { value: 'GOOGLE_MEET' as const, label: t('calls.filter.provider.googleMeet', 'Google Meet') },
+      { value: 'TWILIO_VOICE' as const, label: t('calls.filter.provider.twilioVoice', 'Twilio Voice') },
+    ],
+    [t],
+  );
+
+  const statusOptions = useMemo(
+    () => [
+      { value: '' as const, label: t('calls.filter.status.all', 'All statuses') },
+      { value: 'SCHEDULED' as const, label: t('calls.filter.status.scheduled', 'Scheduled') },
+      { value: 'LIVE' as const, label: t('calls.filter.status.live', 'Live') },
+      { value: 'COMPLETED' as const, label: t('calls.filter.status.completed', 'Completed') },
+      { value: 'FAILED' as const, label: t('calls.filter.status.failed', 'Failed') },
+      { value: 'CANCELLED' as const, label: t('calls.filter.status.cancelled', 'Cancelled') },
+    ],
+    [t],
+  );
+
+  const dateOptions = useMemo(
+    () => [
+      { value: 'all', label: t('calls.filter.date.all', 'All time') },
+      { value: 'week', label: t('calls.filter.date.week', 'This week') },
+      { value: 'month', label: t('calls.filter.date.month', 'This month') },
+    ],
+    [t],
+  );
+
+  const tableColumns = useMemo(
+    () => [
+      t('calls.table.provider', 'Provider'),
+      t('calls.table.entity', 'Entity'),
+      t('calls.table.scheduled', 'Scheduled'),
+      t('calls.table.duration', 'Duration'),
+      t('calls.table.sentiment', 'Sentiment'),
+      t('calls.table.status', 'Status'),
+    ],
+    [t],
+  );
 
   const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useCalls({
@@ -224,8 +251,8 @@ export default function CallsPage() {
   if (isError) {
     return (
       <ErrorState
-        title="Failed to load calls"
-        message={error instanceof Error ? error.message : 'Something went wrong'}
+        title={t('calls.error.title', 'Failed to load calls')}
+        message={error instanceof Error ? error.message : t('calls.error.fallback', 'Something went wrong')}
       />
     );
   }
@@ -234,43 +261,45 @@ export default function CallsPage() {
     <div className="flex flex-col gap-5 p-6">
       {/* Page header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-[var(--fg-primary)]">Calls</h1>
+        <h1 className="text-xl font-semibold text-[var(--fg-primary)]">{t('calls.heading', 'Calls')}</h1>
         <p className="text-sm text-[var(--fg-tertiary)]" role="status" aria-live="polite">
-          {filtered.length} {filtered.length === 1 ? 'call' : 'calls'}
+          {filtered.length === 1
+            ? t('calls.count.one', '{{count}} call', { count: filtered.length })
+            : t('calls.count.other', '{{count}} calls', { count: filtered.length })}
         </p>
       </div>
 
       {/* Filter row */}
-      <div className="flex flex-wrap gap-3" role="group" aria-label="Filter calls">
+      <div className="flex flex-wrap gap-3" role="group" aria-label={t('calls.filter.groupAria', 'Filter calls')}>
         <Select
-          aria-label="Filter by entity type"
+          aria-label={t('calls.filter.entityAria', 'Filter by entity type')}
           value={entityType}
           onChange={(e) => setEntityType(e.target.value as CallEntityType | '')}
-          options={ENTITY_OPTIONS}
+          options={entityOptions}
           size="sm"
           className="min-h-[44px]"
         />
         <Select
-          aria-label="Filter by provider"
+          aria-label={t('calls.filter.providerAria', 'Filter by provider')}
           value={provider}
           onChange={(e) => setProvider(e.target.value as CallProvider | '')}
-          options={PROVIDER_OPTIONS}
+          options={providerOptions}
           size="sm"
           className="min-h-[44px]"
         />
         <Select
-          aria-label="Filter by status"
+          aria-label={t('calls.filter.statusAria', 'Filter by status')}
           value={status}
           onChange={(e) => setStatus(e.target.value as CallStatus | '')}
-          options={STATUS_OPTIONS}
+          options={statusOptions}
           size="sm"
           className="min-h-[44px]"
         />
         <Select
-          aria-label="Filter by date range"
+          aria-label={t('calls.filter.dateAria', 'Filter by date range')}
           value={dateRange}
           onChange={(e) => setDateRange(e.target.value)}
-          options={DATE_OPTIONS}
+          options={dateOptions}
           size="sm"
           className="min-h-[44px]"
         />
@@ -279,25 +308,18 @@ export default function CallsPage() {
       {/* Table */}
       {filtered.length === 0 ? (
         <EmptyState
-          title="No calls found"
-          message="Try adjusting your filters, or start a call from a Contact or Deal page."
+          title={t('calls.empty.title', 'No calls found')}
+          message={t('calls.empty.message', 'Try adjusting your filters, or start a call from a Contact or Deal page.')}
         />
       ) : (
         <div className="overflow-x-auto rounded-lg border border-[var(--border-default)]">
           <table
             className="w-full text-sm border-collapse"
-            aria-label="Calls list"
+            aria-label={t('calls.table.aria', 'Calls list')}
           >
             <thead>
               <tr className="border-b border-[var(--border-default)] bg-[var(--surface-sunken)]">
-                {[
-                  'Provider',
-                  'Entity',
-                  'Scheduled',
-                  'Duration',
-                  'Sentiment',
-                  'Status',
-                ].map((col) => (
+                {tableColumns.map((col) => (
                   <th
                     key={col}
                     scope="col"
@@ -314,7 +336,11 @@ export default function CallsPage() {
                   key={call.id}
                   role="button"
                   tabIndex={0}
-                  aria-label={`${PROVIDER_ICON[call.provider] ?? ''} ${call.provider} call — ${call.status}`}
+                  aria-label={t('calls.row.aria', '{{icon}} {{provider}} call — {{status}}', {
+                    icon: PROVIDER_ICON[call.provider] ?? '',
+                    provider: call.provider,
+                    status: call.status,
+                  })}
                   onClick={() => handleRowClick(call)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
@@ -382,7 +408,7 @@ export default function CallsPage() {
             disabled={isFetchingNextPage}
             aria-busy={isFetchingNextPage}
           >
-            {isFetchingNextPage ? 'Loading…' : 'Load more'}
+            {isFetchingNextPage ? t('calls.loadMore.loading', 'Loading…') : t('calls.loadMore.label', 'Load more')}
           </Button>
         </div>
       )}

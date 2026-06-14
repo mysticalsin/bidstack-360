@@ -7,6 +7,7 @@
  * Admin routes      → ./AdminRoutes
  */
 import { AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 import { PageTransition } from '@/components/motion/PageTransition';
@@ -66,6 +67,7 @@ export { RequireAuth, RequireAdmin };
 
 export function AppRoutes() {
   const location = useLocation();
+  const { t } = useTranslation('common');
   // Key on the top-level segment so sibling navigations (e.g. /accounts/1 →
   // /accounts/2) don't re-trigger the page cross-fade — only true page swaps
   // animate.
@@ -110,6 +112,14 @@ export function AppRoutes() {
               inside the page via useIsAdmin(). */}
           <Route
             path="/agent-studio"
+            element={
+              <RequireAuth>
+                <AgentStudioPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/agents"
             element={
               <RequireAuth>
                 <AgentStudioPage />
@@ -437,15 +447,17 @@ export function AppRoutes() {
                 <div className="text-4xl mb-4" aria-hidden>
                   🔭
                 </div>
-                <h1 className="text-lg font-semibold text-[var(--fg-primary)]">Page not found</h1>
+                <h1 className="text-lg font-semibold text-[var(--fg-primary)]">
+                  {t('appRoutes.notFoundTitle', 'Page not found')}
+                </h1>
                 <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-                  The page you are looking for does not exist.
+                  {t('appRoutes.notFoundMessage', 'The page you are looking for does not exist.')}
                 </p>
                 <a
                   href="/dashboard"
                   className="mt-4 inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-fg-on-brand transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
                 >
-                  Go to Dashboard
+                  {t('appRoutes.goToDashboard', 'Go to Dashboard')}
                 </a>
               </div>
             }

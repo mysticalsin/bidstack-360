@@ -15,6 +15,7 @@ import {
   Fragment,
 } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 
 export interface SelectOption {
@@ -76,6 +77,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     },
     ref,
   ) => {
+    const { t } = useTranslation('common');
     const generatedId = useId();
     const hasError = Boolean(error);
     const selectId = rest.id ?? generatedId;
@@ -258,7 +260,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                   : 'border-[var(--border-subtle)] focus-visible:border-[var(--brand-primary)]',
             )}
           >
-            <span className="truncate">{selectedOption?.label ?? '—'}</span>
+            <span className="truncate">{selectedOption?.label ?? t('select.placeholder', '—')}</span>
             {/* Chevron indicator */}
             <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--fg-tertiary)] pointer-events-none">
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
@@ -324,7 +326,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                 className="absolute left-0 mt-1.5 w-full z-50 rounded-lg glass-menu max-h-60 overflow-y-auto p-1.5 focus:outline-none"
               >
                 {parsedOptions.length === 0 ? (
-                  <li className="px-3 py-2 text-xs text-[var(--fg-muted)] italic">No options</li>
+                  <li className="px-3 py-2 text-xs text-[var(--fg-muted)] italic">
+                    {t('select.noOptions', 'No options')}
+                  </li>
                 ) : (
                   parsedOptions.map((option, index) => {
                     const isSelected = option.value === selectedValue;

@@ -63,5 +63,91 @@
     "calls": "Appels",
     "emails": "E-mails",
     "meetings": "Réunions"
+  },
+  "reportBuilder": {
+    "toast": {
+      "previewFailed": "Échec de l'aperçu",
+      "nameRequired": "Nommez votre rapport avant d'enregistrer.",
+      "updated": "Rapport mis à jour",
+      "created": "Rapport créé",
+      "saveFailed": "Échec de l'enregistrement"
+    },
+    "backToReports": "Retour aux rapports",
+    "title": {
+      "edit": "Modifier le rapport",
+      "new": "Nouveau rapport"
+    },
+    "subtitle": "Composez une requête, prévisualisez-la en direct, puis enregistrez.",
+    "saveButton": {
+      "saving": "Enregistrement…",
+      "saveChanges": "Enregistrer les modifications",
+      "create": "Créer le rapport"
+    },
+    "details": {
+      "title": "Détails du rapport",
+      "nameLabel": "Nom",
+      "namePlaceholder": "ex. Affaires gagnées par mois",
+      "nameAria": "Nom du rapport",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Facultatif",
+      "descriptionAria": "Description du rapport",
+      "dataSourceLabel": "Source de données",
+      "dataSourceAria": "Entité du rapport"
+    },
+    "filters": {
+      "title": "Filtres",
+      "caption": "Limitez les enregistrements inclus."
+    },
+    "measures": {
+      "title": "Mesures",
+      "caption": "Valeurs agrégées (laissez vide pour lister les lignes)."
+    },
+    "groupBy": {
+      "title": "Grouper par",
+      "caption": "Décomposez les mesures par dimension."
+    },
+    "sortLimit": {
+      "title": "Trier et limiter",
+      "rowLimitLabel": "Limite de lignes",
+      "rowLimitAria": "Limite de lignes"
+    },
+    "visualization": {
+      "title": "Visualisation",
+      "chartTypeAria": "Type de graphique"
+    },
+    "preview": {
+      "running": "Exécution…",
+      "run": "Lancer l'aperçu"
+    },
+    "sort": {
+      "label": "Trier",
+      "fieldAria": "Champ de tri",
+      "pickColumn": "Choisir une colonne…",
+      "directionAria": "Sens de tri",
+      "ascending": "Croissant",
+      "descending": "Décroissant",
+      "removeAria": "Supprimer le tri",
+      "add": "+ Ajouter un tri"
+    },
+    "error": {
+      "notFoundTitle": "Rapport introuvable",
+      "notFoundMessage": "Il a peut-être été supprimé."
+    }
+  },
+  "filterBuilder": {
+    "valueAriaLabel": "Valeur du filtre",
+    "pickOption": "— Choisir —",
+    "dateValueAriaLabel": "Valeur de date du filtre",
+    "numericValueAriaLabel": "Valeur numérique du filtre",
+    "valuePlaceholder": "Valeur",
+    "fieldPlaceholder": "Champ…",
+    "operatorAriaLabel": "Opérateur",
+    "removeConditionAriaLabel": "Supprimer la condition",
+    "toggleLogicAriaLabel": "Basculer la logique — actuellement {{logic}}",
+    "noConditions": "Aucune condition pour l'instant",
+    "conditionCount": "{{count}} condition",
+    "removeGroupAriaLabel": "Supprimer le groupe",
+    "addCondition": "Condition",
+    "addGroup": "Groupe"
   }
 }

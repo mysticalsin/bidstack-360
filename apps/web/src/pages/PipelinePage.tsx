@@ -13,6 +13,7 @@
 import { useCallback, useMemo, useState, type DragEvent, type KeyboardEvent } from 'react';
 
 import { useReducedMotion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { KanbanSkeleton } from '@/components/skeletons/PageSkeletons';
@@ -36,6 +37,7 @@ import { getStageId } from './pipelineBoard/pipelineUtils';
 import { StageColumn } from './pipelineBoard/StageColumn';
 
 export function PipelinePage() {
+  const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
   const navigate = useNavigate();
   const { formatMoney } = useFormatMoney();
@@ -124,7 +126,10 @@ export function PipelinePage() {
       move.mutate(
         { id: opp.id, pipelineStageId: nextStage.id, pipelineStage: nextStage },
         {
-          onSuccess: () => toast.success(`Moved to ${nextStage.name}`),
+          onSuccess: () =>
+            toast.success(
+              t('pipeline.movedToStageToast', 'Moved to {{stage}}', { stage: nextStage.name }),
+            ),
         },
       );
     }
@@ -142,10 +147,19 @@ export function PipelinePage() {
     move.mutate(
       { id, pipelineStageId: stageId, pipelineStage: targetStage },
       {
-        onSuccess: () => toast.success(`Moved "${item.name}" to ${targetStageName}`),
+        onSuccess: () =>
+          toast.success(
+            t('pipeline.movedOpportunityToast', 'Moved "{{name}}" to {{stage}}', {
+              name: item.name,
+              stage: targetStageName,
+            }),
+          ),
         onError: (err) =>
-          toast.error('Could not move opportunity', {
-            description: err instanceof Error ? err.message : 'The server rejected the request.',
+          toast.error(t('pipeline.moveErrorToastTitle', 'Could not move opportunity'), {
+            description:
+              err instanceof Error
+                ? err.message
+                : t('pipeline.moveErrorToastDescription', 'The server rejected the request.'),
           }),
       },
     );
@@ -157,22 +171,27 @@ export function PipelinePage() {
     <div className="space-y-6">
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">Pipeline</h1>
+          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
+            {t('pipeline.heading', 'Pipeline')}
+          </h1>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            Drag a card between columns, or focus a card and use ← / → to move stages.
+            {t(
+              'pipeline.subtitle',
+              'Drag a card between columns, or focus a card and use ← / → to move stages.',
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <PipelineViewSwitch current="board" />
           <label className="flex items-center gap-1.5 text-xs text-[var(--fg-tertiary)]">
-            <span>Stage</span>
+            <span>{t('pipeline.stageFilterLabel', 'Stage')}</span>
             <select
-              aria-label="Filter pipeline by stage"
+              aria-label={t('pipeline.stageFilterAriaLabel', 'Filter pipeline by stage')}
               value={stageFilter ?? ''}
               onChange={(e) => setStageFilter(e.target.value || null)}
               className="rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-1 text-xs text-[var(--fg-primary)]"
             >
-              <option value="">All</option>
+              <option value="">{t('pipeline.stageFilterAllOption', 'All')}</option>
               {stages.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -187,7 +206,7 @@ export function PipelinePage() {
               className={`inline-block h-1.5 w-1.5 rounded-full bg-[var(--brand-primary)] ${reduced ? '' : 'animate-pulse'}`}
               aria-hidden
             />
-            Updating…
+            {t('pipeline.updatingIndicator', 'Updating…')}
           </div>
         ) : null}
       </header>
@@ -195,7 +214,20 @@ export function PipelinePage() {
       {/* sr-only live region — announces visible opportunity count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {!isLoading && data
-          ? `${visibleStages.reduce((s, st) => s + (byStage.get(st.id)?.length ?? 0), 0)} opportunit${visibleStages.reduce((s, st) => s + (byStage.get(st.id)?.length ?? 0), 0) === 1 ? 'y' : 'ies'}${stageFilter ? ` · ${stages.find((s) => s.id === stageFilter)?.name ?? ''}` : ''}`
+          ? (() => {
+              const count = visibleStages.reduce(
+                (s, st) => s + (byStage.get(st.id)?.length ?? 0),
+                0,
+              );
+              const filteredStageName = stageFilter
+                ? (stages.find((s) => s.id === stageFilter)?.name ?? '')
+                : '';
+              const label =
+                count === 1
+                  ? t('pipeline.liveRegionCountOne', '{{count}} opportunity', { count })
+                  : t('pipeline.liveRegionCountOther', '{{count}} opportunities', { count });
+              return stageFilter ? `${label} · ${filteredStageName}` : label;
+            })()
           : ''}
       </p>
 
@@ -212,22 +244,26 @@ export function PipelinePage() {
             const winRate =
               closedTotal > 0
                 ? `${Math.round((closedWon / closedTotal) * 100)}%`
-                : 'No closed bids';
+                : t('pipeline.winRateNoClosedBids', 'No closed bids');
             const loading = report.isLoading;
             return [
               {
-                label: 'Total pipeline',
+                label: t('pipeline.kpiTotalPipeline', 'Total pipeline'),
                 value: loading ? '…' : formatMoney(totalValue, 'EUR'),
                 tone: 'blue' as const,
               },
               {
-                label: 'Open value',
+                label: t('pipeline.kpiOpenValue', 'Open value'),
                 value: loading ? '…' : formatMoney(rep?.totalValueOpen ?? 0, 'EUR'),
                 tone: 'jade' as const,
               },
-              { label: 'Win rate', value: loading ? '…' : winRate, tone: 'amber' as const },
               {
-                label: 'Active deals',
+                label: t('pipeline.kpiWinRate', 'Win rate'),
+                value: loading ? '…' : winRate,
+                tone: 'amber' as const,
+              },
+              {
+                label: t('pipeline.kpiActiveDeals', 'Active deals'),
                 value: loading ? '…' : String(rep?.totalOpen ?? 0),
                 tone: 'purple' as const,
               },
@@ -250,15 +286,19 @@ export function PipelinePage() {
 
       {isError ? (
         <ErrorState
-          title="Could not load pipeline"
-          message={error instanceof Error ? error.message : 'Please try again.'}
+          title={t('pipeline.errorTitle', 'Could not load pipeline')}
+          message={
+            error instanceof Error
+              ? error.message
+              : t('pipeline.errorMessage', 'Please try again.')
+          }
           action={
             <button
               type="button"
               onClick={() => window.location.reload()}
               className="inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-medium text-fg-on-brand hover:bg-brand-hover"
             >
-              Reload
+              {t('pipeline.errorReloadButton', 'Reload')}
             </button>
           }
         />
@@ -266,15 +306,18 @@ export function PipelinePage() {
         <KanbanSkeleton />
       ) : (data?.items.length ?? 0) === 0 ? (
         <EmptyState
-          title="No opportunities yet"
-          message="Create an opportunity to start building your pipeline."
+          title={t('pipeline.emptyTitle', 'No opportunities yet')}
+          message={t(
+            'pipeline.emptyMessage',
+            'Create an opportunity to start building your pipeline.',
+          )}
           action={
             <button
               type="button"
               onClick={() => navigate('/opportunities')}
               className="inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-medium text-fg-on-brand hover:bg-brand-hover"
             >
-              Go to Opportunities
+              {t('pipeline.emptyGoToOpportunitiesButton', 'Go to Opportunities')}
             </button>
           }
         />

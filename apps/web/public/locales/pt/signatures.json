@@ -53,5 +53,18 @@
     "cancel": "Cancelar pedido",
     "viewCertificate": "Ver certificado",
     "confirmCancel": "Cancelar este pedido de assinatura? Os signatários serão notificados."
+  },
+  "signaturePad": {
+    "modeTablistLabel": "Método de assinatura",
+    "modeDraw": "Desenhar",
+    "modeType": "Digitar",
+    "drawPlaceholder": "Assine aqui",
+    "canvasLabel": "Área de desenho da assinatura. Use o mouse ou o toque para desenhar sua assinatura.",
+    "typedNameLabel": "Digite seu nome completo",
+    "typedNamePlaceholder": "Seu nome",
+    "clearButtonLabel": "Limpar assinatura",
+    "clearButton": "Limpar",
+    "undoButtonLabel": "Desfazer último traço",
+    "undoButton": "Desfazer"
   }
 }

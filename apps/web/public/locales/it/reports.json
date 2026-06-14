@@ -63,5 +63,91 @@
     "calls": "Chiamate",
     "emails": "Email",
     "meetings": "Riunioni"
+  },
+  "reportBuilder": {
+    "toast": {
+      "previewFailed": "Anteprima non riuscita",
+      "nameRequired": "Assegna un nome al report prima di salvare.",
+      "updated": "Report aggiornato",
+      "created": "Report creato",
+      "saveFailed": "Impossibile salvare"
+    },
+    "backToReports": "Torna ai report",
+    "title": {
+      "edit": "Modifica report",
+      "new": "Nuovo report"
+    },
+    "subtitle": "Componi una query, visualizzala in anteprima dal vivo, quindi salva.",
+    "saveButton": {
+      "saving": "Salvataggio…",
+      "saveChanges": "Salva modifiche",
+      "create": "Crea report"
+    },
+    "details": {
+      "title": "Dettagli del report",
+      "nameLabel": "Nome",
+      "namePlaceholder": "es. Trattative vinte per mese",
+      "nameAria": "Nome del report",
+      "descriptionLabel": "Descrizione",
+      "descriptionPlaceholder": "Facoltativo",
+      "descriptionAria": "Descrizione del report",
+      "dataSourceLabel": "Origine dati",
+      "dataSourceAria": "Entità del report"
+    },
+    "filters": {
+      "title": "Filtri",
+      "caption": "Limita quali record vengono inclusi."
+    },
+    "measures": {
+      "title": "Misure",
+      "caption": "Valori aggregati (lascia vuoto per elencare le righe)."
+    },
+    "groupBy": {
+      "title": "Raggruppa per",
+      "caption": "Suddividi le misure per dimensione."
+    },
+    "sortLimit": {
+      "title": "Ordina e limita",
+      "rowLimitLabel": "Limite righe",
+      "rowLimitAria": "Limite righe"
+    },
+    "visualization": {
+      "title": "Visualizzazione",
+      "chartTypeAria": "Tipo di grafico"
+    },
+    "preview": {
+      "running": "Esecuzione…",
+      "run": "Esegui anteprima"
+    },
+    "sort": {
+      "label": "Ordina",
+      "fieldAria": "Campo di ordinamento",
+      "pickColumn": "Scegli colonna…",
+      "directionAria": "Direzione di ordinamento",
+      "ascending": "Crescente",
+      "descending": "Decrescente",
+      "removeAria": "Rimuovi ordinamento",
+      "add": "+ Aggiungi ordinamento"
+    },
+    "error": {
+      "notFoundTitle": "Report non trovato",
+      "notFoundMessage": "Potrebbe essere stato eliminato."
+    }
+  },
+  "filterBuilder": {
+    "valueAriaLabel": "Valore del filtro",
+    "pickOption": "— Scegli —",
+    "dateValueAriaLabel": "Valore data del filtro",
+    "numericValueAriaLabel": "Valore numerico del filtro",
+    "valuePlaceholder": "Valore",
+    "fieldPlaceholder": "Campo…",
+    "operatorAriaLabel": "Operatore",
+    "removeConditionAriaLabel": "Rimuovi condizione",
+    "toggleLogicAriaLabel": "Cambia logica — attualmente {{logic}}",
+    "noConditions": "Ancora nessuna condizione",
+    "conditionCount": "{{count}} condizione",
+    "removeGroupAriaLabel": "Rimuovi gruppo",
+    "addCondition": "Condizione",
+    "addGroup": "Gruppo"
   }
 }

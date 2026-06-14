@@ -6,6 +6,7 @@
 // (no effect-driven setState).
 
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Save, ArrowLeft, Play, Trash2 } from 'lucide-react';
 
@@ -67,6 +68,7 @@ const inputCls = cn(
 // ── Builder form (seeded once from `initial`; remounted on hydrate) ───────────
 
 function BuilderForm({ initial, reportId }: { initial: Report | null; reportId: string | null }) {
+  const { t } = useTranslation('reports');
   const navigate = useNavigate();
   const create = useCreateReport();
   const update = useUpdateReport(reportId ?? '');
@@ -94,23 +96,32 @@ function BuilderForm({ initial, reportId }: { initial: Report | null; reportId: 
 
   function runPreview() {
     preview.mutate(query, {
-      onError: (err) => toast.error('Preview failed', { description: (err as Error).message }),
+      onError: (err) =>
+        toast.error(t('reportBuilder.toast.previewFailed', 'Preview failed'), {
+          description: (err as Error).message,
+        }),
     });
   }
 
   function save() {
     if (!name.trim()) {
-      toast.error('Name your report before saving.');
+      toast.error(t('reportBuilder.toast.nameRequired', 'Name your report before saving.'));
       return;
     }
     const body = { name: name.trim(), description: description.trim() || undefined, query, chartType };
     const opts = {
       onSuccess: () => {
-        toast.success(reportId ? 'Report updated' : 'Report created');
+        toast.success(
+          reportId
+            ? t('reportBuilder.toast.updated', 'Report updated')
+            : t('reportBuilder.toast.created', 'Report created'),
+        );
         navigate('/reports/list');
       },
       onError: (err: unknown) =>
-        toast.error('Could not save', { description: (err as Error).message }),
+        toast.error(t('reportBuilder.toast.saveFailed', 'Could not save'), {
+          description: (err as Error).message,
+        }),
     };
     if (reportId) update.mutate(body, opts);
     else create.mutate(body, opts);
@@ -131,17 +142,19 @@ function BuilderForm({ initial, reportId }: { initial: Report | null; reportId: 
         <button
           type="button"
           onClick={() => navigate('/reports/list')}
-          aria-label="Back to reports"
+          aria-label={t('reportBuilder.backToReports', 'Back to reports')}
           className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)]"
         >
           <ArrowLeft size={18} />
         </button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold tracking-tight text-[var(--fg-primary)]">
-            {reportId ? 'Edit report' : 'New report'}
+            {reportId
+              ? t('reportBuilder.title.edit', 'Edit report')
+              : t('reportBuilder.title.new', 'New report')}
           </h1>
           <p className="mt-0.5 text-sm text-[var(--fg-tertiary)]">
-            Compose a query, preview it live, then save.
+            {t('reportBuilder.subtitle', 'Compose a query, preview it live, then save.')}
           </p>
         </div>
         <button
@@ -155,7 +168,11 @@ function BuilderForm({ initial, reportId }: { initial: Report | null; reportId: 
           )}
         >
           <Save size={16} />
-          {saving ? 'Saving…' : reportId ? 'Save changes' : 'Create report'}
+          {saving
+            ? t('reportBuilder.saveButton.saving', 'Saving…')
+            : reportId
+              ? t('reportBuilder.saveButton.saveChanges', 'Save changes')
+              : t('reportBuilder.saveButton.create', 'Create report')}
         </button>
       </div>
 
@@ -163,41 +180,41 @@ function BuilderForm({ initial, reportId }: { initial: Report | null; reportId: 
         {/* ── Left: builder controls ── */}
         <div className="space-y-5">
           <Card>
-            <SectionHeader title="Report details" />
+            <SectionHeader title={t('reportBuilder.details.title', 'Report details')} />
             <div className="space-y-3 p-5">
               <div>
                 <label className="mb-1 block text-sm font-medium text-[var(--fg-primary)]">
-                  Name
+                  {t('reportBuilder.details.nameLabel', 'Name')}
                 </label>
                 <input
                   className={inputCls}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Won deals by month"
-                  aria-label="Report name"
+                  placeholder={t('reportBuilder.details.namePlaceholder', 'e.g. Won deals by month')}
+                  aria-label={t('reportBuilder.details.nameAria', 'Report name')}
                 />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-[var(--fg-primary)]">
-                  Description
+                  {t('reportBuilder.details.descriptionLabel', 'Description')}
                 </label>
                 <input
                   className={inputCls}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Optional"
-                  aria-label="Report description"
+                  placeholder={t('reportBuilder.details.descriptionPlaceholder', 'Optional')}
+                  aria-label={t('reportBuilder.details.descriptionAria', 'Report description')}
                 />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-[var(--fg-primary)]">
-                  Data source
+                  {t('reportBuilder.details.dataSourceLabel', 'Data source')}
                 </label>
                 <select
                   className={inputCls}
                   value={entity}
                   onChange={(e) => onEntityChange(e.target.value as ReportEntityType)}
-                  aria-label="Report entity"
+                  aria-label={t('reportBuilder.details.dataSourceAria', 'Report entity')}
                 >
                   {ENTITIES.map((e) => (
                     <option key={e.value} value={e.value}>
@@ -210,33 +227,42 @@ function BuilderForm({ initial, reportId }: { initial: Report | null; reportId: 
           </Card>
 
           <Card>
-            <SectionHeader title="Filters" caption="Limit which records are included." />
+            <SectionHeader
+              title={t('reportBuilder.filters.title', 'Filters')}
+              caption={t('reportBuilder.filters.caption', 'Limit which records are included.')}
+            />
             <div className="p-5">
               <FilterBuilder entity={entity} value={filters} onChange={setFilters} />
             </div>
           </Card>
 
           <Card>
-            <SectionHeader title="Measures" caption="Aggregate values (leave empty to list rows)." />
+            <SectionHeader
+              title={t('reportBuilder.measures.title', 'Measures')}
+              caption={t('reportBuilder.measures.caption', 'Aggregate values (leave empty to list rows).')}
+            />
             <div className="p-5">
               <AggregatePicker entity={entity} aggregates={aggregates} onChange={setAggregates} />
             </div>
           </Card>
 
           <Card>
-            <SectionHeader title="Group by" caption="Break measures down by dimension." />
+            <SectionHeader
+              title={t('reportBuilder.groupBy.title', 'Group by')}
+              caption={t('reportBuilder.groupBy.caption', 'Break measures down by dimension.')}
+            />
             <div className="p-5">
               <GroupByPicker entity={entity} groupBy={groupBy} onChange={setGroupBy} />
             </div>
           </Card>
 
           <Card>
-            <SectionHeader title="Sort & limit" />
+            <SectionHeader title={t('reportBuilder.sortLimit.title', 'Sort & limit')} />
             <div className="space-y-3 p-5">
               <SortEditor entity={entity} aliases={aliases} sort={sort} onChange={setSort} />
               <div>
                 <label className="mb-1 block text-sm font-medium text-[var(--fg-primary)]">
-                  Row limit
+                  {t('reportBuilder.sortLimit.rowLimitLabel', 'Row limit')}
                 </label>
                 <input
                   type="number"
@@ -252,20 +278,20 @@ function BuilderForm({ initial, reportId }: { initial: Report | null; reportId: 
                   onBlur={() => {
                     if (!limit) setLimit(100);
                   }}
-                  aria-label="Row limit"
+                  aria-label={t('reportBuilder.sortLimit.rowLimitAria', 'Row limit')}
                 />
               </div>
             </div>
           </Card>
 
           <Card>
-            <SectionHeader title="Visualization" />
+            <SectionHeader title={t('reportBuilder.visualization.title', 'Visualization')} />
             <div className="p-5">
               <select
                 className={cn(inputCls, 'max-w-[14rem]')}
                 value={chartType}
                 onChange={(e) => setChartType(e.target.value as ChartType)}
-                aria-label="Chart type"
+                aria-label={t('reportBuilder.visualization.chartTypeAria', 'Chart type')}
               >
                 {CHART_TYPES.map((c) => (
                   <option key={c.value} value={c.value}>
@@ -290,7 +316,9 @@ function BuilderForm({ initial, reportId }: { initial: Report | null; reportId: 
             )}
           >
             <Play size={15} />
-            {preview.isPending ? 'Running…' : 'Run preview'}
+            {preview.isPending
+              ? t('reportBuilder.preview.running', 'Running…')
+              : t('reportBuilder.preview.run', 'Run preview')}
           </button>
           <ReportPreview
             chartType={chartType}
@@ -319,6 +347,7 @@ function SortEditor({
   sort: SortField[];
   onChange: (s: SortField[]) => void;
 }) {
+  const { t } = useTranslation('reports');
   const selectCls = cn(
     'rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)]',
     'px-2 py-1.5 text-sm text-[var(--fg-primary)]',
@@ -329,7 +358,9 @@ function SortEditor({
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-[var(--fg-primary)]">Sort</label>
+      <label className="block text-sm font-medium text-[var(--fg-primary)]">
+        {t('reportBuilder.sort.label', 'Sort')}
+      </label>
       {sort.map((s, i) => (
         <div key={i} className="flex items-center gap-2">
           {aliases.length > 0 ? (
@@ -337,9 +368,9 @@ function SortEditor({
               className={cn(selectCls, 'flex-1')}
               value={s.field}
               onChange={(e) => update(i, { field: e.target.value })}
-              aria-label="Sort field"
+              aria-label={t('reportBuilder.sort.fieldAria', 'Sort field')}
             >
-              <option value="">Pick column…</option>
+              <option value="">{t('reportBuilder.sort.pickColumn', 'Pick column…')}</option>
               {aliases.map((a) => (
                 <option key={a} value={a}>
                   {a}
@@ -353,7 +384,7 @@ function SortEditor({
                 entity={entity}
                 value={s.field}
                 onChange={(key) => update(i, { field: key })}
-                placeholder="Pick column…"
+                placeholder={t('reportBuilder.sort.pickColumn', 'Pick column…')}
               />
             </div>
           )}
@@ -361,15 +392,15 @@ function SortEditor({
             className={selectCls}
             value={s.dir}
             onChange={(e) => update(i, { dir: e.target.value as 'asc' | 'desc' })}
-            aria-label="Sort direction"
+            aria-label={t('reportBuilder.sort.directionAria', 'Sort direction')}
           >
-            <option value="asc">Ascending</option>
-            <option value="desc">Descending</option>
+            <option value="asc">{t('reportBuilder.sort.ascending', 'Ascending')}</option>
+            <option value="desc">{t('reportBuilder.sort.descending', 'Descending')}</option>
           </select>
           <button
             type="button"
             onClick={() => onChange(sort.filter((_, idx) => idx !== i))}
-            aria-label="Remove sort"
+            aria-label={t('reportBuilder.sort.removeAria', 'Remove sort')}
             className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-[var(--fg-tertiary)] hover:bg-[var(--danger-tint)] hover:text-[var(--danger)]"
           >
             <Trash2 size={14} />
@@ -382,7 +413,7 @@ function SortEditor({
           onClick={() => onChange([...sort, { field: '', dir: 'desc' }])}
           className="min-h-[44px] rounded px-2 text-xs text-[var(--brand-primary)] hover:underline"
         >
-          + Add sort
+          {t('reportBuilder.sort.add', '+ Add sort')}
         </button>
       )}
     </div>
@@ -399,6 +430,7 @@ export function ReportBuilderPage() {
 }
 
 function EditLoader({ id }: { id: string }) {
+  const { t } = useTranslation('reports');
   const { data, isLoading, error } = useAnalyticsReport(id);
   if (isLoading) {
     return (
@@ -410,7 +442,10 @@ function EditLoader({ id }: { id: string }) {
   if (error || !data) {
     return (
       <div className="p-8">
-        <ErrorState title="Report not found" message={(error as Error)?.message ?? 'It may have been deleted.'} />
+        <ErrorState
+          title={t('reportBuilder.error.notFoundTitle', 'Report not found')}
+          message={(error as Error)?.message ?? t('reportBuilder.error.notFoundMessage', 'It may have been deleted.')}
+        />
       </div>
     );
   }

@@ -5,6 +5,7 @@
 // breakdown of opportunities in that region.
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, useReducedMotion } from 'framer-motion';
 
 import { WorldMap } from '@/components/territories/WorldMap';
@@ -44,6 +45,7 @@ import {
 } from './territoriesPage/TerritoryPanels';
 
 export function TerritoriesPage() {
+  const { t } = useTranslation('crm');
   const { formatMoneyMicros } = useFormatMoney();
   const territories = useTerritories();
   const rules = useLeadRoutingRules();
@@ -77,23 +79,31 @@ export function TerritoriesPage() {
   const isLoading = territories.isLoading || analytics.isLoading;
   const isError = territories.isError || analytics.isError;
 
-  const handleDeleteTerritory = async (t: Territory) => {
+  const handleDeleteTerritory = async (territory: Territory) => {
     if (
       await confirm({
-        title: `Delete "${t.name}"?`,
-        description: 'This territory will be deactivated.',
+        title: t('territories.deleteTerritoryConfirmTitle', 'Delete "{{name}}"?', {
+          name: territory.name,
+        }),
+        description: t(
+          'territories.deleteTerritoryConfirmDescription',
+          'This territory will be deactivated.',
+        ),
         destructive: true,
       })
     ) {
-      deleteTerritory.mutate(t.id);
+      deleteTerritory.mutate(territory.id);
     }
   };
 
   const handleDeleteRule = async (r: LeadRoutingRule) => {
     if (
       await confirm({
-        title: `Delete "${r.name}"?`,
-        description: 'This routing rule will be deactivated.',
+        title: t('territories.deleteRuleConfirmTitle', 'Delete "{{name}}"?', { name: r.name }),
+        description: t(
+          'territories.deleteRuleConfirmDescription',
+          'This routing rule will be deactivated.',
+        ),
         destructive: true,
       })
     ) {
@@ -115,10 +125,13 @@ export function TerritoriesPage() {
       >
         <div>
           <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
-            Territories
+            {t('territories.pageTitle', 'Territories')}
           </h1>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            Global opportunity footprint, territory coverage, and lead routing.
+            {t(
+              'territories.pageSubtitle',
+              'Global opportunity footprint, territory coverage, and lead routing.',
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -130,7 +143,14 @@ export function TerritoriesPage() {
                   reducedMotion ? '' : 'animate-pulse'
                 }`}
               />
-              {totals.totalOpportunities} opps across {totals.totalCountries} countries
+              {t(
+                'territories.totalsBadge',
+                '{{opportunities}} opps across {{countries}} countries',
+                {
+                  opportunities: totals.totalOpportunities,
+                  countries: totals.totalCountries,
+                },
+              )}
             </div>
           ) : null}
           <Button
@@ -140,7 +160,7 @@ export function TerritoriesPage() {
               setRuleDialogOpen(true);
             }}
           >
-            <Icon name="git-branch" size={14} /> New rule
+            <Icon name="git-branch" size={14} /> {t('territories.newRuleButton', 'New rule')}
           </Button>
           <Button
             size="sm"
@@ -149,7 +169,7 @@ export function TerritoriesPage() {
               setTerritoryDialogOpen(true);
             }}
           >
-            <Icon name="plus" size={14} /> New territory
+            <Icon name="plus" size={14} /> {t('territories.newTerritoryButton', 'New territory')}
           </Button>
         </div>
       </motion.header>
@@ -199,13 +219,25 @@ export function TerritoriesPage() {
           className="grid grid-cols-2 gap-3 sm:grid-cols-4"
         >
           <KpiTile
-            label="Total Pipeline"
+            label={t('territories.kpiTotalPipeline', 'Total Pipeline')}
             value={formatMoneyMicros(totals.totalValueMicros, 'EUR')}
             tone="blue"
           />
-          <KpiTile label="Countries Active" value={String(totals.totalCountries)} tone="jade" />
-          <KpiTile label="Opportunities" value={String(totals.totalOpportunities)} tone="amber" />
-          <KpiTile label="Avg Probability" value={`${totals.avgProbability}%`} tone="purple" />
+          <KpiTile
+            label={t('territories.kpiCountriesActive', 'Countries Active')}
+            value={String(totals.totalCountries)}
+            tone="jade"
+          />
+          <KpiTile
+            label={t('territories.kpiOpportunities', 'Opportunities')}
+            value={String(totals.totalOpportunities)}
+            tone="amber"
+          />
+          <KpiTile
+            label={t('territories.kpiAvgProbability', 'Avg Probability')}
+            value={`${totals.avgProbability}%`}
+            tone="purple"
+          />
         </motion.section>
       )}
 
@@ -215,27 +247,33 @@ export function TerritoriesPage() {
           <SectionHeader
             title={
               view === 'region'
-                ? 'Global Opportunity Map'
+                ? t('territories.sectionTitleRegion', 'Global Opportunity Map')
                 : view === 'industry'
-                  ? 'Opportunities by Industry'
-                  : 'Opportunities by Account'
+                  ? t('territories.sectionTitleIndustry', 'Opportunities by Industry')
+                  : t('territories.sectionTitleAccount', 'Opportunities by Account')
             }
             caption={
               view === 'region'
-                ? 'Heat intensity = total pipeline value. Click a country for details.'
-                : 'Ranked by total pipeline value across all opportunities.'
+                ? t(
+                    'territories.sectionCaptionRegion',
+                    'Heat intensity = total pipeline value. Click a country for details.',
+                  )
+                : t(
+                    'territories.sectionCaptionSegment',
+                    'Ranked by total pipeline value across all opportunities.',
+                  )
             }
             action={
               <div
                 role="tablist"
-                aria-label="Breakdown dimension"
+                aria-label={t('territories.breakdownTablistLabel', 'Breakdown dimension')}
                 className="inline-flex rounded-lg border border-[var(--border-default)] p-0.5"
               >
                 {(
                   [
-                    ['region', 'Region'],
-                    ['industry', 'Industry'],
-                    ['account', 'Account'],
+                    ['region', t('territories.tabRegion', 'Region')],
+                    ['industry', t('territories.tabIndustry', 'Industry')],
+                    ['account', t('territories.tabAccount', 'Account')],
                   ] as const
                 ).map(([key, label]) => (
                   <button
@@ -259,7 +297,7 @@ export function TerritoriesPage() {
           {view === 'region' ? (
             isError ? (
               <ErrorState
-                title="Failed to load map data"
+                title={t('territories.mapErrorTitle', 'Failed to load map data')}
                 message={analytics.error?.message ?? territories.error?.message}
                 action={
                   <Button
@@ -268,7 +306,7 @@ export function TerritoriesPage() {
                       territories.refetch();
                     }}
                   >
-                    Retry
+                    {t('territories.retryButton', 'Retry')}
                   </Button>
                 }
               />
@@ -279,8 +317,11 @@ export function TerritoriesPage() {
             ) : aItems.length === 0 ? (
               <div className="h-[420px] flex items-center justify-center">
                 <EmptyState
-                  title="No geographic data"
-                  message="Opportunities need a country or territory assignment to appear on the map."
+                  title={t('territories.mapEmptyTitle', 'No geographic data')}
+                  message={t(
+                    'territories.mapEmptyMessage',
+                    'Opportunities need a country or territory assignment to appear on the map.',
+                  )}
                 />
               </div>
             ) : (

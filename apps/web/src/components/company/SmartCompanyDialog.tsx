@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
@@ -38,6 +39,7 @@ export function SmartCompanyDialog({ trigger }: Props) {
   const reducedMotion = useReducedMotion();
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { t } = useTranslation('crm');
 
   useEffect(() => {
     const handle = window.setTimeout(() => setDebounced(query.trim()), 220);
@@ -72,39 +74,53 @@ export function SmartCompanyDialog({ trigger }: Props) {
   const logoUrl = company?.logo?.url ?? (previewDomain ? faviconUrl(previewDomain, 128) : null);
   const sourceItems =
     company?.sourceAttribution.slice(0, 3).map((source) => source.label) ??
-    (previewDomain ? ['Domain signal', 'Logo preview', 'Open data ready'] : ['Name signal']);
+    (previewDomain
+      ? [
+          t('smartCompany.source.domainSignal', 'Domain signal'),
+          t('smartCompany.source.logoPreview', 'Logo preview'),
+          t('smartCompany.source.openDataReady', 'Open data ready'),
+        ]
+      : [t('smartCompany.source.nameSignal', 'Name signal')]);
   const autofillItems = [
     {
-      label: 'Legal profile',
-      value: company?.legalName ? 'verified' : previewName ? 'queued' : 'waiting',
+      label: t('smartCompany.autofill.legalProfile', 'Legal profile'),
+      value: company?.legalName
+        ? t('smartCompany.autofill.value.verified', 'verified')
+        : previewName
+          ? t('smartCompany.autofill.value.queued', 'queued')
+          : t('smartCompany.autofill.value.waiting', 'waiting'),
       progress: company?.legalName ? 100 : previewName ? 58 : 18,
     },
     {
-      label: 'Domain',
-      value: previewDomain ? previewDomain : 'needed',
+      label: t('smartCompany.autofill.domain', 'Domain'),
+      value: previewDomain ? previewDomain : t('smartCompany.autofill.value.needed', 'needed'),
       progress: previewDomain ? 100 : 24,
     },
     {
-      label: 'Website',
-      value: previewWebsite ? 'ready' : 'needed',
+      label: t('smartCompany.autofill.website', 'Website'),
+      value: previewWebsite
+        ? t('smartCompany.autofill.value.ready', 'ready')
+        : t('smartCompany.autofill.value.needed', 'needed'),
       progress: previewWebsite ? 100 : 24,
     },
     {
-      label: 'Logo',
+      label: t('smartCompany.autofill.logo', 'Logo'),
       value: company?.logo?.source
         ? logoSourceLabel(company.logo.source)
         : logoUrl
-          ? 'preview'
-          : 'fallback',
+          ? t('smartCompany.autofill.value.preview', 'preview')
+          : t('smartCompany.autofill.value.fallback', 'fallback'),
       progress: company?.logo?.url ? 100 : logoUrl ? 72 : 34,
     },
     {
-      label: 'Source receipts',
+      label: t('smartCompany.autofill.sourceReceipts', 'Source receipts'),
       value: company?.sourceAttribution.length
-        ? `${company.sourceAttribution.length} live`
+        ? t('smartCompany.autofill.value.live', '{{count}} live', {
+            count: company.sourceAttribution.length,
+          })
         : previewDomain
-          ? 'ready'
-          : 'queued',
+          ? t('smartCompany.autofill.value.ready', 'ready')
+          : t('smartCompany.autofill.value.queued', 'queued'),
       progress: company?.sourceAttribution.length
         ? Math.min(100, company.sourceAttribution.length * 24)
         : previewDomain
@@ -116,7 +132,10 @@ export function SmartCompanyDialog({ trigger }: Props) {
   const createCompany = useMutation({
     mutationFn: async () => {
       const name = previewName.trim();
-      if (!name) throw new Error('Add a company name or domain first.');
+      if (!name)
+        throw new Error(
+          t('smartCompany.error.nameRequired', 'Add a company name or domain first.'),
+        );
       return api<CrmCompany>(`/api/crm/companies/${encodeURIComponent(slugFor(name))}/enrich`, {
         method: 'POST',
         body: {
@@ -164,13 +183,16 @@ export function SmartCompanyDialog({ trigger }: Props) {
         {trigger ?? (
           <Button size="sm">
             <Icon name="plus" size={14} />
-            New account
+            {t('smartCompany.trigger.newAccount', 'New account')}
           </Button>
         )}
       </DialogTrigger>
       <DialogContent
-        title="Add company"
-        description="Prefill the account from verified sources, logo providers, and the verified data cache."
+        title={t('smartCompany.dialog.title', 'Add company')}
+        description={t(
+          'smartCompany.dialog.description',
+          'Prefill the account from verified sources, logo providers, and the verified data cache.',
+        )}
         className="smart-company-dialog"
       >
         <div className="smart-company-shell">
@@ -189,15 +211,23 @@ export function SmartCompanyDialog({ trigger }: Props) {
               {logoUrl ? (
                 <img src={logoUrl} alt="" loading="lazy" decoding="async" />
               ) : (
-                <span>{initialsFor(previewName || 'Company')}</span>
+                <span>
+                  {initialsFor(previewName || t('smartCompany.preview.companyFallback', 'Company'))}
+                </span>
               )}
             </div>
             <div>
-              <strong>{previewName || 'Company preview'}</strong>
-              <span>{previewDomain ?? 'Add a domain for logo and registry matching'}</span>
+              <strong>{previewName || t('smartCompany.preview.namePlaceholder', 'Company preview')}</strong>
+              <span>
+                {previewDomain ??
+                  t(
+                    'smartCompany.preview.domainPrompt',
+                    'Add a domain for logo and registry matching',
+                  )}
+              </span>
             </div>
             <div className="smart-confidence">
-              <span>Confidence</span>
+              <span>{t('smartCompany.preview.confidence', 'Confidence')}</span>
               <strong>
                 <AnimatedMetric value={`${confidence}%`} />
               </strong>
@@ -206,40 +236,40 @@ export function SmartCompanyDialog({ trigger }: Props) {
 
           <div className="smart-company-form">
             <label className="smart-field">
-              <span>Company or domain</span>
+              <span>{t('smartCompany.field.companyOrDomain', 'Company or domain')}</span>
               <div>
                 <Icon name="search" size={14} />
                 <input
-                  aria-label="Company or domain"
+                  aria-label={t('smartCompany.field.companyOrDomain', 'Company or domain')}
                   value={query}
                   onChange={(event) => handleQueryChange(event.target.value)}
-                  placeholder="Mantu or mantu.com"
+                  placeholder={t('smartCompany.field.companyOrDomainPlaceholder', 'Mantu or mantu.com')}
                 />
               </div>
             </label>
 
             <div className="smart-field-grid">
               <label className="smart-field">
-                <span>Domain</span>
+                <span>{t('smartCompany.field.domain', 'Domain')}</span>
                 <div>
                   <Icon name="link" size={14} />
                   <input
-                    aria-label="Domain"
+                    aria-label={t('smartCompany.field.domain', 'Domain')}
                     value={domain}
                     onChange={(event) => handleDomainChange(event.target.value)}
-                    placeholder="company.com"
+                    placeholder={t('smartCompany.field.domainPlaceholder', 'company.com')}
                   />
                 </div>
               </label>
               <label className="smart-field">
-                <span>Website</span>
+                <span>{t('smartCompany.field.website', 'Website')}</span>
                 <div>
                   <Icon name="building" size={14} />
                   <input
-                    aria-label="Website"
+                    aria-label={t('smartCompany.field.website', 'Website')}
                     value={website}
                     onChange={(event) => handleWebsiteChange(event.target.value)}
-                    placeholder="https://company.com/"
+                    placeholder={t('smartCompany.field.websitePlaceholder', 'https://company.com/')}
                   />
                 </div>
               </label>
@@ -248,9 +278,15 @@ export function SmartCompanyDialog({ trigger }: Props) {
             <div className="smart-intel-card">
               <div className="smart-intel-head">
                 <div>
-                  <span>{existing ? 'Existing account' : 'New data'}</span>
+                  <span>
+                    {existing
+                      ? t('smartCompany.intel.existingAccount', 'Existing account')
+                      : t('smartCompany.intel.newData', 'New data')}
+                  </span>
                   <strong>
-                    {lookup.isFetching ? 'Resolving profile...' : statusLabel(lookup.data?.match)}
+                    {lookup.isFetching
+                      ? t('smartCompany.intel.resolving', 'Resolving profile...')
+                      : statusLabel(lookup.data?.match)}
                   </strong>
                 </div>
                 <motion.span
@@ -272,7 +308,10 @@ export function SmartCompanyDialog({ trigger }: Props) {
                   </motion.span>
                 ))}
               </div>
-              <div className="smart-autofill-map" aria-label="Autofill readiness map">
+              <div
+                className="smart-autofill-map"
+                aria-label={t('smartCompany.autofill.mapLabel', 'Autofill readiness map')}
+              >
                 {autofillItems.map((item, index) => (
                   <motion.div
                     key={item.label}
@@ -303,7 +342,9 @@ export function SmartCompanyDialog({ trigger }: Props) {
                     <button
                       key={item.id}
                       type="button"
-                      aria-label={`Select ${item.name}`}
+                      aria-label={t('smartCompany.alternatives.select', 'Select {{name}}', {
+                        name: item.name,
+                      })}
                       onClick={() => {
                         setQuery(item.name);
                         setDomain(item.domain ?? '');
@@ -327,7 +368,7 @@ export function SmartCompanyDialog({ trigger }: Props) {
             <div className="smart-actions">
               <DialogClose asChild>
                 <Button type="button" variant="ghost">
-                  Cancel
+                  {t('smartCompany.action.cancel', 'Cancel')}
                 </Button>
               </DialogClose>
               {existing ? (
@@ -339,7 +380,7 @@ export function SmartCompanyDialog({ trigger }: Props) {
                     navigate(`/accounts/${encodeURIComponent(existing.id)}`);
                   }}
                 >
-                  Open cockpit
+                  {t('smartCompany.action.openCockpit', 'Open cockpit')}
                 </Button>
               ) : null}
               <Button
@@ -348,7 +389,9 @@ export function SmartCompanyDialog({ trigger }: Props) {
                 onClick={() => createCompany.mutate()}
                 whileHover={reducedMotion || !canCreate ? undefined : { y: -1 }}
               >
-                {createCompany.isPending ? 'Enriching...' : 'Create enriched account'}
+                {createCompany.isPending
+                  ? t('smartCompany.action.enriching', 'Enriching...')
+                  : t('smartCompany.action.createEnriched', 'Create enriched account')}
               </Button>
             </div>
           </div>

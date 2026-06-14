@@ -290,5 +290,14 @@
     "signOut": "退出登录",
     "portfolio": "客户组合",
     "detail": "详情"
+  },
+  "appRoutes": {
+    "notFoundTitle": "页面未找到",
+    "notFoundMessage": "您查找的页面不存在。",
+    "goToDashboard": "前往仪表板"
+  },
+  "select": {
+    "placeholder": "—",
+    "noOptions": "无选项"
   }
 }

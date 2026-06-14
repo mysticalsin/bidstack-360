@@ -18,6 +18,8 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 import { LeadPriorityBadge, LeadStatusBadge } from '@/components/lead/LeadStatusBadge';
 import { Icon } from '@/components/ui/Icon';
@@ -46,6 +48,7 @@ interface Props {
 }
 
 export function LeadKanbanView({ leads }: Props) {
+  const { t } = useTranslation('crm');
   const { data: rotConfig } = useLeadRotConfig();
   const update = useUpdateLeadById();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
@@ -79,12 +82,15 @@ export function LeadKanbanView({ leads }: Props) {
       update.mutate(
         { id: lead.id, patch: { status: targetStatus } },
         {
-          onSuccess: () => toast.success(`Moved to ${targetStatus}`),
-          onError: () => toast.error('Could not move lead'),
+          onSuccess: () =>
+            toast.success(
+              t('leadKanban.moveSuccess', 'Moved to {{status}}', { status: targetStatus }),
+            ),
+          onError: () => toast.error(t('leadKanban.moveError', 'Could not move lead')),
         },
       );
     },
-    [update],
+    [update, t],
   );
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -112,13 +118,13 @@ export function LeadKanbanView({ leads }: Props) {
       <div
         className="grid gap-3 overflow-x-auto pb-2"
         style={{ gridTemplateColumns: `repeat(${COLUMNS.length}, minmax(220px, 1fr))` }}
-        aria-label="Lead pipeline kanban"
+        aria-label={t('leadKanban.boardAriaLabel', 'Lead pipeline kanban')}
       >
         {COLUMNS.map((col) => (
           <Column
             key={col.status}
             status={col.status}
-            label={col.label}
+            label={t(`leadKanban.column.${col.status}`, col.label)}
             leads={byStatus.get(col.status) ?? []}
             rottenDays={rotByStatus.get(col.status) ?? null}
             onMove={moveLeadByKeyboard}
@@ -142,11 +148,15 @@ const Column = memo(function Column({
   rottenDays: number | null;
   onMove: (leadId: string, dir: -1 | 1) => void;
 }) {
+  const { t } = useTranslation('crm');
   const { setNodeRef, isOver } = useDroppable({ id: status });
   return (
     <section
       ref={setNodeRef}
-      aria-label={`${label} column with ${leads.length} leads`}
+      aria-label={t('leadKanban.columnAriaLabel', '{{label}} column with {{count}} leads', {
+        label,
+        count: leads.length,
+      })}
       className={cn(
         'flex min-h-[60vh] flex-col rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] p-2',
         isOver && 'ring-2 ring-[var(--brand-primary)]',
@@ -159,10 +169,13 @@ const Column = memo(function Column({
       </header>
       {leads.length === 0 ? (
         <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-[var(--border-subtle)] p-4 text-xs text-[var(--fg-muted)]">
-          No leads
+          {t('leadKanban.emptyColumn', 'No leads')}
         </div>
       ) : (
-        <ul className="flex flex-col gap-2 overflow-y-auto" aria-label={`${label} leads`}>
+        <ul
+          className="flex flex-col gap-2 overflow-y-auto"
+          aria-label={t('leadKanban.columnLeadsAriaLabel', '{{label}} leads', { label })}
+        >
           {leads.map((lead) => (
             <li key={lead.id}>
               <Card lead={lead} rottenDays={rottenDays} onMove={onMove} />
@@ -183,6 +196,7 @@ function Card({
   rottenDays: number | null;
   onMove: (leadId: string, dir: -1 | 1) => void;
 }) {
+  const { t } = useTranslation('crm');
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: lead.id });
   const days = daysSince(lead.statusChangedAt);
   const isRotten = rottenDays !== null && days >= rottenDays;
@@ -197,7 +211,16 @@ function Card({
       // These come AFTER the spreads so they win over dnd-kit's defaults.
       tabIndex={0}
       aria-roledescription="draggable lead"
-      aria-label={`${lead.firstName} ${lead.lastName}, ${lead.companyName}, in ${lead.status}. Use the left and right arrow keys to move between columns.`}
+      aria-label={t(
+        'leadKanban.cardAriaLabel',
+        '{{firstName}} {{lastName}}, {{company}}, in {{status}}. Use the left and right arrow keys to move between columns.',
+        {
+          firstName: lead.firstName,
+          lastName: lead.lastName,
+          company: lead.companyName,
+          status: lead.status,
+        },
+      )}
       onKeyDown={(e: KeyboardEvent<HTMLElement>) => {
         if (e.key === 'ArrowRight') {
           e.preventDefault();
@@ -229,7 +252,9 @@ function Card({
       <p className="truncate text-xs text-[var(--fg-secondary)]">{lead.companyName}</p>
 
       <footer className="mt-1 flex items-center justify-between gap-2">
-        <span className="text-[10px] text-[var(--fg-tertiary)]">{days}d in stage</span>
+        <span className="text-[10px] text-[var(--fg-tertiary)]">
+          {t('leadKanban.daysInStage', '{{count}}d in stage', { count: days })}
+        </span>
         {isRotten ? <RotBadge leadId={lead.id} daysOver={days - (rottenDays ?? 0)} /> : null}
       </footer>
     </article>
@@ -237,6 +262,7 @@ function Card({
 }
 
 function RotBadge({ leadId, daysOver }: { leadId: string; daysOver: number }) {
+  const { t } = useTranslation('crm');
   const [open, setOpen] = useState(false);
   const [plays, setPlays] = useState<RecoveryPlay[]>([]);
   const suggest = useRecoverySuggest();
@@ -283,25 +309,33 @@ function RotBadge({ leadId, daysOver }: { leadId: string; daysOver: number }) {
         aria-haspopup="menu"
         aria-expanded={open}
         className="inline-flex h-5 items-center gap-1 rounded-full bg-[var(--danger)] px-2 text-[10px] font-semibold text-white"
-        aria-label={`Rotting: ${daysOver} days past threshold. Open recovery plays.`}
+        aria-label={t(
+          'leadKanban.rotBadgeAriaLabel',
+          'Rotting: {{count}} days past threshold. Open recovery plays.',
+          { count: daysOver },
+        )}
       >
         <Icon name="warning" size={10} ariaHidden />
-        Rot · +{daysOver}d
+        {t('leadKanban.rotBadgeLabel', 'Rot · +{{count}}d', { count: daysOver })}
       </button>
       {open ? (
         <div
           ref={menuRef}
           role="menu"
-          aria-label="Suggested recovery plays"
+          aria-label={t('leadKanban.recoveryMenuAriaLabel', 'Suggested recovery plays')}
           className="absolute right-0 top-6 z-20 w-64 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] p-2 shadow-xl"
         >
           <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-            Suggested recovery
+            {t('leadKanban.recoveryHeading', 'Suggested recovery')}
           </div>
           {suggest.isPending ? (
-            <p className="px-2 py-1 text-xs text-[var(--fg-secondary)]">Thinking…</p>
+            <p className="px-2 py-1 text-xs text-[var(--fg-secondary)]">
+              {t('leadKanban.recoveryLoading', 'Thinking…')}
+            </p>
           ) : plays.length === 0 ? (
-            <p className="px-2 py-1 text-xs text-[var(--fg-secondary)]">No suggestions.</p>
+            <p className="px-2 py-1 text-xs text-[var(--fg-secondary)]">
+              {t('leadKanban.recoveryEmpty', 'No suggestions.')}
+            </p>
           ) : (
             <ul className="flex flex-col gap-0.5">
               {plays.map((play) => (
@@ -316,7 +350,7 @@ function RotBadge({ leadId, daysOver }: { leadId: string; daysOver: number }) {
                     onClick={() => setOpen(false)}
                   >
                     <div className="font-medium text-[var(--fg-primary)]">
-                      {labelFor(play.kind)}
+                      {labelFor(play.kind, t)}
                     </div>
                     <div className="text-[10px] text-[var(--fg-tertiary)]">{play.rationale}</div>
                   </Link>
@@ -335,16 +369,16 @@ function daysSince(iso: string): number {
   return Math.max(0, Math.floor(ms / (1000 * 60 * 60 * 24)));
 }
 
-function labelFor(kind: RecoveryPlay['kind']): string {
+function labelFor(kind: RecoveryPlay['kind'], t: TFunction): string {
   switch (kind) {
     case 'send_reengagement_email':
-      return 'Send re-engagement email';
+      return t('leadKanban.play.sendReengagementEmail', 'Send re-engagement email');
     case 'schedule_call':
-      return 'Schedule a call';
+      return t('leadKanban.play.scheduleCall', 'Schedule a call');
     case 'add_to_nurture':
-      return 'Add to nurture cadence';
+      return t('leadKanban.play.addToNurture', 'Add to nurture cadence');
     case 'mark_lost':
-      return 'Mark as lost';
+      return t('leadKanban.play.markLost', 'Mark as lost');
   }
 }
 

@@ -53,5 +53,18 @@
     "cancel": "取消请求",
     "viewCertificate": "查看证书",
     "confirmCancel": "取消此签名请求？签署人将收到通知。"
+  },
+  "signaturePad": {
+    "modeTablistLabel": "签名方式",
+    "modeDraw": "手写",
+    "modeType": "输入",
+    "drawPlaceholder": "在此签名",
+    "canvasLabel": "签名绘制区域。使用鼠标或触控绘制您的签名。",
+    "typedNameLabel": "输入您的全名",
+    "typedNamePlaceholder": "您的姓名",
+    "clearButtonLabel": "清除签名",
+    "clearButton": "清除",
+    "undoButtonLabel": "撤销上一笔",
+    "undoButton": "撤销"
   }
 }

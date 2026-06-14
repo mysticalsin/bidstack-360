@@ -5,6 +5,7 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
@@ -18,18 +19,29 @@ import type { CrmConnector } from '@bidstack/shared';
 
 type Category = CrmConnector['category'];
 
-const CATEGORY_LABEL: Record<Category, string> = {
-  company: 'Company data',
-  market: 'Market & open data',
-  procurement: 'Procurement & tenders',
-  logo: 'Logos & branding',
-  people: 'People & contacts',
-  ai: 'AI & agents',
-};
+type TFunc = ReturnType<typeof useTranslation>['t'];
+
+function categoryLabel(t: TFunc, category: Category): string {
+  switch (category) {
+    case 'company':
+      return t('connectors.category.company', 'Company data');
+    case 'market':
+      return t('connectors.category.market', 'Market & open data');
+    case 'procurement':
+      return t('connectors.category.procurement', 'Procurement & tenders');
+    case 'logo':
+      return t('connectors.category.logo', 'Logos & branding');
+    case 'people':
+      return t('connectors.category.people', 'People & contacts');
+    case 'ai':
+      return t('connectors.category.ai', 'AI & agents');
+  }
+}
 
 const ALL: Category[] = ['company', 'market', 'procurement', 'logo', 'people', 'ai'];
 
 export function ConnectorsSection() {
+  const { t } = useTranslation('integrations');
   const { data, isLoading, isError, error, refetch } = useConnectorCatalog();
   const [filter, setFilter] = useState<Category | 'all'>('all');
   const items = useMemo(() => data?.items ?? [], [data?.items]);
@@ -69,13 +81,16 @@ export function ConnectorsSection() {
   return (
     <Card className="overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-primary)]">
       <SectionHeader
-        title="Connectors catalog"
-        caption="External data sources BidStack can reach. Open feeds run without keys; licensed feeds need credentials."
+        title={t('connectors.header.title', 'Connectors catalog')}
+        caption={t(
+          'connectors.header.caption',
+          'External data sources BidStack can reach. Open feeds run without keys; licensed feeds need credentials.',
+        )}
         action={
           <Badge
             tone={statusCounts.down > 0 ? 'tomato' : statusCounts.degraded > 0 ? 'amber' : 'jade'}
           >
-            {items.length} sources
+            {t('connectors.header.sourcesBadge', '{{count}} sources', { count: items.length })}
           </Badge>
         }
       />
@@ -85,7 +100,7 @@ export function ConnectorsSection() {
         </div>
       ) : isError ? (
         <ErrorState
-          title="Could not load connectors"
+          title={t('connectors.error.title', 'Could not load connectors')}
           message={error instanceof Error ? error.message : undefined}
           action={
             <button
@@ -93,7 +108,7 @@ export function ConnectorsSection() {
               className="text-xs text-[var(--brand-primary)] underline"
               onClick={() => refetch()}
             >
-              Try again
+              {t('connectors.error.retry', 'Try again')}
             </button>
           }
         />
@@ -102,47 +117,47 @@ export function ConnectorsSection() {
           <div className="grid gap-3 p-5 md:grid-cols-4">
             <ConnectorStat
               icon="globe"
-              label="Total sources"
+              label={t('connectors.stat.totalSources', 'Total sources')}
               value={String(items.length)}
               tone="blue"
             />
             <ConnectorStat
               icon="checkCircle"
-              label="Healthy"
+              label={t('connectors.stat.healthy', 'Healthy')}
               value={String(statusCounts.healthy)}
               tone="jade"
             />
             <ConnectorStat
               icon="shield"
-              label="Needs key"
+              label={t('connectors.stat.needsKey', 'Needs key')}
               value={String(credentialCount)}
               tone={credentialCount > 0 ? 'amber' : 'gray'}
             />
             <ConnectorStat
               icon="warning"
-              label="Degraded/down"
+              label={t('connectors.stat.degradedDown', 'Degraded/down')}
               value={String(statusCounts.degraded + statusCounts.down)}
               tone={statusCounts.down > 0 ? 'tomato' : statusCounts.degraded > 0 ? 'amber' : 'gray'}
             />
           </div>
           <div
             role="group"
-            aria-label="Filter connectors by category"
+            aria-label={t('connectors.filter.groupLabel', 'Filter connectors by category')}
             className="flex flex-wrap gap-2 border-t border-[var(--border-subtle)] px-5 py-4 text-xs"
           >
             <FilterChip active={filter === 'all'} onClick={() => setFilter('all')}>
-              All
+              {t('connectors.filter.all', 'All')}
               <span className="ml-1.5 text-[var(--fg-tertiary)]">{items.length}</span>
             </FilterChip>
             {ALL.map((cat) => (
               <FilterChip key={cat} active={filter === cat} onClick={() => setFilter(cat)}>
-                {CATEGORY_LABEL[cat]}
+                {categoryLabel(t, cat)}
                 <span className="ml-1.5 text-[var(--fg-tertiary)]">{counts[cat]}</span>
               </FilterChip>
             ))}
           </div>
           {filtered.length === 0 ? (
-            <EmptyState title="No connectors in this category" />
+            <EmptyState title={t('connectors.empty.title', 'No connectors in this category')} />
           ) : (
             <ul className="divide-y divide-[var(--border-subtle)]">
               {filtered.map((c) => (
@@ -167,6 +182,7 @@ function ConnectorStat({
   value: string;
   tone: BadgeTone;
 }) {
+  const { t } = useTranslation('integrations');
   return (
     <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4">
       <div className="flex items-center justify-between gap-3">
@@ -181,13 +197,14 @@ function ConnectorStat({
         {value}
       </div>
       <Badge tone={tone} className="mt-2">
-        catalog
+        {t('connectors.stat.catalogBadge', 'catalog')}
       </Badge>
     </div>
   );
 }
 
 function ConnectorRow({ connector }: { connector: CrmConnector }) {
+  const { t } = useTranslation('integrations');
   const qc = useQueryClient();
   const { data: userIntegrationsData } = useUserIntegrationsStatus();
 
@@ -270,7 +287,7 @@ function ConnectorRow({ connector }: { connector: CrmConnector }) {
           >
             {connector.name}
           </a>
-          <Badge tone="gray">{CATEGORY_LABEL[connector.category]}</Badge>
+          <Badge tone="gray">{categoryLabel(t, connector.category)}</Badge>
           <Badge tone={connector.kind === 'open_api' ? 'jade' : 'amber'}>
             {connector.kind.replace('_', ' ')}
           </Badge>
@@ -279,7 +296,11 @@ function ConnectorRow({ connector }: { connector: CrmConnector }) {
           <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">{connector.message}</p>
         ) : null}
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--fg-tertiary)]">
-          <span>Checked {relativeTime(connector.lastCheckedAt)}</span>
+          <span>
+            {t('connectors.row.checkedAt', 'Checked {{time}}', {
+              time: relativeTime(connector.lastCheckedAt),
+            })}
+          </span>
           {connector.capabilities.length ? (
             <>
               <span aria-hidden>.</span>
@@ -292,7 +313,7 @@ function ConnectorRow({ connector }: { connector: CrmConnector }) {
             rel="noreferrer noopener"
             className="ml-1.5 text-[var(--brand-primary)] hover:underline"
           >
-            Docs ↗
+            {t('connectors.row.docsLink', 'Docs ↗')}
           </a>
         </div>
       </div>
@@ -307,7 +328,9 @@ function ConnectorRow({ connector }: { connector: CrmConnector }) {
                 onClick={() => disconnectMutation.mutate()}
                 disabled={disconnectMutation.isPending}
               >
-                {disconnectMutation.isPending ? 'Disconnecting...' : 'Disconnect'}
+                {disconnectMutation.isPending
+                  ? t('connectors.row.disconnecting', 'Disconnecting...')
+                  : t('connectors.row.disconnect', 'Disconnect')}
               </LiquidGlassButton>
             ) : (
               <LiquidGlassButton
@@ -316,14 +339,16 @@ function ConnectorRow({ connector }: { connector: CrmConnector }) {
                 onClick={() => connectMutation.mutate()}
                 disabled={connectMutation.isPending}
               >
-                {connectMutation.isPending ? 'Connecting...' : 'Connect'}
+                {connectMutation.isPending
+                  ? t('connectors.row.connecting', 'Connecting...')
+                  : t('connectors.row.connect', 'Connect')}
               </LiquidGlassButton>
             )}
           </>
         ) : connector.requiresCredential ? (
-          <Badge tone="amber">requires key</Badge>
+          <Badge tone="amber">{t('connectors.row.requiresKey', 'requires key')}</Badge>
         ) : (
-          <Badge tone="blue">open</Badge>
+          <Badge tone="blue">{t('connectors.row.open', 'open')}</Badge>
         )}
         <StatusBadge status={status} />
       </div>
@@ -332,6 +357,7 @@ function ConnectorRow({ connector }: { connector: CrmConnector }) {
 }
 
 function StatusBadge({ status }: { status: CrmConnector['status'] }) {
+  const { t } = useTranslation('integrations');
   const tone =
     status === 'healthy'
       ? 'jade'
@@ -340,7 +366,15 @@ function StatusBadge({ status }: { status: CrmConnector['status'] }) {
         : status === 'down'
           ? 'tomato'
           : 'gray';
-  return <Badge tone={tone}>{status}</Badge>;
+  const label =
+    status === 'healthy'
+      ? t('connectors.status.healthy', 'healthy')
+      : status === 'degraded'
+        ? t('connectors.status.degraded', 'degraded')
+        : status === 'down'
+          ? t('connectors.status.down', 'down')
+          : t('connectors.status.disabled', 'disabled');
+  return <Badge tone={tone}>{label}</Badge>;
 }
 
 function FilterChip({

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { Card, SectionHeader } from '@/components/ui/Card';
@@ -45,15 +46,20 @@ export function OpportunityTabs({
   documents = [],
   timeline = [],
 }: OpportunityTabsProps) {
+  const { t } = useTranslation('crm');
   return (
     <Tabs defaultValue="decision-unit">
-      <TabsList aria-label="Opportunity sections">
-        <TabsTrigger value="decision-unit">Decision unit</TabsTrigger>
-        <TabsTrigger value="contacts">Contacts</TabsTrigger>
-        <TabsTrigger value="tasks">Tasks</TabsTrigger>
-        <TabsTrigger value="documents">Documents</TabsTrigger>
-        <TabsTrigger value="calls">Calls</TabsTrigger>
-        <TabsTrigger value="activity">Activity</TabsTrigger>
+      <TabsList aria-label={t('opportunityTabs.sectionsAriaLabel', 'Opportunity sections')}>
+        <TabsTrigger value="decision-unit">
+          {t('opportunityTabs.tabDecisionUnit', 'Decision unit')}
+        </TabsTrigger>
+        <TabsTrigger value="contacts">{t('opportunityTabs.tabContacts', 'Contacts')}</TabsTrigger>
+        <TabsTrigger value="tasks">{t('opportunityTabs.tabTasks', 'Tasks')}</TabsTrigger>
+        <TabsTrigger value="documents">
+          {t('opportunityTabs.tabDocuments', 'Documents')}
+        </TabsTrigger>
+        <TabsTrigger value="calls">{t('opportunityTabs.tabCalls', 'Calls')}</TabsTrigger>
+        <TabsTrigger value="activity">{t('opportunityTabs.tabActivity', 'Activity')}</TabsTrigger>
       </TabsList>
 
       <TabsContent value="decision-unit">
@@ -87,6 +93,7 @@ function DecisionUnitPanel({
   customer: string;
   intelDecisionUnit: NonNullable<OpportunityTabsProps['intelDecisionUnit']>;
 }) {
+  const { t } = useTranslation('crm');
   const contacts = useQuery({
     queryKey: ['contacts', customer],
     queryFn: ({ signal }) =>
@@ -141,11 +148,11 @@ function DecisionUnitPanel({
   if (contacts.isError)
     return (
       <ErrorState
-        title="Couldn't load decision-unit contacts"
-        message="Please try again."
+        title={t('opportunityTabs.decisionUnitErrorTitle', "Couldn't load decision-unit contacts")}
+        message={t('opportunityTabs.errorMessage', 'Please try again.')}
         action={
           <Button size="sm" variant="secondary" onClick={() => void contacts.refetch()}>
-            Retry
+            {t('opportunityTabs.retry', 'Retry')}
           </Button>
         }
       />
@@ -153,21 +160,31 @@ function DecisionUnitPanel({
   if (rows.length === 0)
     return (
       <EmptyState
-        title="No decision-unit members yet"
-        message="Add a contact from the Contacts page or sync from Dust."
+        title={t('opportunityTabs.decisionUnitEmptyTitle', 'No decision-unit members yet')}
+        message={t(
+          'opportunityTabs.decisionUnitEmptyMessage',
+          'Add a contact from the Contacts page or sync from Dust.',
+        )}
       />
     );
 
   return (
     <Card>
-      <SectionHeader title="Decision unit" caption={`${rows.length} stakeholders`} />
+      <SectionHeader
+        title={t('opportunityTabs.decisionUnitTitle', 'Decision unit')}
+        caption={t('opportunityTabs.stakeholdersCount', '{{count}} stakeholders', {
+          count: rows.length,
+        })}
+      />
       <ul className="divide-y divide-[var(--border-subtle)]">
         {rows.map((r) => (
           <li key={r.id} className="flex items-center justify-between gap-3 px-5 py-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <div className="text-sm font-medium text-[var(--fg-primary)]">{r.name}</div>
-                {r.source === 'intel' ? <Badge tone="purple">Dust</Badge> : null}
+                {r.source === 'intel' ? (
+                  <Badge tone="purple">{t('opportunityTabs.dustBadge', 'Dust')}</Badge>
+                ) : null}
               </div>
               <div className="text-xs text-[var(--fg-tertiary)]">{r.role}</div>
               {r.email ? (
@@ -192,7 +209,9 @@ function DecisionUnitPanel({
               </Badge>
               <div
                 className="text-xs font-semibold tabular-nums text-[var(--fg-primary)]"
-                aria-label={`Influence ${r.influence} out of 5`}
+                aria-label={t('opportunityTabs.influenceAriaLabel', 'Influence {{value}} out of 5', {
+                  value: r.influence,
+                })}
               >
                 {r.influence}/5
               </div>
@@ -205,23 +224,37 @@ function DecisionUnitPanel({
 }
 
 function TasksPanel({ oppId }: { oppId: string }) {
+  const { t: translate } = useTranslation('crm');
   const all = useTasks();
   if (all.isLoading) return <LoadingSkeleton />;
   const tasks = all.data?.items.filter((t) => t.oppId === oppId) ?? [];
   if (tasks.length === 0)
     return (
-      <EmptyState title="No tasks yet" message="Create a follow-up to keep this bid moving." />
+      <EmptyState
+        title={translate('opportunityTabs.tasksEmptyTitle', 'No tasks yet')}
+        message={translate(
+          'opportunityTabs.tasksEmptyMessage',
+          'Create a follow-up to keep this bid moving.',
+        )}
+      />
     );
   return (
     <Card>
-      <SectionHeader title="Tasks" caption={`${tasks.length} active`} />
+      <SectionHeader
+        title={translate('opportunityTabs.tasksTitle', 'Tasks')}
+        caption={translate('opportunityTabs.tasksActiveCount', '{{count}} active', {
+          count: tasks.length,
+        })}
+      />
       <ul className="divide-y divide-[var(--border-subtle)]">
         {tasks.map((t: Task) => (
           <li key={t.id} className="flex items-center justify-between gap-3 px-5 py-3">
             <div>
               <div className="text-sm text-[var(--fg-primary)]">{t.title}</div>
               <div className="text-xs text-[var(--fg-tertiary)]">
-                Due {formatDate(t.dueDate)}
+                {translate('opportunityTabs.taskDue', 'Due {{date}}', {
+                  date: formatDate(t.dueDate),
+                })}
                 {t.assignee ? <> · {t.assignee}</> : null}
               </div>
             </div>
@@ -246,16 +279,17 @@ function TasksPanel({ oppId }: { oppId: string }) {
 }
 
 function CallsPanel({ oppId }: { oppId: string }) {
+  const { t } = useTranslation('crm');
   const calls = useCalls({ entityType: 'OPPORTUNITY', entityId: oppId });
   if (calls.isLoading) return <LoadingSkeleton />;
   if (calls.isError)
     return (
       <ErrorState
-        title="Couldn't load calls"
-        message="Please try again."
+        title={t('opportunityTabs.callsErrorTitle', "Couldn't load calls")}
+        message={t('opportunityTabs.errorMessage', 'Please try again.')}
         action={
           <Button size="sm" variant="secondary" onClick={() => void calls.refetch()}>
-            Retry
+            {t('opportunityTabs.retry', 'Retry')}
           </Button>
         }
       />
@@ -264,21 +298,35 @@ function CallsPanel({ oppId }: { oppId: string }) {
   if (items.length === 0)
     return (
       <EmptyState
-        title="No calls yet"
-        message="Scheduled and completed calls for this opportunity show up here."
+        title={t('opportunityTabs.callsEmptyTitle', 'No calls yet')}
+        message={t(
+          'opportunityTabs.callsEmptyMessage',
+          'Scheduled and completed calls for this opportunity show up here.',
+        )}
       />
     );
   return (
     <Card>
-      <SectionHeader title="Calls" caption={`${items.length} call${items.length === 1 ? '' : 's'}`} />
+      <SectionHeader
+        title={t('opportunityTabs.callsTitle', 'Calls')}
+        caption={t('opportunityTabs.callsCount', '{{count}} call', {
+          count: items.length,
+        })}
+      />
       <ul className="divide-y divide-[var(--border-subtle)]">
         {items.map((c) => {
           const when = c.startedAt
             ? formatDate(c.startedAt)
             : c.scheduledAt
-              ? `Scheduled ${formatDate(c.scheduledAt)}`
+              ? t('opportunityTabs.callScheduledAt', 'Scheduled {{date}}', {
+                  date: formatDate(c.scheduledAt),
+                })
               : '—';
-          const mins = c.durationSec ? ` · ${Math.round(c.durationSec / 60)} min` : '';
+          const mins = c.durationSec
+            ? ` · ${t('opportunityTabs.callDurationMinutes', '{{count}} min', {
+                count: Math.round(c.durationSec / 60),
+              })}`
+            : '';
           return (
             <li key={c.id} className="flex items-center justify-between gap-3 px-5 py-3">
               <div className="min-w-0">
@@ -309,20 +357,32 @@ function DocumentsPanel({
 }: {
   documents: NonNullable<OpportunityTabsProps['documents']>;
 }) {
+  const { t } = useTranslation('crm');
   if (documents.length === 0)
     return (
-      <EmptyState title="No documents attached" message="Upload an RFP, SoW, or proposal draft." />
+      <EmptyState
+        title={t('opportunityTabs.documentsEmptyTitle', 'No documents attached')}
+        message={t('opportunityTabs.documentsEmptyMessage', 'Upload an RFP, SoW, or proposal draft.')}
+      />
     );
   return (
     <Card>
-      <SectionHeader title="Documents" caption={`${documents.length} files`} />
+      <SectionHeader
+        title={t('opportunityTabs.documentsTitle', 'Documents')}
+        caption={t('opportunityTabs.documentsCount', '{{count}} files', {
+          count: documents.length,
+        })}
+      />
       <ul className="divide-y divide-[var(--border-subtle)]">
         {documents.map((d) => (
           <li key={d.id} className="flex items-center justify-between gap-3 px-5 py-3">
             <div className="min-w-0">
               <div className="text-sm font-medium text-[var(--fg-primary)] truncate">{d.name}</div>
               <div className="text-xs text-[var(--fg-tertiary)]">
-                {d.kind} · {d.bytes ? `${(d.bytes / 1024).toFixed(1)} KB` : 'unknown size'}
+                {d.kind} ·{' '}
+                {d.bytes
+                  ? `${(d.bytes / 1024).toFixed(1)} KB`
+                  : t('opportunityTabs.documentUnknownSize', 'unknown size')}
               </div>
             </div>
             <Badge tone="gray">{d.kind}</Badge>
@@ -334,16 +394,20 @@ function DocumentsPanel({
 }
 
 function ActivityPanel({ timeline }: { timeline: NonNullable<OpportunityTabsProps['timeline']> }) {
+  const { t } = useTranslation('crm');
   if (timeline.length === 0)
     return (
       <EmptyState
-        title="No activity yet"
-        message="Stage moves, Dust webhooks, and notes will appear here."
+        title={t('opportunityTabs.activityEmptyTitle', 'No activity yet')}
+        message={t(
+          'opportunityTabs.activityEmptyMessage',
+          'Stage moves, Dust webhooks, and notes will appear here.',
+        )}
       />
     );
   return (
     <Card>
-      <SectionHeader title="Activity" />
+      <SectionHeader title={t('opportunityTabs.activityTitle', 'Activity')} />
       <ol className="px-5 py-4 space-y-3">
         {timeline.map((e, i) => (
           <li key={i} className="flex items-start gap-3">

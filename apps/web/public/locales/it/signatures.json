@@ -53,5 +53,18 @@
     "cancel": "Annulla richiesta",
     "viewCertificate": "Visualizza certificato",
     "confirmCancel": "Annullare questa richiesta di firma? I firmatari verranno notificati."
+  },
+  "signaturePad": {
+    "modeTablistLabel": "Metodo di firma",
+    "modeDraw": "Disegna",
+    "modeType": "Digita",
+    "drawPlaceholder": "Firma qui",
+    "canvasLabel": "Area di disegno della firma. Usa il mouse o il tocco per disegnare la tua firma.",
+    "typedNameLabel": "Digita il tuo nome completo",
+    "typedNamePlaceholder": "Il tuo nome",
+    "clearButtonLabel": "Cancella firma",
+    "clearButton": "Cancella",
+    "undoButtonLabel": "Annulla ultimo tratto",
+    "undoButton": "Annulla"
   }
 }

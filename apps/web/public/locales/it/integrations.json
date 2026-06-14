@@ -51,5 +51,148 @@
     "connectFailed": "Connessione non riuscita. Verifica le tue credenziali.",
     "syncFailed": "Sincronizzazione non riuscita.",
     "disconnectFailed": "Disconnessione non riuscita."
+  },
+  "agentProviderCredentials": {
+    "toast": {
+      "activeSet": "{{label}} è ora il modello attivo",
+      "activeCleared": "Modello attivo azzerato",
+      "activeSetDescription": "Ogni passaggio IA usa questo provider finché non cambi di nuovo, senza redeploy.",
+      "switchFailedTitle": "Impossibile cambiare provider",
+      "serverRejected": "Il server ha rifiutato la richiesta.",
+      "testAliveTitle": "{{label}} è attivo",
+      "testAliveDescription": "{{model}} ha risposto in {{latencyMs}} ms.",
+      "testNoResponseTitle": "{{label}} non ha risposto",
+      "testNoResponseDescription": "Nessuna risposta dal provider.",
+      "testFailedTitle": "Test non riuscito",
+      "savedTitle": "{{label}} salvato",
+      "savedDescription": "Lo stato del provider e la disponibilità di Agent Studio sono stati aggiornati.",
+      "removedTitle": "Credenziali di {{label}} rimosse",
+      "removeFailedTitle": "Rimozione non riuscita"
+    },
+    "error": {
+      "apiKeyRequired": "È richiesta una chiave API per questo provider.",
+      "claudeModelRequired": "Claude richiede un modello, ad esempio claude-sonnet-4-5.",
+      "saveFailed": "Impossibile salvare le credenziali del provider."
+    },
+    "remove": {
+      "confirmTitle": "Rimuovere le credenziali di {{label}}?",
+      "confirmDescription": "Gli agenti useranno le credenziali d'ambiente della piattaforma, se disponibili. Le definizioni degli agenti esistenti restano invariate.",
+      "confirmLabel": "Rimuovi"
+    },
+    "header": {
+      "title": "Provider di modelli",
+      "caption": "Resta indipendente dal fornitore: salva chiavi di proprietà dell'organizzazione per GPT, Claude, Kimi, NVIDIA NIM o Gemma locale, poi scegli quella attiva. Il cambio del provider attivo ha effetto al passaggio IA successivo, senza redeploy. Le chiavi sono cifrate a riposo e non vengono più mostrate.",
+      "addProvider": "Aggiungi provider"
+    },
+    "errorState": {
+      "title": "Impossibile caricare le chiavi del provider",
+      "message": "La disponibilità del provider usa ancora il fallback d'ambiente del server, ma non è stato possibile caricare le chiavi salvate dell'organizzazione.",
+      "retry": "Riprova"
+    },
+    "emptyState": {
+      "title": "Nessun elenco di provider restituito",
+      "message": "L'API dovrebbe sempre restituire i provider diretti supportati."
+    },
+    "summary": {
+      "savedCountOne": "{{count}} provider dell'organizzazione salvato",
+      "savedCountOther": "{{count}} provider dell'organizzazione salvati",
+      "activeBadge": "Attivo · {{label}}",
+      "noActiveBadge": "Nessun provider attivo — uso del predefinito della piattaforma",
+      "fallbackNote": "I provider d'ambiente della piattaforma restano disponibili come fallback quando configurati."
+    },
+    "row": {
+      "activeBadge": "Attivo",
+      "orgKeySaved": "Chiave dell'organizzazione salvata",
+      "noOrgKey": "Nessuna chiave dell'organizzazione",
+      "activeDescription": "Guida ogni passaggio IA per questo tenant in questo momento.",
+      "readyDescription": "Salvato e pronto — impostalo come attivo per instradare l'IA tramite esso.",
+      "fallbackDescription": "Usa il fallback d'ambiente della piattaforma se configurato.",
+      "edit": "Modifica",
+      "connect": "Connetti",
+      "remove": "Rimuovi",
+      "inUse": "In uso",
+      "setActive": "Imposta come attivo",
+      "testing": "Test in corso…",
+      "test": "Testa",
+      "testAlive": "Attivo · {{latencyMs}} ms",
+      "testFailed": "Non riuscito · {{error}}",
+      "testNoResponse": "nessuna risposta"
+    },
+    "detail": {
+      "model": "Modello",
+      "endpoint": "Endpoint",
+      "key": "Chiave",
+      "keyOptional": "Facoltativo",
+      "keyNotSaved": "Non salvata",
+      "updated": "Aggiornato",
+      "updatedNever": "Mai"
+    },
+    "dialog": {
+      "updateTitle": "Aggiorna {{label}}",
+      "addTitle": "Aggiungi provider di modelli",
+      "description": "La chiave API viene cifrata prima dell'archiviazione e non viene mai restituita al browser. Lascia vuota la chiave durante la modifica per mantenere quella salvata.",
+      "providerLabel": "Provider",
+      "apiKeyLabelOptional": "Chiave API (facoltativa)",
+      "apiKeyLabel": "Chiave API",
+      "apiKeyPlaceholderKeep": "Lascia vuoto per mantenere la chiave salvata",
+      "apiKeyPlaceholderOptional": "Facoltativo per i runtime locali",
+      "apiKeyPlaceholder": "Incolla la chiave del provider",
+      "modelLabel": "Modello",
+      "baseUrlLabel": "URL di base",
+      "baseUrlHintLocal": "Localhost è accettato solo nello sviluppo locale. La produzione richiede https pubblico.",
+      "baseUrlHint": "Deve essere un endpoint https pubblico.",
+      "cancel": "Annulla",
+      "saving": "Salvataggio...",
+      "save": "Salva provider"
+    }
+  },
+  "connectors": {
+    "category": {
+      "company": "Dati azienda",
+      "market": "Mercato e dati aperti",
+      "procurement": "Approvvigionamento e gare",
+      "logo": "Loghi e branding",
+      "people": "Persone e contatti",
+      "ai": "IA e agenti"
+    },
+    "header": {
+      "title": "Catalogo connettori",
+      "caption": "Fonti di dati esterne raggiungibili da BidStack. I feed aperti funzionano senza chiavi; i feed con licenza richiedono credenziali.",
+      "sourcesBadge": "{{count}} fonti"
+    },
+    "error": {
+      "title": "Impossibile caricare i connettori",
+      "retry": "Riprova"
+    },
+    "stat": {
+      "totalSources": "Fonti totali",
+      "healthy": "Integri",
+      "needsKey": "Richiede chiave",
+      "degradedDown": "Degradati/inattivi",
+      "catalogBadge": "catalogo"
+    },
+    "filter": {
+      "groupLabel": "Filtra i connettori per categoria",
+      "all": "Tutti"
+    },
+    "empty": {
+      "title": "Nessun connettore in questa categoria"
+    },
+    "row": {
+      "checkedAt": "Verificato {{time}}",
+      "docsLink": "Docs ↗",
+      "disconnecting": "Disconnessione...",
+      "disconnect": "Disconnetti",
+      "connecting": "Connessione...",
+      "connect": "Connetti",
+      "requiresKey": "richiede chiave",
+      "open": "aperto"
+    },
+    "status": {
+      "healthy": "integro",
+      "degraded": "degradato",
+      "down": "inattivo",
+      "disabled": "disabilitato"
+    }
   }
 }

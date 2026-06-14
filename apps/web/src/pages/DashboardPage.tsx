@@ -1,6 +1,7 @@
 import '../styles/cockpit.css';
 
 import { useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 
 import {
@@ -59,15 +60,17 @@ import type { CrmDashboardSnapshot } from '@bidstack/shared';
 // for the right company — we only need to render the layout here.
 export function DashboardPage() {
   const { accountId } = useParams<{ accountId?: string }>();
+  const { t } = useTranslation('crm');
   return (
     <>
-      <h1 className="sr-only">Dashboard</h1>
+      <h1 className="sr-only">{t('dashboard.srHeading', 'Dashboard')}</h1>
       {!accountId ? <OrgDashboard /> : <AccountCockpitPage accountId={accountId} />}
     </>
   );
 }
 
 function AccountCockpitPage({ accountId }: { accountId: string }) {
+  const { t } = useTranslation('crm');
   const dashboard = useCrmDashboard(accountId);
   const report = usePipelineReport();
   const opps = useOpportunities({ limit: 5 });
@@ -153,8 +156,8 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
   if (!snapshot) {
     return (
       <ErrorState
-        title="Couldn't load the account cockpit"
-        message={dashboard.error?.message ?? 'The dashboard endpoint did not respond.'}
+        title={t('dashboard.cockpitErrorTitle', "Couldn't load the account cockpit")}
+        message={dashboard.error?.message ?? t('dashboard.cockpitErrorMessage', 'The dashboard endpoint did not respond.')}
         action={
           <div className="flex flex-wrap items-center justify-center gap-2">
             <button
@@ -162,10 +165,10 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
               className="btn btn-primary"
               onClick={() => void dashboard.refetch()}
             >
-              Retry
+              {t('dashboard.retry', 'Retry')}
             </button>
             <Link to="/accounts" className="btn btn-secondary">
-              Back to accounts
+              {t('dashboard.backToAccounts', 'Back to accounts')}
             </Link>
           </div>
         }
@@ -189,9 +192,9 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
     <>
       {dashboard.isError && (
         <div role="status" className="bg-yellow-50 text-yellow-800 px-4 py-2 text-sm text-center rounded-md mb-4 flex items-center justify-center gap-2">
-          <span>Warning: Live refresh failed, showing the last verified snapshot.</span>
+          <span>{t('dashboard.liveRefreshFailed', 'Warning: Live refresh failed, showing the last verified snapshot.')}</span>
           <button type="button" onClick={() => void dashboard.refetch()} className="font-semibold underline hover:no-underline">
-            Retry
+            {t('dashboard.retry', 'Retry')}
           </button>
         </div>
       )}
@@ -206,13 +209,13 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
 
       <div className="mt-1 flex flex-col gap-1">
         <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
-          Portfolio sales intelligence
+          {t('dashboard.portfolioIntelTitle', 'Portfolio sales intelligence')}
         </h2>
         <p className="text-xs text-[var(--fg-tertiary)]">
-          Pipeline, risks, contacts, and records for this account.
+          {t('dashboard.portfolioIntelSubtitle', 'Pipeline, risks, contacts, and records for this account.')}
         </p>
       </div>
-      <section className="cockpit-grid" aria-label="Account cockpit">
+      <section className="cockpit-grid" aria-label={t('dashboard.accountCockpitAria', 'Account cockpit')}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
           {show('techStack') && (
             <Reveal>
@@ -279,7 +282,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
           )}
         </div>
 
-        <aside className="cockpit-side" aria-label="Cockpit details">
+        <aside className="cockpit-side" aria-label={t('dashboard.cockpitDetailsAria', 'Cockpit details')}>
           {show('healthScore') && (
             <Reveal>
               <HealthScoreCard cockpit={cockpit} />

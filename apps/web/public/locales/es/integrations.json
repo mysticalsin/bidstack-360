@@ -41,5 +41,148 @@
     "connectFailed": "La conexión falló. Comprueba tus credenciales.",
     "syncFailed": "La sincronización falló.",
     "disconnectFailed": "La desconexión falló."
+  },
+  "agentProviderCredentials": {
+    "toast": {
+      "activeSet": "{{label}} es ahora el modelo activo",
+      "activeCleared": "Modelo activo borrado",
+      "activeSetDescription": "Cada paso de IA usa este proveedor hasta que vuelvas a cambiar, sin necesidad de redesplegar.",
+      "switchFailedTitle": "No se pudo cambiar el proveedor",
+      "serverRejected": "El servidor rechazó la solicitud.",
+      "testAliveTitle": "{{label}} está activo",
+      "testAliveDescription": "{{model}} respondió en {{latencyMs}} ms.",
+      "testNoResponseTitle": "{{label}} no respondió",
+      "testNoResponseDescription": "Sin respuesta del proveedor.",
+      "testFailedTitle": "La prueba falló",
+      "savedTitle": "{{label}} guardado",
+      "savedDescription": "Se actualizaron el estado del proveedor y la disponibilidad de Agent Studio.",
+      "removedTitle": "Credenciales de {{label}} eliminadas",
+      "removeFailedTitle": "Error al eliminar"
+    },
+    "error": {
+      "apiKeyRequired": "Se requiere una clave de API para este proveedor.",
+      "claudeModelRequired": "Claude requiere un modelo, por ejemplo claude-sonnet-4-5.",
+      "saveFailed": "No se pudieron guardar las credenciales del proveedor."
+    },
+    "remove": {
+      "confirmTitle": "¿Eliminar las credenciales de {{label}}?",
+      "confirmDescription": "Los agentes recurrirán a las credenciales de entorno de la plataforma si están disponibles. Las definiciones de agentes existentes permanecen intactas.",
+      "confirmLabel": "Eliminar"
+    },
+    "header": {
+      "title": "Proveedores de modelos",
+      "caption": "Mantente independiente del proveedor: guarda claves propias de la organización para GPT, Claude, Kimi, NVIDIA NIM o Gemma local, y luego elige la activa. Cambiar el proveedor activo surte efecto en el siguiente paso de IA, sin redespliegue. Las claves se cifran en reposo y no se muestran de nuevo.",
+      "addProvider": "Añadir proveedor"
+    },
+    "errorState": {
+      "title": "No se pudieron cargar las claves del proveedor",
+      "message": "La disponibilidad del proveedor sigue usando el respaldo de entorno del servidor, pero no se pudieron cargar las claves guardadas de la organización.",
+      "retry": "Reintentar"
+    },
+    "emptyState": {
+      "title": "No se devolvió ninguna lista de proveedores",
+      "message": "La API siempre debería devolver los proveedores directos compatibles."
+    },
+    "summary": {
+      "savedCountOne": "{{count}} proveedor de la organización guardado",
+      "savedCountOther": "{{count}} proveedores de la organización guardados",
+      "activeBadge": "Activo · {{label}}",
+      "noActiveBadge": "Sin proveedor activo: usando el predeterminado de la plataforma",
+      "fallbackNote": "Los proveedores de entorno de la plataforma siguen disponibles como respaldo cuando están configurados."
+    },
+    "row": {
+      "activeBadge": "Activo",
+      "orgKeySaved": "Clave de la organización guardada",
+      "noOrgKey": "Sin clave de la organización",
+      "activeDescription": "Impulsa cada paso de IA para este inquilino en este momento.",
+      "readyDescription": "Guardado y listo: actívalo para enrutar la IA a través de él.",
+      "fallbackDescription": "Usa el respaldo de entorno de la plataforma si está configurado.",
+      "edit": "Editar",
+      "connect": "Conectar",
+      "remove": "Eliminar",
+      "inUse": "En uso",
+      "setActive": "Establecer como activo",
+      "testing": "Probando…",
+      "test": "Probar",
+      "testAlive": "Activo · {{latencyMs}} ms",
+      "testFailed": "Falló · {{error}}",
+      "testNoResponse": "sin respuesta"
+    },
+    "detail": {
+      "model": "Modelo",
+      "endpoint": "Punto de conexión",
+      "key": "Clave",
+      "keyOptional": "Opcional",
+      "keyNotSaved": "No guardada",
+      "updated": "Actualizado",
+      "updatedNever": "Nunca"
+    },
+    "dialog": {
+      "updateTitle": "Actualizar {{label}}",
+      "addTitle": "Añadir proveedor de modelos",
+      "description": "La clave de API se cifra antes de almacenarse y nunca se devuelve al navegador. Deja la clave en blanco al editar para conservar la clave guardada.",
+      "providerLabel": "Proveedor",
+      "apiKeyLabelOptional": "Clave de API (opcional)",
+      "apiKeyLabel": "Clave de API",
+      "apiKeyPlaceholderKeep": "Déjalo en blanco para conservar la clave guardada",
+      "apiKeyPlaceholderOptional": "Opcional para entornos de ejecución locales",
+      "apiKeyPlaceholder": "Pega la clave del proveedor",
+      "modelLabel": "Modelo",
+      "baseUrlLabel": "URL base",
+      "baseUrlHintLocal": "Localhost solo se acepta en desarrollo local. Producción requiere https público.",
+      "baseUrlHint": "Debe ser un punto de conexión https público.",
+      "cancel": "Cancelar",
+      "saving": "Guardando...",
+      "save": "Guardar proveedor"
+    }
+  },
+  "connectors": {
+    "category": {
+      "company": "Datos de empresa",
+      "market": "Datos de mercado y abiertos",
+      "procurement": "Compras y licitaciones",
+      "logo": "Logos y marca",
+      "people": "Personas y contactos",
+      "ai": "IA y agentes"
+    },
+    "header": {
+      "title": "Catálogo de conectores",
+      "caption": "Fuentes de datos externas a las que BidStack puede acceder. Los feeds abiertos funcionan sin claves; los feeds con licencia necesitan credenciales.",
+      "sourcesBadge": "{{count}} fuentes"
+    },
+    "error": {
+      "title": "No se pudieron cargar los conectores",
+      "retry": "Reintentar"
+    },
+    "stat": {
+      "totalSources": "Fuentes totales",
+      "healthy": "Saludables",
+      "needsKey": "Requiere clave",
+      "degradedDown": "Degradados/caídos",
+      "catalogBadge": "catálogo"
+    },
+    "filter": {
+      "groupLabel": "Filtrar conectores por categoría",
+      "all": "Todos"
+    },
+    "empty": {
+      "title": "No hay conectores en esta categoría"
+    },
+    "row": {
+      "checkedAt": "Verificado {{time}}",
+      "docsLink": "Docs ↗",
+      "disconnecting": "Desconectando...",
+      "disconnect": "Desconectar",
+      "connecting": "Conectando...",
+      "connect": "Conectar",
+      "requiresKey": "requiere clave",
+      "open": "abierto"
+    },
+    "status": {
+      "healthy": "saludable",
+      "degraded": "degradado",
+      "down": "caído",
+      "disabled": "deshabilitado"
+    }
   }
 }

@@ -14,6 +14,7 @@
  */
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/cn';
 
@@ -67,6 +68,7 @@ function getPos(canvas: HTMLCanvasElement, e: MouseEvent | TouchEvent): { x: num
 
 export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
   ({ className, onChange }, ref) => {
+    const { t } = useTranslation('signatures');
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [mode, setMode] = useState<SignatureMode>('draw');
     const [typedName, setTypedName] = useState('');
@@ -274,7 +276,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
         {/* Mode tabs */}
         <div
           role="tablist"
-          aria-label="Signature method"
+          aria-label={t('signaturePad.modeTablistLabel', 'Signature method')}
           className="flex gap-1 rounded-lg bg-[var(--surface-sunken)] p-1 w-fit"
         >
           {(['draw', 'type'] as const).map((m) => (
@@ -291,7 +293,9 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
                   : 'text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]',
               )}
             >
-              {m === 'draw' ? 'Draw' : 'Type'}
+              {m === 'draw'
+                ? t('signaturePad.modeDraw', 'Draw')
+                : t('signaturePad.modeType', 'Type')}
             </button>
           ))}
         </div>
@@ -310,13 +314,16 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
               // (~6.5:1); gray-400 was ~2.5:1.
               className="pointer-events-none absolute inset-0 flex select-none items-center justify-center text-sm text-gray-600"
             >
-              Sign here
+              {t('signaturePad.drawPlaceholder', 'Sign here')}
             </p>
           )}
           <canvas
             ref={canvasRef}
             role="application"
-            aria-label="Signature drawing area. Use mouse or touch to draw your signature."
+            aria-label={t(
+              'signaturePad.canvasLabel',
+              'Signature drawing area. Use mouse or touch to draw your signature.',
+            )}
             className={cn(
               'block w-full rounded-xl',
               mode === 'draw' ? 'cursor-crosshair' : 'cursor-default pointer-events-none',
@@ -332,14 +339,14 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
               htmlFor="typed-signature"
               className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
             >
-              Type your full name
+              {t('signaturePad.typedNameLabel', 'Type your full name')}
             </label>
             <input
               id="typed-signature"
               type="text"
               value={typedName}
               onChange={(e) => setTypedName(e.target.value)}
-              placeholder="Your Name"
+              placeholder={t('signaturePad.typedNamePlaceholder', 'Your Name')}
               className={cn(
                 'w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)]',
                 'px-3 py-2 text-sm text-[var(--fg-primary)] placeholder:text-[var(--fg-disabled)]',
@@ -356,7 +363,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
           <button
             type="button"
             onClick={clearCanvas}
-            aria-label="Clear signature"
+            aria-label={t('signaturePad.clearButtonLabel', 'Clear signature')}
             className={cn(
               'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg',
               'border border-[var(--border-default)] bg-[var(--surface-card)]',
@@ -365,14 +372,14 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
               'transition-colors',
             )}
           >
-            Clear
+            {t('signaturePad.clearButton', 'Clear')}
           </button>
           {mode === 'draw' && (
             <button
               type="button"
               onClick={undo}
               disabled={history.current.length === 0}
-              aria-label="Undo last stroke"
+              aria-label={t('signaturePad.undoButtonLabel', 'Undo last stroke')}
               className={cn(
                 'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg',
                 'border border-[var(--border-default)] bg-[var(--surface-card)]',
@@ -381,7 +388,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
                 'transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
               )}
             >
-              Undo
+              {t('signaturePad.undoButton', 'Undo')}
             </button>
           )}
         </div>

@@ -51,5 +51,148 @@
     "connectFailed": "Connection failed. Check your credentials.",
     "syncFailed": "Sync failed.",
     "disconnectFailed": "Disconnect failed."
+  },
+  "agentProviderCredentials": {
+    "toast": {
+      "activeSet": "{{label}} is now the active model",
+      "activeCleared": "Active model cleared",
+      "activeSetDescription": "Every AI step uses this provider until you switch again — no redeploy.",
+      "switchFailedTitle": "Could not switch provider",
+      "serverRejected": "The server rejected the request.",
+      "testAliveTitle": "{{label}} is alive",
+      "testAliveDescription": "{{model}} responded in {{latencyMs}} ms.",
+      "testNoResponseTitle": "{{label}} did not respond",
+      "testNoResponseDescription": "No response from the provider.",
+      "testFailedTitle": "Test failed",
+      "savedTitle": "{{label}} saved",
+      "savedDescription": "Provider status and Agent Studio readiness were refreshed.",
+      "removedTitle": "{{label}} credentials removed",
+      "removeFailedTitle": "Remove failed"
+    },
+    "error": {
+      "apiKeyRequired": "API key is required for this provider.",
+      "claudeModelRequired": "Claude requires a model, for example claude-sonnet-4-5.",
+      "saveFailed": "Could not save provider credentials."
+    },
+    "remove": {
+      "confirmTitle": "Remove {{label}} credentials?",
+      "confirmDescription": "Agents will fall back to platform env credentials if available. Existing agent definitions stay intact.",
+      "confirmLabel": "Remove"
+    },
+    "header": {
+      "title": "Model providers",
+      "caption": "Stay vendor-independent: store org-owned keys for GPT, Claude, Kimi, NVIDIA NIM, or local Gemma, then pick the active one. Switching the active provider takes effect on the next AI step — no redeploy. Keys are encrypted at rest and never shown again.",
+      "addProvider": "Add provider"
+    },
+    "errorState": {
+      "title": "Could not load provider keys",
+      "message": "Provider readiness still uses server env fallback, but saved org keys could not be loaded.",
+      "retry": "Retry"
+    },
+    "emptyState": {
+      "title": "No provider list returned",
+      "message": "The API should always return the supported direct providers."
+    },
+    "summary": {
+      "savedCountOne": "{{count}} org provider saved",
+      "savedCountOther": "{{count}} org providers saved",
+      "activeBadge": "Active · {{label}}",
+      "noActiveBadge": "No active provider — using platform default",
+      "fallbackNote": "Platform env providers remain available as fallback when configured."
+    },
+    "row": {
+      "activeBadge": "Active",
+      "orgKeySaved": "Org key saved",
+      "noOrgKey": "No org key",
+      "activeDescription": "Drives every AI step for this tenant right now.",
+      "readyDescription": "Saved and ready — set it active to route AI through it.",
+      "fallbackDescription": "Uses platform env fallback if configured.",
+      "edit": "Edit",
+      "connect": "Connect",
+      "remove": "Remove",
+      "inUse": "In use",
+      "setActive": "Set active",
+      "testing": "Testing…",
+      "test": "Test",
+      "testAlive": "Alive · {{latencyMs}} ms",
+      "testFailed": "Failed · {{error}}",
+      "testNoResponse": "no response"
+    },
+    "detail": {
+      "model": "Model",
+      "endpoint": "Endpoint",
+      "key": "Key",
+      "keyOptional": "Optional",
+      "keyNotSaved": "Not saved",
+      "updated": "Updated",
+      "updatedNever": "Never"
+    },
+    "dialog": {
+      "updateTitle": "Update {{label}}",
+      "addTitle": "Add model provider",
+      "description": "The API key is encrypted before storage and never returned to the browser. Leave the key blank when editing to keep the saved key.",
+      "providerLabel": "Provider",
+      "apiKeyLabelOptional": "API key (optional)",
+      "apiKeyLabel": "API key",
+      "apiKeyPlaceholderKeep": "Leave blank to keep the saved key",
+      "apiKeyPlaceholderOptional": "Optional for local runtimes",
+      "apiKeyPlaceholder": "Paste provider key",
+      "modelLabel": "Model",
+      "baseUrlLabel": "Base URL",
+      "baseUrlHintLocal": "Localhost is accepted only in local development. Production requires public https.",
+      "baseUrlHint": "Must be a public https endpoint.",
+      "cancel": "Cancel",
+      "saving": "Saving...",
+      "save": "Save provider"
+    }
+  },
+  "connectors": {
+    "category": {
+      "company": "Company data",
+      "market": "Market & open data",
+      "procurement": "Procurement & tenders",
+      "logo": "Logos & branding",
+      "people": "People & contacts",
+      "ai": "AI & agents"
+    },
+    "header": {
+      "title": "Connectors catalog",
+      "caption": "External data sources BidStack can reach. Open feeds run without keys; licensed feeds need credentials.",
+      "sourcesBadge": "{{count}} sources"
+    },
+    "error": {
+      "title": "Could not load connectors",
+      "retry": "Try again"
+    },
+    "stat": {
+      "totalSources": "Total sources",
+      "healthy": "Healthy",
+      "needsKey": "Needs key",
+      "degradedDown": "Degraded/down",
+      "catalogBadge": "catalog"
+    },
+    "filter": {
+      "groupLabel": "Filter connectors by category",
+      "all": "All"
+    },
+    "empty": {
+      "title": "No connectors in this category"
+    },
+    "row": {
+      "checkedAt": "Checked {{time}}",
+      "docsLink": "Docs ↗",
+      "disconnecting": "Disconnecting...",
+      "disconnect": "Disconnect",
+      "connecting": "Connecting...",
+      "connect": "Connect",
+      "requiresKey": "requires key",
+      "open": "open"
+    },
+    "status": {
+      "healthy": "healthy",
+      "degraded": "degraded",
+      "down": "down",
+      "disabled": "disabled"
+    }
   }
 }

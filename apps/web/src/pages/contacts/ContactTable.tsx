@@ -11,6 +11,7 @@
  *
  * Import DAG: no local sibling imports. Imported by ContactsPage.
  */
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { ContactDialog } from '@/components/contact/ContactDialog';
@@ -110,19 +111,23 @@ export function ContactTable({
   onDelete,
   setContextMenu,
 }: ContactTableProps) {
+  const { t } = useTranslation('crm');
+
   return (
     <>
       {/* aria-live region — announces filter/sort result counts to screen
           readers. Visually hidden; updates only when the count actually
           changes so SR doesn't fire on every keystroke. */}
       <p className="sr-only" role="status" aria-live="polite">
-        {search ? (
-          <>
-            Showing {items.length} of {raw.length} contacts matching {search}.
-          </>
-        ) : (
-          <>Showing {items.length} contacts.</>
-        )}
+        {search
+          ? t(
+              'contactTable.announceFiltered',
+              'Showing {{count}} of {{total}} contacts matching {{search}}.',
+              { count: items.length, total: raw.length, search },
+            )
+          : t('contactTable.announceTotal', 'Showing {{count}} contacts.', {
+              count: items.length,
+            })}
       </p>
 
       <Card className="overflow-hidden">
@@ -130,32 +135,41 @@ export function ContactTable({
           <TableSkeleton rows={8} columns={8} headless />
         ) : isError ? (
           <ErrorState
-            title="Could not load contacts"
+            title={t('contactTable.errorTitle', 'Could not load contacts')}
             message={error instanceof Error ? error.message : undefined}
             action={
               <Button size="sm" variant="secondary" onClick={() => refetch()}>
-                Try again
+                {t('contactTable.tryAgain', 'Try again')}
               </Button>
             }
           />
         ) : items.length === 0 ? (
           <EmptyState
-            title={search ? 'No matches' : 'No contacts yet'}
+            title={
+              search
+                ? t('contactTable.emptyFilteredTitle', 'No matches')
+                : t('contactTable.emptyTitle', 'No contacts yet')
+            }
             message={
               search
-                ? `Nothing matched "${search}".`
-                : 'Add the first decision-maker to start mapping the buying group.'
+                ? t('contactTable.emptyFilteredMessage', 'Nothing matched "{{search}}".', {
+                    search,
+                  })
+                : t(
+                    'contactTable.emptyMessage',
+                    'Add the first decision-maker to start mapping the buying group.',
+                  )
             }
             action={
               search ? (
                 <Button size="sm" variant="secondary" onClick={() => setSearch('')}>
-                  Clear search
+                  {t('contactTable.clearSearch', 'Clear search')}
                 </Button>
               ) : (
                 <ContactDialog
                   trigger={
                     <Button size="sm" variant="primary">
-                      Add first contact
+                      {t('contactTable.addFirstContact', 'Add first contact')}
                     </Button>
                   }
                 />
@@ -173,7 +187,9 @@ export function ContactTable({
                 <th scope="col" className="w-10 px-5 py-3">
                   <label className="table-checkbox-hit">
                     <span className="sr-only">
-                      {allSelected ? 'Deselect all contacts' : 'Select all contacts'}
+                      {allSelected
+                        ? t('contactTable.deselectAll', 'Deselect all contacts')
+                        : t('contactTable.selectAll', 'Select all contacts')}
                     </span>
                     <input
                       type="checkbox"
@@ -195,7 +211,7 @@ export function ContactTable({
                   className="px-5 py-3 font-semibold"
                 >
                   <SortableHeader columnKey="name" state={sortState} onChange={setSortState}>
-                    Name
+                    {t('contactTable.colName', 'Name')}
                   </SortableHeader>
                 </th>
                 <th
@@ -204,7 +220,7 @@ export function ContactTable({
                   className="px-5 py-3 font-semibold"
                 >
                   <SortableHeader columnKey="role" state={sortState} onChange={setSortState}>
-                    Role
+                    {t('contactTable.colRole', 'Role')}
                   </SortableHeader>
                 </th>
                 <th
@@ -213,11 +229,11 @@ export function ContactTable({
                   className="px-5 py-3 font-semibold"
                 >
                   <SortableHeader columnKey="customer" state={sortState} onChange={setSortState}>
-                    Customer
+                    {t('contactTable.colCustomer', 'Customer')}
                   </SortableHeader>
                 </th>
                 <th scope="col" className="px-5 py-3 font-semibold">
-                  Contact
+                  {t('contactTable.colContact', 'Contact')}
                 </th>
                 <th
                   scope="col"
@@ -225,7 +241,7 @@ export function ContactTable({
                   className="px-5 py-3 font-semibold"
                 >
                   <SortableHeader columnKey="influence" state={sortState} onChange={setSortState}>
-                    Influence
+                    {t('contactTable.colInfluence', 'Influence')}
                   </SortableHeader>
                 </th>
                 <th
@@ -234,11 +250,11 @@ export function ContactTable({
                   className="px-5 py-3 font-semibold"
                 >
                   <SortableHeader columnKey="sentiment" state={sortState} onChange={setSortState}>
-                    Sentiment
+                    {t('contactTable.colSentiment', 'Sentiment')}
                   </SortableHeader>
                 </th>
                 <th scope="col" className="px-5 py-3 text-right font-semibold">
-                  Actions
+                  {t('contactTable.colActions', 'Actions')}
                 </th>
               </tr>
             </thead>
@@ -259,7 +275,9 @@ export function ContactTable({
                   <td className="w-10 px-5 py-3">
                     <label className="table-checkbox-hit">
                       <span className="sr-only">
-                        {selectedIds.has(c.id) ? `Deselect ${c.name}` : `Select ${c.name}`}
+                        {selectedIds.has(c.id)
+                          ? t('contactTable.deselectRow', 'Deselect {{name}}', { name: c.name })
+                          : t('contactTable.selectRow', 'Select {{name}}', { name: c.name })}
                       </span>
                       <input
                         type="checkbox"
@@ -285,8 +303,10 @@ export function ContactTable({
                       onSave={(next) =>
                         updateContact.mutate({ id: c.id, patch: { role: next || null } })
                       }
-                      label={`Edit role for ${c.name}`}
-                      placeholder="Add role…"
+                      label={t('contactTable.editRoleLabel', 'Edit role for {{name}}', {
+                        name: c.name,
+                      })}
+                      placeholder={t('contactTable.addRolePlaceholder', 'Add role…')}
                       display={(v) => v || <span className="text-[var(--fg-tertiary)]">—</span>}
                     />
                   </td>
@@ -320,7 +340,9 @@ export function ContactTable({
                           patch: { influence: next === 0 ? null : next },
                         })
                       }
-                      label={`Edit influence for ${c.name}`}
+                      label={t('contactTable.editInfluenceLabel', 'Edit influence for {{name}}', {
+                        name: c.name,
+                      })}
                       display={(v) =>
                         v ? `${v}/5` : <span className="text-[var(--fg-tertiary)]">—</span>
                       }
@@ -337,7 +359,9 @@ export function ContactTable({
                           patch: { sentiment: (next as Sentiment) || null },
                         })
                       }
-                      label={`Edit sentiment for ${c.name}`}
+                      label={t('contactTable.editSentimentLabel', 'Edit sentiment for {{name}}', {
+                        name: c.name,
+                      })}
                       display={(v) =>
                         v ? (
                           <Badge tone={SENTIMENT_TONE[v as Sentiment]}>{v}</Badge>
@@ -353,19 +377,23 @@ export function ContactTable({
                         size="sm"
                         variant="ghost"
                         onClick={() => setEditTarget(c)}
-                        aria-label={`Edit ${c.name}`}
+                        aria-label={t('contactTable.editRowLabel', 'Edit {{name}}', {
+                          name: c.name,
+                        })}
                       >
-                        Edit
+                        {t('contactTable.editAction', 'Edit')}
                       </Button>
                       <Button
                         size="sm"
                         variant="ghost"
                         onClick={() => onDelete(c)}
                         disabled={del.isPending}
-                        aria-label={`Delete ${c.name}`}
+                        aria-label={t('contactTable.deleteRowLabel', 'Delete {{name}}', {
+                          name: c.name,
+                        })}
                         className="text-[var(--danger)] hover:text-[var(--danger)]"
                       >
-                        Delete
+                        {t('contactTable.deleteAction', 'Delete')}
                       </Button>
                     </div>
                   </td>

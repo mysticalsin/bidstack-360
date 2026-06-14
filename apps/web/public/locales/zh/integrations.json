@@ -51,5 +51,148 @@
     "connectFailed": "连接失败，请检查您的凭据。",
     "syncFailed": "同步失败。",
     "disconnectFailed": "断开连接失败。"
+  },
+  "agentProviderCredentials": {
+    "toast": {
+      "activeSet": "{{label}} 现在是活动模型",
+      "activeCleared": "已清除活动模型",
+      "activeSetDescription": "在你再次切换之前，每个 AI 步骤都使用此提供商，无需重新部署。",
+      "switchFailedTitle": "无法切换提供商",
+      "serverRejected": "服务器拒绝了该请求。",
+      "testAliveTitle": "{{label}} 已就绪",
+      "testAliveDescription": "{{model}} 在 {{latencyMs}} 毫秒内响应。",
+      "testNoResponseTitle": "{{label}} 未响应",
+      "testNoResponseDescription": "提供商无响应。",
+      "testFailedTitle": "测试失败",
+      "savedTitle": "{{label}} 已保存",
+      "savedDescription": "已刷新提供商状态和 Agent Studio 就绪情况。",
+      "removedTitle": "已移除 {{label}} 凭据",
+      "removeFailedTitle": "移除失败"
+    },
+    "error": {
+      "apiKeyRequired": "此提供商需要 API 密钥。",
+      "claudeModelRequired": "Claude 需要指定模型，例如 claude-sonnet-4-5。",
+      "saveFailed": "无法保存提供商凭据。"
+    },
+    "remove": {
+      "confirmTitle": "移除 {{label}} 凭据？",
+      "confirmDescription": "如可用，代理将回退到平台环境凭据。现有代理定义保持不变。",
+      "confirmLabel": "移除"
+    },
+    "header": {
+      "title": "模型提供商",
+      "caption": "保持厂商中立：为 GPT、Claude、Kimi、NVIDIA NIM 或本地 Gemma 存储组织自有密钥，然后选择活动项。切换活动提供商会在下一个 AI 步骤生效，无需重新部署。密钥在静态下加密存储，且不会再次显示。",
+      "addProvider": "添加提供商"
+    },
+    "errorState": {
+      "title": "无法加载提供商密钥",
+      "message": "提供商就绪情况仍使用服务器环境回退，但无法加载已保存的组织密钥。",
+      "retry": "重试"
+    },
+    "emptyState": {
+      "title": "未返回提供商列表",
+      "message": "该 API 应始终返回受支持的直连提供商。"
+    },
+    "summary": {
+      "savedCountOne": "已保存 {{count}} 个组织提供商",
+      "savedCountOther": "已保存 {{count}} 个组织提供商",
+      "activeBadge": "活动 · {{label}}",
+      "noActiveBadge": "无活动提供商 — 使用平台默认值",
+      "fallbackNote": "配置后，平台环境提供商仍可作为回退使用。"
+    },
+    "row": {
+      "activeBadge": "活动",
+      "orgKeySaved": "已保存组织密钥",
+      "noOrgKey": "无组织密钥",
+      "activeDescription": "目前为该租户驱动每个 AI 步骤。",
+      "readyDescription": "已保存并就绪 — 设为活动以通过它路由 AI。",
+      "fallbackDescription": "如已配置，则使用平台环境回退。",
+      "edit": "编辑",
+      "connect": "连接",
+      "remove": "移除",
+      "inUse": "使用中",
+      "setActive": "设为活动",
+      "testing": "测试中…",
+      "test": "测试",
+      "testAlive": "就绪 · {{latencyMs}} 毫秒",
+      "testFailed": "失败 · {{error}}",
+      "testNoResponse": "无响应"
+    },
+    "detail": {
+      "model": "模型",
+      "endpoint": "端点",
+      "key": "密钥",
+      "keyOptional": "可选",
+      "keyNotSaved": "未保存",
+      "updated": "已更新",
+      "updatedNever": "从不"
+    },
+    "dialog": {
+      "updateTitle": "更新 {{label}}",
+      "addTitle": "添加模型提供商",
+      "description": "API 密钥在存储前会加密，且绝不会返回给浏览器。编辑时将密钥留空以保留已保存的密钥。",
+      "providerLabel": "提供商",
+      "apiKeyLabelOptional": "API 密钥（可选）",
+      "apiKeyLabel": "API 密钥",
+      "apiKeyPlaceholderKeep": "留空以保留已保存的密钥",
+      "apiKeyPlaceholderOptional": "对本地运行时为可选",
+      "apiKeyPlaceholder": "粘贴提供商密钥",
+      "modelLabel": "模型",
+      "baseUrlLabel": "基础 URL",
+      "baseUrlHintLocal": "localhost 仅在本地开发中受支持。生产环境需要公网 https。",
+      "baseUrlHint": "必须是公网 https 端点。",
+      "cancel": "取消",
+      "saving": "保存中...",
+      "save": "保存提供商"
+    }
+  },
+  "connectors": {
+    "category": {
+      "company": "公司数据",
+      "market": "市场与开放数据",
+      "procurement": "采购与招标",
+      "logo": "标志与品牌",
+      "people": "人员与联系人",
+      "ai": "AI 与智能体"
+    },
+    "header": {
+      "title": "连接器目录",
+      "caption": "BidStack 可访问的外部数据源。开放数据源无需密钥即可运行；授权数据源需要凭据。",
+      "sourcesBadge": "{{count}} 个数据源"
+    },
+    "error": {
+      "title": "无法加载连接器",
+      "retry": "重试"
+    },
+    "stat": {
+      "totalSources": "数据源总数",
+      "healthy": "正常",
+      "needsKey": "需要密钥",
+      "degradedDown": "降级/中断",
+      "catalogBadge": "目录"
+    },
+    "filter": {
+      "groupLabel": "按类别筛选连接器",
+      "all": "全部"
+    },
+    "empty": {
+      "title": "此类别中没有连接器"
+    },
+    "row": {
+      "checkedAt": "检查于 {{time}}",
+      "docsLink": "文档 ↗",
+      "disconnecting": "正在断开连接...",
+      "disconnect": "断开连接",
+      "connecting": "正在连接...",
+      "connect": "连接",
+      "requiresKey": "需要密钥",
+      "open": "开放"
+    },
+    "status": {
+      "healthy": "正常",
+      "degraded": "降级",
+      "down": "中断",
+      "disabled": "已禁用"
+    }
   }
 }

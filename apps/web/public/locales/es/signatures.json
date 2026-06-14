@@ -53,5 +53,18 @@
     "cancel": "Cancelar solicitud",
     "viewCertificate": "Ver certificado",
     "confirmCancel": "¿Cancelar esta solicitud de firma? Se notificará a los firmantes."
+  },
+  "signaturePad": {
+    "modeTablistLabel": "Método de firma",
+    "modeDraw": "Dibujar",
+    "modeType": "Escribir",
+    "drawPlaceholder": "Firme aquí",
+    "canvasLabel": "Área de dibujo de la firma. Use el ratón o el dedo para dibujar su firma.",
+    "typedNameLabel": "Escriba su nombre completo",
+    "typedNamePlaceholder": "Su nombre",
+    "clearButtonLabel": "Borrar firma",
+    "clearButton": "Borrar",
+    "undoButtonLabel": "Deshacer último trazo",
+    "undoButton": "Deshacer"
   }
 }

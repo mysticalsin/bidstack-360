@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { LeadPriorityBadge, LeadStatusBadge } from '@/components/lead/LeadStatusBadge';
@@ -30,6 +31,7 @@ const STATUS_OPTIONS: LeadStatus[] = [
 const PRIORITY_OPTIONS: LeadPriority[] = ['low', 'medium', 'high', 'critical'];
 
 export function LeadDetailPage() {
+  const { t } = useTranslation('crm');
   const { id } = useParams<{ id: string }>();
   const nav = useNavigate();
   const lead = useLead(id ?? '');
@@ -38,24 +40,32 @@ export function LeadDetailPage() {
   const del = useDeleteLead();
   const { debounced: debouncedUpdate } = useDebouncedCallback((patch: Record<string, unknown>) => {
     update.mutate(patch as Parameters<typeof update.mutate>[0], {
-      onSuccess: () => toast.success('Saved'),
-      onError: () => toast.error('Save failed'),
+      onSuccess: () => toast.success(t('leadDetail.toastSaved', 'Saved')),
+      onError: () => toast.error(t('leadDetail.toastSaveFailed', 'Save failed')),
     });
   }, 500);
   const [isConverting, setIsConverting] = useState(false);
 
   if (lead.isLoading) return <DetailPageSkeleton columns={2} cards={3} />;
   if (lead.isError) {
-    return <ErrorState title="Couldn't load lead" message="The lead may have been deleted." />;
+    return (
+      <ErrorState
+        title={t('leadDetail.errorTitle', "Couldn't load lead")}
+        message={t('leadDetail.errorMessage', 'The lead may have been deleted.')}
+      />
+    );
   }
   if (!lead.data) {
     return (
       <EmptyState
-        title="Lead not found"
-        message="The lead may have been deleted or you may not have access to it."
+        title={t('leadDetail.notFoundTitle', 'Lead not found')}
+        message={t(
+          'leadDetail.notFoundMessage',
+          'The lead may have been deleted or you may not have access to it.',
+        )}
         action={
           <Button variant="secondary" onClick={() => window.history.back()}>
-            Go back
+            {t('leadDetail.goBack', 'Go back')}
           </Button>
         }
       />
@@ -67,43 +77,55 @@ export function LeadDetailPage() {
   const isConverted = l.status === 'converted';
 
   const handleStatusChange = (status: LeadStatus) => {
-    update.mutate({ status }, { onSuccess: () => toast.success('Status updated') });
+    update.mutate(
+      { status },
+      { onSuccess: () => toast.success(t('leadDetail.toastStatusUpdated', 'Status updated')) },
+    );
   };
 
   const handlePriorityChange = (priority: LeadPriority) => {
-    update.mutate({ priority }, { onSuccess: () => toast.success('Priority updated') });
+    update.mutate(
+      { priority },
+      { onSuccess: () => toast.success(t('leadDetail.toastPriorityUpdated', 'Priority updated')) },
+    );
   };
 
   const handleConvert = (form: Parameters<typeof convert.mutate>[0]) => {
     convert.mutate(form, {
       onSuccess: (data) => {
-        toast.success('Lead converted successfully');
+        toast.success(t('leadDetail.toastConverted', 'Lead converted successfully'));
         setIsConverting(false);
         nav(`/opportunities/${data.opportunityId}`);
       },
-      onError: () => toast.error('Failed to convert lead'),
+      onError: () => toast.error(t('leadDetail.toastConvertFailed', 'Failed to convert lead')),
     });
   };
 
   const handleDelete = async () => {
     const ok = await confirm({
-      title: 'Delete lead?',
-      description: `This will permanently remove ${l.firstName} ${l.lastName} from your leads.`,
-      confirmLabel: 'Delete',
+      title: t('leadDetail.deleteConfirmTitle', 'Delete lead?'),
+      description: t(
+        'leadDetail.deleteConfirmDescription',
+        'This will permanently remove {{firstName}} {{lastName}} from your leads.',
+        { firstName: l.firstName, lastName: l.lastName },
+      ),
+      confirmLabel: t('leadDetail.deleteConfirmLabel', 'Delete'),
       destructive: true,
     });
     if (!ok) return;
-    del.mutate(l.id, { onSuccess: () => toast.success('Lead deleted') });
+    del.mutate(l.id, {
+      onSuccess: () => toast.success(t('leadDetail.toastDeleted', 'Lead deleted')),
+    });
   };
 
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
-      <nav aria-label="Breadcrumb">
+      <nav aria-label={t('leadDetail.breadcrumbAriaLabel', 'Breadcrumb')}>
         <ol className="flex items-center gap-2 text-xs text-[var(--fg-tertiary)]">
           <li>
             <Link to="/leads" className="hover:text-[var(--fg-primary)]">
-              Leads
+              {t('leadDetail.breadcrumbLeads', 'Leads')}
             </Link>
           </li>
           <li aria-hidden>/</li>
@@ -159,15 +181,15 @@ export function LeadDetailPage() {
           <div className="flex items-center gap-2">
             {canConvert ? (
               <Button data-testid="lead-convert-action" onClick={() => setIsConverting(true)}>
-                Convert to opportunity
+                {t('leadDetail.convertAction', 'Convert to opportunity')}
               </Button>
             ) : (
               <Button data-testid="lead-convert-action" disabled variant="secondary">
-                Convert lead unavailable
+                {t('leadDetail.convertUnavailable', 'Convert lead unavailable')}
               </Button>
             )}
             <Button variant="ghost" onClick={handleDelete}>
-              Delete
+              {t('leadDetail.deleteAction', 'Delete')}
             </Button>
           </div>
         </div>
@@ -189,12 +211,12 @@ export function LeadDetailPage() {
           <div className="flex items-center gap-3 p-4">
             <Icon name="check" size={16} className="text-[var(--success)]" />
             <span className="text-sm text-[var(--fg-primary)]">
-              This lead was converted to{' '}
+              {t('leadDetail.convertedBannerPrefix', 'This lead was converted to')}{' '}
               <Link
                 to={`/opportunities/${l.convertedToOpportunityId}`}
                 className="font-medium text-[var(--brand-primary)] hover:underline"
               >
-                converted opportunity
+                {t('leadDetail.convertedBannerLink', 'converted opportunity')}
               </Link>
               .
             </span>
@@ -207,10 +229,14 @@ export function LeadDetailPage() {
         {/* Status & scoring */}
         <Card>
           <div className="p-5">
-            <h3 className="text-sm font-semibold text-[var(--fg-primary)]">Status & scoring</h3>
+            <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
+              {t('leadDetail.statusScoringHeading', 'Status & scoring')}
+            </h3>
             <div className="mt-4 grid grid-cols-2 gap-4">
               <div>
-                <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">Status</label>
+                <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">
+                  {t('leadDetail.labelStatus', 'Status')}
+                </label>
                 <select
                   value={l.status}
                   onChange={(e) => handleStatusChange(LeadStatus.parse(e.target.value))}
@@ -225,7 +251,9 @@ export function LeadDetailPage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">Priority</label>
+                <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">
+                  {t('leadDetail.labelPriority', 'Priority')}
+                </label>
                 <select
                   value={l.priority}
                   onChange={(e) => handlePriorityChange(LeadPriority.parse(e.target.value))}
@@ -239,7 +267,9 @@ export function LeadDetailPage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">Score</label>
+                <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">
+                  {t('leadDetail.labelScore', 'Score')}
+                </label>
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
@@ -252,7 +282,9 @@ export function LeadDetailPage() {
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">Source</label>
+                <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">
+                  {t('leadDetail.labelSource', 'Source')}
+                </label>
                 <select
                   value={l.source}
                   onChange={(e) => update.mutate({ source: LeadSource.parse(e.target.value) })}
@@ -272,45 +304,58 @@ export function LeadDetailPage() {
         {/* BANT */}
         <Card>
           <div className="p-5">
-            <h3 className="text-sm font-semibold text-[var(--fg-primary)]">BANT qualification</h3>
+            <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
+              {t('leadDetail.bantHeading', 'BANT qualification')}
+            </h3>
             <div className="mt-4 grid grid-cols-2 gap-4">
               <div>
-                <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">Budget</label>
+                <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">
+                  {t('leadDetail.labelBudget', 'Budget')}
+                </label>
                 <DraftInput
                   type="text"
                   serverValue={l.budget ?? ''}
                   commit={(v) => update.mutate({ budget: v || null })}
-                  placeholder="e.g. €500K"
+                  placeholder={t('leadDetail.placeholderBudget', 'e.g. €500K')}
                   className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">Authority</label>
+                <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">
+                  {t('leadDetail.labelAuthority', 'Authority')}
+                </label>
                 <DraftInput
                   type="text"
                   serverValue={l.authority ?? ''}
                   commit={(v) => update.mutate({ authority: v || null })}
-                  placeholder="Decision maker"
+                  placeholder={t('leadDetail.placeholderAuthority', 'Decision maker')}
                   className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
                 />
               </div>
               <div className="col-span-2">
-                <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">Need</label>
+                <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">
+                  {t('leadDetail.labelNeed', 'Need')}
+                </label>
                 <DraftTextarea
                   serverValue={l.need ?? ''}
                   commit={(v) => update.mutate({ need: v || null })}
-                  placeholder="What problem are they trying to solve?"
+                  placeholder={t(
+                    'leadDetail.placeholderNeed',
+                    'What problem are they trying to solve?',
+                  )}
                   rows={2}
                   className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">Timeline</label>
+                <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">
+                  {t('leadDetail.labelTimeline', 'Timeline')}
+                </label>
                 <DraftInput
                   type="text"
                   serverValue={l.timeline ?? ''}
                   commit={(v) => update.mutate({ timeline: v || null })}
-                  placeholder="e.g. Q2 2026"
+                  placeholder={t('leadDetail.placeholderTimeline', 'e.g. Q2 2026')}
                   className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
                 />
               </div>
@@ -322,13 +367,13 @@ export function LeadDetailPage() {
         <Card className="lg:col-span-2">
           <div className="p-5">
             <label className="text-sm font-semibold text-[var(--fg-primary)]" htmlFor="lead-notes">
-              Notes
+              {t('leadDetail.labelNotes', 'Notes')}
             </label>
             <DraftTextarea
               id="lead-notes"
               serverValue={l.notes ?? ''}
               commit={(v) => update.mutate({ notes: v || null })}
-              placeholder="Add notes about this lead…"
+              placeholder={t('leadDetail.placeholderNotes', 'Add notes about this lead…')}
               rows={4}
               className="mt-3 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
             />
@@ -338,9 +383,11 @@ export function LeadDetailPage() {
         {/* Metadata */}
         <Card className="lg:col-span-2">
           <div className="flex flex-wrap gap-x-6 gap-y-2 p-4 text-xs text-[var(--fg-tertiary)]">
-            <span>Created {formatDate(l.createdAt)}</span>
-            <span>Updated {formatDate(l.updatedAt)}</span>
-            {l.ownerName && <span>Owner: {l.ownerName}</span>}
+            <span>{t('leadDetail.metaCreated', 'Created {{date}}', { date: formatDate(l.createdAt) })}</span>
+            <span>{t('leadDetail.metaUpdated', 'Updated {{date}}', { date: formatDate(l.updatedAt) })}</span>
+            {l.ownerName && (
+              <span>{t('leadDetail.metaOwner', 'Owner: {{name}}', { name: l.ownerName })}</span>
+            )}
           </div>
         </Card>
       </div>
@@ -352,7 +399,7 @@ export function LeadDetailPage() {
         entityType="lead"
         entityId={id}
         fieldKey="notes"
-        label="Live collaboration"
+        label={t('leadDetail.liveCollaboration', 'Live collaboration')}
       />
     </div>
   );

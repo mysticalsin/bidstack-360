@@ -7,6 +7,7 @@
  * Design: Apple HIG card grid. Dark-mode via CSS vars. WCAG 2.2 AA.
  */
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { confirm } from '@/components/ui/ConfirmDialog';
@@ -49,6 +50,7 @@ const PRESET_COLORS = [
 ];
 
 export function CustomObjectsAdminPage() {
+  const { t } = useTranslation('crm');
   const { data, isLoading, isError } = useCustomObjectDefs();
   const createDef = useCreateCustomObjectDef();
   const deleteDef = useDeleteCustomObjectDef();
@@ -80,12 +82,20 @@ export function CustomObjectsAdminPage() {
     e.preventDefault();
     setFormError(null);
     if (!form.key || !form.labelSingular || !form.labelPlural) {
-      setFormError('Key, singular label, and plural label are required.');
+      setFormError(
+        t(
+          'customObjectsAdmin.errorRequiredFields',
+          'Key, singular label, and plural label are required.',
+        ),
+      );
       return;
     }
     if (!/^[a-z][a-z0-9_-]*$/.test(form.key)) {
       setFormError(
-        'Key must start with a letter and contain only lowercase letters, digits, _ or -',
+        t(
+          'customObjectsAdmin.errorKeyFormat',
+          'Key must start with a letter and contain only lowercase letters, digits, _ or -',
+        ),
       );
       return;
     }
@@ -100,27 +110,35 @@ export function CustomObjectsAdminPage() {
       });
       setShowCreate(false);
       setForm(INITIAL_FORM);
-      toast.success('Custom object created');
+      toast.success(t('customObjectsAdmin.toastCreated', 'Custom object created'));
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to create';
+      const msg =
+        err instanceof Error
+          ? err.message
+          : t('customObjectsAdmin.errorCreateFailed', 'Failed to create');
       setFormError(msg);
     }
   }
 
   async function handleDelete(id: string) {
     const ok = await confirm({
-      title: 'Delete Custom Object?',
-      description:
+      title: t('customObjectsAdmin.deleteConfirmTitle', 'Delete Custom Object?'),
+      description: t(
+        'customObjectsAdmin.deleteConfirmDescription',
         'This will permanently delete the object definition and all records belonging to it. This action cannot be undone.',
-      confirmLabel: 'Delete',
+      ),
+      confirmLabel: t('customObjectsAdmin.deleteConfirmLabel', 'Delete'),
       destructive: true,
     });
     if (!ok) return;
     try {
       await deleteDef.mutateAsync(id);
     } catch (err) {
-      toast.error('Delete failed', {
-        description: err instanceof Error ? err.message : 'Delete failed',
+      toast.error(t('customObjectsAdmin.toastDeleteFailedTitle', 'Delete failed'), {
+        description:
+          err instanceof Error
+            ? err.message
+            : t('customObjectsAdmin.toastDeleteFailedTitle', 'Delete failed'),
       });
     }
   }
@@ -130,9 +148,14 @@ export function CustomObjectsAdminPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Custom Objects</h1>
+          <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
+            {t('customObjectsAdmin.title', 'Custom Objects')}
+          </h1>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            Define new entity types for your organisation — Projects, Vendors, Assets, and more.
+            {t(
+              'customObjectsAdmin.subtitle',
+              'Define new entity types for your organisation — Projects, Vendors, Assets, and more.',
+            )}
           </p>
         </div>
         <button
@@ -145,13 +168,16 @@ export function CustomObjectsAdminPage() {
             'transition-opacity min-h-[44px]',
           )}
         >
-          <span aria-hidden="true">＋</span> New Object
+          <span aria-hidden="true">＋</span> {t('customObjectsAdmin.newObjectButton', 'New Object')}
         </button>
       </div>
 
       {/* State: loading */}
       {isLoading && (
-        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4" aria-label="Loading custom objects">
+        <ul
+          className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+          aria-label={t('customObjectsAdmin.loadingLabel', 'Loading custom objects')}
+        >
           {[1, 2, 3].map((i) => (
             <li key={i} className="h-28 rounded-xl bg-[var(--surface-2)] animate-pulse" />
           ))}
@@ -164,7 +190,7 @@ export function CustomObjectsAdminPage() {
           role="alert"
           className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
         >
-          Failed to load custom objects. Please refresh.
+          {t('customObjectsAdmin.errorLoad', 'Failed to load custom objects. Please refresh.')}
         </div>
       )}
 
@@ -174,9 +200,14 @@ export function CustomObjectsAdminPage() {
           <span className="text-4xl mb-4" aria-hidden="true">
             📦
           </span>
-          <p className="font-medium">No custom objects yet</p>
+          <p className="font-medium">
+            {t('customObjectsAdmin.emptyTitle', 'No custom objects yet')}
+          </p>
           <p className="text-sm mt-1">
-            Click &quot;New Object&quot; to define your first custom entity type.
+            {t(
+              'customObjectsAdmin.emptyDescription',
+              'Click "New Object" to define your first custom entity type.',
+            )}
           </p>
         </div>
       )}
@@ -213,7 +244,9 @@ export function CustomObjectsAdminPage() {
                   )}
                 </div>
                 <span className="text-xs text-[var(--text-tertiary)] ml-auto whitespace-nowrap">
-                  {def.recordCount ?? 0} records
+                  {t('customObjectsAdmin.recordCount', '{{count}} records', {
+                    count: def.recordCount ?? 0,
+                  })}
                 </span>
               </Link>
 
@@ -230,7 +263,9 @@ export function CustomObjectsAdminPage() {
                   'focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]',
                   'min-w-[44px] min-h-[44px] flex items-center justify-center',
                 )}
-                aria-label={`Delete ${def.labelSingular}`}
+                aria-label={t('customObjectsAdmin.deleteItemLabel', 'Delete {{label}}', {
+                  label: def.labelSingular,
+                })}
               >
                 ✕
               </button>
@@ -251,7 +286,7 @@ export function CustomObjectsAdminPage() {
       >
         <div className="bg-[var(--surface)] rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
           <h2 id="create-obj-title" className="text-lg font-semibold text-[var(--text-primary)]">
-            New Custom Object
+            {t('customObjectsAdmin.modalTitle', 'New Custom Object')}
           </h2>
           <form
             onSubmit={(e) => {
@@ -270,14 +305,15 @@ export function CustomObjectsAdminPage() {
                 htmlFor="co-label-singular"
                 className="block text-sm font-medium text-[var(--text-primary)] mb-1"
               >
-                Singular label <span aria-hidden="true">*</span>
+                {t('customObjectsAdmin.fieldSingularLabel', 'Singular label')}{' '}
+                <span aria-hidden="true">*</span>
               </label>
               <input
                 id="co-label-singular"
                 type="text"
                 value={form.labelSingular}
                 onChange={(e) => handleField('labelSingular', e.target.value)}
-                placeholder="e.g. Project"
+                placeholder={t('customObjectsAdmin.fieldSingularPlaceholder', 'e.g. Project')}
                 required
                 className="input w-full"
                 aria-required="true"
@@ -289,14 +325,15 @@ export function CustomObjectsAdminPage() {
                 htmlFor="co-label-plural"
                 className="block text-sm font-medium text-[var(--text-primary)] mb-1"
               >
-                Plural label <span aria-hidden="true">*</span>
+                {t('customObjectsAdmin.fieldPluralLabel', 'Plural label')}{' '}
+                <span aria-hidden="true">*</span>
               </label>
               <input
                 id="co-label-plural"
                 type="text"
                 value={form.labelPlural}
                 onChange={(e) => handleField('labelPlural', e.target.value)}
-                placeholder="e.g. Projects"
+                placeholder={t('customObjectsAdmin.fieldPluralPlaceholder', 'e.g. Projects')}
                 required
                 className="input w-full"
                 aria-required="true"
@@ -308,14 +345,17 @@ export function CustomObjectsAdminPage() {
                 htmlFor="co-key"
                 className="block text-sm font-medium text-[var(--text-primary)] mb-1"
               >
-                API key <span className="text-[var(--text-tertiary)] font-normal">(auto)</span>
+                {t('customObjectsAdmin.fieldKeyLabel', 'API key')}{' '}
+                <span className="text-[var(--text-tertiary)] font-normal">
+                  {t('customObjectsAdmin.fieldKeyAuto', '(auto)')}
+                </span>
               </label>
               <input
                 id="co-key"
                 type="text"
                 value={form.key}
                 onChange={(e) => handleField('key', e.target.value)}
-                placeholder="e.g. project"
+                placeholder={t('customObjectsAdmin.fieldKeyPlaceholder', 'e.g. project')}
                 pattern="^[a-z][a-z0-9_-]*$"
                 required
                 className="input w-full font-mono text-sm"
@@ -323,7 +363,10 @@ export function CustomObjectsAdminPage() {
                 aria-describedby="co-key-hint"
               />
               <p id="co-key-hint" className="text-xs text-[var(--text-tertiary)] mt-0.5">
-                Lowercase letters, digits, _ or - only. Immutable after creation.
+                {t(
+                  'customObjectsAdmin.fieldKeyHint',
+                  'Lowercase letters, digits, _ or - only. Immutable after creation.',
+                )}
               </p>
             </div>
 
@@ -332,7 +375,7 @@ export function CustomObjectsAdminPage() {
                 htmlFor="co-description"
                 className="block text-sm font-medium text-[var(--text-primary)] mb-1"
               >
-                Description
+                {t('customObjectsAdmin.fieldDescriptionLabel', 'Description')}
               </label>
               <textarea
                 id="co-description"
@@ -346,7 +389,9 @@ export function CustomObjectsAdminPage() {
 
             {/* Color picker */}
             <fieldset>
-              <legend className="text-sm font-medium text-[var(--text-primary)] mb-1">Color</legend>
+              <legend className="text-sm font-medium text-[var(--text-primary)] mb-1">
+                {t('customObjectsAdmin.fieldColorLegend', 'Color')}
+              </legend>
               <div className="flex gap-2 flex-wrap">
                 {PRESET_COLORS.map((c) => (
                   <button
@@ -360,7 +405,9 @@ export function CustomObjectsAdminPage() {
                         : 'border-transparent',
                     )}
                     style={{ backgroundColor: c }}
-                    aria-label={`Select color ${c}`}
+                    aria-label={t('customObjectsAdmin.selectColorLabel', 'Select color {{color}}', {
+                      color: c,
+                    })}
                     aria-pressed={form.color === c}
                   />
                 ))}
@@ -377,14 +424,16 @@ export function CustomObjectsAdminPage() {
                 }}
                 className="flex-1 px-4 py-2 rounded-lg border border-[var(--border)] text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--surface-2)] transition-colors min-h-[44px]"
               >
-                Cancel
+                {t('customObjectsAdmin.cancelButton', 'Cancel')}
               </button>
               <button
                 type="submit"
                 disabled={createDef.isPending}
                 className="flex-1 px-4 py-2 rounded-lg bg-[var(--accent)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
               >
-                {createDef.isPending ? 'Creating…' : 'Create'}
+                {createDef.isPending
+                  ? t('customObjectsAdmin.creatingButton', 'Creating…')
+                  : t('customObjectsAdmin.createButton', 'Create')}
               </button>
             </div>
           </form>

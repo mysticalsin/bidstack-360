@@ -290,5 +290,14 @@
     "signOut": "Sair",
     "portfolio": "Portfólio",
     "detail": "Detalhe"
+  },
+  "appRoutes": {
+    "notFoundTitle": "Página não encontrada",
+    "notFoundMessage": "A página que você procura não existe.",
+    "goToDashboard": "Ir para o painel"
+  },
+  "select": {
+    "placeholder": "—",
+    "noOptions": "Sem opções"
   }
 }

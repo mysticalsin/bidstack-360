@@ -51,5 +51,148 @@
     "connectFailed": "La connexion a échoué. Vérifiez vos identifiants.",
     "syncFailed": "La synchronisation a échoué.",
     "disconnectFailed": "La déconnexion a échoué."
+  },
+  "agentProviderCredentials": {
+    "toast": {
+      "activeSet": "{{label}} est désormais le modèle actif",
+      "activeCleared": "Modèle actif effacé",
+      "activeSetDescription": "Chaque étape d'IA utilise ce fournisseur jusqu'au prochain changement, sans redéploiement.",
+      "switchFailedTitle": "Impossible de changer de fournisseur",
+      "serverRejected": "Le serveur a rejeté la requête.",
+      "testAliveTitle": "{{label}} est opérationnel",
+      "testAliveDescription": "{{model}} a répondu en {{latencyMs}} ms.",
+      "testNoResponseTitle": "{{label}} n'a pas répondu",
+      "testNoResponseDescription": "Aucune réponse du fournisseur.",
+      "testFailedTitle": "Échec du test",
+      "savedTitle": "{{label}} enregistré",
+      "savedDescription": "L'état du fournisseur et la disponibilité d'Agent Studio ont été actualisés.",
+      "removedTitle": "Identifiants {{label}} supprimés",
+      "removeFailedTitle": "Échec de la suppression"
+    },
+    "error": {
+      "apiKeyRequired": "Une clé API est requise pour ce fournisseur.",
+      "claudeModelRequired": "Claude nécessite un modèle, par exemple claude-sonnet-4-5.",
+      "saveFailed": "Impossible d'enregistrer les identifiants du fournisseur."
+    },
+    "remove": {
+      "confirmTitle": "Supprimer les identifiants {{label}} ?",
+      "confirmDescription": "Les agents se rabattront sur les identifiants d'environnement de la plateforme s'ils sont disponibles. Les définitions d'agents existantes restent intactes.",
+      "confirmLabel": "Supprimer"
+    },
+    "header": {
+      "title": "Fournisseurs de modèles",
+      "caption": "Restez indépendant des fournisseurs : stockez des clés détenues par l'organisation pour GPT, Claude, Kimi, NVIDIA NIM ou Gemma local, puis choisissez celle qui est active. Le changement de fournisseur actif prend effet à l'étape d'IA suivante, sans redéploiement. Les clés sont chiffrées au repos et ne sont plus jamais affichées.",
+      "addProvider": "Ajouter un fournisseur"
+    },
+    "errorState": {
+      "title": "Impossible de charger les clés des fournisseurs",
+      "message": "La disponibilité du fournisseur utilise toujours le repli d'environnement serveur, mais les clés enregistrées de l'organisation n'ont pas pu être chargées.",
+      "retry": "Réessayer"
+    },
+    "emptyState": {
+      "title": "Aucune liste de fournisseurs renvoyée",
+      "message": "L'API doit toujours renvoyer les fournisseurs directs pris en charge."
+    },
+    "summary": {
+      "savedCountOne": "{{count}} fournisseur d'organisation enregistré",
+      "savedCountOther": "{{count}} fournisseurs d'organisation enregistrés",
+      "activeBadge": "Actif · {{label}}",
+      "noActiveBadge": "Aucun fournisseur actif — utilisation du fournisseur par défaut de la plateforme",
+      "fallbackNote": "Les fournisseurs d'environnement de la plateforme restent disponibles en repli lorsqu'ils sont configurés."
+    },
+    "row": {
+      "activeBadge": "Actif",
+      "orgKeySaved": "Clé d'organisation enregistrée",
+      "noOrgKey": "Aucune clé d'organisation",
+      "activeDescription": "Pilote actuellement chaque étape d'IA pour ce locataire.",
+      "readyDescription": "Enregistré et prêt — activez-le pour y faire transiter l'IA.",
+      "fallbackDescription": "Utilise le repli d'environnement de la plateforme s'il est configuré.",
+      "edit": "Modifier",
+      "connect": "Connecter",
+      "remove": "Supprimer",
+      "inUse": "En cours d'utilisation",
+      "setActive": "Définir comme actif",
+      "testing": "Test en cours…",
+      "test": "Tester",
+      "testAlive": "Opérationnel · {{latencyMs}} ms",
+      "testFailed": "Échec · {{error}}",
+      "testNoResponse": "aucune réponse"
+    },
+    "detail": {
+      "model": "Modèle",
+      "endpoint": "Point de terminaison",
+      "key": "Clé",
+      "keyOptional": "Facultatif",
+      "keyNotSaved": "Non enregistrée",
+      "updated": "Mis à jour",
+      "updatedNever": "Jamais"
+    },
+    "dialog": {
+      "updateTitle": "Mettre à jour {{label}}",
+      "addTitle": "Ajouter un fournisseur de modèles",
+      "description": "La clé API est chiffrée avant stockage et n'est jamais renvoyée au navigateur. Laissez la clé vide lors de la modification pour conserver la clé enregistrée.",
+      "providerLabel": "Fournisseur",
+      "apiKeyLabelOptional": "Clé API (facultative)",
+      "apiKeyLabel": "Clé API",
+      "apiKeyPlaceholderKeep": "Laissez vide pour conserver la clé enregistrée",
+      "apiKeyPlaceholderOptional": "Facultatif pour les environnements d'exécution locaux",
+      "apiKeyPlaceholder": "Collez la clé du fournisseur",
+      "modelLabel": "Modèle",
+      "baseUrlLabel": "URL de base",
+      "baseUrlHintLocal": "Localhost n'est accepté qu'en développement local. La production requiert un https public.",
+      "baseUrlHint": "Doit être un point de terminaison https public.",
+      "cancel": "Annuler",
+      "saving": "Enregistrement...",
+      "save": "Enregistrer le fournisseur"
+    }
+  },
+  "connectors": {
+    "category": {
+      "company": "Données entreprise",
+      "market": "Marché et données ouvertes",
+      "procurement": "Achats et appels d'offres",
+      "logo": "Logos et image de marque",
+      "people": "Personnes et contacts",
+      "ai": "IA et agents"
+    },
+    "header": {
+      "title": "Catalogue de connecteurs",
+      "caption": "Sources de données externes accessibles par BidStack. Les flux ouverts fonctionnent sans clés ; les flux sous licence nécessitent des identifiants.",
+      "sourcesBadge": "{{count}} sources"
+    },
+    "error": {
+      "title": "Impossible de charger les connecteurs",
+      "retry": "Réessayer"
+    },
+    "stat": {
+      "totalSources": "Sources totales",
+      "healthy": "Sains",
+      "needsKey": "Clé requise",
+      "degradedDown": "Dégradés/hors service",
+      "catalogBadge": "catalogue"
+    },
+    "filter": {
+      "groupLabel": "Filtrer les connecteurs par catégorie",
+      "all": "Tous"
+    },
+    "empty": {
+      "title": "Aucun connecteur dans cette catégorie"
+    },
+    "row": {
+      "checkedAt": "Vérifié {{time}}",
+      "docsLink": "Docs ↗",
+      "disconnecting": "Déconnexion...",
+      "disconnect": "Déconnecter",
+      "connecting": "Connexion...",
+      "connect": "Connecter",
+      "requiresKey": "clé requise",
+      "open": "ouvert"
+    },
+    "status": {
+      "healthy": "sain",
+      "degraded": "dégradé",
+      "down": "hors service",
+      "disabled": "désactivé"
+    }
   }
 }

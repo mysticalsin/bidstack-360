@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -26,6 +27,7 @@ import type { UserGroup } from '@bidstack/shared';
  * = unrestricted. Admin-managed until the source-system sync lands.
  */
 export function AccessGroupsSection() {
+  const { t } = useTranslation('settings');
   const { data: groups, isLoading, isError, refetch } = useUserGroups();
   const create = useCreateUserGroup();
   const del = useDeleteUserGroup();
@@ -43,38 +45,48 @@ export function AccessGroupsSection() {
       setDraftName('');
       setDraftCountries([]);
       setDraftScopeAll(false);
-      toast.success('Access group created');
+      toast.success(t('accessGroups.toastCreated', 'Access group created'));
     } catch {
-      toast.error('Could not create the group — does the name already exist?');
+      toast.error(
+        t(
+          'accessGroups.toastCreateError',
+          'Could not create the group — does the name already exist?',
+        ),
+      );
     }
   };
 
   const handleDelete = async (g: UserGroup) => {
     const ok = confirm(
-      `Delete "${g.name}"? Its ${g.memberCount} member${g.memberCount === 1 ? '' : 's'} will fall back to their remaining groups (or unrestricted access if they have none).`,
+      t(
+        'accessGroups.confirmDelete',
+        'Delete "{{name}}"? Its {{count}} members will fall back to their remaining groups (or unrestricted access if they have none).',
+        { name: g.name, count: g.memberCount },
+      ),
     );
     if (!ok) return;
     try {
       await del.mutateAsync(g.id);
       if (expandedId === g.id) setExpandedId(null);
-      toast.success('Access group deleted');
+      toast.success(t('accessGroups.toastDeleted', 'Access group deleted'));
     } catch {
-      toast.error('Delete failed');
+      toast.error(t('accessGroups.toastDeleteError', 'Delete failed'));
     }
   };
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-[var(--fg-secondary)]">
-        Members of a group only see opportunities in the group&apos;s countries, plus deals they
-        own. Users in no group see everything — scoping starts when you assign them. Groups will
-        sync from ABC / Opportunity Management once those connectors exist.
+        {t(
+          'accessGroups.intro',
+          "Members of a group only see opportunities in the group's countries, plus deals they own. Users in no group see everything — scoping starts when you assign them. Groups will sync from ABC / Opportunity Management once those connectors exist.",
+        )}
       </p>
 
       <Card>
         <div className="p-4">
           <h3 className="mb-3 text-sm font-semibold text-[var(--fg-primary)]">
-            Create access group
+            {t('accessGroups.createHeading', 'Create access group')}
           </h3>
           <div className="space-y-3">
             <input
@@ -82,8 +94,8 @@ export function AccessGroupsSection() {
               maxLength={100}
               value={draftName}
               onChange={(e) => setDraftName(e.target.value)}
-              placeholder="e.g. France bid team"
-              aria-label="Group name"
+              placeholder={t('accessGroups.namePlaceholder', 'e.g. France bid team')}
+              aria-label={t('accessGroups.nameLabel', 'Group name')}
               className="w-full max-w-md rounded-md border border-[var(--border-default)] bg-[var(--surface-input)] px-2.5 py-2 text-sm text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
             />
             {!draftScopeAll && (
@@ -97,13 +109,15 @@ export function AccessGroupsSection() {
                   onChange={(e) => setDraftScopeAll(e.target.checked)}
                   className="h-4 w-4 accent-[var(--brand-primary)]"
                 />
-                Sees everything (no country restriction)
+                {t('accessGroups.scopeAllLabel', 'Sees everything (no country restriction)')}
               </label>
               <Button
                 onClick={() => void handleCreate()}
                 disabled={!draftName.trim() || create.isPending}
               >
-                {create.isPending ? 'Creating…' : 'Create group'}
+                {create.isPending
+                  ? t('accessGroups.creating', 'Creating…')
+                  : t('accessGroups.createButton', 'Create group')}
               </Button>
             </div>
           </div>
@@ -113,7 +127,7 @@ export function AccessGroupsSection() {
       <Card>
         <div className="border-b border-[var(--border-subtle)] px-4 py-2">
           <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
-            Groups{' '}
+            {t('accessGroups.listHeading', 'Groups')}{' '}
             <span className="font-normal text-[var(--fg-tertiary)]">({groups?.length ?? 0})</span>
           </h3>
         </div>
@@ -124,11 +138,11 @@ export function AccessGroupsSection() {
         ) : isError ? (
           <div className="p-6">
             <ErrorState
-              title="Could not load access groups"
-              message="Check your connection and try again."
+              title={t('accessGroups.errorTitle', 'Could not load access groups')}
+              message={t('accessGroups.errorMessage', 'Check your connection and try again.')}
               action={
                 <Button variant="secondary" onClick={() => void refetch()}>
-                  Retry
+                  {t('accessGroups.retry', 'Retry')}
                 </Button>
               }
             />
@@ -136,12 +150,18 @@ export function AccessGroupsSection() {
         ) : !groups || groups.length === 0 ? (
           <div className="p-6">
             <EmptyState
-              title="No access groups yet"
-              message="Everyone currently sees all opportunities. Create a group above to start scoping visibility by country."
+              title={t('accessGroups.emptyTitle', 'No access groups yet')}
+              message={t(
+                'accessGroups.emptyMessage',
+                'Everyone currently sees all opportunities. Create a group above to start scoping visibility by country.',
+              )}
             />
           </div>
         ) : (
-          <ul className="divide-y divide-[var(--border-subtle)]" aria-label="Access groups">
+          <ul
+            className="divide-y divide-[var(--border-subtle)]"
+            aria-label={t('accessGroups.listAriaLabel', 'Access groups')}
+          >
             {groups.map((g) => (
               <li key={g.id}>
                 <div className="flex flex-wrap items-center gap-3 px-4 py-3">
@@ -150,11 +170,11 @@ export function AccessGroupsSection() {
                     <div className="mt-0.5 flex flex-wrap items-center gap-1">
                       {g.scopeAll ? (
                         <span className="rounded-full bg-[var(--success-tint)] px-2 py-0.5 text-[11px] font-medium text-[var(--success)]">
-                          Sees everything
+                          {t('accessGroups.badgeSeesEverything', 'Sees everything')}
                         </span>
                       ) : g.scopeCountries.length === 0 ? (
                         <span className="rounded-full bg-[var(--surface-sunken)] px-2 py-0.5 text-[11px] text-[var(--fg-tertiary)]">
-                          Own records only
+                          {t('accessGroups.badgeOwnRecordsOnly', 'Own records only')}
                         </span>
                       ) : (
                         g.scopeCountries.map((c) => (
@@ -169,7 +189,7 @@ export function AccessGroupsSection() {
                     </div>
                   </div>
                   <span className="min-w-[80px] text-right text-xs text-[var(--fg-tertiary)]">
-                    {g.memberCount} member{g.memberCount === 1 ? '' : 's'}
+                    {t('accessGroups.memberCount', '{{count}} members', { count: g.memberCount })}
                   </span>
                   <Button
                     variant="secondary"
@@ -177,10 +197,10 @@ export function AccessGroupsSection() {
                     aria-expanded={expandedId === g.id}
                     onClick={() => setExpandedId(expandedId === g.id ? null : g.id)}
                   >
-                    <Icon name="pencil" size={14} ariaHidden /> Edit
+                    <Icon name="pencil" size={14} ariaHidden /> {t('accessGroups.edit', 'Edit')}
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => void handleDelete(g)}>
-                    Delete
+                    {t('accessGroups.delete', 'Delete')}
                   </Button>
                 </div>
                 {expandedId === g.id && <GroupEditor group={g} />}
@@ -195,6 +215,7 @@ export function AccessGroupsSection() {
 
 /** Expanded editor: scope countries + member management for one group. */
 function GroupEditor({ group }: { group: UserGroup }) {
+  const { t } = useTranslation('settings');
   const detail = useUserGroup(group.id);
   const update = useUpdateUserGroup();
   const addMember = useAddGroupMember();
@@ -210,7 +231,7 @@ function GroupEditor({ group }: { group: UserGroup }) {
     try {
       await update.mutateAsync({ id: group.id, patch: { scopeCountries: countries } });
     } catch {
-      toast.error('Could not update countries');
+      toast.error(t('accessGroups.toastCountriesError', 'Could not update countries'));
     }
   };
 
@@ -218,7 +239,7 @@ function GroupEditor({ group }: { group: UserGroup }) {
     try {
       await update.mutateAsync({ id: group.id, patch: { scopeAll } });
     } catch {
-      toast.error('Could not update the group');
+      toast.error(t('accessGroups.toastUpdateError', 'Could not update the group'));
     }
   };
 
@@ -227,9 +248,9 @@ function GroupEditor({ group }: { group: UserGroup }) {
     try {
       await addMember.mutateAsync({ groupId: group.id, userId: pickedUserId });
       setPickedUserId('');
-      toast.success('Member added');
+      toast.success(t('accessGroups.toastMemberAdded', 'Member added'));
     } catch {
-      toast.error('Could not add member');
+      toast.error(t('accessGroups.toastMemberAddError', 'Could not add member'));
     }
   };
 
@@ -243,7 +264,7 @@ function GroupEditor({ group }: { group: UserGroup }) {
             onChange={(e) => void handleScopeAll(e.target.checked)}
             className="h-4 w-4 accent-[var(--brand-primary)]"
           />
-          Sees everything (no country restriction)
+          {t('accessGroups.scopeAllLabel', 'Sees everything (no country restriction)')}
         </label>
         {!group.scopeAll && (
           <CountryChipInput value={group.scopeCountries} onChange={(v) => void handleCountries(v)} />
@@ -252,14 +273,21 @@ function GroupEditor({ group }: { group: UserGroup }) {
 
       <div>
         <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-          Members
+          {t('accessGroups.membersHeading', 'Members')}
         </h4>
         {detail.isLoading ? (
           <LoadingSkeleton rows={2} />
         ) : members.length === 0 ? (
-          <p className="text-sm text-[var(--fg-tertiary)]">No members yet.</p>
+          <p className="text-sm text-[var(--fg-tertiary)]">
+            {t('accessGroups.noMembers', 'No members yet.')}
+          </p>
         ) : (
-          <ul className="space-y-1" aria-label={`Members of ${group.name}`}>
+          <ul
+            className="space-y-1"
+            aria-label={t('accessGroups.membersListAriaLabel', 'Members of {{name}}', {
+              name: group.name,
+            })}
+          >
             {members.map((m) => (
               <li key={m.id} className="flex items-center gap-2 text-sm">
                 <span className="flex-1 truncate text-[var(--fg-primary)]">
@@ -271,14 +299,21 @@ function GroupEditor({ group }: { group: UserGroup }) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  aria-label={`Remove ${m.name ?? m.email} from ${group.name}`}
+                  aria-label={t('accessGroups.removeMemberAriaLabel', 'Remove {{member}} from {{group}}', {
+                    member: m.name ?? m.email,
+                    group: group.name,
+                  })}
                   onClick={() =>
                     void removeMember
                       .mutateAsync({ groupId: group.id, userId: m.userId })
-                      .catch(() => toast.error('Could not remove member'))
+                      .catch(() =>
+                        toast.error(
+                          t('accessGroups.toastMemberRemoveError', 'Could not remove member'),
+                        ),
+                      )
                   }
                 >
-                  Remove
+                  {t('accessGroups.remove', 'Remove')}
                 </Button>
               </li>
             ))}
@@ -288,10 +323,10 @@ function GroupEditor({ group }: { group: UserGroup }) {
           <select
             value={pickedUserId}
             onChange={(e) => setPickedUserId(e.target.value)}
-            aria-label="Add a member"
+            aria-label={t('accessGroups.addMemberLabel', 'Add a member')}
             className="h-9 min-w-[220px] rounded-md border border-[var(--border-default)] bg-[var(--surface-input)] px-2 text-sm text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
           >
-            <option value="">Add a member…</option>
+            <option value="">{t('accessGroups.addMemberPlaceholder', 'Add a member…')}</option>
             {candidates.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.name ?? u.email}
@@ -303,7 +338,7 @@ function GroupEditor({ group }: { group: UserGroup }) {
             onClick={() => void handleAdd()}
             disabled={!pickedUserId || addMember.isPending}
           >
-            Add
+            {t('accessGroups.add', 'Add')}
           </Button>
         </div>
       </div>
@@ -319,13 +354,17 @@ function CountryChipInput({
   value: string[];
   onChange: (next: string[]) => void;
 }) {
+  const { t } = useTranslation('settings');
   const [draft, setDraft] = useState('');
 
   const commit = () => {
     const code = draft.trim().toUpperCase();
     setDraft('');
     if (!/^[A-Z]{2}$/.test(code)) {
-      if (code) toast.error('Country codes are 2 letters (ISO-2), e.g. FR');
+      if (code)
+        toast.error(
+          t('accessGroups.countryCodeError', 'Country codes are 2 letters (ISO-2), e.g. FR'),
+        );
       return;
     }
     if (!value.includes(code)) onChange([...value, code]);
@@ -346,7 +385,7 @@ function CountryChipInput({
           {c}
           <button
             type="button"
-            aria-label={`Remove ${c}`}
+            aria-label={t('accessGroups.removeCountryAriaLabel', 'Remove {{code}}', { code: c })}
             onClick={() => onChange(value.filter((v) => v !== c))}
             className="rounded-full p-0.5 hover:text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
           >
@@ -366,8 +405,12 @@ function CountryChipInput({
             commit();
           }
         }}
-        placeholder={value.length === 0 ? 'Countries (ISO-2): FR, DE…' : 'Add…'}
-        aria-label="Add country code"
+        placeholder={
+          value.length === 0
+            ? t('accessGroups.countryPlaceholder', 'Countries (ISO-2): FR, DE…')
+            : t('accessGroups.countryPlaceholderShort', 'Add…')
+        }
+        aria-label={t('accessGroups.addCountryAriaLabel', 'Add country code')}
         className="min-w-[90px] flex-1 bg-transparent py-1 text-sm text-[var(--fg-primary)] placeholder:text-[var(--fg-tertiary)] focus-visible:outline-none"
       />
     </div>

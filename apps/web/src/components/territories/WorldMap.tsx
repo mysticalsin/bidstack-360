@@ -5,6 +5,7 @@
 // we map our alpha-3 codes to those numeric codes via a small lookup table.
 
 import { memo, useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ComposableMap,
   Geographies,
@@ -244,6 +245,7 @@ export const WorldMap = memo(function WorldMap({
   onCountryClick,
   selectedCountryCode,
 }: WorldMapProps) {
+  const { t } = useTranslation('crm');
   const theme = useThemeStore((s) => s.theme);
   const [hovered, setHovered] = useState<{
     item: TerritoryAnalyticsItem;
@@ -287,6 +289,29 @@ export const WorldMap = memo(function WorldMap({
   );
 
   // Brand-aware interpolation with highly visible, contrast-safe gradient scales
+  // Maps the stable preset code to its translated, user-facing label.
+  const presetLabel = useCallback(
+    (label: string): string => {
+      switch (label) {
+        case 'Global':
+          return t('worldMap.preset.global', 'Global');
+        case 'N. America':
+          return t('worldMap.preset.northAmerica', 'N. America');
+        case 'Europe':
+          return t('worldMap.preset.europe', 'Europe');
+        case 'Asia Pac':
+          return t('worldMap.preset.asiaPacific', 'Asia Pac');
+        case 'L. America':
+          return t('worldMap.preset.latinAmerica', 'L. America');
+        case 'ME & Africa':
+          return t('worldMap.preset.middleEastAfrica', 'ME & Africa');
+        default:
+          return label;
+      }
+    },
+    [t],
+  );
+
   const interpolateBrand = useCallback(
     (t: number) => {
       if (theme === 'dark') {
@@ -513,7 +538,7 @@ export const WorldMap = memo(function WorldMap({
                   : 'text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)]',
               )}
             >
-              {p.label}
+              {presetLabel(p.label)}
             </button>
           );
         })}
@@ -524,14 +549,14 @@ export const WorldMap = memo(function WorldMap({
         <button
           onClick={handleZoomIn}
           className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)] active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] cursor-pointer"
-          title="Zoom In"
+          title={t('worldMap.zoomIn', 'Zoom In')}
         >
           <Icon name="plus" size={14} />
         </button>
         <button
           onClick={handleZoomOut}
           className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)] active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] cursor-pointer"
-          title="Zoom Out"
+          title={t('worldMap.zoomOut', 'Zoom Out')}
         >
           <Icon name="minus" size={14} />
         </button>
@@ -539,7 +564,7 @@ export const WorldMap = memo(function WorldMap({
         <button
           onClick={handleReset}
           className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)] active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] cursor-pointer"
-          title="Reset View"
+          title={t('worldMap.resetView', 'Reset View')}
         >
           <Icon name="refresh" size={12} />
         </button>
@@ -547,7 +572,9 @@ export const WorldMap = memo(function WorldMap({
 
       {/* Legend */}
       <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)]/90 px-2.5 py-1.5 text-[10px] shadow-[var(--shadow-xs)] backdrop-blur select-none z-10">
-        <span className="text-[var(--fg-tertiary)] font-medium">Pipeline</span>
+        <span className="text-[var(--fg-tertiary)] font-medium">
+          {t('worldMap.legend.pipeline', 'Pipeline')}
+        </span>
         <div className="flex items-center gap-1">
           {legendItems.map((l, i) => (
             <div
@@ -590,7 +617,9 @@ export const WorldMap = memo(function WorldMap({
           </div>
           <div className="mt-1 flex items-center gap-2 text-[11px] tabular-nums text-[var(--fg-secondary)]">
             <span>
-              {hovered.item.opportunityCount} opp{hovered.item.opportunityCount === 1 ? '' : 's'}
+              {t('worldMap.tooltip.opportunityCount', '{{count}} opps', {
+                count: hovered.item.opportunityCount,
+              })}
             </span>
             <span className="text-[var(--border-subtle)]">·</span>
             <span className="font-semibold text-[var(--brand-primary)]">
@@ -598,7 +627,9 @@ export const WorldMap = memo(function WorldMap({
             </span>
           </div>
           <div className="text-[10px] font-medium tabular-nums text-[var(--fg-tertiary)] mt-0.5">
-            Avg probability {hovered.item.avgProbability}%
+            {t('worldMap.tooltip.avgProbability', 'Avg probability {{probability}}%', {
+              probability: hovered.item.avgProbability,
+            })}
           </div>
         </div>
       ) : null}

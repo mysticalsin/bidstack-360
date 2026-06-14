@@ -43,5 +43,91 @@
     "leads": "Prospectos",
     "conversionRate": "Tasa de conversión",
     "activities": "Actividades"
+  },
+  "reportBuilder": {
+    "toast": {
+      "previewFailed": "Error en la vista previa",
+      "nameRequired": "Asigna un nombre a tu informe antes de guardar.",
+      "updated": "Informe actualizado",
+      "created": "Informe creado",
+      "saveFailed": "No se pudo guardar"
+    },
+    "backToReports": "Volver a los informes",
+    "title": {
+      "edit": "Editar informe",
+      "new": "Nuevo informe"
+    },
+    "subtitle": "Crea una consulta, previsualízala en vivo y luego guárdala.",
+    "saveButton": {
+      "saving": "Guardando…",
+      "saveChanges": "Guardar cambios",
+      "create": "Crear informe"
+    },
+    "details": {
+      "title": "Detalles del informe",
+      "nameLabel": "Nombre",
+      "namePlaceholder": "p. ej. Negocios ganados por mes",
+      "nameAria": "Nombre del informe",
+      "descriptionLabel": "Descripción",
+      "descriptionPlaceholder": "Opcional",
+      "descriptionAria": "Descripción del informe",
+      "dataSourceLabel": "Fuente de datos",
+      "dataSourceAria": "Entidad del informe"
+    },
+    "filters": {
+      "title": "Filtros",
+      "caption": "Limita qué registros se incluyen."
+    },
+    "measures": {
+      "title": "Medidas",
+      "caption": "Valores agregados (deja vacío para listar filas)."
+    },
+    "groupBy": {
+      "title": "Agrupar por",
+      "caption": "Desglosa las medidas por dimensión."
+    },
+    "sortLimit": {
+      "title": "Ordenar y limitar",
+      "rowLimitLabel": "Límite de filas",
+      "rowLimitAria": "Límite de filas"
+    },
+    "visualization": {
+      "title": "Visualización",
+      "chartTypeAria": "Tipo de gráfico"
+    },
+    "preview": {
+      "running": "Ejecutando…",
+      "run": "Ejecutar vista previa"
+    },
+    "sort": {
+      "label": "Ordenar",
+      "fieldAria": "Campo de ordenación",
+      "pickColumn": "Elegir columna…",
+      "directionAria": "Dirección de ordenación",
+      "ascending": "Ascendente",
+      "descending": "Descendente",
+      "removeAria": "Eliminar ordenación",
+      "add": "+ Añadir orden"
+    },
+    "error": {
+      "notFoundTitle": "Informe no encontrado",
+      "notFoundMessage": "Es posible que se haya eliminado."
+    }
+  },
+  "filterBuilder": {
+    "valueAriaLabel": "Valor del filtro",
+    "pickOption": "— Elegir —",
+    "dateValueAriaLabel": "Valor de fecha del filtro",
+    "numericValueAriaLabel": "Valor numérico del filtro",
+    "valuePlaceholder": "Valor",
+    "fieldPlaceholder": "Campo…",
+    "operatorAriaLabel": "Operador",
+    "removeConditionAriaLabel": "Eliminar condición",
+    "toggleLogicAriaLabel": "Alternar lógica — actualmente {{logic}}",
+    "noConditions": "Aún no hay condiciones",
+    "conditionCount": "{{count}} condición",
+    "removeGroupAriaLabel": "Eliminar grupo",
+    "addCondition": "Condición",
+    "addGroup": "Grupo"
   }
 }

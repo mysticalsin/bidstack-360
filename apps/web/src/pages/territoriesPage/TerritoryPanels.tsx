@@ -1,6 +1,7 @@
 // Display-only sub-panels and KPI tile for TerritoriesPage.
 // All data-fetching and mutation state stays in the orchestrator.
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import type { LeadRoutingRule, Territory } from '@bidstack/shared';
 
 import { Button } from '@/components/ui/Button';
@@ -90,6 +91,7 @@ export function CountryDetailPanel({
   globalTotals?: { totalValueMicros: number } | null;
   onClear?: () => void;
 }) {
+  const { t } = useTranslation('crm');
   const sharePct =
     selected && globalTotals && globalTotals.totalValueMicros > 0
       ? (selected.totalValueMicros / globalTotals.totalValueMicros) * 100
@@ -102,15 +104,21 @@ export function CountryDetailPanel({
       }
     >
       <SectionHeader
-        title={selected ? `${selected.countryCode} Detail` : 'Country Detail'}
-        caption={selected ? undefined : 'Click a country on the map'}
+        title={
+          selected
+            ? t('territoryPanels.countryDetailTitleWithCode', '{{countryCode}} Detail', {
+                countryCode: selected.countryCode,
+              })
+            : t('territoryPanels.countryDetailTitle', 'Country Detail')
+        }
+        caption={selected ? undefined : t('territoryPanels.clickCountryHint', 'Click a country on the map')}
         action={
           selected && onClear ? (
             <button
               onClick={onClear}
               className="text-[10px] font-bold text-[var(--fg-tertiary)] hover:text-[var(--brand-primary)] px-2 py-0.5 rounded border border-[var(--border-subtle)] bg-[var(--surface-card)] hover:bg-[var(--surface-hover)] transition-all cursor-pointer active:scale-95"
             >
-              Clear
+              {t('territoryPanels.clear', 'Clear')}
             </button>
           ) : undefined
         }
@@ -121,7 +129,7 @@ export function CountryDetailPanel({
             <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)]/40 p-3 hover:bg-[var(--surface-sunken)] transition-colors duration-150">
               <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-tertiary)] flex items-center gap-1.5">
                 <Icon name="target" size={10} className="text-amber-500" />
-                Opportunities
+                {t('territoryPanels.opportunities', 'Opportunities')}
               </div>
               <div className="mt-1 text-2xl font-extrabold text-[var(--fg-primary)] tabular-nums">
                 {selected.opportunityCount}
@@ -130,7 +138,7 @@ export function CountryDetailPanel({
             <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)]/40 p-3 hover:bg-[var(--surface-sunken)] transition-colors duration-150">
               <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-tertiary)] flex items-center gap-1.5">
                 <Icon name="dollar" size={10} className="text-blue-500" />
-                Pipeline
+                {t('territoryPanels.pipeline', 'Pipeline')}
               </div>
               <div className="mt-1 text-2xl font-extrabold text-[var(--fg-primary)] tabular-nums">
                 {formatMoneyMicros(selected.totalValueMicros, 'EUR')}
@@ -143,7 +151,7 @@ export function CountryDetailPanel({
               <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[var(--fg-tertiary)]">
                 <span className="flex items-center gap-1.5">
                   <Icon name="activity" size={11} className="text-emerald-500" />
-                  Global Pipeline Share
+                  {t('territoryPanels.globalPipelineShare', 'Global Pipeline Share')}
                 </span>
                 <span className="font-extrabold text-[var(--fg-primary)] tabular-nums">
                   {sharePct.toFixed(1)}%
@@ -162,7 +170,7 @@ export function CountryDetailPanel({
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-tertiary)] mb-2 flex items-center gap-1.5">
                 <Icon name="git-branch" size={11} className="text-purple-500" />
-                Assigned Territories
+                {t('territoryPanels.assignedTerritories', 'Assigned Territories')}
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {selected.territories.length > 0 ? (
@@ -176,7 +184,7 @@ export function CountryDetailPanel({
                   ))
                 ) : (
                   <span className="text-xs text-[var(--fg-tertiary)] italic">
-                    No territories assigned
+                    {t('territoryPanels.noTerritoriesAssigned', 'No territories assigned')}
                   </span>
                 )}
               </div>
@@ -185,7 +193,7 @@ export function CountryDetailPanel({
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-tertiary)] mb-2 flex items-center gap-1.5">
                 <Icon name="user" size={11} className="text-emerald-500" />
-                Account Owners
+                {t('territoryPanels.accountOwners', 'Account Owners')}
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {selected.ownerNames.length > 0 ? (
@@ -199,7 +207,7 @@ export function CountryDetailPanel({
                     </span>
                   ))
                 ) : (
-                  <span className="text-xs text-[var(--fg-tertiary)] italic">No active owners</span>
+                  <span className="text-xs text-[var(--fg-tertiary)] italic">{t('territoryPanels.noActiveOwners', 'No active owners')}</span>
                 )}
               </div>
             </div>
@@ -211,10 +219,13 @@ export function CountryDetailPanel({
             <Icon name="globe" size={24} />
           </div>
           <span className="text-xs font-semibold text-[var(--fg-secondary)]">
-            No Country Selected
+            {t('territoryPanels.noCountrySelected', 'No Country Selected')}
           </span>
           <span className="text-[11px] text-[var(--fg-tertiary)] mt-1.5 max-w-[200px]">
-            Click any active territory on the interactive map above to load metrics.
+            {t(
+              'territoryPanels.noCountrySelectedHint',
+              'Click any active territory on the interactive map above to load metrics.',
+            )}
           </span>
         </div>
       )}
@@ -241,39 +252,48 @@ export function TerritoryListPanel({
   onDelete: (t: Territory) => void;
   selectedCountryCode?: string | null;
 }) {
+  const { t } = useTranslation('crm');
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-[var(--fg-primary)] flex items-center gap-1.5">
           <Icon name="building" size={14} className="text-indigo-500" />
-          Territories
+          {t('territoryPanels.territories', 'Territories')}
         </h2>
-        <span className="text-xs text-[var(--fg-tertiary)] tabular-nums">{items.length} total</span>
+        <span className="text-xs text-[var(--fg-tertiary)] tabular-nums">
+          {t('territoryPanels.countTotal', '{{count}} total', { count: items.length })}
+        </span>
       </div>
       {isError ? (
         <ErrorState
-          title="Failed to load"
+          title={t('territoryPanels.failedToLoad', 'Failed to load')}
           message={errorMessage}
-          action={<Button onClick={onRetry}>Retry</Button>}
+          action={<Button onClick={onRetry}>{t('territoryPanels.retry', 'Retry')}</Button>}
         />
       ) : isLoading ? (
         <TableSkeleton rows={4} />
       ) : items.length === 0 ? (
-        <EmptyState title="No territories" message="Create your first territory to get started." />
+        <EmptyState
+          title={t('territoryPanels.noTerritories', 'No territories')}
+          message={t(
+            'territoryPanels.noTerritoriesHint',
+            'Create your first territory to get started.',
+          )}
+        />
       ) : (
         <div className="space-y-2">
-          {items.map((t) => {
+          {items.map((territory) => {
             const isMatch =
               !selectedCountryCode ||
-              t.countryCodes.includes(selectedCountryCode) ||
-              t.countryCodes.length === 0;
+              territory.countryCodes.includes(selectedCountryCode) ||
+              territory.countryCodes.length === 0;
 
             return (
               <motion.div
                 layout
                 whileHover={isMatch ? { y: -1 } : undefined}
                 transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                key={t.id}
+                key={territory.id}
                 style={{
                   opacity: isMatch ? 1 : 0.4,
                   filter: isMatch ? 'none' : 'blur(0.2px)',
@@ -288,7 +308,7 @@ export function TerritoryListPanel({
                       : 'pointer-events-none',
                   )}
                   style={
-                    selectedCountryCode && isMatch && t.countryCodes.length > 0
+                    selectedCountryCode && isMatch && territory.countryCodes.length > 0
                       ? {
                           borderColor: 'var(--brand-primary)',
                           boxShadow: '0 0 12px rgba(168,85,247,0.1)',
@@ -300,51 +320,57 @@ export function TerritoryListPanel({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <div className="text-sm font-semibold text-[var(--fg-primary)] tracking-tight truncate">
-                          {t.name}
+                          {territory.name}
                         </div>
-                        {t.active ? (
+                        {territory.active ? (
                           <span className="inline-flex items-center rounded-full bg-[var(--success-surface)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--success-fg)] tracking-wide uppercase">
-                            Active
+                            {t('territoryPanels.active', 'Active')}
                           </span>
                         ) : (
                           <span className="inline-flex items-center rounded-full bg-[var(--surface-sunken)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--fg-tertiary)] tracking-wide uppercase">
-                            Inactive
+                            {t('territoryPanels.inactive', 'Inactive')}
                           </span>
                         )}
                       </div>
                       <div className="text-[11px] text-[var(--fg-secondary)] mt-0.5 flex items-center gap-1.5 flex-wrap">
                         <span className="font-semibold text-indigo-500/80 dark:text-indigo-400/80">
-                          {t.region ?? 'Global'}
+                          {territory.region ?? t('territoryPanels.global', 'Global')}
                         </span>
                         <span className="text-[var(--border-strong)]">·</span>
-                        <span className="truncate" title={t.countryCodes.join(', ')}>
-                          {t.countryCodes.length > 0
-                            ? `${t.countryCodes.length} countr${
-                                t.countryCodes.length === 1 ? 'y' : 'ies'
-                              } (${t.countryCodes.slice(0, 3).join(', ')}${
-                                t.countryCodes.length > 3 ? '...' : ''
-                              })`
-                            : 'All Countries'}
+                        <span className="truncate" title={territory.countryCodes.join(', ')}>
+                          {territory.countryCodes.length > 0
+                            ? t(
+                                'territoryPanels.countryCountSummary',
+                                '{{count}} countries ({{preview}})',
+                                {
+                                  count: territory.countryCodes.length,
+                                  preview: `${territory.countryCodes.slice(0, 3).join(', ')}${
+                                    territory.countryCodes.length > 3 ? '...' : ''
+                                  }`,
+                                  defaultValue_one: '{{count}} country ({{preview}})',
+                                },
+                              )
+                            : t('territoryPanels.allCountries', 'All Countries')}
                         </span>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       <div className="text-[10px] font-semibold text-[var(--fg-secondary)] flex items-center gap-1 bg-[var(--surface-sunken)]/60 px-2 py-0.5 rounded-md border border-[var(--border-subtle)]">
                         <Icon name="user" size={10} className="text-[var(--fg-tertiary)]" />
-                        {t.ownerName ?? 'Unassigned'}
+                        {territory.ownerName ?? t('territoryPanels.unassigned', 'Unassigned')}
                       </div>
                       <div className="flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
                         <button
-                          onClick={() => onEdit(t)}
+                          onClick={() => onEdit(territory)}
                           className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--brand-primary-tint)] hover:text-[var(--brand-primary)] active:scale-95 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
-                          title="Edit"
+                          title={t('territoryPanels.edit', 'Edit')}
                         >
                           <Icon name="pencil" size={13} />
                         </button>
                         <button
-                          onClick={() => onDelete(t)}
+                          onClick={() => onDelete(territory)}
                           className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--error-surface)] hover:text-[var(--fg-error)] active:scale-95 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
-                          title="Delete"
+                          title={t('territoryPanels.delete', 'Delete')}
                         >
                           <Icon name="trash" size={13} />
                         </button>
@@ -380,39 +406,47 @@ export function RoutingRuleListPanel({
   onDelete: (r: LeadRoutingRule) => void;
   selectedCountryCode?: string | null;
 }) {
+  const { t } = useTranslation('crm');
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-[var(--fg-primary)] flex items-center gap-1.5">
           <Icon name="git-branch" size={14} className="text-purple-500" />
-          Lead Routing Rules
+          {t('territoryPanels.leadRoutingRules', 'Lead Routing Rules')}
         </h2>
-        <span className="text-xs text-[var(--fg-tertiary)] tabular-nums">{items.length} total</span>
+        <span className="text-xs text-[var(--fg-tertiary)] tabular-nums">
+          {t('territoryPanels.countTotal', '{{count}} total', { count: items.length })}
+        </span>
       </div>
       {isError ? (
         <ErrorState
-          title="Failed to load"
+          title={t('territoryPanels.failedToLoad', 'Failed to load')}
           message={errorMessage}
-          action={<Button onClick={onRetry}>Retry</Button>}
+          action={<Button onClick={onRetry}>{t('territoryPanels.retry', 'Retry')}</Button>}
         />
       ) : isLoading ? (
         <TableSkeleton rows={4} />
       ) : items.length === 0 ? (
         <EmptyState
-          title="No routing rules"
-          message="Create your first rule to auto-assign leads."
+          title={t('territoryPanels.noRoutingRules', 'No routing rules')}
+          message={t(
+            'territoryPanels.noRoutingRulesHint',
+            'Create your first rule to auto-assign leads.',
+          )}
         />
       ) : (
         <div className="space-y-2">
           {items.map((r) => {
             const criteria = r.criteria as Record<string, unknown>;
             const assignText = r.assignToUserId
-              ? 'User'
+              ? t('territoryPanels.assignUser', 'User')
               : r.assignToTerritoryId
-                ? 'Territory'
+                ? t('territoryPanels.assignTerritory', 'Territory')
                 : r.roundRobinTeam && r.roundRobinTeam.length > 0
-                  ? `Round Robin (${r.roundRobinTeam.length})`
-                  : 'None';
+                  ? t('territoryPanels.assignRoundRobin', 'Round Robin ({{count}})', {
+                      count: r.roundRobinTeam.length,
+                    })
+                  : t('territoryPanels.assignNone', 'None');
             const assignIcon = r.assignToUserId
               ? ('user' as IconName)
               : r.assignToTerritoryId
@@ -460,11 +494,11 @@ export function RoutingRuleListPanel({
                         </div>
                         {r.active ? (
                           <span className="inline-flex items-center rounded-full bg-[var(--success-surface)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--success-fg)] tracking-wide uppercase">
-                            Active
+                            {t('territoryPanels.active', 'Active')}
                           </span>
                         ) : (
                           <span className="inline-flex items-center rounded-full bg-[var(--surface-sunken)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--fg-tertiary)] tracking-wide uppercase">
-                            Inactive
+                            {t('territoryPanels.inactive', 'Inactive')}
                           </span>
                         )}
                         {criteria.countryCode ? (
@@ -475,7 +509,9 @@ export function RoutingRuleListPanel({
                       </div>
                       <div className="text-[11px] text-[var(--fg-secondary)] mt-1 flex items-center gap-1.5 flex-wrap">
                         <span className="font-semibold text-[var(--fg-tertiary)]">
-                          Priority {r.priority}
+                          {t('territoryPanels.priority', 'Priority {{priority}}', {
+                            priority: r.priority,
+                          })}
                         </span>
                         <span className="text-[var(--border-strong)]">·</span>
                         <span className="inline-flex items-center gap-1 text-violet-500 font-semibold dark:text-violet-400">
@@ -488,14 +524,14 @@ export function RoutingRuleListPanel({
                       <button
                         onClick={() => onEdit(r)}
                         className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--brand-primary-tint)] hover:text-[var(--brand-primary)] active:scale-95 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
-                        title="Edit"
+                        title={t('territoryPanels.edit', 'Edit')}
                       >
                         <Icon name="pencil" size={13} />
                       </button>
                       <button
                         onClick={() => onDelete(r)}
                         className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--error-surface)] hover:text-[var(--fg-error)] active:scale-95 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
-                        title="Delete"
+                        title={t('territoryPanels.delete', 'Delete')}
                       >
                         <Icon name="trash" size={13} />
                       </button>

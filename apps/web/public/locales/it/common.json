@@ -290,5 +290,14 @@
     "signOut": "Esci",
     "portfolio": "Portfolio",
     "detail": "Dettaglio"
+  },
+  "appRoutes": {
+    "notFoundTitle": "Pagina non trovata",
+    "notFoundMessage": "La pagina che stai cercando non esiste.",
+    "goToDashboard": "Vai alla dashboard"
+  },
+  "select": {
+    "placeholder": "—",
+    "noOptions": "Nessuna opzione"
   }
 }

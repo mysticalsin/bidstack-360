@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
@@ -23,6 +24,7 @@ import { CompanyRow } from './companiesPage/CompanyRow';
 import { NewCompanyDialog } from './companiesPage/NewCompanyDialog';
 
 export function CompaniesPage() {
+  const { t } = useTranslation('crm');
   const [params, setParams] = useSearchParams();
   const [showNew, setShowNew] = useState(false);
 
@@ -77,20 +79,32 @@ export function CompaniesPage() {
     const withIndustry = items.filter((company) => Boolean(company.industry)).length;
     const countries = new Set(items.map((company) => company.countryCode).filter(Boolean));
     return [
-      { label: 'Visible companies', value: items.length.toLocaleString(), detail: 'current view' },
       {
-        label: 'Domain coverage',
-        value: `${withDomain}/${items.length || 0}`,
-        detail: 'ready for data verification',
+        label: t('companies.stats.visibleLabel', 'Visible companies'),
+        value: items.length.toLocaleString(),
+        detail: t('companies.stats.visibleDetail', 'current view'),
       },
-      { label: 'Industries', value: withIndustry.toLocaleString(), detail: 'classified profiles' },
-      { label: 'Countries', value: countries.size.toLocaleString(), detail: 'market coverage' },
+      {
+        label: t('companies.stats.domainLabel', 'Domain coverage'),
+        value: `${withDomain}/${items.length || 0}`,
+        detail: t('companies.stats.domainDetail', 'ready for data verification'),
+      },
+      {
+        label: t('companies.stats.industriesLabel', 'Industries'),
+        value: withIndustry.toLocaleString(),
+        detail: t('companies.stats.industriesDetail', 'classified profiles'),
+      },
+      {
+        label: t('companies.stats.countriesLabel', 'Countries'),
+        value: countries.size.toLocaleString(),
+        detail: t('companies.stats.countriesDetail', 'market coverage'),
+      },
     ];
-  }, [items]);
+  }, [items, t]);
 
   const exportSelected = () => {
     if (bulk.selectedItems.length === 0) {
-      toast.info('Nothing to export');
+      toast.info(t('companies.toast.nothingToExport', 'Nothing to export'));
       return;
     }
     const csv = rowsToCsv(
@@ -113,16 +127,29 @@ export function CompaniesPage() {
     );
     downloadCsv(`bidstack-companies-${new Date().toISOString().slice(0, 10)}`, csv);
     toast.success(
-      `Exported ${bulk.selectedItems.length} compan${bulk.selectedItems.length === 1 ? 'y' : 'ies'}`,
+      bulk.selectedItems.length === 1
+        ? t('companies.toast.exportedOne', 'Exported {{count}} company', {
+            count: bulk.selectedItems.length,
+          })
+        : t('companies.toast.exportedMany', 'Exported {{count}} companies', {
+            count: bulk.selectedItems.length,
+          }),
     );
   };
 
   const bulkDelete = async () => {
     if (bulk.selectedItems.length === 0) return;
     const ok = await confirmDialog({
-      title: `Delete ${bulk.selectedItems.length} compan${bulk.selectedItems.length === 1 ? 'y' : 'ies'}?`,
-      description: 'This action cannot be undone.',
-      confirmLabel: 'Delete',
+      title:
+        bulk.selectedItems.length === 1
+          ? t('companies.confirmDelete.titleOne', 'Delete {{count}} company?', {
+              count: bulk.selectedItems.length,
+            })
+          : t('companies.confirmDelete.titleMany', 'Delete {{count}} companies?', {
+              count: bulk.selectedItems.length,
+            }),
+      description: t('companies.confirmDelete.description', 'This action cannot be undone.'),
+      confirmLabel: t('companies.confirmDelete.confirmLabel', 'Delete'),
       destructive: true,
     });
     if (!ok) return;
@@ -137,10 +164,20 @@ export function CompaniesPage() {
     bulk.clear();
     if (failed === 0) {
       toast.success(
-        `Deleted ${bulk.selectedItems.length} compan${bulk.selectedItems.length === 1 ? 'y' : 'ies'}`,
+        bulk.selectedItems.length === 1
+          ? t('companies.toast.deletedOne', 'Deleted {{count}} company', {
+              count: bulk.selectedItems.length,
+            })
+          : t('companies.toast.deletedMany', 'Deleted {{count}} companies', {
+              count: bulk.selectedItems.length,
+            }),
       );
     } else {
-      toast.error(`${failed} deletion${failed === 1 ? '' : 's'} failed`);
+      toast.error(
+        failed === 1
+          ? t('companies.toast.deleteFailedOne', '{{count}} deletion failed', { count: failed })
+          : t('companies.toast.deleteFailedMany', '{{count}} deletions failed', { count: failed }),
+      );
     }
   };
 
@@ -148,20 +185,24 @@ export function CompaniesPage() {
     <div className="space-y-6">
       <header className="page-head flex-wrap">
         <div>
-          <h1 className="page-title">Companies</h1>
+          <h1 className="page-title">{t('companies.title', 'Companies')}</h1>
           <p className="page-sub">
-            {items.length} {items.length === 1 ? 'company' : 'companies'} visible.
+            {items.length === 1
+              ? t('companies.subtitleOne', '{{count}} company visible.', { count: items.length })
+              : t('companies.subtitleMany', '{{count}} companies visible.', {
+                  count: items.length,
+                })}
           </p>
         </div>
         <LiquidGlassButton onClick={() => setShowNew(true)}>
           <Icon name="plus" size={14} />
-          New company
+          {t('companies.newCompany', 'New company')}
         </LiquidGlassButton>
       </header>
 
       <section
         className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
-        aria-label="Company list summary"
+        aria-label={t('companies.summaryAriaLabel', 'Company list summary')}
       >
         {stats.map((stat) => (
           <Card key={stat.label} className="px-4 py-3">
@@ -181,8 +222,8 @@ export function CompaniesPage() {
             <input
               id="company-search"
               type="search"
-              placeholder="Search by name or domain…"
-              aria-label="Search companies"
+              placeholder={t('companies.searchPlaceholder', 'Search by name or domain…')}
+              aria-label={t('companies.searchAriaLabel', 'Search companies')}
               value={searchTerm}
               onChange={(e) => {
                 const next = new URLSearchParams(params);
@@ -196,8 +237,16 @@ export function CompaniesPage() {
           <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--fg-tertiary)]">
             <span role="status" aria-live="polite">
               {searchTerm
-                ? `${items.length} result${items.length === 1 ? '' : 's'} for "${searchTerm}"`
-                : 'Showing latest 50 companies'}
+                ? items.length === 1
+                  ? t('companies.resultsCountOne', '{{count}} result for "{{term}}"', {
+                      count: items.length,
+                      term: searchTerm,
+                    })
+                  : t('companies.resultsCountMany', '{{count}} results for "{{term}}"', {
+                      count: items.length,
+                      term: searchTerm,
+                    })
+                : t('companies.showingLatest', 'Showing latest 50 companies')}
             </span>
             {searchTerm ? (
               <Button
@@ -209,7 +258,7 @@ export function CompaniesPage() {
                   setParams(next, { replace: true });
                 }}
               >
-                Clear
+                {t('companies.clear', 'Clear')}
               </Button>
             ) : null}
           </div>
@@ -255,18 +304,31 @@ export function CompaniesPage() {
         <LoadingSkeleton rows={8} />
       ) : companies.isError ? (
         <ErrorState
-          title="Failed to load companies"
+          title={t('companies.error.title', 'Failed to load companies')}
           message={
-            companies.error instanceof Error ? companies.error.message : 'Something went wrong'
+            companies.error instanceof Error
+              ? companies.error.message
+              : t('companies.error.fallback', 'Something went wrong')
           }
         />
       ) : !companies.data || companies.data.items.length === 0 ? (
         <EmptyState
-          title={searchTerm ? 'No companies match your search' : 'No companies found'}
+          title={
+            searchTerm
+              ? t('companies.empty.searchTitle', 'No companies match your search')
+              : t('companies.empty.title', 'No companies found')
+          }
           message={
             searchTerm
-              ? `Nothing matched "${searchTerm}". Try a company name or domain.`
-              : 'Create the first company to start building your account list.'
+              ? t(
+                  'companies.empty.searchMessage',
+                  'Nothing matched "{{term}}". Try a company name or domain.',
+                  { term: searchTerm },
+                )
+              : t(
+                  'companies.empty.message',
+                  'Create the first company to start building your account list.',
+                )
           }
           action={
             searchTerm ? (
@@ -279,11 +341,11 @@ export function CompaniesPage() {
                   setParams(next, { replace: true });
                 }}
               >
-                Clear search
+                {t('companies.empty.clearSearch', 'Clear search')}
               </Button>
             ) : (
               <Button size="sm" onClick={() => setShowNew(true)}>
-                Add company
+                {t('companies.empty.addCompany', 'Add company')}
               </Button>
             )
           }
@@ -300,7 +362,9 @@ export function CompaniesPage() {
                 <th className="w-10">
                   <label className="table-checkbox-hit">
                     <span className="sr-only">
-                      {bulk.allSelected ? 'Deselect all' : 'Select all'}
+                      {bulk.allSelected
+                        ? t('companies.table.deselectAll', 'Deselect all')
+                        : t('companies.table.selectAll', 'Select all')}
                     </span>
                     <input
                       type="checkbox"
@@ -315,31 +379,31 @@ export function CompaniesPage() {
                 </th>
                 <th scope="col" aria-sort={getSortableHeaderAriaSort('name', sortState)}>
                   <SortableHeader columnKey="name" state={sortState} onChange={setSortState}>
-                    Company
+                    {t('companies.table.company', 'Company')}
                   </SortableHeader>
                 </th>
                 <th scope="col" aria-sort={getSortableHeaderAriaSort('domain', sortState)}>
                   <SortableHeader columnKey="domain" state={sortState} onChange={setSortState}>
-                    Domain
+                    {t('companies.table.domain', 'Domain')}
                   </SortableHeader>
                 </th>
                 <th scope="col" aria-sort={getSortableHeaderAriaSort('industry', sortState)}>
                   <SortableHeader columnKey="industry" state={sortState} onChange={setSortState}>
-                    Industry
+                    {t('companies.table.industry', 'Industry')}
                   </SortableHeader>
                 </th>
                 <th scope="col" aria-sort={getSortableHeaderAriaSort('employeeCount', sortState)}>
                   <SortableHeader columnKey="employeeCount" state={sortState} onChange={setSortState}>
-                    Employees
+                    {t('companies.table.employees', 'Employees')}
                   </SortableHeader>
                 </th>
                 <th scope="col" aria-sort={getSortableHeaderAriaSort('countryCode', sortState)}>
                   <SortableHeader columnKey="countryCode" state={sortState} onChange={setSortState}>
-                    Country
+                    {t('companies.table.country', 'Country')}
                   </SortableHeader>
                 </th>
                 <th scope="col" className="text-right">
-                  Actions
+                  {t('companies.table.actions', 'Actions')}
                 </th>
               </tr>
             </thead>

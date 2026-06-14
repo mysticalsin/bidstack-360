@@ -7,6 +7,7 @@
 
 import { Plus, Trash2, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { cn } from '@/lib/cn';
@@ -64,6 +65,7 @@ function ValueInput({
   value: unknown;
   onChange: (v: unknown) => void;
 }) {
+  const { t } = useTranslation('reports');
   if (operator === 'isNull' || operator === 'isNotNull') return null;
   const inputCls = cn(
     'flex-1 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)]',
@@ -76,10 +78,10 @@ function ValueInput({
       <select
         value={String(value ?? '')}
         onChange={(e) => onChange(e.target.value)}
-        aria-label="Filter value"
+        aria-label={t('filterBuilder.valueAriaLabel', 'Filter value')}
         className={inputCls}
       >
-        <option value="">— Pick —</option>
+        <option value="">{t('filterBuilder.pickOption', '— Pick —')}</option>
         {fieldDef.enumValues.map((v) => (
           <option key={v} value={v}>
             {v}
@@ -94,7 +96,7 @@ function ValueInput({
         type="date"
         value={String(value ?? '')}
         onChange={(e) => onChange(e.target.value)}
-        aria-label="Filter date value"
+        aria-label={t('filterBuilder.dateValueAriaLabel', 'Filter date value')}
         className={inputCls}
       />
     );
@@ -105,7 +107,7 @@ function ValueInput({
         type="number"
         value={String(value ?? '')}
         onChange={(e) => onChange(Number(e.target.value))}
-        aria-label="Filter numeric value"
+        aria-label={t('filterBuilder.numericValueAriaLabel', 'Filter numeric value')}
         className={inputCls}
       />
     );
@@ -115,8 +117,8 @@ function ValueInput({
       type="text"
       value={String(value ?? '')}
       onChange={(e) => onChange(e.target.value)}
-      placeholder="Value"
-      aria-label="Filter value"
+      placeholder={t('filterBuilder.valuePlaceholder', 'Value')}
+      aria-label={t('filterBuilder.valueAriaLabel', 'Filter value')}
       className={inputCls}
     />
   );
@@ -135,6 +137,7 @@ function ConditionRow({
   onChange: (c: FilterCondition) => void;
   onRemove: () => void;
 }) {
+  const { t } = useTranslation('reports');
   const [fieldDef, setFieldDef] = useState<FieldDef | undefined>();
   const ops = opsForType(fieldDef?.type);
 
@@ -155,7 +158,7 @@ function ConditionRow({
             setFieldDef(def);
             onChange({ ...condition, field: key, operator: 'eq', value: undefined });
           }}
-          placeholder="Field…"
+          placeholder={t('filterBuilder.fieldPlaceholder', 'Field…')}
         />
       </div>
 
@@ -163,7 +166,7 @@ function ConditionRow({
       <select
         value={condition.operator}
         onChange={(e) => onChange({ ...condition, operator: e.target.value as FilterOperator })}
-        aria-label="Operator"
+        aria-label={t('filterBuilder.operatorAriaLabel', 'Operator')}
         className={cn(
           'rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)]',
           'px-2 py-2 text-sm text-[var(--fg-primary)]',
@@ -189,7 +192,7 @@ function ConditionRow({
       {/* Remove */}
       <button
         onClick={onRemove}
-        aria-label="Remove condition"
+        aria-label={t('filterBuilder.removeConditionAriaLabel', 'Remove condition')}
         className={cn(
           'flex items-center justify-center rounded-lg text-[var(--fg-tertiary)]',
           'hover:text-[var(--danger)] hover:bg-[var(--danger-tint)] transition-colors',
@@ -217,6 +220,7 @@ function GroupNode({
   onRemove?: () => void;
   depth?: number;
 }) {
+  const { t } = useTranslation('reports');
   const updateChild = (i: number, child: FilterCondition | FilterGroup) => {
     const next = group.conditions.map((c, idx) => (idx === i ? child : c));
     onChange({ ...group, conditions: next });
@@ -266,7 +270,9 @@ function GroupNode({
       <div className="flex items-center gap-2">
         <button
           onClick={toggleLogic}
-          aria-label={`Toggle logic — currently ${group.logic}`}
+          aria-label={t('filterBuilder.toggleLogicAriaLabel', 'Toggle logic — currently {{logic}}', {
+            logic: group.logic,
+          })}
           className={cn(
             'flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold transition-colors',
             'border min-h-[44px]',
@@ -280,13 +286,15 @@ function GroupNode({
         </button>
         <span className="text-xs text-[var(--fg-tertiary)]">
           {group.conditions.length === 0
-            ? 'No conditions yet'
-            : `${group.conditions.length} condition${group.conditions.length !== 1 ? 's' : ''}`}
+            ? t('filterBuilder.noConditions', 'No conditions yet')
+            : t('filterBuilder.conditionCount', '{{count}} condition', {
+                count: group.conditions.length,
+              })}
         </span>
         {onRemove && (
           <button
             onClick={onRemove}
-            aria-label="Remove group"
+            aria-label={t('filterBuilder.removeGroupAriaLabel', 'Remove group')}
             className={cn(
               'ml-auto flex items-center justify-center rounded-lg text-[var(--fg-tertiary)]',
               'hover:text-[var(--danger)] hover:bg-[var(--danger-tint)] transition-colors',
@@ -333,7 +341,7 @@ function GroupNode({
           )}
         >
           <Plus size={12} />
-          Condition
+          {t('filterBuilder.addCondition', 'Condition')}
         </button>
         <button
           onClick={addGroup}
@@ -344,7 +352,7 @@ function GroupNode({
           )}
         >
           <Plus size={12} />
-          Group
+          {t('filterBuilder.addGroup', 'Group')}
         </button>
       </div>
     </div>
