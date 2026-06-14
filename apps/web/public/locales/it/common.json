@@ -140,9 +140,15 @@
     "dustSynced": "sincronizzato {{when}}"
   },
   "pages": {
-    "dashboard": { "title": "Dashboard" },
-    "opportunities": { "title": "Opportunità" },
-    "contacts": { "title": "Contatti" },
+    "dashboard": {
+      "title": "Dashboard"
+    },
+    "opportunities": {
+      "title": "Opportunità"
+    },
+    "contacts": {
+      "title": "Contatti"
+    },
     "rfpHub": {
       "title": "Hub risposta alle RFP",
       "subtitle": "Qualifica, redigi, valuta e invia — l'intero flusso RFP in un unico posto.",
@@ -230,7 +236,9 @@
         "title": "Nessun lead ancora",
         "message": "Crea il tuo primo lead per iniziare a tracciare i potenziali clienti."
       },
-      "error": { "title": "Impossibile caricare i lead" },
+      "error": {
+        "title": "Impossibile caricare i lead"
+      },
       "view": {
         "list": "Lista",
         "kanban": "Kanban",
