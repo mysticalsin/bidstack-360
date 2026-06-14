@@ -25,7 +25,11 @@ import type { DustClient } from '@bidstack/dust-client';
 import { extractTextFromBufferSandboxed } from '../lib/extract-text-sandbox.js';
 import { readStoredDocument } from '../lib/storage-read.js';
 import { extractContractFields } from '../lib/contract-extract-fields.js';
+import { extractContractFieldsLLM } from '../lib/contract-extract-llm.js';
+import { resolveLlmFromEnv } from '../lib/llm-provider.js';
+import { resolveOrgLlm } from '../lib/org-llm.js';
 import { getOrgDust, resolveAgentId } from '../lib/dust-credentials.js';
+import type { ContractExtractionDraft } from '@bidstack/shared';
 
 import { deterministicExtract } from './document-extract-analysis.js';
 import { writeBidWorkspaceArtifacts } from './document-extract-db.js';
@@ -133,6 +137,29 @@ async function runDustExtraction(
   return { result, runId: run.run_id };
 }
 
+// Prefer the LLM draft, but backfill any field it left null from the
+// deterministic regex pass — best of both. The LLM warnings (incl. the review
+// reminder) carry through; confidence stays the LLM's higher value.
+function mergeContractDrafts(
+  llm: ContractExtractionDraft,
+  det: ContractExtractionDraft,
+): ContractExtractionDraft {
+  const pick = <T>(a: T | null, b: T | null): T | null => (a !== null ? a : b);
+  return {
+    reference: pick(llm.reference, det.reference),
+    kind: pick(llm.kind, det.kind),
+    countries: llm.countries.length ? llm.countries : det.countries,
+    currency: pick(llm.currency, det.currency),
+    globalRebateBps: pick(llm.globalRebateBps, det.globalRebateBps),
+    effectiveDate: pick(llm.effectiveDate, det.effectiveDate),
+    expiryDate: pick(llm.expiryDate, det.expiryDate),
+    rateReviewSchedule: pick(llm.rateReviewSchedule, det.rateReviewSchedule),
+    rateCard: llm.rateCard.length ? llm.rateCard : det.rateCard,
+    confidenceBps: llm.confidenceBps,
+    warnings: llm.warnings,
+  };
+}
+
 // ─── Worker processor ──────────────────────────────────────────────────────
 
 async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
@@ -181,10 +208,26 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
 
   // Contract lane: extract MSA/rate-card fields and park a reviewable draft on
   // the extraction row (the user confirms before a ContractAgreement is created).
-  // No solutions/products writeback. LLM upgrade is a future step; the
-  // deterministic extractor is the always-available baseline.
+  // No solutions/products writeback. The deterministic extractor is the
+  // always-available baseline; when the org has an active LLM provider (Settings)
+  // or a deployment env provider is set, an LLM refinement pass produces a
+  // higher-confidence draft over the same OCR'd text.
   if (extractionKind === 'contract') {
-    const draft = extractContractFields(text);
+    const deterministic = extractContractFields(text);
+    let draft = deterministic;
+    let source: 'deterministic' | 'llm' = 'deterministic';
+
+    const llm = (await resolveOrgLlm(orgId)) ?? resolveLlmFromEnv();
+    if (llm) {
+      const llmDraft = await extractContractFieldsLLM(text, llm);
+      if (llmDraft) {
+        draft = mergeContractDrafts(llmDraft, deterministic);
+        source = 'llm';
+      } else {
+        log.warn({ jobId: job.id, provider: llm.kind }, 'contract LLM pass failed; using deterministic');
+      }
+    }
+
     const done = await prisma.documentExtraction.updateMany({
       where: { id: extractionId, orgId, documentId, deletedAt: null },
       data: {
@@ -195,7 +238,10 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
     if (done.count !== 1) {
       throw new Error('Contract extraction does not match an active tenant-scoped extraction');
     }
-    log.info({ jobId: job.id, documentId }, 'contract extraction completed');
+    log.info(
+      { jobId: job.id, documentId, source, provider: llm?.kind ?? null },
+      'contract extraction completed',
+    );
     return;
   }
 
