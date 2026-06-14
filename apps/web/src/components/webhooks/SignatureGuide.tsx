@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
@@ -54,6 +55,7 @@ end`,
 type Lang = keyof typeof SIGNATURE_SNIPPETS;
 
 export function SignatureGuide() {
+  const { t } = useTranslation('signatures');
   const [lang, setLang] = useState<Lang>('Node.js');
   const [copied, setCopied] = useState(false);
 
@@ -72,14 +74,14 @@ export function SignatureGuide() {
       <div className="border-b border-[var(--border-subtle)] px-5 py-4">
         <div className="flex items-center gap-2">
           <Icon name="shield" size={16} className="text-[var(--brand-primary)]" />
-          <h2 className="text-sm font-semibold text-[var(--fg-primary)]">Signature verification</h2>
+          <h2 className="text-sm font-semibold text-[var(--fg-primary)]">{t('signatureGuide.title', 'Signature verification')}</h2>
         </div>
         <p className="mt-1 text-xs leading-5 text-[var(--fg-secondary)]">
-          Every delivery includes an{' '}
+          {t('signatureGuide.introBefore', 'Every delivery includes an')}{' '}
           <code className="rounded bg-[var(--surface-sunken)] px-1 py-0.5 font-mono text-[11px]">
             X-BidStack-Signature
           </code>{' '}
-          header. Verify it before trusting the payload. Format:{' '}
+          {t('signatureGuide.introAfter', 'header. Verify it before trusting the payload. Format:')}{' '}
           <code className="rounded bg-[var(--surface-sunken)] px-1 py-0.5 font-mono text-[11px]">
             t=&lt;unix-seconds&gt;,v1=&lt;hmac-sha256-hex&gt;
           </code>
@@ -90,7 +92,7 @@ export function SignatureGuide() {
         <div
           className="mb-3 flex w-fit gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-1"
           role="tablist"
-          aria-label="Signature verification language"
+          aria-label={t('signatureGuide.languageTablistLabel', 'Signature verification language')}
         >
           {(Object.keys(SIGNATURE_SNIPPETS) as Lang[]).map((item) => (
             <button
@@ -118,7 +120,7 @@ export function SignatureGuide() {
           <button
             type="button"
             onClick={handleCopy}
-            aria-label="Copy code"
+            aria-label={t('signatureGuide.copyCodeLabel', 'Copy code')}
             className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] text-[var(--fg-tertiary)] transition-colors hover:text-[var(--fg-primary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
           >
             <Icon name={copied ? 'check' : 'copy'} size={14} />
@@ -126,8 +128,12 @@ export function SignatureGuide() {
         </div>
 
         <p className="mt-3 text-xs text-[var(--fg-tertiary)]">
-          Reject events where <code className="font-mono">|now - t| &gt; 300</code> seconds to
-          prevent replay attacks. Always use a timing-safe comparison.
+          {t('signatureGuide.replayBefore', 'Reject events where')}{' '}
+          <code className="font-mono">|now - t| &gt; 300</code>{' '}
+          {t(
+            'signatureGuide.replayAfter',
+            'seconds to prevent replay attacks. Always use a timing-safe comparison.',
+          )}
         </p>
       </div>
     </Card>

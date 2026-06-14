@@ -90,5 +90,28 @@
     },
     "recipientEventsAriaLabel": "Eventos de {{name}}",
     "noEventsYet": "Ainda não há eventos"
+  },
+  "recipientsStep": {
+    "listAriaLabel": "Destinatários",
+    "nameLabel": "Nome",
+    "namePlaceholder": "Jane Smith",
+    "emailLabel": "E-mail",
+    "emailPlaceholder": "jane@example.com",
+    "roleLabel": "Função",
+    "roleSigner": "Signatário",
+    "roleCc": "Cc",
+    "removeRecipientAriaLabel": "Remover destinatário {{recipient}}",
+    "addRecipient": "+ Adicionar destinatário",
+    "back": "Voltar",
+    "nextReview": "Próximo: Revisar"
+  },
+  "signatureGuide": {
+    "title": "Verificação de assinatura",
+    "introBefore": "Cada entrega inclui um",
+    "introAfter": "cabeçalho. Verifique-o antes de confiar no payload. Formato:",
+    "languageTablistLabel": "Linguagem de verificação de assinatura",
+    "copyCodeLabel": "Copiar código",
+    "replayBefore": "Rejeite os eventos onde",
+    "replayAfter": "segundos para evitar ataques de repetição. Use sempre uma comparação de tempo constante."
   }
 }

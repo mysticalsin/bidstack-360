@@ -354,7 +354,20 @@
     "undo": {
       "deletedCount": "已删除 {{count}} 个联系人",
       "deleted": "已删除 {{name}}"
-    }
+    },
+    "linkedTitle": "关联联系人",
+    "countCaption": "{{count}} 个联系人",
+    "linkAction": "+ 关联联系人",
+    "selectPlaceholder": "选择联系人…",
+    "cancel": "取消",
+    "emptyTitle": "无关联联系人",
+    "emptyMessage": "关联联系人以跟踪谁参与了此交易。",
+    "primaryBadge": "主要",
+    "noEmail": "无邮箱",
+    "unsetPrimary": "取消主要",
+    "setPrimary": "设为主要",
+    "unlinkConfirm": "取消关联 {{name}}？",
+    "remove": "移除"
   },
   "accounts": {
     "title": "客户",
@@ -3178,6 +3191,40 @@
         "none": "无",
         "noEvents": "范围内无事件"
       }
+    }
+  },
+  "taskCalendar": {
+    "previousMonth": "上个月",
+    "nextMonth": "下个月",
+    "weekdaySun": "周日",
+    "weekdayMon": "周一",
+    "weekdayTue": "周二",
+    "weekdayWed": "周三",
+    "weekdayThu": "周四",
+    "weekdayFri": "周五",
+    "weekdaySat": "周六"
+  },
+  "recentActivity": {
+    "heading": "最近活动",
+    "latestUpdates": "最新更新",
+    "empty": "暂无最近活动",
+    "viewAll": "查看全部 {{count}} 项活动 →"
+  },
+  "extractStep": {
+    "heading": "运行提取",
+    "processingCount": "正在处理 {{count}} 个文档…",
+    "intro": "Dust 代理将解析 {{count}} 个文档并提取解决方案、产品、能力和定价。",
+    "back": "← 返回",
+    "queuing": "排队中…",
+    "runButton": "运行提取",
+    "status": {
+      "queued": "已排队",
+      "pending": "待处理",
+      "running": "运行中",
+      "done": "已完成",
+      "completed": "已完成",
+      "error": "错误",
+      "failed": "失败"
     }
   }
 }

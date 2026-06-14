@@ -7,6 +7,7 @@
 // grey = offline) used in the Team settings table (A5 pattern).
 
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/cn';
 
@@ -116,7 +117,10 @@ interface OnlineDotProps {
 }
 
 export function OnlineDot({ online, label, className }: OnlineDotProps) {
-  const statusText = online ? 'Online' : 'Offline';
+  const { t } = useTranslation('common');
+  const statusText = online
+    ? t('avatar.statusOnline', 'Online')
+    : t('avatar.statusOffline', 'Offline');
   const accessibleLabel = label ?? statusText;
 
   return (

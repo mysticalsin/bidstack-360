@@ -620,5 +620,51 @@
     "colorLabel": "颜色",
     "savingButton": "保存中...",
     "saveButton": "保存"
+  },
+  "settingsLayout": {
+    "mobileMenuToggle": "设置菜单",
+    "groupCommandCenter": "指挥中心",
+    "groupPersonal": "个人",
+    "groupWorkspace": "工作区",
+    "groupDeveloperTools": "开发者工具",
+    "itemOverview": "概览",
+    "itemAppearance": "外观与语言",
+    "itemNotifications": "通知",
+    "itemSecurity": "个人资料与安全",
+    "itemWorkspace": "工作区",
+    "itemCrm": "数据配置",
+    "itemDataImport": "数据导入",
+    "itemTopAccounts": "重点客户",
+    "itemGroups": "访问组",
+    "itemOpportunityFilters": "商机筛选器",
+    "itemRfpAnalytics": "RFP 分析",
+    "itemIntegrations": "集成",
+    "itemWebhooks": "Webhook",
+    "itemDeveloper": "开发者访问",
+    "itemAuditLog": "审计日志"
+  },
+  "team": {
+    "title": "团队",
+    "caption": "您工作区的成员。管理员可以管理角色。",
+    "empty": "未找到团队成员。",
+    "col": {
+      "status": "在线状态",
+      "name": "姓名",
+      "email": "电子邮件",
+      "role": "角色",
+      "joined": "加入时间",
+      "actions": "操作"
+    },
+    "presence": {
+      "label": "{{name}} {{status}}",
+      "online": "在线",
+      "offline": "离线"
+    },
+    "action": {
+      "hideRoles": "隐藏角色",
+      "manageRoles": "管理角色",
+      "demote": "降级为成员",
+      "promote": "提升为管理员"
+    }
   }
 }

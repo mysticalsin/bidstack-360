@@ -315,5 +315,34 @@
     "delete": "删除",
     "confirm": "确认",
     "save": "保存"
+  },
+  "avatar": {
+    "statusOnline": "在线",
+    "statusOffline": "离线"
+  },
+  "helpDrawer": {
+    "title": "键盘快捷键",
+    "closeAria": "关闭快捷键",
+    "groupGlobal": "全局",
+    "groupNavigation": "导航",
+    "groupRecords": "记录",
+    "openCommandPalette": "打开命令面板",
+    "quickAddMenu": "快速添加菜单",
+    "openThisDrawer": "打开此面板",
+    "closeCurrentDialog": "关闭当前对话框",
+    "goToDashboard": "转到仪表板",
+    "goToOpportunities": "转到商机",
+    "goToPipeline": "转到管道",
+    "goToContacts": "转到联系人",
+    "goToTasks": "转到任务",
+    "goToReports": "转到报告",
+    "goToAccounts": "转到客户",
+    "goToSettings": "转到设置",
+    "goToSearch": "转到搜索",
+    "moveSelectionInLists": "在列表中移动选择",
+    "openRecord": "打开记录",
+    "editSelectedRecord": "编辑所选记录",
+    "deleteWithConfirmation": "删除并确认",
+    "footer": "除文本字段内之外，大多数快捷键在任何地方都有效。随时按 ? 重新打开此面板。"
   }
 }

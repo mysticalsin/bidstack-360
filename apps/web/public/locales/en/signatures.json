@@ -90,5 +90,28 @@
     },
     "recipientEventsAriaLabel": "Events for {{name}}",
     "noEventsYet": "No events yet"
+  },
+  "recipientsStep": {
+    "listAriaLabel": "Recipients",
+    "nameLabel": "Name",
+    "namePlaceholder": "Jane Smith",
+    "emailLabel": "Email",
+    "emailPlaceholder": "jane@example.com",
+    "roleLabel": "Role",
+    "roleSigner": "Signer",
+    "roleCc": "CC",
+    "removeRecipientAriaLabel": "Remove recipient {{recipient}}",
+    "addRecipient": "+ Add recipient",
+    "back": "Back",
+    "nextReview": "Next: Review"
+  },
+  "signatureGuide": {
+    "title": "Signature verification",
+    "introBefore": "Every delivery includes an",
+    "introAfter": "header. Verify it before trusting the payload. Format:",
+    "languageTablistLabel": "Signature verification language",
+    "copyCodeLabel": "Copy code",
+    "replayBefore": "Reject events where",
+    "replayAfter": "seconds to prevent replay attacks. Always use a timing-safe comparison."
   }
 }

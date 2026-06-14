@@ -220,5 +220,16 @@
     "listboxLabel": "Opções de campo",
     "searchPlaceholder": "Pesquisar campos…",
     "empty": "Nenhum campo encontrado."
+  },
+  "reportPreview": {
+    "title": "Pré-visualização ao vivo",
+    "rowCountOne": "{{count}} linha",
+    "rowCountOther": "{{count}} linhas",
+    "emptyMessage": "Ainda não há linhas que correspondam a esta consulta.",
+    "chartAriaLabel": "Pré-visualização do relatório",
+    "rowsAriaLabel": "Linhas da pré-visualização do relatório",
+    "runPrompt": "Crie sua consulta e execute uma pré-visualização para ver os resultados aqui.",
+    "chartShapeMismatch": "Este tipo de gráfico não se ajusta ao formato da consulta atual. A tabela abaixo mostra as linhas brutas.",
+    "queryFailed": "A consulta falhou"
   }
 }

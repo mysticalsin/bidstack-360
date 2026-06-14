@@ -1,4 +1,5 @@
 // Step 2: add / edit / remove recipients.
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { type Recipient, FieldLabel, inputClass } from './signatureModalShared';
 
@@ -10,6 +11,8 @@ interface Props {
 }
 
 export function RecipientsStep({ recipients, onChangeRecipients, onBack, onNext }: Props) {
+  const { t } = useTranslation('signatures');
+
   const addRecipient = () =>
     onChangeRecipients([...recipients, { email: '', name: '', role: 'SIGNER' }]);
 
@@ -28,7 +31,7 @@ export function RecipientsStep({ recipients, onChangeRecipients, onBack, onNext 
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3" role="list" aria-label="Recipients">
+      <div className="flex flex-col gap-3" role="list" aria-label={t('recipientsStep.listAriaLabel', 'Recipients')}>
         {recipients.map((r, i) => (
           <div
             key={i}
@@ -37,49 +40,49 @@ export function RecipientsStep({ recipients, onChangeRecipients, onBack, onNext 
           >
             <div>
               <FieldLabel htmlFor={`recip-name-${i}`} required>
-                Name
+                {t('recipientsStep.nameLabel', 'Name')}
               </FieldLabel>
               <input
                 id={`recip-name-${i}`}
                 type="text"
                 value={r.name}
                 onChange={(e) => updateRecipient(i, { name: e.target.value })}
-                placeholder="Jane Smith"
+                placeholder={t('recipientsStep.namePlaceholder', 'Jane Smith')}
                 className={inputClass}
                 required
               />
             </div>
             <div>
               <FieldLabel htmlFor={`recip-email-${i}`} required>
-                Email
+                {t('recipientsStep.emailLabel', 'Email')}
               </FieldLabel>
               <input
                 id={`recip-email-${i}`}
                 type="email"
                 value={r.email}
                 onChange={(e) => updateRecipient(i, { email: e.target.value })}
-                placeholder="jane@example.com"
+                placeholder={t('recipientsStep.emailPlaceholder', 'jane@example.com')}
                 className={inputClass}
                 required
               />
             </div>
             <div>
-              <FieldLabel htmlFor={`recip-role-${i}`}>Role</FieldLabel>
+              <FieldLabel htmlFor={`recip-role-${i}`}>{t('recipientsStep.roleLabel', 'Role')}</FieldLabel>
               <select
                 id={`recip-role-${i}`}
                 value={r.role}
                 onChange={(e) => updateRecipient(i, { role: e.target.value as 'SIGNER' | 'CC' })}
                 className={inputClass}
               >
-                <option value="SIGNER">Signer</option>
-                <option value="CC">CC</option>
+                <option value="SIGNER">{t('recipientsStep.roleSigner', 'Signer')}</option>
+                <option value="CC">{t('recipientsStep.roleCc', 'CC')}</option>
               </select>
             </div>
             <div className="flex items-end">
               <button
                 type="button"
                 onClick={() => removeRecipient(i)}
-                aria-label={`Remove recipient ${r.name || i + 1}`}
+                aria-label={t('recipientsStep.removeRecipientAriaLabel', 'Remove recipient {{recipient}}', { recipient: r.name || i + 1 })}
                 disabled={recipients.length === 1}
                 className={cn(
                   'min-h-[44px] min-w-[44px] rounded-lg border border-[var(--border-default)]',
@@ -106,7 +109,7 @@ export function RecipientsStep({ recipients, onChangeRecipients, onBack, onNext 
           'transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
         )}
       >
-        + Add recipient
+        {t('recipientsStep.addRecipient', '+ Add recipient')}
       </button>
 
       <div className="flex justify-between">
@@ -119,7 +122,7 @@ export function RecipientsStep({ recipients, onChangeRecipients, onBack, onNext 
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)] focus-visible:ring-offset-1',
           )}
         >
-          Back
+          {t('recipientsStep.back', 'Back')}
         </button>
         <button
           type="button"
@@ -132,7 +135,7 @@ export function RecipientsStep({ recipients, onChangeRecipients, onBack, onNext 
             'disabled:opacity-40 disabled:cursor-not-allowed',
           )}
         >
-          Next: Review
+          {t('recipientsStep.nextReview', 'Next: Review')}
         </button>
       </div>
     </div>

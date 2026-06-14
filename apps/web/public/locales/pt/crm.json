@@ -354,7 +354,20 @@
     "undo": {
       "deletedCount": "{{count}} contatos excluídos",
       "deleted": "{{name}} excluído"
-    }
+    },
+    "linkedTitle": "Contatos vinculados",
+    "countCaption": "{{count}} contatos",
+    "linkAction": "+ Vincular contato",
+    "selectPlaceholder": "Selecione um contato…",
+    "cancel": "Cancelar",
+    "emptyTitle": "Nenhum contato vinculado",
+    "emptyMessage": "Vincule contatos para acompanhar quem está envolvido neste negócio.",
+    "primaryBadge": "Principal",
+    "noEmail": "sem e-mail",
+    "unsetPrimary": "Remover como principal",
+    "setPrimary": "Definir como principal",
+    "unlinkConfirm": "Desvincular {{name}}?",
+    "remove": "Remover"
   },
   "accounts": {
     "title": "Contas",
@@ -3178,6 +3191,40 @@
         "none": "Nenhum",
         "noEvents": "Nenhum evento no intervalo"
       }
+    }
+  },
+  "taskCalendar": {
+    "previousMonth": "Mês anterior",
+    "nextMonth": "Próximo mês",
+    "weekdaySun": "Dom",
+    "weekdayMon": "Seg",
+    "weekdayTue": "Ter",
+    "weekdayWed": "Qua",
+    "weekdayThu": "Qui",
+    "weekdayFri": "Sex",
+    "weekdaySat": "Sáb"
+  },
+  "recentActivity": {
+    "heading": "Atividade recente",
+    "latestUpdates": "Últimas atualizações",
+    "empty": "Nenhuma atividade recente",
+    "viewAll": "Ver todas as {{count}} atividades →"
+  },
+  "extractStep": {
+    "heading": "Executar extração",
+    "processingCount": "Processando {{count}} documentos…",
+    "intro": "Os agentes Dust irão analisar {{count}} documentos e extrair soluções, produtos, capacidades e preços.",
+    "back": "← Voltar",
+    "queuing": "Enfileirando…",
+    "runButton": "Executar extração",
+    "status": {
+      "queued": "Na fila",
+      "pending": "Pendente",
+      "running": "Em execução",
+      "done": "Concluído",
+      "completed": "Concluído",
+      "error": "Erro",
+      "failed": "Falhou"
     }
   }
 }

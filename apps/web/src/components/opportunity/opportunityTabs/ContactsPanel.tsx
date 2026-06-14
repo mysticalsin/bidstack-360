@@ -6,6 +6,7 @@
  * orchestrator under the 400-line cap and makes the panel independently testable.
  */
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
@@ -19,6 +20,7 @@ import {
 } from '@/hooks/useOpportunityContacts';
 
 export function ContactsPanel({ oppId }: { oppId: string }) {
+  const { t } = useTranslation('crm');
   const [showLink, setShowLink] = useState(false);
   const contacts = useOpportunityContacts(oppId);
   const link = useLinkContact();
@@ -30,11 +32,13 @@ export function ContactsPanel({ oppId }: { oppId: string }) {
     <Card>
       <div className="flex items-center justify-between px-5 py-4">
         <SectionHeader
-          title="Linked contacts"
-          caption={`${contacts.data?.items.length ?? 0} contacts`}
+          title={t('contacts.linkedTitle', 'Linked contacts')}
+          caption={t('contacts.countCaption', '{{count}} contacts', {
+            count: contacts.data?.items.length ?? 0,
+          })}
         />
         <button className="btn btn-secondary btn-sm" onClick={() => setShowLink(true)}>
-          + Link contact
+          {t('contacts.linkAction', '+ Link contact')}
         </button>
       </div>
 
@@ -52,7 +56,7 @@ export function ContactsPanel({ oppId }: { oppId: string }) {
                 setShowLink(false);
               }}
             >
-              <option value="">Select a contact…</option>
+              <option value="">{t('contacts.selectPlaceholder', 'Select a contact…')}</option>
               {(allContacts.data?.items ?? [])
                 .filter((c) => !contacts.data?.items.some((oc) => oc.contactId === c.id))
                 .map((c) => (
@@ -62,7 +66,7 @@ export function ContactsPanel({ oppId }: { oppId: string }) {
                 ))}
             </select>
             <button className="btn btn-secondary btn-sm" onClick={() => setShowLink(false)}>
-              Cancel
+              {t('contacts.cancel', 'Cancel')}
             </button>
           </div>
         </div>
@@ -72,8 +76,8 @@ export function ContactsPanel({ oppId }: { oppId: string }) {
         <LoadingSkeleton rows={3} />
       ) : !contacts.data || contacts.data.items.length === 0 ? (
         <EmptyState
-          title="No linked contacts"
-          message="Link contacts to track who is involved in this deal."
+          title={t('contacts.emptyTitle', 'No linked contacts')}
+          message={t('contacts.emptyMessage', 'Link contacts to track who is involved in this deal.')}
         />
       ) : (
         <ul className="divide-y divide-[var(--border-subtle)]">
@@ -84,10 +88,10 @@ export function ContactsPanel({ oppId }: { oppId: string }) {
                   <span className="text-sm font-medium text-[var(--fg-primary)]">
                     {oc.contact.name}
                   </span>
-                  {oc.isPrimary && <Badge tone="jade">Primary</Badge>}
+                  {oc.isPrimary && <Badge tone="jade">{t('contacts.primaryBadge', 'Primary')}</Badge>}
                 </div>
                 <div className="text-xs text-[var(--fg-tertiary)]">
-                  {oc.role} · {oc.contact.email ?? 'no email'}
+                  {oc.role} · {oc.contact.email ?? t('contacts.noEmail', 'no email')}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -117,18 +121,22 @@ export function ContactsPanel({ oppId }: { oppId: string }) {
                       patch: { isPrimary: !oc.isPrimary },
                     })
                   }
-                  title={oc.isPrimary ? 'Unset primary' : 'Set as primary'}
+                  title={
+                    oc.isPrimary
+                      ? t('contacts.unsetPrimary', 'Unset primary')
+                      : t('contacts.setPrimary', 'Set as primary')
+                  }
                 >
                   {oc.isPrimary ? '★' : '☆'}
                 </button>
                 <button
                   className="text-xs text-[var(--fg-tertiary)] hover:text-[var(--rose-9)]"
                   onClick={() => {
-                    if (confirm(`Unlink ${oc.contact.name}?`))
+                    if (confirm(t('contacts.unlinkConfirm', 'Unlink {{name}}?', { name: oc.contact.name })))
                       unlink.mutate({ opportunityId: oppId, contactId: oc.contactId });
                   }}
                 >
-                  Remove
+                  {t('contacts.remove', 'Remove')}
                 </button>
               </div>
             </li>

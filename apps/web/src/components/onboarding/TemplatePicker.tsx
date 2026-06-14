@@ -4,6 +4,7 @@
 // templatePickerOpen flag. Backed by /api/onboarding/templates[/:key/install].
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Check, Loader2 } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
@@ -21,6 +22,7 @@ export function TemplatePicker() {
   const markChecklistItem = useOnboardingStore((s) => s.markChecklistItem);
   const setHasSampleData = useOnboardingStore((s) => s.setHasSampleData);
   const navigate = useNavigate();
+  const { t } = useTranslation('onboarding');
 
   const templates = useTemplates();
   const install = useInstallTemplate();
@@ -34,23 +36,34 @@ export function TemplatePicker() {
       onSuccess: (result) => {
         markChecklistItem('template');
         setHasSampleData(true);
-        toast.success('Pipeline installed', {
-          description: `${result.stagesCreated} stages, ${result.dealsCreated} sample deals, ${result.leadsCreated} leads.`,
+        toast.success(t('templatePicker.toastInstalledTitle', 'Pipeline installed'), {
+          description: t(
+            'templatePicker.toastInstalledDescription',
+            '{{stages}} stages, {{deals}} sample deals, {{leads}} leads.',
+            {
+              stages: result.stagesCreated,
+              deals: result.dealsCreated,
+              leads: result.leadsCreated,
+            },
+          ),
         });
         close();
         navigate('/pipeline');
       },
       onError: (err) => {
         if (err instanceof ApiError && err.status === 409) {
-          toast.error('A pipeline is already installed', {
-            description: 'Remove the existing sample data first, or start from your live pipeline.',
+          toast.error(t('templatePicker.toastConflictTitle', 'A pipeline is already installed'), {
+            description: t(
+              'templatePicker.toastConflictDescription',
+              'Remove the existing sample data first, or start from your live pipeline.',
+            ),
           });
           close();
           navigate('/pipeline');
           return;
         }
-        toast.error('Could not install template', {
-          description: err instanceof Error ? err.message : 'Please try again.',
+        toast.error(t('templatePicker.toastErrorTitle', 'Could not install template'), {
+          description: err instanceof Error ? err.message : t('templatePicker.tryAgain', 'Please try again.'),
         });
       },
     });
@@ -60,29 +73,31 @@ export function TemplatePicker() {
     <Modal open={open} onClose={close} labelId="template-picker-title">
       <div className="w-[min(640px,calc(100vw-2rem))] max-h-[85vh] overflow-y-auto rounded-2xl border border-[var(--border-default)] bg-[var(--surface-card)] p-6 shadow-[var(--shadow-lg)]">
         <h2 id="template-picker-title" className="text-lg font-bold text-[var(--fg-primary)]">
-          Choose a starter pipeline
+          {t('templatePicker.title', 'Choose a starter pipeline')}
         </h2>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          Each template sets up a pipeline with stages and a handful of sample records so you can
-          explore right away. You can remove the sample data any time.
+          {t(
+            'templatePicker.subtitle',
+            'Each template sets up a pipeline with stages and a handful of sample records so you can explore right away. You can remove the sample data any time.',
+          )}
         </p>
 
         <div className="mt-5 space-y-2">
           {templates.isError ? (
             <ErrorState
-              title="Couldn't load templates"
-              message={(templates.error as Error)?.message ?? 'Please try again.'}
+              title={t('templatePicker.loadErrorTitle', "Couldn't load templates")}
+              message={(templates.error as Error)?.message ?? t('templatePicker.tryAgain', 'Please try again.')}
             />
           ) : templates.isLoading ? (
             <LoadingSkeleton rows={4} />
           ) : (
-            (templates.data ?? []).map((t) => {
-              const isSelected = selected === t.key;
+            (templates.data ?? []).map((tpl) => {
+              const isSelected = selected === tpl.key;
               return (
                 <button
-                  key={t.key}
+                  key={tpl.key}
                   type="button"
-                  onClick={() => setSelected(t.key)}
+                  onClick={() => setSelected(tpl.key)}
                   aria-pressed={isSelected}
                   className={cn(
                     'flex w-full items-start gap-3 rounded-xl border p-4 text-left transition-colors min-h-[44px]',
@@ -103,13 +118,13 @@ export function TemplatePicker() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold text-[var(--fg-primary)]">
-                      {t.name}
+                      {tpl.name}
                     </span>
                     <span className="mt-0.5 block text-xs text-[var(--fg-secondary)]">
-                      {t.description}
+                      {tpl.description}
                     </span>
                     <span className="mt-1 block text-[11px] text-[var(--fg-tertiary)]">
-                      {t.stageCount} stages
+                      {t('templatePicker.stageCount', '{{count}} stages', { count: tpl.stageCount })}
                     </span>
                   </span>
                 </button>
@@ -120,15 +135,16 @@ export function TemplatePicker() {
 
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="ghost" onClick={close} disabled={install.isPending}>
-            Cancel
+            {t('templatePicker.cancel', 'Cancel')}
           </Button>
           <Button variant="primary" onClick={onInstall} disabled={!selected || install.isPending}>
             {install.isPending ? (
               <>
-                <Loader2 size={14} className="animate-spin" aria-hidden /> Installing…
+                <Loader2 size={14} className="animate-spin" aria-hidden />{' '}
+                {t('templatePicker.installing', 'Installing…')}
               </>
             ) : (
-              'Install pipeline'
+              t('templatePicker.install', 'Install pipeline')
             )}
           </Button>
         </div>

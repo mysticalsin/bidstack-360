@@ -90,5 +90,28 @@
     },
     "recipientEventsAriaLabel": "{{name}} 的事件",
     "noEventsYet": "暂无事件"
+  },
+  "recipientsStep": {
+    "listAriaLabel": "收件人",
+    "nameLabel": "姓名",
+    "namePlaceholder": "Jane Smith",
+    "emailLabel": "电子邮件",
+    "emailPlaceholder": "jane@example.com",
+    "roleLabel": "角色",
+    "roleSigner": "签署人",
+    "roleCc": "抄送",
+    "removeRecipientAriaLabel": "移除收件人 {{recipient}}",
+    "addRecipient": "+ 添加收件人",
+    "back": "返回",
+    "nextReview": "下一步：审核"
+  },
+  "signatureGuide": {
+    "title": "签名验证",
+    "introBefore": "每次投递都包含一个",
+    "introAfter": "请求头。在信任负载之前请先验证它。格式：",
+    "languageTablistLabel": "签名验证语言",
+    "copyCodeLabel": "复制代码",
+    "replayBefore": "拒绝满足以下条件的事件：",
+    "replayAfter": "秒，以防止重放攻击。请始终使用时间安全的比较方式。"
   }
 }

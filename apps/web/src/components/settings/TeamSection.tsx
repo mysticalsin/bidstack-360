@@ -1,4 +1,5 @@
 import { Fragment, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useUsers, useUpdateUserRole, useOrgPresence } from '@/hooks/useUsers';
 import { Card, SectionHeader } from '@/components/ui/Card';
@@ -10,6 +11,7 @@ import { useIsAdmin } from '@/lib/auth';
 import { UserRolesManager } from './UserRolesManager';
 
 export function TeamSection() {
+  const { t } = useTranslation('settings');
   const isAdmin = useIsAdmin();
   const users = useUsers();
   const updateRole = useUpdateUserRole();
@@ -23,12 +25,17 @@ export function TeamSection() {
 
   return (
     <Card>
-      <SectionHeader title="Team" caption="Members of your workspace. Admins can manage roles." />
+      <SectionHeader
+        title={t('team.title', 'Team')}
+        caption={t('team.caption', 'Members of your workspace. Admins can manage roles.')}
+      />
       <div className="p-5">
         {users.isLoading ? (
           <LoadingSkeleton rows={3} />
         ) : !users.data || users.data.length === 0 ? (
-          <p className="text-sm text-[var(--fg-secondary)]">No team members found.</p>
+          <p className="text-sm text-[var(--fg-secondary)]">
+            {t('team.empty', 'No team members found.')}
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -38,23 +45,23 @@ export function TeamSection() {
                   <th
                     scope="col"
                     className="py-2 pr-2 font-medium w-6"
-                    aria-label="Online status"
+                    aria-label={t('team.col.status', 'Online status')}
                   />
                   <th scope="col" className="py-2 pr-4 font-medium">
-                    Name
+                    {t('team.col.name', 'Name')}
                   </th>
                   <th scope="col" className="py-2 pr-4 font-medium">
-                    Email
+                    {t('team.col.email', 'Email')}
                   </th>
                   <th scope="col" className="py-2 pr-4 font-medium">
-                    Role
+                    {t('team.col.role', 'Role')}
                   </th>
                   <th scope="col" className="py-2 pr-4 font-medium">
-                    Joined
+                    {t('team.col.joined', 'Joined')}
                   </th>
                   {isAdmin ? (
                     <th scope="col" className="py-2 font-medium text-right">
-                      Actions
+                      {t('team.col.actions', 'Actions')}
                     </th>
                   ) : null}
                 </tr>
@@ -72,7 +79,12 @@ export function TeamSection() {
                       <td className="py-2 pr-2 w-6">
                         <OnlineDot
                           online={isOnline}
-                          label={`${u.name ?? u.email} ${isOnline ? 'online' : 'offline'}`}
+                          label={t('team.presence.label', '{{name}} {{status}}', {
+                            name: u.name ?? u.email,
+                            status: isOnline
+                              ? t('team.presence.online', 'online')
+                              : t('team.presence.offline', 'offline'),
+                          })}
                         />
                       </td>
                       <td className="py-2 pr-4 text-[var(--fg-primary)]">{u.name ?? '—'}</td>
@@ -93,7 +105,9 @@ export function TeamSection() {
                               setExpandedUserId((cur) => (cur === u.id ? null : u.id))
                             }
                           >
-                            {expandedUserId === u.id ? 'Hide roles' : 'Manage roles'}
+                            {expandedUserId === u.id
+                              ? t('team.action.hideRoles', 'Hide roles')
+                              : t('team.action.manageRoles', 'Manage roles')}
                           </button>
                           {u.role === 'admin' ? (
                             <button
@@ -102,7 +116,7 @@ export function TeamSection() {
                               disabled={updateRole.isPending}
                               onClick={() => updateRole.mutate({ id: u.id, role: 'member' })}
                             >
-                              Demote to member
+                              {t('team.action.demote', 'Demote to member')}
                             </button>
                           ) : (
                             <button
@@ -111,7 +125,7 @@ export function TeamSection() {
                               disabled={updateRole.isPending}
                               onClick={() => updateRole.mutate({ id: u.id, role: 'admin' })}
                             >
-                              Promote to admin
+                              {t('team.action.promote', 'Promote to admin')}
                             </button>
                           )}
                         </td>

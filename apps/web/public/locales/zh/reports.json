@@ -220,5 +220,16 @@
     "listboxLabel": "字段选项",
     "searchPlaceholder": "搜索字段…",
     "empty": "未找到字段。"
+  },
+  "reportPreview": {
+    "title": "实时预览",
+    "rowCountOne": "{{count}} 行",
+    "rowCountOther": "{{count}} 行",
+    "emptyMessage": "暂无与此查询匹配的行。",
+    "chartAriaLabel": "报表预览",
+    "rowsAriaLabel": "报表预览行",
+    "runPrompt": "构建查询，然后运行预览以在此处查看结果。",
+    "chartShapeMismatch": "此图表类型不适合当前的查询结构。下表显示原始行数据。",
+    "queryFailed": "查询失败"
   }
 }

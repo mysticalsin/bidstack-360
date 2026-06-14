@@ -124,5 +124,20 @@
     "back": "Indietro",
     "ctaFinish": "Invita il tuo team",
     "ctaNext": "Avanti"
+  },
+  "templatePicker": {
+    "title": "Scegli una pipeline iniziale",
+    "subtitle": "Ogni modello imposta una pipeline con fasi e alcuni record di esempio così puoi esplorare subito. Puoi rimuovere i dati di esempio in qualsiasi momento.",
+    "loadErrorTitle": "Impossibile caricare i modelli",
+    "tryAgain": "Riprova.",
+    "stageCount": "{{count}} fasi",
+    "cancel": "Annulla",
+    "installing": "Installazione…",
+    "install": "Installa pipeline",
+    "toastInstalledTitle": "Pipeline installata",
+    "toastInstalledDescription": "{{stages}} fasi, {{deals}} trattative di esempio, {{leads}} lead.",
+    "toastConflictTitle": "Una pipeline è già installata",
+    "toastConflictDescription": "Rimuovi prima i dati di esempio esistenti oppure parti dalla tua pipeline attiva.",
+    "toastErrorTitle": "Impossibile installare il modello"
   }
 }

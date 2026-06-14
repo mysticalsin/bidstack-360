@@ -315,5 +315,34 @@
     "delete": "Eliminar",
     "confirm": "Confirmar",
     "save": "Guardar"
+  },
+  "avatar": {
+    "statusOnline": "En línea",
+    "statusOffline": "Desconectado"
+  },
+  "helpDrawer": {
+    "title": "Atajos de teclado",
+    "closeAria": "Cerrar atajos",
+    "groupGlobal": "Global",
+    "groupNavigation": "Navegación",
+    "groupRecords": "Registros",
+    "openCommandPalette": "Abrir paleta de comandos",
+    "quickAddMenu": "Menú de adición rápida",
+    "openThisDrawer": "Abrir este panel",
+    "closeCurrentDialog": "Cerrar el diálogo actual",
+    "goToDashboard": "Ir al panel",
+    "goToOpportunities": "Ir a Oportunidades",
+    "goToPipeline": "Ir al embudo",
+    "goToContacts": "Ir a Contactos",
+    "goToTasks": "Ir a Tareas",
+    "goToReports": "Ir a Informes",
+    "goToAccounts": "Ir a Cuentas",
+    "goToSettings": "Ir a Configuración",
+    "goToSearch": "Ir a Búsqueda",
+    "moveSelectionInLists": "Mover la selección en las listas",
+    "openRecord": "Abrir registro",
+    "editSelectedRecord": "Editar el registro seleccionado",
+    "deleteWithConfirmation": "Eliminar con confirmación",
+    "footer": "La mayoría de los atajos funcionan en todas partes excepto dentro de los campos de texto. Pulsa ? en cualquier momento para volver a abrir este panel."
   }
 }

@@ -315,5 +315,34 @@
     "delete": "Elimina",
     "confirm": "Conferma",
     "save": "Salva"
+  },
+  "avatar": {
+    "statusOnline": "Online",
+    "statusOffline": "Offline"
+  },
+  "helpDrawer": {
+    "title": "Scorciatoie da tastiera",
+    "closeAria": "Chiudi scorciatoie",
+    "groupGlobal": "Globale",
+    "groupNavigation": "Navigazione",
+    "groupRecords": "Record",
+    "openCommandPalette": "Apri la palette dei comandi",
+    "quickAddMenu": "Menu di aggiunta rapida",
+    "openThisDrawer": "Apri questo pannello",
+    "closeCurrentDialog": "Chiudi la finestra di dialogo corrente",
+    "goToDashboard": "Vai alla dashboard",
+    "goToOpportunities": "Vai alle opportunità",
+    "goToPipeline": "Vai alla pipeline",
+    "goToContacts": "Vai ai contatti",
+    "goToTasks": "Vai alle attività",
+    "goToReports": "Vai ai report",
+    "goToAccounts": "Vai agli account",
+    "goToSettings": "Vai alle impostazioni",
+    "goToSearch": "Vai alla ricerca",
+    "moveSelectionInLists": "Sposta la selezione negli elenchi",
+    "openRecord": "Apri record",
+    "editSelectedRecord": "Modifica il record selezionato",
+    "deleteWithConfirmation": "Elimina con conferma",
+    "footer": "La maggior parte delle scorciatoie funziona ovunque tranne che nei campi di testo. Premi ? in qualsiasi momento per riaprire questo pannello."
   }
 }

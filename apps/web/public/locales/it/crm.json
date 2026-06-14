@@ -354,7 +354,20 @@
     "undo": {
       "deletedCount": "Eliminati {{count}} contatti",
       "deleted": "{{name}} eliminato"
-    }
+    },
+    "linkedTitle": "Contatti collegati",
+    "countCaption": "{{count}} contatti",
+    "linkAction": "+ Collega contatto",
+    "selectPlaceholder": "Seleziona un contatto…",
+    "cancel": "Annulla",
+    "emptyTitle": "Nessun contatto collegato",
+    "emptyMessage": "Collega contatti per tenere traccia di chi è coinvolto in questa trattativa.",
+    "primaryBadge": "Principale",
+    "noEmail": "nessuna email",
+    "unsetPrimary": "Rimuovi principale",
+    "setPrimary": "Imposta come principale",
+    "unlinkConfirm": "Scollegare {{name}}?",
+    "remove": "Rimuovi"
   },
   "accounts": {
     "title": "Account",
@@ -3178,6 +3191,40 @@
         "none": "Nessuno",
         "noEvents": "Nessun evento nell'intervallo"
       }
+    }
+  },
+  "taskCalendar": {
+    "previousMonth": "Mese precedente",
+    "nextMonth": "Mese successivo",
+    "weekdaySun": "Dom",
+    "weekdayMon": "Lun",
+    "weekdayTue": "Mar",
+    "weekdayWed": "Mer",
+    "weekdayThu": "Gio",
+    "weekdayFri": "Ven",
+    "weekdaySat": "Sab"
+  },
+  "recentActivity": {
+    "heading": "Attività recente",
+    "latestUpdates": "Ultimi aggiornamenti",
+    "empty": "Nessuna attività recente",
+    "viewAll": "Vedi tutte le {{count}} attività →"
+  },
+  "extractStep": {
+    "heading": "Avvia estrazione",
+    "processingCount": "Elaborazione di {{count}} documenti…",
+    "intro": "Gli agenti Dust analizzeranno {{count}} documenti ed estrarranno soluzioni, prodotti, capacità e prezzi.",
+    "back": "← Indietro",
+    "queuing": "In coda…",
+    "runButton": "Avvia estrazione",
+    "status": {
+      "queued": "In coda",
+      "pending": "In attesa",
+      "running": "In esecuzione",
+      "done": "Completato",
+      "completed": "Completato",
+      "error": "Errore",
+      "failed": "Non riuscito"
     }
   }
 }

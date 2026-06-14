@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useIsAdmin } from '@/lib/auth';
@@ -73,9 +74,62 @@ interface Props {
 }
 
 export function SettingsLayout({ active, onChange, children }: Props) {
+  const { t } = useTranslation('settings');
   const isAdmin = useIsAdmin();
   const [menuOpen, setMenuOpen] = useState(false);
   const navId = 'settings-section-nav';
+
+  const groupLabel = (label: string): string => {
+    switch (label) {
+      case 'Command center':
+        return t('settingsLayout.groupCommandCenter', 'Command center');
+      case 'Personal':
+        return t('settingsLayout.groupPersonal', 'Personal');
+      case 'Workspace':
+        return t('settingsLayout.groupWorkspace', 'Workspace');
+      case 'Developer tools':
+        return t('settingsLayout.groupDeveloperTools', 'Developer tools');
+      default:
+        return label;
+    }
+  };
+
+  const itemLabel = (id: SettingsSection, label: string): string => {
+    switch (id) {
+      case 'overview':
+        return t('settingsLayout.itemOverview', 'Overview');
+      case 'appearance':
+        return t('settingsLayout.itemAppearance', 'Appearance & Language');
+      case 'notifications':
+        return t('settingsLayout.itemNotifications', 'Notifications');
+      case 'security':
+        return t('settingsLayout.itemSecurity', 'Profile & Security');
+      case 'workspace':
+        return t('settingsLayout.itemWorkspace', 'Workspace');
+      case 'crm':
+        return t('settingsLayout.itemCrm', 'Data configuration');
+      case 'data-import':
+        return t('settingsLayout.itemDataImport', 'Data import');
+      case 'top-accounts':
+        return t('settingsLayout.itemTopAccounts', 'Top accounts');
+      case 'groups':
+        return t('settingsLayout.itemGroups', 'Access groups');
+      case 'opportunity-filters':
+        return t('settingsLayout.itemOpportunityFilters', 'Opportunity filters');
+      case 'rfp-analytics':
+        return t('settingsLayout.itemRfpAnalytics', 'RFP Analytics');
+      case 'integrations':
+        return t('settingsLayout.itemIntegrations', 'Integrations');
+      case 'webhooks':
+        return t('settingsLayout.itemWebhooks', 'Webhooks');
+      case 'developer':
+        return t('settingsLayout.itemDeveloper', 'Developer access');
+      case 'audit-log':
+        return t('settingsLayout.itemAuditLog', 'Audit log');
+      default:
+        return label;
+    }
+  };
 
   return (
     <div className="min-h-[calc(100vh-64px)]">
@@ -88,7 +142,7 @@ export function SettingsLayout({ active, onChange, children }: Props) {
         className="mb-3 flex items-center gap-2 text-sm font-medium text-[var(--fg-secondary)] lg:hidden"
       >
         <Icon name="menu" size={16} ariaHidden />
-        Settings menu
+        {t('settingsLayout.mobileMenuToggle', 'Settings menu')}
       </button>
 
       <div className="flex flex-col lg:flex-row">
@@ -105,7 +159,7 @@ export function SettingsLayout({ active, onChange, children }: Props) {
             {GROUPS.map((group) => (
               <div key={group.label} className="mb-5">
                 <span className="px-3 text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-                  {group.label}
+                  {groupLabel(group.label)}
                 </span>
                 <ul className="mt-1 space-y-0.5">
                   {group.items
@@ -126,7 +180,7 @@ export function SettingsLayout({ active, onChange, children }: Props) {
                           )}
                         >
                           <Icon name={item.icon} size={16} ariaHidden />
-                          {item.label}
+                          {itemLabel(item.id, item.label)}
                         </button>
                       </li>
                     ))}

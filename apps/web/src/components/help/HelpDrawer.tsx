@@ -6,6 +6,8 @@
 
 import * as RadixDialog from '@radix-ui/react-dialog';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 import { Icon } from '@/components/ui/Icon';
 import { springModal } from '@/lib/motion';
@@ -17,45 +19,52 @@ interface Shortcut {
   label: string;
 }
 
-const GROUPS: Array<{ title: string; items: Shortcut[] }> = [
-  {
-    title: 'Global',
-    items: [
-      { keys: ['Ctrl', 'K'], label: 'Open command palette' },
-      { keys: ['N'], label: 'Quick-add menu' },
-      { keys: ['?'], label: 'Open this drawer' },
-      { keys: ['Esc'], label: 'Close current dialog' },
-    ],
-  },
-  {
-    title: 'Navigation',
-    items: [
-      { keys: ['G', 'D'], label: 'Go to Dashboard' },
-      { keys: ['G', 'O'], label: 'Go to Opportunities' },
-      { keys: ['G', 'P'], label: 'Go to Pipeline' },
-      { keys: ['G', 'C'], label: 'Go to Contacts' },
-      { keys: ['G', 'T'], label: 'Go to Tasks' },
-      { keys: ['G', 'R'], label: 'Go to Reports' },
-      { keys: ['G', 'A'], label: 'Go to Accounts' },
-      { keys: ['G', 'S'], label: 'Go to Settings' },
-      { keys: ['G', 'F'], label: 'Go to Search' },
-    ],
-  },
-  {
-    title: 'Records',
-    items: [
-      { keys: ['Up', 'Down'], label: 'Move selection in lists' },
-      { keys: ['Enter'], label: 'Open record' },
-      { keys: ['E'], label: 'Edit selected record' },
-      { keys: ['Del'], label: 'Delete with confirmation' },
-    ],
-  },
-];
+function buildGroups(t: TFunction): Array<{ id: string; title: string; items: Shortcut[] }> {
+  return [
+    {
+      id: 'Global',
+      title: t('helpDrawer.groupGlobal', 'Global'),
+      items: [
+        { keys: ['Ctrl', 'K'], label: t('helpDrawer.openCommandPalette', 'Open command palette') },
+        { keys: ['N'], label: t('helpDrawer.quickAddMenu', 'Quick-add menu') },
+        { keys: ['?'], label: t('helpDrawer.openThisDrawer', 'Open this drawer') },
+        { keys: ['Esc'], label: t('helpDrawer.closeCurrentDialog', 'Close current dialog') },
+      ],
+    },
+    {
+      id: 'Navigation',
+      title: t('helpDrawer.groupNavigation', 'Navigation'),
+      items: [
+        { keys: ['G', 'D'], label: t('helpDrawer.goToDashboard', 'Go to Dashboard') },
+        { keys: ['G', 'O'], label: t('helpDrawer.goToOpportunities', 'Go to Opportunities') },
+        { keys: ['G', 'P'], label: t('helpDrawer.goToPipeline', 'Go to Pipeline') },
+        { keys: ['G', 'C'], label: t('helpDrawer.goToContacts', 'Go to Contacts') },
+        { keys: ['G', 'T'], label: t('helpDrawer.goToTasks', 'Go to Tasks') },
+        { keys: ['G', 'R'], label: t('helpDrawer.goToReports', 'Go to Reports') },
+        { keys: ['G', 'A'], label: t('helpDrawer.goToAccounts', 'Go to Accounts') },
+        { keys: ['G', 'S'], label: t('helpDrawer.goToSettings', 'Go to Settings') },
+        { keys: ['G', 'F'], label: t('helpDrawer.goToSearch', 'Go to Search') },
+      ],
+    },
+    {
+      id: 'Records',
+      title: t('helpDrawer.groupRecords', 'Records'),
+      items: [
+        { keys: ['Up', 'Down'], label: t('helpDrawer.moveSelectionInLists', 'Move selection in lists') },
+        { keys: ['Enter'], label: t('helpDrawer.openRecord', 'Open record') },
+        { keys: ['E'], label: t('helpDrawer.editSelectedRecord', 'Edit selected record') },
+        { keys: ['Del'], label: t('helpDrawer.deleteWithConfirmation', 'Delete with confirmation') },
+      ],
+    },
+  ];
+}
 
 export function HelpDrawer() {
   const open = useHelpDrawer((s) => s.open);
   const setOpen = useHelpDrawer((s) => s.setOpen);
   const reduced = useReducedMotion();
+  const { t } = useTranslation('common');
+  const groups = buildGroups(t);
 
   return (
     <RadixDialog.Root open={open} onOpenChange={setOpen}>
@@ -81,10 +90,10 @@ export function HelpDrawer() {
               >
                 <header className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-4">
                   <RadixDialog.Title className="text-sm font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-                    Keyboard shortcuts
+                    {t('helpDrawer.title', 'Keyboard shortcuts')}
                   </RadixDialog.Title>
                   <RadixDialog.Close
-                    aria-label="Close shortcuts"
+                    aria-label={t('helpDrawer.closeAria', 'Close shortcuts')}
                     className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)]"
                   >
                     <Icon name="close" size={16} />
@@ -92,8 +101,8 @@ export function HelpDrawer() {
                 </header>
 
                 <div className="space-y-5 p-5">
-                  {GROUPS.map((g) => (
-                    <section key={g.title}>
+                  {groups.map((g) => (
+                    <section key={g.id}>
                       <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
                         {g.title}
                       </h3>
@@ -121,8 +130,10 @@ export function HelpDrawer() {
                   ))}
 
                   <footer className="pt-2 text-[11px] text-[var(--fg-tertiary)]">
-                    Most shortcuts work everywhere except inside text fields. Press ? any time to
-                    reopen this drawer.
+                    {t(
+                      'helpDrawer.footer',
+                      'Most shortcuts work everywhere except inside text fields. Press ? any time to reopen this drawer.',
+                    )}
                   </footer>
                 </div>
               </motion.aside>

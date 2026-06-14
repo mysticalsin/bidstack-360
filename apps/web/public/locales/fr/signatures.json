@@ -90,5 +90,28 @@
     },
     "recipientEventsAriaLabel": "Événements pour {{name}}",
     "noEventsYet": "Aucun événement pour le moment"
+  },
+  "recipientsStep": {
+    "listAriaLabel": "Destinataires",
+    "nameLabel": "Nom",
+    "namePlaceholder": "Jane Smith",
+    "emailLabel": "E-mail",
+    "emailPlaceholder": "jane@example.com",
+    "roleLabel": "Rôle",
+    "roleSigner": "Signataire",
+    "roleCc": "CC",
+    "removeRecipientAriaLabel": "Supprimer le destinataire {{recipient}}",
+    "addRecipient": "+ Ajouter un destinataire",
+    "back": "Retour",
+    "nextReview": "Suivant : Vérifier"
+  },
+  "signatureGuide": {
+    "title": "Vérification de signature",
+    "introBefore": "Chaque livraison inclut un",
+    "introAfter": "en-tête. Vérifiez-le avant de faire confiance à la charge utile. Format :",
+    "languageTablistLabel": "Langage de vérification de signature",
+    "copyCodeLabel": "Copier le code",
+    "replayBefore": "Rejetez les événements où",
+    "replayAfter": "secondes pour empêcher les attaques par rejeu. Utilisez toujours une comparaison à temps constant."
   }
 }

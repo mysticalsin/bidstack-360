@@ -124,5 +124,20 @@
     "back": "上一步",
     "ctaFinish": "邀请你的团队",
     "ctaNext": "下一步"
+  },
+  "templatePicker": {
+    "title": "选择一个入门管道",
+    "subtitle": "每个模板都会创建一个包含阶段和若干示例记录的管道，让你可以立即开始探索。你可以随时删除示例数据。",
+    "loadErrorTitle": "无法加载模板",
+    "tryAgain": "请重试。",
+    "stageCount": "{{count}} 个阶段",
+    "cancel": "取消",
+    "installing": "正在安装…",
+    "install": "安装管道",
+    "toastInstalledTitle": "管道已安装",
+    "toastInstalledDescription": "{{stages}} 个阶段、{{deals}} 个示例交易、{{leads}} 个潜在客户。",
+    "toastConflictTitle": "已安装一个管道",
+    "toastConflictDescription": "请先删除现有的示例数据，或从你的实时管道开始。",
+    "toastErrorTitle": "无法安装模板"
   }
 }

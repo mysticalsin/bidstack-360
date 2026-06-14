@@ -315,5 +315,34 @@
     "delete": "Excluir",
     "confirm": "Confirmar",
     "save": "Salvar"
+  },
+  "avatar": {
+    "statusOnline": "Online",
+    "statusOffline": "Offline"
+  },
+  "helpDrawer": {
+    "title": "Atalhos de teclado",
+    "closeAria": "Fechar atalhos",
+    "groupGlobal": "Global",
+    "groupNavigation": "Navegação",
+    "groupRecords": "Registros",
+    "openCommandPalette": "Abrir paleta de comandos",
+    "quickAddMenu": "Menu de adição rápida",
+    "openThisDrawer": "Abrir este painel",
+    "closeCurrentDialog": "Fechar o diálogo atual",
+    "goToDashboard": "Ir para o painel",
+    "goToOpportunities": "Ir para Oportunidades",
+    "goToPipeline": "Ir para o funil",
+    "goToContacts": "Ir para Contatos",
+    "goToTasks": "Ir para Tarefas",
+    "goToReports": "Ir para Relatórios",
+    "goToAccounts": "Ir para Contas",
+    "goToSettings": "Ir para Configurações",
+    "goToSearch": "Ir para Pesquisa",
+    "moveSelectionInLists": "Mover a seleção nas listas",
+    "openRecord": "Abrir registro",
+    "editSelectedRecord": "Editar o registro selecionado",
+    "deleteWithConfirmation": "Excluir com confirmação",
+    "footer": "A maioria dos atalhos funciona em todos os lugares, exceto dentro de campos de texto. Pressione ? a qualquer momento para reabrir este painel."
   }
 }

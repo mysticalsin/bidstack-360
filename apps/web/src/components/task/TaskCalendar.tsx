@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { Icon } from '@/components/ui/Icon';
@@ -12,6 +13,7 @@ interface TaskCalendarProps {
 }
 
 export function TaskCalendar({ tasks }: TaskCalendarProps) {
+  const { t } = useTranslation('crm');
   const [month, setMonth] = useState(() => new Date());
 
   const year = month.getFullYear();
@@ -62,22 +64,40 @@ export function TaskCalendar({ tasks }: TaskCalendarProps) {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-[var(--fg-primary)]">{monthLabel}</h2>
         <div className="flex items-center gap-1">
-          <button type="button" onClick={prevMonth} className="iconbtn" aria-label="Previous month">
+          <button
+            type="button"
+            onClick={prevMonth}
+            className="iconbtn"
+            aria-label={t('taskCalendar.previousMonth', 'Previous month')}
+          >
             <Icon name="arrow" size={14} className="rotate-90" ariaHidden />
           </button>
-          <button type="button" onClick={nextMonth} className="iconbtn" aria-label="Next month">
+          <button
+            type="button"
+            onClick={nextMonth}
+            className="iconbtn"
+            aria-label={t('taskCalendar.nextMonth', 'Next month')}
+          >
             <Icon name="arrow" size={14} className="-rotate-90" ariaHidden />
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-7 gap-px rounded-xl border border-[var(--border-subtle)] bg-[var(--border-subtle)] overflow-hidden">
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+        {[
+          { key: 'sun', label: t('taskCalendar.weekdaySun', 'Sun') },
+          { key: 'mon', label: t('taskCalendar.weekdayMon', 'Mon') },
+          { key: 'tue', label: t('taskCalendar.weekdayTue', 'Tue') },
+          { key: 'wed', label: t('taskCalendar.weekdayWed', 'Wed') },
+          { key: 'thu', label: t('taskCalendar.weekdayThu', 'Thu') },
+          { key: 'fri', label: t('taskCalendar.weekdayFri', 'Fri') },
+          { key: 'sat', label: t('taskCalendar.weekdaySat', 'Sat') },
+        ].map((d) => (
           <div
-            key={d}
+            key={d.key}
             className="bg-[var(--surface-card)] px-2 py-1.5 text-center text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]"
           >
-            {d}
+            {d.label}
           </div>
         ))}
         {cells.map((cell, i) => (

@@ -601,5 +601,51 @@
     "colorLabel": "Color",
     "savingButton": "Saving...",
     "saveButton": "Save"
+  },
+  "settingsLayout": {
+    "mobileMenuToggle": "Settings menu",
+    "groupCommandCenter": "Command center",
+    "groupPersonal": "Personal",
+    "groupWorkspace": "Workspace",
+    "groupDeveloperTools": "Developer tools",
+    "itemOverview": "Overview",
+    "itemAppearance": "Appearance & Language",
+    "itemNotifications": "Notifications",
+    "itemSecurity": "Profile & Security",
+    "itemWorkspace": "Workspace",
+    "itemCrm": "Data configuration",
+    "itemDataImport": "Data import",
+    "itemTopAccounts": "Top accounts",
+    "itemGroups": "Access groups",
+    "itemOpportunityFilters": "Opportunity filters",
+    "itemRfpAnalytics": "RFP Analytics",
+    "itemIntegrations": "Integrations",
+    "itemWebhooks": "Webhooks",
+    "itemDeveloper": "Developer access",
+    "itemAuditLog": "Audit log"
+  },
+  "team": {
+    "title": "Team",
+    "caption": "Members of your workspace. Admins can manage roles.",
+    "empty": "No team members found.",
+    "col": {
+      "status": "Online status",
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "joined": "Joined",
+      "actions": "Actions"
+    },
+    "presence": {
+      "label": "{{name}} {{status}}",
+      "online": "online",
+      "offline": "offline"
+    },
+    "action": {
+      "hideRoles": "Hide roles",
+      "manageRoles": "Manage roles",
+      "demote": "Demote to member",
+      "promote": "Promote to admin"
+    }
   }
 }

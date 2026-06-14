@@ -116,5 +116,20 @@
     "back": "Atrás",
     "ctaFinish": "Invita a tu equipo",
     "ctaNext": "Siguiente"
+  },
+  "templatePicker": {
+    "title": "Elige un pipeline inicial",
+    "subtitle": "Cada plantilla configura un pipeline con etapas y algunos registros de ejemplo para que puedas explorar de inmediato. Puedes eliminar los datos de ejemplo en cualquier momento.",
+    "loadErrorTitle": "No se pudieron cargar las plantillas",
+    "tryAgain": "Inténtalo de nuevo.",
+    "stageCount": "{{count}} etapas",
+    "cancel": "Cancelar",
+    "installing": "Instalando…",
+    "install": "Instalar pipeline",
+    "toastInstalledTitle": "Pipeline instalado",
+    "toastInstalledDescription": "{{stages}} etapas, {{deals}} negocios de ejemplo, {{leads}} leads.",
+    "toastConflictTitle": "Ya hay un pipeline instalado",
+    "toastConflictDescription": "Elimina primero los datos de ejemplo existentes o empieza desde tu pipeline en vivo.",
+    "toastErrorTitle": "No se pudo instalar la plantilla"
   }
 }

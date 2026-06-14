@@ -9,6 +9,7 @@
  */
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
@@ -50,6 +51,7 @@ type ActivityItem = {
 };
 
 export function RecentActivityCard({ activity }: { activity: ActivityItem[] }) {
+  const { t } = useTranslation('crm');
   const visible = activity.slice(0, 8);
   const hasMore = activity.length > 8;
 
@@ -61,15 +63,15 @@ export function RecentActivityCard({ activity }: { activity: ActivityItem[] }) {
             <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--surface-sunken)]">
               <Icon name="activity" size={13} className="text-[var(--brand-primary)]" />
             </div>
-            <h2 className="text-sm font-semibold text-[var(--fg-primary)]">Recent activity</h2>
+            <h2 className="text-sm font-semibold text-[var(--fg-primary)]">{t('recentActivity.heading', 'Recent activity')}</h2>
           </div>
-          <span className="text-xs text-[var(--fg-tertiary)]">Latest updates</span>
+          <span className="text-xs text-[var(--fg-tertiary)]">{t('recentActivity.latestUpdates', 'Latest updates')}</span>
         </div>
       </div>
       <div className="divide-y divide-[var(--border-subtle)]">
         {visible.length === 0 ? (
           <div className="px-5 py-6 text-sm text-[var(--fg-secondary)] text-center">
-            No recent activity
+            {t('recentActivity.empty', 'No recent activity')}
           </div>
         ) : (
           visible.map((a, i) => (
@@ -127,7 +129,7 @@ export function RecentActivityCard({ activity }: { activity: ActivityItem[] }) {
             to="/activities"
             className="text-xs font-medium text-[var(--brand-primary)] hover:underline"
           >
-            View all {activity.length} activities →
+            {t('recentActivity.viewAll', 'View all {{count}} activities →', { count: activity.length })}
           </Link>
         </div>
       )}

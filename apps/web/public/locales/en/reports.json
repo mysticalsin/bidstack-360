@@ -220,5 +220,16 @@
     "listboxLabel": "Field options",
     "searchPlaceholder": "Search fields…",
     "empty": "No fields found."
+  },
+  "reportPreview": {
+    "title": "Live preview",
+    "rowCountOne": "{{count}} row",
+    "rowCountOther": "{{count}} rows",
+    "emptyMessage": "No rows match this query yet.",
+    "chartAriaLabel": "Report preview",
+    "rowsAriaLabel": "Report preview rows",
+    "runPrompt": "Build your query, then run a preview to see results here.",
+    "chartShapeMismatch": "This chart type doesn't fit the current query shape. The table below shows the raw rows.",
+    "queryFailed": "Query failed"
   }
 }

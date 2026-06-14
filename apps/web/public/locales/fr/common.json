@@ -315,5 +315,34 @@
     "delete": "Supprimer",
     "confirm": "Confirmer",
     "save": "Enregistrer"
+  },
+  "avatar": {
+    "statusOnline": "En ligne",
+    "statusOffline": "Hors ligne"
+  },
+  "helpDrawer": {
+    "title": "Raccourcis clavier",
+    "closeAria": "Fermer les raccourcis",
+    "groupGlobal": "Global",
+    "groupNavigation": "Navigation",
+    "groupRecords": "Enregistrements",
+    "openCommandPalette": "Ouvrir la palette de commandes",
+    "quickAddMenu": "Menu d'ajout rapide",
+    "openThisDrawer": "Ouvrir ce panneau",
+    "closeCurrentDialog": "Fermer la boîte de dialogue actuelle",
+    "goToDashboard": "Aller au tableau de bord",
+    "goToOpportunities": "Aller aux opportunités",
+    "goToPipeline": "Aller au pipeline",
+    "goToContacts": "Aller aux contacts",
+    "goToTasks": "Aller aux tâches",
+    "goToReports": "Aller aux rapports",
+    "goToAccounts": "Aller aux comptes",
+    "goToSettings": "Aller aux paramètres",
+    "goToSearch": "Aller à la recherche",
+    "moveSelectionInLists": "Déplacer la sélection dans les listes",
+    "openRecord": "Ouvrir l'enregistrement",
+    "editSelectedRecord": "Modifier l'enregistrement sélectionné",
+    "deleteWithConfirmation": "Supprimer avec confirmation",
+    "footer": "La plupart des raccourcis fonctionnent partout, sauf dans les champs de texte. Appuyez sur ? à tout moment pour rouvrir ce panneau."
   }
 }

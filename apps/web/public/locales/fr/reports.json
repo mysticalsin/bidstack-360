@@ -220,5 +220,16 @@
     "listboxLabel": "Options de champ",
     "searchPlaceholder": "Rechercher des champs…",
     "empty": "Aucun champ trouvé."
+  },
+  "reportPreview": {
+    "title": "Aperçu en direct",
+    "rowCountOne": "{{count}} ligne",
+    "rowCountOther": "{{count}} lignes",
+    "emptyMessage": "Aucune ligne ne correspond encore à cette requête.",
+    "chartAriaLabel": "Aperçu du rapport",
+    "rowsAriaLabel": "Lignes de l'aperçu du rapport",
+    "runPrompt": "Construisez votre requête, puis lancez un aperçu pour voir les résultats ici.",
+    "chartShapeMismatch": "Ce type de graphique ne correspond pas à la forme de la requête actuelle. Le tableau ci-dessous affiche les lignes brutes.",
+    "queryFailed": "Échec de la requête"
   }
 }

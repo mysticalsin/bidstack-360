@@ -620,5 +620,51 @@
     "colorLabel": "Colore",
     "savingButton": "Salvataggio...",
     "saveButton": "Salva"
+  },
+  "settingsLayout": {
+    "mobileMenuToggle": "Menu impostazioni",
+    "groupCommandCenter": "Centro di comando",
+    "groupPersonal": "Personale",
+    "groupWorkspace": "Area di lavoro",
+    "groupDeveloperTools": "Strumenti per sviluppatori",
+    "itemOverview": "Panoramica",
+    "itemAppearance": "Aspetto e lingua",
+    "itemNotifications": "Notifiche",
+    "itemSecurity": "Profilo e sicurezza",
+    "itemWorkspace": "Area di lavoro",
+    "itemCrm": "Configurazione dati",
+    "itemDataImport": "Importazione dati",
+    "itemTopAccounts": "Account principali",
+    "itemGroups": "Gruppi di accesso",
+    "itemOpportunityFilters": "Filtri opportunità",
+    "itemRfpAnalytics": "Analisi RFP",
+    "itemIntegrations": "Integrazioni",
+    "itemWebhooks": "Webhook",
+    "itemDeveloper": "Accesso sviluppatore",
+    "itemAuditLog": "Registro di controllo"
+  },
+  "team": {
+    "title": "Team",
+    "caption": "Membri del tuo spazio di lavoro. Gli amministratori possono gestire i ruoli.",
+    "empty": "Nessun membro del team trovato.",
+    "col": {
+      "status": "Stato online",
+      "name": "Nome",
+      "email": "Email",
+      "role": "Ruolo",
+      "joined": "Iscritto",
+      "actions": "Azioni"
+    },
+    "presence": {
+      "label": "{{name}} {{status}}",
+      "online": "online",
+      "offline": "offline"
+    },
+    "action": {
+      "hideRoles": "Nascondi ruoli",
+      "manageRoles": "Gestisci ruoli",
+      "demote": "Retrocedi a membro",
+      "promote": "Promuovi ad amministratore"
+    }
   }
 }

@@ -220,5 +220,16 @@
     "listboxLabel": "Opzioni campo",
     "searchPlaceholder": "Cerca campi…",
     "empty": "Nessun campo trovato."
+  },
+  "reportPreview": {
+    "title": "Anteprima dal vivo",
+    "rowCountOne": "{{count}} riga",
+    "rowCountOther": "{{count}} righe",
+    "emptyMessage": "Nessuna riga corrisponde ancora a questa query.",
+    "chartAriaLabel": "Anteprima del report",
+    "rowsAriaLabel": "Righe dell'anteprima del report",
+    "runPrompt": "Crea la tua query, poi esegui un'anteprima per vedere i risultati qui.",
+    "chartShapeMismatch": "Questo tipo di grafico non si adatta alla forma della query corrente. La tabella sottostante mostra le righe non elaborate.",
+    "queryFailed": "Query non riuscita"
   }
 }

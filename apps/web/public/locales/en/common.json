@@ -315,5 +315,34 @@
     "delete": "Delete",
     "confirm": "Confirm",
     "save": "Save"
+  },
+  "avatar": {
+    "statusOnline": "Online",
+    "statusOffline": "Offline"
+  },
+  "helpDrawer": {
+    "title": "Keyboard shortcuts",
+    "closeAria": "Close shortcuts",
+    "groupGlobal": "Global",
+    "groupNavigation": "Navigation",
+    "groupRecords": "Records",
+    "openCommandPalette": "Open command palette",
+    "quickAddMenu": "Quick-add menu",
+    "openThisDrawer": "Open this drawer",
+    "closeCurrentDialog": "Close current dialog",
+    "goToDashboard": "Go to Dashboard",
+    "goToOpportunities": "Go to Opportunities",
+    "goToPipeline": "Go to Pipeline",
+    "goToContacts": "Go to Contacts",
+    "goToTasks": "Go to Tasks",
+    "goToReports": "Go to Reports",
+    "goToAccounts": "Go to Accounts",
+    "goToSettings": "Go to Settings",
+    "goToSearch": "Go to Search",
+    "moveSelectionInLists": "Move selection in lists",
+    "openRecord": "Open record",
+    "editSelectedRecord": "Edit selected record",
+    "deleteWithConfirmation": "Delete with confirmation",
+    "footer": "Most shortcuts work everywhere except inside text fields. Press ? any time to reopen this drawer."
   }
 }

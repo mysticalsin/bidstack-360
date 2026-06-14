@@ -3,6 +3,7 @@
  * Step 2: user triggers extraction; rows animate between queued/running/done/error.
  */
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -29,6 +30,7 @@ export function ExtractStep({
   isExtracting,
   onBack,
 }: ExtractStepProps) {
+  const { t } = useTranslation('crm');
   const isProcessing = extractingDocIds.size > 0;
 
   // Build status map by documentId for O(1) per-row lookup
@@ -42,12 +44,16 @@ export function ExtractStep({
 
   return (
     <Card className="p-5 space-y-4">
-      <h2 className="text-sm font-semibold text-[var(--fg-primary)]">Run extraction</h2>
+      <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
+        {t('extractStep.heading', 'Run extraction')}
+      </h2>
 
       {isProcessing ? (
         <div className="space-y-3">
           <p className="text-xs text-[var(--fg-secondary)]">
-            Processing {extractingDocIds.size} document{extractingDocIds.size === 1 ? '' : 's'}…
+            {t('extractStep.processingCount', 'Processing {{count}} documents…', {
+              count: extractingDocIds.size,
+            })}
           </p>
           <div className="space-y-2">
             {Array.from(extractingDocIds).map((docId) => {
@@ -79,23 +85,26 @@ export function ExtractStep({
       ) : (
         <>
           <p className="text-xs text-[var(--fg-secondary)]">
-            Dust agents will parse {selectedCount} document{selectedCount === 1 ? '' : 's'} and
-            extract solutions, products, capabilities, and pricing.
+            {t(
+              'extractStep.intro',
+              'Dust agents will parse {{count}} documents and extract solutions, products, capabilities, and pricing.',
+              { count: selectedCount },
+            )}
           </p>
           <div className="flex items-center gap-2">
             <Button variant="secondary" onClick={onBack}>
-              ← Back
+              {t('extractStep.back', '← Back')}
             </Button>
             <Button onClick={onExtract} disabled={isExtracting}>
               {isExtracting ? (
                 <>
                   <span className="mr-1.5 inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-r-transparent" />
-                  Queuing…
+                  {t('extractStep.queuing', 'Queuing…')}
                 </>
               ) : (
                 <>
                   <Icon name="wand" size={14} />
-                  Run extraction
+                  {t('extractStep.runButton', 'Run extraction')}
                 </>
               )}
             </Button>
@@ -109,6 +118,7 @@ export function ExtractStep({
 // ── StatusBadge — only used within this file ──────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation('crm');
   const styles: Record<string, string> = {
     pending: 'bg-[var(--warning-tint)] text-[var(--warning)]',
     running: 'bg-[var(--info-tint)] text-[var(--info)]',
@@ -117,7 +127,17 @@ function StatusBadge({ status }: { status: string }) {
     error: 'bg-[var(--danger-tint)] text-[var(--danger)]',
     failed: 'bg-[var(--danger-tint)] text-[var(--danger)]',
   };
-  const label = status === 'done' ? 'Completed' : status.charAt(0).toUpperCase() + status.slice(1);
+  const statusLabels: Record<string, string> = {
+    queued: t('extractStep.status.queued', 'Queued'),
+    pending: t('extractStep.status.pending', 'Pending'),
+    running: t('extractStep.status.running', 'Running'),
+    done: t('extractStep.status.done', 'Completed'),
+    completed: t('extractStep.status.completed', 'Completed'),
+    error: t('extractStep.status.error', 'Error'),
+    failed: t('extractStep.status.failed', 'Failed'),
+  };
+  const label =
+    statusLabels[status] ?? status.charAt(0).toUpperCase() + status.slice(1);
   return (
     <span
       className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold ${styles[status] ?? 'bg-gray-100 text-gray-700'}`}

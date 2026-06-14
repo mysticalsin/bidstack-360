@@ -620,5 +620,51 @@
     "colorLabel": "Couleur",
     "savingButton": "Enregistrement...",
     "saveButton": "Enregistrer"
+  },
+  "settingsLayout": {
+    "mobileMenuToggle": "Menu des paramètres",
+    "groupCommandCenter": "Centre de commande",
+    "groupPersonal": "Personnel",
+    "groupWorkspace": "Espace de travail",
+    "groupDeveloperTools": "Outils de développement",
+    "itemOverview": "Vue d'ensemble",
+    "itemAppearance": "Apparence et langue",
+    "itemNotifications": "Notifications",
+    "itemSecurity": "Profil et sécurité",
+    "itemWorkspace": "Espace de travail",
+    "itemCrm": "Configuration des données",
+    "itemDataImport": "Importation de données",
+    "itemTopAccounts": "Comptes principaux",
+    "itemGroups": "Groupes d'accès",
+    "itemOpportunityFilters": "Filtres d'opportunités",
+    "itemRfpAnalytics": "Analyse des RFP",
+    "itemIntegrations": "Intégrations",
+    "itemWebhooks": "Webhooks",
+    "itemDeveloper": "Accès développeur",
+    "itemAuditLog": "Journal d'audit"
+  },
+  "team": {
+    "title": "Équipe",
+    "caption": "Membres de votre espace de travail. Les administrateurs peuvent gérer les rôles.",
+    "empty": "Aucun membre de l'équipe trouvé.",
+    "col": {
+      "status": "Statut en ligne",
+      "name": "Nom",
+      "email": "E-mail",
+      "role": "Rôle",
+      "joined": "Inscrit le",
+      "actions": "Actions"
+    },
+    "presence": {
+      "label": "{{name}} {{status}}",
+      "online": "en ligne",
+      "offline": "hors ligne"
+    },
+    "action": {
+      "hideRoles": "Masquer les rôles",
+      "manageRoles": "Gérer les rôles",
+      "demote": "Rétrograder en membre",
+      "promote": "Promouvoir administrateur"
+    }
   }
 }

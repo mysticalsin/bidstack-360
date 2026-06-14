@@ -354,7 +354,20 @@
     "undo": {
       "deletedCount": "Deleted {{count}} contacts",
       "deleted": "Deleted {{name}}"
-    }
+    },
+    "linkedTitle": "Linked contacts",
+    "countCaption": "{{count}} contacts",
+    "linkAction": "+ Link contact",
+    "selectPlaceholder": "Select a contact…",
+    "cancel": "Cancel",
+    "emptyTitle": "No linked contacts",
+    "emptyMessage": "Link contacts to track who is involved in this deal.",
+    "primaryBadge": "Primary",
+    "noEmail": "no email",
+    "unsetPrimary": "Unset primary",
+    "setPrimary": "Set as primary",
+    "unlinkConfirm": "Unlink {{name}}?",
+    "remove": "Remove"
   },
   "accounts": {
     "title": "Accounts",
@@ -3178,6 +3191,40 @@
         "none": "None",
         "noEvents": "No events in range"
       }
+    }
+  },
+  "taskCalendar": {
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "weekdaySun": "Sun",
+    "weekdayMon": "Mon",
+    "weekdayTue": "Tue",
+    "weekdayWed": "Wed",
+    "weekdayThu": "Thu",
+    "weekdayFri": "Fri",
+    "weekdaySat": "Sat"
+  },
+  "recentActivity": {
+    "heading": "Recent activity",
+    "latestUpdates": "Latest updates",
+    "empty": "No recent activity",
+    "viewAll": "View all {{count}} activities →"
+  },
+  "extractStep": {
+    "heading": "Run extraction",
+    "processingCount": "Processing {{count}} documents…",
+    "intro": "Dust agents will parse {{count}} documents and extract solutions, products, capabilities, and pricing.",
+    "back": "← Back",
+    "queuing": "Queuing…",
+    "runButton": "Run extraction",
+    "status": {
+      "queued": "Queued",
+      "pending": "Pending",
+      "running": "Running",
+      "done": "Completed",
+      "completed": "Completed",
+      "error": "Error",
+      "failed": "Failed"
     }
   }
 }

@@ -90,5 +90,28 @@
     },
     "recipientEventsAriaLabel": "Eventos de {{name}}",
     "noEventsYet": "Aún no hay eventos"
+  },
+  "recipientsStep": {
+    "listAriaLabel": "Destinatarios",
+    "nameLabel": "Nombre",
+    "namePlaceholder": "Jane Smith",
+    "emailLabel": "Correo electrónico",
+    "emailPlaceholder": "jane@example.com",
+    "roleLabel": "Rol",
+    "roleSigner": "Firmante",
+    "roleCc": "CC",
+    "removeRecipientAriaLabel": "Eliminar destinatario {{recipient}}",
+    "addRecipient": "+ Añadir destinatario",
+    "back": "Atrás",
+    "nextReview": "Siguiente: Revisar"
+  },
+  "signatureGuide": {
+    "title": "Verificación de firma",
+    "introBefore": "Cada entrega incluye un",
+    "introAfter": "encabezado. Verifícalo antes de confiar en la carga útil. Formato:",
+    "languageTablistLabel": "Lenguaje de verificación de firma",
+    "copyCodeLabel": "Copiar código",
+    "replayBefore": "Rechaza los eventos donde",
+    "replayAfter": "segundos para prevenir ataques de repetición. Usa siempre una comparación de tiempo constante."
   }
 }

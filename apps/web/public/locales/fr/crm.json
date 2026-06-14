@@ -439,7 +439,20 @@
     "undo": {
       "deletedCount": "{{count}} contacts supprimés",
       "deleted": "{{name}} supprimé"
-    }
+    },
+    "linkedTitle": "Contacts liés",
+    "countCaption": "{{count}} contacts",
+    "linkAction": "+ Lier un contact",
+    "selectPlaceholder": "Sélectionner un contact…",
+    "cancel": "Annuler",
+    "emptyTitle": "Aucun contact lié",
+    "emptyMessage": "Liez des contacts pour suivre qui participe à cette affaire.",
+    "primaryBadge": "Principal",
+    "noEmail": "aucun e-mail",
+    "unsetPrimary": "Retirer comme principal",
+    "setPrimary": "Définir comme principal",
+    "unlinkConfirm": "Dissocier {{name}} ?",
+    "remove": "Supprimer"
   },
   "accounts": {
     "title": "Comptes",
@@ -3233,6 +3246,40 @@
         "none": "Aucun",
         "noEvents": "Aucun événement dans la plage"
       }
+    }
+  },
+  "taskCalendar": {
+    "previousMonth": "Mois précédent",
+    "nextMonth": "Mois suivant",
+    "weekdaySun": "Dim",
+    "weekdayMon": "Lun",
+    "weekdayTue": "Mar",
+    "weekdayWed": "Mer",
+    "weekdayThu": "Jeu",
+    "weekdayFri": "Ven",
+    "weekdaySat": "Sam"
+  },
+  "recentActivity": {
+    "heading": "Activité récente",
+    "latestUpdates": "Dernières mises à jour",
+    "empty": "Aucune activité récente",
+    "viewAll": "Voir les {{count}} activités →"
+  },
+  "extractStep": {
+    "heading": "Lancer l'extraction",
+    "processingCount": "Traitement de {{count}} documents…",
+    "intro": "Les agents Dust analyseront {{count}} documents et extrairont les solutions, produits, capacités et tarifs.",
+    "back": "← Retour",
+    "queuing": "Mise en file d'attente…",
+    "runButton": "Lancer l'extraction",
+    "status": {
+      "queued": "En file d'attente",
+      "pending": "En attente",
+      "running": "En cours",
+      "done": "Terminé",
+      "completed": "Terminé",
+      "error": "Erreur",
+      "failed": "Échec"
     }
   }
 }

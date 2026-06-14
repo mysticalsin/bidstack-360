@@ -620,5 +620,51 @@
     "colorLabel": "Cor",
     "savingButton": "Salvando...",
     "saveButton": "Salvar"
+  },
+  "settingsLayout": {
+    "mobileMenuToggle": "Menu de configurações",
+    "groupCommandCenter": "Centro de comando",
+    "groupPersonal": "Pessoal",
+    "groupWorkspace": "Espaço de trabalho",
+    "groupDeveloperTools": "Ferramentas de desenvolvedor",
+    "itemOverview": "Visão geral",
+    "itemAppearance": "Aparência e idioma",
+    "itemNotifications": "Notificações",
+    "itemSecurity": "Perfil e segurança",
+    "itemWorkspace": "Espaço de trabalho",
+    "itemCrm": "Configuração de dados",
+    "itemDataImport": "Importação de dados",
+    "itemTopAccounts": "Principais contas",
+    "itemGroups": "Grupos de acesso",
+    "itemOpportunityFilters": "Filtros de oportunidades",
+    "itemRfpAnalytics": "Análise de RFP",
+    "itemIntegrations": "Integrações",
+    "itemWebhooks": "Webhooks",
+    "itemDeveloper": "Acesso de desenvolvedor",
+    "itemAuditLog": "Registro de auditoria"
+  },
+  "team": {
+    "title": "Equipe",
+    "caption": "Membros do seu espaço de trabalho. Os administradores podem gerenciar funções.",
+    "empty": "Nenhum membro da equipe encontrado.",
+    "col": {
+      "status": "Status online",
+      "name": "Nome",
+      "email": "E-mail",
+      "role": "Função",
+      "joined": "Ingressou",
+      "actions": "Ações"
+    },
+    "presence": {
+      "label": "{{name}} {{status}}",
+      "online": "online",
+      "offline": "offline"
+    },
+    "action": {
+      "hideRoles": "Ocultar funções",
+      "manageRoles": "Gerenciar funções",
+      "demote": "Rebaixar para membro",
+      "promote": "Promover a administrador"
+    }
   }
 }

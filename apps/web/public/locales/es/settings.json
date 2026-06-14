@@ -623,5 +623,51 @@
     "colorLabel": "Color",
     "savingButton": "Guardando...",
     "saveButton": "Guardar"
+  },
+  "settingsLayout": {
+    "mobileMenuToggle": "Menú de configuración",
+    "groupCommandCenter": "Centro de mando",
+    "groupPersonal": "Personal",
+    "groupWorkspace": "Espacio de trabajo",
+    "groupDeveloperTools": "Herramientas para desarrolladores",
+    "itemOverview": "Resumen",
+    "itemAppearance": "Apariencia e idioma",
+    "itemNotifications": "Notificaciones",
+    "itemSecurity": "Perfil y seguridad",
+    "itemWorkspace": "Espacio de trabajo",
+    "itemCrm": "Configuración de datos",
+    "itemDataImport": "Importación de datos",
+    "itemTopAccounts": "Cuentas principales",
+    "itemGroups": "Grupos de acceso",
+    "itemOpportunityFilters": "Filtros de oportunidades",
+    "itemRfpAnalytics": "Analítica de RFP",
+    "itemIntegrations": "Integraciones",
+    "itemWebhooks": "Webhooks",
+    "itemDeveloper": "Acceso de desarrollador",
+    "itemAuditLog": "Registro de auditoría"
+  },
+  "team": {
+    "title": "Equipo",
+    "caption": "Miembros de tu espacio de trabajo. Los administradores pueden gestionar roles.",
+    "empty": "No se encontraron miembros del equipo.",
+    "col": {
+      "status": "Estado en línea",
+      "name": "Nombre",
+      "email": "Correo electrónico",
+      "role": "Rol",
+      "joined": "Se unió",
+      "actions": "Acciones"
+    },
+    "presence": {
+      "label": "{{name}} {{status}}",
+      "online": "en línea",
+      "offline": "desconectado"
+    },
+    "action": {
+      "hideRoles": "Ocultar roles",
+      "manageRoles": "Gestionar roles",
+      "demote": "Degradar a miembro",
+      "promote": "Promover a administrador"
+    }
   }
 }

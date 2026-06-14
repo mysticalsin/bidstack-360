@@ -200,5 +200,16 @@
     "listboxLabel": "Opciones de campo",
     "searchPlaceholder": "Buscar campos…",
     "empty": "No se encontraron campos."
+  },
+  "reportPreview": {
+    "title": "Vista previa en vivo",
+    "rowCountOne": "{{count}} fila",
+    "rowCountOther": "{{count}} filas",
+    "emptyMessage": "Aún no hay filas que coincidan con esta consulta.",
+    "chartAriaLabel": "Vista previa del informe",
+    "rowsAriaLabel": "Filas de la vista previa del informe",
+    "runPrompt": "Crea tu consulta y luego ejecuta una vista previa para ver los resultados aquí.",
+    "chartShapeMismatch": "Este tipo de gráfico no se ajusta a la forma de la consulta actual. La tabla siguiente muestra las filas sin procesar.",
+    "queryFailed": "La consulta falló"
   }
 }
