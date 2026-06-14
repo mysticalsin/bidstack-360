@@ -6,11 +6,22 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useTasks } from '@/hooks/useTasks';
+import { useCalls } from '@/hooks/useCalls';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import type { Contact, Task } from '@bidstack/shared';
 
 import { ContactsPanel } from './opportunityTabs/ContactsPanel';
+
+// Call status → Badge tone. Calls live in this tab now rather than a standalone
+// rail page, so they're read in the context of the bid they belong to.
+const CALL_TONE: Record<string, 'jade' | 'blue' | 'gray' | 'tomato'> = {
+  COMPLETED: 'jade',
+  LIVE: 'blue',
+  SCHEDULED: 'gray',
+  FAILED: 'tomato',
+  CANCELLED: 'gray',
+};
 
 interface OpportunityTabsProps {
   oppId: string;
@@ -41,6 +52,7 @@ export function OpportunityTabs({
         <TabsTrigger value="contacts">Contacts</TabsTrigger>
         <TabsTrigger value="tasks">Tasks</TabsTrigger>
         <TabsTrigger value="documents">Documents</TabsTrigger>
+        <TabsTrigger value="calls">Calls</TabsTrigger>
         <TabsTrigger value="activity">Activity</TabsTrigger>
       </TabsList>
 
@@ -55,6 +67,9 @@ export function OpportunityTabs({
       </TabsContent>
       <TabsContent value="documents">
         <DocumentsPanel documents={documents} />
+      </TabsContent>
+      <TabsContent value="calls">
+        <CallsPanel oppId={oppId} />
       </TabsContent>
       <TabsContent value="activity">
         <ActivityPanel timeline={timeline} />
@@ -225,6 +240,65 @@ function TasksPanel({ oppId }: { oppId: string }) {
             </Badge>
           </li>
         ))}
+      </ul>
+    </Card>
+  );
+}
+
+function CallsPanel({ oppId }: { oppId: string }) {
+  const calls = useCalls({ entityType: 'OPPORTUNITY', entityId: oppId });
+  if (calls.isLoading) return <LoadingSkeleton />;
+  if (calls.isError)
+    return (
+      <ErrorState
+        title="Couldn't load calls"
+        message="Please try again."
+        action={
+          <Button size="sm" variant="secondary" onClick={() => void calls.refetch()}>
+            Retry
+          </Button>
+        }
+      />
+    );
+  const items = calls.data?.pages.flatMap((p) => p.calls) ?? [];
+  if (items.length === 0)
+    return (
+      <EmptyState
+        title="No calls yet"
+        message="Scheduled and completed calls for this opportunity show up here."
+      />
+    );
+  return (
+    <Card>
+      <SectionHeader title="Calls" caption={`${items.length} call${items.length === 1 ? '' : 's'}`} />
+      <ul className="divide-y divide-[var(--border-subtle)]">
+        {items.map((c) => {
+          const when = c.startedAt
+            ? formatDate(c.startedAt)
+            : c.scheduledAt
+              ? `Scheduled ${formatDate(c.scheduledAt)}`
+              : '—';
+          const mins = c.durationSec ? ` · ${Math.round(c.durationSec / 60)} min` : '';
+          return (
+            <li key={c.id} className="flex items-center justify-between gap-3 px-5 py-3">
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-[var(--fg-primary)]">
+                  {c.provider.replace(/_/g, ' ')}
+                </div>
+                <div className="text-xs text-[var(--fg-tertiary)]">
+                  {when}
+                  {mins}
+                </div>
+                {c.summary ? (
+                  <div className="mt-0.5 line-clamp-2 text-xs text-[var(--fg-secondary)]">
+                    {c.summary}
+                  </div>
+                ) : null}
+              </div>
+              <Badge tone={CALL_TONE[c.status] ?? 'gray'}>{c.status.toLowerCase()}</Badge>
+            </li>
+          );
+        })}
       </ul>
     </Card>
   );

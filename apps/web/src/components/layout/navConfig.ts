@@ -100,7 +100,9 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { to: '/tasks', label: 'Tasks', icon: 'tasks', badgeKey: 'overdueTasks' },
       { to: '/calendar', label: 'Calendar', icon: 'clock' },
-      { to: '/calls', label: 'Calls', icon: 'phone' },
+      // Calls now live in context on the Opportunity detail (Calls tab). The
+      // /calls route stays (global list, reachable via the command palette) but
+      // is no longer a separate rail door.
       { to: '/workflows', label: 'Workflows', icon: 'git-branch' },
       { to: '/custom-objects', label: 'Custom Objects', icon: 'sliders' },
       { to: '/intake', label: 'Document Intake', icon: 'download' },
