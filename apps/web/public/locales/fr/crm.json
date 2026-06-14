@@ -84,7 +84,114 @@
     "convert": "Convertir en opportunité",
     "source": "Source",
     "score": "Score",
-    "assignTo": "Assigner à"
+    "assignTo": "Assigner à",
+    "actions": {
+      "exportCsv": "Exporter en CSV",
+      "newLead": "Nouveau prospect"
+    },
+    "search": {
+      "label": "Rechercher des prospects",
+      "placeholder": "Rechercher des prospects..."
+    },
+    "filter": {
+      "status": "Filtrer les prospects par statut",
+      "priority": "Filtrer les prospects par priorité"
+    },
+    "statusOption": {
+      "all": "Tous les statuts",
+      "new": "Nouveau",
+      "contacted": "Contacté",
+      "qualified": "Qualifié",
+      "nurture": "À cultiver",
+      "disqualified": "Disqualifié",
+      "converted": "Converti"
+    },
+    "priorityOption": {
+      "all": "Toutes les priorités",
+      "low": "Faible",
+      "medium": "Moyenne",
+      "high": "Élevée",
+      "critical": "Critique"
+    },
+    "summary": {
+      "label": "Résumé de la liste des prospects"
+    },
+    "stats": {
+      "filtered": {
+        "label": "Prospects filtrés",
+        "detail": "vue actuelle"
+      },
+      "highPriority": {
+        "label": "Priorité élevée",
+        "detail": "élevée ou critique"
+      },
+      "pipelineReady": {
+        "label": "Prêts pour le pipeline",
+        "detail": "qualifiés ou convertis"
+      },
+      "avgScore": {
+        "label": "Score moyen",
+        "detail": "score d'adéquation"
+      }
+    },
+    "liveRegion": {
+      "count": "{{count}} prospect",
+      "matching": " correspondant à « {{query}} »"
+    },
+    "error": {
+      "title": "Échec du chargement des prospects",
+      "message": "Une erreur est survenue",
+      "retry": "Réessayer"
+    },
+    "empty": {
+      "title": "Aucun prospect pour l'instant",
+      "message": "Créez votre premier prospect pour commencer le suivi."
+    },
+    "table": {
+      "selectAll": "Tout sélectionner",
+      "deselectAll": "Tout désélectionner",
+      "name": "Nom",
+      "company": "Entreprise",
+      "status": "Statut",
+      "priority": "Priorité",
+      "score": "Score",
+      "source": "Source",
+      "owner": "Propriétaire",
+      "actions": "Actions"
+    },
+    "pager": {
+      "label": "prospects"
+    },
+    "csv": {
+      "name": "Nom",
+      "company": "Entreprise",
+      "title": "Fonction",
+      "email": "E-mail",
+      "status": "Statut",
+      "priority": "Priorité",
+      "score": "Score",
+      "scoreRange": "Score (0-10000)",
+      "source": "Source",
+      "created": "Créé"
+    },
+    "toast": {
+      "nothingToExport": "Rien à exporter",
+      "exported": "{{count}} prospect exporté",
+      "deleted": "{{count}} prospect supprimé",
+      "deleteFailed": "{{count}} suppression a échoué",
+      "leadDeleted": "Prospect supprimé",
+      "deleteOneFailed": "Échec de la suppression du prospect"
+    },
+    "bulkDelete": {
+      "title": "Supprimer {{count}} prospect ?",
+      "description": "Cette action est irréversible.",
+      "confirm": "Supprimer"
+    },
+    "deleteOne": {
+      "title": "Supprimer le prospect ?",
+      "description": "Cela supprimera définitivement {{name}} de vos prospects.",
+      "confirm": "Supprimer"
+    }
   },
   "tasks": {
     "title": "Tâches",
@@ -95,7 +202,49 @@
     "markComplete": "Marquer comme terminé",
     "assignedTo": "Assigné à",
     "relatedTo": "Lié à",
-    "addNote": "Ajouter une note"
+    "addNote": "Ajouter une note",
+    "subtitle": "{{count}} relances actives.",
+    "actions": {
+      "exportCsv": "Exporter en CSV"
+    },
+    "filters": {
+      "groupLabel": "Filtrer les tâches",
+      "all": "Toutes",
+      "today": "Aujourd'hui",
+      "overdue": "En retard"
+    },
+    "status": {
+      "open": "Ouverte",
+      "in_progress": "En cours",
+      "blocked": "Bloquée",
+      "done": "Terminée"
+    },
+    "view": {
+      "list": "Liste",
+      "listLabel": "Vue liste",
+      "calendar": "Calendrier",
+      "calendarLabel": "Vue calendrier"
+    },
+    "sort": {
+      "label": "Trier par",
+      "ariaLabel": "Trier les tâches",
+      "recent": "Récent",
+      "dueDate": "Date d'échéance",
+      "status": "Statut"
+    },
+    "error": {
+      "title": "Impossible de charger les tâches",
+      "generic": "Une erreur s'est produite"
+    },
+    "empty": {
+      "title": "Aucune tâche pour le moment",
+      "filteredTitle": "Aucune tâche ne correspond à ce filtre",
+      "message": "Créez une relance pour commencer."
+    },
+    "reorder": {
+      "announce": "{{title}} déplacée à la position {{position}} sur {{total}}."
+    },
+    "srCount": "{{count}} tâche"
   },
   "activities": {
     "title": "Activités",
@@ -129,5 +278,200 @@
     "criteria": "Critères",
     "weight": "Pondération",
     "rating": "Notation"
+  },
+  "opportunities": {
+    "toast": {
+      "movedOne": "{{count}} opportunité déplacée",
+      "movedMany": "{{count}} opportunités déplacées",
+      "updatesFailedOne": "{{count}} mise à jour a échoué",
+      "updatesFailedMany": "{{count}} mises à jour ont échoué",
+      "updatesFailedDescription": "Les déplacements réussis ont été enregistrés ; réessayez pour les autres.",
+      "deletedOne": "{{count}} opportunité supprimée",
+      "deletedMany": "{{count}} opportunités supprimées",
+      "deletesFailedOne": "{{count}} suppression a échoué",
+      "deletesFailedMany": "{{count}} suppressions ont échoué",
+      "exportComplete": "Exportation terminée",
+      "exportFailed": "Échec de l'exportation",
+      "exportFailedDescription": "Réessayez dans un instant."
+    },
+    "confirmDelete": {
+      "titleOne": "Supprimer {{count}} opportunité ?",
+      "titleMany": "Supprimer {{count}} opportunités ?",
+      "description": "Cette action est irréversible depuis l'interface — le journal d'audit enregistre chaque suppression.",
+      "confirmLabel": "Supprimer"
+    },
+    "liveRegion": {
+      "matchingOne": "{{count}} opportunité correspondant à \"{{search}}\"",
+      "matchingMany": "{{count}} opportunités correspondant à \"{{search}}\"",
+      "inStageOne": "{{count}} opportunité dans l'étape sélectionnée",
+      "inStageMany": "{{count}} opportunités dans l'étape sélectionnée",
+      "totalOne": "{{count}} opportunité",
+      "totalMany": "{{count}} opportunités"
+    },
+    "error": {
+      "title": "Impossible de charger les opportunités",
+      "message": "Réessayez dans un instant."
+    },
+    "empty": {
+      "title": "Aucune opportunité pour l'instant",
+      "message": "Créez votre première opportunité pour commencer à suivre les appels d'offres."
+    },
+    "caption": {
+      "matching": "Opportunités correspondant à \"{{search}}\"",
+      "all": "Toutes les opportunités, triées par activité la plus récente. Les cellules sont modifiables en ligne."
+    },
+    "pagerLabel": "opportunités"
+  },
+  "contacts": {
+    "title": "Contacts",
+    "subtitle": "{{count}} personnes dans l'unité de décision.",
+    "actions": {
+      "importCsv": {
+        "aria": "Importer des contacts depuis un CSV"
+      },
+      "exportCsv": {
+        "aria": "Exporter tous les contacts visibles au format CSV"
+      },
+      "newContact": {
+        "aria": "Créer un nouveau contact"
+      },
+      "delete": "Supprimer",
+      "undo": "Annuler"
+    },
+    "search": {
+      "placeholder": "Rechercher par nom, client, e-mail, rôle…",
+      "aria": "Rechercher des contacts",
+      "clear": {
+        "aria": "Effacer la recherche"
+      }
+    },
+    "pager": {
+      "label": "contacts"
+    },
+    "column": {
+      "name": "Nom",
+      "role": "Rôle",
+      "customer": "Client",
+      "email": "E-mail",
+      "phone": "Téléphone",
+      "influence": "Influence",
+      "sentiment": "Sentiment",
+      "createdAt": "Créé le"
+    },
+    "bulkDelete": {
+      "confirm": {
+        "title": "Supprimer {{count}} contacts ?",
+        "description": "Ils seront retirés de toutes les offres liées. Le journal d'audit enregistre chaque suppression."
+      }
+    },
+    "delete": {
+      "confirm": {
+        "title": "Supprimer {{name}} ?",
+        "description": "Cela les retire également de toutes les offres liées. Le journal d'audit en garde une trace."
+      }
+    },
+    "toast": {
+      "restoredCount": "{{count}} contacts restaurés",
+      "deletedCount": "{{count}} contacts supprimés",
+      "deleteFailedCount": {
+        "description": "Les suppressions réussies ont été appliquées ; réessayez pour le reste."
+      },
+      "nothingToExport": "Rien à exporter",
+      "exportedCount": "{{count}} contacts exportés",
+      "restored": "{{name}} restauré",
+      "couldNotRestore": "Impossible de restaurer",
+      "deleted": "{{name}} supprimé",
+      "deleteFailed": "Échec de la suppression",
+      "serverRejected": "Le serveur a rejeté la requête."
+    },
+    "undo": {
+      "deletedCount": "{{count}} contacts supprimés",
+      "deleted": "{{name}} supprimé"
+    }
+  },
+  "accounts": {
+    "title": "Comptes",
+    "error": {
+      "title": "Impossible de charger les comptes",
+      "message": "Le point de terminaison du tableau de bord n'a pas répondu."
+    },
+    "empty": {
+      "title": "Aucun compte pour l'instant",
+      "filtered": "Aucun compte ne correspond à vos filtres"
+    },
+    "summary": {
+      "companyCount_one": "{{count}} entreprise",
+      "companyCount_other": "{{count}} entreprises",
+      "openDeals": "{{count}} affaires ouvertes",
+      "weightedPipeline": "{{amount}} de pipeline pondéré"
+    },
+    "sync": {
+      "result": "{{enriched}} enrichis / {{cached}} en cache",
+      "buttonTitle": "Synchroniser les principaux clients sale.order de l'ERP vers des comptes BidStack vérifiés",
+      "inProgress": "Synchronisation...",
+      "button": "Synchroniser les comptes ERP",
+      "errorTitle": "Échec de la synchronisation des comptes ERP",
+      "errorDescription": "La dernière récupération des clients ERP n'a pas pu aboutir.",
+      "alertFallback": "La dernière synchronisation n'a pas pu récupérer les 20 principaux clients ERP.",
+      "retry": "Relancer la synchronisation"
+    },
+    "actions": {
+      "newAccount": "Nouveau compte",
+      "retry": "Réessayer"
+    },
+    "stats": {
+      "regionLabel": "Couverture des sources de comptes",
+      "accounts": {
+        "label": "Comptes",
+        "detail": "portefeuille"
+      },
+      "openDeals": {
+        "label": "Affaires ouvertes",
+        "detail": "Pipeline du CRM externe"
+      },
+      "weightedPipeline": {
+        "label": "Pipeline pondéré",
+        "detail": "appel d'offres et avant-vente"
+      },
+      "logoCoverage": {
+        "label": "Couverture des logos",
+        "detail": "ressources de marque"
+      },
+      "enrichedProfiles": {
+        "label": "Profils enrichis",
+        "detail": "cache de données vérifiées"
+      },
+      "sourcesHealthy": {
+        "label": "Sources opérationnelles",
+        "detail": "maillage d'API"
+      }
+    },
+    "filters": {
+      "regionLabel": "Filtres",
+      "search": {
+        "label": "Rechercher",
+        "placeholder": "Rechercher par nom ou domaine…"
+      },
+      "industry": {
+        "label": "Secteur",
+        "all": "Tous les secteurs"
+      },
+      "sort": {
+        "label": "Trier",
+        "pipeline": "Trier : valeur du pipeline",
+        "name": "Trier : nom",
+        "health": "Trier : santé",
+        "industry": "Trier : secteur"
+      }
+    },
+    "liveRegion": {
+      "count_one": "{{count}} compte",
+      "count_other": "{{count}} comptes",
+      "matching_one": "{{count}} compte correspondant à \"{{query}}\"",
+      "matching_other": "{{count}} comptes correspondant à \"{{query}}\""
+    },
+    "grid": {
+      "regionLabel": "Cartes de comptes"
+    }
   }
 }

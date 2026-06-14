@@ -5,6 +5,7 @@
 // only state, sort, bulk-selection, and data-fetching concerns.
 
 import { useCallback, useMemo, useState, useTransition } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -36,6 +37,7 @@ import { OppBulkBar, OppKpiBar, OppPageHeader, OppStageChips } from './opportuni
 import { OppIndustryBreakdown } from './opportunities/OppIndustryBreakdown';
 
 export function OpportunitiesPage() {
+  const { t } = useTranslation('crm');
   const [searchParams, setSearchParams] = useSearchParams();
   const search = searchParams.get('search') ?? undefined;
   const qc = useQueryClient();
@@ -176,12 +178,30 @@ export function OpportunitiesPage() {
       ),
     );
     if (failed === 0) {
-      toast.success(`Moved ${snapshot.length} opportunit${snapshot.length === 1 ? 'y' : 'ies'}`);
+      toast.success(
+        snapshot.length === 1
+          ? t('opportunities.toast.movedOne', 'Moved {{count}} opportunity', {
+              count: snapshot.length,
+            })
+          : t('opportunities.toast.movedMany', 'Moved {{count}} opportunities', {
+              count: snapshot.length,
+            }),
+      );
       clearSelection();
     } else {
-      toast.error(`${failed} update${failed === 1 ? '' : 's'} failed`, {
-        description: 'The successful moves were committed; try again for the rest.',
-      });
+      toast.error(
+        failed === 1
+          ? t('opportunities.toast.updatesFailedOne', '{{count}} update failed', { count: failed })
+          : t('opportunities.toast.updatesFailedMany', '{{count}} updates failed', {
+              count: failed,
+            }),
+        {
+          description: t(
+            'opportunities.toast.updatesFailedDescription',
+            'The successful moves were committed; try again for the rest.',
+          ),
+        },
+      );
     }
   };
 
@@ -189,9 +209,17 @@ export function OpportunitiesPage() {
     if (selectedOpps.length === 0) return;
     const n = selectedOpps.length;
     const ok = await confirm({
-      title: `Delete ${n} opportunit${n === 1 ? 'y' : 'ies'}?`,
-      description: 'This cannot be undone from the UI — the audit log records each delete.',
-      confirmLabel: 'Delete',
+      title:
+        n === 1
+          ? t('opportunities.confirmDelete.titleOne', 'Delete {{count}} opportunity?', { count: n })
+          : t('opportunities.confirmDelete.titleMany', 'Delete {{count}} opportunities?', {
+              count: n,
+            }),
+      description: t(
+        'opportunities.confirmDelete.description',
+        'This cannot be undone from the UI — the audit log records each delete.',
+      ),
+      confirmLabel: t('opportunities.confirmDelete.confirmLabel', 'Delete'),
       destructive: true,
     });
     if (!ok) return;
@@ -213,9 +241,23 @@ export function OpportunitiesPage() {
     // Invalidate regardless of partial failure — some may have succeeded.
     void qc.invalidateQueries({ queryKey: ['opportunities'] });
     if (failed === 0) {
-      toast.success(`Deleted ${snapshot.length} opportunit${snapshot.length === 1 ? 'y' : 'ies'}`);
+      toast.success(
+        snapshot.length === 1
+          ? t('opportunities.toast.deletedOne', 'Deleted {{count}} opportunity', {
+              count: snapshot.length,
+            })
+          : t('opportunities.toast.deletedMany', 'Deleted {{count}} opportunities', {
+              count: snapshot.length,
+            }),
+      );
     } else {
-      toast.error(`${failed} delete${failed === 1 ? '' : 's'} failed`);
+      toast.error(
+        failed === 1
+          ? t('opportunities.toast.deletesFailedOne', '{{count}} delete failed', { count: failed })
+          : t('opportunities.toast.deletesFailedMany', '{{count}} deletes failed', {
+              count: failed,
+            }),
+      );
     }
   };
 
@@ -240,9 +282,11 @@ export function OpportunitiesPage() {
           pipelineStageId: stageFilter ?? undefined,
         },
       });
-      toast.success('Export complete');
+      toast.success(t('opportunities.toast.exportComplete', 'Export complete'));
     } catch {
-      toast.error('Export failed', { description: 'Try again in a moment.' });
+      toast.error(t('opportunities.toast.exportFailed', 'Export failed'), {
+        description: t('opportunities.toast.exportFailedDescription', 'Try again in a moment.'),
+      });
     } finally {
       setIsExporting(false);
     }
@@ -270,10 +314,36 @@ export function OpportunitiesPage() {
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {!isLoading && data
           ? search
-            ? `${data.items.length} opportunit${data.items.length === 1 ? 'y' : 'ies'} matching "${search}"`
+            ? data.items.length === 1
+              ? t(
+                  'opportunities.liveRegion.matchingOne',
+                  '{{count}} opportunity matching "{{search}}"',
+                  { count: data.items.length, search },
+                )
+              : t(
+                  'opportunities.liveRegion.matchingMany',
+                  '{{count}} opportunities matching "{{search}}"',
+                  { count: data.items.length, search },
+                )
             : stageFilter
-              ? `${data.items.length} opportunit${data.items.length === 1 ? 'y' : 'ies'} in selected stage`
-              : `${data.items.length} opportunit${data.items.length === 1 ? 'y' : 'ies'}`
+              ? data.items.length === 1
+                ? t(
+                    'opportunities.liveRegion.inStageOne',
+                    '{{count}} opportunity in selected stage',
+                    { count: data.items.length },
+                  )
+                : t(
+                    'opportunities.liveRegion.inStageMany',
+                    '{{count}} opportunities in selected stage',
+                    { count: data.items.length },
+                  )
+              : data.items.length === 1
+                ? t('opportunities.liveRegion.totalOne', '{{count}} opportunity', {
+                    count: data.items.length,
+                  })
+                : t('opportunities.liveRegion.totalMany', '{{count}} opportunities', {
+                    count: data.items.length,
+                  })
           : ''}
       </p>
 
@@ -315,13 +385,18 @@ export function OpportunitiesPage() {
           <TableSkeleton rows={8} columns={6} headless />
         ) : isError ? (
           <ErrorState
-            title="Couldn't load opportunities"
-            message={error?.message ?? 'Try again in a moment.'}
+            title={t('opportunities.error.title', "Couldn't load opportunities")}
+            message={
+              error?.message ?? t('opportunities.error.message', 'Try again in a moment.')
+            }
           />
         ) : data?.items.length === 0 ? (
           <EmptyState
-            title="No opportunities yet"
-            message="Create your first opportunity to start tracking bids."
+            title={t('opportunities.empty.title', 'No opportunities yet')}
+            message={t(
+              'opportunities.empty.message',
+              'Create your first opportunity to start tracking bids.',
+            )}
             action={<CreateOpportunityDialog />}
           />
         ) : (
@@ -329,8 +404,13 @@ export function OpportunitiesPage() {
             <table className="w-full min-w-[980px] text-left text-sm">
               <caption className="sr-only">
                 {search
-                  ? `Opportunities matching "${search}"`
-                  : 'All opportunities, sorted by most recent activity. Cells are inline-editable.'}
+                  ? t('opportunities.caption.matching', 'Opportunities matching "{{search}}"', {
+                      search,
+                    })
+                  : t(
+                      'opportunities.caption.all',
+                      'All opportunities, sorted by most recent activity. Cells are inline-editable.',
+                    )}
               </caption>
               <OpportunitiesTableHead
                 sortState={sortState}
@@ -358,7 +438,7 @@ export function OpportunitiesPage() {
               hasPrevious={pager.hasPrevious}
               isLoading={isLoading}
               itemCount={data?.items.length ?? 0}
-              label="opportunities"
+              label={t('opportunities.pagerLabel', 'opportunities')}
               onNext={() => pager.goNext(data?.nextCursor)}
               onPrevious={pager.goPrevious}
             />

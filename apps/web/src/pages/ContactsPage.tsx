@@ -1,4 +1,5 @@
 import { useDeferredValue, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 
 import { ContactCsvImportDialog } from '@/components/contact/ContactCsvImportDialog';
@@ -29,6 +30,7 @@ import type { ContactSortKey, ContactSortState } from './contacts/ContactTable';
 import { useContactsKeyboard } from './contacts/useContactsKeyboard';
 
 export function ContactsPage() {
+  const { t } = useTranslation('crm');
   const [search, setSearch] = useState('');
   // useDeferredValue keeps typing snappy; the table re-renders on the next
   // idle tick rather than on every keystroke.
@@ -157,10 +159,14 @@ export function ContactsPage() {
   const bulkDelete = async () => {
     if (selectedContacts.length === 0) return;
     const ok = await confirm({
-      title: `Delete ${selectedContacts.length} contact${selectedContacts.length === 1 ? '' : 's'}?`,
-      description:
+      title: t('contacts.bulkDelete.confirm.title', 'Delete {{count}} contacts?', {
+        count: selectedContacts.length,
+      }),
+      description: t(
+        'contacts.bulkDelete.confirm.description',
         'They will be removed from any linked bids. The audit log records each deletion.',
-      confirmLabel: 'Delete',
+      ),
+      confirmLabel: t('contacts.actions.delete', 'Delete'),
       destructive: true,
     });
     if (!ok) return;
@@ -188,45 +194,63 @@ export function ContactsPage() {
             sentiment: c.sentiment,
           });
         }
-        toast.success(`Restored ${snapshot.length} contact${snapshot.length === 1 ? '' : 's'}`);
+        toast.success(
+          t('contacts.toast.restoredCount', 'Restored {{count}} contacts', {
+            count: snapshot.length,
+          }),
+        );
       };
-      pushUndo(`Deleted ${snapshot.length} contacts`, undoBulk);
-      toast.success(`Deleted ${snapshot.length} contact${snapshot.length === 1 ? '' : 's'}`, {
-        duration: 6500,
-        action: { label: 'Undo', onClick: undoBulk },
-      });
+      pushUndo(t('contacts.undo.deletedCount', 'Deleted {{count}} contacts', { count: snapshot.length }), undoBulk);
+      toast.success(
+        t('contacts.toast.deletedCount', 'Deleted {{count}} contacts', { count: snapshot.length }),
+        {
+          duration: 6500,
+          action: { label: t('contacts.actions.undo', 'Undo'), onClick: undoBulk },
+        },
+      );
     } else {
-      toast.error(`${failed} delete${failed === 1 ? '' : 's'} failed`, {
-        description: 'The successful deletions were committed; try again for the remainder.',
-      });
+      toast.error(
+        t('contacts.toast.deleteFailedCount', '{{count}} deletes failed', { count: failed }),
+        {
+          description: t(
+            'contacts.toast.deleteFailedCount.description',
+            'The successful deletions were committed; try again for the remainder.',
+          ),
+        },
+      );
     }
   };
 
   const exportCsv = (rows: ReadonlyArray<Contact>) => {
     if (rows.length === 0) {
-      toast.info('Nothing to export');
+      toast.info(t('contacts.toast.nothingToExport', 'Nothing to export'));
       return;
     }
     const csv = rowsToCsv(rows, [
-      { key: 'name', label: 'Name' },
-      { key: 'role', label: 'Role' },
-      { key: 'customer', label: 'Customer' },
-      { key: 'email', label: 'Email' },
-      { key: 'phone', label: 'Phone' },
-      { key: 'influence', label: 'Influence' },
-      { key: 'sentiment', label: 'Sentiment' },
-      { key: 'createdAt', label: 'Created at' },
+      { key: 'name', label: t('contacts.column.name', 'Name') },
+      { key: 'role', label: t('contacts.column.role', 'Role') },
+      { key: 'customer', label: t('contacts.column.customer', 'Customer') },
+      { key: 'email', label: t('contacts.column.email', 'Email') },
+      { key: 'phone', label: t('contacts.column.phone', 'Phone') },
+      { key: 'influence', label: t('contacts.column.influence', 'Influence') },
+      { key: 'sentiment', label: t('contacts.column.sentiment', 'Sentiment') },
+      { key: 'createdAt', label: t('contacts.column.createdAt', 'Created at') },
     ]);
     const stamp = new Date().toISOString().slice(0, 10);
     downloadCsv(`bidstack-contacts-${stamp}`, csv);
-    toast.success(`Exported ${rows.length} contact${rows.length === 1 ? '' : 's'}`);
+    toast.success(
+      t('contacts.toast.exportedCount', 'Exported {{count}} contacts', { count: rows.length }),
+    );
   };
 
   const onDelete = async (c: Contact) => {
     const ok = await confirm({
-      title: `Delete ${c.name}?`,
-      description: 'This also removes them from any linked bids. The audit log keeps a record.',
-      confirmLabel: 'Delete',
+      title: t('contacts.delete.confirm.title', 'Delete {{name}}?', { name: c.name }),
+      description: t(
+        'contacts.delete.confirm.description',
+        'This also removes them from any linked bids. The audit log keeps a record.',
+      ),
+      confirmLabel: t('contacts.actions.delete', 'Delete'),
       destructive: true,
     });
     if (!ok) return;
@@ -247,23 +271,29 @@ export function ContactsPage() {
             sentiment: c.sentiment,
           },
           {
-            onSuccess: () => toast.success(`Restored ${c.name}`),
+            onSuccess: () =>
+              toast.success(t('contacts.toast.restored', 'Restored {{name}}', { name: c.name })),
             onError: (err) =>
-              toast.error('Could not restore', {
+              toast.error(t('contacts.toast.couldNotRestore', 'Could not restore'), {
                 description:
-                  err instanceof Error ? err.message : 'The server rejected the request.',
+                  err instanceof Error
+                    ? err.message
+                    : t('contacts.toast.serverRejected', 'The server rejected the request.'),
               }),
           },
         );
       };
-      pushUndo(`Deleted ${c.name}`, undoSingle);
-      toast.success(`Deleted ${c.name}`, {
+      pushUndo(t('contacts.undo.deleted', 'Deleted {{name}}', { name: c.name }), undoSingle);
+      toast.success(t('contacts.toast.deleted', 'Deleted {{name}}', { name: c.name }), {
         duration: 6500,
-        action: { label: 'Undo', onClick: undoSingle },
+        action: { label: t('contacts.actions.undo', 'Undo'), onClick: undoSingle },
       });
     } catch (err) {
-      toast.error('Delete failed', {
-        description: err instanceof Error ? err.message : 'The server rejected the request.',
+      toast.error(t('contacts.toast.deleteFailed', 'Delete failed'), {
+        description:
+          err instanceof Error
+            ? err.message
+            : t('contacts.toast.serverRejected', 'The server rejected the request.'),
       });
     }
   };
@@ -273,17 +303,23 @@ export function ContactsPage() {
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight gradient-text">
-            Contacts
+            {t('contacts.title', 'Contacts')}
           </h1>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            {items.length} {items.length === 1 ? 'person' : 'people'} in the decision unit.
+            {t('contacts.subtitle', '{{count}} people in the decision unit.', {
+              count: items.length,
+            })}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <ContactCsvImportDialog
             trigger={
-              <Button size="sm" variant="secondary" aria-label="Import contacts from CSV">
-                Import CSV
+              <Button
+                size="sm"
+                variant="secondary"
+                aria-label={t('contacts.actions.importCsv.aria', 'Import contacts from CSV')}
+              >
+                {t('contacts.actions.importCsv', 'Import CSV')}
               </Button>
             }
           />
@@ -292,16 +328,20 @@ export function ContactsPage() {
             size="sm"
             onClick={() => exportCsv(items)}
             disabled={items.length === 0}
-            aria-label="Export all visible contacts as CSV"
+            aria-label={t('contacts.actions.exportCsv.aria', 'Export all visible contacts as CSV')}
           >
             <Icon name="download" size={14} />
-            Export CSV
+            {t('contacts.actions.exportCsv', 'Export CSV')}
           </LiquidGlassButton>
           <ContactDialog
             trigger={
-              <Button size="sm" variant="primary" aria-label="Create a new contact">
+              <Button
+                size="sm"
+                variant="primary"
+                aria-label={t('contacts.actions.newContact.aria', 'Create a new contact')}
+              >
                 <Icon name="plus" size={14} />
-                New contact
+                {t('contacts.actions.newContact', 'New contact')}
               </Button>
             }
           />
@@ -324,15 +364,15 @@ export function ContactsPage() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, customer, email, role…"
-            aria-label="Search contacts"
+            placeholder={t('contacts.search.placeholder', 'Search by name, customer, email, role…')}
+            aria-label={t('contacts.search.aria', 'Search contacts')}
             className="dialog-input w-full pr-9"
           />
           {search ? (
             <button
               type="button"
               onClick={() => setSearch('')}
-              aria-label="Clear search"
+              aria-label={t('contacts.search.clear.aria', 'Clear search')}
               className="absolute right-2 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
             >
               <Icon name="close" size={14} ariaHidden />
@@ -373,7 +413,7 @@ export function ContactsPage() {
         hasPrevious={pager.hasPrevious}
         isLoading={isLoading}
         itemCount={items.length}
-        label="contacts"
+        label={t('contacts.pager.label', 'contacts')}
         onNext={() => pager.goNext(data?.nextCursor)}
         onPrevious={pager.goPrevious}
       />

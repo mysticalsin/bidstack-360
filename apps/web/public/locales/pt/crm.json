@@ -66,5 +66,355 @@
     "leads": "Sem potenciais clientes",
     "companies": "Sem empresas",
     "ctaCreate": "Criar o primeiro {{entity}}"
+  },
+  "opportunities": {
+    "toast": {
+      "movedOne": "{{count}} oportunidade movida",
+      "movedMany": "{{count}} oportunidades movidas",
+      "updatesFailedOne": "{{count}} atualização falhou",
+      "updatesFailedMany": "{{count}} atualizações falharam",
+      "updatesFailedDescription": "As movimentações bem-sucedidas foram salvas; tente novamente o restante.",
+      "deletedOne": "{{count}} oportunidade excluída",
+      "deletedMany": "{{count}} oportunidades excluídas",
+      "deletesFailedOne": "{{count}} exclusão falhou",
+      "deletesFailedMany": "{{count}} exclusões falharam",
+      "exportComplete": "Exportação concluída",
+      "exportFailed": "Falha na exportação",
+      "exportFailedDescription": "Tente novamente em instantes."
+    },
+    "confirmDelete": {
+      "titleOne": "Excluir {{count}} oportunidade?",
+      "titleMany": "Excluir {{count}} oportunidades?",
+      "description": "Isto não pode ser desfeito pela interface — o registro de auditoria documenta cada exclusão.",
+      "confirmLabel": "Excluir"
+    },
+    "liveRegion": {
+      "matchingOne": "{{count}} oportunidade correspondente a \"{{search}}\"",
+      "matchingMany": "{{count}} oportunidades correspondentes a \"{{search}}\"",
+      "inStageOne": "{{count}} oportunidade na etapa selecionada",
+      "inStageMany": "{{count}} oportunidades na etapa selecionada",
+      "totalOne": "{{count}} oportunidade",
+      "totalMany": "{{count}} oportunidades"
+    },
+    "error": {
+      "title": "Não foi possível carregar as oportunidades",
+      "message": "Tente novamente em instantes."
+    },
+    "empty": {
+      "title": "Ainda não há oportunidades",
+      "message": "Crie sua primeira oportunidade para começar a acompanhar as propostas."
+    },
+    "caption": {
+      "matching": "Oportunidades correspondentes a \"{{search}}\"",
+      "all": "Todas as oportunidades, ordenadas pela atividade mais recente. As células são editáveis em linha."
+    },
+    "pagerLabel": "oportunidades"
+  },
+  "leads": {
+    "title": "Leads",
+    "actions": {
+      "exportCsv": "Exportar CSV",
+      "newLead": "Novo lead"
+    },
+    "search": {
+      "label": "Pesquisar leads",
+      "placeholder": "Pesquisar leads..."
+    },
+    "filter": {
+      "status": "Filtrar leads por status",
+      "priority": "Filtrar leads por prioridade"
+    },
+    "statusOption": {
+      "all": "Todos os status",
+      "new": "Novo",
+      "contacted": "Contatado",
+      "qualified": "Qualificado",
+      "nurture": "Em nutrição",
+      "disqualified": "Desqualificado",
+      "converted": "Convertido"
+    },
+    "priorityOption": {
+      "all": "Todas as prioridades",
+      "low": "Baixa",
+      "medium": "Média",
+      "high": "Alta",
+      "critical": "Crítica"
+    },
+    "summary": {
+      "label": "Resumo da lista de leads"
+    },
+    "stats": {
+      "filtered": {
+        "label": "Leads filtrados",
+        "detail": "visualização atual"
+      },
+      "highPriority": {
+        "label": "Prioridade alta",
+        "detail": "alta ou crítica"
+      },
+      "pipelineReady": {
+        "label": "Prontos para o pipeline",
+        "detail": "qualificados ou convertidos"
+      },
+      "avgScore": {
+        "label": "Pontuação média",
+        "detail": "pontuação de adequação"
+      }
+    },
+    "liveRegion": {
+      "count": "{{count}} lead",
+      "matching": " correspondentes a \"{{query}}\""
+    },
+    "error": {
+      "title": "Falha ao carregar os leads",
+      "message": "Algo deu errado",
+      "retry": "Tentar novamente"
+    },
+    "empty": {
+      "title": "Ainda não há leads",
+      "message": "Crie seu primeiro lead para começar a acompanhar prospectos."
+    },
+    "table": {
+      "selectAll": "Selecionar tudo",
+      "deselectAll": "Desmarcar tudo",
+      "name": "Nome",
+      "company": "Empresa",
+      "status": "Status",
+      "priority": "Prioridade",
+      "score": "Pontuação",
+      "source": "Origem",
+      "owner": "Responsável",
+      "actions": "Ações"
+    },
+    "pager": {
+      "label": "leads"
+    },
+    "csv": {
+      "name": "Nome",
+      "company": "Empresa",
+      "title": "Cargo",
+      "email": "E-mail",
+      "status": "Status",
+      "priority": "Prioridade",
+      "score": "Pontuação",
+      "scoreRange": "Pontuação (0-10000)",
+      "source": "Origem",
+      "created": "Criado"
+    },
+    "toast": {
+      "nothingToExport": "Nada para exportar",
+      "exported": "{{count}} lead exportado",
+      "deleted": "{{count}} lead excluído",
+      "deleteFailed": "{{count}} exclusão falhou",
+      "leadDeleted": "Lead excluído",
+      "deleteOneFailed": "Falha ao excluir o lead"
+    },
+    "bulkDelete": {
+      "title": "Excluir {{count}} lead?",
+      "description": "Esta ação não pode ser desfeita.",
+      "confirm": "Excluir"
+    },
+    "deleteOne": {
+      "title": "Excluir lead?",
+      "description": "Isso removerá permanentemente {{name}} dos seus leads.",
+      "confirm": "Excluir"
+    }
+  },
+  "tasks": {
+    "title": "Tarefas",
+    "subtitle": "{{count}} acompanhamentos ativos.",
+    "actions": {
+      "exportCsv": "Exportar CSV"
+    },
+    "filters": {
+      "groupLabel": "Filtrar tarefas",
+      "all": "Todas",
+      "today": "Hoje",
+      "overdue": "Atrasadas"
+    },
+    "status": {
+      "open": "Aberta",
+      "in_progress": "Em andamento",
+      "blocked": "Bloqueada",
+      "done": "Concluída"
+    },
+    "view": {
+      "list": "Lista",
+      "listLabel": "Visualização em lista",
+      "calendar": "Calendário",
+      "calendarLabel": "Visualização em calendário"
+    },
+    "sort": {
+      "label": "Ordenar por",
+      "ariaLabel": "Ordenar tarefas",
+      "recent": "Recentes",
+      "dueDate": "Data de vencimento",
+      "status": "Estado"
+    },
+    "error": {
+      "title": "Não foi possível carregar as tarefas",
+      "generic": "Algo deu errado"
+    },
+    "empty": {
+      "title": "Ainda não há tarefas",
+      "filteredTitle": "Nenhuma tarefa corresponde a este filtro",
+      "message": "Crie um acompanhamento para começar."
+    },
+    "reorder": {
+      "announce": "{{title}} movida para a posição {{position}} de {{total}}."
+    },
+    "srCount": "{{count}} tarefa"
+  },
+  "contacts": {
+    "title": "Contatos",
+    "subtitle": "{{count}} pessoas na unidade de decisão.",
+    "actions": {
+      "importCsv": {
+        "aria": "Importar contatos de CSV"
+      },
+      "exportCsv": {
+        "aria": "Exportar todos os contatos visíveis como CSV"
+      },
+      "newContact": {
+        "aria": "Criar um novo contato"
+      },
+      "delete": "Excluir",
+      "undo": "Desfazer"
+    },
+    "search": {
+      "placeholder": "Pesquisar por nome, cliente, e-mail, função…",
+      "aria": "Pesquisar contatos",
+      "clear": {
+        "aria": "Limpar pesquisa"
+      }
+    },
+    "pager": {
+      "label": "contatos"
+    },
+    "column": {
+      "name": "Nome",
+      "role": "Função",
+      "customer": "Cliente",
+      "email": "E-mail",
+      "phone": "Telefone",
+      "influence": "Influência",
+      "sentiment": "Sentimento",
+      "createdAt": "Criado em"
+    },
+    "bulkDelete": {
+      "confirm": {
+        "title": "Excluir {{count}} contatos?",
+        "description": "Eles serão removidos de quaisquer propostas vinculadas. O log de auditoria registra cada exclusão."
+      }
+    },
+    "delete": {
+      "confirm": {
+        "title": "Excluir {{name}}?",
+        "description": "Isso também os remove de quaisquer propostas vinculadas. O log de auditoria mantém um registro."
+      }
+    },
+    "toast": {
+      "restoredCount": "{{count}} contatos restaurados",
+      "deletedCount": "{{count}} contatos excluídos",
+      "deleteFailedCount": {
+        "description": "As exclusões bem-sucedidas foram aplicadas; tente novamente para as restantes."
+      },
+      "nothingToExport": "Nada para exportar",
+      "exportedCount": "{{count}} contatos exportados",
+      "restored": "{{name}} restaurado",
+      "couldNotRestore": "Não foi possível restaurar",
+      "deleted": "{{name}} excluído",
+      "deleteFailed": "Falha ao excluir",
+      "serverRejected": "O servidor rejeitou a solicitação."
+    },
+    "undo": {
+      "deletedCount": "{{count}} contatos excluídos",
+      "deleted": "{{name}} excluído"
+    }
+  },
+  "accounts": {
+    "title": "Contas",
+    "error": {
+      "title": "Não foi possível carregar as contas",
+      "message": "O endpoint do painel não respondeu."
+    },
+    "empty": {
+      "title": "Ainda não há contas",
+      "filtered": "Nenhuma conta corresponde aos seus filtros"
+    },
+    "summary": {
+      "companyCount_one": "{{count}} empresa",
+      "companyCount_other": "{{count}} empresas",
+      "openDeals": "{{count}} negócios em aberto",
+      "weightedPipeline": "{{amount}} de pipeline ponderado"
+    },
+    "sync": {
+      "result": "{{enriched}} enriquecidas / {{cached}} em cache",
+      "buttonTitle": "Sincronize os principais clientes sale.order do ERP em contas verificadas do BidStack",
+      "inProgress": "Sincronizando...",
+      "button": "Sincronizar contas do ERP",
+      "errorTitle": "Falha na sincronização das contas do ERP",
+      "errorDescription": "A última extração de clientes do ERP não pôde ser concluída.",
+      "alertFallback": "A última sincronização não conseguiu extrair os 20 principais clientes do ERP.",
+      "retry": "Tentar sincronizar novamente"
+    },
+    "actions": {
+      "newAccount": "Nova conta",
+      "retry": "Tentar novamente"
+    },
+    "stats": {
+      "regionLabel": "Cobertura de fontes de contas",
+      "accounts": {
+        "label": "Contas",
+        "detail": "portfólio"
+      },
+      "openDeals": {
+        "label": "Negócios em aberto",
+        "detail": "Pipeline do CRM externo"
+      },
+      "weightedPipeline": {
+        "label": "Pipeline ponderado",
+        "detail": "licitação e pré-venda"
+      },
+      "logoCoverage": {
+        "label": "Cobertura de logotipos",
+        "detail": "ativos de marca"
+      },
+      "enrichedProfiles": {
+        "label": "Perfis enriquecidos",
+        "detail": "cache de dados verificados"
+      },
+      "sourcesHealthy": {
+        "label": "Fontes saudáveis",
+        "detail": "malha de API"
+      }
+    },
+    "filters": {
+      "regionLabel": "Filtros",
+      "search": {
+        "label": "Pesquisar",
+        "placeholder": "Pesquisar por nome ou domínio…"
+      },
+      "industry": {
+        "label": "Setor",
+        "all": "Todos os setores"
+      },
+      "sort": {
+        "label": "Ordenar",
+        "pipeline": "Ordenar: valor do pipeline",
+        "name": "Ordenar: nome",
+        "health": "Ordenar: saúde",
+        "industry": "Ordenar: setor"
+      }
+    },
+    "liveRegion": {
+      "count_one": "{{count}} conta",
+      "count_other": "{{count}} contas",
+      "matching_one": "{{count}} conta correspondente a \"{{query}}\"",
+      "matching_other": "{{count}} contas correspondentes a \"{{query}}\""
+    },
+    "grid": {
+      "regionLabel": "Cartões de contas"
+    }
   }
 }

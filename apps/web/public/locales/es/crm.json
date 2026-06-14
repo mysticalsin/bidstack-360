@@ -84,7 +84,114 @@
     "convert": "Convertir en oportunidad",
     "source": "Fuente",
     "score": "Puntuación",
-    "assignTo": "Asignar a"
+    "assignTo": "Asignar a",
+    "actions": {
+      "exportCsv": "Exportar CSV",
+      "newLead": "Nuevo prospecto"
+    },
+    "search": {
+      "label": "Buscar prospectos",
+      "placeholder": "Buscar prospectos..."
+    },
+    "filter": {
+      "status": "Filtrar prospectos por estado",
+      "priority": "Filtrar prospectos por prioridad"
+    },
+    "statusOption": {
+      "all": "Todos los estados",
+      "new": "Nuevo",
+      "contacted": "Contactado",
+      "qualified": "Calificado",
+      "nurture": "En cultivo",
+      "disqualified": "Descalificado",
+      "converted": "Convertido"
+    },
+    "priorityOption": {
+      "all": "Todas las prioridades",
+      "low": "Baja",
+      "medium": "Media",
+      "high": "Alta",
+      "critical": "Crítica"
+    },
+    "summary": {
+      "label": "Resumen de la lista de prospectos"
+    },
+    "stats": {
+      "filtered": {
+        "label": "Prospectos filtrados",
+        "detail": "vista actual"
+      },
+      "highPriority": {
+        "label": "Prioridad alta",
+        "detail": "alta o crítica"
+      },
+      "pipelineReady": {
+        "label": "Listos para el pipeline",
+        "detail": "calificados o convertidos"
+      },
+      "avgScore": {
+        "label": "Puntuación media",
+        "detail": "puntuación de ajuste"
+      }
+    },
+    "liveRegion": {
+      "count": "{{count}} prospecto",
+      "matching": " que coinciden con \"{{query}}\""
+    },
+    "error": {
+      "title": "No se pudieron cargar los prospectos",
+      "message": "Algo salió mal",
+      "retry": "Reintentar"
+    },
+    "empty": {
+      "title": "Aún no hay prospectos",
+      "message": "Crea tu primer prospecto para empezar a hacer seguimiento."
+    },
+    "table": {
+      "selectAll": "Seleccionar todo",
+      "deselectAll": "Deseleccionar todo",
+      "name": "Nombre",
+      "company": "Empresa",
+      "status": "Estado",
+      "priority": "Prioridad",
+      "score": "Puntuación",
+      "source": "Fuente",
+      "owner": "Responsable",
+      "actions": "Acciones"
+    },
+    "pager": {
+      "label": "prospectos"
+    },
+    "csv": {
+      "name": "Nombre",
+      "company": "Empresa",
+      "title": "Cargo",
+      "email": "Correo electrónico",
+      "status": "Estado",
+      "priority": "Prioridad",
+      "score": "Puntuación",
+      "scoreRange": "Puntuación (0-10000)",
+      "source": "Fuente",
+      "created": "Creado"
+    },
+    "toast": {
+      "nothingToExport": "Nada para exportar",
+      "exported": "Se exportó {{count}} prospecto",
+      "deleted": "Se eliminó {{count}} prospecto",
+      "deleteFailed": "{{count}} eliminación falló",
+      "leadDeleted": "Prospecto eliminado",
+      "deleteOneFailed": "No se pudo eliminar el prospecto"
+    },
+    "bulkDelete": {
+      "title": "¿Eliminar {{count}} prospecto?",
+      "description": "Esta acción no se puede deshacer.",
+      "confirm": "Eliminar"
+    },
+    "deleteOne": {
+      "title": "¿Eliminar prospecto?",
+      "description": "Esto eliminará permanentemente a {{name}} de tus prospectos.",
+      "confirm": "Eliminar"
+    }
   },
   "tasks": {
     "title": "Tareas",
@@ -95,7 +202,49 @@
     "markComplete": "Marcar como completada",
     "assignedTo": "Asignado a",
     "relatedTo": "Relacionado con",
-    "addNote": "Agregar nota"
+    "addNote": "Agregar nota",
+    "subtitle": "{{count}} seguimientos activos.",
+    "actions": {
+      "exportCsv": "Exportar CSV"
+    },
+    "filters": {
+      "groupLabel": "Filtrar tareas",
+      "all": "Todas",
+      "today": "Hoy",
+      "overdue": "Atrasadas"
+    },
+    "status": {
+      "open": "Abierta",
+      "in_progress": "En curso",
+      "blocked": "Bloqueada",
+      "done": "Completada"
+    },
+    "view": {
+      "list": "Lista",
+      "listLabel": "Vista de lista",
+      "calendar": "Calendario",
+      "calendarLabel": "Vista de calendario"
+    },
+    "sort": {
+      "label": "Ordenar por",
+      "ariaLabel": "Ordenar tareas",
+      "recent": "Recientes",
+      "dueDate": "Fecha de vencimiento",
+      "status": "Estado"
+    },
+    "error": {
+      "title": "No se pudieron cargar las tareas",
+      "generic": "Algo salió mal"
+    },
+    "empty": {
+      "title": "Aún no hay tareas",
+      "filteredTitle": "Ninguna tarea coincide con este filtro",
+      "message": "Crea un seguimiento para empezar."
+    },
+    "reorder": {
+      "announce": "Se movió {{title}} a la posición {{position}} de {{total}}."
+    },
+    "srCount": "{{count}} tarea"
   },
   "activities": {
     "title": "Actividades",
@@ -107,5 +256,200 @@
     "logActivity": "Registrar actividad",
     "timeline": "Historial",
     "noActivities": "Sin actividades registradas"
+  },
+  "opportunities": {
+    "toast": {
+      "movedOne": "Se movió {{count}} oportunidad",
+      "movedMany": "Se movieron {{count}} oportunidades",
+      "updatesFailedOne": "{{count}} actualización falló",
+      "updatesFailedMany": "{{count}} actualizaciones fallaron",
+      "updatesFailedDescription": "Los movimientos exitosos se guardaron; vuelve a intentar el resto.",
+      "deletedOne": "Se eliminó {{count}} oportunidad",
+      "deletedMany": "Se eliminaron {{count}} oportunidades",
+      "deletesFailedOne": "{{count}} eliminación falló",
+      "deletesFailedMany": "{{count}} eliminaciones fallaron",
+      "exportComplete": "Exportación completada",
+      "exportFailed": "La exportación falló",
+      "exportFailedDescription": "Vuelve a intentarlo en un momento."
+    },
+    "confirmDelete": {
+      "titleOne": "¿Eliminar {{count}} oportunidad?",
+      "titleMany": "¿Eliminar {{count}} oportunidades?",
+      "description": "Esto no se puede deshacer desde la interfaz; el registro de auditoría documenta cada eliminación.",
+      "confirmLabel": "Eliminar"
+    },
+    "liveRegion": {
+      "matchingOne": "{{count}} oportunidad que coincide con \"{{search}}\"",
+      "matchingMany": "{{count}} oportunidades que coinciden con \"{{search}}\"",
+      "inStageOne": "{{count}} oportunidad en la etapa seleccionada",
+      "inStageMany": "{{count}} oportunidades en la etapa seleccionada",
+      "totalOne": "{{count}} oportunidad",
+      "totalMany": "{{count}} oportunidades"
+    },
+    "error": {
+      "title": "No se pudieron cargar las oportunidades",
+      "message": "Vuelve a intentarlo en un momento."
+    },
+    "empty": {
+      "title": "Aún no hay oportunidades",
+      "message": "Crea tu primera oportunidad para empezar a seguir las licitaciones."
+    },
+    "caption": {
+      "matching": "Oportunidades que coinciden con \"{{search}}\"",
+      "all": "Todas las oportunidades, ordenadas por actividad más reciente. Las celdas son editables en línea."
+    },
+    "pagerLabel": "oportunidades"
+  },
+  "contacts": {
+    "title": "Contactos",
+    "subtitle": "{{count}} personas en la unidad de decisión.",
+    "actions": {
+      "importCsv": {
+        "aria": "Importar contactos desde CSV"
+      },
+      "exportCsv": {
+        "aria": "Exportar todos los contactos visibles como CSV"
+      },
+      "newContact": {
+        "aria": "Crear un nuevo contacto"
+      },
+      "delete": "Eliminar",
+      "undo": "Deshacer"
+    },
+    "search": {
+      "placeholder": "Buscar por nombre, cliente, correo, rol…",
+      "aria": "Buscar contactos",
+      "clear": {
+        "aria": "Borrar búsqueda"
+      }
+    },
+    "pager": {
+      "label": "contactos"
+    },
+    "column": {
+      "name": "Nombre",
+      "role": "Rol",
+      "customer": "Cliente",
+      "email": "Correo electrónico",
+      "phone": "Teléfono",
+      "influence": "Influencia",
+      "sentiment": "Sentimiento",
+      "createdAt": "Creado el"
+    },
+    "bulkDelete": {
+      "confirm": {
+        "title": "¿Eliminar {{count}} contactos?",
+        "description": "Se eliminarán de cualquier licitación vinculada. El registro de auditoría registra cada eliminación."
+      }
+    },
+    "delete": {
+      "confirm": {
+        "title": "¿Eliminar a {{name}}?",
+        "description": "Esto también los elimina de cualquier licitación vinculada. El registro de auditoría conserva una constancia."
+      }
+    },
+    "toast": {
+      "restoredCount": "Se restauraron {{count}} contactos",
+      "deletedCount": "Se eliminaron {{count}} contactos",
+      "deleteFailedCount": {
+        "description": "Las eliminaciones correctas se aplicaron; inténtalo de nuevo con el resto."
+      },
+      "nothingToExport": "Nada que exportar",
+      "exportedCount": "Se exportaron {{count}} contactos",
+      "restored": "Se restauró a {{name}}",
+      "couldNotRestore": "No se pudo restaurar",
+      "deleted": "Se eliminó a {{name}}",
+      "deleteFailed": "Error al eliminar",
+      "serverRejected": "El servidor rechazó la solicitud."
+    },
+    "undo": {
+      "deletedCount": "Se eliminaron {{count}} contactos",
+      "deleted": "Se eliminó a {{name}}"
+    }
+  },
+  "accounts": {
+    "title": "Cuentas",
+    "error": {
+      "title": "No se pudieron cargar las cuentas",
+      "message": "El endpoint del panel no respondió."
+    },
+    "empty": {
+      "title": "Aún no hay cuentas",
+      "filtered": "Ninguna cuenta coincide con tus filtros"
+    },
+    "summary": {
+      "companyCount_one": "{{count}} empresa",
+      "companyCount_other": "{{count}} empresas",
+      "openDeals": "{{count}} oportunidades abiertas",
+      "weightedPipeline": "{{amount}} de pipeline ponderado"
+    },
+    "sync": {
+      "result": "{{enriched}} enriquecidas / {{cached}} en caché",
+      "buttonTitle": "Sincroniza los principales clientes sale.order del ERP en cuentas verificadas de BidStack",
+      "inProgress": "Sincronizando...",
+      "button": "Sincronizar cuentas del ERP",
+      "errorTitle": "Falló la sincronización de cuentas del ERP",
+      "errorDescription": "No se pudo completar la última extracción de clientes del ERP.",
+      "alertFallback": "La última sincronización no pudo extraer los 20 principales clientes del ERP.",
+      "retry": "Reintentar sincronización"
+    },
+    "actions": {
+      "newAccount": "Nueva cuenta",
+      "retry": "Reintentar"
+    },
+    "stats": {
+      "regionLabel": "Cobertura de fuentes de cuentas",
+      "accounts": {
+        "label": "Cuentas",
+        "detail": "cartera"
+      },
+      "openDeals": {
+        "label": "Oportunidades abiertas",
+        "detail": "Pipeline del CRM externo"
+      },
+      "weightedPipeline": {
+        "label": "Pipeline ponderado",
+        "detail": "licitación y preventa"
+      },
+      "logoCoverage": {
+        "label": "Cobertura de logotipos",
+        "detail": "recursos de marca"
+      },
+      "enrichedProfiles": {
+        "label": "Perfiles enriquecidos",
+        "detail": "caché de datos verificados"
+      },
+      "sourcesHealthy": {
+        "label": "Fuentes operativas",
+        "detail": "malla de API"
+      }
+    },
+    "filters": {
+      "regionLabel": "Filtros",
+      "search": {
+        "label": "Buscar",
+        "placeholder": "Buscar por nombre o dominio…"
+      },
+      "industry": {
+        "label": "Sector",
+        "all": "Todos los sectores"
+      },
+      "sort": {
+        "label": "Ordenar",
+        "pipeline": "Ordenar: valor del pipeline",
+        "name": "Ordenar: nombre",
+        "health": "Ordenar: salud",
+        "industry": "Ordenar: sector"
+      }
+    },
+    "liveRegion": {
+      "count_one": "{{count}} cuenta",
+      "count_other": "{{count}} cuentas",
+      "matching_one": "{{count}} cuenta que coincide con \"{{query}}\"",
+      "matching_other": "{{count}} cuentas que coinciden con \"{{query}}\""
+    },
+    "grid": {
+      "regionLabel": "Tarjetas de cuentas"
+    }
   }
 }

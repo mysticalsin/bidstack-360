@@ -66,5 +66,355 @@
     "leads": "No leads yet",
     "companies": "No companies yet",
     "ctaCreate": "Create your first {{entity}}"
+  },
+  "opportunities": {
+    "toast": {
+      "movedOne": "Moved {{count}} opportunity",
+      "movedMany": "Moved {{count}} opportunities",
+      "updatesFailedOne": "{{count}} update failed",
+      "updatesFailedMany": "{{count}} updates failed",
+      "updatesFailedDescription": "The successful moves were committed; try again for the rest.",
+      "deletedOne": "Deleted {{count}} opportunity",
+      "deletedMany": "Deleted {{count}} opportunities",
+      "deletesFailedOne": "{{count}} delete failed",
+      "deletesFailedMany": "{{count}} deletes failed",
+      "exportComplete": "Export complete",
+      "exportFailed": "Export failed",
+      "exportFailedDescription": "Try again in a moment."
+    },
+    "confirmDelete": {
+      "titleOne": "Delete {{count}} opportunity?",
+      "titleMany": "Delete {{count}} opportunities?",
+      "description": "This cannot be undone from the UI — the audit log records each delete.",
+      "confirmLabel": "Delete"
+    },
+    "liveRegion": {
+      "matchingOne": "{{count}} opportunity matching \"{{search}}\"",
+      "matchingMany": "{{count}} opportunities matching \"{{search}}\"",
+      "inStageOne": "{{count}} opportunity in selected stage",
+      "inStageMany": "{{count}} opportunities in selected stage",
+      "totalOne": "{{count}} opportunity",
+      "totalMany": "{{count}} opportunities"
+    },
+    "error": {
+      "title": "Couldn't load opportunities",
+      "message": "Try again in a moment."
+    },
+    "empty": {
+      "title": "No opportunities yet",
+      "message": "Create your first opportunity to start tracking bids."
+    },
+    "caption": {
+      "matching": "Opportunities matching \"{{search}}\"",
+      "all": "All opportunities, sorted by most recent activity. Cells are inline-editable."
+    },
+    "pagerLabel": "opportunities"
+  },
+  "leads": {
+    "title": "Leads",
+    "actions": {
+      "exportCsv": "Export CSV",
+      "newLead": "New lead"
+    },
+    "search": {
+      "label": "Search leads",
+      "placeholder": "Search leads..."
+    },
+    "filter": {
+      "status": "Filter leads by status",
+      "priority": "Filter leads by priority"
+    },
+    "statusOption": {
+      "all": "All statuses",
+      "new": "New",
+      "contacted": "Contacted",
+      "qualified": "Qualified",
+      "nurture": "Nurture",
+      "disqualified": "Disqualified",
+      "converted": "Converted"
+    },
+    "priorityOption": {
+      "all": "All priorities",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "critical": "Critical"
+    },
+    "summary": {
+      "label": "Lead list summary"
+    },
+    "stats": {
+      "filtered": {
+        "label": "Filtered leads",
+        "detail": "current view"
+      },
+      "highPriority": {
+        "label": "High priority",
+        "detail": "high or critical"
+      },
+      "pipelineReady": {
+        "label": "Pipeline-ready",
+        "detail": "qualified or converted"
+      },
+      "avgScore": {
+        "label": "Avg score",
+        "detail": "fit score"
+      }
+    },
+    "liveRegion": {
+      "count": "{{count}} lead",
+      "matching": " matching \"{{query}}\""
+    },
+    "error": {
+      "title": "Failed to load leads",
+      "message": "Something went wrong",
+      "retry": "Retry"
+    },
+    "empty": {
+      "title": "No leads yet",
+      "message": "Create your first lead to start tracking prospects."
+    },
+    "table": {
+      "selectAll": "Select all",
+      "deselectAll": "Deselect all",
+      "name": "Name",
+      "company": "Company",
+      "status": "Status",
+      "priority": "Priority",
+      "score": "Score",
+      "source": "Source",
+      "owner": "Owner",
+      "actions": "Actions"
+    },
+    "pager": {
+      "label": "leads"
+    },
+    "csv": {
+      "name": "Name",
+      "company": "Company",
+      "title": "Title",
+      "email": "Email",
+      "status": "Status",
+      "priority": "Priority",
+      "score": "Score",
+      "scoreRange": "Score (0-10000)",
+      "source": "Source",
+      "created": "Created"
+    },
+    "toast": {
+      "nothingToExport": "Nothing to export",
+      "exported": "Exported {{count}} lead",
+      "deleted": "Deleted {{count}} lead",
+      "deleteFailed": "{{count}} deletion failed",
+      "leadDeleted": "Lead deleted",
+      "deleteOneFailed": "Failed to delete lead"
+    },
+    "bulkDelete": {
+      "title": "Delete {{count}} lead?",
+      "description": "This action cannot be undone.",
+      "confirm": "Delete"
+    },
+    "deleteOne": {
+      "title": "Delete lead?",
+      "description": "This will permanently remove {{name}} from your leads.",
+      "confirm": "Delete"
+    }
+  },
+  "tasks": {
+    "title": "Tasks",
+    "subtitle": "{{count}} active follow-ups.",
+    "actions": {
+      "exportCsv": "Export CSV"
+    },
+    "filters": {
+      "groupLabel": "Filter tasks",
+      "all": "All",
+      "today": "Today",
+      "overdue": "Overdue"
+    },
+    "status": {
+      "open": "Open",
+      "in_progress": "In progress",
+      "blocked": "Blocked",
+      "done": "Done"
+    },
+    "view": {
+      "list": "List",
+      "listLabel": "List view",
+      "calendar": "Calendar",
+      "calendarLabel": "Calendar view"
+    },
+    "sort": {
+      "label": "Sort by",
+      "ariaLabel": "Sort tasks",
+      "recent": "Recent",
+      "dueDate": "Due date",
+      "status": "Status"
+    },
+    "error": {
+      "title": "Could not load tasks",
+      "generic": "Something went wrong"
+    },
+    "empty": {
+      "title": "No tasks yet",
+      "filteredTitle": "No tasks match this filter",
+      "message": "Create a follow-up to get started."
+    },
+    "reorder": {
+      "announce": "Moved {{title}} to position {{position}} of {{total}}."
+    },
+    "srCount": "{{count}} task"
+  },
+  "contacts": {
+    "title": "Contacts",
+    "subtitle": "{{count}} people in the decision unit.",
+    "actions": {
+      "importCsv": {
+        "aria": "Import contacts from CSV"
+      },
+      "exportCsv": {
+        "aria": "Export all visible contacts as CSV"
+      },
+      "newContact": {
+        "aria": "Create a new contact"
+      },
+      "delete": "Delete",
+      "undo": "Undo"
+    },
+    "search": {
+      "placeholder": "Search by name, customer, email, role…",
+      "aria": "Search contacts",
+      "clear": {
+        "aria": "Clear search"
+      }
+    },
+    "pager": {
+      "label": "contacts"
+    },
+    "column": {
+      "name": "Name",
+      "role": "Role",
+      "customer": "Customer",
+      "email": "Email",
+      "phone": "Phone",
+      "influence": "Influence",
+      "sentiment": "Sentiment",
+      "createdAt": "Created at"
+    },
+    "bulkDelete": {
+      "confirm": {
+        "title": "Delete {{count}} contacts?",
+        "description": "They will be removed from any linked bids. The audit log records each deletion."
+      }
+    },
+    "delete": {
+      "confirm": {
+        "title": "Delete {{name}}?",
+        "description": "This also removes them from any linked bids. The audit log keeps a record."
+      }
+    },
+    "toast": {
+      "restoredCount": "Restored {{count}} contacts",
+      "deletedCount": "Deleted {{count}} contacts",
+      "deleteFailedCount": {
+        "description": "The successful deletions were committed; try again for the remainder."
+      },
+      "nothingToExport": "Nothing to export",
+      "exportedCount": "Exported {{count}} contacts",
+      "restored": "Restored {{name}}",
+      "couldNotRestore": "Could not restore",
+      "deleted": "Deleted {{name}}",
+      "deleteFailed": "Delete failed",
+      "serverRejected": "The server rejected the request."
+    },
+    "undo": {
+      "deletedCount": "Deleted {{count}} contacts",
+      "deleted": "Deleted {{name}}"
+    }
+  },
+  "accounts": {
+    "title": "Accounts",
+    "error": {
+      "title": "Couldn't load accounts",
+      "message": "The dashboard endpoint did not respond."
+    },
+    "empty": {
+      "title": "No accounts yet",
+      "filtered": "No accounts match your filters"
+    },
+    "summary": {
+      "companyCount_one": "{{count}} company",
+      "companyCount_other": "{{count}} companies",
+      "openDeals": "{{count}} open deals",
+      "weightedPipeline": "{{amount}} weighted pipeline"
+    },
+    "sync": {
+      "result": "{{enriched}} enriched / {{cached}} cached",
+      "buttonTitle": "Sync top ERP sale.order customers into verified BidStack accounts",
+      "inProgress": "Syncing...",
+      "button": "Sync ERP accounts",
+      "errorTitle": "ERP account sync failed",
+      "errorDescription": "The latest ERP customer pull could not complete.",
+      "alertFallback": "The last sync could not pull the top 20 ERP customers.",
+      "retry": "Retry sync"
+    },
+    "actions": {
+      "newAccount": "New account",
+      "retry": "Retry"
+    },
+    "stats": {
+      "regionLabel": "Account source coverage",
+      "accounts": {
+        "label": "Accounts",
+        "detail": "portfolio"
+      },
+      "openDeals": {
+        "label": "Open deals",
+        "detail": "External CRM pipeline"
+      },
+      "weightedPipeline": {
+        "label": "Weighted pipeline",
+        "detail": "bid and presales"
+      },
+      "logoCoverage": {
+        "label": "Logo coverage",
+        "detail": "brand assets"
+      },
+      "enrichedProfiles": {
+        "label": "Enriched profiles",
+        "detail": "verified data cache"
+      },
+      "sourcesHealthy": {
+        "label": "Sources healthy",
+        "detail": "API mesh"
+      }
+    },
+    "filters": {
+      "regionLabel": "Filters",
+      "search": {
+        "label": "Search",
+        "placeholder": "Search by name or domain…"
+      },
+      "industry": {
+        "label": "Industry",
+        "all": "All industries"
+      },
+      "sort": {
+        "label": "Sort",
+        "pipeline": "Sort: pipeline value",
+        "name": "Sort: name",
+        "health": "Sort: health",
+        "industry": "Sort: industry"
+      }
+    },
+    "liveRegion": {
+      "count_one": "{{count}} account",
+      "count_other": "{{count}} accounts",
+      "matching_one": "{{count}} account matching \"{{query}}\"",
+      "matching_other": "{{count}} accounts matching \"{{query}}\""
+    },
+    "grid": {
+      "regionLabel": "Account cards"
+    }
   }
 }

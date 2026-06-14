@@ -1,4 +1,5 @@
 import { useDeferredValue, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
@@ -45,6 +46,7 @@ const PRIORITY_OPTIONS: { value: LeadPriority | ''; label: string }[] = [
 const PRIORITY_ORDER: Record<string, number> = { low: 0, medium: 1, high: 2, critical: 3 };
 
 export function LeadsPage() {
+  const { t } = useTranslation('crm');
   const nav = useNavigate();
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
@@ -118,24 +120,32 @@ export function LeadsPage() {
         : Math.round(items.reduce((sum, lead) => sum + lead.score, 0) / total).toLocaleString();
 
     return [
-      { label: 'Filtered leads', value: total.toLocaleString(), detail: 'current view' },
       {
-        label: 'High priority',
+        label: t('leads.stats.filtered.label', 'Filtered leads'),
+        value: total.toLocaleString(),
+        detail: t('leads.stats.filtered.detail', 'current view'),
+      },
+      {
+        label: t('leads.stats.highPriority.label', 'High priority'),
         value: `${priorityLeads}/${total || 0}`,
-        detail: 'high or critical',
+        detail: t('leads.stats.highPriority.detail', 'high or critical'),
       },
       {
-        label: 'Pipeline-ready',
+        label: t('leads.stats.pipelineReady.label', 'Pipeline-ready'),
         value: pipelineReady.toLocaleString(),
-        detail: 'qualified or converted',
+        detail: t('leads.stats.pipelineReady.detail', 'qualified or converted'),
       },
-      { label: 'Avg score', value: averageScore, detail: 'fit score' },
+      {
+        label: t('leads.stats.avgScore.label', 'Avg score'),
+        value: averageScore,
+        detail: t('leads.stats.avgScore.detail', 'fit score'),
+      },
     ];
-  }, [items]);
+  }, [items, t]);
 
   const exportSelected = () => {
     if (bulk.selectedItems.length === 0) {
-      toast.info('Nothing to export');
+      toast.info(t('leads.toast.nothingToExport', 'Nothing to export'));
       return;
     }
     const csv = rowsToCsv(
@@ -150,28 +160,30 @@ export function LeadsPage() {
         createdAt: l.createdAt.slice(0, 10),
       })),
       [
-        { key: 'name', label: 'Name' },
-        { key: 'company', label: 'Company' },
-        { key: 'email', label: 'Email' },
-        { key: 'status', label: 'Status' },
-        { key: 'priority', label: 'Priority' },
-        { key: 'score', label: 'Score' },
-        { key: 'source', label: 'Source' },
-        { key: 'createdAt', label: 'Created' },
+        { key: 'name', label: t('leads.csv.name', 'Name') },
+        { key: 'company', label: t('leads.csv.company', 'Company') },
+        { key: 'email', label: t('leads.csv.email', 'Email') },
+        { key: 'status', label: t('leads.csv.status', 'Status') },
+        { key: 'priority', label: t('leads.csv.priority', 'Priority') },
+        { key: 'score', label: t('leads.csv.score', 'Score') },
+        { key: 'source', label: t('leads.csv.source', 'Source') },
+        { key: 'createdAt', label: t('leads.csv.created', 'Created') },
       ],
     );
     downloadCsv(`bidstack-leads-${new Date().toISOString().slice(0, 10)}`, csv);
     toast.success(
-      `Exported ${bulk.selectedItems.length} lead${bulk.selectedItems.length === 1 ? '' : 's'}`,
+      t('leads.toast.exported', 'Exported {{count}} lead', { count: bulk.selectedItems.length }),
     );
   };
 
   const bulkDelete = async () => {
     if (bulk.selectedItems.length === 0) return;
     const ok = await confirm({
-      title: `Delete ${bulk.selectedItems.length} lead${bulk.selectedItems.length === 1 ? '' : 's'}?`,
-      description: 'This action cannot be undone.',
-      confirmLabel: 'Delete',
+      title: t('leads.bulkDelete.title', 'Delete {{count}} lead?', {
+        count: bulk.selectedItems.length,
+      }),
+      description: t('leads.bulkDelete.description', 'This action cannot be undone.'),
+      confirmLabel: t('leads.bulkDelete.confirm', 'Delete'),
       destructive: true,
     });
     if (!ok) return;
@@ -186,24 +198,24 @@ export function LeadsPage() {
     bulk.clear();
     if (failed === 0) {
       toast.success(
-        `Deleted ${bulk.selectedItems.length} lead${bulk.selectedItems.length === 1 ? '' : 's'}`,
+        t('leads.toast.deleted', 'Deleted {{count}} lead', { count: bulk.selectedItems.length }),
       );
     } else {
-      toast.error(`${failed} deletion${failed === 1 ? '' : 's'} failed`);
+      toast.error(t('leads.toast.deleteFailed', '{{count}} deletion failed', { count: failed }));
     }
   };
 
   return (
     <div className="page">
       <div className="page-head">
-        <h1 className="page-title">Leads</h1>
+        <h1 className="page-title">{t('leads.title', 'Leads')}</h1>
         <div className="flex items-center gap-2">
           <LiquidGlassButton
             tone="secondary"
             size="sm"
             onClick={() => {
               if (items.length === 0) {
-                toast.info('Nothing to export');
+                toast.info(t('leads.toast.nothingToExport', 'Nothing to export'));
                 return;
               }
               const csv = rowsToCsv(
@@ -217,26 +229,28 @@ export function LeadsPage() {
                   createdAt: l.createdAt.slice(0, 10),
                 })),
                 [
-                  { key: 'name', label: 'Name' },
-                  { key: 'company', label: 'Company' },
-                  { key: 'title', label: 'Title' },
-                  { key: 'status', label: 'Status' },
-                  { key: 'score', label: 'Score (0-10000)' },
-                  { key: 'source', label: 'Source' },
-                  { key: 'createdAt', label: 'Created' },
+                  { key: 'name', label: t('leads.csv.name', 'Name') },
+                  { key: 'company', label: t('leads.csv.company', 'Company') },
+                  { key: 'title', label: t('leads.csv.title', 'Title') },
+                  { key: 'status', label: t('leads.csv.status', 'Status') },
+                  { key: 'score', label: t('leads.csv.scoreRange', 'Score (0-10000)') },
+                  { key: 'source', label: t('leads.csv.source', 'Source') },
+                  { key: 'createdAt', label: t('leads.csv.created', 'Created') },
                 ],
               );
               downloadCsv(`bidstack-leads-${new Date().toISOString().slice(0, 10)}`, csv);
-              toast.success(`Exported ${items.length} lead${items.length === 1 ? '' : 's'}`);
+              toast.success(
+                t('leads.toast.exported', 'Exported {{count}} lead', { count: items.length }),
+              );
             }}
             disabled={items.length === 0}
           >
             <Icon name="download" size={14} />
-            Export CSV
+            {t('leads.actions.exportCsv', 'Export CSV')}
           </LiquidGlassButton>
           <LiquidGlassButton onClick={() => nav('/leads/new')} size="sm" data-tour="leads-page-add">
             <Icon name="plus" size={14} />
-            New lead
+            {t('leads.actions.newLead', 'New lead')}
           </LiquidGlassButton>
         </div>
       </div>
@@ -244,18 +258,18 @@ export function LeadsPage() {
       <Card className="mb-4">
         <div className="flex flex-wrap items-center gap-3 p-3">
           <label className="min-w-[200px] flex-1">
-            <span className="sr-only">Search leads</span>
+            <span className="sr-only">{t('leads.search.label', 'Search leads')}</span>
             <input
               type="text"
-              aria-label="Search leads"
-              placeholder="Search leads..."
+              aria-label={t('leads.search.label', 'Search leads')}
+              placeholder={t('leads.search.placeholder', 'Search leads...')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] min-h-[44px] dark:bg-[var(--surface-glass)] dark:backdrop-blur-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-page)] focus:border-[var(--brand-primary)]"
             />
           </label>
           <select
-            aria-label="Filter leads by status"
+            aria-label={t('leads.filter.status', 'Filter leads by status')}
             value={statusFilter}
             onChange={(e) =>
               setStatusFilter(e.target.value === '' ? '' : LeadStatus.parse(e.target.value))
@@ -264,12 +278,12 @@ export function LeadsPage() {
           >
             {STATUS_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
-                {o.label}
+                {t(`leads.statusOption.${o.value || 'all'}`, o.label)}
               </option>
             ))}
           </select>
           <select
-            aria-label="Filter leads by priority"
+            aria-label={t('leads.filter.priority', 'Filter leads by priority')}
             value={priorityFilter}
             onChange={(e) =>
               setPriorityFilter(e.target.value === '' ? '' : LeadPriority.parse(e.target.value))
@@ -278,7 +292,7 @@ export function LeadsPage() {
           >
             {PRIORITY_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
-                {o.label}
+                {t(`leads.priorityOption.${o.value || 'all'}`, o.label)}
               </option>
             ))}
           </select>
@@ -288,7 +302,7 @@ export function LeadsPage() {
       {!isLoading && !isError ? (
         <section
           className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4"
-          aria-label="Lead list summary"
+          aria-label={t('leads.summary.label', 'Lead list summary')}
         >
           {leadStats.map((stat) => (
             <Card key={stat.label} className="px-3 py-2">
@@ -305,7 +319,11 @@ export function LeadsPage() {
       {/* sr-only live region — announces filter/search result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {!isLoading && !isError
-          ? `${items.length} lead${items.length === 1 ? '' : 's'}${deferredSearch ? ` matching "${deferredSearch}"` : ''}`
+          ? `${t('leads.liveRegion.count', '{{count}} lead', { count: items.length })}${
+              deferredSearch
+                ? t('leads.liveRegion.matching', ' matching "{{query}}"', { query: deferredSearch })
+                : ''
+            }`
           : ''}
       </p>
 
@@ -319,17 +337,21 @@ export function LeadsPage() {
 
       {isError ? (
         <ErrorState
-          title="Failed to load leads"
-          message={error?.message ?? 'Something went wrong'}
-          action={<Button onClick={() => refetch()}>Retry</Button>}
+          title={t('leads.error.title', 'Failed to load leads')}
+          message={error?.message ?? t('leads.error.message', 'Something went wrong')}
+          action={<Button onClick={() => refetch()}>{t('leads.error.retry', 'Retry')}</Button>}
         />
       ) : isLoading ? (
         <TableSkeleton rows={8} />
       ) : items.length === 0 ? (
         <EmptyState
-          title="No leads yet"
-          message="Create your first lead to start tracking prospects."
-          action={<Button onClick={() => nav('/leads/new')}>New lead</Button>}
+          title={t('leads.empty.title', 'No leads yet')}
+          message={t('leads.empty.message', 'Create your first lead to start tracking prospects.')}
+          action={
+            <Button onClick={() => nav('/leads/new')}>
+              {t('leads.actions.newLead', 'New lead')}
+            </Button>
+          }
         />
       ) : (
         <Card className="min-w-0 overflow-hidden p-3">
@@ -343,7 +365,9 @@ export function LeadsPage() {
                 <th className="w-10">
                   <label className="table-checkbox-hit">
                     <span className="sr-only">
-                      {bulk.allSelected ? 'Deselect all' : 'Select all'}
+                      {bulk.allSelected
+                        ? t('leads.table.deselectAll', 'Deselect all')
+                        : t('leads.table.selectAll', 'Select all')}
                     </span>
                     <input
                       type="checkbox"
@@ -358,39 +382,39 @@ export function LeadsPage() {
                 </th>
                 <th scope="col" className="px-4 py-3 font-medium" aria-sort={getSortableHeaderAriaSort('name', sortState)}>
                   <SortableHeader columnKey="name" state={sortState} onChange={setSortState}>
-                    Name
+                    {t('leads.table.name', 'Name')}
                   </SortableHeader>
                 </th>
                 <th scope="col" className="px-4 py-3 font-medium" aria-sort={getSortableHeaderAriaSort('companyName', sortState)}>
                   <SortableHeader columnKey="companyName" state={sortState} onChange={setSortState}>
-                    Company
+                    {t('leads.table.company', 'Company')}
                   </SortableHeader>
                 </th>
                 <th scope="col" className="px-4 py-3 font-medium" aria-sort={getSortableHeaderAriaSort('status', sortState)}>
                   <SortableHeader columnKey="status" state={sortState} onChange={setSortState}>
-                    Status
+                    {t('leads.table.status', 'Status')}
                   </SortableHeader>
                 </th>
                 <th scope="col" className="px-4 py-3 font-medium" aria-sort={getSortableHeaderAriaSort('priority', sortState)}>
                   <SortableHeader columnKey="priority" state={sortState} onChange={setSortState}>
-                    Priority
+                    {t('leads.table.priority', 'Priority')}
                   </SortableHeader>
                 </th>
                 <th scope="col" className="px-4 py-3 font-medium" aria-sort={getSortableHeaderAriaSort('score', sortState)}>
                   <SortableHeader columnKey="score" state={sortState} onChange={setSortState}>
-                    Score
+                    {t('leads.table.score', 'Score')}
                   </SortableHeader>
                 </th>
                 <th scope="col" className="px-4 py-3 font-medium" aria-sort={getSortableHeaderAriaSort('source', sortState)}>
                   <SortableHeader columnKey="source" state={sortState} onChange={setSortState}>
-                    Source
+                    {t('leads.table.source', 'Source')}
                   </SortableHeader>
                 </th>
                 <th scope="col" className="px-4 py-3 font-medium">
-                  Owner
+                  {t('leads.table.owner', 'Owner')}
                 </th>
                 <th scope="col" className="px-4 py-3 font-medium text-right">
-                  Actions
+                  {t('leads.table.actions', 'Actions')}
                 </th>
               </tr>
             </thead>
@@ -405,15 +429,20 @@ export function LeadsPage() {
                   onPatch={(patch) => updateLead.mutate({ id: lead.id, patch })}
                   onDelete={async () => {
                     const ok = await confirm({
-                      title: 'Delete lead?',
-                      description: `This will permanently remove ${lead.firstName} ${lead.lastName} from your leads.`,
-                      confirmLabel: 'Delete',
+                      title: t('leads.deleteOne.title', 'Delete lead?'),
+                      description: t(
+                        'leads.deleteOne.description',
+                        'This will permanently remove {{name}} from your leads.',
+                        { name: `${lead.firstName} ${lead.lastName}` },
+                      ),
+                      confirmLabel: t('leads.deleteOne.confirm', 'Delete'),
                       destructive: true,
                     });
                     if (!ok) return;
                     del.mutate(lead.id, {
-                      onSuccess: () => toast.success('Lead deleted'),
-                      onError: () => toast.error('Failed to delete lead'),
+                      onSuccess: () => toast.success(t('leads.toast.leadDeleted', 'Lead deleted')),
+                      onError: () =>
+                        toast.error(t('leads.toast.deleteOneFailed', 'Failed to delete lead')),
                     });
                   }}
                 />
@@ -426,7 +455,7 @@ export function LeadsPage() {
             hasPrevious={pager.hasPrevious}
             isLoading={isLoading}
             itemCount={items.length}
-            label="leads"
+            label={t('leads.pager.label', 'leads')}
             onNext={() => pager.goNext(data?.nextCursor)}
             onPrevious={pager.goPrevious}
           />

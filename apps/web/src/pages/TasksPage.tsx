@@ -1,5 +1,6 @@
 import { AnimatePresence, Reorder } from 'framer-motion';
 import { useCallback, useMemo, useState, useTransition } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 
 import { InlineTaskAdd } from '@/components/task/InlineTaskAdd';
@@ -45,6 +46,7 @@ function parseFilter(raw: string | null): StatusFilter {
 }
 
 export function TasksPage() {
+  const { t } = useTranslation('crm');
   const { data, isLoading, isError, error } = useTasks();
   // Filter rides on the query string so the view is shareable + back/forward
   // navigable. Linking to "/tasks?filter=overdue" lands a coworker on the
@@ -126,9 +128,15 @@ export function TasksPage() {
       if (!moved) return;
       next.splice(toIndex, 0, moved);
       setOrder(next.map((task) => task.id));
-      setTaskOrderMessage(`Moved ${moved.title} to position ${toIndex + 1} of ${next.length}.`);
+      setTaskOrderMessage(
+        t('tasks.reorder.announce', 'Moved {{title}} to position {{position}} of {{total}}.', {
+          title: moved.title,
+          position: toIndex + 1,
+          total: next.length,
+        }),
+      );
     },
-    [items, setOrder],
+    [items, setOrder, t],
   );
 
   const view = (searchParams.get('view') as 'list' | 'calendar') ?? 'list';
@@ -161,9 +169,13 @@ export function TasksPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">Tasks</h1>
+          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
+            {t('tasks.title', 'Tasks')}
+          </h1>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            {data?.items.length ?? 0} active follow-ups.
+            {t('tasks.subtitle', '{{count}} active follow-ups.', {
+              count: data?.items.length ?? 0,
+            })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -188,7 +200,7 @@ export function TasksPage() {
               downloadCsv(`tasks-${new Date().toISOString().slice(0, 10)}`, csv);
             }}
           >
-            Export CSV
+            {t('tasks.actions.exportCsv', 'Export CSV')}
           </Button>
           <SavedViewsBar />
           <CreateTaskDialog />
@@ -197,19 +209,19 @@ export function TasksPage() {
 
       {/* Filter chips — CRM-style segmented control above the table */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-        <div role="group" aria-label="Filter tasks" className="flex flex-wrap gap-2">
+        <div role="group" aria-label={t('tasks.filters.groupLabel', 'Filter tasks')} className="flex flex-wrap gap-2">
           <Chip active={filter === 'all'} onClick={() => switchFilter('all')}>
-            All
+            {t('tasks.filters.all', 'All')}
           </Chip>
           <Chip active={filter === 'today'} onClick={() => switchFilter('today')}>
-            Today
+            {t('tasks.filters.today', 'Today')}
           </Chip>
           <Chip active={filter === 'overdue'} onClick={() => switchFilter('overdue')} tone="danger">
-            Overdue
+            {t('tasks.filters.overdue', 'Overdue')}
           </Chip>
           {(['open', 'in_progress', 'blocked', 'done'] as const).map((s) => (
             <Chip key={s} active={filter === s} onClick={() => switchFilter(s)}>
-              {STATUS_LABELS[s]}
+              {t(`tasks.status.${s}`, STATUS_LABELS[s])}
             </Chip>
           ))}
         </div>
@@ -225,9 +237,9 @@ export function TasksPage() {
                   : 'text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)]',
               )}
               aria-pressed={view === 'list'}
-              aria-label="List view"
+              aria-label={t('tasks.view.listLabel', 'List view')}
             >
-              List
+              {t('tasks.view.list', 'List')}
             </button>
             <button
               type="button"
@@ -239,24 +251,24 @@ export function TasksPage() {
                   : 'text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)]',
               )}
               aria-pressed={view === 'calendar'}
-              aria-label="Calendar view"
+              aria-label={t('tasks.view.calendarLabel', 'Calendar view')}
             >
-              Calendar
+              {t('tasks.view.calendar', 'Calendar')}
             </button>
           </div>
           {view === 'list' && (
             <div className="flex items-center gap-1.5 text-[var(--fg-tertiary)]">
-              <span>Sort by</span>
+              <span>{t('tasks.sort.label', 'Sort by')}</span>
               <Select
-                aria-label="Sort tasks"
+                aria-label={t('tasks.sort.ariaLabel', 'Sort tasks')}
                 value={sort}
                 onChange={(e) => setSort(e.target.value as Sort)}
                 size="sm"
                 className="w-28"
               >
-                <option value="natural">Recent</option>
-                <option value="due">Due date</option>
-                <option value="status">Status</option>
+                <option value="natural">{t('tasks.sort.recent', 'Recent')}</option>
+                <option value="due">{t('tasks.sort.dueDate', 'Due date')}</option>
+                <option value="status">{t('tasks.sort.status', 'Status')}</option>
               </Select>
             </div>
           )}
@@ -266,7 +278,7 @@ export function TasksPage() {
       {/* sr-only live region — announces filter result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {!isLoading
-          ? `${items.length} task${items.length === 1 ? '' : 's'}${filter !== 'all' ? ` · ${filter.replace('_', ' ')}` : ''}`
+          ? `${t('tasks.srCount', '{{count}} task', { count: items.length })}${filter !== 'all' ? ` · ${filter.replace('_', ' ')}` : ''}`
           : ''}
       </p>
 
@@ -287,15 +299,27 @@ export function TasksPage() {
           >
             {isError ? (
               <ErrorState
-                title="Could not load tasks"
-                message={error instanceof Error ? error.message : 'Something went wrong'}
+                title={t('tasks.error.title', 'Could not load tasks')}
+                message={
+                  error instanceof Error
+                    ? error.message
+                    : t('tasks.error.generic', 'Something went wrong')
+                }
               />
             ) : isLoading ? (
               <LoadingSkeleton />
             ) : items.length === 0 ? (
               <EmptyState
-                title={filter === 'all' ? 'No tasks yet' : 'No tasks match this filter'}
-                message={filter === 'all' ? 'Create a follow-up to get started.' : undefined}
+                title={
+                  filter === 'all'
+                    ? t('tasks.empty.title', 'No tasks yet')
+                    : t('tasks.empty.filteredTitle', 'No tasks match this filter')
+                }
+                message={
+                  filter === 'all'
+                    ? t('tasks.empty.message', 'Create a follow-up to get started.')
+                    : undefined
+                }
                 action={filter === 'all' ? <CreateTaskDialog /> : null}
               />
             ) : sort === 'natural' ? (

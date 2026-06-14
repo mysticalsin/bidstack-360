@@ -66,5 +66,355 @@
     "leads": "Nessun lead",
     "companies": "Nessuna azienda",
     "ctaCreate": "Crea il primo {{entity}}"
+  },
+  "opportunities": {
+    "toast": {
+      "movedOne": "Spostata {{count}} opportunità",
+      "movedMany": "Spostate {{count}} opportunità",
+      "updatesFailedOne": "{{count}} aggiornamento non riuscito",
+      "updatesFailedMany": "{{count}} aggiornamenti non riusciti",
+      "updatesFailedDescription": "Gli spostamenti riusciti sono stati salvati; riprova per gli altri.",
+      "deletedOne": "Eliminata {{count}} opportunità",
+      "deletedMany": "Eliminate {{count}} opportunità",
+      "deletesFailedOne": "{{count}} eliminazione non riuscita",
+      "deletesFailedMany": "{{count}} eliminazioni non riuscite",
+      "exportComplete": "Esportazione completata",
+      "exportFailed": "Esportazione non riuscita",
+      "exportFailedDescription": "Riprova tra poco."
+    },
+    "confirmDelete": {
+      "titleOne": "Eliminare {{count}} opportunità?",
+      "titleMany": "Eliminare {{count}} opportunità?",
+      "description": "Questa azione non può essere annullata dall'interfaccia: il registro di audit documenta ogni eliminazione.",
+      "confirmLabel": "Elimina"
+    },
+    "liveRegion": {
+      "matchingOne": "{{count}} opportunità corrispondente a \"{{search}}\"",
+      "matchingMany": "{{count}} opportunità corrispondenti a \"{{search}}\"",
+      "inStageOne": "{{count}} opportunità nella fase selezionata",
+      "inStageMany": "{{count}} opportunità nella fase selezionata",
+      "totalOne": "{{count}} opportunità",
+      "totalMany": "{{count}} opportunità"
+    },
+    "error": {
+      "title": "Impossibile caricare le opportunità",
+      "message": "Riprova tra poco."
+    },
+    "empty": {
+      "title": "Ancora nessuna opportunità",
+      "message": "Crea la tua prima opportunità per iniziare a tracciare le gare."
+    },
+    "caption": {
+      "matching": "Opportunità corrispondenti a \"{{search}}\"",
+      "all": "Tutte le opportunità, ordinate per attività più recente. Le celle sono modificabili in linea."
+    },
+    "pagerLabel": "opportunità"
+  },
+  "leads": {
+    "title": "Lead",
+    "actions": {
+      "exportCsv": "Esporta CSV",
+      "newLead": "Nuovo lead"
+    },
+    "search": {
+      "label": "Cerca lead",
+      "placeholder": "Cerca lead..."
+    },
+    "filter": {
+      "status": "Filtra lead per stato",
+      "priority": "Filtra lead per priorità"
+    },
+    "statusOption": {
+      "all": "Tutti gli stati",
+      "new": "Nuovo",
+      "contacted": "Contattato",
+      "qualified": "Qualificato",
+      "nurture": "Da coltivare",
+      "disqualified": "Squalificato",
+      "converted": "Convertito"
+    },
+    "priorityOption": {
+      "all": "Tutte le priorità",
+      "low": "Bassa",
+      "medium": "Media",
+      "high": "Alta",
+      "critical": "Critica"
+    },
+    "summary": {
+      "label": "Riepilogo elenco lead"
+    },
+    "stats": {
+      "filtered": {
+        "label": "Lead filtrati",
+        "detail": "vista corrente"
+      },
+      "highPriority": {
+        "label": "Priorità alta",
+        "detail": "alta o critica"
+      },
+      "pipelineReady": {
+        "label": "Pronti per la pipeline",
+        "detail": "qualificati o convertiti"
+      },
+      "avgScore": {
+        "label": "Punteggio medio",
+        "detail": "punteggio di idoneità"
+      }
+    },
+    "liveRegion": {
+      "count": "{{count}} lead",
+      "matching": " corrispondenti a \"{{query}}\""
+    },
+    "error": {
+      "title": "Impossibile caricare i lead",
+      "message": "Si è verificato un errore",
+      "retry": "Riprova"
+    },
+    "empty": {
+      "title": "Ancora nessun lead",
+      "message": "Crea il tuo primo lead per iniziare a tracciare i potenziali clienti."
+    },
+    "table": {
+      "selectAll": "Seleziona tutto",
+      "deselectAll": "Deseleziona tutto",
+      "name": "Nome",
+      "company": "Azienda",
+      "status": "Stato",
+      "priority": "Priorità",
+      "score": "Punteggio",
+      "source": "Fonte",
+      "owner": "Titolare",
+      "actions": "Azioni"
+    },
+    "pager": {
+      "label": "lead"
+    },
+    "csv": {
+      "name": "Nome",
+      "company": "Azienda",
+      "title": "Titolo",
+      "email": "E-mail",
+      "status": "Stato",
+      "priority": "Priorità",
+      "score": "Punteggio",
+      "scoreRange": "Punteggio (0-10000)",
+      "source": "Fonte",
+      "created": "Creato"
+    },
+    "toast": {
+      "nothingToExport": "Niente da esportare",
+      "exported": "Esportato {{count}} lead",
+      "deleted": "Eliminato {{count}} lead",
+      "deleteFailed": "{{count}} eliminazione non riuscita",
+      "leadDeleted": "Lead eliminato",
+      "deleteOneFailed": "Impossibile eliminare il lead"
+    },
+    "bulkDelete": {
+      "title": "Eliminare {{count}} lead?",
+      "description": "Questa azione non può essere annullata.",
+      "confirm": "Elimina"
+    },
+    "deleteOne": {
+      "title": "Eliminare il lead?",
+      "description": "Questo rimuoverà definitivamente {{name}} dai tuoi lead.",
+      "confirm": "Elimina"
+    }
+  },
+  "tasks": {
+    "title": "Attività",
+    "subtitle": "{{count}} follow-up attivi.",
+    "actions": {
+      "exportCsv": "Esporta CSV"
+    },
+    "filters": {
+      "groupLabel": "Filtra le attività",
+      "all": "Tutte",
+      "today": "Oggi",
+      "overdue": "In ritardo"
+    },
+    "status": {
+      "open": "Aperta",
+      "in_progress": "In corso",
+      "blocked": "Bloccata",
+      "done": "Completata"
+    },
+    "view": {
+      "list": "Elenco",
+      "listLabel": "Vista elenco",
+      "calendar": "Calendario",
+      "calendarLabel": "Vista calendario"
+    },
+    "sort": {
+      "label": "Ordina per",
+      "ariaLabel": "Ordina le attività",
+      "recent": "Recenti",
+      "dueDate": "Data di scadenza",
+      "status": "Stato"
+    },
+    "error": {
+      "title": "Impossibile caricare le attività",
+      "generic": "Si è verificato un errore"
+    },
+    "empty": {
+      "title": "Ancora nessuna attività",
+      "filteredTitle": "Nessuna attività corrisponde a questo filtro",
+      "message": "Crea un follow-up per iniziare."
+    },
+    "reorder": {
+      "announce": "{{title}} spostata alla posizione {{position}} di {{total}}."
+    },
+    "srCount": "{{count}} attività"
+  },
+  "contacts": {
+    "title": "Contatti",
+    "subtitle": "{{count}} persone nell'unità decisionale.",
+    "actions": {
+      "importCsv": {
+        "aria": "Importa contatti da CSV"
+      },
+      "exportCsv": {
+        "aria": "Esporta tutti i contatti visibili in CSV"
+      },
+      "newContact": {
+        "aria": "Crea un nuovo contatto"
+      },
+      "delete": "Elimina",
+      "undo": "Annulla"
+    },
+    "search": {
+      "placeholder": "Cerca per nome, cliente, e-mail, ruolo…",
+      "aria": "Cerca contatti",
+      "clear": {
+        "aria": "Cancella ricerca"
+      }
+    },
+    "pager": {
+      "label": "contatti"
+    },
+    "column": {
+      "name": "Nome",
+      "role": "Ruolo",
+      "customer": "Cliente",
+      "email": "E-mail",
+      "phone": "Telefono",
+      "influence": "Influenza",
+      "sentiment": "Sentiment",
+      "createdAt": "Creato il"
+    },
+    "bulkDelete": {
+      "confirm": {
+        "title": "Eliminare {{count}} contatti?",
+        "description": "Verranno rimossi da eventuali gare collegate. Il registro di audit registra ogni eliminazione."
+      }
+    },
+    "delete": {
+      "confirm": {
+        "title": "Eliminare {{name}}?",
+        "description": "Questo li rimuove anche da eventuali gare collegate. Il registro di audit ne conserva traccia."
+      }
+    },
+    "toast": {
+      "restoredCount": "Ripristinati {{count}} contatti",
+      "deletedCount": "Eliminati {{count}} contatti",
+      "deleteFailedCount": {
+        "description": "Le eliminazioni riuscite sono state applicate; riprova per le restanti."
+      },
+      "nothingToExport": "Niente da esportare",
+      "exportedCount": "Esportati {{count}} contatti",
+      "restored": "{{name}} ripristinato",
+      "couldNotRestore": "Impossibile ripristinare",
+      "deleted": "{{name}} eliminato",
+      "deleteFailed": "Eliminazione non riuscita",
+      "serverRejected": "Il server ha rifiutato la richiesta."
+    },
+    "undo": {
+      "deletedCount": "Eliminati {{count}} contatti",
+      "deleted": "{{name}} eliminato"
+    }
+  },
+  "accounts": {
+    "title": "Account",
+    "error": {
+      "title": "Impossibile caricare gli account",
+      "message": "L'endpoint della dashboard non ha risposto."
+    },
+    "empty": {
+      "title": "Nessun account ancora",
+      "filtered": "Nessun account corrisponde ai tuoi filtri"
+    },
+    "summary": {
+      "companyCount_one": "{{count}} azienda",
+      "companyCount_other": "{{count}} aziende",
+      "openDeals": "{{count}} trattative aperte",
+      "weightedPipeline": "{{amount}} di pipeline ponderata"
+    },
+    "sync": {
+      "result": "{{enriched}} arricchiti / {{cached}} in cache",
+      "buttonTitle": "Sincronizza i principali clienti sale.order dell'ERP negli account BidStack verificati",
+      "inProgress": "Sincronizzazione...",
+      "button": "Sincronizza account ERP",
+      "errorTitle": "Sincronizzazione degli account ERP non riuscita",
+      "errorDescription": "Non è stato possibile completare l'ultimo recupero clienti dall'ERP.",
+      "alertFallback": "L'ultima sincronizzazione non è riuscita a recuperare i primi 20 clienti dell'ERP.",
+      "retry": "Riprova sincronizzazione"
+    },
+    "actions": {
+      "newAccount": "Nuovo account",
+      "retry": "Riprova"
+    },
+    "stats": {
+      "regionLabel": "Copertura delle fonti degli account",
+      "accounts": {
+        "label": "Account",
+        "detail": "portafoglio"
+      },
+      "openDeals": {
+        "label": "Trattative aperte",
+        "detail": "Pipeline del CRM esterno"
+      },
+      "weightedPipeline": {
+        "label": "Pipeline ponderata",
+        "detail": "gara e prevendita"
+      },
+      "logoCoverage": {
+        "label": "Copertura dei logo",
+        "detail": "risorse del brand"
+      },
+      "enrichedProfiles": {
+        "label": "Profili arricchiti",
+        "detail": "cache di dati verificati"
+      },
+      "sourcesHealthy": {
+        "label": "Fonti integre",
+        "detail": "mesh di API"
+      }
+    },
+    "filters": {
+      "regionLabel": "Filtri",
+      "search": {
+        "label": "Cerca",
+        "placeholder": "Cerca per nome o dominio…"
+      },
+      "industry": {
+        "label": "Settore",
+        "all": "Tutti i settori"
+      },
+      "sort": {
+        "label": "Ordina",
+        "pipeline": "Ordina: valore della pipeline",
+        "name": "Ordina: nome",
+        "health": "Ordina: salute",
+        "industry": "Ordina: settore"
+      }
+    },
+    "liveRegion": {
+      "count_one": "{{count}} account",
+      "count_other": "{{count}} account",
+      "matching_one": "{{count}} account corrispondente a \"{{query}}\"",
+      "matching_other": "{{count}} account corrispondenti a \"{{query}}\""
+    },
+    "grid": {
+      "regionLabel": "Schede degli account"
+    }
   }
 }

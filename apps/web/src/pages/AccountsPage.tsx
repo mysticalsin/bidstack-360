@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { SmartCompanyDialog } from '@/components/company/SmartCompanyDialog';
 import { Icon } from '@/components/ui/Icon';
@@ -15,6 +16,7 @@ import { IntegrationMotionRail, SourceStat } from './accountsPage/AccountDashboa
 import { deriveAccount, sortRows, titleCase, type SortKey } from './accountsPage/accountUtils';
 
 export function AccountsPage() {
+  const { t } = useTranslation('crm');
   const { formatMoneyMicros } = useFormatMoney();
   const dashboard = useCrmDashboard();
   const autopopulate = useAutopopulateSalesCompanies();
@@ -66,7 +68,7 @@ export function AccountsPage() {
   if (dashboard.isLoading) {
     return (
       <>
-        <h1 className="sr-only">Accounts</h1>
+        <h1 className="sr-only">{t('accounts.title', 'Accounts')}</h1>
         <LoadingSkeleton rows={10} />
       </>
     );
@@ -74,10 +76,13 @@ export function AccountsPage() {
   if (dashboard.isError) {
     return (
       <>
-        <h1 className="sr-only">Accounts</h1>
+        <h1 className="sr-only">{t('accounts.title', 'Accounts')}</h1>
         <ErrorState
-          title="Couldn't load accounts"
-          message={dashboard.error?.message ?? 'The dashboard endpoint did not respond.'}
+          title={t('accounts.error.title', "Couldn't load accounts")}
+          message={
+            dashboard.error?.message ??
+            t('accounts.error.message', 'The dashboard endpoint did not respond.')
+          }
         />
       </>
     );
@@ -85,8 +90,8 @@ export function AccountsPage() {
   if (!dashboard.data) {
     return (
       <>
-        <h1 className="sr-only">Accounts</h1>
-        <EmptyState title="No accounts yet" />
+        <h1 className="sr-only">{t('accounts.title', 'Accounts')}</h1>
+        <EmptyState title={t('accounts.empty.title', 'No accounts yet')} />
       </>
     );
   }
@@ -102,12 +107,12 @@ export function AccountsPage() {
       { limit: 20 },
       {
         onError: (error) => {
-          toast.error('ERP account sync failed', {
+          toast.error(t('accounts.sync.errorTitle', 'ERP account sync failed'), {
             description:
               error instanceof Error
                 ? error.message
-                : 'The latest ERP customer pull could not complete.',
-            action: { label: 'Retry', onClick: syncErpAccounts },
+                : t('accounts.sync.errorDescription', 'The latest ERP customer pull could not complete.'),
+            action: { label: t('accounts.actions.retry', 'Retry'), onClick: syncErpAccounts },
           });
         },
       },
@@ -123,16 +128,26 @@ export function AccountsPage() {
         transition={springSoft}
       >
         <div>
-          <h1 className="page-title gradient-text">Accounts</h1>
+          <h1 className="page-title gradient-text">{t('accounts.title', 'Accounts')}</h1>
           <div className="page-sub">
-            {rows.length} {rows.length === 1 ? 'company' : 'companies'} · {totalOpen} open deals ·{' '}
-            {formatMoneyMicros(totalPipeline, 'EUR')} weighted pipeline
+            {rows.length === 1
+              ? t('accounts.summary.companyCount_one', '{{count}} company', { count: rows.length })
+              : t('accounts.summary.companyCount_other', '{{count}} companies', {
+                  count: rows.length,
+                })}{' '}
+            · {t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })} ·{' '}
+            {t('accounts.summary.weightedPipeline', '{{amount}} weighted pipeline', {
+              amount: formatMoneyMicros(totalPipeline, 'EUR'),
+            })}
           </div>
         </div>
         <div className="page-actions">
           {autopopulate.data ? (
             <div className="account-sync-result">
-              {autopopulate.data.enriched} enriched / {autopopulate.data.cached} cached
+              {t('accounts.sync.result', '{{enriched}} enriched / {{cached}} cached', {
+                enriched: autopopulate.data.enriched,
+                cached: autopopulate.data.cached,
+              })}
             </div>
           ) : null}
           <button
@@ -140,7 +155,10 @@ export function AccountsPage() {
             className="btn btn-secondary"
             disabled={autopopulate.isPending}
             onClick={syncErpAccounts}
-            title="Sync top ERP sale.order customers into verified BidStack accounts"
+            title={t(
+              'accounts.sync.buttonTitle',
+              'Sync top ERP sale.order customers into verified BidStack accounts',
+            )}
           >
             {autopopulate.isPending ? (
               <span
@@ -150,13 +168,15 @@ export function AccountsPage() {
             ) : (
               <Icon name="download" size={14} />
             )}
-            {autopopulate.isPending ? 'Syncing...' : 'Sync ERP accounts'}
+            {autopopulate.isPending
+              ? t('accounts.sync.inProgress', 'Syncing...')
+              : t('accounts.sync.button', 'Sync ERP accounts')}
           </button>
           <SmartCompanyDialog
             trigger={
               <button type="button" className="btn btn-primary">
                 <Icon name="plus" size={14} />
-                New account
+                {t('accounts.actions.newAccount', 'New account')}
               </button>
             }
           />
@@ -169,9 +189,15 @@ export function AccountsPage() {
           className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--danger)] bg-[var(--danger-tint)] px-4 py-3 text-sm"
         >
           <div>
-            <div className="font-semibold text-[var(--danger)]">ERP account sync failed</div>
+            <div className="font-semibold text-[var(--danger)]">
+              {t('accounts.sync.errorTitle', 'ERP account sync failed')}
+            </div>
             <div className="mt-0.5 text-xs text-[var(--fg-secondary)]">
-              {syncError ?? 'The last sync could not pull the top 20 ERP customers.'}
+              {syncError ??
+                t(
+                  'accounts.sync.alertFallback',
+                  'The last sync could not pull the top 20 ERP customers.',
+                )}
             </div>
           </div>
           <button
@@ -180,37 +206,44 @@ export function AccountsPage() {
             disabled={autopopulate.isPending}
             onClick={syncErpAccounts}
           >
-            Retry sync
+            {t('accounts.sync.retry', 'Retry sync')}
           </button>
         </div>
       ) : null}
 
-      <section className="account-dashboard-strip" aria-label="Account source coverage">
-        <SourceStat label="Accounts" value={rows.length.toLocaleString()} detail="portfolio" />
+      <section
+        className="account-dashboard-strip"
+        aria-label={t('accounts.stats.regionLabel', 'Account source coverage')}
+      >
         <SourceStat
-          label="Open deals"
+          label={t('accounts.stats.accounts.label', 'Accounts')}
+          value={rows.length.toLocaleString()}
+          detail={t('accounts.stats.accounts.detail', 'portfolio')}
+        />
+        <SourceStat
+          label={t('accounts.stats.openDeals.label', 'Open deals')}
           value={totalOpen.toLocaleString()}
-          detail="External CRM pipeline"
+          detail={t('accounts.stats.openDeals.detail', 'External CRM pipeline')}
         />
         <SourceStat
-          label="Weighted pipeline"
+          label={t('accounts.stats.weightedPipeline.label', 'Weighted pipeline')}
           value={formatMoneyMicros(totalPipeline, 'EUR')}
-          detail="bid and presales"
+          detail={t('accounts.stats.weightedPipeline.detail', 'bid and presales')}
         />
         <SourceStat
-          label="Logo coverage"
+          label={t('accounts.stats.logoCoverage.label', 'Logo coverage')}
           value={`${logoCoverage}/${rows.length || 0}`}
-          detail="brand assets"
+          detail={t('accounts.stats.logoCoverage.detail', 'brand assets')}
         />
         <SourceStat
-          label="Enriched profiles"
+          label={t('accounts.stats.enrichedProfiles.label', 'Enriched profiles')}
           value={enrichedAccounts.toLocaleString()}
-          detail="verified data cache"
+          detail={t('accounts.stats.enrichedProfiles.detail', 'verified data cache')}
         />
         <SourceStat
-          label="Sources healthy"
+          label={t('accounts.stats.sourcesHealthy.label', 'Sources healthy')}
           value={`${healthyProviders}/${providerCount}`}
-          detail="API mesh"
+          detail={t('accounts.stats.sourcesHealthy.detail', 'API mesh')}
         />
       </section>
       <IntegrationMotionRail
@@ -222,25 +255,28 @@ export function AccountsPage() {
 
       <motion.section
         className="card account-filter-card"
-        aria-label="Filters"
+        aria-label={t('accounts.filters.regionLabel', 'Filters')}
         initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ ...springSoft, delay: reducedMotion ? 0 : 0.08 }}
       >
         <div className="card-body" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <label className="account-filter" aria-label="Search">
+          <label className="account-filter" aria-label={t('accounts.filters.search.label', 'Search')}>
             <Icon name="search" size={14} />
             <input
               type="search"
-              placeholder="Search by name or domain…"
+              placeholder={t('accounts.filters.search.placeholder', 'Search by name or domain…')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </label>
-          <label className="account-filter" aria-label="Industry">
+          <label
+            className="account-filter"
+            aria-label={t('accounts.filters.industry.label', 'Industry')}
+          >
             <Icon name="briefcase" size={14} />
             <select value={industry ?? ''} onChange={(e) => setIndustry(e.target.value || null)}>
-              <option value="">All industries</option>
+              <option value="">{t('accounts.filters.industry.all', 'All industries')}</option>
               {industries.map((ind) => (
                 <option key={ind} value={ind}>
                   {titleCase(ind)}
@@ -248,13 +284,17 @@ export function AccountsPage() {
               ))}
             </select>
           </label>
-          <label className="account-filter" aria-label="Sort">
+          <label className="account-filter" aria-label={t('accounts.filters.sort.label', 'Sort')}>
             <Icon name="reports" size={14} />
             <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
-              <option value="pipeline">Sort: pipeline value</option>
-              <option value="name">Sort: name</option>
-              <option value="health">Sort: health</option>
-              <option value="industry">Sort: industry</option>
+              <option value="pipeline">
+                {t('accounts.filters.sort.pipeline', 'Sort: pipeline value')}
+              </option>
+              <option value="name">{t('accounts.filters.sort.name', 'Sort: name')}</option>
+              <option value="health">{t('accounts.filters.sort.health', 'Sort: health')}</option>
+              <option value="industry">
+                {t('accounts.filters.sort.industry', 'Sort: industry')}
+              </option>
             </select>
           </label>
         </div>
@@ -262,15 +302,27 @@ export function AccountsPage() {
 
       {/* sr-only live region — announces filter/search result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {`${rows.length} account${rows.length === 1 ? '' : 's'}${search ? ` matching "${search}"` : ''}`}
+        {search
+          ? rows.length === 1
+            ? t('accounts.liveRegion.matching_one', '{{count}} account matching "{{query}}"', {
+                count: rows.length,
+                query: search,
+              })
+            : t('accounts.liveRegion.matching_other', '{{count}} accounts matching "{{query}}"', {
+                count: rows.length,
+                query: search,
+              })
+          : rows.length === 1
+            ? t('accounts.liveRegion.count_one', '{{count}} account', { count: rows.length })
+            : t('accounts.liveRegion.count_other', '{{count}} accounts', { count: rows.length })}
       </p>
 
       {rows.length === 0 ? (
-        <EmptyState title="No accounts match your filters" />
+        <EmptyState title={t('accounts.empty.filtered', 'No accounts match your filters')} />
       ) : (
         <motion.section
           className="account-grid"
-          aria-label="Account cards"
+          aria-label={t('accounts.grid.regionLabel', 'Account cards')}
           // Animate filter changes — surviving cards glide to new positions
           // while removed cards fade. Matches the macOS Stocks watchlist
           // reorder animation.
