@@ -37,7 +37,7 @@ removed (§8).
 | Action-plan management (§6) | Distinct from the audit trail (S1). Targeted V2, after the full bid process is in the tool. |
 | Onboarding agent "Moha" (§7) | Adjacent initiative; connect to the LMS/toolkit piece. |
 | RFP reading automation (§7) | Explicitly later phase; depends on structured storage of past proposals. |
-| Contractual: "link to Red Cards" (§1d) | "Red Cards" is not a concept in the codebase yet. Deferred until the model/owner is defined. |
+| ~~Contractual: "link to Red Cards" (§1d)~~ | **RESOLVED 2026-06-14: "Red Cards" = RATE CARDS (garbled transcript).** Already built: `ContractAgreement.rateCard` lines (role/rate/unit/currency) per MSA, shown in `ContractAgreementsCard`, OCR-extracted from the uploaded MSA, with the source document hosted + linked for verification. No separate model needed. |
 
 ## CONSTRAINTS — status
 
@@ -73,5 +73,5 @@ Still BLOCKED exactly as above — all need Tony's decisions/data, none faked.
 1. Define the **expertise-vs-solution OM rule** (unblocks the dashboard filter, per-account split, and the ABC/OM pull).
 2. Pick the **revenue data source**.
 3. Decide **where prospection capture lives** (DOS→ABC vs in-tool).
-4. Confirm **"Red Cards"** meaning (is it `RiskRegisterItem`?) to wire the contract↔risk link.
+4. ~~Confirm "Red Cards" meaning~~ **RESOLVED 2026-06-14: = Rate Cards, already built** (rate-card lines on contracts + OCR extraction + source-doc link).
 5. Schedule the **group security validation** (the gate to beta).
