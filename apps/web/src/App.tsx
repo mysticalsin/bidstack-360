@@ -11,6 +11,7 @@ import { WebVitalsHud } from '@/components/dev/WebVitalsHud';
 import { HelpDrawer } from '@/components/help/HelpDrawer';
 import { useHelpDrawerHotkey } from '@/components/help/useHelpDrawer';
 import { AppShell } from '@/components/layout/AppShell';
+import { PageTransition } from '@/components/motion/PageTransition';
 import { RouteProgress } from '@/components/layout/RouteProgress';
 import { ProductTour } from '@/components/onboarding/ProductTour';
 import { SampleDataBanner } from '@/components/onboarding/SampleDataBanner';
@@ -65,11 +66,16 @@ export function App() {
         <AppShell>
           {/* ErrorBoundary scoped inside AppShell so a render error in any page
               falls back gracefully while the sidebar/topbar survive. */}
-          <ErrorBoundary>
-            <Suspense fallback={<LoadingSkeleton rows={6} />}>
-              <AppRoutes />
-            </Suspense>
-          </ErrorBoundary>
+          {/* Enter-only page transition keyed on the path: each navigation
+              fades+rises the new page in. No exit animation (avoids router
+              location-freezing complexity); reduced-motion → opacity only. */}
+          <PageTransition pageKey={location.pathname}>
+            <ErrorBoundary>
+              <Suspense fallback={<LoadingSkeleton rows={6} />}>
+                <AppRoutes />
+              </Suspense>
+            </ErrorBoundary>
+          </PageTransition>
           <CommandPalette open={palette.open} onOpenChange={palette.setOpen} />
           <QuickAddMenu />
           <HelpDrawer />
