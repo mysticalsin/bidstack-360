@@ -214,5 +214,11 @@
     "duplicateAriaLabel": "Duplicate report {{name}}",
     "deleteConfirm": "Delete \"{{name}}\"?",
     "deleteAriaLabel": "Delete report {{name}}"
+  },
+  "fieldPicker": {
+    "placeholder": "Pick a field…",
+    "listboxLabel": "Field options",
+    "searchPlaceholder": "Search fields…",
+    "empty": "No fields found."
   }
 }

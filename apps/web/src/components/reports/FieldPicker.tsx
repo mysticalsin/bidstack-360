@@ -4,6 +4,7 @@
 
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, Search } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
@@ -71,9 +72,12 @@ interface Props {
   className?: string;
 }
 
-export function FieldPicker({ entity, value, onChange, placeholder = 'Pick a field…', className }: Props) {
+export function FieldPicker({ entity, value, onChange, placeholder, className }: Props) {
+  const { t } = useTranslation('reports');
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+
+  const resolvedPlaceholder = placeholder ?? t('fieldPicker.placeholder', 'Pick a field…');
 
   const { data: remoteFields } = useQuery<FieldDef[]>({
     queryKey: ['entity-fields', entity],
@@ -115,7 +119,7 @@ export function FieldPicker({ entity, value, onChange, placeholder = 'Pick a fie
         )}
       >
         <span className={selectedField ? '' : 'text-[var(--fg-tertiary)]'}>
-          {selectedField?.label ?? placeholder}
+          {selectedField?.label ?? resolvedPlaceholder}
         </span>
         <ChevronDown size={14} className="text-[var(--fg-tertiary)] shrink-0" />
       </button>
@@ -123,7 +127,7 @@ export function FieldPicker({ entity, value, onChange, placeholder = 'Pick a fie
       {open && (
         <div
           role="listbox"
-          aria-label="Field options"
+          aria-label={t('fieldPicker.listboxLabel', 'Field options')}
           className={cn(
             'absolute left-0 top-full mt-1 z-20 w-full max-h-52 overflow-y-auto rounded-lg',
             'border border-[var(--border-default)] bg-[var(--surface-card)] shadow-[var(--shadow-md)]',
@@ -136,13 +140,13 @@ export function FieldPicker({ entity, value, onChange, placeholder = 'Pick a fie
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search fields…"
+                placeholder={t('fieldPicker.searchPlaceholder', 'Search fields…')}
                 className="flex-1 bg-transparent text-xs text-[var(--fg-primary)] placeholder:text-[var(--fg-tertiary)] outline-none"
               />
             </div>
           </div>
           {filtered.length === 0 && (
-            <p className="px-3 py-3 text-xs text-[var(--fg-tertiary)]">No fields found.</p>
+            <p className="px-3 py-3 text-xs text-[var(--fg-tertiary)]">{t('fieldPicker.empty', 'No fields found.')}</p>
           )}
           {filtered.map((f) => (
             <button

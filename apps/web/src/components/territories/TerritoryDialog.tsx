@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { useUsers } from '@/hooks/useUsers';
@@ -23,6 +24,7 @@ function TerritoryDialogForm({
   isPending?: boolean;
   onClose: () => void;
 }) {
+  const { t } = useTranslation('crm');
   const users = useUsers();
   const [name, setName] = useState(territory?.name ?? '');
   const [region, setRegion] = useState(territory?.region ?? '');
@@ -56,13 +58,13 @@ function TerritoryDialogForm({
     <form className="space-y-4" onSubmit={handleSubmit}>
       <div className="space-y-1.5">
         <label htmlFor="t-name" className="text-sm font-medium text-[var(--fg-primary)]">
-          Name
+          {t('territory.fieldName', 'Name')}
         </label>
         <input
           id="t-name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g., DACH Enterprise"
+          placeholder={t('territory.namePlaceholder', 'e.g., DACH Enterprise')}
           required
           className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none placeholder:text-[var(--fg-tertiary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
         />
@@ -70,50 +72,50 @@ function TerritoryDialogForm({
 
       <div className="space-y-1.5">
         <label htmlFor="t-region" className="text-sm font-medium text-[var(--fg-primary)]">
-          Region
+          {t('territory.fieldRegion', 'Region')}
         </label>
         <input
           id="t-region"
           value={region}
           onChange={(e) => setRegion(e.target.value)}
-          placeholder="e.g., Europe"
+          placeholder={t('territory.regionPlaceholder', 'e.g., Europe')}
           className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none placeholder:text-[var(--fg-tertiary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
         />
       </div>
 
       <div className="space-y-1.5">
         <label htmlFor="t-countries" className="text-sm font-medium text-[var(--fg-primary)]">
-          Country codes
+          {t('territory.fieldCountryCodes', 'Country codes')}
         </label>
         <input
           id="t-countries"
           value={countryCodes}
           onChange={(e) => setCountryCodes(e.target.value)}
-          placeholder="DE, AT, CH"
+          placeholder={t('territory.countryCodesPlaceholder', 'DE, AT, CH')}
           className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none placeholder:text-[var(--fg-tertiary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
         />
-        <p className="text-xs text-[var(--fg-tertiary)]">Comma-separated ISO-3166 alpha-2 codes.</p>
+        <p className="text-xs text-[var(--fg-tertiary)]">{t('territory.countryCodesHint', 'Comma-separated ISO-3166 alpha-2 codes.')}</p>
       </div>
 
       <div className="space-y-1.5">
         <label htmlFor="t-postal" className="text-sm font-medium text-[var(--fg-primary)]">
-          Postal codes
+          {t('territory.fieldPostalCodes', 'Postal codes')}
         </label>
         <input
           id="t-postal"
           value={postalCodes}
           onChange={(e) => setPostalCodes(e.target.value)}
-          placeholder="Optional"
+          placeholder={t('territory.postalCodesPlaceholder', 'Optional')}
           className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none placeholder:text-[var(--fg-tertiary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
         />
         <p className="text-xs text-[var(--fg-tertiary)]">
-          Comma-separated postal codes for fine-grained routing.
+          {t('territory.postalCodesHint', 'Comma-separated postal codes for fine-grained routing.')}
         </p>
       </div>
 
       <div className="space-y-1.5">
         <label htmlFor="t-owner" className="text-sm font-medium text-[var(--fg-primary)]">
-          Owner
+          {t('territory.fieldOwner', 'Owner')}
         </label>
         <select
           id="t-owner"
@@ -122,7 +124,7 @@ function TerritoryDialogForm({
           required
           className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
         >
-          <option value="">Select an owner</option>
+          <option value="">{t('territory.ownerPlaceholder', 'Select an owner')}</option>
           {users.data?.map((u) => (
             <option key={u.id} value={u.id}>
               {u.name ?? u.email}
@@ -138,15 +140,15 @@ function TerritoryDialogForm({
           onChange={(e) => setActive(e.target.checked)}
           className="h-4 w-4 rounded border-[var(--border-default)]"
         />
-        Active
+        {t('territory.fieldActive', 'Active')}
       </label>
 
       <div className="flex justify-end gap-2 pt-2">
         <Button type="button" variant="ghost" onClick={onClose}>
-          Cancel
+          {t('territory.cancel', 'Cancel')}
         </Button>
         <Button type="submit" disabled={isPending || !ownerId}>
-          {isEdit ? 'Save changes' : 'Create territory'}
+          {isEdit ? t('territory.saveChanges', 'Save changes') : t('territory.create', 'Create territory')}
         </Button>
       </div>
     </form>
@@ -160,10 +162,11 @@ export function TerritoryDialog({
   onSubmit,
   isPending,
 }: TerritoryDialogProps) {
+  const { t } = useTranslation('crm');
   const isEdit = Boolean(territory);
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent title={isEdit ? 'Edit territory' : 'New territory'}>
+      <DialogContent title={isEdit ? t('territory.editTitle', 'Edit territory') : t('territory.newTitle', 'New territory')}>
         <TerritoryDialogForm
           key={territory?.id ?? 'new'}
           territory={territory}

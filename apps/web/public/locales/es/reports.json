@@ -194,5 +194,11 @@
     "duplicateAriaLabel": "Duplicar informe {{name}}",
     "deleteConfirm": "¿Eliminar \"{{name}}\"?",
     "deleteAriaLabel": "Eliminar informe {{name}}"
+  },
+  "fieldPicker": {
+    "placeholder": "Elige un campo…",
+    "listboxLabel": "Opciones de campo",
+    "searchPlaceholder": "Buscar campos…",
+    "empty": "No se encontraron campos."
   }
 }

@@ -214,5 +214,11 @@
     "duplicateAriaLabel": "复制报告 {{name}}",
     "deleteConfirm": "删除“{{name}}”？",
     "deleteAriaLabel": "删除报告 {{name}}"
+  },
+  "fieldPicker": {
+    "placeholder": "选择一个字段…",
+    "listboxLabel": "字段选项",
+    "searchPlaceholder": "搜索字段…",
+    "empty": "未找到字段。"
   }
 }

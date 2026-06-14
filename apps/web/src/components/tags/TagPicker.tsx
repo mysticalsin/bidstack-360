@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
@@ -31,6 +32,7 @@ interface TagPickerProps {
 }
 
 export function TagPicker({ entityType, entityId, suggestionContext }: TagPickerProps) {
+  const { t } = useTranslation('crm');
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [suggestions, setSuggestions] = useState<TagSuggestion[]>([]);
@@ -102,19 +104,19 @@ export function TagPicker({ entityType, entityId, suggestionContext }: TagPicker
         aria-expanded={open}
       >
         <Icon name="plus" size={10} ariaHidden />
-        Tag
+        {t('tagPicker.addTag', 'Tag')}
       </button>
 
       {open ? (
         <div
-          aria-label="Tag picker"
+          aria-label={t('tagPicker.popoverLabel', 'Tag picker')}
           className="absolute top-8 left-0 z-30 w-72 rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] p-3 shadow-xl"
         >
           <input
             type="text"
             autoFocus
             value={search}
-            placeholder="Search or create…"
+            placeholder={t('tagPicker.searchPlaceholder', 'Search or create…')}
             className="mb-2 w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-input)] px-2.5 py-1.5 text-sm text-[var(--fg-primary)] placeholder:text-[var(--fg-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => {
@@ -127,14 +129,14 @@ export function TagPicker({ entityType, entityId, suggestionContext }: TagPicker
             }}
           />
 
-          <div className="max-h-48 overflow-y-auto" aria-label="Existing tags">
+          <div className="max-h-48 overflow-y-auto" aria-label={t('tagPicker.existingTagsLabel', 'Existing tags')}>
             {candidates.length === 0 && search ? (
               <button
                 type="button"
                 onClick={() => void onCreateInline()}
                 className="block w-full rounded-md px-2 py-1.5 text-left text-sm text-[var(--brand-primary)] hover:bg-[var(--surface-sunken)]"
               >
-                + Create &ldquo;{search}&rdquo;
+                {t('tagPicker.createNamed', '+ Create “{{name}}”', { name: search })}
               </button>
             ) : null}
             {candidates.map((tag) => (
@@ -153,7 +155,7 @@ export function TagPicker({ entityType, entityId, suggestionContext }: TagPicker
             <div className="mt-3 border-t border-[var(--border-subtle)] pt-2">
               <div className="mb-1 flex items-center justify-between">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-                  AI suggestions
+                  {t('tagPicker.aiSuggestions', 'AI suggestions')}
                 </span>
                 <button
                   type="button"
@@ -161,7 +163,9 @@ export function TagPicker({ entityType, entityId, suggestionContext }: TagPicker
                   disabled={suggest.isPending}
                   className="text-[11px] font-medium text-[var(--brand-primary)] hover:underline disabled:opacity-50"
                 >
-                  {suggest.isPending ? 'Thinking…' : 'Suggest'}
+                  {suggest.isPending
+                    ? t('tagPicker.suggestThinking', 'Thinking…')
+                    : t('tagPicker.suggestAction', 'Suggest')}
                 </button>
               </div>
               <div className="flex flex-wrap gap-1.5">

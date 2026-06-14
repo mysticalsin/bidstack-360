@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -19,6 +20,7 @@ import type { WorkflowCreate } from '@bidstack/shared';
 import { NewWorkflowDialog } from './workflowsPage/NewWorkflowDialog';
 
 export function WorkflowsPage() {
+  const { t } = useTranslation('crm');
   const [showActiveOnly, setShowActiveOnly] = useState<boolean | undefined>(undefined);
   const { data, isLoading, isError, error, refetch } = useWorkflows(showActiveOnly);
 
@@ -34,9 +36,9 @@ export function WorkflowsPage() {
     createWf.mutate(body, {
       onSuccess: () => {
         setShowCreate(false);
-        toast.success('Workflow created');
+        toast.success(t('workflows.toastCreated', 'Workflow created'));
       },
-      onError: () => toast.error('Could not create workflow'),
+      onError: () => toast.error(t('workflows.toastCreateError', 'Could not create workflow')),
     });
   };
 
@@ -44,8 +46,13 @@ export function WorkflowsPage() {
     updateWf.mutate(
       { id, active: !active },
       {
-        onSuccess: () => toast.success(active ? 'Workflow paused' : 'Workflow activated'),
-        onError: () => toast.error('Could not update workflow'),
+        onSuccess: () =>
+          toast.success(
+            active
+              ? t('workflows.toastPaused', 'Workflow paused')
+              : t('workflows.toastActivated', 'Workflow activated'),
+          ),
+        onError: () => toast.error(t('workflows.toastUpdateError', 'Could not update workflow')),
       },
     );
   };
@@ -53,31 +60,42 @@ export function WorkflowsPage() {
   const handleRun = (id: string) => {
     runWf.mutate(id, {
       onSuccess: (run) => {
-        if (run.status === 'succeeded') toast.success('Workflow ran successfully');
-        else toast.error(`Workflow run ${run.status}${run.error ? `: ${run.error}` : ''}`);
+        if (run.status === 'succeeded')
+          toast.success(t('workflows.toastRunSuccess', 'Workflow ran successfully'));
+        else
+          toast.error(
+            t('workflows.toastRunFailed', 'Workflow run {{status}}{{detail}}', {
+              status: run.status,
+              detail: run.error ? `: ${run.error}` : '',
+            }),
+          );
       },
-      onError: () => toast.error('Could not run workflow'),
+      onError: () => toast.error(t('workflows.toastRunError', 'Could not run workflow')),
     });
   };
 
   const handleDelete = async (id: string, name: string) => {
     const ok = await confirm({
-      title: 'Delete workflow?',
-      description: `"${name}" will be removed. This can't be undone.`,
-      confirmLabel: 'Delete',
+      title: t('workflows.deleteConfirmTitle', 'Delete workflow?'),
+      description: t(
+        'workflows.deleteConfirmDescription',
+        '"{{name}}" will be removed. This can\'t be undone.',
+        { name },
+      ),
+      confirmLabel: t('workflows.deleteConfirmLabel', 'Delete'),
       destructive: true,
     });
     if (!ok) return;
     deleteWf.mutate(id, {
-      onSuccess: () => toast.success('Workflow deleted'),
-      onError: () => toast.error('Could not delete workflow'),
+      onSuccess: () => toast.success(t('workflows.toastDeleted', 'Workflow deleted')),
+      onError: () => toast.error(t('workflows.toastDeleteError', 'Could not delete workflow')),
     });
   };
 
   return (
     <div className="page">
       <div className="page-head">
-        <h1 className="page-title">Workflows</h1>
+        <h1 className="page-title">{t('workflows.pageTitle', 'Workflows')}</h1>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 text-sm text-[var(--fg-secondary)]">
             <input
@@ -86,32 +104,40 @@ export function WorkflowsPage() {
               onChange={(e) => setShowActiveOnly(e.target.checked ? true : undefined)}
               className="h-4 w-4 rounded border-[var(--border-subtle)]"
             />
-            Active only
+            {t('workflows.activeOnly', 'Active only')}
           </label>
-          <Button onClick={() => setShowCreate(true)}>New workflow</Button>
+          <Button onClick={() => setShowCreate(true)}>{t('workflows.newWorkflow', 'New workflow')}</Button>
         </div>
       </div>
 
       {/* sr-only live region — announces filter result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {!isLoading && data
-          ? `${items.length} workflow${items.length === 1 ? '' : 's'}${showActiveOnly ? ' · active only' : ''}`
+          ? `${
+              items.length === 1
+                ? t('workflows.countOne', '{{count}} workflow', { count: items.length })
+                : t('workflows.countOther', '{{count}} workflows', { count: items.length })
+            }${showActiveOnly ? t('workflows.activeOnlySuffix', ' · active only') : ''}`
           : ''}
       </p>
 
       {isError ? (
         <ErrorState
-          title="Failed to load workflows"
+          title={t('workflows.errorTitle', 'Failed to load workflows')}
           message={error?.message}
-          action={<Button onClick={() => refetch()}>Retry</Button>}
+          action={<Button onClick={() => refetch()}>{t('workflows.retry', 'Retry')}</Button>}
         />
       ) : isLoading ? (
         <TableSkeleton rows={6} />
       ) : items.length === 0 ? (
         <EmptyState
-          title="No workflows yet"
-          message="Automate your pre-sales workflows."
-          action={<Button onClick={() => setShowCreate(true)}>New workflow</Button>}
+          title={t('workflows.emptyTitle', 'No workflows yet')}
+          message={t('workflows.emptyMessage', 'Automate your pre-sales workflows.')}
+          action={
+            <Button onClick={() => setShowCreate(true)}>
+              {t('workflows.newWorkflow', 'New workflow')}
+            </Button>
+          }
         />
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -124,7 +150,11 @@ export function WorkflowsPage() {
                     <p className="mt-1 text-xs text-[var(--fg-secondary)]">{w.description}</p>
                   )}
                 </div>
-                <Badge tone={w.active ? 'jade' : 'gray'}>{w.active ? 'Active' : 'Inactive'}</Badge>
+                <Badge tone={w.active ? 'jade' : 'gray'}>
+                  {w.active
+                    ? t('workflows.statusActive', 'Active')
+                    : t('workflows.statusInactive', 'Inactive')}
+                </Badge>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Badge tone="blue">{w.triggerKind.replace(/_/g, ' ')}</Badge>
@@ -135,8 +165,14 @@ export function WorkflowsPage() {
                 ))}
               </div>
               <div className="mt-3 flex items-center gap-4 text-xs text-[var(--fg-tertiary)]">
-                <span>{w.runCount} runs</span>
-                {w.lastRunAt && <span>Last run {new Date(w.lastRunAt).toLocaleDateString()}</span>}
+                <span>{t('workflows.runCount', '{{count}} runs', { count: w.runCount })}</span>
+                {w.lastRunAt && (
+                  <span>
+                    {t('workflows.lastRun', 'Last run {{date}}', {
+                      date: new Date(w.lastRunAt).toLocaleDateString(),
+                    })}
+                  </span>
+                )}
               </div>
               <div className="mt-3 flex items-center justify-between border-t border-[var(--border-subtle)] pt-3">
                 <label className="flex cursor-pointer items-center gap-2 text-xs text-[var(--fg-secondary)]">
@@ -147,7 +183,9 @@ export function WorkflowsPage() {
                     disabled={updateWf.isPending}
                     className="h-4 w-4 rounded border-[var(--border-subtle)]"
                   />
-                  {w.active ? 'Active' : 'Paused'}
+                  {w.active
+                    ? t('workflows.statusActive', 'Active')
+                    : t('workflows.statusPaused', 'Paused')}
                 </label>
                 <div className="flex items-center gap-1">
                   <Button
@@ -156,12 +194,16 @@ export function WorkflowsPage() {
                     onClick={() => handleRun(w.id)}
                     disabled={runWf.isPending}
                   >
-                    {runWf.isPending ? 'Running…' : 'Run'}
+                    {runWf.isPending
+                      ? t('workflows.running', 'Running…')
+                      : t('workflows.run', 'Run')}
                   </Button>
                   <button
                     type="button"
                     onClick={() => handleDelete(w.id, w.name)}
-                    aria-label={`Delete workflow: ${w.name}`}
+                    aria-label={t('workflows.deleteAriaLabel', 'Delete workflow: {{name}}', {
+                      name: w.name,
+                    })}
                     disabled={deleteWf.isPending}
                     className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--fg-tertiary)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)] disabled:opacity-50 pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px]"
                   >

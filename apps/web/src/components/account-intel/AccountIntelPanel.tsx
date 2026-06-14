@@ -3,6 +3,7 @@
 
 import { motion, useReducedMotion } from 'framer-motion';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
   useAccountIntel,
@@ -31,15 +32,27 @@ export function AccountIntelPanel({ accountId }: Props) {
   const deleteSolution = useDeleteSolution(accountId);
   const deleteProduct = useDeleteProduct(accountId);
   const reducedMotion = useReducedMotion();
+  const { t } = useTranslation('crm');
   const [activeTab, setActiveTab] = useState<IntelTabKey>('solutions');
 
   const solutions = intel.data?.solutions ?? [];
   const products = intel.data?.products ?? [];
   const extractions = intel.data?.extractions ?? [];
   const tabs: Array<{ key: IntelTabKey; label: string }> = [
-    { key: 'solutions', label: `Solutions (${solutions.length})` },
-    { key: 'products', label: `Products (${products.length})` },
-    { key: 'extractions', label: `Extractions (${extractions.length})` },
+    {
+      key: 'solutions',
+      label: t('accountIntel.tabSolutions', 'Solutions ({{count}})', { count: solutions.length }),
+    },
+    {
+      key: 'products',
+      label: t('accountIntel.tabProducts', 'Products ({{count}})', { count: products.length }),
+    },
+    {
+      key: 'extractions',
+      label: t('accountIntel.tabExtractions', 'Extractions ({{count}})', {
+        count: extractions.length,
+      }),
+    },
   ];
 
   const selectTab = (key: IntelTabKey) => {
@@ -53,10 +66,16 @@ export function AccountIntelPanel({ accountId }: Props) {
     extract.mutate(
       { documentId },
       {
-        onSuccess: () => toast.success('Extraction queued — intelligence will appear shortly'),
+        onSuccess: () =>
+          toast.success(
+            t('accountIntel.extractQueued', 'Extraction queued — intelligence will appear shortly'),
+          ),
         onError: (err) =>
-          toast.error('Extraction failed', {
-            description: err instanceof Error ? err.message : 'Unknown error',
+          toast.error(t('accountIntel.extractFailed', 'Extraction failed'), {
+            description:
+              err instanceof Error
+                ? err.message
+                : t('accountIntel.unknownError', 'Unknown error'),
           }),
       },
     );
@@ -70,14 +89,14 @@ export function AccountIntelPanel({ accountId }: Props) {
       animate="animate"
     >
       <SectionHeader
-        title="Account Intelligence"
-        caption="Solutions, products & document extractions"
+        title={t('accountIntel.title', 'Account Intelligence')}
+        caption={t('accountIntel.caption', 'Solutions, products & document extractions')}
       />
 
       <div
         className="flex items-center gap-1 border-b border-[var(--border-subtle)]"
         role="tablist"
-        aria-label="Account intelligence views"
+        aria-label={t('accountIntel.tablistLabel', 'Account intelligence views')}
       >
         {tabs.map((tab) => (
           <button
@@ -127,7 +146,10 @@ export function AccountIntelPanel({ accountId }: Props) {
       </div>
 
       {intel.isError ? (
-        <ErrorState title="Failed to load" message={intel.error?.message} />
+        <ErrorState
+          title={t('accountIntel.loadFailed', 'Failed to load')}
+          message={intel.error?.message}
+        />
       ) : intel.isLoading ? (
         <TableSkeleton rows={4} columns={3} headless />
       ) : (

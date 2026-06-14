@@ -3,6 +3,7 @@
 // it read); "Mark all read" clears the unread badge in one shot.
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { Icon, type IconName } from '@/components/ui/Icon';
@@ -24,6 +25,7 @@ const TYPE_ICON: Record<NotificationType, IconName> = {
 };
 
 export function NotificationsBell() {
+  const { t } = useTranslation('crm');
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -59,15 +61,23 @@ export function NotificationsBell() {
       <Tooltip
         content={
           unreadCount > 0
-            ? `${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}`
-            : 'Notifications'
+            ? t('topbarNotifications.tooltipUnread', '{{count}} unread notification', {
+                count: unreadCount,
+              })
+            : t('topbarNotifications.tooltipTitle', 'Notifications')
         }
       >
         <button
           type="button"
           className="iconbtn relative"
           data-testid="notification-bell"
-          aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
+          aria-label={
+            unreadCount > 0
+              ? t('topbarNotifications.bellAriaUnread', 'Notifications, {{count}} unread', {
+                  count: unreadCount,
+                })
+              : t('topbarNotifications.bellAria', 'Notifications')
+          }
           aria-haspopup="menu"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
@@ -89,7 +99,7 @@ export function NotificationsBell() {
           <motion.div
             role="menu"
             data-testid="notification-tray"
-            aria-label="Notifications"
+            aria-label={t('topbarNotifications.trayAria', 'Notifications')}
             initial={reduced ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={reduced ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.98 }}
@@ -97,7 +107,9 @@ export function NotificationsBell() {
             className="absolute right-0 top-[calc(100%+6px)] z-30 w-80 rounded-lg glass-menu p-1.5 focus:outline-none"
           >
             <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-3 py-2 mb-1">
-              <span className="text-sm font-semibold text-[var(--fg-primary)]">Notifications</span>
+              <span className="text-sm font-semibold text-[var(--fg-primary)]">
+                {t('topbarNotifications.heading', 'Notifications')}
+              </span>
               {unreadCount > 0 && (
                 <button
                   type="button"
@@ -105,22 +117,22 @@ export function NotificationsBell() {
                   onClick={() => markAll.mutate()}
                   disabled={markAll.isPending}
                 >
-                  Mark all read
+                  {t('topbarNotifications.markAllRead', 'Mark all read')}
                 </button>
               )}
             </div>
             <div className="max-h-80 overflow-y-auto flex flex-col gap-0.5">
               {notifications.isError ? (
                 <div className="px-4 py-6 text-center text-sm text-[var(--danger)]">
-                  Could not load notifications
+                  {t('topbarNotifications.errorMessage', 'Could not load notifications')}
                 </div>
               ) : notifications.isLoading ? (
                 <div className="px-4 py-6 text-center text-sm text-[var(--fg-secondary)]">
-                  Loading…
+                  {t('topbarNotifications.loading', 'Loading…')}
                 </div>
               ) : items.length === 0 ? (
                 <div className="px-4 py-6 text-center text-sm text-[var(--fg-secondary)]">
-                  You&rsquo;re all caught up
+                  {t('topbarNotifications.empty', 'You’re all caught up')}
                 </div>
               ) : (
                 items.map((n) => {

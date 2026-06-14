@@ -14,6 +14,8 @@
  */
 
 import { useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import type { ScoreFactor } from '@/hooks/usePredictiveScore';
 import { useLeadScore } from '@/hooks/usePredictiveScore';
 
@@ -41,10 +43,10 @@ function scoreColorClasses(score: number): string {
   return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
 }
 
-function scoreLabel(score: number): string {
-  if (score >= 60) return 'Hot';
-  if (score >= 40) return 'Warm';
-  return 'Cold';
+function scoreLabel(score: number, t: TFunction): string {
+  if (score >= 60) return t('leadScoreBadge.labelHot', 'Hot');
+  if (score >= 40) return t('leadScoreBadge.labelWarm', 'Warm');
+  return t('leadScoreBadge.labelCold', 'Cold');
 }
 
 function featureLabel(feature: string): string {
@@ -60,11 +62,12 @@ function featureLabel(feature: string): string {
 // ─── Skeleton ─────────────────────────────────────────────────────────────
 
 function ScoreSkeleton({ size = 'md' }: { size?: 'sm' | 'md' }) {
+  const { t } = useTranslation('crm');
   const h = size === 'sm' ? 'h-5 w-12' : 'h-6 w-16';
   return (
     <span
       className={`inline-block rounded-full animate-pulse bg-[var(--color-neutral-200)] dark:bg-[var(--color-neutral-700)] ${h}`}
-      aria-label="Loading score..."
+      aria-label={t('leadScoreBadge.loading', 'Loading score...')}
       aria-busy="true"
     />
   );
@@ -111,6 +114,7 @@ function FactorList({ factors }: { factors: ScoreFactor[] }) {
 
 export function LeadScoreBadge({ leadId, prefetched, size = 'md' }: LeadScoreBadgeProps) {
   const { data, isLoading, isError } = useLeadScore(prefetched ? undefined : leadId);
+  const { t } = useTranslation('crm');
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
@@ -121,7 +125,7 @@ export function LeadScoreBadge({ leadId, prefetched, size = 'md' }: LeadScoreBad
   if (isError || score === undefined) return null;
 
   const colorClasses = scoreColorClasses(score);
-  const label = scoreLabel(score);
+  const label = scoreLabel(score, t);
   const padding = size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-xs';
 
   return (
@@ -130,7 +134,7 @@ export function LeadScoreBadge({ leadId, prefetched, size = 'md' }: LeadScoreBad
       <button
         ref={triggerRef}
         type="button"
-        aria-label={`Lead score: ${score} out of 100 — ${label}`}
+        aria-label={t('leadScoreBadge.badgeAriaLabel', 'Lead score: {{score}} out of 100 — {{label}}', { score, label })}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         onFocus={() => setOpen(true)}
@@ -161,7 +165,7 @@ export function LeadScoreBadge({ leadId, prefetched, size = 'md' }: LeadScoreBad
       {/* Popover — SHAP factor breakdown */}
       {open && factors.length > 0 && (
         <div
-          aria-label="Score factors"
+          aria-label={t('leadScoreBadge.popoverAriaLabel', 'Score factors')}
           className={[
             'absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50',
             'w-60 rounded-lg border p-3 shadow-lg',
@@ -170,11 +174,11 @@ export function LeadScoreBadge({ leadId, prefetched, size = 'md' }: LeadScoreBad
           ].join(' ')}
         >
           <p className="text-xs font-semibold text-[var(--color-neutral-900)] dark:text-[var(--color-neutral-100)] mb-2">
-            Top scoring factors
+            {t('leadScoreBadge.popoverHeading', 'Top scoring factors')}
           </p>
           <FactorList factors={factors} />
           <p className="mt-2 text-[10px] text-[var(--color-neutral-500)]">
-            Score {score}/100 · ML model
+            {t('leadScoreBadge.popoverFooter', 'Score {{score}}/100 · ML model', { score })}
           </p>
         </div>
       )}

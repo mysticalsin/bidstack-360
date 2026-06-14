@@ -3,6 +3,7 @@
 // when ready.
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/Button';
@@ -14,6 +15,7 @@ interface MeetingPrepCardProps {
 }
 
 export function MeetingPrepCard({ calendarEventId }: MeetingPrepCardProps) {
+  const { t } = useTranslation('crm');
   const [result, setResult] = useState<MeetingPrepResult | null>(null);
   const mutation = useMeetingPrep(calendarEventId);
 
@@ -27,11 +29,11 @@ export function MeetingPrepCard({ calendarEventId }: MeetingPrepCardProps) {
         'rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] p-4',
         'dark:bg-[var(--surface-glass)] dark:border-[var(--border-glow-strong)] dark:backdrop-blur-xl',
       )}
-      aria-label="AI Meeting Prep"
+      aria-label={t('meetingPrep.ariaLabel', 'AI Meeting Prep')}
     >
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
-          ✦ AI Meeting Prep
+          {t('meetingPrep.title', '✦ AI Meeting Prep')}
         </h3>
         {!result ? (
           <Button
@@ -40,14 +42,16 @@ export function MeetingPrepCard({ calendarEventId }: MeetingPrepCardProps) {
             disabled={mutation.isPending}
             onClick={handleGenerate}
           >
-            {mutation.isPending ? 'Preparing…' : 'Generate brief'}
+            {mutation.isPending
+              ? t('meetingPrep.preparing', 'Preparing…')
+              : t('meetingPrep.generateButton', 'Generate brief')}
           </Button>
         ) : null}
       </div>
 
       {/* Pending skeleton */}
       {mutation.isPending ? (
-        <div className="space-y-2 animate-pulse" aria-label="Generating meeting brief…" aria-live="polite">
+        <div className="space-y-2 animate-pulse" aria-label={t('meetingPrep.generatingAriaLabel', 'Generating meeting brief…')} aria-live="polite">
           {[80, 60, 70, 50].map((w, i) => (
             <div
               key={i}
@@ -62,8 +66,8 @@ export function MeetingPrepCard({ calendarEventId }: MeetingPrepCardProps) {
       {mutation.isError ? (
         <p className="text-xs text-[var(--danger)]" role="alert">
           {mutation.error.message.includes('cap')
-            ? 'Daily AI limit reached. Try again tomorrow.'
-            : 'Failed to prepare brief. Please try again.'}
+            ? t('meetingPrep.errorCapReached', 'Daily AI limit reached. Try again tomorrow.')
+            : t('meetingPrep.errorGeneric', 'Failed to prepare brief. Please try again.')}
         </p>
       ) : null}
 
@@ -74,7 +78,7 @@ export function MeetingPrepCard({ calendarEventId }: MeetingPrepCardProps) {
           {result.attendees.length > 0 ? (
             <div>
               <h4 className="mb-1.5 text-xs font-semibold text-[var(--fg-secondary)] uppercase tracking-wider">
-                Attendees
+                {t('meetingPrep.sectionAttendees', 'Attendees')}
               </h4>
               <ul className="space-y-1">
                 {result.attendees.map((a, i) => (
@@ -92,7 +96,7 @@ export function MeetingPrepCard({ calendarEventId }: MeetingPrepCardProps) {
           {result.openOpps.length > 0 ? (
             <div>
               <h4 className="mb-1.5 text-xs font-semibold text-[var(--fg-secondary)] uppercase tracking-wider">
-                Open Deals
+                {t('meetingPrep.sectionOpenDeals', 'Open Deals')}
               </h4>
               <ul className="space-y-1">
                 {result.openOpps.map((opp) => (
@@ -111,7 +115,7 @@ export function MeetingPrepCard({ calendarEventId }: MeetingPrepCardProps) {
           {result.talkingPoints.length > 0 ? (
             <div>
               <h4 className="mb-1.5 text-xs font-semibold text-[var(--fg-secondary)] uppercase tracking-wider">
-                Talking Points
+                {t('meetingPrep.sectionTalkingPoints', 'Talking Points')}
               </h4>
               <ul className="list-disc list-inside space-y-1">
                 {result.talkingPoints.map((tp, i) => (
@@ -127,7 +131,7 @@ export function MeetingPrepCard({ calendarEventId }: MeetingPrepCardProps) {
           {result.suggestedQuestions.length > 0 ? (
             <div>
               <h4 className="mb-1.5 text-xs font-semibold text-[var(--fg-secondary)] uppercase tracking-wider">
-                Suggested Questions
+                {t('meetingPrep.sectionSuggestedQuestions', 'Suggested Questions')}
               </h4>
               <ul className="list-disc list-inside space-y-1">
                 {result.suggestedQuestions.map((q, i) => (
@@ -143,7 +147,7 @@ export function MeetingPrepCard({ calendarEventId }: MeetingPrepCardProps) {
           {result.recentInteractions.length > 0 ? (
             <div>
               <h4 className="mb-1.5 text-xs font-semibold text-[var(--fg-secondary)] uppercase tracking-wider">
-                Recent Interactions
+                {t('meetingPrep.sectionRecentInteractions', 'Recent Interactions')}
               </h4>
               <ul className="space-y-1">
                 {result.recentInteractions.map((ri, i) => (
@@ -156,7 +160,9 @@ export function MeetingPrepCard({ calendarEventId }: MeetingPrepCardProps) {
           ) : null}
 
           <p className="text-[10px] text-[var(--fg-muted)]">
-            Cost: ${(result.costMicros / 1_000_000).toFixed(4)}
+            {t('meetingPrep.cost', 'Cost: ${{amount}}', {
+              amount: (result.costMicros / 1_000_000).toFixed(4),
+            })}
           </p>
 
           <AiFeedback sessionId={result.sessionId} />
@@ -166,8 +172,10 @@ export function MeetingPrepCard({ calendarEventId }: MeetingPrepCardProps) {
       {/* Empty state — not yet generated */}
       {!mutation.isPending && !mutation.isError && !result ? (
         <p className="text-xs text-[var(--fg-tertiary)]">
-          Generate an AI-powered brief covering attendees, open deals, talking points, and suggested
-          questions for this meeting.
+          {t(
+            'meetingPrep.emptyState',
+            'Generate an AI-powered brief covering attendees, open deals, talking points, and suggested questions for this meeting.',
+          )}
         </p>
       ) : null}
     </section>

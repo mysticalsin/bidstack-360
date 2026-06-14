@@ -214,5 +214,11 @@
     "duplicateAriaLabel": "Dupliquer le rapport {{name}}",
     "deleteConfirm": "Supprimer \"{{name}}\" ?",
     "deleteAriaLabel": "Supprimer le rapport {{name}}"
+  },
+  "fieldPicker": {
+    "placeholder": "Choisir un champ…",
+    "listboxLabel": "Options de champ",
+    "searchPlaceholder": "Rechercher des champs…",
+    "empty": "Aucun champ trouvé."
   }
 }

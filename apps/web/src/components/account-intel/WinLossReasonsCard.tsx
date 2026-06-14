@@ -4,6 +4,7 @@
  * surfaces the org-wide pattern (e.g. "most losses are price").
  */
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -35,36 +36,44 @@ export interface ClosedOpp {
 }
 
 export function WinLossReasonsCard({ closedOpps }: { closedOpps: ClosedOpp[] }) {
+  const { t } = useTranslation('crm');
   const patterns = useWinLossPatterns();
   const canWrite = useIsAdmin();
 
   return (
-    <Card role="region" aria-label="Win/loss reasons">
+    <Card role="region" aria-label={t('winLossReasons.regionLabel', 'Win/loss reasons')}>
       <SectionHeader
-        title="Win / loss reasons"
-        caption="Why deals close — and the pattern across the org"
+        title={t('winLossReasons.title', 'Win / loss reasons')}
+        caption={t('winLossReasons.caption', 'Why deals close — and the pattern across the org')}
       />
       <div className="px-5 pb-5 space-y-4">
         {patterns.isLoading ? (
           <LoadingSkeleton rows={2} />
         ) : patterns.isError ? (
           <ErrorState
-            title="Could not load win/loss patterns"
-            message={patterns.error?.message ?? 'Try again shortly.'}
+            title={t('winLossReasons.errorTitle', 'Could not load win/loss patterns')}
+            message={patterns.error?.message ?? t('winLossReasons.errorMessage', 'Try again shortly.')}
           />
         ) : (
           <div>
             <p className="text-sm text-[var(--fg-secondary)]">
-              {patterns.data!.totalWon} won · {patterns.data!.totalLost} lost recorded
+              {t('winLossReasons.recordedCount', '{{won}} won · {{lost}} lost recorded', {
+                won: patterns.data!.totalWon,
+                lost: patterns.data!.totalLost,
+              })}
             </p>
             {patterns.data!.topLossReason ? (
               <p className="mt-2 flex items-center gap-2 text-sm text-[var(--fg-primary)]">
-                <Badge tone="tomato">Pattern</Badge>
-                Most losses cite <strong>{REASON_LABEL[patterns.data!.topLossReason]}</strong>.
+                <Badge tone="tomato">{t('winLossReasons.patternBadge', 'Pattern')}</Badge>
+                {t('winLossReasons.mostLossesCitePrefix', 'Most losses cite ')}
+                <strong>{REASON_LABEL[patterns.data!.topLossReason]}</strong>.
               </p>
             ) : (
               <p className="mt-2 text-sm text-[var(--fg-tertiary)]">
-                No loss reasons recorded yet — capture a few to surface patterns.
+                {t(
+                  'winLossReasons.noReasonsYet',
+                  'No loss reasons recorded yet — capture a few to surface patterns.',
+                )}
               </p>
             )}
             {patterns.data!.rows.filter((r) => r.outcome === 'lost').length > 0 && (
@@ -91,6 +100,7 @@ export function WinLossReasonsCard({ closedOpps }: { closedOpps: ClosedOpp[] }) 
 }
 
 function CaptureForm({ closedOpps }: { closedOpps: ClosedOpp[] }) {
+  const { t } = useTranslation('crm');
   const upsert = useUpsertWinLoss();
   const [oppId, setOppId] = useState('');
   const [reason, setReason] = useState<WinLossReasonCode>('price');
@@ -102,7 +112,7 @@ function CaptureForm({ closedOpps }: { closedOpps: ClosedOpp[] }) {
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!selectedOpp) {
-      toast.error('Pick a closed deal first');
+      toast.error(t('winLossReasons.toastPickDeal', 'Pick a closed deal first'));
       return;
     }
     upsert.mutate(
@@ -117,12 +127,15 @@ function CaptureForm({ closedOpps }: { closedOpps: ClosedOpp[] }) {
       },
       {
         onSuccess: () => {
-          toast.success('Reason recorded');
+          toast.success(t('winLossReasons.toastRecorded', 'Reason recorded'));
           setOppId('');
           setCompetitor('');
           setNote('');
         },
-        onError: (err: Error) => toast.error('Could not save', { description: err.message }),
+        onError: (err: Error) =>
+          toast.error(t('winLossReasons.toastSaveError', 'Could not save'), {
+            description: err.message,
+          }),
       },
     );
   };
@@ -130,16 +143,16 @@ function CaptureForm({ closedOpps }: { closedOpps: ClosedOpp[] }) {
   return (
     <form onSubmit={onSubmit} className="space-y-2 border-t border-[var(--border)] pt-3">
       <p className="text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
-        Record a reason
+        {t('winLossReasons.formHeading', 'Record a reason')}
       </p>
       <div className="grid grid-cols-2 gap-2">
         <select
           value={oppId}
           onChange={(e) => setOppId(e.target.value)}
           className={inputCls}
-          aria-label="Closed deal"
+          aria-label={t('winLossReasons.closedDealLabel', 'Closed deal')}
         >
-          <option value="">Select a closed deal…</option>
+          <option value="">{t('winLossReasons.selectClosedDeal', 'Select a closed deal…')}</option>
           {closedOpps.map((o) => (
             <option key={o.id} value={o.id}>
               {o.outcome === 'won' ? '✓ ' : '✗ '}
@@ -151,7 +164,7 @@ function CaptureForm({ closedOpps }: { closedOpps: ClosedOpp[] }) {
           value={reason}
           onChange={(e) => setReason(e.target.value as WinLossReasonCode)}
           className={inputCls}
-          aria-label="Reason"
+          aria-label={t('winLossReasons.reasonLabel', 'Reason')}
         >
           {REASONS.map((r) => (
             <option key={r} value={r}>
@@ -162,20 +175,22 @@ function CaptureForm({ closedOpps }: { closedOpps: ClosedOpp[] }) {
         <input
           value={competitor}
           onChange={(e) => setCompetitor(e.target.value)}
-          placeholder="Competitor (optional)"
+          placeholder={t('winLossReasons.competitorPlaceholder', 'Competitor (optional)')}
           className={inputCls}
-          aria-label="Competitor"
+          aria-label={t('winLossReasons.competitorLabel', 'Competitor')}
         />
         <input
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="Note (optional)"
+          placeholder={t('winLossReasons.notePlaceholder', 'Note (optional)')}
           className={inputCls}
-          aria-label="Note"
+          aria-label={t('winLossReasons.noteLabel', 'Note')}
         />
       </div>
       <Button type="submit" disabled={!oppId || upsert.isPending}>
-        {upsert.isPending ? 'Saving…' : 'Record reason'}
+        {upsert.isPending
+          ? t('winLossReasons.saving', 'Saving…')
+          : t('winLossReasons.submit', 'Record reason')}
       </Button>
     </form>
   );

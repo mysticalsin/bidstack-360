@@ -1,5 +1,6 @@
 // Self-contained "create calendar event" modal — owns its own form state.
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Modal } from '@/components/ui/Modal';
 import type { CreateEventBody } from './types';
@@ -19,6 +20,7 @@ export function CreateEventModal({
   loading,
   error,
 }: CreateEventModalProps) {
+  const { t } = useTranslation('crm');
   // WHY: derive baseDateStr inline — avoids importing toIso from the parent module
   const baseDateStr = (initialDate ?? new Date()).toISOString().slice(0, 10);
   const [subject, setSubject] = useState('');
@@ -42,9 +44,11 @@ export function CreateEventModal({
   }
 
   return (
-    <Modal open onClose={onClose} label="Create calendar event">
+    <Modal open onClose={onClose} label={t('createEvent.modalLabel', 'Create calendar event')}>
       <div className="bg-(--color-surface) rounded-2xl p-6 shadow-xl w-full max-w-md mx-4 focus:outline-none">
-        <h2 className="text-lg font-semibold mb-4 text-(--color-text-primary)">New event</h2>
+        <h2 className="text-lg font-semibold mb-4 text-(--color-text-primary)">
+          {t('createEvent.heading', 'New event')}
+        </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error ? (
             <p
@@ -59,7 +63,7 @@ export function CreateEventModal({
               htmlFor="evt-subject"
               className="block text-sm font-medium text-(--color-text-secondary) mb-1"
             >
-              Title
+              {t('createEvent.titleLabel', 'Title')}
             </label>
             <input
               id="evt-subject"
@@ -68,7 +72,7 @@ export function CreateEventModal({
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               className="w-full rounded-lg border border-(--color-border) bg-(--color-bg) px-3 py-2 text-sm text-(--color-text-primary) focus:outline-none focus:ring-2 focus:ring-(--color-accent)"
-              placeholder="Event title"
+              placeholder={t('createEvent.titlePlaceholder', 'Event title')}
               autoFocus
             />
           </div>
@@ -79,7 +83,7 @@ export function CreateEventModal({
                 htmlFor="evt-date"
                 className="block text-sm font-medium text-(--color-text-secondary) mb-1"
               >
-                Date
+                {t('createEvent.dateLabel', 'Date')}
               </label>
               <input
                 id="evt-date"
@@ -95,7 +99,7 @@ export function CreateEventModal({
                 htmlFor="evt-provider"
                 className="block text-sm font-medium text-(--color-text-secondary) mb-1"
               >
-                Calendar
+                {t('createEvent.calendarLabel', 'Calendar')}
               </label>
               <select
                 id="evt-provider"
@@ -103,8 +107,10 @@ export function CreateEventModal({
                 onChange={(e) => setProvider(e.target.value as typeof provider)}
                 className="w-full rounded-lg border border-(--color-border) bg-(--color-bg) px-3 py-2 text-sm text-(--color-text-primary) focus:outline-none focus:ring-2 focus:ring-(--color-accent)"
               >
-                <option value="google_workspace">Google</option>
-                <option value="microsoft_graph">Microsoft</option>
+                <option value="google_workspace">{t('createEvent.providerGoogle', 'Google')}</option>
+                <option value="microsoft_graph">
+                  {t('createEvent.providerMicrosoft', 'Microsoft')}
+                </option>
               </select>
             </div>
           </div>
@@ -115,7 +121,7 @@ export function CreateEventModal({
                 htmlFor="evt-start"
                 className="block text-sm font-medium text-(--color-text-secondary) mb-1"
               >
-                Start
+                {t('createEvent.startLabel', 'Start')}
               </label>
               <input
                 id="evt-start"
@@ -131,7 +137,7 @@ export function CreateEventModal({
                 htmlFor="evt-end"
                 className="block text-sm font-medium text-(--color-text-secondary) mb-1"
               >
-                End
+                {t('createEvent.endLabel', 'End')}
               </label>
               <input
                 id="evt-end"
@@ -149,7 +155,7 @@ export function CreateEventModal({
               htmlFor="evt-location"
               className="block text-sm font-medium text-(--color-text-secondary) mb-1"
             >
-              Location (optional)
+              {t('createEvent.locationLabel', 'Location (optional)')}
             </label>
             <input
               id="evt-location"
@@ -157,7 +163,7 @@ export function CreateEventModal({
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               className="w-full rounded-lg border border-(--color-border) bg-(--color-bg) px-3 py-2 text-sm text-(--color-text-primary) focus:outline-none focus:ring-2 focus:ring-(--color-accent)"
-              placeholder="Room, Zoom link, address…"
+              placeholder={t('createEvent.locationPlaceholder', 'Room, Zoom link, address…')}
             />
           </div>
 
@@ -167,14 +173,16 @@ export function CreateEventModal({
               onClick={onClose}
               className="min-h-[44px] px-4 py-2 rounded-lg text-sm font-medium text-(--color-text-secondary) hover:bg-(--color-surface-hover) focus:outline-none focus:ring-2 focus:ring-(--color-accent)"
             >
-              Cancel
+              {t('createEvent.cancel', 'Cancel')}
             </button>
             <button
               type="submit"
               disabled={loading}
               className="min-h-[44px] px-4 py-2 rounded-lg text-sm font-medium bg-(--color-accent) text-white hover:bg-(--color-accent-hover) focus:outline-none focus:ring-2 focus:ring-(--color-accent) focus:ring-offset-2 disabled:opacity-50"
             >
-              {loading ? 'Saving…' : 'Create event'}
+              {loading
+                ? t('createEvent.saving', 'Saving…')
+                : t('createEvent.submit', 'Create event')}
             </button>
           </div>
         </form>

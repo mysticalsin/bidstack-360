@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -25,6 +26,7 @@ const STATUS_FLOW: Record<string, string[]> = {
 };
 
 export function ServiceCaseDetailPage() {
+  const { t } = useTranslation('crm');
   const { id } = useParams<{ id: string }>();
   const c = useServiceCase(id);
   const update = useUpdateServiceCase();
@@ -34,12 +36,21 @@ export function ServiceCaseDetailPage() {
   if (c.isError)
     return (
       <ErrorState
-        title="Failed to load case"
-        message={c.error instanceof Error ? c.error.message : 'Something went wrong'}
+        title={t('serviceCaseDetail.errorTitle', 'Failed to load case')}
+        message={
+          c.error instanceof Error
+            ? c.error.message
+            : t('serviceCaseDetail.errorMessage', 'Something went wrong')
+        }
       />
     );
   if (!c.data)
-    return <EmptyState title="Case not found" message="This case may have been deleted." />;
+    return (
+      <EmptyState
+        title={t('serviceCaseDetail.notFoundTitle', 'Case not found')}
+        message={t('serviceCaseDetail.notFoundMessage', 'This case may have been deleted.')}
+      />
+    );
   const cs = c.data;
 
   const transitions = STATUS_FLOW[cs.status] ?? [];
@@ -58,9 +69,9 @@ export function ServiceCaseDetailPage() {
       {
         onSuccess: () => {
           setNote('');
-          toast.success('Note added to case');
+          toast.success(t('serviceCaseDetail.noteAddedToast', 'Note added to case'));
         },
-        onError: () => toast.error('Could not save note'),
+        onError: () => toast.error(t('serviceCaseDetail.noteErrorToast', 'Could not save note')),
       },
     );
   };
@@ -89,12 +100,16 @@ export function ServiceCaseDetailPage() {
           </div>
           <p className="mt-1 text-lg text-[var(--fg-primary)]">{cs.subject}</p>
           <div className="mt-2 flex flex-wrap gap-2 text-sm text-[var(--fg-secondary)]">
-            {cs.ownerName && <span>Owner: {cs.ownerName}</span>}
-            <span>Priority: {cs.priority}</span>
-            <span>Source: {cs.source}</span>
+            {cs.ownerName && (
+              <span>{t('serviceCaseDetail.ownerLabel', 'Owner: {{name}}', { name: cs.ownerName })}</span>
+            )}
+            <span>{t('serviceCaseDetail.priorityLabel', 'Priority: {{priority}}', { priority: cs.priority })}</span>
+            <span>{t('serviceCaseDetail.sourceLabel', 'Source: {{source}}', { source: cs.source })}</span>
             {cs.slaDeadline && (
               <span className={new Date(cs.slaDeadline) < new Date() ? 'text-[var(--rose-9)]' : ''}>
-                SLA: {new Date(cs.slaDeadline).toLocaleDateString()}
+                {t('serviceCaseDetail.slaLabel', 'SLA: {{date}}', {
+                  date: new Date(cs.slaDeadline).toLocaleDateString(),
+                })}
               </span>
             )}
           </div>
@@ -107,7 +122,9 @@ export function ServiceCaseDetailPage() {
               onClick={() => update.mutate({ id: cs.id, body: { status: s as never } })}
               disabled={update.isPending}
             >
-              Mark {s.replace(/_/g, ' ')}
+              {t('serviceCaseDetail.markStatusButton', 'Mark {{status}}', {
+                status: s.replace(/_/g, ' '),
+              })}
             </Button>
           ))}
         </div>
@@ -116,9 +133,11 @@ export function ServiceCaseDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <Card className="p-5">
-            <h3 className="text-sm font-medium text-[var(--fg-secondary)] mb-2">Description</h3>
+            <h3 className="text-sm font-medium text-[var(--fg-secondary)] mb-2">
+              {t('serviceCaseDetail.descriptionHeading', 'Description')}
+            </h3>
             <p className="text-[var(--fg-primary)] whitespace-pre-wrap">
-              {cs.description ?? 'No description provided.'}
+              {cs.description ?? t('serviceCaseDetail.noDescription', 'No description provided.')}
             </p>
           </Card>
 
@@ -127,14 +146,14 @@ export function ServiceCaseDetailPage() {
               htmlFor="case-note"
               className="block text-sm font-medium text-[var(--fg-secondary)] mb-2"
             >
-              Add note
+              {t('serviceCaseDetail.addNoteLabel', 'Add note')}
             </label>
             <textarea
               id="case-note"
               className="input w-full min-h-[80px]"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Write an internal note…"
+              placeholder={t('serviceCaseDetail.notePlaceholder', 'Write an internal note…')}
             />
             <div className="mt-2 flex justify-end">
               <Button
@@ -142,7 +161,9 @@ export function ServiceCaseDetailPage() {
                 onClick={handleSaveNote}
                 disabled={!note.trim() || update.isPending}
               >
-                {update.isPending ? 'Saving…' : 'Save note'}
+                {update.isPending
+                  ? t('serviceCaseDetail.savingButton', 'Saving…')
+                  : t('serviceCaseDetail.saveNoteButton', 'Save note')}
               </Button>
             </div>
           </Card>
@@ -150,23 +171,31 @@ export function ServiceCaseDetailPage() {
 
         <div className="space-y-4">
           <Card className="p-5">
-            <h3 className="text-sm font-medium text-[var(--fg-secondary)] mb-3">Details</h3>
+            <h3 className="text-sm font-medium text-[var(--fg-secondary)] mb-3">
+              {t('serviceCaseDetail.detailsHeading', 'Details')}
+            </h3>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-[var(--fg-tertiary)]">Created</span>
+                <span className="text-[var(--fg-tertiary)]">
+                  {t('serviceCaseDetail.createdLabel', 'Created')}
+                </span>
                 <span className="text-[var(--fg-primary)]">
                   {new Date(cs.createdAt).toLocaleDateString()}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[var(--fg-tertiary)]">Updated</span>
+                <span className="text-[var(--fg-tertiary)]">
+                  {t('serviceCaseDetail.updatedLabel', 'Updated')}
+                </span>
                 <span className="text-[var(--fg-primary)]">
                   {new Date(cs.updatedAt).toLocaleDateString()}
                 </span>
               </div>
               {cs.resolvedAt && (
                 <div className="flex justify-between">
-                  <span className="text-[var(--fg-tertiary)]">Resolved</span>
+                  <span className="text-[var(--fg-tertiary)]">
+                    {t('serviceCaseDetail.resolvedLabel', 'Resolved')}
+                  </span>
                   <span className="text-[var(--fg-primary)]">
                     {new Date(cs.resolvedAt).toLocaleDateString()}
                   </span>
@@ -174,7 +203,9 @@ export function ServiceCaseDetailPage() {
               )}
               {cs.closedAt && (
                 <div className="flex justify-between">
-                  <span className="text-[var(--fg-tertiary)]">Closed</span>
+                  <span className="text-[var(--fg-tertiary)]">
+                    {t('serviceCaseDetail.closedLabel', 'Closed')}
+                  </span>
                   <span className="text-[var(--fg-primary)]">
                     {new Date(cs.closedAt).toLocaleDateString()}
                   </span>
