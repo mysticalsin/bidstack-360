@@ -5,6 +5,7 @@
 // can read other state and surface optimistic updates).
 
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface BaseProps<T> {
   value: T;
@@ -50,6 +51,7 @@ export function InlineEditText(props: TextProps) {
   const [draft, setDraft] = useState(value);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const { t } = useTranslation('crm');
 
   useEffect(() => {
     if (editing) inputRef.current?.select();
@@ -58,7 +60,7 @@ export function InlineEditText(props: TextProps) {
   if (!editing) {
     return (
       <ReadMode
-        label={label ?? 'Edit'}
+        label={label ?? t('inlineEdit.editLabel', 'Edit')}
         onActivate={() => {
           setDraft(value);
           setEditing(true);
@@ -110,11 +112,12 @@ export function InlineEditNumber(props: NumberProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(value));
   const [error, setError] = useState<string | null>(null);
+  const { t } = useTranslation('crm');
 
   if (!editing) {
     return (
       <ReadMode
-        label={label ?? 'Edit'}
+        label={label ?? t('inlineEdit.editLabel', 'Edit')}
         onActivate={() => {
           setDraft(String(value));
           setEditing(true);
@@ -129,7 +132,7 @@ export function InlineEditNumber(props: NumberProps) {
   const commit = async () => {
     const num = Number(draft);
     if (Number.isNaN(num)) {
-      setError('Must be a number');
+      setError(t('inlineEdit.mustBeNumber', 'Must be a number'));
       return;
     }
     const err = validate?.(num) ?? null;
@@ -171,11 +174,12 @@ export function InlineEditDate(props: DateProps) {
   const { value, onSave, label } = props;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? '');
+  const { t } = useTranslation('crm');
 
   if (!editing) {
     return (
       <ReadMode
-        label={label ?? 'Edit'}
+        label={label ?? t('inlineEdit.editLabel', 'Edit')}
         onActivate={() => {
           setDraft(value ?? '');
           setEditing(true);
@@ -211,12 +215,13 @@ export function InlineEditDate(props: DateProps) {
 export function InlineEditSelect<V extends string>(props: SelectProps<V>) {
   const { value, onSave, options, label } = props;
   const [editing, setEditing] = useState(false);
+  const { t } = useTranslation('crm');
 
   if (!editing) {
     const opt = options.find((o) => o.value === value);
     return (
       <ReadMode
-        label={label ?? 'Edit'}
+        label={label ?? t('inlineEdit.editLabel', 'Edit')}
         onActivate={() => setEditing(true)}
         className={props.className}
       >

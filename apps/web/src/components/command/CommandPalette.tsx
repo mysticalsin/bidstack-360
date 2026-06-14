@@ -20,6 +20,7 @@ import {
   useState,
   type KeyboardEvent,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/cn';
 import { springModal } from '@/lib/motion';
@@ -36,6 +37,7 @@ interface CommandPaletteProps {
 
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const reduced = useReducedMotion();
+  const { t } = useTranslation('crm');
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <AnimatePresence>
@@ -58,7 +60,9 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                 transition={springModal}
                 className="fixed left-1/2 top-[15vh] z-50 w-[min(560px,92vw)] -translate-x-1/2 rounded-xl outline-none glass-menu"
               >
-                <Dialog.Title className="sr-only">Command palette</Dialog.Title>
+                <Dialog.Title className="sr-only">
+                  {t('commandPalette.title', 'Command palette')}
+                </Dialog.Title>
                 <PaletteBody onClose={() => onOpenChange(false)} />
               </motion.div>
             </Dialog.Content>
@@ -72,6 +76,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 // ── PaletteBody ──────────────────────────────────────────────────────────────
 
 function PaletteBody({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation('crm');
   const [query, setQuery] = useState('');
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -186,9 +191,12 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
               items[safeIdx]?.onSelect();
             }
           }}
-          placeholder="Search accounts, contacts, tasks, opportunities…"
+          placeholder={t(
+            'commandPalette.searchPlaceholder',
+            'Search accounts, contacts, tasks, opportunities…',
+          )}
           className="flex-1 bg-transparent text-sm text-[var(--fg-primary)] placeholder:text-[var(--fg-tertiary)] focus:outline-none"
-          aria-label="Search across the workspace"
+          aria-label={t('commandPalette.searchAriaLabel', 'Search across the workspace')}
           aria-autocomplete="list"
           aria-expanded="true"
           aria-controls="cmdk-list"
@@ -202,7 +210,9 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
       <ul ref={listRef} id="cmdk-list" role="listbox" className="max-h-[60vh] overflow-y-auto py-2">
         {items.length === 0 ? (
           <li className="px-4 py-6 text-center text-xs text-[var(--fg-tertiary)]">
-            {isFetching ? 'Searching…' : 'No matches.'}
+            {isFetching
+              ? t('commandPalette.searching', 'Searching…')
+              : t('commandPalette.noMatches', 'No matches.')}
           </li>
         ) : null}
         {items.map((item, i) => {

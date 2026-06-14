@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { computeBidComposite } from '@bidstack/shared';
 
@@ -26,6 +27,7 @@ import { OverrideDialog } from './bidNoBid/OverrideDialog';
 import { ScoreSummaryStrip } from './bidNoBid/ScoreSummaryStrip';
 
 export function BidNoBidPage() {
+  const { t } = useTranslation('crm');
   useDocumentTitle();
   const reduced = useReducedMotion();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -125,9 +127,10 @@ export function BidNoBidPage() {
   // Surface mutation failures — previously Save Score / AI Calibrate / Defend
   // rejected silently, so a failed save looked identical to a successful one.
   const actionError =
-    (createScore.isError && 'Could not save the score. Try again.') ||
-    (aiCalibrate.isError && 'AI calibration failed. Try again.') ||
-    (defendScore.isError && 'Could not generate the score defense. Try again.') ||
+    (createScore.isError && t('bidNoBid.error.saveScore', 'Could not save the score. Try again.')) ||
+    (aiCalibrate.isError && t('bidNoBid.error.aiCalibrate', 'AI calibration failed. Try again.')) ||
+    (defendScore.isError &&
+      t('bidNoBid.error.defend', 'Could not generate the score defense. Try again.')) ||
     null;
 
   return (
@@ -135,7 +138,7 @@ export function BidNoBidPage() {
       <div className="motion-page-head page-head">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="page-title">Bid/No-Bid Decision Matrix</h1>
+            <h1 className="page-title">{t('bidNoBid.title', 'Bid/No-Bid Decision Matrix')}</h1>
             {latestScore?.overrideJustification ? (
               <Tooltip content={latestScore.overrideJustification}>
                 <span tabIndex={0} className="inline-flex cursor-help rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]">
@@ -143,15 +146,22 @@ export function BidNoBidPage() {
                     tone="amber"
                     className="px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider"
                   >
-                    Override on record
+                    {t('bidNoBid.overrideBadge', 'Override on record')}
                   </Badge>
                 </span>
               </Tooltip>
             ) : null}
           </div>
           <p className="page-sub">
-            Score each criterion to get an AI-powered go/no-go recommendation.
-            {ratedCount > 0 && ` ${ratedCount}/${CRITERIA.length} criteria rated.`}
+            {t(
+              'bidNoBid.subtitle',
+              'Score each criterion to get an AI-powered go/no-go recommendation.',
+            )}
+            {ratedCount > 0 &&
+              ` ${t('bidNoBid.criteriaRated', '{{rated}}/{{total}} criteria rated.', {
+                rated: ratedCount,
+                total: CRITERIA.length,
+              })}`}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -162,9 +172,11 @@ export function BidNoBidPage() {
                 size="sm"
                 onClick={handleAICalibrate}
                 disabled={aiCalibrate.isPending}
-                aria-label="AI calibrate scores"
+                aria-label={t('bidNoBid.aiCalibrate.aria', 'AI calibrate scores')}
               >
-                {aiCalibrate.isPending ? 'Calibrating…' : 'AI Calibrate'}
+                {aiCalibrate.isPending
+                  ? t('bidNoBid.aiCalibrate.pending', 'Calibrating…')
+                  : t('bidNoBid.aiCalibrate.label', 'AI Calibrate')}
               </Button>
               {latestScore && (
                 <Button
@@ -172,9 +184,11 @@ export function BidNoBidPage() {
                   size="sm"
                   onClick={handleDefend}
                   disabled={defendScore.isPending}
-                  aria-label="Defend score with AI"
+                  aria-label={t('bidNoBid.defend.aria', 'Defend score with AI')}
                 >
-                  {defendScore.isPending ? 'Analyzing…' : 'Defend Score'}
+                  {defendScore.isPending
+                    ? t('bidNoBid.defend.pending', 'Analyzing…')
+                    : t('bidNoBid.defend.label', 'Defend Score')}
                 </Button>
               )}
               <Button
@@ -182,9 +196,11 @@ export function BidNoBidPage() {
                 size="sm"
                 onClick={handleSave}
                 disabled={createScore.isPending || ratedCount === 0}
-                aria-label="Save bid score"
+                aria-label={t('bidNoBid.save.aria', 'Save bid score')}
               >
-                {createScore.isPending ? 'Saving…' : 'Save Score'}
+                {createScore.isPending
+                  ? t('bidNoBid.save.pending', 'Saving…')
+                  : t('bidNoBid.save.label', 'Save Score')}
               </Button>
             </>
           )}
@@ -202,7 +218,9 @@ export function BidNoBidPage() {
 
       {/* Opportunity Selector */}
       <GlassCard className="mb-4">
-        <label className="text-sm font-medium text-fg-secondary block mb-2">Opportunity</label>
+        <label className="text-sm font-medium text-fg-secondary block mb-2">
+          {t('bidNoBid.opportunity.label', 'Opportunity')}
+        </label>
         <select
           className="dialog-input w-full"
           value={opportunityId ?? ''}
@@ -214,15 +232,15 @@ export function BidNoBidPage() {
               setSearchParams({});
             }
           }}
-          aria-label="Select opportunity"
+          aria-label={t('bidNoBid.opportunity.aria', 'Select opportunity')}
           disabled={oppsLoading || oppsError}
         >
           <option value="">
             {oppsLoading
-              ? 'Loading opportunities…'
+              ? t('bidNoBid.opportunity.loading', 'Loading opportunities…')
               : oppsError
-                ? 'Could not load opportunities'
-                : '— Select an opportunity —'}
+                ? t('bidNoBid.opportunity.loadError', 'Could not load opportunities')
+                : t('bidNoBid.opportunity.placeholder', '— Select an opportunity —')}
           </option>
           {opps?.items.map((o) => (
             <option key={o.id} value={o.id}>
@@ -232,11 +250,14 @@ export function BidNoBidPage() {
         </select>
         {oppsError ? (
           <p className="text-xs text-[var(--color-danger,#dc2626)] mt-2" role="alert">
-            Opportunities failed to load. Refresh to try again.
+            {t('bidNoBid.opportunity.loadFailed', 'Opportunities failed to load. Refresh to try again.')}
           </p>
         ) : !opportunityId ? (
           <p className="text-xs text-fg-tertiary mt-2">
-            Select an opportunity to enable saving and AI calibration.
+            {t(
+              'bidNoBid.opportunity.hint',
+              'Select an opportunity to enable saving and AI calibration.',
+            )}
           </p>
         ) : null}
       </GlassCard>
@@ -270,7 +291,9 @@ export function BidNoBidPage() {
           <GlassCard padding="lg" className="mb-6 border-l-4 border-l-brand-primary">
             <div className="flex items-center gap-2 mb-2">
               <Icon name="sparkle" size={16} className="text-brand-primary" />
-              <h2 className="text-sm font-semibold text-fg-primary">AI Score Defense</h2>
+              <h2 className="text-sm font-semibold text-fg-primary">
+                {t('bidNoBid.defensePanel.title', 'AI Score Defense')}
+              </h2>
             </div>
             <p className="text-sm text-fg-secondary leading-relaxed whitespace-pre-wrap">
               {defenseReasoning}
@@ -292,13 +315,18 @@ export function BidNoBidPage() {
       {/* Notes Section */}
       <Reveal delay={0.2}>
         <GlassCard padding="lg" className="mb-8">
-          <h2 className="text-sm font-semibold text-fg-primary mb-2">Decision Notes</h2>
+          <h2 className="text-sm font-semibold text-fg-primary mb-2">
+            {t('bidNoBid.notes.title', 'Decision Notes')}
+          </h2>
           <textarea
             className="dialog-input min-h-[100px] resize-y"
-            placeholder="Add rationale, key concerns, or conditions for bidding…"
+            placeholder={t(
+              'bidNoBid.notes.placeholder',
+              'Add rationale, key concerns, or conditions for bidding…',
+            )}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            aria-label="Bid decision notes"
+            aria-label={t('bidNoBid.notes.aria', 'Bid decision notes')}
           />
         </GlassCard>
       </Reveal>

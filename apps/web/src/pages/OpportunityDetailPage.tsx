@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useParams, Link } from 'react-router-dom';
 
 import { Badge, stageTone } from '@/components/ui/Badge';
@@ -37,17 +38,20 @@ import {
 } from './opportunityDetail/IntelCards';
 import { BidScoreCard } from './opportunityDetail/BidScoreCard';
 
-const STAGE_OPTIONS: ReadonlyArray<{ value: OpportunityStage; label: string }> = [
-  { value: 's1_lead', label: 'S1 Lead' },
-  { value: 's1_ongoing', label: 'S1 Ongoing' },
-  { value: 's2_sent', label: 'S2 Sent' },
-  { value: 's3_technical_iteration', label: 'S3 Technical Iteration' },
-  { value: 's4_negotiation', label: 'S4 Negotiation' },
-  { value: 'closed_won', label: 'Closed won' },
-  { value: 'closed_lost', label: 'Closed lost' },
-];
-
 export function OpportunityDetailPage() {
+  const { t } = useTranslation('crm');
+  const stageOptions: ReadonlyArray<{ value: OpportunityStage; label: string }> = [
+    { value: 's1_lead', label: t('opportunityDetail.stageS1Lead', 'S1 Lead') },
+    { value: 's1_ongoing', label: t('opportunityDetail.stageS1Ongoing', 'S1 Ongoing') },
+    { value: 's2_sent', label: t('opportunityDetail.stageS2Sent', 'S2 Sent') },
+    {
+      value: 's3_technical_iteration',
+      label: t('opportunityDetail.stageS3TechnicalIteration', 'S3 Technical Iteration'),
+    },
+    { value: 's4_negotiation', label: t('opportunityDetail.stageS4Negotiation', 'S4 Negotiation') },
+    { value: 'closed_won', label: t('opportunityDetail.stageClosedWon', 'Closed won') },
+    { value: 'closed_lost', label: t('opportunityDetail.stageClosedLost', 'Closed lost') },
+  ];
   const { id } = useParams<{ id: string }>();
   const { data, isLoading, isError, error } = useOpportunity(id);
   const patch = usePatchOpportunity();
@@ -64,14 +68,18 @@ export function OpportunityDetailPage() {
       ? [
           {
             id: 'opp-create-task',
-            label: `Create task for ${data.name}`,
-            hint: 'Add a to-do linked to this opportunity',
+            label: t('opportunityDetail.commandCreateTaskLabel', 'Create task for {{name}}', {
+              name: data.name,
+            }),
+            hint: t('opportunityDetail.commandCreateTaskHint', 'Add a to-do linked to this opportunity'),
             onSelect: () => setTaskOpen(true),
           },
           {
             id: 'opp-open-briefing',
-            label: `Open AI briefing for ${data.name}`,
-            hint: 'Generate a Dust AI briefing document',
+            label: t('opportunityDetail.commandBriefingLabel', 'Open AI briefing for {{name}}', {
+              name: data.name,
+            }),
+            hint: t('opportunityDetail.commandBriefingHint', 'Generate a Dust AI briefing document'),
             onSelect: () => setBriefOpen(true),
           },
         ]
@@ -80,15 +88,23 @@ export function OpportunityDetailPage() {
 
   if (isLoading) return <DetailPageSkeleton tabs columns={2} cards={3} />;
   if (isError)
-    return <ErrorState title="Couldn't load this opportunity" message={error?.message ?? '—'} />;
+    return (
+      <ErrorState
+        title={t('opportunityDetail.errorTitle', "Couldn't load this opportunity")}
+        message={error?.message ?? '—'}
+      />
+    );
   if (!data) {
     return (
       <EmptyState
-        title="Opportunity not found"
-        message="The opportunity may have been deleted or you may not have access to it."
+        title={t('opportunityDetail.notFoundTitle', 'Opportunity not found')}
+        message={t(
+          'opportunityDetail.notFoundMessage',
+          'The opportunity may have been deleted or you may not have access to it.',
+        )}
         action={
           <Button variant="secondary" onClick={() => window.history.back()}>
-            Go back
+            {t('opportunityDetail.goBack', 'Go back')}
           </Button>
         }
       />
@@ -109,14 +125,17 @@ export function OpportunityDetailPage() {
         className="border-none bg-gradient-to-br from-[var(--surface-card)] to-[var(--surface-sunken-alpha)] shadow-2xl"
       >
         <header>
-          <nav aria-label="Breadcrumb" className="text-xs text-[var(--fg-tertiary)] mb-4">
+          <nav
+            aria-label={t('opportunityDetail.breadcrumbAriaLabel', 'Breadcrumb')}
+            className="text-xs text-[var(--fg-tertiary)] mb-4"
+          >
             <ol className="flex items-center gap-2">
               <li>
                 <Link
                   to="/opportunities"
                   className="hover:text-[var(--brand-primary)] transition-colors"
                 >
-                  Opportunities
+                  {t('opportunityDetail.breadcrumbOpportunities', 'Opportunities')}
                 </Link>
               </li>
               <li aria-hidden="true" className="opacity-30">
@@ -133,8 +152,10 @@ export function OpportunityDetailPage() {
                 <InlineEditText
                   value={data.name}
                   onSave={(v) => patch.mutateAsync({ id: id!, patch: { name: v } })}
-                  label="Edit opportunity name"
-                  validate={(v) => (v.length < 1 ? 'Name is required' : null)}
+                  label={t('opportunityDetail.editNameLabel', 'Edit opportunity name')}
+                  validate={(v) =>
+                    v.length < 1 ? t('opportunityDetail.nameRequired', 'Name is required') : null
+                  }
                 />
               </h1>
               <div className="mt-2 flex items-center gap-2 text-sm text-[var(--fg-secondary)]">
@@ -143,8 +164,12 @@ export function OpportunityDetailPage() {
                   <InlineEditText
                     value={data.customer}
                     onSave={(v) => patch.mutateAsync({ id: id!, patch: { customer: v } })}
-                    label="Edit customer name"
-                    validate={(v) => (v.length < 1 ? 'Customer is required' : null)}
+                    label={t('opportunityDetail.editCustomerLabel', 'Edit customer name')}
+                    validate={(v) =>
+                      v.length < 1
+                        ? t('opportunityDetail.customerRequired', 'Customer is required')
+                        : null
+                    }
                   />
                 </span>
                 <span className="opacity-30">|</span>
@@ -153,9 +178,9 @@ export function OpportunityDetailPage() {
                   <InlineEditText
                     value={data.industry ?? ''}
                     onSave={(v) => patch.mutateAsync({ id: id!, patch: { industry: v || null } })}
-                    label="Edit industry"
+                    label={t('opportunityDetail.editIndustryLabel', 'Edit industry')}
                     display={(v) => v || '—'}
-                    placeholder="Industry"
+                    placeholder={t('opportunityDetail.industryPlaceholder', 'Industry')}
                   />
                 </span>
                 <span className="opacity-30">|</span>
@@ -177,24 +202,26 @@ export function OpportunityDetailPage() {
                   oppId={data.id}
                   trigger={
                     <Button variant="ghost" size="sm" className="rounded-full">
-                      + Task
+                      {t('opportunityDetail.addTaskButton', '+ Task')}
                     </Button>
                   }
                 />
                 <Link to={`/rfp/${data.id}/pipeline`}>
                   <Button variant="ghost" size="sm" className="rounded-full">
                     <Icon name="wand" size={12} className="text-[var(--brand-primary)] mr-1" />
-                    RFP Pipeline
+                    {t('opportunityDetail.rfpPipelineButton', 'RFP Pipeline')}
                   </Button>
                 </Link>
                 <ScheduleReviewDialog
                   entityType="OPPORTUNITY"
                   entityId={data.id}
-                  defaultTopic={`Go/No-Go review — ${data.name}`}
+                  defaultTopic={t('opportunityDetail.reviewDefaultTopic', 'Go/No-Go review — {{name}}', {
+                    name: data.name,
+                  })}
                   trigger={
                     <Button variant="ghost" size="sm" className="rounded-full">
                       <Icon name="clock" size={12} className="text-[var(--brand-primary)] mr-1" />
-                      Schedule review
+                      {t('opportunityDetail.scheduleReviewButton', 'Schedule review')}
                     </Button>
                   }
                 />
@@ -202,14 +229,14 @@ export function OpportunityDetailPage() {
                   onClick={() => setBriefOpen(true)}
                   className="h-8 px-4 text-xs shadow-none"
                 >
-                  Ask Dust
+                  {t('opportunityDetail.askDustButton', 'Ask Dust')}
                 </MagneticButton>
               </div>
               <InlineEditSelect<OpportunityStage>
                 value={data.stage as OpportunityStage}
                 onSave={(v) => patch.mutateAsync({ id: id!, patch: { stage: v } })}
-                options={STAGE_OPTIONS}
-                label="Change stage"
+                options={stageOptions}
+                label={t('opportunityDetail.changeStageLabel', 'Change stage')}
                 display={(v) => (
                   <Badge tone={stageTone(v)} className="px-4 py-1 text-xs uppercase tracking-wider">
                     {formatStage(v)}
@@ -221,7 +248,7 @@ export function OpportunityDetailPage() {
                   <InlineEditNumber
                     value={data.value}
                     onSave={(v) => patch.mutateAsync({ id: id!, patch: { value: v } })}
-                    label="Edit deal value (EUR)"
+                    label={t('opportunityDetail.editValueLabel', 'Edit deal value (EUR)')}
                     min={0}
                     step={1000}
                     display={(v) => formatMoney(v, 'EUR')}
@@ -233,14 +260,14 @@ export function OpportunityDetailPage() {
                       <InlineEditNumber
                         value={data.probability}
                         onSave={(v) => patch.mutateAsync({ id: id!, patch: { probability: v } })}
-                        label="Edit probability"
+                        label={t('opportunityDetail.editProbabilityLabel', 'Edit probability')}
                         min={0}
                         max={100}
                         step={5}
                         suffix="%"
                       />
                     </span>
-                    <span>likely</span>
+                    <span>{t('opportunityDetail.likely', 'likely')}</span>
                   </span>
                   <span className="opacity-30">·</span>
                   <span className="flex items-center gap-1">
@@ -248,7 +275,7 @@ export function OpportunityDetailPage() {
                     <InlineEditDate
                       value={data.dueDate}
                       onSave={(v) => patch.mutateAsync({ id: id!, patch: { dueDate: v } })}
-                      label="Edit due date"
+                      label={t('opportunityDetail.editDueDateLabel', 'Edit due date')}
                       display={(v) => formatDate(v)}
                     />
                   </span>
@@ -297,7 +324,7 @@ export function OpportunityDetailPage() {
         entityType="opportunity"
         entityId={id}
         fieldKey="notes"
-        label="Live collaboration"
+        label={t('opportunityDetail.liveCollaborationLabel', 'Live collaboration')}
       />
 
       {/* Controlled CreateTaskDialog driven by the command palette (A3). */}

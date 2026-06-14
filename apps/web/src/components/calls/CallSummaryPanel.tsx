@@ -15,6 +15,7 @@
  * Dark mode via CSS variables.
  */
 
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -43,35 +44,39 @@ function confidenceTone(confidence: number): BadgeTone {
 // ─── MEDDIC table ─────────────────────────────────────────────────────────────
 
 function MeddicTable({ summaries }: { summaries: CallSummaryEntry[] }) {
+  const { t } = useTranslation('crm');
   const meddic = summaries.filter((s) => s.key in MEDDIC_LABELS);
   if (meddic.length === 0) {
     return (
       <p className="text-sm text-[var(--fg-tertiary)]">
-        No MEDDIC signals extracted. Transcript may be too short or not yet processed.
+        {t(
+          'callSummary.meddicEmpty',
+          'No MEDDIC signals extracted. Transcript may be too short or not yet processed.',
+        )}
       </p>
     );
   }
   return (
-    <table className="w-full text-sm border-collapse" aria-label="MEDDIC signal table">
+    <table className="w-full text-sm border-collapse" aria-label={t('callSummary.meddicTableLabel', 'MEDDIC signal table')}>
       <thead>
         <tr>
           <th
             scope="col"
             className="py-2 pr-3 text-left text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]"
           >
-            Dimension
+            {t('callSummary.colDimension', 'Dimension')}
           </th>
           <th
             scope="col"
             className="py-2 pr-3 text-left text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]"
           >
-            Extracted signal
+            {t('callSummary.colExtractedSignal', 'Extracted signal')}
           </th>
           <th
             scope="col"
             className="py-2 text-left text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]"
           >
-            Confidence
+            {t('callSummary.colConfidence', 'Confidence')}
           </th>
         </tr>
       </thead>
@@ -82,7 +87,7 @@ function MeddicTable({ summaries }: { summaries: CallSummaryEntry[] }) {
             className="border-t border-[var(--border-subtle)] align-top"
           >
             <td className="py-2 pr-3 font-medium text-[var(--fg-primary)] whitespace-nowrap">
-              {MEDDIC_LABELS[entry.key]}
+              {t(`callSummary.dimension.${entry.key}`, MEDDIC_LABELS[entry.key] ?? entry.key)}
             </td>
             <td className="py-2 pr-3 text-[var(--fg-primary)] leading-snug">
               {entry.value}
@@ -107,15 +112,19 @@ function MeddicTable({ summaries }: { summaries: CallSummaryEntry[] }) {
 // ─── Deal suggestions (human-in-the-loop only) ───────────────────────────────
 
 function DealSuggestions({ summaries }: { summaries: CallSummaryEntry[] }) {
+  const { t } = useTranslation('crm');
   const suggestions = summaries.filter((s) => s.key === 'DEAL_SUGGESTION');
   if (suggestions.length === 0) return null;
   return (
-    <section aria-label="Suggested deal updates">
+    <section aria-label={t('callSummary.dealSuggestionsLabel', 'Suggested deal updates')}>
       <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
-        Suggested deal updates
+        {t('callSummary.dealSuggestionsHeading', 'Suggested deal updates')}
       </p>
       <p className="mb-3 text-xs text-[var(--fg-tertiary)]">
-        These are AI suggestions only. Review before applying to the deal.
+        {t(
+          'callSummary.dealSuggestionsNote',
+          'These are AI suggestions only. Review before applying to the deal.',
+        )}
       </p>
       <ul className="space-y-2" role="list">
         {suggestions.map((s) => (
@@ -138,12 +147,13 @@ function DealSuggestions({ summaries }: { summaries: CallSummaryEntry[] }) {
 // ─── Talk ratio ───────────────────────────────────────────────────────────────
 
 function TalkRatioBar({ ratio }: { ratio: Record<string, number> }) {
+  const { t } = useTranslation('crm');
   const entries = Object.entries(ratio).sort((a, b) => b[1] - a[1]);
   if (entries.length === 0) return null;
   return (
-    <section aria-label="Talk ratio">
+    <section aria-label={t('callSummary.talkRatioLabel', 'Talk ratio')}>
       <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
-        Talk Ratio
+        {t('callSummary.talkRatioHeading', 'Talk Ratio')}
       </p>
       <ul className="space-y-1.5" role="list">
         {entries.map(([speaker, pct]) => (
@@ -157,7 +167,7 @@ function TalkRatioBar({ ratio }: { ratio: Record<string, number> }) {
               aria-valuenow={Math.round(pct * 100)}
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-label={`${speaker} talk ratio`}
+              aria-label={t('callSummary.speakerTalkRatio', '{{speaker}} talk ratio', { speaker })}
             >
               <div
                 className="h-full rounded-full bg-[var(--brand-primary)] transition-[width] duration-500"
@@ -184,10 +194,11 @@ export interface CallSummaryPanelProps {
 export function CallSummaryPanel({ callSessionId, className }: CallSummaryPanelProps) {
   const { data: call, isLoading, isError } = useCall(callSessionId);
   const extractInsights = useExtractInsights(callSessionId);
+  const { t } = useTranslation('crm');
 
   if (isLoading) {
     return (
-      <div className={cn('space-y-3', className)} aria-busy="true" aria-label="Loading call summary">
+      <div className={cn('space-y-3', className)} aria-busy="true" aria-label={t('callSummary.loadingLabel', 'Loading call summary')}>
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className="h-5 w-full animate-pulse rounded bg-[var(--surface-sunken)]" />
         ))}
@@ -198,7 +209,7 @@ export function CallSummaryPanel({ callSessionId, className }: CallSummaryPanelP
   if (isError) {
     return (
       <div className={cn('rounded-lg border border-[var(--danger)] bg-[var(--surface-card)] p-4', className)} role="alert">
-        <p className="text-sm text-[var(--danger)]">Failed to load call summary.</p>
+        <p className="text-sm text-[var(--danger)]">{t('callSummary.loadError', 'Failed to load call summary.')}</p>
       </div>
     );
   }
@@ -215,9 +226,9 @@ export function CallSummaryPanel({ callSessionId, className }: CallSummaryPanelP
     <div className={cn('space-y-6', className)}>
       {/* AI summary */}
       {call.summary && (
-        <section aria-label="AI summary">
+        <section aria-label={t('callSummary.aiSummaryLabel', 'AI summary')}>
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
-            Summary
+            {t('callSummary.summaryHeading', 'Summary')}
           </p>
           <p className="text-sm leading-relaxed text-[var(--fg-primary)]">{call.summary}</p>
         </section>
@@ -225,9 +236,9 @@ export function CallSummaryPanel({ callSessionId, className }: CallSummaryPanelP
 
       {/* Action items (read-only in this panel) */}
       {actionItems.length > 0 && (
-        <section aria-label="Action items">
+        <section aria-label={t('callSummary.actionItemsLabel', 'Action items')}>
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
-            Action Items
+            {t('callSummary.actionItemsHeading', 'Action Items')}
           </p>
           <ul className="space-y-1" role="list">
             {actionItems.map((item, i) => (
@@ -246,9 +257,9 @@ export function CallSummaryPanel({ callSessionId, className }: CallSummaryPanelP
       )}
 
       {/* MEDDIC signals */}
-      <section aria-label="MEDDIC signals">
+      <section aria-label={t('callSummary.meddicSignalsLabel', 'MEDDIC signals')}>
         <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
-          MEDDIC Signals
+          {t('callSummary.meddicSignalsHeading', 'MEDDIC Signals')}
         </p>
         <MeddicTable summaries={summaries} />
       </section>
@@ -261,8 +272,11 @@ export function CallSummaryPanel({ callSessionId, className }: CallSummaryPanelP
         <div className="rounded-lg border border-dashed border-[var(--border-default)] px-6 py-8 text-center">
           <p className="mb-3 text-sm text-[var(--fg-tertiary)]">
             {call.transcriptText
-              ? 'AI analysis has not run yet.'
-              : 'Transcript not available. Insights will be extracted after the recording is processed.'}
+              ? t('callSummary.analysisNotRun', 'AI analysis has not run yet.')
+              : t(
+                  'callSummary.transcriptUnavailable',
+                  'Transcript not available. Insights will be extracted after the recording is processed.',
+                )}
           </p>
           {call.transcriptText && (
             <Button
@@ -272,7 +286,9 @@ export function CallSummaryPanel({ callSessionId, className }: CallSummaryPanelP
               disabled={extractInsights.isPending}
               aria-busy={extractInsights.isPending}
             >
-              {extractInsights.isPending ? 'Analysing…' : 'Extract insights now'}
+              {extractInsights.isPending
+                ? t('callSummary.analysing', 'Analysing…')
+                : t('callSummary.extractInsights', 'Extract insights now')}
             </Button>
           )}
         </div>
@@ -288,7 +304,9 @@ export function CallSummaryPanel({ callSessionId, className }: CallSummaryPanelP
             disabled={extractInsights.isPending}
             aria-busy={extractInsights.isPending}
           >
-            {extractInsights.isPending ? 'Re-analysing…' : 'Re-extract insights'}
+            {extractInsights.isPending
+              ? t('callSummary.reAnalysing', 'Re-analysing…')
+              : t('callSummary.reExtractInsights', 'Re-extract insights')}
           </Button>
         </div>
       )}

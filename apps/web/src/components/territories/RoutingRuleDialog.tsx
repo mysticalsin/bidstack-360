@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { useUsers } from '@/hooks/useUsers';
@@ -37,6 +38,7 @@ function RoutingRuleDialogForm({
   isPending?: boolean;
   onClose: () => void;
 }) {
+  const { t } = useTranslation('crm');
   const users = useUsers();
   const territories = useTerritories();
   const [name, setName] = useState(rule?.name ?? '');
@@ -86,13 +88,13 @@ function RoutingRuleDialogForm({
     <form className="space-y-4" onSubmit={handleSubmit}>
       <div className="space-y-1.5">
         <label htmlFor="r-name" className="text-sm font-medium text-[var(--fg-primary)]">
-          Name
+          {t('routingRule.nameLabel', 'Name')}
         </label>
         <input
           id="r-name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g., Enterprise US leads"
+          placeholder={t('routingRule.namePlaceholder', 'e.g., Enterprise US leads')}
           required
           className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none placeholder:text-[var(--fg-tertiary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
         />
@@ -101,7 +103,7 @@ function RoutingRuleDialogForm({
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <label htmlFor="r-priority" className="text-sm font-medium text-[var(--fg-primary)]">
-            Priority
+            {t('routingRule.priorityLabel', 'Priority')}
           </label>
           <input
             id="r-priority"
@@ -116,7 +118,7 @@ function RoutingRuleDialogForm({
         </div>
         <div className="space-y-1.5">
           <label htmlFor="r-country" className="text-sm font-medium text-[var(--fg-primary)]">
-            Country filter
+            {t('routingRule.countryFilterLabel', 'Country filter')}
           </label>
           <input
             id="r-country"
@@ -132,19 +134,19 @@ function RoutingRuleDialogForm({
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <label htmlFor="r-industry" className="text-sm font-medium text-[var(--fg-primary)]">
-            Industry filter
+            {t('routingRule.industryFilterLabel', 'Industry filter')}
           </label>
           <input
             id="r-industry"
             value={industry}
             onChange={(e) => setIndustry(e.target.value)}
-            placeholder="technology"
+            placeholder={t('routingRule.industryFilterPlaceholder', 'technology')}
             className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none placeholder:text-[var(--fg-tertiary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
           />
         </div>
         <div className="space-y-1.5">
           <label htmlFor="r-minvalue" className="text-sm font-medium text-[var(--fg-primary)]">
-            Min value (micros)
+            {t('routingRule.minValueLabel', 'Min value (micros)')}
           </label>
           <input
             id="r-minvalue"
@@ -159,20 +161,26 @@ function RoutingRuleDialogForm({
       </div>
 
       <div className="space-y-1.5">
-        <label className="text-sm font-medium text-[var(--fg-primary)]">Assignment</label>
+        <label className="text-sm font-medium text-[var(--fg-primary)]">
+          {t('routingRule.assignmentLabel', 'Assignment')}
+        </label>
         <div className="flex gap-2">
-          {(['user', 'territory', 'round_robin'] as AssignmentType[]).map((t) => (
+          {(['user', 'territory', 'round_robin'] as AssignmentType[]).map((type) => (
             <button
-              key={t}
+              key={type}
               type="button"
-              onClick={() => setAssignType(t)}
+              onClick={() => setAssignType(type)}
               className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                assignType === t
+                assignType === type
                   ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] text-[var(--brand-primary)]'
                   : 'border-[var(--border-subtle)] bg-[var(--surface-sunken)] text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)]'
               }`}
             >
-              {t === 'user' ? 'User' : t === 'territory' ? 'Territory' : 'Round robin'}
+              {type === 'user'
+                ? t('routingRule.assignTypeUser', 'User')
+                : type === 'territory'
+                  ? t('routingRule.assignTypeTerritory', 'Territory')
+                  : t('routingRule.assignTypeRoundRobin', 'Round robin')}
             </button>
           ))}
         </div>
@@ -181,7 +189,7 @@ function RoutingRuleDialogForm({
       {assignType === 'user' && (
         <div className="space-y-1.5">
           <label htmlFor="r-user" className="text-sm font-medium text-[var(--fg-primary)]">
-            Assign to user
+            {t('routingRule.assignToUserLabel', 'Assign to user')}
           </label>
           <select
             id="r-user"
@@ -189,7 +197,7 @@ function RoutingRuleDialogForm({
             onChange={(e) => setAssignToUserId(e.target.value)}
             className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
           >
-            <option value="">Select a user</option>
+            <option value="">{t('routingRule.selectUserOption', 'Select a user')}</option>
             {users.data?.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.name ?? u.email}
@@ -202,7 +210,7 @@ function RoutingRuleDialogForm({
       {assignType === 'territory' && (
         <div className="space-y-1.5">
           <label htmlFor="r-territory" className="text-sm font-medium text-[var(--fg-primary)]">
-            Assign to territory
+            {t('routingRule.assignToTerritoryLabel', 'Assign to territory')}
           </label>
           <select
             id="r-territory"
@@ -210,7 +218,7 @@ function RoutingRuleDialogForm({
             onChange={(e) => setAssignToTerritoryId(e.target.value)}
             className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
           >
-            <option value="">Select a territory</option>
+            <option value="">{t('routingRule.selectTerritoryOption', 'Select a territory')}</option>
             {territories.data?.items.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
@@ -223,7 +231,7 @@ function RoutingRuleDialogForm({
       {assignType === 'round_robin' && (
         <div className="space-y-1.5 flex flex-col">
           <label className="text-sm font-medium text-[var(--fg-primary)]">
-            Round-robin team members
+            {t('routingRule.roundRobinTeamLabel', 'Round-robin team members')}
           </label>
           <div className="max-h-40 overflow-y-auto rounded-lg border border-[var(--border-default)] bg-[var(--surface-sunken)] p-2 space-y-1">
             {users.data?.map((u) => {
@@ -250,11 +258,16 @@ function RoutingRuleDialogForm({
               );
             })}
             {(!users.data || users.data.length === 0) && (
-              <div className="text-xs text-[var(--fg-tertiary)] italic p-2">No users available</div>
+              <div className="text-xs text-[var(--fg-tertiary)] italic p-2">
+                {t('routingRule.noUsersAvailable', 'No users available')}
+              </div>
             )}
           </div>
           <p className="text-xs text-[var(--fg-tertiary)]">
-            Select one or more team members. The system will cycle through this team.
+            {t(
+              'routingRule.roundRobinHint',
+              'Select one or more team members. The system will cycle through this team.',
+            )}
           </p>
         </div>
       )}
@@ -266,12 +279,12 @@ function RoutingRuleDialogForm({
           onChange={(e) => setActive(e.target.checked)}
           className="h-4 w-4 rounded border-[var(--border-default)]"
         />
-        Active
+        {t('routingRule.activeLabel', 'Active')}
       </label>
 
       <div className="flex justify-end gap-2 pt-2">
         <Button type="button" variant="ghost" onClick={onClose}>
-          Cancel
+          {t('routingRule.cancelButton', 'Cancel')}
         </Button>
         <Button
           type="submit"
@@ -283,7 +296,9 @@ function RoutingRuleDialogForm({
             (assignType === 'round_robin' && selectedUserIds.length === 0)
           }
         >
-          {isEdit ? 'Save changes' : 'Create rule'}
+          {isEdit
+            ? t('routingRule.saveChangesButton', 'Save changes')
+            : t('routingRule.createRuleButton', 'Create rule')}
         </Button>
       </div>
     </form>
@@ -297,10 +312,17 @@ export function RoutingRuleDialog({
   onSubmit,
   isPending,
 }: RoutingRuleDialogProps) {
+  const { t } = useTranslation('crm');
   const isEdit = Boolean(rule);
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent title={isEdit ? 'Edit routing rule' : 'New routing rule'}>
+      <DialogContent
+        title={
+          isEdit
+            ? t('routingRule.editDialogTitle', 'Edit routing rule')
+            : t('routingRule.newDialogTitle', 'New routing rule')
+        }
+      >
         <RoutingRuleDialogForm
           key={rule?.id ?? 'new'}
           rule={rule}

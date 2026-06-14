@@ -11,6 +11,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useId, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { toast } from '@/components/ui/Toast';
@@ -85,6 +86,7 @@ export function ContactCsvImportDialog({ trigger }: Props) {
   // Allows the abort path to skip the success toast if the dialog was closed
   // mid-import (not exposed as a cancel button — just a safety guard).
   const mountedRef = useRef(true);
+  const { t } = useTranslation('crm');
 
   const { headers, rows } = useMemo(() => parseCsv(pasted), [pasted]);
   const importable = rows.filter((r) => r.errors.length === 0);
@@ -132,12 +134,17 @@ export function ContactCsvImportDialog({ trigger }: Props) {
     if (!mountedRef.current) return; // dialog was closed mid-import
     setProgress(null);
     if (failed === 0) {
-      toast.success(`Imported ${total} contact${total === 1 ? '' : 's'}`);
+      toast.success(
+        t('contactCsvImport.toastImported', 'Imported {{count}} contact', { count: total }),
+      );
       setOpen(false);
       reset();
     } else {
-      toast.error(`${failed} import${failed === 1 ? '' : 's'} failed`, {
-        description: 'The successful rows were committed. Review and retry the rest.',
+      toast.error(t('contactCsvImport.toastFailed', '{{count}} import failed', { count: failed }), {
+        description: t(
+          'contactCsvImport.toastFailedDescription',
+          'The successful rows were committed. Review and retry the rest.',
+        ),
       });
     }
   };
@@ -156,7 +163,9 @@ export function ContactCsvImportDialog({ trigger }: Props) {
       }}
     >
       <Dialog.Trigger asChild>
-        {trigger ?? <Button variant="secondary">Paste CSV</Button>}
+        {trigger ?? (
+          <Button variant="secondary">{t('contactCsvImport.triggerButton', 'Paste CSV')}</Button>
+        )}
       </Dialog.Trigger>
       <AnimatePresence>
         {open ? (
@@ -179,23 +188,29 @@ export function ContactCsvImportDialog({ trigger }: Props) {
                 className="fixed left-1/2 top-1/2 z-50 w-[min(640px,92vw)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--surface-card)] shadow-[var(--shadow-lg)] outline-none"
               >
                 <Dialog.Title className="border-b border-[var(--border-subtle)] px-5 py-3 text-sm font-semibold text-[var(--fg-primary)]">
-                  Import contacts from CSV
+                  {t('contactCsvImport.dialogTitle', 'Import contacts from CSV')}
                 </Dialog.Title>
                 <Dialog.Description className="px-5 pt-3 text-xs text-[var(--fg-secondary)]">
-                  Paste a tab- or comma-separated block. First row must be a header — supported
-                  columns: <code>name, customer, role, email, phone, influence, sentiment</code>.
+                  {t(
+                    'contactCsvImport.dialogDescription',
+                    'Paste a tab- or comma-separated block. First row must be a header — supported columns:',
+                  )}{' '}
+                  <code>name, customer, role, email, phone, influence, sentiment</code>.
                 </Dialog.Description>
                 <div className="space-y-3 p-5 pt-3">
                   <label
                     htmlFor={textareaId}
                     className="block text-xs font-medium text-[var(--fg-primary)]"
                   >
-                    CSV contact rows
+                    {t('contactCsvImport.textareaLabel', 'CSV contact rows')}
                   </label>
                   <p id={guidanceId} className="-mt-2 text-xs text-[var(--fg-secondary)]">
-                    Include headers for at least <code>name</code> and <code>customer</code>.
-                    Optional headers are <code>role</code>, <code>email</code>, <code>phone</code>,{' '}
-                    <code>influence</code>, and <code>sentiment</code>.
+                    {t('contactCsvImport.guidancePrefix', 'Include headers for at least')}{' '}
+                    <code>name</code> {t('contactCsvImport.guidanceAnd', 'and')}{' '}
+                    <code>customer</code>. {t('contactCsvImport.guidanceOptional', 'Optional headers are')}{' '}
+                    <code>role</code>, <code>email</code>, <code>phone</code>,{' '}
+                    <code>influence</code>, {t('contactCsvImport.guidanceAnd', 'and')}{' '}
+                    <code>sentiment</code>.
                   </p>
                   <textarea
                     id={textareaId}
@@ -210,8 +225,11 @@ export function ContactCsvImportDialog({ trigger }: Props) {
                   />
                   {invalidRows > 0 ? (
                     <p id={errorId} className="text-xs text-[var(--danger)]">
-                      {invalidRows} row{invalidRows === 1 ? '' : 's'} need fixes before import.
-                      Check missing required fields, email format, and sentiment values.
+                      {t(
+                        'contactCsvImport.invalidRowsError',
+                        '{{count}} row need fixes before import. Check missing required fields, email format, and sentiment values.',
+                        { count: invalidRows },
+                      )}
                     </p>
                   ) : null}
                   {rows.length > 0 ? (
@@ -225,7 +243,7 @@ export function ContactCsvImportDialog({ trigger }: Props) {
                               </th>
                             ))}
                             <th scope="col" className="px-2 py-1 text-left font-semibold">
-                              status
+                              {t('contactCsvImport.tableStatusHeader', 'status')}
                             </th>
                           </tr>
                         </thead>
@@ -242,13 +260,17 @@ export function ContactCsvImportDialog({ trigger }: Props) {
                               ))}
                               <td className="px-2 py-1">
                                 {r.errors.length === 0 ? (
-                                  <span className="text-[var(--success)]">ok</span>
+                                  <span className="text-[var(--success)]">
+                                    {t('contactCsvImport.rowStatusOk', 'ok')}
+                                  </span>
                                 ) : (
                                   <span
                                     className="text-[var(--danger)]"
                                     title={r.errors.join('; ')}
                                   >
-                                    {r.errors.length} issue{r.errors.length === 1 ? '' : 's'}
+                                    {t('contactCsvImport.rowStatusIssues', '{{count}} issue', {
+                                      count: r.errors.length,
+                                    })}
                                   </span>
                                 )}
                               </td>
@@ -258,7 +280,9 @@ export function ContactCsvImportDialog({ trigger }: Props) {
                       </table>
                       {rows.length > 20 ? (
                         <div className="bg-[var(--surface-sunken)] px-2 py-1 text-[10px] text-[var(--fg-tertiary)]">
-                          Showing first 20 of {rows.length} rows.
+                          {t('contactCsvImport.showingFirstRows', 'Showing first 20 of {{count}} rows.', {
+                            count: rows.length,
+                          })}
                         </div>
                       ) : null}
                     </div>
@@ -267,22 +291,28 @@ export function ContactCsvImportDialog({ trigger }: Props) {
                 <footer className="flex items-center justify-between border-t border-[var(--border-subtle)] px-5 py-3 text-xs">
                   <span className="text-[var(--fg-tertiary)]">
                     {isImporting
-                      ? `Importing ${progress?.done ?? 0} of ${progress?.total ?? 0}…`
+                      ? t('contactCsvImport.footerImporting', 'Importing {{done}} of {{total}}…', {
+                          done: progress?.done ?? 0,
+                          total: progress?.total ?? 0,
+                        })
                       : rows.length > 0
-                        ? `${importable.length}/${rows.length} ready to import`
-                        : 'Awaiting paste'}
+                        ? t('contactCsvImport.footerReady', '{{ready}}/{{total}} ready to import', {
+                            ready: importable.length,
+                            total: rows.length,
+                          })
+                        : t('contactCsvImport.footerAwaiting', 'Awaiting paste')}
                   </span>
                   <div className="flex gap-2">
                     {/* Disabled (not a Dialog.Close) during import — closing mid-flight
                         would leave the user uncertain which rows were committed. */}
                     {isImporting ? (
                       <Button size="sm" variant="ghost" disabled>
-                        Cancel
+                        {t('contactCsvImport.cancelButton', 'Cancel')}
                       </Button>
                     ) : (
                       <Dialog.Close asChild>
                         <Button size="sm" variant="ghost">
-                          Cancel
+                          {t('contactCsvImport.cancelButton', 'Cancel')}
                         </Button>
                       </Dialog.Close>
                     )}
@@ -293,8 +323,13 @@ export function ContactCsvImportDialog({ trigger }: Props) {
                       disabled={importable.length === 0 || isImporting}
                     >
                       {isImporting
-                        ? `Importing ${progress?.done ?? 0} / ${progress?.total ?? 0}…`
-                        : `Import ${importable.length || ''}`}
+                        ? t('contactCsvImport.importButtonImporting', 'Importing {{done}} / {{total}}…', {
+                            done: progress?.done ?? 0,
+                            total: progress?.total ?? 0,
+                          })
+                        : t('contactCsvImport.importButton', 'Import {{label}}', {
+                            label: importable.length || '',
+                          })}
                     </Button>
                   </div>
                 </footer>

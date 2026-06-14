@@ -15,6 +15,7 @@
 
 import { Fragment, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
@@ -75,6 +76,7 @@ const PROVIDER_COLORS: Record<string, string> = {
 // ─── Main page ──────────────────────────────────────────────────────────────
 
 export function CalendarPage() {
+  const { t } = useTranslation('crm');
   const [anchor, setAnchor] = useState<Date>(() => new Date());
   const [showModal, setShowModal] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -117,7 +119,15 @@ export function CalendarPage() {
     });
   }
 
-  const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const DAY_LABELS = [
+    t('calendar.dayMon', 'Mon'),
+    t('calendar.dayTue', 'Tue'),
+    t('calendar.dayWed', 'Wed'),
+    t('calendar.dayThu', 'Thu'),
+    t('calendar.dayFri', 'Fri'),
+    t('calendar.daySat', 'Sat'),
+    t('calendar.daySun', 'Sun'),
+  ];
   const todayStr = toIso(new Date());
 
   return (
@@ -126,7 +136,7 @@ export function CalendarPage() {
       <div className="flex items-center gap-3 px-4 py-3 border-b border-(--color-border)">
         <button
           onClick={prevWeek}
-          aria-label="Previous week"
+          aria-label={t('calendar.previousWeek', 'Previous week')}
           className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-(--color-surface-hover) focus:outline-none focus:ring-2 focus:ring-(--color-accent) text-(--color-text-secondary)"
         >
           ‹
@@ -135,11 +145,11 @@ export function CalendarPage() {
           onClick={goToday}
           className="min-h-[44px] px-3 py-1 rounded-lg text-sm font-medium hover:bg-(--color-surface-hover) focus:outline-none focus:ring-2 focus:ring-(--color-accent)"
         >
-          Today
+          {t('calendar.today', 'Today')}
         </button>
         <button
           onClick={nextWeek}
-          aria-label="Next week"
+          aria-label={t('calendar.nextWeek', 'Next week')}
           className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-(--color-surface-hover) focus:outline-none focus:ring-2 focus:ring-(--color-accent) text-(--color-text-secondary)"
         >
           ›
@@ -152,7 +162,7 @@ export function CalendarPage() {
         </span>
 
         {/* Provider filter */}
-        <div role="group" aria-label="Calendar filter" className="flex gap-2">
+        <div role="group" aria-label={t('calendar.filterGroup', 'Calendar filter')} className="flex gap-2">
           {(['all', 'google_workspace', 'microsoft_graph'] as const).map((p) => (
             <button
               key={p}
@@ -164,7 +174,11 @@ export function CalendarPage() {
                   : 'bg-(--color-surface) text-(--color-text-secondary) hover:bg-(--color-surface-hover)'
               }`}
             >
-              {p === 'all' ? 'All' : p === 'google_workspace' ? 'Google' : 'Microsoft'}
+              {p === 'all'
+                ? t('calendar.providerAll', 'All')
+                : p === 'google_workspace'
+                  ? t('calendar.providerGoogle', 'Google')
+                  : t('calendar.providerMicrosoft', 'Microsoft')}
             </button>
           ))}
         </div>
@@ -176,7 +190,7 @@ export function CalendarPage() {
           }}
           className="min-h-[44px] px-4 py-2 rounded-lg text-sm font-semibold bg-(--color-accent) text-white hover:bg-(--color-accent-hover) focus:outline-none focus:ring-2 focus:ring-(--color-accent) focus:ring-offset-2"
         >
-          + New event
+          {t('calendar.newEvent', '+ New event')}
         </button>
       </div>
 
@@ -187,12 +201,12 @@ export function CalendarPage() {
           aria-live="polite"
           className="flex-1 flex items-center justify-center text-(--color-text-secondary) text-sm"
         >
-          Loading calendar…
+          {t('calendar.loading', 'Loading calendar…')}
         </div>
       )}
       {isError && (
         <div role="alert" className="flex-1 flex items-center justify-center text-red-500 text-sm">
-          Failed to load calendar events.
+          {t('calendar.loadError', 'Failed to load calendar events.')}
         </div>
       )}
       {!isLoading && !isError && (
@@ -240,11 +254,14 @@ export function CalendarPage() {
                     setSelectedDate(d);
                     setShowModal(true);
                   };
-                  const slotLabel = `New event ${day.toLocaleDateString(undefined, {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric',
-                  })} at ${String(hour).padStart(2, '0')}:00`;
+                  const slotLabel = t('calendar.slotLabel', 'New event {{date}} at {{time}}', {
+                    date: day.toLocaleDateString(undefined, {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                    }),
+                    time: `${String(hour).padStart(2, '0')}:00`,
+                  });
                   return (
                     // Keyboard-reachable slot: a real button so Tab focuses it
                     // and Enter/Space activate it — the old click-only div was
@@ -266,7 +283,10 @@ export function CalendarPage() {
                             ${ev.syncState === 'PENDING_PUSH' ? 'opacity-70 italic' : ''}`}
                         >
                           {ev.syncState === 'CONFLICT' && (
-                            <span aria-label="Sync conflict" title="Sync conflict">
+                            <span
+                              aria-label={t('calendar.syncConflict', 'Sync conflict')}
+                              title={t('calendar.syncConflict', 'Sync conflict')}
+                            >
                               ⚠{' '}
                             </span>
                           )}
@@ -300,7 +320,9 @@ export function CalendarPage() {
               setShowModal(false);
             } catch (err) {
               setCreateError(
-                err instanceof Error ? err.message : 'Could not create the event. Try again.',
+                err instanceof Error
+                  ? err.message
+                  : t('calendar.createError', 'Could not create the event. Try again.'),
               );
             }
           }}

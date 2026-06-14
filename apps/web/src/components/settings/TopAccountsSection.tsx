@@ -5,6 +5,7 @@
 // (regional strategic, star/purple) — see AccountTierBadges.
 
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
@@ -25,6 +26,7 @@ interface PickedCompany {
 }
 
 export function TopAccountsSection() {
+  const { t } = useTranslation('settings');
   const current = useTopAccounts({ limit: TOP_ACCOUNTS_MAX });
   const save = useUpdateTopAccountList();
 
@@ -65,11 +67,11 @@ export function TopAccountsSection() {
       await save.mutateAsync(picked.map((c) => c.id));
       toast.success(
         picked.length > 0
-          ? `Saved — Top ${picked.length} curated`
-          : 'Curation cleared — back to auto ranking',
+          ? t('topAccounts.toastSaved', 'Saved — Top {{count}} curated', { count: picked.length })
+          : t('topAccounts.toastCleared', 'Curation cleared — back to auto ranking'),
       );
     } catch {
-      toast.error('Save failed');
+      toast.error(t('topAccounts.toastSaveFailed', 'Save failed'));
     }
   };
 
@@ -77,11 +79,15 @@ export function TopAccountsSection() {
   if (current.isError) {
     return (
       <ErrorState
-        title="Couldn't load the current Top 10"
-        message={current.error instanceof Error ? current.error.message : 'Endpoint did not respond.'}
+        title={t('topAccounts.errorTitle', "Couldn't load the current Top 10")}
+        message={
+          current.error instanceof Error
+            ? current.error.message
+            : t('topAccounts.errorMessage', 'Endpoint did not respond.')
+        }
         action={
           <button type="button" className="btn btn-secondary" onClick={() => void current.refetch()}>
-            Retry
+            {t('topAccounts.retry', 'Retry')}
           </button>
         }
       />
@@ -94,25 +100,31 @@ export function TopAccountsSection() {
         <div className="border-b border-[var(--border-subtle)] px-4 py-3">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
-              Global Top 10 accounts
+              {t('topAccounts.heading', 'Global Top 10 accounts')}
             </h3>
             <TopAccountBadge />
           </div>
           <p className="mt-1 text-xs text-[var(--fg-secondary)]">
-            Hand-pick and order up to {TOP_ACCOUNTS_MAX} accounts for the Amaris global Top 10.
-            This is separate from Key Accounts (regional strategic accounts flagged per company).
-            Saving an empty list reverts the Top Accounts page to the automatic pipeline-value
-            ranking.
+            {t(
+              'topAccounts.subtitle',
+              'Hand-pick and order up to {{count}} accounts for the Amaris global Top 10. This is separate from Key Accounts (regional strategic accounts flagged per company). Saving an empty list reverts the Top Accounts page to the automatic pipeline-value ranking.',
+              { count: TOP_ACCOUNTS_MAX },
+            )}
           </p>
         </div>
 
         {picked.length === 0 ? (
           <p className="px-4 py-6 text-center text-sm text-[var(--fg-secondary)]">
-            No curated accounts yet — search below to build the list. The Top Accounts page is
-            currently auto-ranked by pipeline value.
+            {t(
+              'topAccounts.empty',
+              'No curated accounts yet — search below to build the list. The Top Accounts page is currently auto-ranked by pipeline value.',
+            )}
           </p>
         ) : (
-          <ol aria-label="Curated top accounts, in rank order" className="divide-y divide-[var(--border-subtle)]">
+          <ol
+            aria-label={t('topAccounts.listAriaLabel', 'Curated top accounts, in rank order')}
+            className="divide-y divide-[var(--border-subtle)]"
+          >
             {picked.map((company, index) => (
               <li key={company.id} className="flex min-h-[44px] items-center gap-3 px-4 py-2">
                 <span className="w-6 shrink-0 text-center text-sm font-bold text-[var(--fg-tertiary)]">
@@ -128,19 +140,27 @@ export function TopAccountsSection() {
                   </div>
                 </div>
                 <RowButton
-                  label={`Move ${company.name} up to rank ${index}`}
+                  label={t('topAccounts.moveUpLabel', 'Move {{name}} up to rank {{rank}}', {
+                    name: company.name,
+                    rank: index,
+                  })}
                   icon="caretup"
                   disabled={index === 0}
                   onClick={() => move(index, -1)}
                 />
                 <RowButton
-                  label={`Move ${company.name} down to rank ${index + 2}`}
+                  label={t('topAccounts.moveDownLabel', 'Move {{name}} down to rank {{rank}}', {
+                    name: company.name,
+                    rank: index + 2,
+                  })}
                   icon="caret"
                   disabled={index === picked.length - 1}
                   onClick={() => move(index, 1)}
                 />
                 <RowButton
-                  label={`Remove ${company.name} from the top accounts`}
+                  label={t('topAccounts.removeLabel', 'Remove {{name}} from the top accounts', {
+                    name: company.name,
+                  })}
                   icon="close"
                   onClick={() => setList(picked.filter((c) => c.id !== company.id))}
                 />
@@ -151,7 +171,10 @@ export function TopAccountsSection() {
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-subtle)] px-4 py-3">
           <span className="text-xs text-[var(--fg-tertiary)]">
-            {picked.length}/{TOP_ACCOUNTS_MAX} slots used
+            {t('topAccounts.slotsUsed', '{{used}}/{{max}} slots used', {
+              used: picked.length,
+              max: TOP_ACCOUNTS_MAX,
+            })}
           </span>
           <button
             type="button"
@@ -159,7 +182,9 @@ export function TopAccountsSection() {
             disabled={!dirty || save.isPending}
             onClick={() => void onSave()}
           >
-            {save.isPending ? 'Saving…' : 'Save top accounts'}
+            {save.isPending
+              ? t('topAccounts.saving', 'Saving…')
+              : t('topAccounts.save', 'Save top accounts')}
           </button>
         </div>
       </Card>
@@ -220,6 +245,7 @@ function CompanyPicker({
   onSearchChange: (value: string) => void;
   onAdd: (company: PickedCompany) => void;
 }) {
+  const { t } = useTranslation('settings');
   const results = useCompanies(debouncedSearch ? { search: debouncedSearch } : {});
   const candidates = (results.data?.items ?? [])
     .filter((c) => !pickedIds.includes(c.id))
@@ -228,7 +254,9 @@ function CompanyPicker({
   return (
     <Card>
       <div className="border-b border-[var(--border-subtle)] px-4 py-3">
-        <h3 className="text-sm font-semibold text-[var(--fg-primary)]">Add accounts</h3>
+        <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
+          {t('topAccounts.addHeading', 'Add accounts')}
+        </h3>
       </div>
       <div className="p-4">
         <div className="relative">
@@ -242,28 +270,40 @@ function CompanyPicker({
             type="search"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search companies to add…"
-            aria-label="Search companies to add to the top accounts"
+            placeholder={t('topAccounts.searchPlaceholder', 'Search companies to add…')}
+            aria-label={t(
+              'topAccounts.searchAriaLabel',
+              'Search companies to add to the top accounts',
+            )}
             disabled={full}
             className="input w-full pl-9"
           />
         </div>
         {full ? (
           <p className="mt-2 text-xs text-[var(--fg-tertiary)]">
-            All {TOP_ACCOUNTS_MAX} slots are used — remove an account to add another.
+            {t(
+              'topAccounts.slotsFull',
+              'All {{count}} slots are used — remove an account to add another.',
+              { count: TOP_ACCOUNTS_MAX },
+            )}
           </p>
         ) : results.isLoading ? (
           <div className="mt-3 h-10 animate-pulse rounded-lg bg-[var(--surface-sunken)]" aria-hidden />
         ) : results.isError ? (
           <p role="alert" className="mt-3 text-xs text-[var(--danger)]">
-            Company search failed — try again.
+            {t('topAccounts.searchFailed', 'Company search failed — try again.')}
           </p>
         ) : candidates.length === 0 ? (
           <p className="mt-3 text-xs text-[var(--fg-tertiary)]">
-            {debouncedSearch ? 'No matching companies.' : 'Type to search your portfolio.'}
+            {debouncedSearch
+              ? t('topAccounts.noMatches', 'No matching companies.')
+              : t('topAccounts.typeToSearch', 'Type to search your portfolio.')}
           </p>
         ) : (
-          <ul className="mt-3 divide-y divide-[var(--border-subtle)]" aria-label="Company search results">
+          <ul
+            className="mt-3 divide-y divide-[var(--border-subtle)]"
+            aria-label={t('topAccounts.resultsAriaLabel', 'Company search results')}
+          >
             {candidates.map((company) => (
               <li key={company.id}>
                 <button
@@ -284,7 +324,7 @@ function CompanyPicker({
                   </span>
                   <span className="flex items-center gap-1 text-xs font-semibold text-[var(--brand-primary)]">
                     <Icon name="plus" size={13} ariaHidden />
-                    Add
+                    {t('topAccounts.add', 'Add')}
                   </span>
                 </button>
               </li>

@@ -1,5 +1,7 @@
 // Settings > Appearance. Theme, density, and motion preferences.
 
+import { useTranslation } from 'react-i18next';
+
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { useThemeStore } from '@/stores/theme';
 import { usePreferences, type Density, type MotionPref } from '@/stores/preferences';
@@ -18,26 +20,33 @@ export function AppearanceSection() {
   const setSound = usePreferences((s) => s.setSound);
   const soundVolume = usePreferences((s) => s.soundVolume);
   const setSoundVolume = usePreferences((s) => s.setSoundVolume);
+  const { t } = useTranslation('settings');
 
   return (
     <div className="space-y-6">
       <Card>
-        <SectionHeader title="Theme" caption="Choose your preferred color scheme." />
+        <SectionHeader
+          title={t('appearance.themeTitle', 'Theme')}
+          caption={t('appearance.themeCaption', 'Choose your preferred color scheme.')}
+        />
         <div className="p-5">
           <fieldset>
-            <legend className="sr-only">Theme</legend>
+            <legend className="sr-only">{t('appearance.themeLegend', 'Theme')}</legend>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <ThemeOption
                 value="light"
-                label="Light"
-                description="Bright surfaces, sharp contrast."
+                label={t('appearance.themeLightLabel', 'Light')}
+                description={t('appearance.themeLightDescription', 'Bright surfaces, sharp contrast.')}
                 checked={theme === 'light'}
                 onChange={() => setTheme('light')}
               />
               <ThemeOption
                 value="dark"
-                label="Dark"
-                description="Dim surfaces, easier on the eyes at night."
+                label={t('appearance.themeDarkLabel', 'Dark')}
+                description={t(
+                  'appearance.themeDarkDescription',
+                  'Dim surfaces, easier on the eyes at night.',
+                )}
                 checked={theme === 'dark'}
                 onChange={() => setTheme('dark')}
               />
@@ -52,10 +61,13 @@ export function AppearanceSection() {
             />
             <span>
               <span className="block text-sm font-medium text-[var(--fg-primary)]">
-                Premium visual effects
+                {t('appearance.visualEffectsLabel', 'Premium visual effects')}
               </span>
               <span className="block text-xs text-[var(--fg-secondary)]">
-                Keep subtle depth and motion details on supported screens.
+                {t(
+                  'appearance.visualEffectsDescription',
+                  'Keep subtle depth and motion details on supported screens.',
+                )}
               </span>
             </span>
           </label>
@@ -64,34 +76,46 @@ export function AppearanceSection() {
 
       <Card>
         <SectionHeader
-          title="Density"
-          caption="How much breathing room tables and forms give themselves."
+          title={t('appearance.densityTitle', 'Density')}
+          caption={t(
+            'appearance.densityCaption',
+            'How much breathing room tables and forms give themselves.',
+          )}
         />
         <div className="p-5">
           <fieldset>
-            <legend className="sr-only">Density</legend>
+            <legend className="sr-only">{t('appearance.densityLegend', 'Density')}</legend>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <RadioOption
                 name="density"
                 value="compact"
-                label="Compact"
-                description="More rows per screen. Best on large monitors."
+                label={t('appearance.densityCompactLabel', 'Compact')}
+                description={t(
+                  'appearance.densityCompactDescription',
+                  'More rows per screen. Best on large monitors.',
+                )}
                 checked={density === 'compact'}
                 onChange={() => setDensity('compact')}
               />
               <RadioOption
                 name="density"
                 value="comfortable"
-                label="Comfortable"
-                description="The default - balanced for most workflows."
+                label={t('appearance.densityComfortableLabel', 'Comfortable')}
+                description={t(
+                  'appearance.densityComfortableDescription',
+                  'The default - balanced for most workflows.',
+                )}
                 checked={density === 'comfortable'}
                 onChange={() => setDensity('comfortable')}
               />
               <RadioOption
                 name="density"
                 value="spacious"
-                label="Spacious"
-                description="Roomier targets. Pairs well with touch input."
+                label={t('appearance.densitySpaciousLabel', 'Spacious')}
+                description={t(
+                  'appearance.densitySpaciousDescription',
+                  'Roomier targets. Pairs well with touch input.',
+                )}
                 checked={density === 'spacious'}
                 onChange={() => setDensity('spacious')}
               />
@@ -102,34 +126,45 @@ export function AppearanceSection() {
 
       <Card>
         <SectionHeader
-          title="Motion"
-          caption='"System" follows your OS reduced-motion preference.'
+          title={t('appearance.motionTitle', 'Motion')}
+          caption={t(
+            'appearance.motionCaption',
+            '"System" follows your OS reduced-motion preference.',
+          )}
         />
         <div className="p-5">
           <fieldset>
-            <legend className="sr-only">Motion preference</legend>
+            <legend className="sr-only">
+              {t('appearance.motionLegend', 'Motion preference')}
+            </legend>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <RadioOption
                 name="motion"
                 value="system"
-                label="System"
-                description="Honor the OS setting."
+                label={t('appearance.motionSystemLabel', 'System')}
+                description={t('appearance.motionSystemDescription', 'Honor the OS setting.')}
                 checked={motion === 'system'}
                 onChange={() => setMotion('system')}
               />
               <RadioOption
                 name="motion"
                 value="full"
-                label="Full motion"
-                description="Animate everything regardless of OS."
+                label={t('appearance.motionFullLabel', 'Full motion')}
+                description={t(
+                  'appearance.motionFullDescription',
+                  'Animate everything regardless of OS.',
+                )}
                 checked={motion === 'full'}
                 onChange={() => setMotion('full')}
               />
               <RadioOption
                 name="motion"
                 value="reduced"
-                label="Reduced"
-                description="Minimize transitions and animation."
+                label={t('appearance.motionReducedLabel', 'Reduced')}
+                description={t(
+                  'appearance.motionReducedDescription',
+                  'Minimize transitions and animation.',
+                )}
                 checked={motion === 'reduced'}
                 onChange={() => setMotion('reduced')}
               />
@@ -140,8 +175,11 @@ export function AppearanceSection() {
 
       <Card>
         <SectionHeader
-          title="Sound"
-          caption="Short, tactile UI sounds on clicks and confirmations. Interaction-only — never ambient."
+          title={t('appearance.soundTitle', 'Sound')}
+          caption={t(
+            'appearance.soundCaption',
+            'Short, tactile UI sounds on clicks and confirmations. Interaction-only — never ambient.',
+          )}
         />
         <div className="space-y-4 p-5">
           <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border border-[var(--border-default)] p-3 transition-colors hover:bg-[var(--surface-sunken)]">
@@ -153,10 +191,13 @@ export function AppearanceSection() {
             />
             <span>
               <span className="block text-sm font-medium text-[var(--fg-primary)]">
-                Sound effects
+                {t('appearance.soundEffectsLabel', 'Sound effects')}
               </span>
               <span className="block text-xs text-[var(--fg-secondary)]">
-                Play a soft click on button presses and a chime on save / error.
+                {t(
+                  'appearance.soundEffectsDescription',
+                  'Play a soft click on button presses and a chime on save / error.',
+                )}
               </span>
             </span>
           </label>
@@ -166,7 +207,7 @@ export function AppearanceSection() {
               htmlFor="sound-volume"
               className="flex items-center justify-between text-sm font-medium text-[var(--fg-primary)]"
             >
-              Volume
+              {t('appearance.volumeLabel', 'Volume')}
               <span className="font-mono text-xs text-[var(--fg-secondary)]">
                 {Math.round(soundVolume * 100)}%
               </span>
@@ -181,18 +222,30 @@ export function AppearanceSection() {
               disabled={!sound}
               onChange={(event) => setSoundVolume(Number(event.target.value) / 100)}
               className="mt-2 h-2 w-full cursor-pointer accent-[var(--brand-primary)] disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
-              aria-label="Sound volume"
+              aria-label={t('appearance.volumeAriaLabel', 'Sound volume')}
             />
           </div>
 
           <div>
             <div className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
-              Preview
+              {t('appearance.previewLabel', 'Preview')}
             </div>
             <div className="flex flex-wrap gap-2">
-              <SoundTestChip kind="click" label="Click" volume={soundVolume} />
-              <SoundTestChip kind="success" label="Success" volume={soundVolume} />
-              <SoundTestChip kind="error" label="Error" volume={soundVolume} />
+              <SoundTestChip
+                kind="click"
+                label={t('appearance.previewClickLabel', 'Click')}
+                volume={soundVolume}
+              />
+              <SoundTestChip
+                kind="success"
+                label={t('appearance.previewSuccessLabel', 'Success')}
+                volume={soundVolume}
+              />
+              <SoundTestChip
+                kind="error"
+                label={t('appearance.previewErrorLabel', 'Error')}
+                volume={soundVolume}
+              />
             </div>
           </div>
         </div>

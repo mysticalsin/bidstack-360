@@ -3,6 +3,7 @@ import '../../styles/org-dashboard.css';
 import { memo, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 import { Icon } from '@/components/ui/Icon';
 import { ErrorState } from '@/components/ui/StateMessages';
@@ -31,6 +32,7 @@ import { WinRateCard } from './widgets/WinRateCard';
 // Layout-only orchestrator. Every widget component lives in ./widgets/.
 
 export const OrgDashboard = memo(function OrgDashboard() {
+  const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
   const summary = useOrgSummary();
   const pipelineReport = usePipelineReport();
@@ -62,103 +64,112 @@ export const OrgDashboard = memo(function OrgDashboard() {
             value: stage.count,
             color: stageColor(stage.stage),
           }))
-        : [{ label: 'Open deals', value: openOpportunities, color: 'var(--tag-teal-fg)' }];
+        : [
+            {
+              label: t('orgDashboard.signalOpenDeals', 'Open deals'),
+              value: openOpportunities,
+              color: 'var(--tag-teal-fg)',
+            },
+          ];
 
     return [
       {
-        label: 'Companies',
+        label: t('orgDashboard.kpiCompaniesLabel', 'Companies'),
         value: companies,
-        detail: 'in portfolio',
+        detail: t('orgDashboard.kpiCompaniesDetail', 'in portfolio'),
         tone: 'blue',
         icon: 'building',
         href: '/companies',
         signal: [
-          { label: 'Accounts', value: companies, color: 'var(--tag-blue-fg)' },
-          { label: 'Open deals', value: openOpportunities, color: 'var(--tag-teal-fg)' },
+          { label: t('orgDashboard.signalAccounts', 'Accounts'), value: companies, color: 'var(--tag-blue-fg)' },
+          { label: t('orgDashboard.signalOpenDeals', 'Open deals'), value: openOpportunities, color: 'var(--tag-teal-fg)' },
         ],
       },
       {
-        label: 'Contacts',
+        label: t('orgDashboard.kpiContactsLabel', 'Contacts'),
         value: contacts,
-        detail: 'decision makers',
+        detail: t('orgDashboard.kpiContactsDetail', 'decision makers'),
         tone: 'jade',
         icon: 'contacts',
         href: '/contacts',
         signal: [
-          { label: 'Contacts', value: contacts, color: 'var(--tag-jade-fg)' },
-          { label: 'Accounts', value: companies, color: 'var(--tag-blue-fg)' },
-          { label: 'Leads', value: leads, color: 'var(--tag-purple-fg)' },
+          { label: t('orgDashboard.signalContacts', 'Contacts'), value: contacts, color: 'var(--tag-jade-fg)' },
+          { label: t('orgDashboard.signalAccounts', 'Accounts'), value: companies, color: 'var(--tag-blue-fg)' },
+          { label: t('orgDashboard.signalLeads', 'Leads'), value: leads, color: 'var(--tag-purple-fg)' },
         ],
       },
       {
-        label: 'Leads',
+        label: t('orgDashboard.kpiLeadsLabel', 'Leads'),
         value: leads,
-        detail: 'in funnel',
+        detail: t('orgDashboard.kpiLeadsDetail', 'in funnel'),
         tone: 'purple',
         icon: 'user',
         href: '/leads',
         signal: [
-          { label: 'Leads', value: leads, color: 'var(--tag-purple-fg)' },
-          { label: 'Opportunities', value: opportunities, color: 'var(--tag-amber-fg)' },
-          { label: 'Open deals', value: openOpportunities, color: 'var(--tag-teal-fg)' },
+          { label: t('orgDashboard.signalLeads', 'Leads'), value: leads, color: 'var(--tag-purple-fg)' },
+          { label: t('orgDashboard.signalOpportunities', 'Opportunities'), value: opportunities, color: 'var(--tag-amber-fg)' },
+          { label: t('orgDashboard.signalOpenDeals', 'Open deals'), value: openOpportunities, color: 'var(--tag-teal-fg)' },
         ],
       },
       {
-        label: 'Opportunities',
+        label: t('orgDashboard.kpiOpportunitiesLabel', 'Opportunities'),
         value: opportunities,
-        detail: 'total bids',
+        detail: t('orgDashboard.kpiOpportunitiesDetail', 'total bids'),
         tone: 'amber',
         icon: 'briefcase',
         href: '/opportunities',
         signal: [
-          { label: 'Open', value: openOpportunities, color: 'var(--tag-teal-fg)' },
-          { label: 'Won', value: closedWon, color: 'var(--tag-jade-fg)' },
-          { label: 'Lost', value: closedLost, color: 'var(--tag-rose-fg)' },
+          { label: t('orgDashboard.signalOpen', 'Open'), value: openOpportunities, color: 'var(--tag-teal-fg)' },
+          { label: t('orgDashboard.signalWon', 'Won'), value: closedWon, color: 'var(--tag-jade-fg)' },
+          { label: t('orgDashboard.signalLost', 'Lost'), value: closedLost, color: 'var(--tag-rose-fg)' },
         ],
       },
       {
-        label: 'Open Pipeline',
+        label: t('orgDashboard.kpiOpenPipelineLabel', 'Open Pipeline'),
         value: openOpportunities,
-        detail: 'active deals',
+        detail: t('orgDashboard.kpiOpenPipelineDetail', 'active deals'),
         tone: 'teal',
         icon: 'dollar',
         href: '/opportunities',
         signal: stageSignals,
       },
       {
-        label: 'Tasks',
+        label: t('orgDashboard.kpiTasksLabel', 'Tasks'),
         value: tasks,
-        detail: 'follow-ups',
+        detail: t('orgDashboard.kpiTasksDetail', 'follow-ups'),
         tone: 'rose',
         icon: 'tasks',
         href: '/tasks',
         signal: [
-          { label: 'Active', value: activeTasks, color: 'var(--tag-teal-fg)' },
-          { label: 'Overdue', value: overdueTasks, color: 'var(--tag-rose-fg)' },
+          { label: t('orgDashboard.signalActive', 'Active'), value: activeTasks, color: 'var(--tag-teal-fg)' },
+          { label: t('orgDashboard.signalOverdue', 'Overdue'), value: overdueTasks, color: 'var(--tag-rose-fg)' },
         ],
       },
     ] satisfies OrgKpi[];
-  }, [closedLost, closedWon, pipelineStages, s]);
+  }, [closedLost, closedWon, pipelineStages, s, t]);
 
   // Compute the greeting once per render instead of calling new Date() three
   // times inline in the JSX below.
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
-  }, []);
+    if (hour < 12) return t('orgDashboard.greetingMorning', 'Good morning');
+    if (hour < 18) return t('orgDashboard.greetingAfternoon', 'Good afternoon');
+    return t('orgDashboard.greetingEvening', 'Good evening');
+  }, [t]);
 
   if (summary.isLoading) return <DashboardSkeleton />;
   if (summary.isError) {
     return (
       <ErrorState
-        title="Could not load dashboard"
-        message={summary.error?.message ?? 'The workspace summary endpoint did not respond.'}
+        title={t('orgDashboard.errorTitle', 'Could not load dashboard')}
+        message={
+          summary.error?.message ??
+          t('orgDashboard.errorMessage', 'The workspace summary endpoint did not respond.')
+        }
         action={
           <button type="button" className="btn btn-secondary" onClick={() => void summary.refetch()}>
             <Icon name="refresh" size={14} />
-            Retry
+            {t('orgDashboard.retry', 'Retry')}
           </button>
         }
       />
@@ -176,43 +187,70 @@ export const OrgDashboard = memo(function OrgDashboard() {
       >
         <div>
           <div className="text-xs font-medium text-[var(--brand-primary)] mb-1">{greeting}</div>
-          <h1 className="page-title gradient-text">Workspace Command Center</h1>
+          <h1 className="page-title gradient-text">
+            {t('orgDashboard.pageTitle', 'Workspace Command Center')}
+          </h1>
           <div className="page-sub">
-            {s?.companies ?? 0} companies · {s?.openOpportunities ?? 0} open deals ·{' '}
-            {formatMoney(convert(s?.pipelineValue ?? 0, 'EUR'), currency)} pipeline
+            {t(
+              'orgDashboard.pageSubtitle',
+              '{{companies}} companies · {{openDeals}} open deals · {{pipeline}} pipeline',
+              {
+                companies: s?.companies ?? 0,
+                openDeals: s?.openOpportunities ?? 0,
+                pipeline: formatMoney(convert(s?.pipelineValue ?? 0, 'EUR'), currency),
+              },
+            )}
           </div>
         </div>
         <div className="page-actions">
           <Link to="/accounts" className="btn btn-secondary">
             <Icon name="building" size={14} />
-            All accounts
+            {t('orgDashboard.allAccounts', 'All accounts')}
           </Link>
           <Link to="/opportunities" className="btn btn-primary">
             <Icon name="plus" size={14} />
-            Opportunities
+            {t('orgDashboard.opportunities', 'Opportunities')}
           </Link>
         </div>
       </motion.div>
 
       {/* Source stat strip with animated metrics */}
-      <section className="account-dashboard-strip" aria-label="Workspace metrics">
-        <SourceStat label="Accounts" value={String(s?.companies ?? 0)} detail="portfolio" />
-        <SourceStat label="Contacts" value={String(s?.contacts ?? 0)} detail="people" />
+      <section
+        className="account-dashboard-strip"
+        aria-label={t('orgDashboard.metricsAriaLabel', 'Workspace metrics')}
+      >
         <SourceStat
-          label="Open Deals"
+          label={t('orgDashboard.statAccountsLabel', 'Accounts')}
+          value={String(s?.companies ?? 0)}
+          detail={t('orgDashboard.statAccountsDetail', 'portfolio')}
+        />
+        <SourceStat
+          label={t('orgDashboard.statContactsLabel', 'Contacts')}
+          value={String(s?.contacts ?? 0)}
+          detail={t('orgDashboard.statContactsDetail', 'people')}
+        />
+        <SourceStat
+          label={t('orgDashboard.statOpenDealsLabel', 'Open Deals')}
           value={String(s?.openOpportunities ?? 0)}
-          detail="pipeline"
+          detail={t('orgDashboard.statOpenDealsDetail', 'pipeline')}
         />
         <SourceStat
-          label="Pipeline"
+          label={t('orgDashboard.statPipelineLabel', 'Pipeline')}
           value={formatMoney(convert(s?.pipelineValue ?? 0, 'EUR'), currency)}
-          detail="weighted"
+          detail={t('orgDashboard.statPipelineDetail', 'weighted')}
         />
-        <SourceStat label="Overdue" value={String(s?.overdueTasks ?? 0)} detail="tasks" />
+        <SourceStat
+          label={t('orgDashboard.statOverdueLabel', 'Overdue')}
+          value={String(s?.overdueTasks ?? 0)}
+          detail={t('orgDashboard.statOverdueDetail', 'tasks')}
+        />
       </section>
 
       {/* Main cockpit grid */}
-      <section className="cockpit-grid" aria-label="Workspace cockpit">
+      <section
+        className="cockpit-grid"
+        aria-label={t('orgDashboard.cockpitAriaLabel', 'Workspace cockpit')}
+      >
         {/* Main column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
           <Reveal>
@@ -248,7 +286,10 @@ export const OrgDashboard = memo(function OrgDashboard() {
         </div>
 
         {/* Sidebar */}
-        <aside className="cockpit-side" aria-label="Workspace details">
+        <aside
+          className="cockpit-side"
+          aria-label={t('orgDashboard.detailsAriaLabel', 'Workspace details')}
+        >
           <Reveal delay={0.04}>
             <PipelineCard
               value={convert(s?.pipelineValue ?? 0, 'EUR')}
@@ -272,7 +313,7 @@ export const OrgDashboard = memo(function OrgDashboard() {
             <AlertCard
               tone="rose"
               icon="tasks"
-              label="Overdue tasks"
+              label={t('orgDashboard.overdueTasks', 'Overdue tasks')}
               value={s?.overdueTasks ?? 0}
               total={s?.tasks ?? 0}
               href="/tasks?filter=overdue"

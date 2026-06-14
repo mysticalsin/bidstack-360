@@ -12,6 +12,7 @@
 //   - WCAG 2.2 AA: focus ring on interactive elements, 44px min touch targets.
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
   RBAC_MATRIX,
@@ -55,9 +56,14 @@ interface MatrixCellProps {
 }
 
 function MatrixCell({ level, role, resource }: MatrixCellProps) {
-  const label = `${role}: ${resource} — ${
-    level === 'read-write' ? 'read and write' : level === 'read-only' ? 'read only' : 'no access'
-  }`;
+  const { t } = useTranslation('crm');
+  const accessText =
+    level === 'read-write'
+      ? t('roles.access.readWrite', 'read and write')
+      : level === 'read-only'
+        ? t('roles.access.readOnly', 'read only')
+        : t('roles.access.none', 'no access');
+  const label = `${role}: ${resource} — ${accessText}`;
 
   return (
     <td
@@ -71,17 +77,17 @@ function MatrixCell({ level, role, resource }: MatrixCellProps) {
       )}
     >
       {level === 'read-write' && (
-        <span aria-hidden="true" title="Read + Write">
+        <span aria-hidden="true" title={t('roles.cell.readWriteTitle', 'Read + Write')}>
           R+W
         </span>
       )}
       {level === 'read-only' && (
-        <span aria-hidden="true" title="Read only">
+        <span aria-hidden="true" title={t('roles.cell.readOnlyTitle', 'Read only')}>
           R
         </span>
       )}
       {level === 'none' && (
-        <span aria-hidden="true" title="No access">
+        <span aria-hidden="true" title={t('roles.cell.noAccessTitle', 'No access')}>
           —
         </span>
       )}
@@ -92,28 +98,29 @@ function MatrixCell({ level, role, resource }: MatrixCellProps) {
 // ─── Legend ───────────────────────────────────────────────────────────────────
 
 function Legend() {
+  const { t } = useTranslation('crm');
   return (
     <div
       className="flex flex-wrap items-center gap-4 text-xs text-[var(--fg-secondary)]"
-      aria-label="Legend"
+      aria-label={t('roles.legend.label', 'Legend')}
     >
       <span className="flex items-center gap-1.5">
         <span className="inline-block h-4 w-8 rounded text-center text-[11px] font-semibold bg-[var(--tag-jade-bg)] text-[var(--tag-jade-fg)]">
           R+W
         </span>
-        Read &amp; Write
+        {t('roles.legend.readWrite', 'Read & Write')}
       </span>
       <span className="flex items-center gap-1.5">
         <span className="inline-block h-4 w-8 rounded text-center text-[11px] font-semibold bg-[var(--tag-blue-bg)] text-[var(--tag-blue-fg)]">
           R
         </span>
-        Read only
+        {t('roles.legend.readOnly', 'Read only')}
       </span>
       <span className="flex items-center gap-1.5">
         <span className="inline-block h-4 w-8 rounded text-center text-[11px] font-medium text-[var(--fg-disabled)]">
           —
         </span>
-        No access
+        {t('roles.legend.noAccess', 'No access')}
       </span>
     </div>
   );
@@ -122,15 +129,16 @@ function Legend() {
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 
 type Tab = 'matrix' | 'custom';
-const ROLE_TABS: Array<{ id: Tab; label: string; adminOnly?: boolean }> = [
-  { id: 'matrix', label: 'System Roles Matrix' },
-  { id: 'custom', label: 'Custom Roles', adminOnly: true },
+const ROLE_TABS: Array<{ id: Tab; labelKey: string; labelDefault: string; adminOnly?: boolean }> = [
+  { id: 'matrix', labelKey: 'roles.tabs.matrix', labelDefault: 'System Roles Matrix' },
+  { id: 'custom', labelKey: 'roles.tabs.custom', labelDefault: 'Custom Roles', adminOnly: true },
 ];
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function RolesPage() {
   const isAdmin = useIsAdmin();
+  const { t } = useTranslation('crm');
   const [tab, setTab] = useState<Tab>('matrix');
 
   return (
@@ -138,20 +146,23 @@ export function RolesPage() {
       {/* Page header */}
       <header>
         <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
-          Roles &amp; Permissions
+          {t('roles.header.title', 'Roles & Permissions')}
         </h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          Default permission matrix for system roles. Admins can create custom roles below.
+          {t(
+            'roles.header.subtitle',
+            'Default permission matrix for system roles. Admins can create custom roles below.',
+          )}
         </p>
       </header>
 
       {/* Tab bar */}
       <div
         role="tablist"
-        aria-label="Roles views"
+        aria-label={t('roles.tablist.label', 'Roles views')}
         className="flex gap-1 border-b border-[var(--border-subtle)]"
       >
-        {ROLE_TABS.map(({ id, label, adminOnly }) => {
+        {ROLE_TABS.map(({ id, labelKey, labelDefault, adminOnly }) => {
           if (adminOnly && !isAdmin) return null;
           return (
             <button
@@ -170,7 +181,7 @@ export function RolesPage() {
                   : 'text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]',
               )}
             >
-              {label}
+              {t(labelKey, labelDefault)}
             </button>
           );
         })}
@@ -190,7 +201,7 @@ export function RolesPage() {
           <div className="overflow-x-auto rounded-lg border border-[var(--border-subtle)] shadow-sm">
             <table
               role="grid"
-              aria-label="Permission matrix for system roles"
+              aria-label={t('roles.table.label', 'Permission matrix for system roles')}
               className="border-collapse min-w-full text-sm"
             >
               <thead>
@@ -199,7 +210,7 @@ export function RolesPage() {
                     scope="col"
                     className="sticky left-0 z-10 bg-[var(--surface-sunken)] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[var(--fg-secondary)] min-w-[140px] border-b border-[var(--border-subtle)]"
                   >
-                    Resource
+                    {t('roles.table.resourceHeader', 'Resource')}
                   </th>
                   {SYSTEM_ROLE_NAMES.map((role) => (
                     <th
@@ -263,32 +274,32 @@ export function RolesPage() {
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-[var(--fg-primary)] text-sm">{role}</span>
                     <Badge tone={role === 'Admin' ? 'purple' : role === 'Read-Only' ? 'gray' : 'blue'}>
-                      System
+                      {t('roles.card.systemBadge', 'System')}
                     </Badge>
                   </div>
                   <div className="flex gap-3 text-xs text-[var(--fg-secondary)]">
-                    <span>{readCount} read</span>
+                    <span>{t('roles.card.readCount', '{{count}} read', { count: readCount })}</span>
                     <span>·</span>
-                    <span>{writeCount} write</span>
+                    <span>{t('roles.card.writeCount', '{{count}} write', { count: writeCount })}</span>
                   </div>
                   <div className="flex flex-wrap gap-1 pt-1">
                     {role === 'Admin' && (
-                      <Badge tone="amber">Full access</Badge>
+                      <Badge tone="amber">{t('roles.card.fullAccess', 'Full access')}</Badge>
                     )}
                     {role === 'Read-Only' && (
-                      <Badge tone="gray">No write access</Badge>
+                      <Badge tone="gray">{t('roles.card.noWriteAccess', 'No write access')}</Badge>
                     )}
                     {role === 'SDR' && (
-                      <Badge tone="jade">Lead-focused</Badge>
+                      <Badge tone="jade">{t('roles.card.leadFocused', 'Lead-focused')}</Badge>
                     )}
                     {role === 'Customer Success' && (
-                      <Badge tone="teal">Post-sale</Badge>
+                      <Badge tone="teal">{t('roles.card.postSale', 'Post-sale')}</Badge>
                     )}
                     {role === 'Account Executive' && (
-                      <Badge tone="blue">Pipeline owner</Badge>
+                      <Badge tone="blue">{t('roles.card.pipelineOwner', 'Pipeline owner')}</Badge>
                     )}
                     {role === 'Sales Manager' && (
-                      <Badge tone="purple">Team lead</Badge>
+                      <Badge tone="purple">{t('roles.card.teamLead', 'Team lead')}</Badge>
                     )}
                   </div>
                 </div>
