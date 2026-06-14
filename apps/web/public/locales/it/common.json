@@ -279,5 +279,16 @@
         "leadRot": "Regole di obsolescenza"
       }
     }
+  },
+  "topbar": {
+    "skipToContent": "Vai al contenuto",
+    "switchToLight": "Passa alla modalità chiara",
+    "switchToDark": "Passa alla modalità scura",
+    "help": "Aiuto e scorciatoie",
+    "helpAria": "Aiuto e scorciatoie da tastiera",
+    "productTour": "Fai il tour del prodotto",
+    "signOut": "Esci",
+    "portfolio": "Portfolio",
+    "detail": "Dettaglio"
   }
 }

@@ -279,5 +279,16 @@
         "leadRot": "Reglas de caducidad"
       }
     }
+  },
+  "topbar": {
+    "skipToContent": "Saltar al contenido",
+    "switchToLight": "Cambiar a modo claro",
+    "switchToDark": "Cambiar a modo oscuro",
+    "help": "Ayuda y atajos",
+    "helpAria": "Ayuda y atajos de teclado",
+    "productTour": "Hacer el recorrido del producto",
+    "signOut": "Cerrar sesión",
+    "portfolio": "Cartera",
+    "detail": "Detalle"
   }
 }

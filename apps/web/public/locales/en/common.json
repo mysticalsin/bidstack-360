@@ -279,5 +279,16 @@
         "leadRot": "Lead rot rules"
       }
     }
+  },
+  "topbar": {
+    "skipToContent": "Skip to content",
+    "switchToLight": "Switch to light mode",
+    "switchToDark": "Switch to dark mode",
+    "help": "Help & shortcuts",
+    "helpAria": "Help and keyboard shortcuts",
+    "productTour": "Take the product tour",
+    "signOut": "Sign out",
+    "portfolio": "Portfolio",
+    "detail": "Detail"
   }
 }

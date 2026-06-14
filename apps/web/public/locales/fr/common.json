@@ -279,5 +279,16 @@
         "leadRot": "Règles de vieillissement"
       }
     }
+  },
+  "topbar": {
+    "skipToContent": "Aller au contenu",
+    "switchToLight": "Passer en mode clair",
+    "switchToDark": "Passer en mode sombre",
+    "help": "Aide & raccourcis",
+    "helpAria": "Aide et raccourcis clavier",
+    "productTour": "Faire la visite du produit",
+    "signOut": "Se déconnecter",
+    "portfolio": "Portefeuille",
+    "detail": "Détail"
   }
 }

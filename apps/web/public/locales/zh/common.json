@@ -279,5 +279,16 @@
         "leadRot": "线索过期规则"
       }
     }
+  },
+  "topbar": {
+    "skipToContent": "跳至内容",
+    "switchToLight": "切换到浅色模式",
+    "switchToDark": "切换到深色模式",
+    "help": "帮助与快捷键",
+    "helpAria": "帮助和键盘快捷键",
+    "productTour": "开始产品导览",
+    "signOut": "退出登录",
+    "portfolio": "客户组合",
+    "detail": "详情"
   }
 }

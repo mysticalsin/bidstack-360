@@ -279,5 +279,16 @@
         "leadRot": "Regras de envelhecimento"
       }
     }
+  },
+  "topbar": {
+    "skipToContent": "Pular para o conteúdo",
+    "switchToLight": "Mudar para o modo claro",
+    "switchToDark": "Mudar para o modo escuro",
+    "help": "Ajuda e atalhos",
+    "helpAria": "Ajuda e atalhos de teclado",
+    "productTour": "Fazer o tour do produto",
+    "signOut": "Sair",
+    "portfolio": "Portfólio",
+    "detail": "Detalhe"
   }
 }

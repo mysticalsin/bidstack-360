@@ -1,5 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 import { Avatar } from '@/components/ui/Avatar';
 import { useHelpDrawer } from '@/components/help/useHelpDrawer';
@@ -14,28 +15,30 @@ import { CurrencySelector } from './CurrencySelector';
 import { SearchBar } from './topbar/TopbarSearch';
 import { NotificationsBell } from './topbar/TopbarNotifications';
 
-// Breadcrumb labels by first-path segment. Nested routes inherit their parent.
-const CRUMB_LABELS: Record<string, string> = {
-  dashboard: 'Portfolio',
-  accounts: 'Accounts',
-  opportunities: 'Opportunities',
-  pipeline: 'Pipeline',
-  contacts: 'Contacts',
-  tasks: 'Tasks',
-  reports: 'Reports',
-  integrations: 'Integrations',
-  'audit-log': 'Audit log',
-  settings: 'Settings',
-  search: 'Search',
+// Breadcrumb i18n keys by first-path segment. Nested routes inherit their parent.
+const CRUMB_KEYS: Record<string, string> = {
+  dashboard: 'topbar.portfolio',
+  accounts: 'nav.accounts',
+  opportunities: 'nav.opportunities',
+  pipeline: 'nav.pipeline',
+  contacts: 'nav.contacts',
+  tasks: 'nav.tasks',
+  reports: 'nav.reports',
+  integrations: 'nav.integrations',
+  'audit-log': 'nav.auditLog',
+  settings: 'nav.settings',
+  search: 'nav.search',
 };
 
 function useCrumbs(): { label: string; here: boolean }[] {
+  const { t } = useTranslation('common');
   const { pathname } = useLocation();
   const segments = pathname.split('/').filter(Boolean);
   const root = segments[0];
-  if (!root) return [{ label: 'Portfolio', here: true }];
+  const portfolio = t('topbar.portfolio', 'Portfolio');
+  if (!root) return [{ label: portfolio, here: true }];
 
-  const rootLabel = CRUMB_LABELS[root] ?? capitalize(root);
+  const rootLabel = CRUMB_KEYS[root] ? t(CRUMB_KEYS[root]) : capitalize(root);
   const second = segments[1];
   if (!second) {
     return [{ label: rootLabel, here: true }];
@@ -44,7 +47,7 @@ function useCrumbs(): { label: string; here: boolean }[] {
   // a raw UUID, until we wire per-record names through React Query cache.
   return [
     { label: rootLabel, here: false },
-    { label: prettifySegment(second), here: true },
+    { label: prettifySegment(second, t('topbar.detail', 'Detail')), here: true },
   ];
 }
 
@@ -52,15 +55,19 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function prettifySegment(s: string): string {
-  if (/^[0-9a-f-]{12,}$/i.test(s)) return 'Detail';
+function prettifySegment(s: string, detailLabel: string): string {
+  if (/^[0-9a-f-]{12,}$/i.test(s)) return detailLabel;
   return capitalize(s.replace(/-/g, ' '));
 }
 
 export function Topbar() {
   useDocumentTitle();
+  const { t } = useTranslation('common');
   const crumbs = useCrumbs();
   const { theme, toggle } = useThemeStore();
+  const themeLabel = t(theme === 'dark' ? 'topbar.switchToLight' : 'topbar.switchToDark', {
+    defaultValue: `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`,
+  });
   const { user } = useUser();
   const { signOut } = useSignOut();
   const navigate = useNavigate();
@@ -75,14 +82,14 @@ export function Topbar() {
   return (
     <header className="topbar" role="banner">
       <a href="#main" className="skip-link">
-        Skip to content
+        {t('topbar.skipToContent', 'Skip to content')}
       </a>
 
       {/* Hamburger — visible only below md breakpoint where sidebar is hidden */}
       <button
         type="button"
         className="iconbtn md:!hidden"
-        aria-label="Open navigation"
+        aria-label={t('nav.openNavigation', 'Open navigation')}
         aria-controls="mobile-nav-drawer"
         aria-expanded={mobileNavOpen}
         onClick={toggleMobileNav}
@@ -112,12 +119,12 @@ export function Topbar() {
 
       <SearchBar />
 
-      <Tooltip content={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
+      <Tooltip content={themeLabel}>
         <button
           type="button"
           onClick={toggle}
           className="iconbtn relative overflow-hidden"
-          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          aria-label={themeLabel}
           aria-pressed={theme === 'dark'}
         >
           <AnimatedThemeIcon theme={theme} />
@@ -128,11 +135,11 @@ export function Topbar() {
 
       <CurrencySelector />
 
-      <Tooltip content="Help & shortcuts (?)">
+      <Tooltip content={`${t('topbar.help', 'Help & shortcuts')} (?)`}>
         <button
           type="button"
           className="iconbtn tb-help-btn"
-          aria-label="Help and keyboard shortcuts"
+          aria-label={t('topbar.helpAria', 'Help and keyboard shortcuts')}
           onClick={() => openHelp(true)}
         >
           <Icon name="help" size={16} ariaHidden />
@@ -142,23 +149,23 @@ export function Topbar() {
       <div className="tb-user" title={user?.primaryEmailAddress?.emailAddress ?? ''}>
         <Avatar seed={seed} size={32} decorative className="av" />
         <div className="who">
-          <div className="name">{user?.fullName ?? 'Guest'}</div>
+          <div className="name">{user?.fullName ?? t('app.guest', 'Guest')}</div>
           <div className="role">
             {role ? (
               <span className="mr-1.5 inline-flex items-center rounded border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-1 py-0 text-[9px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
                 {role}
               </span>
             ) : null}
-            {user?.primaryEmailAddress?.emailAddress ?? 'Not signed in'}
+            {user?.primaryEmailAddress?.emailAddress ?? t('app.notSignedIn', 'Not signed in')}
           </div>
         </div>
-        <Tooltip content="Take the product tour">
+        <Tooltip content={t('topbar.productTour', 'Take the product tour')}>
           <button
             type="button"
             onClick={startTour}
             className="tb-signout"
-            aria-label="Take product tour"
-            title="Take product tour"
+            aria-label={t('topbar.productTour', 'Take the product tour')}
+            title={t('topbar.productTour', 'Take the product tour')}
           >
             <Icon name="play" size={14} ariaHidden />
           </button>
@@ -167,10 +174,10 @@ export function Topbar() {
           type="button"
           onClick={() => signOut(() => navigate('/login'))}
           className="tb-signout"
-          aria-label="Sign out"
-          title="Sign out"
+          aria-label={t('topbar.signOut', 'Sign out')}
+          title={t('topbar.signOut', 'Sign out')}
         >
-          ↩
+          <Icon name="logOut" size={15} ariaHidden />
         </button>
       </div>
     </header>
