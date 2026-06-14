@@ -11,10 +11,9 @@
  *   OppStageChips   — quick-filter pill group
  *   OppBulkBar      — sticky bulk-action bar (stage move + delete + clear)
  */
-import { useNavigate } from 'react-router-dom';
-
 import { CreateOpportunityDialog } from '@/components/opportunity/CreateOpportunityDialog';
 import { ImportOpportunitiesDialog } from '@/components/opportunity/ImportOpportunitiesDialog';
+import { PipelineViewSwitch } from '@/components/opportunity/PipelineViewSwitch';
 import { Button } from '@/components/ui/Button';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { cn } from '@/lib/cn';
@@ -81,14 +80,12 @@ export function OppPageHeader({
   onClearStageFilter: () => void;
   onExportCsv: () => void;
 }) {
-  const navigate = useNavigate();
-
   const clearBtnClass =
     'ml-2 rounded text-xs text-[var(--fg-tertiary)] underline hover:text-[var(--brand-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]';
 
   return (
-    <header className="flex items-start justify-between gap-3">
-      <div>
+    <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0">
         <h1 className="gradient-text text-2xl font-bold tracking-tight text-[var(--fg-primary)]">
           Opportunities
         </h1>
@@ -116,15 +113,8 @@ export function OppPageHeader({
           )}
         </p>
       </div>
-      <div className="flex items-center gap-2">
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => navigate('/pipeline')}
-          aria-label="Switch to kanban view"
-        >
-          Kanban
-        </Button>
+      <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+        <PipelineViewSwitch current="list" />
         <ImportOpportunitiesDialog />
         <Button
           size="sm"

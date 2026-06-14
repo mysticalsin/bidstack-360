@@ -10,7 +10,7 @@
 // two systems coexist — framer drives the visual spring/inertia, HTML5
 // drives the data hand-off.
 
-import { useMemo, useState, type DragEvent, type KeyboardEvent } from 'react';
+import { useCallback, useMemo, useState, type DragEvent, type KeyboardEvent } from 'react';
 
 import { useReducedMotion } from 'framer-motion';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -20,12 +20,19 @@ import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
+import { usePipelineStages } from '@/hooks/usePipelineStages';
 import { useStageMutation } from '@/hooks/useStageMutation';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
-import { getPipelineStages } from '@/lib/pipeline-stages';
-import type { Opportunity } from '@bidstack/shared';
+import {
+  getOpportunityStageBusinessKey,
+  getPipelineStageBusinessKey,
+  getPipelineStages,
+} from '@/lib/pipeline-stages';
+import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
-import { getStageId, getStageName } from './pipelineBoard/pipelineUtils';
+import { PipelineViewSwitch } from '@/components/opportunity/PipelineViewSwitch';
+
+import { getStageId } from './pipelineBoard/pipelineUtils';
 import { StageColumn } from './pipelineBoard/StageColumn';
 
 export function PipelinePage() {
@@ -33,6 +40,7 @@ export function PipelinePage() {
   const navigate = useNavigate();
   const { formatMoney } = useFormatMoney();
   const { data, isLoading, isError, error } = useOpportunities({ limit: 50 });
+  const configuredStages = usePipelineStages();
   // KPI bar reads the server-side aggregate over the WHOLE pipeline — the
   // board itself only loads the first 50 cards, so totals/win-rate computed
   // from `data.items` were silently truncated for any org past 50 deals.
@@ -59,9 +67,35 @@ export function PipelinePage() {
   // for a11y — drag-and-drop is unreachable by keyboard alone (WCAG 2.1.1).
   const [focusedId, setFocusedId] = useState<string | null>(null);
 
-  // Derive stage columns from canonical PipelineStage rows, with a legacy
-  // fallback for tenants that still only carry the old stage enum.
-  const stages = useMemo(() => getPipelineStages(data?.items ?? []), [data?.items]);
+  const configuredStageOptions = useMemo<PipelineStage[]>(
+    () =>
+      configuredStages.data?.items.map((stage) => ({
+        id: stage.id,
+        name: stage.name,
+        probability: stage.probability,
+        color: stage.color,
+        isWon: stage.isWon,
+        isLost: stage.isLost,
+      })) ?? [],
+    [configuredStages.data?.items],
+  );
+
+  // Stage columns come from CRM configuration, not whichever opportunity
+  // records happen to be present in the current page. This keeps empty stages
+  // visible and avoids pagination hiding parts of the funnel.
+  const stages = useMemo(
+    () => getPipelineStages(data?.items ?? [], configuredStageOptions),
+    [configuredStageOptions, data?.items],
+  );
+
+  const stageIdByBusinessKey = useMemo(
+    () => new Map(stages.map((stage) => [getPipelineStageBusinessKey(stage), stage.id])),
+    [stages],
+  );
+  const getVisibleStageId = useCallback(
+    (opp: Opportunity) => stageIdByBusinessKey.get(getOpportunityStageBusinessKey(opp)) ?? getStageId(opp),
+    [stageIdByBusinessKey],
+  );
 
   // Group items by pipelineStageId once per data change so each column doesn't
   // filter the whole list on every render.
@@ -70,30 +104,27 @@ export function PipelinePage() {
     for (const stage of stages) map.set(stage.id, []);
     map.set('none', []);
     for (const opp of data?.items ?? []) {
-      const sid = getStageId(opp);
+      const sid = getVisibleStageId(opp);
       const arr = map.get(sid) ?? [];
       arr.push(opp);
       map.set(sid, arr);
     }
     return map;
-  }, [data?.items, stages]);
+  }, [data?.items, getVisibleStageId, stages]);
 
   const handleKey = (e: KeyboardEvent<HTMLAnchorElement>, opp: Opportunity) => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     const ids = stages.map((s) => s.id);
-    const idx = ids.indexOf(getStageId(opp));
+    const idx = ids.indexOf(getVisibleStageId(opp));
     const nextIdx = e.key === 'ArrowRight' ? idx + 1 : idx - 1;
     if (nextIdx < 0 || nextIdx >= ids.length) return;
     e.preventDefault();
-    const nextStageId = ids[nextIdx];
-    if (nextStageId) {
+    const nextStage = stages[nextIdx];
+    if (nextStage) {
       move.mutate(
-        { id: opp.id, pipelineStageId: nextStageId },
+        { id: opp.id, pipelineStageId: nextStage.id, pipelineStage: nextStage },
         {
-          onSuccess: () =>
-            toast.success(
-              `Moved to ${stages.find((s) => s.id === nextStageId)?.name ?? nextStageId}`,
-            ),
+          onSuccess: () => toast.success(`Moved to ${nextStage.name}`),
         },
       );
     }
@@ -105,11 +136,13 @@ export function PipelinePage() {
     const id = e.dataTransfer.getData('text/plain');
     if (!id) return;
     const item = data?.items.find((o) => o.id === id);
-    if (!item || getStageId(item) === stageId) return;
+    if (!item || getVisibleStageId(item) === stageId) return;
+    const targetStage = stages.find((s) => s.id === stageId);
+    const targetStageName = targetStage?.name ?? stageId;
     move.mutate(
-      { id, pipelineStageId: stageId },
+      { id, pipelineStageId: stageId, pipelineStage: targetStage },
       {
-        onSuccess: () => toast.success(`Moved "${item.name}" to ${getStageName(item)}`),
+        onSuccess: () => toast.success(`Moved "${item.name}" to ${targetStageName}`),
         onError: (err) =>
           toast.error('Could not move opportunity', {
             description: err instanceof Error ? err.message : 'The server rejected the request.',
@@ -130,13 +163,7 @@ export function PipelinePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => navigate('/opportunities')}
-            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-1 text-xs text-[var(--fg-primary)] hover:bg-[var(--surface-hover)]"
-          >
-            List
-          </button>
+          <PipelineViewSwitch current="board" />
           <label className="flex items-center gap-1.5 text-xs text-[var(--fg-tertiary)]">
             <span>Stage</span>
             <select
@@ -235,7 +262,7 @@ export function PipelinePage() {
             </button>
           }
         />
-      ) : isLoading ? (
+      ) : isLoading || (configuredStages.isLoading && configuredStageOptions.length === 0) ? (
         <KanbanSkeleton />
       ) : (data?.items.length ?? 0) === 0 ? (
         <EmptyState
@@ -256,10 +283,12 @@ export function PipelinePage() {
           className={
             // When filtered to one stage, collapse to a single column so it
             // dominates the screen — the "focus mode" affordance. Otherwise
-            // keep the columns flowing.
+            // keep a horizontal kanban rail with the design-contract minimum
+            // column width; cramped columns make stage labels and cards hard
+            // to scan on ordinary laptop widths.
             stageFilter
               ? 'grid gap-3 grid-cols-1'
-              : 'grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-7'
+              : 'grid grid-flow-col auto-cols-[minmax(280px,1fr)] gap-3 overflow-x-auto pb-3'
           }
         >
           {visibleStages.map((stage) => {

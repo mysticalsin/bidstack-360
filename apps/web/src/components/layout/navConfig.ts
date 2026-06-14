@@ -74,8 +74,10 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: 'pipeline',
     items: [
       { to: '/leads', label: 'Leads', icon: 'zap' },
+      // Opportunities hosts both the list and the kanban board (List / Board
+      // toggle in-page); the standalone /pipeline route still works and is
+      // reached through that toggle, so it is no longer a separate rail entry.
       { to: '/opportunities', label: 'Opportunities', icon: 'target', badgeKey: 'openBids' },
-      { to: '/pipeline', label: 'Pipeline', icon: 'pipeline' },
       { to: '/territories', label: 'Territories', icon: 'globe' },
     ],
   },
