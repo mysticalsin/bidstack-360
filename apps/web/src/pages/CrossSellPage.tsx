@@ -120,6 +120,7 @@ export default function CrossSellPage() {
                     <button
                       type="button"
                       disabled={!canWrite || patch.isPending}
+                      aria-busy={patch.isPending && patch.variables?.id === a.id}
                       onClick={() =>
                         patch.mutate(
                           { id: a.id, body: { status: NEXT_STATUS[a.status] } },
@@ -129,7 +130,13 @@ export default function CrossSellPage() {
                       className="min-h-[28px] rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] disabled:opacity-60"
                       aria-label={`Advance status of ${a.description}`}
                     >
-                      <Badge tone={STATUS_TONE[a.status]}>{a.status.replace('_', ' ')}</Badge>
+                      {/* Per-row pending label so a slow PATCH shows WHICH row is
+                          updating instead of the whole table looking frozen. */}
+                      <Badge tone={STATUS_TONE[a.status]}>
+                        {patch.isPending && patch.variables?.id === a.id
+                          ? 'updating…'
+                          : a.status.replace('_', ' ')}
+                      </Badge>
                     </button>
                   </td>
                 </tr>
