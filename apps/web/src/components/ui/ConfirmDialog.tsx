@@ -10,6 +10,7 @@
 import * as RadixDialog from '@radix-ui/react-dialog';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { create } from 'zustand';
 
 import { Button } from '@/components/ui/Button';
@@ -80,6 +81,7 @@ function ConfirmInstance({
   pending: PendingConfirm;
   onResolve: (value: boolean) => void;
 }) {
+  const { t } = useTranslation('common');
   const reduced = useReducedMotion();
   const confirmRef = useRef<HTMLButtonElement | null>(null);
 
@@ -124,7 +126,7 @@ function ConfirmInstance({
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-5 py-3">
               <Button size="sm" variant="secondary" onClick={() => onResolve(false)}>
-                {pending.cancelLabel ?? 'Cancel'}
+                {pending.cancelLabel ?? t('confirm.cancel', 'Cancel')}
               </Button>
               <Button
                 ref={confirmRef}
@@ -132,7 +134,10 @@ function ConfirmInstance({
                 variant={pending.destructive ? 'destructive' : 'primary'}
                 onClick={() => onResolve(true)}
               >
-                {pending.confirmLabel ?? (pending.destructive ? 'Delete' : 'Confirm')}
+                {pending.confirmLabel ??
+                  (pending.destructive
+                    ? t('confirm.delete', 'Delete')
+                    : t('confirm.confirm', 'Confirm'))}
               </Button>
             </div>
           </motion.div>
@@ -204,6 +209,7 @@ function PromptInstance({
   pending: PendingPrompt;
   onResolve: (value: string | null) => void;
 }) {
+  const { t } = useTranslation('common');
   const reduced = useReducedMotion();
   const [value, setValue] = useState(pending.defaultValue ?? '');
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -267,10 +273,10 @@ function PromptInstance({
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-5 py-3">
               <Button size="sm" variant="secondary" onClick={() => onResolve(null)}>
-                {pending.cancelLabel ?? 'Cancel'}
+                {pending.cancelLabel ?? t('confirm.cancel', 'Cancel')}
               </Button>
               <Button size="sm" variant="primary" onClick={handleConfirm}>
-                {pending.confirmLabel ?? 'Save'}
+                {pending.confirmLabel ?? t('confirm.save', 'Save')}
               </Button>
             </div>
           </motion.div>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
@@ -20,6 +21,7 @@ import {
 type TabKey = 'contacts' | 'opportunities' | 'cases' | 'notes' | 'hierarchy';
 
 export function CompanyDetailPage() {
+  const { t } = useTranslation('crm');
   const { id } = useParams<{ id: string }>();
   const company = useCompany(id);
   const update = useUpdateCompany();
@@ -38,11 +40,11 @@ export function CompanyDetailPage() {
   if (company.isError) {
     return (
       <ErrorState
-        title="Couldn't load company"
+        title={t('companyDetail.error.title', "Couldn't load company")}
         message={
           company.error instanceof Error
             ? company.error.message
-            : 'The company may have been deleted.'
+            : t('companyDetail.error.message', 'The company may have been deleted.')
         }
       />
     );
@@ -50,11 +52,14 @@ export function CompanyDetailPage() {
   if (!company.data) {
     return (
       <EmptyState
-        title="Company not found"
-        message="The company may have been deleted or you may not have access to it."
+        title={t('companyDetail.notFound.title', 'Company not found')}
+        message={t(
+          'companyDetail.notFound.message',
+          'The company may have been deleted or you may not have access to it.',
+        )}
         action={
           <Button variant="secondary" onClick={() => window.history.back()}>
-            Go back
+            {t('companyDetail.notFound.goBack', 'Go back')}
           </Button>
         }
       />
@@ -106,7 +111,7 @@ export function CompanyDetailPage() {
                   className="input text-xl font-bold"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  aria-label="Company name"
+                  aria-label={t('companyDetail.field.companyName', 'Company name')}
                   autoFocus
                 />
               ) : (
@@ -132,12 +137,20 @@ export function CompanyDetailPage() {
               </a>
             )}
             {c.countryCode && <span>{c.countryCode}</span>}
-            {c.employeeCount && <span>{c.employeeCount.toLocaleString()} employees</span>}
-            {c.taxId && <span>Tax ID: {c.taxId}</span>}
+            {c.employeeCount && (
+              <span>
+                {t('companyDetail.meta.employees', '{{count}} employees', {
+                  count: c.employeeCount,
+                })}
+              </span>
+            )}
+            {c.taxId && (
+              <span>{t('companyDetail.meta.taxId', 'Tax ID: {{taxId}}', { taxId: c.taxId })}</span>
+            )}
             {c.parent && (
               <span className="flex items-center gap-1">
                 <Icon name="git-branch" size={12} />
-                Parent:
+                {t('companyDetail.meta.parent', 'Parent:')}
                 <Link
                   to={`/companies/${c.parent.id}`}
                   className="font-medium text-[var(--brand-primary)] hover:underline"
@@ -151,15 +164,15 @@ export function CompanyDetailPage() {
             <div className="mt-2 flex gap-3">
               <input
                 className="input text-sm"
-                aria-label="Industry"
-                placeholder="Industry"
+                aria-label={t('companyDetail.field.industry', 'Industry')}
+                placeholder={t('companyDetail.field.industry', 'Industry')}
                 value={editIndustry}
                 onChange={(e) => setEditIndustry(e.target.value)}
               />
               <input
                 className="input text-sm"
-                aria-label="Domain"
-                placeholder="Domain"
+                aria-label={t('companyDetail.field.domain', 'Domain')}
+                placeholder={t('companyDetail.field.domain', 'Domain')}
                 value={editDomain}
                 onChange={(e) => setEditDomain(e.target.value)}
               />
@@ -170,16 +183,18 @@ export function CompanyDetailPage() {
           {editing ? (
             <>
               <Button variant="secondary" size="sm" onClick={() => setEditing(false)}>
-                Cancel
+                {t('companyDetail.action.cancel', 'Cancel')}
               </Button>
               <Button size="sm" onClick={saveEdit} disabled={update.isPending}>
-                {update.isPending ? 'Saving…' : 'Save'}
+                {update.isPending
+                  ? t('companyDetail.action.saving', 'Saving…')
+                  : t('companyDetail.action.save', 'Save')}
               </Button>
             </>
           ) : (
             <Button variant="secondary" size="sm" onClick={startEdit}>
               <Icon name="edit" size={14} />
-              Edit
+              {t('companyDetail.action.edit', 'Edit')}
             </Button>
           )}
         </div>
@@ -188,28 +203,46 @@ export function CompanyDetailPage() {
       <div
         className="flex gap-2 border-b border-[var(--border-subtle)]"
         role="tablist"
-        aria-label="Company sections"
+        aria-label={t('companyDetail.tabs.label', 'Company sections')}
       >
         {(
           [
-            { key: 'contacts', label: `Contacts (${c.contacts.length})` },
-            { key: 'opportunities', label: `Opportunities (${c.opportunities.length})` },
-            { key: 'cases', label: `Cases (${c.openCases.length})` },
-            { key: 'notes', label: `Notes (${c.notes.length})` },
-            { key: 'hierarchy', label: `Hierarchy` },
+            {
+              key: 'contacts',
+              label: t('companyDetail.tab.contacts', 'Contacts ({{count}})', {
+                count: c.contacts.length,
+              }),
+            },
+            {
+              key: 'opportunities',
+              label: t('companyDetail.tab.opportunities', 'Opportunities ({{count}})', {
+                count: c.opportunities.length,
+              }),
+            },
+            {
+              key: 'cases',
+              label: t('companyDetail.tab.cases', 'Cases ({{count}})', {
+                count: c.openCases.length,
+              }),
+            },
+            {
+              key: 'notes',
+              label: t('companyDetail.tab.notes', 'Notes ({{count}})', { count: c.notes.length }),
+            },
+            { key: 'hierarchy', label: t('companyDetail.tab.hierarchy', 'Hierarchy') },
           ] as { key: TabKey; label: string }[]
-        ).map((t) => (
+        ).map((tabItem) => (
           <button
-            key={t.key}
+            key={tabItem.key}
             role="tab"
-            aria-selected={tab === t.key}
-            aria-controls={panelId(t.key)}
-            id={tabId(t.key)}
-            tabIndex={tab === t.key ? 0 : -1}
-            onClick={() => setTab(t.key)}
+            aria-selected={tab === tabItem.key}
+            aria-controls={panelId(tabItem.key)}
+            id={tabId(tabItem.key)}
+            tabIndex={tab === tabItem.key ? 0 : -1}
+            onClick={() => setTab(tabItem.key)}
             onKeyDown={(e) => {
               const keys = ['contacts', 'opportunities', 'cases', 'notes', 'hierarchy'] as const;
-              const idx = keys.indexOf(t.key);
+              const idx = keys.indexOf(tabItem.key);
               if (e.key === 'ArrowRight') {
                 e.preventDefault();
                 const next = keys[(idx + 1) % keys.length] as TabKey;
@@ -223,12 +256,12 @@ export function CompanyDetailPage() {
               }
             }}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] rounded-t-md ${
-              tab === t.key
+              tab === tabItem.key
                 ? 'border-[var(--brand-primary)] text-[var(--brand-primary)]'
                 : 'border-transparent text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]'
             }`}
           >
-            {t.label}
+            {tabItem.label}
           </button>
         ))}
       </div>

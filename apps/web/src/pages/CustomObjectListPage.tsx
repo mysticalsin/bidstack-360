@@ -10,6 +10,7 @@
  * WCAG 2.2 AA. Dark mode. prefers-reduced-motion via CSS transitions only.
  */
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import {
@@ -24,6 +25,7 @@ import { Modal } from '@/components/ui/Modal';
 export function CustomObjectListPage() {
   const { objectKey = '' } = useParams<{ objectKey: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslation('crm');
 
   const { data: defsData, isLoading: defsLoading } = useCustomObjectDefs();
   const def = defsData?.items.find((d) => d.key === objectKey);
@@ -48,7 +50,11 @@ export function CustomObjectListPage() {
       setCreateValues({ name: '' });
       navigate(`/o/${objectKey}/${record.id}`);
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : 'Failed to create record');
+      setCreateError(
+        err instanceof Error
+          ? err.message
+          : t('customObjectList.createErrorFallback', 'Failed to create record'),
+      );
     }
   }
 
@@ -65,12 +71,16 @@ export function CustomObjectListPage() {
     return (
       <div className="p-6 text-center text-[var(--fg-secondary)]">
         <p className="text-2xl mb-2">404</p>
-        <p>Custom object &quot;{objectKey}&quot; not found.</p>
+        <p>
+          {t('customObjectList.notFound', 'Custom object "{{objectKey}}" not found.', {
+            objectKey,
+          })}
+        </p>
         <Link
           to="/settings/custom-objects"
           className="mt-4 inline-block text-[var(--brand-primary)] underline"
         >
-          Manage custom objects
+          {t('customObjectList.manageLink', 'Manage custom objects')}
         </Link>
       </div>
     );
@@ -96,7 +106,7 @@ export function CustomObjectListPage() {
           />
           <h1 className="text-2xl font-semibold text-[var(--fg-primary)]">{def.labelPlural}</h1>
           <span className="text-sm text-[var(--fg-tertiary)]">
-            {total > 0 ? `${total} total` : ''}
+            {total > 0 ? t('customObjectList.totalCount', '{{count}} total', { count: total }) : ''}
           </span>
         </div>
         <button
@@ -109,7 +119,8 @@ export function CustomObjectListPage() {
             'transition-opacity min-h-[44px]',
           )}
         >
-          <span aria-hidden="true">＋</span> New {def.labelSingular}
+          <span aria-hidden="true">＋</span>{' '}
+          {t('customObjectList.newRecordButton', 'New {{label}}', { label: def.labelSingular })}
         </button>
       </div>
 
@@ -127,15 +138,23 @@ export function CustomObjectListPage() {
           role="alert"
           className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
         >
-          Failed to load records.
+          {t('customObjectList.loadError', 'Failed to load records.')}
         </div>
       )}
 
       {!recordsQuery.isLoading && records.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center text-[var(--fg-secondary)]">
-          <p className="font-medium">No {def.labelPlural.toLowerCase()} yet</p>
+          <p className="font-medium">
+            {t('customObjectList.emptyTitle', 'No {{label}} yet', {
+              label: def.labelPlural.toLowerCase(),
+            })}
+          </p>
           <p className="text-sm mt-1">
-            Click &quot;New {def.labelSingular}&quot; to create your first record.
+            {t(
+              'customObjectList.emptyDescription',
+              'Click "New {{label}}" to create your first record.',
+              { label: def.labelSingular },
+            )}
           </p>
         </div>
       )}
@@ -145,13 +164,17 @@ export function CustomObjectListPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-[var(--surface-card)] text-[var(--fg-secondary)] text-left">
-                <th className="px-4 py-3 font-medium whitespace-nowrap">Record</th>
+                <th className="px-4 py-3 font-medium whitespace-nowrap">
+                  {t('customObjectList.columnRecord', 'Record')}
+                </th>
                 {displayKeys.map((k) => (
                   <th key={k} className="px-4 py-3 font-medium capitalize whitespace-nowrap">
                     {k.replace(/_/g, ' ')}
                   </th>
                 ))}
-                <th className="px-4 py-3 font-medium whitespace-nowrap">Updated</th>
+                <th className="px-4 py-3 font-medium whitespace-nowrap">
+                  {t('customObjectList.columnUpdated', 'Updated')}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -185,17 +208,20 @@ export function CustomObjectListPage() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <nav aria-label="Pagination" className="flex items-center justify-between">
+        <nav
+          aria-label={t('customObjectList.paginationLabel', 'Pagination')}
+          className="flex items-center justify-between"
+        >
           <button
             type="button"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1}
             className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-sm disabled:opacity-40 hover:bg-[var(--surface-card)] transition-colors min-h-[44px]"
           >
-            ← Previous
+            {t('customObjectList.previous', '← Previous')}
           </button>
           <span className="text-sm text-[var(--fg-secondary)]">
-            Page {page} of {totalPages}
+            {t('customObjectList.pageOf', 'Page {{page}} of {{totalPages}}', { page, totalPages })}
           </span>
           <button
             type="button"
@@ -203,7 +229,7 @@ export function CustomObjectListPage() {
             disabled={page >= totalPages}
             className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-sm disabled:opacity-40 hover:bg-[var(--surface-card)] transition-colors min-h-[44px]"
           >
-            Next →
+            {t('customObjectList.next', 'Next →')}
           </button>
         </nav>
       )}
@@ -220,7 +246,7 @@ export function CustomObjectListPage() {
       >
         <div className="bg-[var(--surface-card)] rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
           <h2 id="create-record-title" className="text-lg font-semibold text-[var(--fg-primary)]">
-            New {def.labelSingular}
+            {t('customObjectList.newRecordTitle', 'New {{label}}', { label: def.labelSingular })}
           </h2>
           <form
             onSubmit={(e) => {
@@ -238,7 +264,7 @@ export function CustomObjectListPage() {
                 htmlFor="cr-name"
                 className="block text-sm font-medium text-[var(--fg-primary)] mb-1"
               >
-                Name <span aria-hidden="true">*</span>
+                {t('customObjectList.nameLabel', 'Name')} <span aria-hidden="true">*</span>
               </label>
               <input
                 id="cr-name"
@@ -261,14 +287,16 @@ export function CustomObjectListPage() {
                 }}
                 className="flex-1 px-4 py-2 rounded-lg border border-[var(--border-subtle)] text-sm hover:bg-[var(--surface-card)] transition-colors min-h-[44px]"
               >
-                Cancel
+                {t('customObjectList.cancel', 'Cancel')}
               </button>
               <button
                 type="submit"
                 disabled={createRecord.isPending}
                 className="flex-1 px-4 py-2 rounded-lg bg-[var(--brand-primary)] text-white text-sm hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
               >
-                {createRecord.isPending ? 'Creating…' : 'Create'}
+                {createRecord.isPending
+                  ? t('customObjectList.creating', 'Creating…')
+                  : t('customObjectList.create', 'Create')}
               </button>
             </div>
           </form>

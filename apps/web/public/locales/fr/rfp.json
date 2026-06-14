@@ -1,1 +1,25 @@
-{}
+{
+  "proposalDetail": {
+    "loadingAriaLabel": "Chargement de la proposition",
+    "errorTitle": "Échec du chargement de la proposition",
+    "errorRetry": "Veuillez réessayer dans un instant.",
+    "backToProposals": "Retour aux propositions",
+    "notFound": "Proposition introuvable.",
+    "backToProposalsAriaLabel": "Retour aux propositions",
+    "version": "v{{version}}",
+    "due": "Échéance {{date}}",
+    "requiredBadge": "Obligatoire",
+    "aiDraftedBadge": "Rédigé par IA",
+    "wordCount": "{{count}} mots",
+    "draftingSectionAriaLabel": "Rédaction de {{title}}…",
+    "aiDraftSectionAriaLabel": "Brouillon IA pour {{title}}",
+    "drafting": "Rédaction…",
+    "aiDraft": "Brouillon IA",
+    "editSectionAriaLabel": "Modifier la section {{title}}",
+    "editContentAriaLabel": "Modifier le contenu de {{title}}",
+    "cancel": "Annuler",
+    "saving": "Enregistrement…",
+    "save": "Enregistrer",
+    "emptyContent": "Aucun contenu pour l'instant. Utilisez le brouillon IA pour générer une première version."
+  }
+}

@@ -1578,5 +1578,149 @@
   "inlineEdit": {
     "editLabel": "Modifica",
     "mustBeNumber": "Deve essere un numero"
+  },
+  "callTranscript": {
+    "emptyNotAvailable": "Trascrizione non ancora disponibile.",
+    "sectionLabel": "Trascrizione della chiamata",
+    "searchLabel": "Cerca nella trascrizione",
+    "searchPlaceholder": "Cerca nella trascrizione…",
+    "downloadAriaLabel": "Scarica la trascrizione come file di testo",
+    "downloadButton": "Scarica",
+    "resultCountOne": "{{count}} corrispondenza per \"{{term}}\"",
+    "resultCountOther": "{{count}} corrispondenze per \"{{term}}\"",
+    "segmentsLabel": "Segmenti della trascrizione",
+    "noSegmentsMatch": "Nessun segmento corrisponde alla ricerca.",
+    "seekTo": "Vai a {{time}}"
+  },
+  "forecastList": {
+    "sectionTitle": "Dettagli della previsione",
+    "sectionCaption": "{{count}} gruppi di previsione",
+    "errorTitle": "Impossibile caricare le previsioni",
+    "retry": "Riprova",
+    "emptyTitle": "Nessuna previsione trovata",
+    "emptyMessage": "Prova a modificare il filtro del periodo o crea la tua prima previsione.",
+    "newForecast": "Nuova previsione",
+    "tableLabel": "Previsioni dei ricavi",
+    "columnOwner": "Proprietario",
+    "columnPeriod": "Periodo",
+    "columnPipeline": "Pipeline",
+    "columnBestCase": "Caso migliore",
+    "columnCommit": "Impegnato",
+    "columnClosed": "Chiuso",
+    "columnTotal": "Totale",
+    "unassigned": "Non assegnato",
+    "cellLabel": "{{category}} per {{period}}",
+    "cellEditLabel": "Modifica {{category}} per {{period}}",
+    "deleteLabel": "Elimina le previsioni per {{period}}",
+    "totalLabel": "Totale:"
+  },
+  "customObjectList": {
+    "createErrorFallback": "Impossibile creare il record",
+    "notFound": "Oggetto personalizzato \"{{objectKey}}\" non trovato.",
+    "manageLink": "Gestisci oggetti personalizzati",
+    "totalCount": "{{count}} in totale",
+    "newRecordButton": "Nuovo {{label}}",
+    "loadError": "Impossibile caricare i record.",
+    "emptyTitle": "Ancora nessun {{label}}",
+    "emptyDescription": "Fai clic su \"Nuovo {{label}}\" per creare il tuo primo record.",
+    "columnRecord": "Record",
+    "columnUpdated": "Aggiornato",
+    "paginationLabel": "Impaginazione",
+    "previous": "← Precedente",
+    "pageOf": "Pagina {{page}} di {{totalPages}}",
+    "next": "Successivo →",
+    "newRecordTitle": "Nuovo {{label}}",
+    "nameLabel": "Nome",
+    "cancel": "Annulla",
+    "creating": "Creazione…",
+    "create": "Crea"
+  },
+  "widgetRenderer": {
+    "chartRenderError": "Errore di rendering del grafico",
+    "retry": "Riprova",
+    "configure": "Configura",
+    "duplicate": "Duplica",
+    "exportCsv": "Esporta CSV",
+    "delete": "Elimina"
+  },
+  "intelTabs": {
+    "solutionsEmptyTitle": "Nessuna soluzione ancora",
+    "solutionsEmptyMessage": "Carica documenti ed esegui l'estrazione per esaminare le soluzioni suggerite.",
+    "highConfidenceBadge": "Alta affidabilità",
+    "sourceLabel": "Da: {{source}}",
+    "deleteAriaLabel": "Elimina {{name}}",
+    "productsEmptyTitle": "Nessun prodotto ancora",
+    "productsEmptyMessage": "Carica documenti ed esegui l'estrazione per esaminare i prodotti suggeriti.",
+    "extractionsEmptyTitle": "Nessun documento",
+    "extractionsEmptyMessage": "Carica file su questo account per iniziare l'estrazione.",
+    "extractingButton": "Estrazione in corso…",
+    "reExtractButton": "Ri-estrai",
+    "extractButton": "Estrai",
+    "extractionSummary": "{{solutionCount}} soluzioni, {{productCount}} prodotti trovati"
+  },
+  "customFieldValues": {
+    "heading": "Campi personalizzati",
+    "definedCount": "{{count}} definiti",
+    "reset": "Reimposta",
+    "save": "Salva",
+    "saving": "Salvataggio…",
+    "toastSaved": "Campi personalizzati salvati",
+    "toastSaveFailed": "Salvataggio dei campi personalizzati non riuscito",
+    "selectNone": "—"
+  },
+  "createOpportunity": {
+    "triggerButton": "+ Nuova opportunità",
+    "dialogTitle": "Nuova opportunità",
+    "dialogDescription": "Aggiungi una gara al tuo pipeline. Puoi affinare le informazioni dopo la verifica dei dati di Dust.",
+    "customerLabel": "Cliente",
+    "customerPlaceholder": "Cerca aziende…",
+    "nameLabel": "Nome dell'opportunità",
+    "namePlaceholder": "Acme — Modernizzazione IT",
+    "stageLabel": "Fase",
+    "industryLabel": "Settore",
+    "valueLabel": "Valore (EUR)",
+    "probabilityLabel": "Probabilità %",
+    "dueDateLabel": "Data di scadenza",
+    "countryLabel": "Paese",
+    "cancel": "Annulla",
+    "submitting": "Creazione…",
+    "submit": "Crea opportunità"
+  },
+  "companyDetail": {
+    "error": {
+      "title": "Impossibile caricare l'azienda",
+      "message": "L'azienda potrebbe essere stata eliminata."
+    },
+    "notFound": {
+      "title": "Azienda non trovata",
+      "message": "L'azienda potrebbe essere stata eliminata o potresti non avervi accesso.",
+      "goBack": "Indietro"
+    },
+    "field": {
+      "companyName": "Nome dell'azienda",
+      "industry": "Settore",
+      "domain": "Dominio"
+    },
+    "meta": {
+      "employees": "{{count}} dipendenti",
+      "taxId": "Codice fiscale: {{taxId}}",
+      "parent": "Capogruppo:"
+    },
+    "action": {
+      "cancel": "Annulla",
+      "saving": "Salvataggio…",
+      "save": "Salva",
+      "edit": "Modifica"
+    },
+    "tabs": {
+      "label": "Sezioni dell'azienda"
+    },
+    "tab": {
+      "contacts": "Contatti ({{count}})",
+      "opportunities": "Opportunità ({{count}})",
+      "cases": "Casi ({{count}})",
+      "notes": "Note ({{count}})",
+      "hierarchy": "Gerarchia"
+    }
   }
 }

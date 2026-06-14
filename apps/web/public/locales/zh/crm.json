@@ -1578,5 +1578,149 @@
   "inlineEdit": {
     "editLabel": "编辑",
     "mustBeNumber": "必须是数字"
+  },
+  "callTranscript": {
+    "emptyNotAvailable": "转录尚未生成。",
+    "sectionLabel": "通话转录",
+    "searchLabel": "搜索转录",
+    "searchPlaceholder": "搜索转录…",
+    "downloadAriaLabel": "将转录下载为文本文件",
+    "downloadButton": "下载",
+    "resultCountOne": "找到 {{count}} 个“{{term}}”的匹配项",
+    "resultCountOther": "找到 {{count}} 个“{{term}}”的匹配项",
+    "segmentsLabel": "转录片段",
+    "noSegmentsMatch": "没有片段匹配您的搜索。",
+    "seekTo": "跳转到 {{time}}"
+  },
+  "forecastList": {
+    "sectionTitle": "预测详情",
+    "sectionCaption": "{{count}} 个预测组",
+    "errorTitle": "加载预测失败",
+    "retry": "重试",
+    "emptyTitle": "未找到预测",
+    "emptyMessage": "请尝试更改周期筛选条件，或创建您的第一个预测。",
+    "newForecast": "新建预测",
+    "tableLabel": "收入预测",
+    "columnOwner": "负责人",
+    "columnPeriod": "周期",
+    "columnPipeline": "管道",
+    "columnBestCase": "最佳情况",
+    "columnCommit": "承诺",
+    "columnClosed": "已成交",
+    "columnTotal": "合计",
+    "unassigned": "未分配",
+    "cellLabel": "{{period}} 的 {{category}}",
+    "cellEditLabel": "编辑 {{period}} 的 {{category}}",
+    "deleteLabel": "删除 {{period}} 的预测",
+    "totalLabel": "合计："
+  },
+  "customObjectList": {
+    "createErrorFallback": "创建记录失败",
+    "notFound": "未找到自定义对象“{{objectKey}}”。",
+    "manageLink": "管理自定义对象",
+    "totalCount": "共 {{count}} 个",
+    "newRecordButton": "新建{{label}}",
+    "loadError": "加载记录失败。",
+    "emptyTitle": "暂无{{label}}",
+    "emptyDescription": "点击“新建{{label}}”以创建您的第一条记录。",
+    "columnRecord": "记录",
+    "columnUpdated": "更新时间",
+    "paginationLabel": "分页",
+    "previous": "← 上一页",
+    "pageOf": "第 {{page}} 页，共 {{totalPages}} 页",
+    "next": "下一页 →",
+    "newRecordTitle": "新建{{label}}",
+    "nameLabel": "名称",
+    "cancel": "取消",
+    "creating": "正在创建…",
+    "create": "创建"
+  },
+  "widgetRenderer": {
+    "chartRenderError": "图表渲染错误",
+    "retry": "重试",
+    "configure": "配置",
+    "duplicate": "复制",
+    "exportCsv": "导出 CSV",
+    "delete": "删除"
+  },
+  "intelTabs": {
+    "solutionsEmptyTitle": "暂无解决方案",
+    "solutionsEmptyMessage": "上传文档并运行提取以查看建议的解决方案。",
+    "highConfidenceBadge": "高置信度",
+    "sourceLabel": "来源：{{source}}",
+    "deleteAriaLabel": "删除 {{name}}",
+    "productsEmptyTitle": "暂无产品",
+    "productsEmptyMessage": "上传文档并运行提取以查看建议的产品。",
+    "extractionsEmptyTitle": "暂无文档",
+    "extractionsEmptyMessage": "将文件上传到此账户以开始提取。",
+    "extractingButton": "正在提取…",
+    "reExtractButton": "重新提取",
+    "extractButton": "提取",
+    "extractionSummary": "找到 {{solutionCount}} 个解决方案，{{productCount}} 个产品"
+  },
+  "customFieldValues": {
+    "heading": "自定义字段",
+    "definedCount": "已定义 {{count}} 个",
+    "reset": "重置",
+    "save": "保存",
+    "saving": "保存中…",
+    "toastSaved": "自定义字段已保存",
+    "toastSaveFailed": "保存自定义字段失败",
+    "selectNone": "—"
+  },
+  "createOpportunity": {
+    "triggerButton": "+ 新商机",
+    "dialogTitle": "新商机",
+    "dialogDescription": "将一个投标添加到您的管道。Dust 数据验证运行后，您可以完善情报。",
+    "customerLabel": "客户",
+    "customerPlaceholder": "搜索公司…",
+    "nameLabel": "商机名称",
+    "namePlaceholder": "Acme — IT 现代化",
+    "stageLabel": "阶段",
+    "industryLabel": "行业",
+    "valueLabel": "金额 (欧元)",
+    "probabilityLabel": "概率 %",
+    "dueDateLabel": "截止日期",
+    "countryLabel": "国家",
+    "cancel": "取消",
+    "submitting": "正在创建…",
+    "submit": "创建商机"
+  },
+  "companyDetail": {
+    "error": {
+      "title": "无法加载公司",
+      "message": "该公司可能已被删除。"
+    },
+    "notFound": {
+      "title": "未找到公司",
+      "message": "该公司可能已被删除，或者您没有访问权限。",
+      "goBack": "返回"
+    },
+    "field": {
+      "companyName": "公司名称",
+      "industry": "行业",
+      "domain": "域名"
+    },
+    "meta": {
+      "employees": "{{count}} 名员工",
+      "taxId": "税号：{{taxId}}",
+      "parent": "母公司："
+    },
+    "action": {
+      "cancel": "取消",
+      "saving": "保存中…",
+      "save": "保存",
+      "edit": "编辑"
+    },
+    "tabs": {
+      "label": "公司板块"
+    },
+    "tab": {
+      "contacts": "联系人 ({{count}})",
+      "opportunities": "商机 ({{count}})",
+      "cases": "工单 ({{count}})",
+      "notes": "备注 ({{count}})",
+      "hierarchy": "层级结构"
+    }
   }
 }

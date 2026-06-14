@@ -8,6 +8,8 @@
 import { Component, type ReactNode, useCallback } from 'react';
 import { Download, Settings, Copy, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 import { ChartContainer } from '@/components/charts/ChartContainer';
 import {
@@ -34,8 +36,11 @@ interface ErrorBoundaryState {
   message: string;
 }
 
-class ChartErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
-  constructor(props: { children: ReactNode }) {
+class ChartErrorBoundary extends Component<
+  { children: ReactNode; t: TFunction },
+  ErrorBoundaryState
+> {
+  constructor(props: { children: ReactNode; t: TFunction }) {
     super(props);
     this.state = { hasError: false, message: '' };
   }
@@ -43,24 +48,27 @@ class ChartErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundar
   static getDerivedStateFromError(err: unknown): ErrorBoundaryState {
     return {
       hasError: true,
-      message: err instanceof Error ? err.message : 'Chart render error',
+      message: err instanceof Error ? err.message : '',
     };
   }
 
   override render() {
+    const { t } = this.props;
     if (this.state.hasError) {
+      const message =
+        this.state.message || t('widgetRenderer.chartRenderError', 'Chart render error');
       return (
         <div
           role="alert"
           className="flex flex-col items-center justify-center py-10 text-center"
         >
           <span className="text-2xl mb-2" aria-hidden>⚠</span>
-          <p className="text-xs text-[var(--danger)]">{this.state.message}</p>
+          <p className="text-xs text-[var(--danger)]">{message}</p>
           <button
             onClick={() => this.setState({ hasError: false, message: '' })}
             className="mt-3 text-xs text-[var(--brand-primary)] underline min-h-[44px] px-3"
           >
-            Retry
+            {t('widgetRenderer.retry', 'Retry')}
           </button>
         </div>
       );
@@ -203,6 +211,7 @@ interface Props {
 }
 
 export function WidgetRenderer({ widget, onConfigure, onDuplicate, onDelete }: Props) {
+  const { t } = useTranslation('crm');
   const qc = useQueryClient();
   const runMutation = useRunReport();
 
@@ -245,14 +254,14 @@ export function WidgetRenderer({ widget, onConfigure, onDuplicate, onDelete }: P
 
   const actions = [
     ...(onConfigure
-      ? [{ label: 'Configure', icon: <Settings size={14} />, onClick: onConfigure }]
+      ? [{ label: t('widgetRenderer.configure', 'Configure'), icon: <Settings size={14} />, onClick: onConfigure }]
       : []),
     ...(onDuplicate
-      ? [{ label: 'Duplicate', icon: <Copy size={14} />, onClick: onDuplicate }]
+      ? [{ label: t('widgetRenderer.duplicate', 'Duplicate'), icon: <Copy size={14} />, onClick: onDuplicate }]
       : []),
-    { label: 'Export CSV', icon: <Download size={14} />, onClick: handleExportCsv },
+    { label: t('widgetRenderer.exportCsv', 'Export CSV'), icon: <Download size={14} />, onClick: handleExportCsv },
     ...(onDelete
-      ? [{ label: 'Delete', icon: <Trash2 size={14} />, onClick: onDelete }]
+      ? [{ label: t('widgetRenderer.delete', 'Delete'), icon: <Trash2 size={14} />, onClick: onDelete }]
       : []),
   ];
 
@@ -269,7 +278,7 @@ export function WidgetRenderer({ widget, onConfigure, onDuplicate, onDelete }: P
       actions={actions}
       aria-label={widget.title}
     >
-      <ChartErrorBoundary>
+      <ChartErrorBoundary t={t}>
         <ChartBody widget={widget} data={data} />
       </ChartErrorBoundary>
     </ChartContainer>

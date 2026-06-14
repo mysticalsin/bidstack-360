@@ -1,1 +1,25 @@
-{}
+{
+  "proposalDetail": {
+    "loadingAriaLabel": "正在加载提案",
+    "errorTitle": "加载提案失败",
+    "errorRetry": "请稍后再试。",
+    "backToProposals": "返回提案列表",
+    "notFound": "未找到提案。",
+    "backToProposalsAriaLabel": "返回提案列表",
+    "version": "v{{version}}",
+    "due": "截止 {{date}}",
+    "requiredBadge": "必填",
+    "aiDraftedBadge": "AI 起草",
+    "wordCount": "{{count}} 个字",
+    "draftingSectionAriaLabel": "正在起草 {{title}}…",
+    "aiDraftSectionAriaLabel": "为 {{title}} 生成 AI 草稿",
+    "drafting": "正在起草…",
+    "aiDraft": "AI 草稿",
+    "editSectionAriaLabel": "编辑 {{title}} 部分",
+    "editContentAriaLabel": "编辑 {{title}} 的内容",
+    "cancel": "取消",
+    "saving": "正在保存…",
+    "save": "保存",
+    "emptyContent": "暂无内容。使用 AI 草稿生成初始版本。"
+  }
+}

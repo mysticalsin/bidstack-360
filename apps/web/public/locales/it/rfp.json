@@ -1,1 +1,25 @@
-{}
+{
+  "proposalDetail": {
+    "loadingAriaLabel": "Caricamento proposta",
+    "errorTitle": "Impossibile caricare la proposta",
+    "errorRetry": "Riprova tra un momento.",
+    "backToProposals": "Torna alle proposte",
+    "notFound": "Proposta non trovata.",
+    "backToProposalsAriaLabel": "Torna alle proposte",
+    "version": "v{{version}}",
+    "due": "Scadenza {{date}}",
+    "requiredBadge": "Obbligatorio",
+    "aiDraftedBadge": "Redatto dall'IA",
+    "wordCount": "{{count}} parole",
+    "draftingSectionAriaLabel": "Redazione di {{title}}…",
+    "aiDraftSectionAriaLabel": "Bozza IA per {{title}}",
+    "drafting": "Redazione…",
+    "aiDraft": "Bozza IA",
+    "editSectionAriaLabel": "Modifica la sezione {{title}}",
+    "editContentAriaLabel": "Modifica il contenuto di {{title}}",
+    "cancel": "Annulla",
+    "saving": "Salvataggio…",
+    "save": "Salva",
+    "emptyContent": "Ancora nessun contenuto. Usa Bozza IA per generare una prima versione."
+  }
+}

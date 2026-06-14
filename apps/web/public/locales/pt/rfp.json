@@ -1,1 +1,25 @@
-{}
+{
+  "proposalDetail": {
+    "loadingAriaLabel": "Carregando proposta",
+    "errorTitle": "Falha ao carregar a proposta",
+    "errorRetry": "Tente novamente em um momento.",
+    "backToProposals": "Voltar para propostas",
+    "notFound": "Proposta não encontrada.",
+    "backToProposalsAriaLabel": "Voltar para propostas",
+    "version": "v{{version}}",
+    "due": "Vencimento {{date}}",
+    "requiredBadge": "Obrigatório",
+    "aiDraftedBadge": "Redigido por IA",
+    "wordCount": "{{count}} palavras",
+    "draftingSectionAriaLabel": "Redigindo {{title}}…",
+    "aiDraftSectionAriaLabel": "Rascunho de IA para {{title}}",
+    "drafting": "Redigindo…",
+    "aiDraft": "Rascunho de IA",
+    "editSectionAriaLabel": "Editar a seção {{title}}",
+    "editContentAriaLabel": "Editar o conteúdo de {{title}}",
+    "cancel": "Cancelar",
+    "saving": "Salvando…",
+    "save": "Salvar",
+    "emptyContent": "Ainda sem conteúdo. Use Rascunho de IA para gerar uma primeira versão."
+  }
+}

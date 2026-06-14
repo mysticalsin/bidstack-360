@@ -306,5 +306,11 @@
     "searching": "Ricerca in corso…",
     "noResults": "Nessun risultato.",
     "typeToSearch": "Digita per cercare…"
+  },
+  "confirm": {
+    "cancel": "Annulla",
+    "delete": "Elimina",
+    "confirm": "Conferma",
+    "save": "Salva"
   }
 }

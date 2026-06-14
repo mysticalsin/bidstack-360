@@ -125,5 +125,28 @@
     "emptyTitle": "No competitor findings yet",
     "emptyMessage": "Pick a competitor and run research. We only surface claims we can link to a public source — including real federal award pricing from USASpending.",
     "error": "Couldn't load competitor findings."
+  },
+  "proposalDetail": {
+    "loadingAriaLabel": "Loading proposal",
+    "errorTitle": "Failed to load proposal",
+    "errorRetry": "Please try again in a moment.",
+    "backToProposals": "Back to Proposals",
+    "notFound": "Proposal not found.",
+    "backToProposalsAriaLabel": "Back to proposals",
+    "version": "v{{version}}",
+    "due": "Due {{date}}",
+    "requiredBadge": "Required",
+    "aiDraftedBadge": "AI Drafted",
+    "wordCount": "{{count}} words",
+    "draftingSectionAriaLabel": "Drafting {{title}}…",
+    "aiDraftSectionAriaLabel": "AI Draft for {{title}}",
+    "drafting": "Drafting…",
+    "aiDraft": "AI Draft",
+    "editSectionAriaLabel": "Edit {{title}} section",
+    "editContentAriaLabel": "Edit content for {{title}}",
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "save": "Save",
+    "emptyContent": "No content yet. Use AI Draft to generate a first version."
   }
 }

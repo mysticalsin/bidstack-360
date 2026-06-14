@@ -1578,5 +1578,149 @@
   "inlineEdit": {
     "editLabel": "Edit",
     "mustBeNumber": "Must be a number"
+  },
+  "callTranscript": {
+    "emptyNotAvailable": "Transcript not yet available.",
+    "sectionLabel": "Call transcript",
+    "searchLabel": "Search transcript",
+    "searchPlaceholder": "Search transcript…",
+    "downloadAriaLabel": "Download transcript as text file",
+    "downloadButton": "Download",
+    "resultCountOne": "{{count}} match for \"{{term}}\"",
+    "resultCountOther": "{{count}} matches for \"{{term}}\"",
+    "segmentsLabel": "Transcript segments",
+    "noSegmentsMatch": "No segments match your search.",
+    "seekTo": "Seek to {{time}}"
+  },
+  "forecastList": {
+    "sectionTitle": "Forecast Details",
+    "sectionCaption": "{{count}} forecast groups",
+    "errorTitle": "Failed to load forecasts",
+    "retry": "Retry",
+    "emptyTitle": "No forecasts found",
+    "emptyMessage": "Try changing the period filter or create your first forecast.",
+    "newForecast": "New Forecast",
+    "tableLabel": "Revenue forecasts",
+    "columnOwner": "Owner",
+    "columnPeriod": "Period",
+    "columnPipeline": "Pipeline",
+    "columnBestCase": "Best Case",
+    "columnCommit": "Commit",
+    "columnClosed": "Closed",
+    "columnTotal": "Total",
+    "unassigned": "Unassigned",
+    "cellLabel": "{{category}} for {{period}}",
+    "cellEditLabel": "Edit {{category}} for {{period}}",
+    "deleteLabel": "Delete forecasts for {{period}}",
+    "totalLabel": "Total:"
+  },
+  "customObjectList": {
+    "createErrorFallback": "Failed to create record",
+    "notFound": "Custom object \"{{objectKey}}\" not found.",
+    "manageLink": "Manage custom objects",
+    "totalCount": "{{count}} total",
+    "newRecordButton": "New {{label}}",
+    "loadError": "Failed to load records.",
+    "emptyTitle": "No {{label}} yet",
+    "emptyDescription": "Click \"New {{label}}\" to create your first record.",
+    "columnRecord": "Record",
+    "columnUpdated": "Updated",
+    "paginationLabel": "Pagination",
+    "previous": "← Previous",
+    "pageOf": "Page {{page}} of {{totalPages}}",
+    "next": "Next →",
+    "newRecordTitle": "New {{label}}",
+    "nameLabel": "Name",
+    "cancel": "Cancel",
+    "creating": "Creating…",
+    "create": "Create"
+  },
+  "widgetRenderer": {
+    "chartRenderError": "Chart render error",
+    "retry": "Retry",
+    "configure": "Configure",
+    "duplicate": "Duplicate",
+    "exportCsv": "Export CSV",
+    "delete": "Delete"
+  },
+  "intelTabs": {
+    "solutionsEmptyTitle": "No solutions yet",
+    "solutionsEmptyMessage": "Upload documents and run extraction to review suggested solutions.",
+    "highConfidenceBadge": "High confidence",
+    "sourceLabel": "From: {{source}}",
+    "deleteAriaLabel": "Delete {{name}}",
+    "productsEmptyTitle": "No products yet",
+    "productsEmptyMessage": "Upload documents and run extraction to review suggested products.",
+    "extractionsEmptyTitle": "No documents",
+    "extractionsEmptyMessage": "Upload files to this account to begin extraction.",
+    "extractingButton": "Extracting…",
+    "reExtractButton": "Re-extract",
+    "extractButton": "Extract",
+    "extractionSummary": "{{solutionCount}} solutions, {{productCount}} products found"
+  },
+  "customFieldValues": {
+    "heading": "Custom Fields",
+    "definedCount": "{{count}} defined",
+    "reset": "Reset",
+    "save": "Save",
+    "saving": "Saving…",
+    "toastSaved": "Custom fields saved",
+    "toastSaveFailed": "Failed to save custom fields",
+    "selectNone": "—"
+  },
+  "createOpportunity": {
+    "triggerButton": "+ New opportunity",
+    "dialogTitle": "New opportunity",
+    "dialogDescription": "Add a bid to your pipeline. You can refine intel after Dust data verification runs.",
+    "customerLabel": "Customer",
+    "customerPlaceholder": "Search companies…",
+    "nameLabel": "Opportunity name",
+    "namePlaceholder": "Acme — IT Modernization",
+    "stageLabel": "Stage",
+    "industryLabel": "Industry",
+    "valueLabel": "Value (EUR)",
+    "probabilityLabel": "Probability %",
+    "dueDateLabel": "Due date",
+    "countryLabel": "Country",
+    "cancel": "Cancel",
+    "submitting": "Creating…",
+    "submit": "Create opportunity"
+  },
+  "companyDetail": {
+    "error": {
+      "title": "Couldn't load company",
+      "message": "The company may have been deleted."
+    },
+    "notFound": {
+      "title": "Company not found",
+      "message": "The company may have been deleted or you may not have access to it.",
+      "goBack": "Go back"
+    },
+    "field": {
+      "companyName": "Company name",
+      "industry": "Industry",
+      "domain": "Domain"
+    },
+    "meta": {
+      "employees": "{{count}} employees",
+      "taxId": "Tax ID: {{taxId}}",
+      "parent": "Parent:"
+    },
+    "action": {
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "save": "Save",
+      "edit": "Edit"
+    },
+    "tabs": {
+      "label": "Company sections"
+    },
+    "tab": {
+      "contacts": "Contacts ({{count}})",
+      "opportunities": "Opportunities ({{count}})",
+      "cases": "Cases ({{count}})",
+      "notes": "Notes ({{count}})",
+      "hierarchy": "Hierarchy"
+    }
   }
 }

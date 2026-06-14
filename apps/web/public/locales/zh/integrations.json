@@ -248,5 +248,109 @@
       "duns": "DUNS {{value}}",
       "noRegistryKeys": "尚无注册标识"
     }
+  },
+  "connectionCommandCenter": {
+    "path": {
+      "dust": {
+        "title": "Dust 智能体桥接",
+        "eyebrow": "智能体操作",
+        "summary": "通过 MCP 加 REST 同步，为 Dust 提供服务端 CRM 工具集。"
+      },
+      "mcp": {
+        "title": "MCP 服务器",
+        "eyebrow": "自定义工具",
+        "summary": "将 BidStack 注册为 Dust、Claude Desktop 或内部智能体的 MCP 服务器。"
+      },
+      "rest": {
+        "title": "REST API",
+        "eyebrow": "双向数据",
+        "summary": "使用类型化 API 密钥处理 ETL 任务、客户门户和企业自动化。"
+      },
+      "webhooks": {
+        "title": "Webhook",
+        "eyebrow": "实时事件",
+        "summary": "让外部系统订阅交易、投标、提案、发票和智能体事件。"
+      }
+    },
+    "readyLabel": "就绪",
+    "needsSetupLabel": "需要设置",
+    "error": {
+      "title": "无法加载设置指南",
+      "message": "集成契约端点没有响应。",
+      "retry": "重试设置指南"
+    },
+    "readiness": {
+      "dustCredentials": {
+        "label": "Dust 凭据",
+        "ready": "就绪",
+        "needsKey": "需要密钥"
+      },
+      "dustAgents": {
+        "label": "Dust 智能体",
+        "found": "找到 {{count}} 个",
+        "disabled": "已禁用"
+      },
+      "mcpEndpoint": {
+        "label": "MCP 端点",
+        "publicUrlSet": "已设置公共 URL",
+        "localFallback": "本地回退"
+      },
+      "dustDataSource": {
+        "label": "Dust 数据源",
+        "ready": "就绪",
+        "missing": "缺失"
+      }
+    },
+    "title": "连接指挥中心",
+    "generatedAt": "生成于 {{time}}",
+    "subtitle": "选择一条路径，创建正确的密钥，复制精确的端点，并以最小权限范围连接外部系统。",
+    "keyVault": "密钥保险库",
+    "webhookHub": "Webhook 中心",
+    "tablistLabel": "集成设置路径"
+  },
+  "dustCredentials": {
+    "sectionTitle": "Dust 凭据",
+    "sectionCaption": "只需连接一次您的 Dust 工作区——团队智能体、RFP 起草、合规和文档智能都会自动使用它。",
+    "removeButton": "移除",
+    "updateKeysButton": "更新密钥",
+    "connectButton": "连接 Dust",
+    "dialogUpdateTitle": "更新 Dust 凭据",
+    "dialogConnectTitle": "连接 Dust",
+    "dialogDescription": "保存前我们会通过 Dust 验证密钥。API 密钥静态加密存储，且不会再次显示。",
+    "fieldApiKeyLabel": "API 密钥",
+    "fieldApiKeyHint": "来自 Dust → 设置 → API 密钥。",
+    "fieldWorkspaceIdLabel": "工作区 ID",
+    "fieldDataSourceIdLabel": "数据源 ID",
+    "fieldDataSourceIdPlaceholder": "可选——启用文档同步",
+    "fieldBaseUrlLabel": "基础 URL",
+    "fieldBaseUrlPlaceholder": "可选——默认为 https://dust.tt/api",
+    "cancelButton": "取消",
+    "validatingButton": "正在验证…",
+    "validateSaveButton": "验证并保存",
+    "errorBothRequired": "API 密钥和工作区 ID 均为必填项。",
+    "errorCouldNotSave": "无法保存凭据。",
+    "toastConnectedTitle": "Dust 已连接",
+    "toastConnectedDescription": "凭据已验证并保存。AI 功能现在使用您的工作区。",
+    "confirmRemoveTitle": "移除 Dust 凭据？",
+    "confirmRemoveDescription": "AI 功能将回退到平台默认设置（如已设置），否则将暂停，直到添加新密钥。",
+    "confirmRemoveLabel": "移除",
+    "toastRemovedTitle": "Dust 凭据已移除",
+    "toastRemoveFailedTitle": "移除失败",
+    "errorServerRejected": "服务器拒绝了该请求。",
+    "loadErrorTitle": "无法加载 Dust 凭据",
+    "loadErrorMessage": "请重试。",
+    "retryButton": "重试",
+    "emptyTitle": "Dust 尚未连接",
+    "emptyMessageAdmin": "添加您的 Dust API 密钥和工作区 ID，以开启 AI 起草、合规和团队智能体。",
+    "emptyMessageNonAdmin": "请管理员连接您的 Dust 工作区以启用 AI 功能。",
+    "badgePlatformDefault": "平台默认",
+    "badgeConnected": "已连接",
+    "platformKeyNote": "正在使用平台共享的 Dust 密钥。在上方添加您自己的密钥以使用您的工作区。",
+    "detailWorkspaceId": "工作区 ID",
+    "detailDataSourceId": "数据源 ID",
+    "detailBaseUrl": "基础 URL",
+    "detailAgentOverrides": "智能体覆盖",
+    "agentOverridesConfigured": "已配置 {{count}} 个",
+    "agentOverridesDefaults": "使用默认值"
   }
 }

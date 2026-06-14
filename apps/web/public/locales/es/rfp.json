@@ -1,1 +1,25 @@
-{}
+{
+  "proposalDetail": {
+    "loadingAriaLabel": "Cargando propuesta",
+    "errorTitle": "No se pudo cargar la propuesta",
+    "errorRetry": "Vuelve a intentarlo en un momento.",
+    "backToProposals": "Volver a propuestas",
+    "notFound": "Propuesta no encontrada.",
+    "backToProposalsAriaLabel": "Volver a propuestas",
+    "version": "v{{version}}",
+    "due": "Vence {{date}}",
+    "requiredBadge": "Obligatorio",
+    "aiDraftedBadge": "Redactado por IA",
+    "wordCount": "{{count}} palabras",
+    "draftingSectionAriaLabel": "Redactando {{title}}…",
+    "aiDraftSectionAriaLabel": "Borrador de IA para {{title}}",
+    "drafting": "Redactando…",
+    "aiDraft": "Borrador de IA",
+    "editSectionAriaLabel": "Editar la sección {{title}}",
+    "editContentAriaLabel": "Editar el contenido de {{title}}",
+    "cancel": "Cancelar",
+    "saving": "Guardando…",
+    "save": "Guardar",
+    "emptyContent": "Aún no hay contenido. Usa Borrador de IA para generar una primera versión."
+  }
+}

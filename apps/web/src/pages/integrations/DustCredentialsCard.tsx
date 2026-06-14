@@ -7,6 +7,8 @@
 // only a masked tail. Non-admins see read-only status.
 
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -24,6 +26,7 @@ import {
 import { useIsAdmin } from '@/lib/auth';
 
 export function DustCredentialsCard() {
+  const { t } = useTranslation('integrations');
   const isAdmin = useIsAdmin();
   const creds = useDustCredentials();
   const save = useSaveDustCredentials();
@@ -43,7 +46,7 @@ export function DustCredentialsCard() {
     const baseUrl = String(fd.get('baseUrl') ?? '').trim();
     const dataSourceId = String(fd.get('dataSourceId') ?? '').trim();
     if (!apiKey || !workspaceId) {
-      setError('API key and workspace ID are both required.');
+      setError(t('dustCredentials.errorBothRequired', 'API key and workspace ID are both required.'));
       return;
     }
     try {
@@ -54,30 +57,42 @@ export function DustCredentialsCard() {
         dataSourceId: dataSourceId || undefined,
       });
       setOpen(false);
-      toast.success('Dust connected', {
-        description: 'Credentials validated and saved. AI features now use your workspace.',
+      toast.success(t('dustCredentials.toastConnectedTitle', 'Dust connected'), {
+        description: t(
+          'dustCredentials.toastConnectedDescription',
+          'Credentials validated and saved. AI features now use your workspace.',
+        ),
       });
     } catch (err) {
       // The API validates the keys against Dust and returns a clear message.
-      setError(err instanceof Error ? err.message : 'Could not save the credentials.');
+      setError(
+        err instanceof Error
+          ? err.message
+          : t('dustCredentials.errorCouldNotSave', 'Could not save the credentials.'),
+      );
     }
   };
 
   const onRemove = async () => {
     const ok = await confirm({
-      title: 'Remove Dust credentials?',
-      description:
+      title: t('dustCredentials.confirmRemoveTitle', 'Remove Dust credentials?'),
+      description: t(
+        'dustCredentials.confirmRemoveDescription',
         'AI features will fall back to the platform default (if one is set) or pause until new keys are added.',
-      confirmLabel: 'Remove',
+      ),
+      confirmLabel: t('dustCredentials.confirmRemoveLabel', 'Remove'),
       destructive: true,
     });
     if (!ok) return;
     try {
       await remove.mutateAsync();
-      toast.success('Dust credentials removed');
+      toast.success(t('dustCredentials.toastRemovedTitle', 'Dust credentials removed'));
     } catch (err) {
-      toast.error('Remove failed', {
-        description: err instanceof Error ? err.message : 'The server rejected the request.',
+      toast.error(t('dustCredentials.toastRemoveFailedTitle', 'Remove failed'), {
+        description:
+          err instanceof Error
+            ? err.message
+            : t('dustCredentials.errorServerRejected', 'The server rejected the request.'),
       });
     }
   };
@@ -85,8 +100,11 @@ export function DustCredentialsCard() {
   return (
     <Card>
       <SectionHeader
-        title="Dust credentials"
-        caption="Connect your Dust workspace once — crew agents, RFP drafting, compliance and document intelligence all use it automatically."
+        title={t('dustCredentials.sectionTitle', 'Dust credentials')}
+        caption={t(
+          'dustCredentials.sectionCaption',
+          'Connect your Dust workspace once — crew agents, RFP drafting, compliance and document intelligence all use it automatically.',
+        )}
         action={
           isAdmin ? (
             <div className="flex items-center gap-2">
@@ -98,7 +116,7 @@ export function DustCredentialsCard() {
                   onClick={onRemove}
                   disabled={remove.isPending}
                 >
-                  Remove
+                  {t('dustCredentials.removeButton', 'Remove')}
                 </Button>
               ) : null}
               <Dialog
@@ -109,39 +127,56 @@ export function DustCredentialsCard() {
                 }}
               >
                 <DialogTrigger asChild>
-                  <Button size="sm">{isOrg ? 'Update keys' : 'Connect Dust'}</Button>
+                  <Button size="sm">
+                    {isOrg
+                      ? t('dustCredentials.updateKeysButton', 'Update keys')
+                      : t('dustCredentials.connectButton', 'Connect Dust')}
+                  </Button>
                 </DialogTrigger>
                 <DialogContent
-                  title={isOrg ? 'Update Dust credentials' : 'Connect Dust'}
-                  description="We validate the keys against Dust before saving. The API key is encrypted at rest and never shown again."
+                  title={
+                    isOrg
+                      ? t('dustCredentials.dialogUpdateTitle', 'Update Dust credentials')
+                      : t('dustCredentials.dialogConnectTitle', 'Connect Dust')
+                  }
+                  description={t(
+                    'dustCredentials.dialogDescription',
+                    'We validate the keys against Dust before saving. The API key is encrypted at rest and never shown again.',
+                  )}
                 >
                   <form onSubmit={onSubmit} className="space-y-4">
                     <Field
-                      label="API key"
+                      label={t('dustCredentials.fieldApiKeyLabel', 'API key')}
                       name="apiKey"
                       type="password"
                       placeholder="sk-…"
                       required
-                      hint="From Dust → Settings → API Keys."
+                      hint={t('dustCredentials.fieldApiKeyHint', 'From Dust → Settings → API Keys.')}
                     />
                     <Field
-                      label="Workspace ID"
+                      label={t('dustCredentials.fieldWorkspaceIdLabel', 'Workspace ID')}
                       name="workspaceId"
                       defaultValue={data?.workspaceId ?? ''}
                       placeholder="w-…"
                       required
                     />
                     <Field
-                      label="Data source ID"
+                      label={t('dustCredentials.fieldDataSourceIdLabel', 'Data source ID')}
                       name="dataSourceId"
                       defaultValue={data?.dataSourceId ?? ''}
-                      placeholder="Optional — enables document sync"
+                      placeholder={t(
+                        'dustCredentials.fieldDataSourceIdPlaceholder',
+                        'Optional — enables document sync',
+                      )}
                     />
                     <Field
-                      label="Base URL"
+                      label={t('dustCredentials.fieldBaseUrlLabel', 'Base URL')}
                       name="baseUrl"
                       defaultValue={data?.baseUrl ?? ''}
-                      placeholder="Optional — defaults to https://dust.tt/api"
+                      placeholder={t(
+                        'dustCredentials.fieldBaseUrlPlaceholder',
+                        'Optional — defaults to https://dust.tt/api',
+                      )}
                     />
                     {error ? (
                       <p
@@ -154,11 +189,13 @@ export function DustCredentialsCard() {
                     <div className="flex items-center justify-end gap-2 pt-1">
                       <DialogClose asChild>
                         <Button type="button" variant="secondary" size="sm">
-                          Cancel
+                          {t('dustCredentials.cancelButton', 'Cancel')}
                         </Button>
                       </DialogClose>
                       <Button type="submit" size="sm" disabled={save.isPending}>
-                        {save.isPending ? 'Validating…' : 'Validate & save'}
+                        {save.isPending
+                          ? t('dustCredentials.validatingButton', 'Validating…')
+                          : t('dustCredentials.validateSaveButton', 'Validate & save')}
                       </Button>
                     </div>
                   </form>
@@ -174,23 +211,29 @@ export function DustCredentialsCard() {
           <div className="bs-shimmer h-16 w-full rounded-lg" />
         ) : creds.isError ? (
           <ErrorState
-            title="Could not load Dust credentials"
-            message="Please try again."
+            title={t('dustCredentials.loadErrorTitle', 'Could not load Dust credentials')}
+            message={t('dustCredentials.loadErrorMessage', 'Please try again.')}
             action={
               <Button size="sm" variant="secondary" onClick={() => void creds.refetch()}>
-                Retry
+                {t('dustCredentials.retryButton', 'Retry')}
               </Button>
             }
           />
         ) : data?.configured ? (
-          <ConfiguredView data={data} />
+          <ConfiguredView data={data} t={t} />
         ) : (
           <EmptyState
-            title="Dust isn't connected yet"
+            title={t('dustCredentials.emptyTitle', "Dust isn't connected yet")}
             message={
               isAdmin
-                ? 'Add your Dust API key and workspace ID to turn on AI drafting, compliance and crew agents.'
-                : 'Ask an admin to connect your Dust workspace to enable AI features.'
+                ? t(
+                    'dustCredentials.emptyMessageAdmin',
+                    'Add your Dust API key and workspace ID to turn on AI drafting, compliance and crew agents.',
+                  )
+                : t(
+                    'dustCredentials.emptyMessageNonAdmin',
+                    'Ask an admin to connect your Dust workspace to enable AI features.',
+                  )
             }
           />
         )}
@@ -199,13 +242,21 @@ export function DustCredentialsCard() {
   );
 }
 
-function ConfiguredView({ data }: { data: DustCredentialsSummary }) {
+function ConfiguredView({
+  data,
+  t,
+}: {
+  data: DustCredentialsSummary;
+  t: TFunction;
+}) {
   const fromEnv = data.source === 'env';
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone={fromEnv ? 'amber' : 'jade'}>
-          {fromEnv ? 'Platform default' : 'Connected'}
+          {fromEnv
+            ? t('dustCredentials.badgePlatformDefault', 'Platform default')
+            : t('dustCredentials.badgeConnected', 'Connected')}
         </Badge>
         {data.apiKeyMasked ? (
           <code className="rounded bg-[var(--surface-card)] px-2 py-0.5 font-mono text-xs text-[var(--fg-secondary)]">
@@ -215,19 +266,30 @@ function ConfiguredView({ data }: { data: DustCredentialsSummary }) {
       </div>
       {fromEnv ? (
         <p className="text-xs text-[var(--fg-tertiary)]">
-          Running on the platform&apos;s shared Dust key. Add your own above to use your workspace.
+          {t(
+            'dustCredentials.platformKeyNote',
+            "Running on the platform's shared Dust key. Add your own above to use your workspace.",
+          )}
         </p>
       ) : null}
       <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Detail label="Workspace ID" value={data.workspaceId} />
-        <Detail label="Data source ID" value={data.dataSourceId} />
-        <Detail label="Base URL" value={data.baseUrl ?? 'https://dust.tt/api'} />
+        <Detail label={t('dustCredentials.detailWorkspaceId', 'Workspace ID')} value={data.workspaceId} />
         <Detail
-          label="Agent overrides"
+          label={t('dustCredentials.detailDataSourceId', 'Data source ID')}
+          value={data.dataSourceId}
+        />
+        <Detail
+          label={t('dustCredentials.detailBaseUrl', 'Base URL')}
+          value={data.baseUrl ?? 'https://dust.tt/api'}
+        />
+        <Detail
+          label={t('dustCredentials.detailAgentOverrides', 'Agent overrides')}
           value={
             Object.keys(data.agentIds).length > 0
-              ? `${Object.keys(data.agentIds).length} configured`
-              : 'Using defaults'
+              ? t('dustCredentials.agentOverridesConfigured', '{{count}} configured', {
+                  count: Object.keys(data.agentIds).length,
+                })
+              : t('dustCredentials.agentOverridesDefaults', 'Using defaults')
           }
         />
       </dl>

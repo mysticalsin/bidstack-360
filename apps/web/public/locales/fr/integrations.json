@@ -248,5 +248,109 @@
       "duns": "DUNS {{value}}",
       "noRegistryKeys": "Pas encore de clés de registre"
     }
+  },
+  "connectionCommandCenter": {
+    "path": {
+      "dust": {
+        "title": "Passerelle agent Dust",
+        "eyebrow": "Actions de l'agent",
+        "summary": "Donnez à Dust une boîte à outils CRM côté serveur avec MCP et synchronisation REST."
+      },
+      "mcp": {
+        "title": "Serveur MCP",
+        "eyebrow": "Outils personnalisés",
+        "summary": "Enregistrez BidStack comme serveur MCP pour Dust, Claude Desktop ou des agents internes."
+      },
+      "rest": {
+        "title": "API REST",
+        "eyebrow": "Données bidirectionnelles",
+        "summary": "Utilisez des clés d'API typées pour les tâches ETL, les portails clients et l'automatisation d'entreprise."
+      },
+      "webhooks": {
+        "title": "Webhooks",
+        "eyebrow": "Événements en temps réel",
+        "summary": "Abonnez des systèmes externes aux événements d'affaires, d'appels d'offres, de propositions, de factures et d'agents."
+      }
+    },
+    "readyLabel": "prêt",
+    "needsSetupLabel": "configuration requise",
+    "error": {
+      "title": "Impossible de charger le guide de configuration",
+      "message": "Le point de terminaison du contrat d'intégration n'a pas répondu.",
+      "retry": "Réessayer le guide de configuration"
+    },
+    "readiness": {
+      "dustCredentials": {
+        "label": "Identifiants Dust",
+        "ready": "Prêt",
+        "needsKey": "Clé requise"
+      },
+      "dustAgents": {
+        "label": "Agents Dust",
+        "found": "{{count}} trouvés",
+        "disabled": "Désactivé"
+      },
+      "mcpEndpoint": {
+        "label": "Point de terminaison MCP",
+        "publicUrlSet": "URL publique définie",
+        "localFallback": "Repli local"
+      },
+      "dustDataSource": {
+        "label": "Source de données Dust",
+        "ready": "Prêt",
+        "missing": "Manquant"
+      }
+    },
+    "title": "Centre de commande des connexions",
+    "generatedAt": "Généré {{time}}",
+    "subtitle": "Choisissez une voie, créez la bonne clé, copiez le point de terminaison exact et connectez le système externe avec des permissions de moindre privilège.",
+    "keyVault": "Coffre de clés",
+    "webhookHub": "Hub de webhooks",
+    "tablistLabel": "Voies de configuration d'intégration"
+  },
+  "dustCredentials": {
+    "sectionTitle": "Identifiants Dust",
+    "sectionCaption": "Connectez votre espace de travail Dust une seule fois : les agents d'équipe, la rédaction d'appels d'offres, la conformité et l'intelligence documentaire l'utilisent automatiquement.",
+    "removeButton": "Supprimer",
+    "updateKeysButton": "Mettre à jour les clés",
+    "connectButton": "Connecter Dust",
+    "dialogUpdateTitle": "Mettre à jour les identifiants Dust",
+    "dialogConnectTitle": "Connecter Dust",
+    "dialogDescription": "Nous validons les clés auprès de Dust avant l'enregistrement. La clé API est chiffrée au repos et n'est plus jamais affichée.",
+    "fieldApiKeyLabel": "Clé API",
+    "fieldApiKeyHint": "Depuis Dust → Paramètres → Clés API.",
+    "fieldWorkspaceIdLabel": "ID de l'espace de travail",
+    "fieldDataSourceIdLabel": "ID de la source de données",
+    "fieldDataSourceIdPlaceholder": "Facultatif — active la synchronisation des documents",
+    "fieldBaseUrlLabel": "URL de base",
+    "fieldBaseUrlPlaceholder": "Facultatif — par défaut https://dust.tt/api",
+    "cancelButton": "Annuler",
+    "validatingButton": "Validation…",
+    "validateSaveButton": "Valider et enregistrer",
+    "errorBothRequired": "La clé API et l'ID de l'espace de travail sont tous deux requis.",
+    "errorCouldNotSave": "Impossible d'enregistrer les identifiants.",
+    "toastConnectedTitle": "Dust connecté",
+    "toastConnectedDescription": "Identifiants validés et enregistrés. Les fonctionnalités d'IA utilisent désormais votre espace de travail.",
+    "confirmRemoveTitle": "Supprimer les identifiants Dust ?",
+    "confirmRemoveDescription": "Les fonctionnalités d'IA reviendront à la valeur par défaut de la plateforme (si elle est définie) ou seront suspendues jusqu'à l'ajout de nouvelles clés.",
+    "confirmRemoveLabel": "Supprimer",
+    "toastRemovedTitle": "Identifiants Dust supprimés",
+    "toastRemoveFailedTitle": "Échec de la suppression",
+    "errorServerRejected": "Le serveur a rejeté la requête.",
+    "loadErrorTitle": "Impossible de charger les identifiants Dust",
+    "loadErrorMessage": "Veuillez réessayer.",
+    "retryButton": "Réessayer",
+    "emptyTitle": "Dust n'est pas encore connecté",
+    "emptyMessageAdmin": "Ajoutez votre clé API Dust et l'ID de votre espace de travail pour activer la rédaction par IA, la conformité et les agents d'équipe.",
+    "emptyMessageNonAdmin": "Demandez à un administrateur de connecter votre espace de travail Dust pour activer les fonctionnalités d'IA.",
+    "badgePlatformDefault": "Valeur par défaut de la plateforme",
+    "badgeConnected": "Connecté",
+    "platformKeyNote": "Fonctionne avec la clé Dust partagée de la plateforme. Ajoutez la vôtre ci-dessus pour utiliser votre espace de travail.",
+    "detailWorkspaceId": "ID de l'espace de travail",
+    "detailDataSourceId": "ID de la source de données",
+    "detailBaseUrl": "URL de base",
+    "detailAgentOverrides": "Remplacements d'agents",
+    "agentOverridesConfigured": "{{count}} configurés",
+    "agentOverridesDefaults": "Utilisation des valeurs par défaut"
   }
 }

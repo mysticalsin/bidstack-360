@@ -17,6 +17,7 @@
  */
 
 import { useState, useRef, useCallback, useId, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/Button';
 import type { TranscriptSegment } from '@/hooks/useCalls';
@@ -103,6 +104,7 @@ export function CallTranscriptViewer({
   callId,
   className,
 }: CallTranscriptViewerProps) {
+  const { t } = useTranslation('crm');
   const [search, setSearch] = useState('');
   const searchId = useId();
   const resultId = useId();
@@ -181,21 +183,21 @@ export function CallTranscriptViewer({
   if (segments.length === 0 && !transcriptText) {
     return (
       <div className={cn('rounded-lg border border-dashed border-[var(--border-default)] px-6 py-8 text-center', className)}>
-        <p className="text-sm text-[var(--fg-tertiary)]">Transcript not yet available.</p>
+        <p className="text-sm text-[var(--fg-tertiary)]">{t('callTranscript.emptyNotAvailable', 'Transcript not yet available.')}</p>
       </div>
     );
   }
 
   return (
     <section
-      aria-label="Call transcript"
+      aria-label={t('callTranscript.sectionLabel', 'Call transcript')}
       className={cn('flex flex-col gap-3', className)}
     >
       {/* Toolbar */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <label htmlFor={searchId} className="sr-only">
-            Search transcript
+            {t('callTranscript.searchLabel', 'Search transcript')}
           </label>
           <input
             ref={searchRef}
@@ -203,7 +205,7 @@ export function CallTranscriptViewer({
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search transcript…"
+            placeholder={t('callTranscript.searchPlaceholder', 'Search transcript…')}
             aria-controls={resultId}
             className={cn(
               'w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 pl-8 text-sm text-[var(--fg-primary)] placeholder:text-[var(--fg-tertiary)]',
@@ -215,24 +217,33 @@ export function CallTranscriptViewer({
             🔍
           </span>
         </div>
-        <Button size="sm" variant="ghost" onClick={downloadTranscript} aria-label="Download transcript as text file">
-          ⬇ Download
+        <Button size="sm" variant="ghost" onClick={downloadTranscript} aria-label={t('callTranscript.downloadAriaLabel', 'Download transcript as text file')}>
+          ⬇ {t('callTranscript.downloadButton', 'Download')}
         </Button>
       </div>
 
       {/* Search result count (aria-live so screen readers announce it) */}
       <div id={resultId} role="status" aria-live="polite" className="sr-only">
-        {search && `${matchCount} ${matchCount === 1 ? 'match' : 'matches'} for "${search}"`}
+        {search &&
+          (matchCount === 1
+            ? t('callTranscript.resultCountOne', '{{count}} match for "{{term}}"', {
+                count: matchCount,
+                term: search,
+              })
+            : t('callTranscript.resultCountOther', '{{count}} matches for "{{term}}"', {
+                count: matchCount,
+                term: search,
+              }))}
       </div>
 
       {/* Segment list */}
       <div
         role="list"
-        aria-label="Transcript segments"
+        aria-label={t('callTranscript.segmentsLabel', 'Transcript segments')}
         className="space-y-3 overflow-y-auto max-h-[60vh] pr-1"
       >
         {visibleSegments.length === 0 && search && (
-          <p className="text-sm text-[var(--fg-tertiary)]">No segments match your search.</p>
+          <p className="text-sm text-[var(--fg-tertiary)]">{t('callTranscript.noSegmentsMatch', 'No segments match your search.')}</p>
         )}
 
         {visibleSegments.map((seg, i) => {
@@ -247,8 +258,16 @@ export function CallTranscriptViewer({
                 onClick={() => seekTo(seg.startMs)}
                 disabled={!canSeek}
                 tabIndex={canSeek ? 0 : -1}
-                aria-label={canSeek ? `Seek to ${formatMs(seg.startMs)}` : undefined}
-                title={canSeek ? `Seek to ${formatMs(seg.startMs)}` : formatMs(seg.startMs)}
+                aria-label={
+                  canSeek
+                    ? t('callTranscript.seekTo', 'Seek to {{time}}', { time: formatMs(seg.startMs) })
+                    : undefined
+                }
+                title={
+                  canSeek
+                    ? t('callTranscript.seekTo', 'Seek to {{time}}', { time: formatMs(seg.startMs) })
+                    : formatMs(seg.startMs)
+                }
                 className={cn(
                   'mt-0.5 flex-shrink-0 rounded px-1.5 py-0.5 text-[11px] font-mono text-[var(--fg-tertiary)] bg-[var(--surface-sunken)] leading-none',
                   canSeek &&

@@ -8,6 +8,7 @@
  * and makes the command-center independently testable.
  */
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -73,21 +74,26 @@ function ConnectionPathPanel({
   path: (typeof PATHS)[number];
   guide: IntegrationSetupGuide;
 }) {
+  const { t } = useTranslation('integrations');
   const detail = getPathDetail(path.key, guide);
   return (
     <div role="tabpanel" className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-            {path.eyebrow}
+            {t(`connectionCommandCenter.path.${path.key}.eyebrow`, path.eyebrow)}
           </div>
-          <h3 className="mt-1 text-xl font-semibold text-[var(--fg-primary)]">{path.title}</h3>
+          <h3 className="mt-1 text-xl font-semibold text-[var(--fg-primary)]">
+            {t(`connectionCommandCenter.path.${path.key}.title`, path.title)}
+          </h3>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--fg-secondary)]">
             {detail.description}
           </p>
         </div>
         <Badge tone={detail.ready ? 'jade' : 'amber'}>
-          {detail.ready ? 'ready' : 'needs setup'}
+          {detail.ready
+            ? t('connectionCommandCenter.readyLabel', 'ready')
+            : t('connectionCommandCenter.needsSetupLabel', 'needs setup')}
         </Badge>
       </div>
 
@@ -133,6 +139,7 @@ export function ConnectionCommandCenter({
   dustConfigured: boolean;
   dustAgents: number;
 }) {
+  const { t } = useTranslation('integrations');
   const [active, setActive] = useState<PathKey>('mcp');
 
   if (isLoading) {
@@ -149,11 +156,14 @@ export function ConnectionCommandCenter({
     return (
       <Card>
         <ErrorState
-          title="Could not load setup guide"
-          message="The integration contract endpoint did not respond."
+          title={t('connectionCommandCenter.error.title', 'Could not load setup guide')}
+          message={t(
+            'connectionCommandCenter.error.message',
+            'The integration contract endpoint did not respond.',
+          )}
           action={
             <Button variant="secondary" size="sm" onClick={onRetry}>
-              Retry setup guide
+              {t('connectionCommandCenter.error.retry', 'Retry setup guide')}
             </Button>
           }
         />
@@ -164,23 +174,33 @@ export function ConnectionCommandCenter({
   const activePath = PATHS.find((path) => path.key === active) ?? DEFAULT_PATH;
   const readiness = [
     {
-      label: 'Dust credentials',
-      value: dustConfigured ? 'Ready' : 'Needs key',
+      label: t('connectionCommandCenter.readiness.dustCredentials.label', 'Dust credentials'),
+      value: dustConfigured
+        ? t('connectionCommandCenter.readiness.dustCredentials.ready', 'Ready')
+        : t('connectionCommandCenter.readiness.dustCredentials.needsKey', 'Needs key'),
       tone: dustConfigured ? 'jade' : 'amber',
     },
     {
-      label: 'Dust agents',
-      value: dustConfigured ? `${dustAgents} found` : 'Disabled',
+      label: t('connectionCommandCenter.readiness.dustAgents.label', 'Dust agents'),
+      value: dustConfigured
+        ? t('connectionCommandCenter.readiness.dustAgents.found', '{{count}} found', {
+            count: dustAgents,
+          })
+        : t('connectionCommandCenter.readiness.dustAgents.disabled', 'Disabled'),
       tone: dustConfigured && dustAgents > 0 ? 'teal' : dustConfigured ? 'blue' : 'gray',
     },
     {
-      label: 'MCP endpoint',
-      value: guide.mcp.configured ? 'Public URL set' : 'Local fallback',
+      label: t('connectionCommandCenter.readiness.mcpEndpoint.label', 'MCP endpoint'),
+      value: guide.mcp.configured
+        ? t('connectionCommandCenter.readiness.mcpEndpoint.publicUrlSet', 'Public URL set')
+        : t('connectionCommandCenter.readiness.mcpEndpoint.localFallback', 'Local fallback'),
       tone: guide.mcp.configured ? 'jade' : 'amber',
     },
     {
-      label: 'Dust data source',
-      value: guide.dust.dataSourceConfigured ? 'Ready' : 'Missing',
+      label: t('connectionCommandCenter.readiness.dustDataSource.label', 'Dust data source'),
+      value: guide.dust.dataSourceConfigured
+        ? t('connectionCommandCenter.readiness.dustDataSource.ready', 'Ready')
+        : t('connectionCommandCenter.readiness.dustDataSource.missing', 'Missing'),
       tone: guide.dust.dataSourceConfigured ? 'jade' : 'amber',
     },
   ] as const;
@@ -196,24 +216,28 @@ export function ConnectionCommandCenter({
               </span>
               <div>
                 <h2 className="text-lg font-semibold text-[var(--fg-primary)]">
-                  Connection command center
+                  {t('connectionCommandCenter.title', 'Connection command center')}
                 </h2>
                 <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
-                  Generated {relativeTime(guide.generatedAt)}
+                  {t('connectionCommandCenter.generatedAt', 'Generated {{time}}', {
+                    time: relativeTime(guide.generatedAt),
+                  })}
                 </p>
               </div>
             </div>
             <p className="mt-4 max-w-3xl text-sm leading-6 text-[var(--fg-secondary)]">
-              Pick a path, create the right key, copy the exact endpoint, and connect the external
-              system with least-privilege scopes.
+              {t(
+                'connectionCommandCenter.subtitle',
+                'Pick a path, create the right key, copy the exact endpoint, and connect the external system with least-privilege scopes.',
+              )}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <LiquidGlassButton as="a" href="#api-keys" tone="secondary" size="sm">
-              Key vault
+              {t('connectionCommandCenter.keyVault', 'Key vault')}
             </LiquidGlassButton>
             <LiquidGlassButton as="a" href="#webhooks" tone="secondary" size="sm">
-              Webhook hub
+              {t('connectionCommandCenter.webhookHub', 'Webhook hub')}
             </LiquidGlassButton>
           </div>
         </div>
@@ -237,7 +261,11 @@ export function ConnectionCommandCenter({
 
       <div className="grid gap-0 xl:grid-cols-[320px_1fr]">
         <div className="border-b border-[var(--border-subtle)] p-3 xl:border-b-0 xl:border-r">
-          <div role="tablist" aria-label="Integration setup paths" className="space-y-2">
+          <div
+            role="tablist"
+            aria-label={t('connectionCommandCenter.tablistLabel', 'Integration setup paths')}
+            className="space-y-2"
+          >
             {PATHS.map((path) => {
               const isActive = active === path.key;
               return (
@@ -262,13 +290,13 @@ export function ConnectionCommandCenter({
                         isActive ? 'text-[var(--fg-secondary)]' : 'text-[var(--fg-tertiary)]'
                       }`}
                     >
-                      {path.eyebrow}
+                      {t(`connectionCommandCenter.path.${path.key}.eyebrow`, path.eyebrow)}
                     </span>
                     <span className="mt-0.5 block text-sm font-semibold text-[var(--fg-primary)]">
-                      {path.title}
+                      {t(`connectionCommandCenter.path.${path.key}.title`, path.title)}
                     </span>
                     <span className="mt-1 block text-xs leading-5 text-[var(--fg-secondary)]">
-                      {path.summary}
+                      {t(`connectionCommandCenter.path.${path.key}.summary`, path.summary)}
                     </span>
                   </span>
                 </button>

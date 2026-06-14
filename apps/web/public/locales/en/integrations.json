@@ -248,5 +248,109 @@
       "duns": "DUNS {{value}}",
       "noRegistryKeys": "No registry keys yet"
     }
+  },
+  "connectionCommandCenter": {
+    "path": {
+      "dust": {
+        "title": "Dust agent bridge",
+        "eyebrow": "Agent actions",
+        "summary": "Give Dust a server-side CRM toolbelt with MCP plus REST sync."
+      },
+      "mcp": {
+        "title": "MCP server",
+        "eyebrow": "Custom tools",
+        "summary": "Register BidStack as an MCP server for Dust, Claude Desktop, or internal agents."
+      },
+      "rest": {
+        "title": "REST API",
+        "eyebrow": "Bi-directional data",
+        "summary": "Use typed API keys for ETL jobs, client portals, and enterprise automation."
+      },
+      "webhooks": {
+        "title": "Webhooks",
+        "eyebrow": "Realtime events",
+        "summary": "Subscribe external systems to deal, bid, proposal, invoice, and agent events."
+      }
+    },
+    "readyLabel": "ready",
+    "needsSetupLabel": "needs setup",
+    "error": {
+      "title": "Could not load setup guide",
+      "message": "The integration contract endpoint did not respond.",
+      "retry": "Retry setup guide"
+    },
+    "readiness": {
+      "dustCredentials": {
+        "label": "Dust credentials",
+        "ready": "Ready",
+        "needsKey": "Needs key"
+      },
+      "dustAgents": {
+        "label": "Dust agents",
+        "found": "{{count}} found",
+        "disabled": "Disabled"
+      },
+      "mcpEndpoint": {
+        "label": "MCP endpoint",
+        "publicUrlSet": "Public URL set",
+        "localFallback": "Local fallback"
+      },
+      "dustDataSource": {
+        "label": "Dust data source",
+        "ready": "Ready",
+        "missing": "Missing"
+      }
+    },
+    "title": "Connection command center",
+    "generatedAt": "Generated {{time}}",
+    "subtitle": "Pick a path, create the right key, copy the exact endpoint, and connect the external system with least-privilege scopes.",
+    "keyVault": "Key vault",
+    "webhookHub": "Webhook hub",
+    "tablistLabel": "Integration setup paths"
+  },
+  "dustCredentials": {
+    "sectionTitle": "Dust credentials",
+    "sectionCaption": "Connect your Dust workspace once — crew agents, RFP drafting, compliance and document intelligence all use it automatically.",
+    "removeButton": "Remove",
+    "updateKeysButton": "Update keys",
+    "connectButton": "Connect Dust",
+    "dialogUpdateTitle": "Update Dust credentials",
+    "dialogConnectTitle": "Connect Dust",
+    "dialogDescription": "We validate the keys against Dust before saving. The API key is encrypted at rest and never shown again.",
+    "fieldApiKeyLabel": "API key",
+    "fieldApiKeyHint": "From Dust → Settings → API Keys.",
+    "fieldWorkspaceIdLabel": "Workspace ID",
+    "fieldDataSourceIdLabel": "Data source ID",
+    "fieldDataSourceIdPlaceholder": "Optional — enables document sync",
+    "fieldBaseUrlLabel": "Base URL",
+    "fieldBaseUrlPlaceholder": "Optional — defaults to https://dust.tt/api",
+    "cancelButton": "Cancel",
+    "validatingButton": "Validating…",
+    "validateSaveButton": "Validate & save",
+    "errorBothRequired": "API key and workspace ID are both required.",
+    "errorCouldNotSave": "Could not save the credentials.",
+    "toastConnectedTitle": "Dust connected",
+    "toastConnectedDescription": "Credentials validated and saved. AI features now use your workspace.",
+    "confirmRemoveTitle": "Remove Dust credentials?",
+    "confirmRemoveDescription": "AI features will fall back to the platform default (if one is set) or pause until new keys are added.",
+    "confirmRemoveLabel": "Remove",
+    "toastRemovedTitle": "Dust credentials removed",
+    "toastRemoveFailedTitle": "Remove failed",
+    "errorServerRejected": "The server rejected the request.",
+    "loadErrorTitle": "Could not load Dust credentials",
+    "loadErrorMessage": "Please try again.",
+    "retryButton": "Retry",
+    "emptyTitle": "Dust isn't connected yet",
+    "emptyMessageAdmin": "Add your Dust API key and workspace ID to turn on AI drafting, compliance and crew agents.",
+    "emptyMessageNonAdmin": "Ask an admin to connect your Dust workspace to enable AI features.",
+    "badgePlatformDefault": "Platform default",
+    "badgeConnected": "Connected",
+    "platformKeyNote": "Running on the platform's shared Dust key. Add your own above to use your workspace.",
+    "detailWorkspaceId": "Workspace ID",
+    "detailDataSourceId": "Data source ID",
+    "detailBaseUrl": "Base URL",
+    "detailAgentOverrides": "Agent overrides",
+    "agentOverridesConfigured": "{{count}} configured",
+    "agentOverridesDefaults": "Using defaults"
   }
 }

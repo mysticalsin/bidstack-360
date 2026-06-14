@@ -4,6 +4,7 @@
  * to the parent for actual mutation.
  */
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -59,6 +60,7 @@ export function ForecastList({
   onDeleteRow,
   formatMoneyMicros,
 }: ForecastListProps) {
+  const { t } = useTranslation('crm');
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
 
   const isEditingCell = (row: ForecastRow, cat: Forecast['category']) =>
@@ -92,23 +94,31 @@ export function ForecastList({
 
   return (
     <Card>
-      <SectionHeader title="Forecast Details" caption={`${rows.length} forecast groups`} />
+      <SectionHeader
+        title={t('forecastList.sectionTitle', 'Forecast Details')}
+        caption={t('forecastList.sectionCaption', '{{count}} forecast groups', {
+          count: rows.length,
+        })}
+      />
 
       {isError ? (
         <ErrorState
-          title="Failed to load forecasts"
+          title={t('forecastList.errorTitle', 'Failed to load forecasts')}
           message={errorMessage}
-          action={<Button onClick={onRetry}>Retry</Button>}
+          action={<Button onClick={onRetry}>{t('forecastList.retry', 'Retry')}</Button>}
         />
       ) : isLoading ? (
         <LoadingSkeleton rows={4} />
       ) : rows.length === 0 ? (
         <EmptyState
-          title="No forecasts found"
-          message="Try changing the period filter or create your first forecast."
+          title={t('forecastList.emptyTitle', 'No forecasts found')}
+          message={t(
+            'forecastList.emptyMessage',
+            'Try changing the period filter or create your first forecast.',
+          )}
           action={
             <Button size="sm" onClick={onNewForecast}>
-              <Icon name="plus" size={14} /> New Forecast
+              <Icon name="plus" size={14} /> {t('forecastList.newForecast', 'New Forecast')}
             </Button>
           }
         />
@@ -117,16 +127,26 @@ export function ForecastList({
           {/* ── Desktop table ── */}
           <div className="hidden md:block">
             <TableScrollArea>
-              <Table aria-label="Revenue forecasts">
+              <Table aria-label={t('forecastList.tableLabel', 'Revenue forecasts')}>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Owner</TableHead>
-                    <TableHead>Period</TableHead>
-                    <TableHead className="text-right">Pipeline</TableHead>
-                    <TableHead className="text-right">Best Case</TableHead>
-                    <TableHead className="text-right">Commit</TableHead>
-                    <TableHead className="text-right">Closed</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead>{t('forecastList.columnOwner', 'Owner')}</TableHead>
+                    <TableHead>{t('forecastList.columnPeriod', 'Period')}</TableHead>
+                    <TableHead className="text-right">
+                      {t('forecastList.columnPipeline', 'Pipeline')}
+                    </TableHead>
+                    <TableHead className="text-right">
+                      {t('forecastList.columnBestCase', 'Best Case')}
+                    </TableHead>
+                    <TableHead className="text-right">
+                      {t('forecastList.columnCommit', 'Commit')}
+                    </TableHead>
+                    <TableHead className="text-right">
+                      {t('forecastList.columnClosed', 'Closed')}
+                    </TableHead>
+                    <TableHead className="text-right">
+                      {t('forecastList.columnTotal', 'Total')}
+                    </TableHead>
                     <TableHead className="w-16" />
                   </TableRow>
                 </TableHeader>
@@ -135,7 +155,7 @@ export function ForecastList({
                     <TableRow key={`${row.ownerId}|${row.period}`}>
                       <TableCell>
                         <span className="text-sm font-medium text-[var(--fg-primary)]">
-                          {row.ownerName ?? 'Unassigned'}
+                          {row.ownerName ?? t('forecastList.unassigned', 'Unassigned')}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -152,7 +172,11 @@ export function ForecastList({
                                 autoFocus
                                 defaultValue={val / 1_000_000}
                                 className="w-28 text-right"
-                                aria-label={`${CATEGORY_LABELS[cat]} for ${row.period}`}
+                                aria-label={t(
+                                  'forecastList.cellLabel',
+                                  '{{category}} for {{period}}',
+                                  { category: CATEGORY_LABELS[cat], period: row.period },
+                                )}
                                 onBlur={(e) => handleBlurSave(e, row, cat)}
                                 onKeyDown={handleKeyDown}
                               />
@@ -168,7 +192,11 @@ export function ForecastList({
                                     value: val,
                                   })
                                 }
-                                aria-label={`Edit ${CATEGORY_LABELS[cat]} for ${row.period}`}
+                                aria-label={t(
+                                  'forecastList.cellEditLabel',
+                                  'Edit {{category}} for {{period}}',
+                                  { category: CATEGORY_LABELS[cat], period: row.period },
+                                )}
                               >
                                 {formatMoneyMicros(val, 'EUR')}
                               </button>
@@ -189,7 +217,9 @@ export function ForecastList({
                           type="button"
                           onClick={() => onDeleteRow(row)}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)] pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-                          aria-label={`Delete forecasts for ${row.period}`}
+                          aria-label={t('forecastList.deleteLabel', 'Delete forecasts for {{period}}', {
+                            period: row.period,
+                          })}
                         >
                           <Icon name="trash" size={14} />
                         </button>
@@ -210,7 +240,7 @@ export function ForecastList({
               >
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-medium text-[var(--fg-primary)]">
-                    {row.ownerName ?? 'Unassigned'}
+                    {row.ownerName ?? t('forecastList.unassigned', 'Unassigned')}
                   </div>
                   <Badge tone="gray">{row.period}</Badge>
                 </div>
@@ -228,7 +258,10 @@ export function ForecastList({
                             size="sm"
                             autoFocus
                             defaultValue={val / 1_000_000}
-                            aria-label={`${CATEGORY_LABELS[cat]} for ${row.period}`}
+                            aria-label={t('forecastList.cellLabel', '{{category}} for {{period}}', {
+                              category: CATEGORY_LABELS[cat],
+                              period: row.period,
+                            })}
                             onBlur={(e) => handleBlurSave(e, row, cat)}
                             onKeyDown={handleKeyDown}
                           />
@@ -244,7 +277,11 @@ export function ForecastList({
                                 value: val,
                               })
                             }
-                            aria-label={`Edit ${CATEGORY_LABELS[cat]} for ${row.period}`}
+                            aria-label={t(
+                              'forecastList.cellEditLabel',
+                              'Edit {{category}} for {{period}}',
+                              { category: CATEGORY_LABELS[cat], period: row.period },
+                            )}
                           >
                             {formatMoneyMicros(val, 'EUR')}
                           </button>
@@ -255,7 +292,7 @@ export function ForecastList({
                 </div>
                 <div className="flex items-center justify-between border-t border-[var(--border-subtle)] pt-3">
                   <span className="text-xs font-semibold text-[var(--fg-primary)]">
-                    Total:{' '}
+                    {t('forecastList.totalLabel', 'Total:')}{' '}
                     {formatMoneyMicros(
                       row.pipeline + row.bestCase + row.commit + row.closed,
                       'EUR',
@@ -265,7 +302,9 @@ export function ForecastList({
                     type="button"
                     onClick={() => onDeleteRow(row)}
                     className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)] pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-                    aria-label={`Delete forecasts for ${row.period}`}
+                    aria-label={t('forecastList.deleteLabel', 'Delete forecasts for {{period}}', {
+                      period: row.period,
+                    })}
                   >
                     <Icon name="trash" size={14} />
                   </button>

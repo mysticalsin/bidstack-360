@@ -1,4 +1,5 @@
 // Display sub-components for AccountIntelPanel: no mutations; money uses the display-currency hook.
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/StateMessages';
@@ -55,11 +56,15 @@ export function SolutionsTab({
   onDelete: (id: string) => void;
   isDeleting: boolean;
 }) {
+  const { t } = useTranslation('crm');
   if (solutions.length === 0) {
     return (
       <EmptyState
-        title="No solutions yet"
-        message="Upload documents and run extraction to review suggested solutions."
+        title={t('intelTabs.solutionsEmptyTitle', 'No solutions yet')}
+        message={t(
+          'intelTabs.solutionsEmptyMessage',
+          'Upload documents and run extraction to review suggested solutions.',
+        )}
       />
     );
   }
@@ -78,7 +83,7 @@ export function SolutionsTab({
                   </span>
                   {s.confidenceBps > 7000 && (
                     <span className="rounded-full bg-[var(--success-tint)] px-2 py-0.5 text-[10px] font-medium text-[var(--success)]">
-                      High confidence
+                      {t('intelTabs.highConfidenceBadge', 'High confidence')}
                     </span>
                   )}
                 </div>
@@ -88,7 +93,9 @@ export function SolutionsTab({
                   </p>
                 ) : null}
                 {src ? (
-                  <p className="mt-1 text-[10px] text-[var(--fg-tertiary)]">From: {src}</p>
+                  <p className="mt-1 text-[10px] text-[var(--fg-tertiary)]">
+                    {t('intelTabs.sourceLabel', 'From: {{source}}', { source: src })}
+                  </p>
                 ) : null}
               </div>
               <button
@@ -96,7 +103,7 @@ export function SolutionsTab({
                 onClick={() => onDelete(s.id)}
                 disabled={isDeleting}
                 className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)] focus:outline-none focus:ring-2 focus:ring-border-focus pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-                aria-label={`Delete ${s.name}`}
+                aria-label={t('intelTabs.deleteAriaLabel', 'Delete {{name}}', { name: s.name })}
               >
                 <Icon name="trash" size={14} />
               </button>
@@ -130,12 +137,16 @@ export function ProductsTab({
   isDeleting: boolean;
 }) {
   const { formatMoneyMicros } = useFormatMoney();
+  const { t } = useTranslation('crm');
 
   if (products.length === 0) {
     return (
       <EmptyState
-        title="No products yet"
-        message="Upload documents and run extraction to review suggested products."
+        title={t('intelTabs.productsEmptyTitle', 'No products yet')}
+        message={t(
+          'intelTabs.productsEmptyMessage',
+          'Upload documents and run extraction to review suggested products.',
+        )}
       />
     );
   }
@@ -164,7 +175,9 @@ export function ProductsTab({
                   </p>
                 ) : null}
                 {src ? (
-                  <p className="mt-1 text-[10px] text-[var(--fg-tertiary)]">From: {src}</p>
+                  <p className="mt-1 text-[10px] text-[var(--fg-tertiary)]">
+                    {t('intelTabs.sourceLabel', 'From: {{source}}', { source: src })}
+                  </p>
                 ) : null}
               </div>
               <button
@@ -172,7 +185,7 @@ export function ProductsTab({
                 onClick={() => onDelete(p.id)}
                 disabled={isDeleting}
                 className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)] focus:outline-none focus:ring-2 focus:ring-border-focus pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-                aria-label={`Delete ${p.name}`}
+                aria-label={t('intelTabs.deleteAriaLabel', 'Delete {{name}}', { name: p.name })}
               >
                 <Icon name="trash" size={14} />
               </button>
@@ -202,12 +215,16 @@ export function ExtractionsTab({
   onExtract: (documentId: string) => void;
   isExtracting: boolean;
 }) {
+  const { t } = useTranslation('crm');
   return (
     <div className="space-y-3">
       {files.length === 0 ? (
         <EmptyState
-          title="No documents"
-          message="Upload files to this account to begin extraction."
+          title={t('intelTabs.extractionsEmptyTitle', 'No documents')}
+          message={t(
+            'intelTabs.extractionsEmptyMessage',
+            'Upload files to this account to begin extraction.',
+          )}
         />
       ) : (
         <div className="space-y-2">
@@ -238,29 +255,41 @@ export function ExtractionsTab({
                     {extraction?.status === 'running' ? (
                       <>
                         <span className="mr-1.5 inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-r-transparent" />
-                        Extracting…
+                        {t('intelTabs.extractingButton', 'Extracting…')}
                       </>
                     ) : extraction?.status === 'done' ? (
                       <>
                         <Icon name="refresh" size={14} />
-                        Re-extract
+                        {t('intelTabs.reExtractButton', 'Re-extract')}
                       </>
                     ) : (
                       <>
                         <Icon name="wand" size={14} />
-                        Extract
+                        {t('intelTabs.extractButton', 'Extract')}
                       </>
                     )}
                   </Button>
                 </div>
                 {extraction?.status === 'done' && extraction.extractedData ? (
                   <div className="mt-2 rounded-md bg-[var(--surface-sunken)] p-2 text-xs font-mono text-[var(--fg-secondary)]">
-                    {(extraction.extractedData.solutions as Array<{ name: string }> | undefined)
-                      ?.length ?? 0}{' '}
-                    solutions,{' '}
-                    {(extraction.extractedData.products as Array<{ name: string }> | undefined)
-                      ?.length ?? 0}{' '}
-                    products found
+                    {t(
+                      'intelTabs.extractionSummary',
+                      '{{solutionCount}} solutions, {{productCount}} products found',
+                      {
+                        solutionCount:
+                          (
+                            extraction.extractedData.solutions as
+                              | Array<{ name: string }>
+                              | undefined
+                          )?.length ?? 0,
+                        productCount:
+                          (
+                            extraction.extractedData.products as
+                              | Array<{ name: string }>
+                              | undefined
+                          )?.length ?? 0,
+                      },
+                    )}
                   </div>
                 ) : null}
                 {extraction?.error ? (

@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from '@/components/ui/Dialog';
@@ -36,6 +37,7 @@ export function CreateOpportunityDialog({
   open: controlledOpen,
   onOpenChange,
 }: Props = {}) {
+  const { t } = useTranslation('crm');
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = onOpenChange !== undefined ? onOpenChange : setInternalOpen;
@@ -127,23 +129,30 @@ export function CreateOpportunityDialog({
       }}
     >
       <DialogTrigger asChild>
-        {trigger ?? <Button size="sm">+ New opportunity</Button>}
+        {trigger ?? <Button size="sm">{t('createOpportunity.triggerButton', '+ New opportunity')}</Button>}
       </DialogTrigger>
       <DialogContent
-        title="New opportunity"
-        description="Add a bid to your pipeline. You can refine intel after Dust data verification runs."
+        title={t('createOpportunity.dialogTitle', 'New opportunity')}
+        description={t(
+          'createOpportunity.dialogDescription',
+          'Add a bid to your pipeline. You can refine intel after Dust data verification runs.',
+        )}
       >
         <form key={formKey} onSubmit={submit} className="space-y-4">
           {/* A4 — LookupFieldPicker replaces plain text input for company relation field.
               Hidden input carries the selected label for FormData fallback. */}
-          <Field label="Customer" htmlFor="customer-picker" error={fieldErrors.customer?.[0]}>
+          <Field
+            label={t('createOpportunity.customerLabel', 'Customer')}
+            htmlFor="customer-picker"
+            error={fieldErrors.customer?.[0]}
+          >
             <LookupFieldPicker
               value={selectedCompany}
               onChange={setSelectedCompany}
               onSearch={searchCompanies}
               recentOptions={recentCompanies}
-              placeholder="Search companies…"
-              label="Customer"
+              placeholder={t('createOpportunity.customerPlaceholder', 'Search companies…')}
+              label={t('createOpportunity.customerLabel', 'Customer')}
             />
             {/* Hidden input feeds the customer name into FormData for the submit handler's fallback path */}
             <input
@@ -153,11 +162,24 @@ export function CreateOpportunityDialog({
               aria-hidden="true"
             />
           </Field>
-          <Field label="Opportunity name" htmlFor="name" error={fieldErrors.name?.[0]}>
-            <Input id="name" name="name" required placeholder="Acme — IT Modernization" />
+          <Field
+            label={t('createOpportunity.nameLabel', 'Opportunity name')}
+            htmlFor="name"
+            error={fieldErrors.name?.[0]}
+          >
+            <Input
+              id="name"
+              name="name"
+              required
+              placeholder={t('createOpportunity.namePlaceholder', 'Acme — IT Modernization')}
+            />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Stage" htmlFor="stage" error={fieldErrors.stage?.[0]}>
+            <Field
+              label={t('createOpportunity.stageLabel', 'Stage')}
+              htmlFor="stage"
+              error={fieldErrors.stage?.[0]}
+            >
               <Select id="stage" name="stage" defaultValue="s1_ongoing">
                 {STAGES.map((s) => (
                   <option key={s} value={s}>
@@ -166,7 +188,11 @@ export function CreateOpportunityDialog({
                 ))}
               </Select>
             </Field>
-            <Field label="Industry" htmlFor="industry" error={fieldErrors.industry?.[0]}>
+            <Field
+              label={t('createOpportunity.industryLabel', 'Industry')}
+              htmlFor="industry"
+              error={fieldErrors.industry?.[0]}
+            >
               <Select id="industry" name="industry" defaultValue="">
                 <option value="">—</option>
                 {INDUSTRIES.map((i) => (
@@ -178,10 +204,18 @@ export function CreateOpportunityDialog({
             </Field>
           </div>
           <div className="grid grid-cols-4 gap-3">
-            <Field label="Value (EUR)" htmlFor="value" error={fieldErrors.value?.[0]}>
+            <Field
+              label={t('createOpportunity.valueLabel', 'Value (EUR)')}
+              htmlFor="value"
+              error={fieldErrors.value?.[0]}
+            >
               <Input id="value" name="value" type="number" min={0} step="100" defaultValue="0" />
             </Field>
-            <Field label="Probability %" htmlFor="probability" error={fieldErrors.probability?.[0]}>
+            <Field
+              label={t('createOpportunity.probabilityLabel', 'Probability %')}
+              htmlFor="probability"
+              error={fieldErrors.probability?.[0]}
+            >
               <Input
                 id="probability"
                 name="probability"
@@ -192,10 +226,18 @@ export function CreateOpportunityDialog({
                 defaultValue="20"
               />
             </Field>
-            <Field label="Due date" htmlFor="dueDate" error={fieldErrors.dueDate?.[0]}>
+            <Field
+              label={t('createOpportunity.dueDateLabel', 'Due date')}
+              htmlFor="dueDate"
+              error={fieldErrors.dueDate?.[0]}
+            >
               <Input id="dueDate" name="dueDate" type="date" />
             </Field>
-            <Field label="Country" htmlFor="country" error={fieldErrors.country?.[0]}>
+            <Field
+              label={t('createOpportunity.countryLabel', 'Country')}
+              htmlFor="country"
+              error={fieldErrors.country?.[0]}
+            >
               <Input id="country" name="country" maxLength={2} placeholder="DE" />
             </Field>
           </div>
@@ -212,11 +254,13 @@ export function CreateOpportunityDialog({
           <div className="flex justify-end gap-2 pt-2">
             <DialogClose asChild>
               <Button type="button" variant="ghost" size="md">
-                Cancel
+                {t('createOpportunity.cancel', 'Cancel')}
               </Button>
             </DialogClose>
             <Button type="submit" disabled={create.isPending}>
-              {create.isPending ? 'Creating…' : 'Create opportunity'}
+              {create.isPending
+                ? t('createOpportunity.submitting', 'Creating…')
+                : t('createOpportunity.submit', 'Create opportunity')}
             </Button>
           </div>
         </form>

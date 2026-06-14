@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -27,6 +28,7 @@ const QUERY_KEYS: Record<EntityType, string> = {
 };
 
 export function CustomFieldValuesSection({ entityType, entityId }: CustomFieldValuesSectionProps) {
+  const { t } = useTranslation('crm');
   const defs = useCustomFieldDefinitions(entityType);
   const values = useCustomFieldValues(entityType, entityId);
   const upsert = useUpsertCustomFieldValues();
@@ -65,7 +67,7 @@ export function CustomFieldValuesSection({ entityType, entityId }: CustomFieldVa
       { entityType, entityId, values: payload },
       {
         onSuccess: () => {
-          toast.success('Custom fields saved');
+          toast.success(t('customFieldValues.toastSaved', 'Custom fields saved'));
           setHasChanges(false);
           // Invalidate parent detail query so the page reflects the change
           const parentKey = QUERY_KEYS[entityType];
@@ -76,7 +78,7 @@ export function CustomFieldValuesSection({ entityType, entityId }: CustomFieldVa
           }
         },
         onError: () => {
-          toast.error('Failed to save custom fields');
+          toast.error(t('customFieldValues.toastSaveFailed', 'Failed to save custom fields'));
         },
       },
     );
@@ -85,7 +87,7 @@ export function CustomFieldValuesSection({ entityType, entityId }: CustomFieldVa
   if (defs.isLoading || values.isLoading) {
     return (
       <Card>
-        <SectionHeader title="Custom Fields" />
+        <SectionHeader title={t('customFieldValues.heading', 'Custom Fields')} />
         <div className="p-5 space-y-3">
           <div className="h-4 w-1/3 bg-[var(--surface-sunken)] animate-pulse rounded" />
           <div className="h-8 w-full bg-[var(--surface-sunken)] animate-pulse rounded" />
@@ -104,7 +106,12 @@ export function CustomFieldValuesSection({ entityType, entityId }: CustomFieldVa
 
   return (
     <Card>
-      <SectionHeader title="Custom Fields" caption={`${activeDefs.length} defined`} />
+      <SectionHeader
+        title={t('customFieldValues.heading', 'Custom Fields')}
+        caption={t('customFieldValues.definedCount', '{{count}} defined', {
+          count: activeDefs.length,
+        })}
+      />
       <div className="p-5 space-y-4">
         {activeDefs.map((def) => (
           <FieldInput
@@ -128,10 +135,12 @@ export function CustomFieldValuesSection({ entityType, entityId }: CustomFieldVa
                 setHasChanges(false);
               }}
             >
-              Reset
+              {t('customFieldValues.reset', 'Reset')}
             </Button>
             <Button size="sm" onClick={handleSave} disabled={upsert.isPending}>
-              {upsert.isPending ? 'Saving…' : 'Save'}
+              {upsert.isPending
+                ? t('customFieldValues.saving', 'Saving…')
+                : t('customFieldValues.save', 'Save')}
             </Button>
           </div>
         )}
@@ -155,6 +164,7 @@ function FieldInput({
   value: unknown;
   onChange: (value: unknown) => void;
 }) {
+  const { t } = useTranslation('crm');
   const { label, fieldType, options, required } = definition;
 
   const baseClass =
@@ -204,7 +214,7 @@ function FieldInput({
           value={(value as string) ?? ''}
           onChange={(e) => onChange(e.target.value || null)}
         >
-          <option value="">—</option>
+          <option value="">{t('customFieldValues.selectNone', '—')}</option>
           {options.map((opt) => (
             <option key={opt} value={opt}>
               {opt}

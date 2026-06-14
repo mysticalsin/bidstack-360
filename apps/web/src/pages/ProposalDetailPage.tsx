@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
@@ -45,6 +46,7 @@ export function ProposalDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { t } = useTranslation('rfp');
   useDocumentTitle();
 
   const {
@@ -98,7 +100,11 @@ export function ProposalDetailPage() {
 
   if (isLoading) {
     return (
-      <div aria-busy="true" aria-label="Loading proposal" className="space-y-4">
+      <div
+        aria-busy="true"
+        aria-label={t('proposalDetail.loadingAriaLabel', 'Loading proposal')}
+        className="space-y-4"
+      >
         <div className="animate-pulse h-8 bg-surface-sunken rounded w-1/2" />
         {[1, 2, 3].map((i) => (
           <GlassCard key={i} padding="md" className="animate-pulse space-y-2">
@@ -114,10 +120,12 @@ export function ProposalDetailPage() {
     return (
       <GlassCard className="py-12 text-center" role="alert">
         <p className="text-sm font-medium text-red-600 dark:text-red-400">
-          Failed to load proposal
+          {t('proposalDetail.errorTitle', 'Failed to load proposal')}
         </p>
         <p className="text-xs text-fg-tertiary mt-1">
-          {error instanceof Error ? error.message : 'Please try again in a moment.'}
+          {error instanceof Error
+            ? error.message
+            : t('proposalDetail.errorRetry', 'Please try again in a moment.')}
         </p>
         <Button
           variant="secondary"
@@ -125,7 +133,7 @@ export function ProposalDetailPage() {
           className="mt-4"
           onClick={() => navigate('/proposals')}
         >
-          Back to Proposals
+          {t('proposalDetail.backToProposals', 'Back to Proposals')}
         </Button>
       </GlassCard>
     );
@@ -134,14 +142,16 @@ export function ProposalDetailPage() {
   if (!proposal) {
     return (
       <GlassCard className="py-12 text-center">
-        <p className="text-fg-tertiary text-sm">Proposal not found.</p>
+        <p className="text-fg-tertiary text-sm">
+          {t('proposalDetail.notFound', 'Proposal not found.')}
+        </p>
         <Button
           variant="secondary"
           size="sm"
           className="mt-4"
           onClick={() => navigate('/proposals')}
         >
-          Back to Proposals
+          {t('proposalDetail.backToProposals', 'Back to Proposals')}
         </Button>
       </GlassCard>
     );
@@ -165,7 +175,7 @@ export function ProposalDetailPage() {
             <button
               onClick={() => navigate('/proposals')}
               className="text-fg-tertiary hover:text-fg-secondary transition-colors"
-              aria-label="Back to proposals"
+              aria-label={t('proposalDetail.backToProposalsAriaLabel', 'Back to proposals')}
             >
               <Icon name="arrow" size={16} className="rotate-180" />
             </button>
@@ -173,8 +183,12 @@ export function ProposalDetailPage() {
             <ProposalStatusChip status={proposal.status} />
           </div>
           <p className="page-sub">
-            v{proposal.version}
-            {proposal.dueDate ? ` · Due ${new Date(proposal.dueDate).toLocaleDateString()}` : ''}
+            {t('proposalDetail.version', 'v{{version}}', { version: proposal.version })}
+            {proposal.dueDate
+              ? ` · ${t('proposalDetail.due', 'Due {{date}}', {
+                  date: new Date(proposal.dueDate).toLocaleDateString(),
+                })}`
+              : ''}
           </p>
         </div>
       </div>
@@ -187,18 +201,20 @@ export function ProposalDetailPage() {
                 <h3 className="text-sm font-semibold text-fg-primary">{section.title}</h3>
                 {section.required && (
                   <span className="text-[10px] font-medium text-danger bg-danger/10 px-1.5 py-0.5 rounded">
-                    Required
+                    {t('proposalDetail.requiredBadge', 'Required')}
                   </span>
                 )}
                 {section.aiDrafted && (
                   <span className="text-[10px] font-medium text-brand-primary bg-brand-primary/10 px-1.5 py-0.5 rounded flex items-center gap-1">
                     <Icon name="sparkle" size={10} />
-                    AI Drafted
+                    {t('proposalDetail.aiDraftedBadge', 'AI Drafted')}
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-fg-muted">{section.wordCount} words</span>
+                <span className="text-[10px] text-fg-muted">
+                  {t('proposalDetail.wordCount', '{{count}} words', { count: section.wordCount })}
+                </span>
                 {editingSection !== section.id && (
                   <>
                     <Button
@@ -206,21 +222,27 @@ export function ProposalDetailPage() {
                       size="sm"
                       aria-label={
                         draftSection.isPending && draftSection.variables === section.key
-                          ? `Drafting ${section.title}…`
-                          : `AI Draft for ${section.title}`
+                          ? t('proposalDetail.draftingSectionAriaLabel', 'Drafting {{title}}…', {
+                              title: section.title,
+                            })
+                          : t('proposalDetail.aiDraftSectionAriaLabel', 'AI Draft for {{title}}', {
+                              title: section.title,
+                            })
                       }
                       onClick={() => draftSection.mutate(section.key)}
                       disabled={draftSection.isPending && draftSection.variables === section.key}
                     >
                       {draftSection.isPending && draftSection.variables === section.key
-                        ? 'Drafting…'
-                        : 'AI Draft'}
+                        ? t('proposalDetail.drafting', 'Drafting…')
+                        : t('proposalDetail.aiDraft', 'AI Draft')}
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => startEdit(section)}
-                      aria-label={`Edit ${section.title} section`}
+                      aria-label={t('proposalDetail.editSectionAriaLabel', 'Edit {{title}} section', {
+                        title: section.title,
+                      })}
                     >
                       <Icon name="pencil" size={14} />
                     </Button>
@@ -233,13 +255,15 @@ export function ProposalDetailPage() {
               <div className="space-y-2">
                 <textarea
                   className="dialog-input min-h-[200px] resize-y w-full font-mono text-sm"
-                  aria-label={`Edit content for ${section.title}`}
+                  aria-label={t('proposalDetail.editContentAriaLabel', 'Edit content for {{title}}', {
+                    title: section.title,
+                  })}
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
                 />
                 <div className="flex justify-end gap-2">
                   <Button variant="secondary" size="sm" onClick={() => setEditingSection(null)}>
-                    Cancel
+                    {t('proposalDetail.cancel', 'Cancel')}
                   </Button>
                   <Button
                     variant="primary"
@@ -247,7 +271,9 @@ export function ProposalDetailPage() {
                     onClick={() => saveEdit(section.id)}
                     disabled={updateSection.isPending}
                   >
-                    {updateSection.isPending ? 'Saving…' : 'Save'}
+                    {updateSection.isPending
+                      ? t('proposalDetail.saving', 'Saving…')
+                      : t('proposalDetail.save', 'Save')}
                   </Button>
                 </div>
               </div>
@@ -255,7 +281,10 @@ export function ProposalDetailPage() {
               <div className="prose prose-sm max-w-none text-fg-secondary whitespace-pre-wrap">
                 {section.content || (
                   <p className="text-fg-muted italic">
-                    No content yet. Use AI Draft to generate a first version.
+                    {t(
+                      'proposalDetail.emptyContent',
+                      'No content yet. Use AI Draft to generate a first version.',
+                    )}
                   </p>
                 )}
               </div>
