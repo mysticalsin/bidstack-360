@@ -116,5 +116,13 @@
     "banner": "Está a visualizar dados de demonstração.",
     "clear": "Limpar dados de demonstração",
     "confirmClear": "Eliminar todos os dados de demonstração? Esta ação não pode ser anulada."
+  },
+  "tourStep": {
+    "dialogAriaLabel": "Etapa {{current}} de {{total}} do tour: {{title}}",
+    "stepCounter": "{{current}} de {{total}}",
+    "skipTour": "Pular tour",
+    "back": "Voltar",
+    "ctaFinish": "Convide sua equipe",
+    "ctaNext": "Próximo"
   }
 }

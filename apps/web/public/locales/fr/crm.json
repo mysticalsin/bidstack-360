@@ -47,7 +47,25 @@
     "updatedAt": "Mis à jour le",
     "dueDate": "Date d'échéance",
     "status": "Statut",
-    "priority": "Priorité"
+    "priority": "Priorité",
+    "heading": "Champs",
+    "addFieldButton": "+ Ajouter un champ",
+    "systemFieldsLabel": "Champs système :",
+    "errorKeyLabelRequired": "La clé et le libellé du champ sont obligatoires.",
+    "errorAddFailed": "Échec de l'ajout du champ",
+    "fieldKeyLabel": "Clé du champ",
+    "fieldKeyPlaceholder": "ex. budget",
+    "labelLabel": "Libellé",
+    "labelPlaceholder": "ex. Budget",
+    "typeLabel": "Type",
+    "requiredCheckbox": "Obligatoire",
+    "cancelButton": "Annuler",
+    "addingButton": "Ajout…",
+    "addButton": "Ajouter",
+    "loading": "Chargement des champs…",
+    "loadError": "Impossible de charger les champs. Veuillez réessayer.",
+    "empty": "Aucun champ personnalisé pour le moment. Utilisez « Ajouter un champ » ci-dessus pour créer le premier.",
+    "requiredBadge": "Obligatoire"
   },
   "detail": {
     "opportunity": "Détail de l'opportunité",
@@ -2563,5 +2581,95 @@
     "creating": "Création...",
     "saveSubscription": "Enregistrer l'abonnement",
     "createSubscription": "Créer l'abonnement"
+  },
+  "governanceLog": {
+    "regionLabel": "Réunions de gouvernance",
+    "title": "Journal de gouvernance",
+    "caption": "Comitologie — comités, revues de direction, BRM, SAR",
+    "errorTitle": "Impossible de charger le journal de gouvernance",
+    "errorMessage": "Réessayez bientôt.",
+    "empty": "Aucune réunion de gouvernance enregistrée pour ce compte pour le moment.",
+    "advanceStatusLabel": "Faire avancer le statut de {{description}}",
+    "dateRequired": "Date requise",
+    "meetingRecorded": "Réunion enregistrée",
+    "couldNotSave": "Impossible d'enregistrer",
+    "addMeeting": "Ajouter une réunion",
+    "meetingTypeLabel": "Type de réunion",
+    "meetingDateLabel": "Date de la réunion",
+    "participantsPlaceholder": "Participants (séparés par des virgules)",
+    "outcomesPlaceholder": "Résultats / décisions",
+    "saving": "Enregistrement…",
+    "save": "Enregistrer",
+    "cancel": "Annuler"
+  },
+  "polarCharts": {
+    "pieChartAriaLabel": "Diagramme circulaire",
+    "columnName": "Nom",
+    "columnValue": "Valeur",
+    "donutChartAriaLabel": "Diagramme en anneau",
+    "radarChartAriaLabel": "Diagramme radar"
+  },
+  "quickAddMenu": {
+    "title": "Créer",
+    "option": {
+      "opportunity": {
+        "label": "Nouvelle opportunité",
+        "description": "Ajoutez une offre au pipeline."
+      },
+      "task": {
+        "label": "Nouvelle tâche",
+        "description": "Créez un suivi, éventuellement lié à une opportunité."
+      },
+      "contact": {
+        "label": "Nouveau contact",
+        "description": "Ajoutez un décideur."
+      },
+      "note": {
+        "label": "Nouvelle note",
+        "description": "Notez une idée sur le compte actuel."
+      }
+    }
+  },
+  "dashboardsList": {
+    "errorTitle": "Échec du chargement des tableaux de bord",
+    "heading": "Tableaux de bord",
+    "countOne": "{{count}} tableau de bord",
+    "countOther": "{{count}} tableaux de bord",
+    "newButton": "Nouveau tableau de bord",
+    "namePlaceholder": "Nom du tableau de bord…",
+    "creating": "Création…",
+    "create": "Créer",
+    "cancel": "Annuler",
+    "emptyTitle": "Aucun tableau de bord pour le moment",
+    "emptyMessage": "Créez votre premier tableau de bord pour commencer à suivre l'essentiel.",
+    "openAria": "Ouvrir le tableau de bord : {{name}}",
+    "sharedAria": "Partagé",
+    "privateAria": "Privé",
+    "deleteConfirm": "Supprimer « {{name}} » ?",
+    "deleteAria": "Supprimer le tableau de bord {{name}}"
+  },
+  "relations": {
+    "errorKeyLabelRequired": "La clé et le libellé de la relation sont obligatoires.",
+    "errorAddFailed": "Échec de l'ajout de la relation",
+    "heading": "Relations",
+    "addButton": "+ Ajouter une relation",
+    "fieldKeyLabel": "Clé de relation",
+    "fieldKeyPlaceholder": "ex. primary_contact",
+    "fieldLabelLabel": "Libellé",
+    "fieldLabelPlaceholder": "ex. Contact principal",
+    "fieldEntityLabel": "Entité associée",
+    "fieldEntityPlaceholder": "ex. contact, opportunité",
+    "fieldCardinalityLabel": "Cardinalité",
+    "cancelButton": "Annuler",
+    "submitButtonPending": "Ajout…",
+    "submitButton": "Ajouter",
+    "emptyState": "Aucune relation définie pour le moment."
+  },
+  "chartContainer": {
+    "emptyMessage": "Aucune donnée disponible pour cette période.",
+    "refresh": "Actualiser",
+    "regionLabel": "Graphique",
+    "actionsLabel": "Actions du graphique",
+    "loadingLabel": "Chargement du graphique"
   }
 }

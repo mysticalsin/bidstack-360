@@ -3,6 +3,7 @@
  * Owns the add-field form state.
  */
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { type useAddCustomObjectField, type useCustomObjectFields } from '@/hooks/useCustomObjects';
 import { FIELD_TYPES } from './customObjectEditorConfig';
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function FieldsSection({ addField, fieldsQuery }: Props) {
+  const { t } = useTranslation('crm');
   const [showFieldForm, setShowFieldForm] = useState(false);
   const [newField, setNewField] = useState({
     fieldKey: '',
@@ -27,7 +29,7 @@ export function FieldsSection({ addField, fieldsQuery }: Props) {
     e.preventDefault();
     setFieldError(null);
     if (!newField.fieldKey || !newField.label) {
-      setFieldError('Field key and label are required.');
+      setFieldError(t('fields.errorKeyLabelRequired', 'Field key and label are required.'));
       return;
     }
     try {
@@ -35,7 +37,7 @@ export function FieldsSection({ addField, fieldsQuery }: Props) {
       setShowFieldForm(false);
       setNewField({ fieldKey: '', label: '', fieldType: 'text', required: false, orderIndex: 0 });
     } catch (err) {
-      setFieldError(err instanceof Error ? err.message : 'Failed to add field');
+      setFieldError(err instanceof Error ? err.message : t('fields.errorAddFailed', 'Failed to add field'));
     }
   }
 
@@ -43,21 +45,22 @@ export function FieldsSection({ addField, fieldsQuery }: Props) {
     <section aria-labelledby="fields-heading">
       <div className="flex items-center justify-between mb-4">
         <h2 id="fields-heading" className="text-lg font-semibold text-[var(--text-primary)]">
-          Fields
+          {t('fields.heading', 'Fields')}
         </h2>
         <button
           type="button"
           onClick={() => setShowFieldForm(true)}
           className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-sm font-medium hover:bg-[var(--surface-2)] transition-colors min-h-[44px]"
         >
-          + Add field
+          {t('fields.addFieldButton', '+ Add field')}
         </button>
       </div>
 
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl overflow-hidden">
         {/* System fields notice */}
         <div className="px-4 py-3 bg-[var(--surface-2)] text-xs text-[var(--text-tertiary)] border-b border-[var(--border)]">
-          System fields: <code className="font-mono">name</code>,{' '}
+          {t('fields.systemFieldsLabel', 'System fields:')}{' '}
+          <code className="font-mono">name</code>,{' '}
           <code className="font-mono">owner</code>, <code className="font-mono">created_date</code>
         </div>
 
@@ -79,7 +82,7 @@ export function FieldsSection({ addField, fieldsQuery }: Props) {
                   htmlFor="nf-key"
                   className="block text-xs font-medium text-[var(--text-primary)] mb-1"
                 >
-                  Field key
+                  {t('fields.fieldKeyLabel', 'Field key')}
                 </label>
                 <input
                   id="nf-key"
@@ -91,7 +94,7 @@ export function FieldsSection({ addField, fieldsQuery }: Props) {
                       fieldKey: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_'),
                     }))
                   }
-                  placeholder="e.g. budget"
+                  placeholder={t('fields.fieldKeyPlaceholder', 'e.g. budget')}
                   className="input w-full text-sm"
                   required
                 />
@@ -101,14 +104,14 @@ export function FieldsSection({ addField, fieldsQuery }: Props) {
                   htmlFor="nf-label"
                   className="block text-xs font-medium text-[var(--text-primary)] mb-1"
                 >
-                  Label
+                  {t('fields.labelLabel', 'Label')}
                 </label>
                 <input
                   id="nf-label"
                   type="text"
                   value={newField.label}
                   onChange={(e) => setNewField((p) => ({ ...p, label: e.target.value }))}
-                  placeholder="e.g. Budget"
+                  placeholder={t('fields.labelPlaceholder', 'e.g. Budget')}
                   className="input w-full text-sm"
                   required
                 />
@@ -118,7 +121,7 @@ export function FieldsSection({ addField, fieldsQuery }: Props) {
                   htmlFor="nf-type"
                   className="block text-xs font-medium text-[var(--text-primary)] mb-1"
                 >
-                  Type
+                  {t('fields.typeLabel', 'Type')}
                 </label>
                 <select
                   id="nf-type"
@@ -147,7 +150,7 @@ export function FieldsSection({ addField, fieldsQuery }: Props) {
                   onChange={(e) => setNewField((p) => ({ ...p, required: e.target.checked }))}
                   className="accent-[var(--accent)]"
                 />
-                Required
+                {t('fields.requiredCheckbox', 'Required')}
               </label>
               <div className="flex gap-2 ml-auto">
                 <button
@@ -155,14 +158,16 @@ export function FieldsSection({ addField, fieldsQuery }: Props) {
                   onClick={() => setShowFieldForm(false)}
                   className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-sm hover:bg-[var(--surface-2)] transition-colors min-h-[44px]"
                 >
-                  Cancel
+                  {t('fields.cancelButton', 'Cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={addField.isPending}
                   className="px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white text-sm hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
                 >
-                  {addField.isPending ? 'Adding…' : 'Add'}
+                  {addField.isPending
+                    ? t('fields.addingButton', 'Adding…')
+                    : t('fields.addButton', 'Add')}
                 </button>
               </div>
             </div>
@@ -170,14 +175,16 @@ export function FieldsSection({ addField, fieldsQuery }: Props) {
         )}
 
         {fieldsQuery.isLoading ? (
-          <p className="p-4 text-sm text-[var(--text-secondary)]">Loading fields…</p>
+          <p className="p-4 text-sm text-[var(--text-secondary)]">
+            {t('fields.loading', 'Loading fields…')}
+          </p>
         ) : fieldsQuery.isError ? (
           <p className="p-4 text-sm text-red-600 dark:text-red-400" role="alert">
-            Could not load fields. Please retry.
+            {t('fields.loadError', 'Could not load fields. Please retry.')}
           </p>
         ) : (fieldsQuery.data?.items.length ?? 0) === 0 ? (
           <p className="p-4 text-sm text-[var(--text-secondary)]">
-            No custom fields yet. Use &quot;Add field&quot; above to create your first one.
+            {t('fields.empty', 'No custom fields yet. Use "Add field" above to create your first one.')}
           </p>
         ) : (
           <ul className="divide-y divide-[var(--border)]">
@@ -190,7 +197,7 @@ export function FieldsSection({ addField, fieldsQuery }: Props) {
                     </span>
                     {f.required && (
                       <span className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
-                        Required
+                        {t('fields.requiredBadge', 'Required')}
                       </span>
                     )}
                   </div>

@@ -487,5 +487,28 @@
     "editButton": "编辑",
     "deleteButton": "删除",
     "noPermissions": "无权限"
+  },
+  "rfpAnalytics": {
+    "errorMessage": "无法加载 RFP 分析数据。请重试。",
+    "kpiSectionLabel": "RFP 分析关键指标",
+    "kpiTotalLabel": "RFP 总数",
+    "kpiTotalDetail": "涵盖所有负责人",
+    "kpiPipelineLabel": "管道价值",
+    "kpiPipelineDetail": "关联商机价值",
+    "kpiWinRateLabel": "赢单率",
+    "kpiWinRateDetail": "{{won}} 个赢单 · {{closed}} 个已结束",
+    "kpiInFlightLabel": "进行中",
+    "kpiInFlightDetail": "尚未赢单或丢单",
+    "byStatusTitle": "按状态",
+    "loading": "加载中…",
+    "byStatusEmptyTitle": "暂无 RFP",
+    "byStatusEmptyMessage": "团队创建的提案将显示在此处。",
+    "byOwnerTitle": "按负责人",
+    "byOwnerSubtitle": "谁负责什么，以及背后的管道价值。",
+    "byOwnerEmptyTitle": "暂无负责人",
+    "byOwnerEmptyMessage": "分配提案以查看按负责人的明细。",
+    "tableOwner": "负责人",
+    "tableRfps": "RFP",
+    "tablePipelineValue": "管道价值"
   }
 }

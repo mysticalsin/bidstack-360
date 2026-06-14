@@ -125,7 +125,10 @@
     "deleted": "Supprimé",
     "copied": "Copié dans le presse-papiers",
     "genericError": "Une erreur est survenue. Veuillez réessayer.",
-    "networkError": "Erreur réseau. Vérifiez votre connexion."
+    "networkError": "Erreur réseau. Vérifiez votre connexion.",
+    "regionLabel": "Notifications",
+    "clearAll": "Tout effacer ({{count}})",
+    "dismiss": "Fermer"
   },
   "validation": {
     "required": "Ce champ est obligatoire",

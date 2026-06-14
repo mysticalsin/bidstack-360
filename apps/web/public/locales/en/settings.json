@@ -468,5 +468,28 @@
     "editButton": "Edit",
     "deleteButton": "Delete",
     "noPermissions": "No permissions"
+  },
+  "rfpAnalytics": {
+    "errorMessage": "Failed to load RFP analytics. Please retry.",
+    "kpiSectionLabel": "RFP analytics key metrics",
+    "kpiTotalLabel": "Total RFPs",
+    "kpiTotalDetail": "across all owners",
+    "kpiPipelineLabel": "Pipeline value",
+    "kpiPipelineDetail": "linked opportunity value",
+    "kpiWinRateLabel": "Win rate",
+    "kpiWinRateDetail": "{{won}} won · {{closed}} closed",
+    "kpiInFlightLabel": "In flight",
+    "kpiInFlightDetail": "not yet won or lost",
+    "byStatusTitle": "By status",
+    "loading": "Loading…",
+    "byStatusEmptyTitle": "No RFPs yet",
+    "byStatusEmptyMessage": "Proposals will appear here as your team creates them.",
+    "byOwnerTitle": "By owner",
+    "byOwnerSubtitle": "Who owns what, and the pipeline value behind it.",
+    "byOwnerEmptyTitle": "No owners yet",
+    "byOwnerEmptyMessage": "Assign proposals to see the per-owner breakdown.",
+    "tableOwner": "Owner",
+    "tableRfps": "RFPs",
+    "tablePipelineValue": "Pipeline value"
   }
 }

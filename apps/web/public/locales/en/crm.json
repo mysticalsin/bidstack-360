@@ -47,7 +47,25 @@
     "updatedAt": "Updated",
     "dueDate": "Due date",
     "status": "Status",
-    "priority": "Priority"
+    "priority": "Priority",
+    "heading": "Fields",
+    "addFieldButton": "+ Add field",
+    "systemFieldsLabel": "System fields:",
+    "errorKeyLabelRequired": "Field key and label are required.",
+    "errorAddFailed": "Failed to add field",
+    "fieldKeyLabel": "Field key",
+    "fieldKeyPlaceholder": "e.g. budget",
+    "labelLabel": "Label",
+    "labelPlaceholder": "e.g. Budget",
+    "typeLabel": "Type",
+    "requiredCheckbox": "Required",
+    "cancelButton": "Cancel",
+    "addingButton": "Adding…",
+    "addButton": "Add",
+    "loading": "Loading fields…",
+    "loadError": "Could not load fields. Please retry.",
+    "empty": "No custom fields yet. Use \"Add field\" above to create your first one.",
+    "requiredBadge": "Required"
   },
   "detail": {
     "opportunity": "Opportunity detail",
@@ -2508,5 +2526,95 @@
     "creating": "Creating...",
     "saveSubscription": "Save subscription",
     "createSubscription": "Create subscription"
+  },
+  "governanceLog": {
+    "regionLabel": "Governance meetings",
+    "title": "Governance log",
+    "caption": "Comitology — committees, C-level reviews, BRM, SAR",
+    "errorTitle": "Could not load governance log",
+    "errorMessage": "Try again shortly.",
+    "empty": "No governance meetings recorded for this account yet.",
+    "advanceStatusLabel": "Advance status of {{description}}",
+    "dateRequired": "Date required",
+    "meetingRecorded": "Meeting recorded",
+    "couldNotSave": "Could not save",
+    "addMeeting": "Add meeting",
+    "meetingTypeLabel": "Meeting type",
+    "meetingDateLabel": "Meeting date",
+    "participantsPlaceholder": "Participants (comma-separated)",
+    "outcomesPlaceholder": "Outcomes / decisions",
+    "saving": "Saving…",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "polarCharts": {
+    "pieChartAriaLabel": "Pie chart",
+    "columnName": "Name",
+    "columnValue": "Value",
+    "donutChartAriaLabel": "Donut chart",
+    "radarChartAriaLabel": "Radar chart"
+  },
+  "quickAddMenu": {
+    "title": "Create",
+    "option": {
+      "opportunity": {
+        "label": "New opportunity",
+        "description": "Add a bid to the pipeline."
+      },
+      "task": {
+        "label": "New task",
+        "description": "Create a follow-up, optionally linked to an opp."
+      },
+      "contact": {
+        "label": "New contact",
+        "description": "Add a decision-maker."
+      },
+      "note": {
+        "label": "New note",
+        "description": "Drop a thought on the current account."
+      }
+    }
+  },
+  "dashboardsList": {
+    "errorTitle": "Failed to load dashboards",
+    "heading": "Dashboards",
+    "countOne": "{{count}} dashboard",
+    "countOther": "{{count}} dashboards",
+    "newButton": "New dashboard",
+    "namePlaceholder": "Dashboard name…",
+    "creating": "Creating…",
+    "create": "Create",
+    "cancel": "Cancel",
+    "emptyTitle": "No dashboards yet",
+    "emptyMessage": "Create your first dashboard to start tracking what matters.",
+    "openAria": "Open dashboard: {{name}}",
+    "sharedAria": "Shared",
+    "privateAria": "Private",
+    "deleteConfirm": "Delete \"{{name}}\"?",
+    "deleteAria": "Delete dashboard {{name}}"
+  },
+  "relations": {
+    "errorKeyLabelRequired": "Relation key and label are required.",
+    "errorAddFailed": "Failed to add relation",
+    "heading": "Relations",
+    "addButton": "+ Add relation",
+    "fieldKeyLabel": "Relation key",
+    "fieldKeyPlaceholder": "e.g. primary_contact",
+    "fieldLabelLabel": "Label",
+    "fieldLabelPlaceholder": "e.g. Primary Contact",
+    "fieldEntityLabel": "Related entity",
+    "fieldEntityPlaceholder": "e.g. contact, opportunity",
+    "fieldCardinalityLabel": "Cardinality",
+    "cancelButton": "Cancel",
+    "submitButtonPending": "Adding…",
+    "submitButton": "Add",
+    "emptyState": "No relations defined yet."
+  },
+  "chartContainer": {
+    "emptyMessage": "No data available for this time period.",
+    "refresh": "Refresh",
+    "regionLabel": "Chart",
+    "actionsLabel": "Chart actions",
+    "loadingLabel": "Loading chart"
   }
 }

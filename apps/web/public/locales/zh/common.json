@@ -125,7 +125,10 @@
     "deleted": "已删除",
     "copied": "已复制到剪贴板",
     "genericError": "出现了问题。请重试。",
-    "networkError": "网络错误。请检查您的连接。"
+    "networkError": "网络错误。请检查您的连接。",
+    "regionLabel": "通知",
+    "clearAll": "全部清除 ({{count}})",
+    "dismiss": "关闭"
   },
   "validation": {
     "required": "此字段为必填项",

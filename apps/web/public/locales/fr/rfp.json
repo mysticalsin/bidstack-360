@@ -21,5 +21,27 @@
     "saving": "Enregistrement…",
     "save": "Enregistrer",
     "emptyContent": "Aucun contenu pour l'instant. Utilisez le brouillon IA pour générer une première version."
+  },
+  "proposals": {
+    "title": "Propositions",
+    "subtitle": "Espace RFP — rédigez, révisez et soumettez des propositions gagnantes.",
+    "newProposal": "Nouvelle proposition",
+    "createProposal": "Créer une proposition",
+    "nameLabel": "Nom de la proposition",
+    "namePlaceholder": "Nom de la proposition…",
+    "creating": "Création…",
+    "create": "Créer",
+    "cancel": "Annuler",
+    "createError": "Échec de la création de la proposition.",
+    "filterByStatus": "Filtrer par statut",
+    "resultCount": "{{count}} propositions",
+    "loading": "Chargement des propositions",
+    "loadError": "Échec du chargement des propositions",
+    "loadErrorRetry": "Veuillez réessayer dans un instant.",
+    "emptyTitle": "Aucune proposition pour le moment.",
+    "emptyMessage": "Créez votre première proposition pour commencer.",
+    "viewProposal": "Voir la proposition : {{name}}",
+    "version": "v{{version}}",
+    "due": "Échéance {{date}}"
   }
 }

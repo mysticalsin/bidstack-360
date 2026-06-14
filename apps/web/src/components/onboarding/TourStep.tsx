@@ -6,6 +6,7 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, useReducedMotion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 import type { TourStep as TourStepDef } from '@/data/tour-steps';
 import { TOUR_TOTAL } from '@/data/tour-steps';
@@ -76,6 +77,7 @@ export function TourStepCard({
   onBack,
   onDismiss,
 }: TourStepProps) {
+  const { t } = useTranslation('onboarding');
   const reduced = useReducedMotion();
   const cardRef = useRef<HTMLDivElement>(null);
   const isFirst = stepIndex === 0;
@@ -129,7 +131,11 @@ export function TourStepCard({
       ref={cardRef}
       role="dialog"
       aria-modal="true"
-      aria-label={`Tour step ${stepIndex + 1} of ${TOUR_TOTAL}: ${step.title}`}
+      aria-label={t('tourStep.dialogAriaLabel', 'Tour step {{current}} of {{total}}: {{title}}', {
+        current: stepIndex + 1,
+        total: TOUR_TOTAL,
+        title: step.title,
+      })}
       onKeyDown={handleKeyDown}
       style={{ top: pos.top, left: pos.left, width: CARD_WIDTH }}
       className="fixed z-[9999] rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] p-5 shadow-[var(--shadow-xl)] outline-none"
@@ -143,7 +149,10 @@ export function TourStepCard({
         {/* Step counter */}
         <div className="mb-3 flex items-center justify-between">
           <span className="text-xs font-medium text-[var(--fg-tertiary)]">
-            {stepIndex + 1} of {TOUR_TOTAL}
+            {t('tourStep.stepCounter', '{{current}} of {{total}}', {
+              current: stepIndex + 1,
+              total: TOUR_TOTAL,
+            })}
           </span>
           {/* Progress dots */}
           <span className="flex gap-1" aria-hidden>
@@ -174,7 +183,7 @@ export function TourStepCard({
             onClick={onDismiss}
             className="text-xs text-[var(--fg-tertiary)] underline-offset-2 hover:text-[var(--fg-secondary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
           >
-            Skip tour
+            {t('tourStep.skipTour', 'Skip tour')}
           </button>
           <div className="flex gap-2">
             {!isFirst && (
@@ -183,7 +192,7 @@ export function TourStepCard({
                 onClick={onBack}
                 className="inline-flex h-8 min-w-[60px] items-center justify-center rounded-lg border border-[var(--border-default)] px-3 text-xs font-medium text-[var(--fg-primary)] transition-colors hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
               >
-                Back
+                {t('tourStep.back', 'Back')}
               </button>
             )}
             <button
@@ -191,7 +200,9 @@ export function TourStepCard({
               onClick={onNext}
               className="inline-flex h-8 min-w-[80px] items-center justify-center rounded-lg bg-[var(--brand)] px-3 text-xs font-medium text-[var(--fg-on-brand)] transition-colors hover:bg-[var(--brand-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
             >
-              {isLast ? (step.ctaLabel ?? 'Invite your team') : (step.ctaLabel ?? 'Next')}
+              {isLast
+                ? (step.ctaLabel ?? t('tourStep.ctaFinish', 'Invite your team'))
+                : (step.ctaLabel ?? t('tourStep.ctaNext', 'Next'))}
             </button>
           </div>
         </div>

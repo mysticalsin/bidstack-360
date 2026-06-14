@@ -47,7 +47,25 @@
     "updatedAt": "更新时间",
     "dueDate": "截止日期",
     "status": "状态",
-    "priority": "优先级"
+    "priority": "优先级",
+    "heading": "字段",
+    "addFieldButton": "+ 添加字段",
+    "systemFieldsLabel": "系统字段：",
+    "errorKeyLabelRequired": "字段键和标签为必填项。",
+    "errorAddFailed": "添加字段失败",
+    "fieldKeyLabel": "字段键",
+    "fieldKeyPlaceholder": "例如 budget",
+    "labelLabel": "标签",
+    "labelPlaceholder": "例如 预算",
+    "typeLabel": "类型",
+    "requiredCheckbox": "必填",
+    "cancelButton": "取消",
+    "addingButton": "添加中…",
+    "addButton": "添加",
+    "loading": "正在加载字段…",
+    "loadError": "无法加载字段。请重试。",
+    "empty": "尚无自定义字段。使用上方的\"添加字段\"创建第一个。",
+    "requiredBadge": "必填"
   },
   "detail": {
     "opportunity": "商机详情",
@@ -2508,5 +2526,95 @@
     "creating": "正在创建…",
     "saveSubscription": "保存订阅",
     "createSubscription": "创建订阅"
+  },
+  "governanceLog": {
+    "regionLabel": "治理会议",
+    "title": "治理日志",
+    "caption": "委员会程序 — 委员会、高管评审、BRM、SAR",
+    "errorTitle": "无法加载治理日志",
+    "errorMessage": "请稍后重试。",
+    "empty": "此账户尚未记录任何治理会议。",
+    "advanceStatusLabel": "推进 {{description}} 的状态",
+    "dateRequired": "需要日期",
+    "meetingRecorded": "会议已记录",
+    "couldNotSave": "无法保存",
+    "addMeeting": "添加会议",
+    "meetingTypeLabel": "会议类型",
+    "meetingDateLabel": "会议日期",
+    "participantsPlaceholder": "参与者（用逗号分隔）",
+    "outcomesPlaceholder": "结果 / 决策",
+    "saving": "正在保存…",
+    "save": "保存",
+    "cancel": "取消"
+  },
+  "polarCharts": {
+    "pieChartAriaLabel": "饼图",
+    "columnName": "名称",
+    "columnValue": "值",
+    "donutChartAriaLabel": "环形图",
+    "radarChartAriaLabel": "雷达图"
+  },
+  "quickAddMenu": {
+    "title": "创建",
+    "option": {
+      "opportunity": {
+        "label": "新建商机",
+        "description": "向管道中添加一个投标。"
+      },
+      "task": {
+        "label": "新建任务",
+        "description": "创建一个跟进，可选择关联到商机。"
+      },
+      "contact": {
+        "label": "新建联系人",
+        "description": "添加一位决策者。"
+      },
+      "note": {
+        "label": "新建备注",
+        "description": "在当前客户上记录一个想法。"
+      }
+    }
+  },
+  "dashboardsList": {
+    "errorTitle": "加载仪表板失败",
+    "heading": "仪表板",
+    "countOne": "{{count}} 个仪表板",
+    "countOther": "{{count}} 个仪表板",
+    "newButton": "新建仪表板",
+    "namePlaceholder": "仪表板名称…",
+    "creating": "正在创建…",
+    "create": "创建",
+    "cancel": "取消",
+    "emptyTitle": "还没有仪表板",
+    "emptyMessage": "创建你的第一个仪表板，开始跟踪重要内容。",
+    "openAria": "打开仪表板：{{name}}",
+    "sharedAria": "已共享",
+    "privateAria": "私有",
+    "deleteConfirm": "删除“{{name}}”？",
+    "deleteAria": "删除仪表板 {{name}}"
+  },
+  "relations": {
+    "errorKeyLabelRequired": "关系键和标签为必填项。",
+    "errorAddFailed": "添加关系失败",
+    "heading": "关系",
+    "addButton": "+ 添加关系",
+    "fieldKeyLabel": "关系键",
+    "fieldKeyPlaceholder": "例如 primary_contact",
+    "fieldLabelLabel": "标签",
+    "fieldLabelPlaceholder": "例如 主要联系人",
+    "fieldEntityLabel": "关联实体",
+    "fieldEntityPlaceholder": "例如 联系人、商机",
+    "fieldCardinalityLabel": "基数",
+    "cancelButton": "取消",
+    "submitButtonPending": "添加中…",
+    "submitButton": "添加",
+    "emptyState": "尚未定义任何关系。"
+  },
+  "chartContainer": {
+    "emptyMessage": "此时间段没有可用数据。",
+    "refresh": "刷新",
+    "regionLabel": "图表",
+    "actionsLabel": "图表操作",
+    "loadingLabel": "正在加载图表"
   }
 }

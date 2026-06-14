@@ -3,6 +3,7 @@
  * governance meetings + their assigned actions — pre-sales visibility gap.
  */
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -38,12 +39,13 @@ const NEXT_STATUS: Record<GovernanceStatus, GovernanceStatus> = {
 export function GovernanceLogCard({ accountKey }: { accountKey: string }) {
   const meetings = useGovernanceMeetings(accountKey);
   const canWrite = useIsAdmin();
+  const { t } = useTranslation('crm');
 
   return (
-    <Card role="region" aria-label="Governance meetings">
+    <Card role="region" aria-label={t('governanceLog.regionLabel', 'Governance meetings')}>
       <SectionHeader
-        title="Governance log"
-        caption="Comitology — committees, C-level reviews, BRM, SAR"
+        title={t('governanceLog.title', 'Governance log')}
+        caption={t('governanceLog.caption', 'Comitology — committees, C-level reviews, BRM, SAR')}
         action={canWrite ? <CreateMeeting accountKey={accountKey} /> : undefined}
       />
       <div className="px-5 pb-5">
@@ -51,12 +53,12 @@ export function GovernanceLogCard({ accountKey }: { accountKey: string }) {
           <LoadingSkeleton rows={3} />
         ) : meetings.isError ? (
           <ErrorState
-            title="Could not load governance log"
-            message={meetings.error?.message ?? 'Try again shortly.'}
+            title={t('governanceLog.errorTitle', 'Could not load governance log')}
+            message={meetings.error?.message ?? t('governanceLog.errorMessage', 'Try again shortly.')}
           />
         ) : (meetings.data?.items.length ?? 0) === 0 ? (
           <p className="text-sm text-[var(--fg-tertiary)]">
-            No governance meetings recorded for this account yet.
+            {t('governanceLog.empty', 'No governance meetings recorded for this account yet.')}
           </p>
         ) : (
           <ul className="space-y-4">
@@ -72,6 +74,7 @@ export function GovernanceLogCard({ accountKey }: { accountKey: string }) {
 
 function MeetingRow({ meeting, canWrite }: { meeting: GovernanceMeeting; canWrite: boolean }) {
   const patchAction = usePatchGovernanceAction();
+  const { t } = useTranslation('crm');
   return (
     <li className="border-l-2 border-[var(--border)] pl-3">
       <div className="flex items-center gap-2">
@@ -106,7 +109,9 @@ function MeetingRow({ meeting, canWrite }: { meeting: GovernanceMeeting; canWrit
                   })
                 }
                 className="min-h-[28px] shrink-0 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] disabled:opacity-60"
-                aria-label={`Advance status of ${action.description}`}
+                aria-label={t('governanceLog.advanceStatusLabel', 'Advance status of {{description}}', {
+                  description: action.description,
+                })}
               >
                 <Badge tone={STATUS_TONE[action.status]}>{action.status.replace('_', ' ')}</Badge>
               </button>
@@ -121,6 +126,7 @@ function MeetingRow({ meeting, canWrite }: { meeting: GovernanceMeeting; canWrit
 function CreateMeeting({ accountKey }: { accountKey: string }) {
   const [open, setOpen] = useState(false);
   const create = useCreateGovernanceMeeting();
+  const { t } = useTranslation('crm');
   const [form, setForm] = useState<{
     meetingType: GovernanceMeetingType;
     date: string;
@@ -131,7 +137,7 @@ function CreateMeeting({ accountKey }: { accountKey: string }) {
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (!form.date) {
-      toast.error('Date required');
+      toast.error(t('governanceLog.dateRequired', 'Date required'));
       return;
     }
     create.mutate(
@@ -148,11 +154,12 @@ function CreateMeeting({ accountKey }: { accountKey: string }) {
       },
       {
         onSuccess: () => {
-          toast.success('Meeting recorded');
+          toast.success(t('governanceLog.meetingRecorded', 'Meeting recorded'));
           setOpen(false);
           setForm({ meetingType: 'monthly_committee', date: '', participants: '', outcomes: '' });
         },
-        onError: (err: Error) => toast.error('Could not save', { description: err.message }),
+        onError: (err: Error) =>
+          toast.error(t('governanceLog.couldNotSave', 'Could not save'), { description: err.message }),
       },
     );
   };
@@ -160,7 +167,7 @@ function CreateMeeting({ accountKey }: { accountKey: string }) {
   if (!open) {
     return (
       <Button variant="secondary" onClick={() => setOpen(true)}>
-        Add meeting
+        {t('governanceLog.addMeeting', 'Add meeting')}
       </Button>
     );
   }
@@ -173,7 +180,7 @@ function CreateMeeting({ accountKey }: { accountKey: string }) {
             setForm((f) => ({ ...f, meetingType: e.target.value as GovernanceMeetingType }))
           }
           className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
-          aria-label="Meeting type"
+          aria-label={t('governanceLog.meetingTypeLabel', 'Meeting type')}
         >
           {Object.entries(MEETING_LABEL).map(([value, label]) => (
             <option key={value} value={value}>
@@ -187,28 +194,30 @@ function CreateMeeting({ accountKey }: { accountKey: string }) {
           value={form.date}
           onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
           className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
-          aria-label="Meeting date"
+          aria-label={t('governanceLog.meetingDateLabel', 'Meeting date')}
         />
       </div>
       <input
         value={form.participants}
         onChange={(e) => setForm((f) => ({ ...f, participants: e.target.value }))}
-        placeholder="Participants (comma-separated)"
+        placeholder={t('governanceLog.participantsPlaceholder', 'Participants (comma-separated)')}
         className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
       />
       <textarea
         value={form.outcomes}
         onChange={(e) => setForm((f) => ({ ...f, outcomes: e.target.value }))}
-        placeholder="Outcomes / decisions"
+        placeholder={t('governanceLog.outcomesPlaceholder', 'Outcomes / decisions')}
         rows={2}
         className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
       />
       <div className="flex gap-2">
         <Button type="submit" disabled={create.isPending}>
-          {create.isPending ? 'Saving…' : 'Save'}
+          {create.isPending
+            ? t('governanceLog.saving', 'Saving…')
+            : t('governanceLog.save', 'Save')}
         </Button>
         <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-          Cancel
+          {t('governanceLog.cancel', 'Cancel')}
         </Button>
       </div>
     </form>

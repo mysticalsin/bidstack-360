@@ -116,5 +116,13 @@
     "banner": "Vous visualisez des données de démonstration.",
     "clear": "Supprimer les données de démo",
     "confirmClear": "Supprimer toutes les données de démonstration ? Cette action est irréversible."
+  },
+  "tourStep": {
+    "dialogAriaLabel": "Étape {{current}} sur {{total}} de la visite : {{title}}",
+    "stepCounter": "{{current}} sur {{total}}",
+    "skipTour": "Passer la visite",
+    "back": "Retour",
+    "ctaFinish": "Invitez votre équipe",
+    "ctaNext": "Suivant"
   }
 }

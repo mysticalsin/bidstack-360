@@ -3,6 +3,7 @@
  * All use polar / radial coordinate systems via Recharts.
  */
 import { useReducedMotion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import {
   Cell,
   Legend,
@@ -32,14 +33,15 @@ interface PieProps {
 
 export function PieChart({ data, 'aria-label': ariaLabel, height = 240 }: PieProps) {
   const reduced = useReducedMotion();
+  const { t } = useTranslation('crm');
   return (
-    <div role="img" aria-label={ariaLabel ?? 'Pie chart'}>
+    <div role="img" aria-label={ariaLabel ?? t('polarCharts.pieChartAriaLabel', 'Pie chart')}>
       <div className="sr-only">
         <table>
           <thead>
             <tr>
-              <th scope="col">Name</th>
-              <th scope="col">Value</th>
+              <th scope="col">{t('polarCharts.columnName', 'Name')}</th>
+              <th scope="col">{t('polarCharts.columnValue', 'Value')}</th>
             </tr>
           </thead>
           <tbody>
@@ -81,8 +83,9 @@ export function PieChart({ data, 'aria-label': ariaLabel, height = 240 }: PiePro
 
 export function DonutChart({ data, 'aria-label': ariaLabel, height = 240 }: PieProps) {
   const reduced = useReducedMotion();
+  const { t } = useTranslation('crm');
   return (
-    <div role="img" aria-label={ariaLabel ?? 'Donut chart'}>
+    <div role="img" aria-label={ariaLabel ?? t('polarCharts.donutChartAriaLabel', 'Donut chart')}>
       <div className="sr-only">
         <ul>
           {data.map((d) => (
@@ -136,8 +139,9 @@ export function RadarChart({
   height = 240,
 }: RadarProps) {
   const reduced = useReducedMotion();
+  const { t } = useTranslation('crm');
   return (
-    <div role="img" aria-label={ariaLabel ?? 'Radar chart'}>
+    <div role="img" aria-label={ariaLabel ?? t('polarCharts.radarChartAriaLabel', 'Radar chart')}>
       <DataTable data={data} xKey={nameKey} yKeys={keys} />
       <ChartEnter height={height}>
         <ResponsiveContainer width="100%" height="100%">

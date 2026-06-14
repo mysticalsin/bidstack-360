@@ -487,5 +487,28 @@
     "editButton": "Modifica",
     "deleteButton": "Elimina",
     "noPermissions": "Nessuna autorizzazione"
+  },
+  "rfpAnalytics": {
+    "errorMessage": "Impossibile caricare le analisi RFP. Riprova.",
+    "kpiSectionLabel": "Metriche chiave delle analisi RFP",
+    "kpiTotalLabel": "RFP totali",
+    "kpiTotalDetail": "di tutti i responsabili",
+    "kpiPipelineLabel": "Valore della pipeline",
+    "kpiPipelineDetail": "valore delle opportunità collegate",
+    "kpiWinRateLabel": "Tasso di successo",
+    "kpiWinRateDetail": "{{won}} vinte · {{closed}} chiuse",
+    "kpiInFlightLabel": "In corso",
+    "kpiInFlightDetail": "non ancora vinte né perse",
+    "byStatusTitle": "Per stato",
+    "loading": "Caricamento…",
+    "byStatusEmptyTitle": "Nessun RFP ancora",
+    "byStatusEmptyMessage": "Le proposte appariranno qui man mano che il tuo team le crea.",
+    "byOwnerTitle": "Per responsabile",
+    "byOwnerSubtitle": "Chi gestisce cosa e il valore della pipeline associato.",
+    "byOwnerEmptyTitle": "Nessun responsabile ancora",
+    "byOwnerEmptyMessage": "Assegna le proposte per vedere la suddivisione per responsabile.",
+    "tableOwner": "Responsabile",
+    "tableRfps": "RFP",
+    "tablePipelineValue": "Valore della pipeline"
   }
 }

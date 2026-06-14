@@ -125,7 +125,10 @@
     "deleted": "Excluído",
     "copied": "Copiado para a área de transferência",
     "genericError": "Algo deu errado. Por favor, tente novamente.",
-    "networkError": "Erro de rede. Verifique sua conexão."
+    "networkError": "Erro de rede. Verifique sua conexão.",
+    "regionLabel": "Notificações",
+    "clearAll": "Limpar tudo ({{count}})",
+    "dismiss": "Dispensar"
   },
   "validation": {
     "required": "Este campo é obrigatório",

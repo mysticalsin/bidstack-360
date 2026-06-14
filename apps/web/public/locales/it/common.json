@@ -125,7 +125,10 @@
     "deleted": "Eliminato",
     "copied": "Copiato negli appunti",
     "genericError": "Qualcosa è andato storto. Riprova.",
-    "networkError": "Errore di rete. Controlla la connessione."
+    "networkError": "Errore di rete. Controlla la connessione.",
+    "regionLabel": "Notifiche",
+    "clearAll": "Cancella tutto ({{count}})",
+    "dismiss": "Ignora"
   },
   "validation": {
     "required": "Questo campo è obbligatorio",

@@ -148,5 +148,27 @@
     "saving": "Saving…",
     "save": "Save",
     "emptyContent": "No content yet. Use AI Draft to generate a first version."
+  },
+  "proposals": {
+    "title": "Proposals",
+    "subtitle": "RFP workspace — draft, review, and submit winning proposals.",
+    "newProposal": "New Proposal",
+    "createProposal": "Create Proposal",
+    "nameLabel": "Proposal name",
+    "namePlaceholder": "Proposal name…",
+    "creating": "Creating…",
+    "create": "Create",
+    "cancel": "Cancel",
+    "createError": "Failed to create proposal.",
+    "filterByStatus": "Filter by status",
+    "resultCount": "{{count}} proposals",
+    "loading": "Loading proposals",
+    "loadError": "Failed to load proposals",
+    "loadErrorRetry": "Please try again in a moment.",
+    "emptyTitle": "No proposals yet.",
+    "emptyMessage": "Create your first proposal to get started.",
+    "viewProposal": "View proposal: {{name}}",
+    "version": "v{{version}}",
+    "due": "Due {{date}}"
   }
 }

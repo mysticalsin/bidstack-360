@@ -125,7 +125,10 @@
     "deleted": "Eliminado",
     "copied": "Copiado al portapapeles",
     "genericError": "Algo salió mal. Por favor, inténtelo de nuevo.",
-    "networkError": "Error de red. Comprueba tu conexión."
+    "networkError": "Error de red. Comprueba tu conexión.",
+    "regionLabel": "Notificaciones",
+    "clearAll": "Borrar todo ({{count}})",
+    "dismiss": "Descartar"
   },
   "validation": {
     "required": "Este campo es obligatorio",

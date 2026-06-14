@@ -6,6 +6,7 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { AlertTriangle, BarChart3, MoreHorizontal, RefreshCw } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/cn';
 import { springSoft } from '@/lib/motion';
@@ -36,16 +37,20 @@ export function ChartContainer({
   loading = false,
   error = null,
   empty = false,
-  emptyMessage = 'No data available for this time period.',
+  emptyMessage,
   actions = [],
   onRefresh,
   className,
   children,
   'aria-label': ariaLabel,
 }: Props) {
+  const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const resolvedEmptyMessage =
+    emptyMessage ??
+    t('chartContainer.emptyMessage', 'No data available for this time period.');
 
   // WHY Escape closes the menu: onBlur alone isn't enough — users navigating
   // via keyboard expect Escape to dismiss a menu without moving focus away from
@@ -59,7 +64,15 @@ export function ChartContainer({
     return () => document.removeEventListener('keydown', onKey);
   }, [menuOpen]);
   const allActions: Action[] = [
-    ...(onRefresh ? [{ label: 'Refresh', icon: <RefreshCw size={14} />, onClick: onRefresh }] : []),
+    ...(onRefresh
+      ? [
+          {
+            label: t('chartContainer.refresh', 'Refresh'),
+            icon: <RefreshCw size={14} />,
+            onClick: onRefresh,
+          },
+        ]
+      : []),
     ...actions,
   ];
 
@@ -72,7 +85,7 @@ export function ChartContainer({
         className,
       )}
       role="region"
-      aria-label={ariaLabel ?? title ?? 'Chart'}
+      aria-label={ariaLabel ?? title ?? t('chartContainer.regionLabel', 'Chart')}
     >
       {/* Header */}
       {(title || allActions.length > 0) && (
@@ -89,7 +102,7 @@ export function ChartContainer({
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setMenuOpen((p) => !p)}
-                aria-label="Chart actions"
+                aria-label={t('chartContainer.actionsLabel', 'Chart actions')}
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
                 className={cn(
@@ -148,7 +161,7 @@ export function ChartContainer({
         ) : error ? (
           <ChartError message={error} />
         ) : empty ? (
-          <ChartEmpty message={emptyMessage} />
+          <ChartEmpty message={resolvedEmptyMessage} />
         ) : (
           children
         )}
@@ -160,8 +173,13 @@ export function ChartContainer({
 // ── Internal sub-states ──────────────────────────────────────────────────────
 
 function ChartSkeleton() {
+  const { t } = useTranslation('crm');
   return (
-    <div className="animate-pulse" aria-label="Loading chart" role="status">
+    <div
+      className="animate-pulse"
+      aria-label={t('chartContainer.loadingLabel', 'Loading chart')}
+      role="status"
+    >
       <div className="flex items-end gap-1.5 h-36">
         {[60, 80, 45, 95, 70, 55, 88, 65, 75, 50].map((h, i) => (
           <div

@@ -125,7 +125,10 @@
     "deleted": "Deleted",
     "copied": "Copied to clipboard",
     "genericError": "Something went wrong. Please try again.",
-    "networkError": "Network error. Check your connection."
+    "networkError": "Network error. Check your connection.",
+    "regionLabel": "Notifications",
+    "clearAll": "Clear all ({{count}})",
+    "dismiss": "Dismiss"
   },
   "validation": {
     "required": "This field is required",

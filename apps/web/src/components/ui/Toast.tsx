@@ -11,6 +11,7 @@
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { create } from 'zustand';
 
 import { springModal } from '@/lib/motion';
@@ -100,10 +101,11 @@ export const toast = {
 export function Toaster() {
   const items = useToastStore((s) => s.items);
   const dismissAll = useToastStore((s) => s.dismissAll);
+  const { t } = useTranslation('common');
   return (
     <div
       role="region"
-      aria-label="Notifications"
+      aria-label={t('toast.regionLabel', 'Notifications')}
       className="pointer-events-none fixed bottom-4 right-4 z-[100] flex w-[min(384px,90vw)] flex-col gap-2"
     >
       {/* Clear-all chip — only shown once the stack gets dense enough to
@@ -116,7 +118,7 @@ export function Toaster() {
             onClick={dismissAll}
             className="rounded-md dark:rounded-full border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-0.5 text-[10px] font-medium text-[var(--fg-secondary)] shadow-[var(--shadow-sm)] hover:text-[var(--fg-primary)] dark:bg-[var(--surface-glass)] dark:backdrop-blur-md"
           >
-            Clear all ({items.length})
+            {t('toast.clearAll', 'Clear all ({{count}})', { count: items.length })}
           </button>
         </div>
       ) : null}
@@ -140,6 +142,7 @@ function ToastCard({ item }: { item: ToastItem }) {
   const dismiss = useToastStore((s) => s.dismiss);
   const reduced = useReducedMotion();
   const play = useUiSound();
+  const { t } = useTranslation('common');
 
   useEffect(() => {
     const handle = window.setTimeout(() => dismiss(item.id), item.duration);
@@ -195,7 +198,7 @@ function ToastCard({ item }: { item: ToastItem }) {
         <button
           type="button"
           onClick={() => dismiss(item.id)}
-          aria-label="Dismiss"
+          aria-label={t('toast.dismiss', 'Dismiss')}
           className="ml-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)]"
         >
           ×

@@ -116,5 +116,13 @@
     "banner": "Stai visualizzando dati dimostrativi.",
     "clear": "Cancella dati dimostrativi",
     "confirmClear": "Eliminare tutti i dati dimostrativi? Questa azione non può essere annullata."
+  },
+  "tourStep": {
+    "dialogAriaLabel": "Passaggio {{current}} di {{total}} del tour: {{title}}",
+    "stepCounter": "{{current}} di {{total}}",
+    "skipTour": "Salta il tour",
+    "back": "Indietro",
+    "ctaFinish": "Invita il tuo team",
+    "ctaNext": "Avanti"
   }
 }

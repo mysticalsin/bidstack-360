@@ -8,6 +8,7 @@
 // admin-only — the Settings tab is admin-gated and /admin/rfp is RequireAdmin.
 
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/Card';
 import { Icon, type IconName } from '@/components/ui/Icon';
@@ -46,6 +47,7 @@ function formatEur(micros: string): string {
 }
 
 export function RfpAnalyticsSection() {
+  const { t } = useTranslation('settings');
   const q = useQuery<RfpAnalytics>({
     queryKey: ['admin-rfp', 'analytics'],
     queryFn: ({ signal }) => api<RfpAnalytics>('/api/v1/proposals/admin/analytics', { signal }),
@@ -59,7 +61,7 @@ export function RfpAnalyticsSection() {
     return (
       <Card className="p-6">
         <div role="alert" className="text-sm text-red-600 dark:text-red-400">
-          Failed to load RFP analytics. Please retry.
+          {t('rfpAnalytics.errorMessage', 'Failed to load RFP analytics. Please retry.')}
         </div>
       </Card>
     );
@@ -69,31 +71,34 @@ export function RfpAnalyticsSection() {
     <div className="space-y-6">
       {/* KPI strip */}
       <section
-        aria-label="RFP analytics key metrics"
+        aria-label={t('rfpAnalytics.kpiSectionLabel', 'RFP analytics key metrics')}
         className="grid grid-cols-2 gap-3 sm:grid-cols-4"
       >
         <KpiTile
-          label="Total RFPs"
+          label={t('rfpAnalytics.kpiTotalLabel', 'Total RFPs')}
           value={q.isLoading ? '…' : String(q.data?.totalCount ?? 0)}
-          detail="across all owners"
+          detail={t('rfpAnalytics.kpiTotalDetail', 'across all owners')}
           icon="briefcase"
         />
         <KpiTile
-          label="Pipeline value"
+          label={t('rfpAnalytics.kpiPipelineLabel', 'Pipeline value')}
           value={q.isLoading ? '…' : formatEur(q.data?.totalValueMicros ?? '0')}
-          detail="linked opportunity value"
+          detail={t('rfpAnalytics.kpiPipelineDetail', 'linked opportunity value')}
           icon="dollar"
         />
         <KpiTile
-          label="Win rate"
+          label={t('rfpAnalytics.kpiWinRateLabel', 'Win rate')}
           value={winRate === null ? '—' : `${winRate}%`}
-          detail={`${q.data?.wonCount ?? 0} won · ${closed} closed`}
+          detail={t('rfpAnalytics.kpiWinRateDetail', '{{won}} won · {{closed}} closed', {
+            won: q.data?.wonCount ?? 0,
+            closed,
+          })}
           icon="trophy"
         />
         <KpiTile
-          label="In flight"
+          label={t('rfpAnalytics.kpiInFlightLabel', 'In flight')}
           value={q.isLoading ? '…' : String(Math.max(0, inFlight))}
-          detail="not yet won or lost"
+          detail={t('rfpAnalytics.kpiInFlightDetail', 'not yet won or lost')}
           icon="pipeline"
         />
       </section>
@@ -101,15 +106,22 @@ export function RfpAnalyticsSection() {
       {/* By status */}
       <Card>
         <div className="border-b border-[var(--border-subtle)] px-4 py-2">
-          <h3 className="text-sm font-semibold text-[var(--fg-primary)]">By status</h3>
+          <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
+            {t('rfpAnalytics.byStatusTitle', 'By status')}
+          </h3>
         </div>
         {q.isLoading ? (
-          <div className="p-6 text-sm text-[var(--fg-secondary)]">Loading…</div>
+          <div className="p-6 text-sm text-[var(--fg-secondary)]">
+            {t('rfpAnalytics.loading', 'Loading…')}
+          </div>
         ) : !q.data?.byStatus.length ? (
           <div className="p-6">
             <EmptyState
-              title="No RFPs yet"
-              message="Proposals will appear here as your team creates them."
+              title={t('rfpAnalytics.byStatusEmptyTitle', 'No RFPs yet')}
+              message={t(
+                'rfpAnalytics.byStatusEmptyMessage',
+                'Proposals will appear here as your team creates them.',
+              )}
             />
           </div>
         ) : (
@@ -130,18 +142,25 @@ export function RfpAnalyticsSection() {
       {/* By owner */}
       <Card>
         <div className="border-b border-[var(--border-subtle)] px-4 py-2">
-          <h3 className="text-sm font-semibold text-[var(--fg-primary)]">By owner</h3>
+          <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
+            {t('rfpAnalytics.byOwnerTitle', 'By owner')}
+          </h3>
           <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
-            Who owns what, and the pipeline value behind it.
+            {t('rfpAnalytics.byOwnerSubtitle', 'Who owns what, and the pipeline value behind it.')}
           </p>
         </div>
         {q.isLoading ? (
-          <div className="p-6 text-sm text-[var(--fg-secondary)]">Loading…</div>
+          <div className="p-6 text-sm text-[var(--fg-secondary)]">
+            {t('rfpAnalytics.loading', 'Loading…')}
+          </div>
         ) : !q.data?.byOwner.length ? (
           <div className="p-6">
             <EmptyState
-              title="No owners yet"
-              message="Assign proposals to see the per-owner breakdown."
+              title={t('rfpAnalytics.byOwnerEmptyTitle', 'No owners yet')}
+              message={t(
+                'rfpAnalytics.byOwnerEmptyMessage',
+                'Assign proposals to see the per-owner breakdown.',
+              )}
             />
           </div>
         ) : (
@@ -149,9 +168,15 @@ export function RfpAnalyticsSection() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-wider text-[var(--fg-tertiary)]">
-                  <th className="px-4 py-2 font-semibold">Owner</th>
-                  <th className="px-4 py-2 text-right font-semibold">RFPs</th>
-                  <th className="px-4 py-2 text-right font-semibold">Pipeline value</th>
+                  <th className="px-4 py-2 font-semibold">
+                    {t('rfpAnalytics.tableOwner', 'Owner')}
+                  </th>
+                  <th className="px-4 py-2 text-right font-semibold">
+                    {t('rfpAnalytics.tableRfps', 'RFPs')}
+                  </th>
+                  <th className="px-4 py-2 text-right font-semibold">
+                    {t('rfpAnalytics.tablePipelineValue', 'Pipeline value')}
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-subtle)]">

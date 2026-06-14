@@ -21,5 +21,27 @@
     "saving": "Salvando…",
     "save": "Salvar",
     "emptyContent": "Ainda sem conteúdo. Use Rascunho de IA para gerar uma primeira versão."
+  },
+  "proposals": {
+    "title": "Propostas",
+    "subtitle": "Espaço de RFP — redija, revise e envie propostas vencedoras.",
+    "newProposal": "Nova proposta",
+    "createProposal": "Criar proposta",
+    "nameLabel": "Nome da proposta",
+    "namePlaceholder": "Nome da proposta…",
+    "creating": "Criando…",
+    "create": "Criar",
+    "cancel": "Cancelar",
+    "createError": "Falha ao criar a proposta.",
+    "filterByStatus": "Filtrar por status",
+    "resultCount": "{{count}} propostas",
+    "loading": "Carregando propostas",
+    "loadError": "Falha ao carregar as propostas",
+    "loadErrorRetry": "Tente novamente em instantes.",
+    "emptyTitle": "Ainda não há propostas.",
+    "emptyMessage": "Crie sua primeira proposta para começar.",
+    "viewProposal": "Ver proposta: {{name}}",
+    "version": "v{{version}}",
+    "due": "Vencimento {{date}}"
   }
 }

@@ -116,5 +116,13 @@
     "banner": "You are viewing demonstration data.",
     "clear": "Clear demo data",
     "confirmClear": "Delete all demonstration data? This action cannot be undone."
+  },
+  "tourStep": {
+    "dialogAriaLabel": "Tour step {{current}} of {{total}}: {{title}}",
+    "stepCounter": "{{current}} of {{total}}",
+    "skipTour": "Skip tour",
+    "back": "Back",
+    "ctaFinish": "Invite your team",
+    "ctaNext": "Next"
   }
 }

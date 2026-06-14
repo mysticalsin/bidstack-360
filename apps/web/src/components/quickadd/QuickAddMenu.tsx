@@ -9,6 +9,7 @@
 import * as RadixDialog from '@radix-ui/react-dialog';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useState, type KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { ContactDialog } from '@/components/contact/ContactDialog';
@@ -19,35 +20,49 @@ import { cn } from '@/lib/cn';
 
 type Entity = 'opportunity' | 'task' | 'contact' | 'note';
 
-const OPTIONS: Array<{ key: Entity; label: string; hint: string; description: string }> = [
+type Option = { key: Entity; label: string; hint: string; description: string };
+
+// `key` and `hint` are logic values (map keys + keyboard shortcuts) and stay
+// untranslated; only the prose `label`/`description` are externalized.
+const buildOptions = (t: (key: string, defaultValue: string) => string): Option[] => [
   {
     key: 'opportunity',
-    label: 'New opportunity',
+    label: t('quickAddMenu.option.opportunity.label', 'New opportunity'),
     hint: 'O',
-    description: 'Add a bid to the pipeline.',
+    description: t('quickAddMenu.option.opportunity.description', 'Add a bid to the pipeline.'),
   },
   {
     key: 'task',
-    label: 'New task',
+    label: t('quickAddMenu.option.task.label', 'New task'),
     hint: 'T',
-    description: 'Create a follow-up, optionally linked to an opp.',
+    description: t(
+      'quickAddMenu.option.task.description',
+      'Create a follow-up, optionally linked to an opp.',
+    ),
   },
-  { key: 'contact', label: 'New contact', hint: 'C', description: 'Add a decision-maker.' },
+  {
+    key: 'contact',
+    label: t('quickAddMenu.option.contact.label', 'New contact'),
+    hint: 'C',
+    description: t('quickAddMenu.option.contact.description', 'Add a decision-maker.'),
+  },
   {
     key: 'note',
-    label: 'New note',
+    label: t('quickAddMenu.option.note.label', 'New note'),
     hint: 'M',
-    description: 'Drop a thought on the current account.',
+    description: t('quickAddMenu.option.note.description', 'Drop a thought on the current account.'),
   },
 ];
 
 export function QuickAddMenu() {
+  const { t } = useTranslation('crm');
   const [open, setOpen] = useState(false);
   // After choosing, mount the matching dialog. Cleared when the dialog closes.
   const [pick, setPick] = useState<Entity | null>(null);
   const [activeIdx, setActiveIdx] = useState(0);
   const reduced = useReducedMotion();
   const navigate = useNavigate();
+  const OPTIONS = buildOptions(t);
 
   // Global keybinding: `N` opens the menu (when not typing in a field). This
   // mirrors Linear/Notion's "new record" shortcut.
@@ -124,7 +139,7 @@ export function QuickAddMenu() {
                   }}
                 >
                   <RadixDialog.Title className="border-b border-[var(--border-subtle)] px-4 py-3 text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-                    Create
+                    {t('quickAddMenu.title', 'Create')}
                   </RadixDialog.Title>
                   <ul role="listbox" className="p-1">
                     {OPTIONS.map((opt, i) => {

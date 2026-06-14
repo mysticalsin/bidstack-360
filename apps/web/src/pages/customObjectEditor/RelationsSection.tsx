@@ -3,6 +3,7 @@
  * Owns the add-relation form state.
  */
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
   type useAddCustomObjectRelation,
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export function RelationsSection({ addRelation, relationsQuery }: Props) {
+  const { t } = useTranslation('crm');
   const [showRelationForm, setShowRelationForm] = useState(false);
   const [newRelation, setNewRelation] = useState({
     relationKey: '',
@@ -30,7 +32,7 @@ export function RelationsSection({ addRelation, relationsQuery }: Props) {
     e.preventDefault();
     setRelationError(null);
     if (!newRelation.relationKey || !newRelation.label) {
-      setRelationError('Relation key and label are required.');
+      setRelationError(t('relations.errorKeyLabelRequired', 'Relation key and label are required.'));
       return;
     }
     try {
@@ -44,7 +46,9 @@ export function RelationsSection({ addRelation, relationsQuery }: Props) {
         required: false,
       });
     } catch (err) {
-      setRelationError(err instanceof Error ? err.message : 'Failed to add relation');
+      setRelationError(
+        err instanceof Error ? err.message : t('relations.errorAddFailed', 'Failed to add relation'),
+      );
     }
   }
 
@@ -52,14 +56,14 @@ export function RelationsSection({ addRelation, relationsQuery }: Props) {
     <section aria-labelledby="relations-heading">
       <div className="flex items-center justify-between mb-4">
         <h2 id="relations-heading" className="text-lg font-semibold text-[var(--text-primary)]">
-          Relations
+          {t('relations.heading', 'Relations')}
         </h2>
         <button
           type="button"
           onClick={() => setShowRelationForm(true)}
           className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-sm font-medium hover:bg-[var(--surface-2)] transition-colors min-h-[44px]"
         >
-          + Add relation
+          {t('relations.addButton', '+ Add relation')}
         </button>
       </div>
 
@@ -82,7 +86,7 @@ export function RelationsSection({ addRelation, relationsQuery }: Props) {
                   htmlFor="nr-key"
                   className="block text-xs font-medium text-[var(--text-primary)] mb-1"
                 >
-                  Relation key
+                  {t('relations.fieldKeyLabel', 'Relation key')}
                 </label>
                 <input
                   id="nr-key"
@@ -94,7 +98,7 @@ export function RelationsSection({ addRelation, relationsQuery }: Props) {
                       relationKey: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '_'),
                     }))
                   }
-                  placeholder="e.g. primary_contact"
+                  placeholder={t('relations.fieldKeyPlaceholder', 'e.g. primary_contact')}
                   className="input w-full text-sm"
                   required
                 />
@@ -104,14 +108,14 @@ export function RelationsSection({ addRelation, relationsQuery }: Props) {
                   htmlFor="nr-label"
                   className="block text-xs font-medium text-[var(--text-primary)] mb-1"
                 >
-                  Label
+                  {t('relations.fieldLabelLabel', 'Label')}
                 </label>
                 <input
                   id="nr-label"
                   type="text"
                   value={newRelation.label}
                   onChange={(e) => setNewRelation((p) => ({ ...p, label: e.target.value }))}
-                  placeholder="e.g. Primary Contact"
+                  placeholder={t('relations.fieldLabelPlaceholder', 'e.g. Primary Contact')}
                   className="input w-full text-sm"
                   required
                 />
@@ -121,7 +125,7 @@ export function RelationsSection({ addRelation, relationsQuery }: Props) {
                   htmlFor="nr-entity"
                   className="block text-xs font-medium text-[var(--text-primary)] mb-1"
                 >
-                  Related entity
+                  {t('relations.fieldEntityLabel', 'Related entity')}
                 </label>
                 <input
                   id="nr-entity"
@@ -130,7 +134,7 @@ export function RelationsSection({ addRelation, relationsQuery }: Props) {
                   onChange={(e) =>
                     setNewRelation((p) => ({ ...p, relatedEntityType: e.target.value }))
                   }
-                  placeholder="e.g. contact, opportunity"
+                  placeholder={t('relations.fieldEntityPlaceholder', 'e.g. contact, opportunity')}
                   className="input w-full text-sm"
                 />
               </div>
@@ -139,7 +143,7 @@ export function RelationsSection({ addRelation, relationsQuery }: Props) {
                   htmlFor="nr-cardinality"
                   className="block text-xs font-medium text-[var(--text-primary)] mb-1"
                 >
-                  Cardinality
+                  {t('relations.fieldCardinalityLabel', 'Cardinality')}
                 </label>
                 <select
                   id="nr-cardinality"
@@ -166,21 +170,25 @@ export function RelationsSection({ addRelation, relationsQuery }: Props) {
                 onClick={() => setShowRelationForm(false)}
                 className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-sm hover:bg-[var(--surface-2)] transition-colors min-h-[44px]"
               >
-                Cancel
+                {t('relations.cancelButton', 'Cancel')}
               </button>
               <button
                 type="submit"
                 disabled={addRelation.isPending}
                 className="px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white text-sm hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
               >
-                {addRelation.isPending ? 'Adding…' : 'Add'}
+                {addRelation.isPending
+                  ? t('relations.submitButtonPending', 'Adding…')
+                  : t('relations.submitButton', 'Add')}
               </button>
             </div>
           </form>
         )}
 
         {relationsQuery.data?.items.length === 0 && (
-          <p className="p-4 text-sm text-[var(--text-secondary)]">No relations defined yet.</p>
+          <p className="p-4 text-sm text-[var(--text-secondary)]">
+            {t('relations.emptyState', 'No relations defined yet.')}
+          </p>
         )}
 
         {relationsQuery.data?.items.map((rel) => (

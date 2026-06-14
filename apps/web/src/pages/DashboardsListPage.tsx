@@ -4,6 +4,7 @@
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { Plus, Layout, Globe, Lock, Trash2 } from 'lucide-react';
 
@@ -13,6 +14,7 @@ import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { useDashboards, useCreateDashboard, useDeleteDashboard } from '@/hooks/useDashboards';
 
 export function DashboardsListPage() {
+  const { t } = useTranslation('crm');
   const { data: dashboards = [], isLoading, error } = useDashboards();
   const createMutation = useCreateDashboard();
   const deleteMutation = useDeleteDashboard();
@@ -42,7 +44,10 @@ export function DashboardsListPage() {
   if (error) {
     return (
       <div className="p-8">
-        <ErrorState title="Failed to load dashboards" message={(error as Error).message} />
+        <ErrorState
+          title={t('dashboardsList.errorTitle', 'Failed to load dashboards')}
+          message={(error as Error).message}
+        />
       </div>
     );
   }
@@ -52,9 +57,13 @@ export function DashboardsListPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">Dashboards</h1>
+          <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
+            {t('dashboardsList.heading', 'Dashboards')}
+          </h1>
           <p className="text-sm text-[var(--fg-tertiary)] mt-0.5">
-            {dashboards.length} dashboard{dashboards.length !== 1 ? 's' : ''}
+            {dashboards.length === 1
+              ? t('dashboardsList.countOne', '{{count}} dashboard', { count: dashboards.length })
+              : t('dashboardsList.countOther', '{{count}} dashboards', { count: dashboards.length })}
           </p>
         </div>
         <button
@@ -66,7 +75,7 @@ export function DashboardsListPage() {
           )}
         >
           <Plus size={16} />
-          New dashboard
+          {t('dashboardsList.newButton', 'New dashboard')}
         </button>
       </div>
 
@@ -82,7 +91,7 @@ export function DashboardsListPage() {
               if (e.key === 'Enter') handleCreate();
               if (e.key === 'Escape') setCreating(false);
             }}
-            placeholder="Dashboard name…"
+            placeholder={t('dashboardsList.namePlaceholder', 'Dashboard name…')}
             className={cn(
               'flex-1 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)]',
               'px-3 py-2 text-sm text-[var(--fg-primary)] placeholder:text-[var(--fg-tertiary)]',
@@ -99,13 +108,15 @@ export function DashboardsListPage() {
               'disabled:opacity-50 disabled:cursor-not-allowed',
             )}
           >
-            {createMutation.isPending ? 'Creating…' : 'Create'}
+            {createMutation.isPending
+              ? t('dashboardsList.creating', 'Creating…')
+              : t('dashboardsList.create', 'Create')}
           </button>
           <button
             onClick={() => setCreating(false)}
             className="px-3 py-2 text-sm text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] min-h-[44px]"
           >
-            Cancel
+            {t('dashboardsList.cancel', 'Cancel')}
           </button>
         </div>
       )}
@@ -113,8 +124,11 @@ export function DashboardsListPage() {
       {/* Grid */}
       {dashboards.length === 0 ? (
         <EmptyState
-          title="No dashboards yet"
-          message="Create your first dashboard to start tracking what matters."
+          title={t('dashboardsList.emptyTitle', 'No dashboards yet')}
+          message={t(
+            'dashboardsList.emptyMessage',
+            'Create your first dashboard to start tracking what matters.',
+          )}
           action={
             <button
               onClick={() => setCreating(true)}
@@ -125,7 +139,7 @@ export function DashboardsListPage() {
               )}
             >
               <Plus size={16} />
-              New dashboard
+              {t('dashboardsList.newButton', 'New dashboard')}
             </button>
           }
         />
@@ -146,7 +160,9 @@ export function DashboardsListPage() {
                   'hover:border-[var(--border-focus)] hover:shadow-[var(--shadow-sm)] transition-all',
                   'focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] focus-visible:outline-none',
                 )}
-                aria-label={`Open dashboard: ${d.name}`}
+                aria-label={t('dashboardsList.openAria', 'Open dashboard: {{name}}', {
+                  name: d.name,
+                })}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
@@ -159,13 +175,13 @@ export function DashboardsListPage() {
                     <Globe
                       size={12}
                       className="text-[var(--fg-tertiary)] shrink-0"
-                      aria-label="Shared"
+                      aria-label={t('dashboardsList.sharedAria', 'Shared')}
                     />
                   ) : (
                     <Lock
                       size={12}
                       className="text-[var(--fg-tertiary)] shrink-0"
-                      aria-label="Private"
+                      aria-label={t('dashboardsList.privateAria', 'Private')}
                     />
                   )}
                 </div>
@@ -183,11 +199,13 @@ export function DashboardsListPage() {
               <button
                 onClick={(e) => {
                   e.preventDefault();
-                  if (confirm(`Delete "${d.name}"?`)) {
+                  if (confirm(t('dashboardsList.deleteConfirm', 'Delete "{{name}}"?', { name: d.name }))) {
                     deleteMutation.mutate(d.id);
                   }
                 }}
-                aria-label={`Delete dashboard ${d.name}`}
+                aria-label={t('dashboardsList.deleteAria', 'Delete dashboard {{name}}', {
+                  name: d.name,
+                })}
                 className={cn(
                   'absolute top-2 right-2 hidden group-hover:flex items-center justify-center',
                   'w-7 h-7 rounded-lg text-[var(--fg-tertiary)]',

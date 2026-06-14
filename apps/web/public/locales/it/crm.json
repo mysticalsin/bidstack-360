@@ -47,7 +47,25 @@
     "updatedAt": "Aggiornato",
     "dueDate": "Scadenza",
     "status": "Stato",
-    "priority": "Priorità"
+    "priority": "Priorità",
+    "heading": "Campi",
+    "addFieldButton": "+ Aggiungi campo",
+    "systemFieldsLabel": "Campi di sistema:",
+    "errorKeyLabelRequired": "La chiave e l'etichetta del campo sono obbligatorie.",
+    "errorAddFailed": "Impossibile aggiungere il campo",
+    "fieldKeyLabel": "Chiave del campo",
+    "fieldKeyPlaceholder": "es. budget",
+    "labelLabel": "Etichetta",
+    "labelPlaceholder": "es. Budget",
+    "typeLabel": "Tipo",
+    "requiredCheckbox": "Obbligatorio",
+    "cancelButton": "Annulla",
+    "addingButton": "Aggiunta…",
+    "addButton": "Aggiungi",
+    "loading": "Caricamento dei campi…",
+    "loadError": "Impossibile caricare i campi. Riprova.",
+    "empty": "Nessun campo personalizzato ancora. Usa \"Aggiungi campo\" sopra per crearne uno.",
+    "requiredBadge": "Obbligatorio"
   },
   "detail": {
     "opportunity": "Dettaglio opportunità",
@@ -2508,5 +2526,95 @@
     "creating": "Creazione...",
     "saveSubscription": "Salva iscrizione",
     "createSubscription": "Crea iscrizione"
+  },
+  "governanceLog": {
+    "regionLabel": "Riunioni di governance",
+    "title": "Registro di governance",
+    "caption": "Comitologia — comitati, revisioni dirigenziali, BRM, SAR",
+    "errorTitle": "Impossibile caricare il registro di governance",
+    "errorMessage": "Riprova tra poco.",
+    "empty": "Nessuna riunione di governance registrata per questo account.",
+    "advanceStatusLabel": "Avanza lo stato di {{description}}",
+    "dateRequired": "Data obbligatoria",
+    "meetingRecorded": "Riunione registrata",
+    "couldNotSave": "Impossibile salvare",
+    "addMeeting": "Aggiungi riunione",
+    "meetingTypeLabel": "Tipo di riunione",
+    "meetingDateLabel": "Data della riunione",
+    "participantsPlaceholder": "Partecipanti (separati da virgole)",
+    "outcomesPlaceholder": "Esiti / decisioni",
+    "saving": "Salvataggio…",
+    "save": "Salva",
+    "cancel": "Annulla"
+  },
+  "polarCharts": {
+    "pieChartAriaLabel": "Grafico a torta",
+    "columnName": "Nome",
+    "columnValue": "Valore",
+    "donutChartAriaLabel": "Grafico ad anello",
+    "radarChartAriaLabel": "Grafico radar"
+  },
+  "quickAddMenu": {
+    "title": "Crea",
+    "option": {
+      "opportunity": {
+        "label": "Nuova opportunità",
+        "description": "Aggiungi un'offerta alla pipeline."
+      },
+      "task": {
+        "label": "Nuova attività",
+        "description": "Crea un follow-up, eventualmente collegato a un'opportunità."
+      },
+      "contact": {
+        "label": "Nuovo contatto",
+        "description": "Aggiungi un decisore."
+      },
+      "note": {
+        "label": "Nuova nota",
+        "description": "Annota un pensiero sull'account corrente."
+      }
+    }
+  },
+  "dashboardsList": {
+    "errorTitle": "Impossibile caricare le dashboard",
+    "heading": "Dashboard",
+    "countOne": "{{count}} dashboard",
+    "countOther": "{{count}} dashboard",
+    "newButton": "Nuova dashboard",
+    "namePlaceholder": "Nome della dashboard…",
+    "creating": "Creazione…",
+    "create": "Crea",
+    "cancel": "Annulla",
+    "emptyTitle": "Ancora nessuna dashboard",
+    "emptyMessage": "Crea la tua prima dashboard per iniziare a monitorare ciò che conta.",
+    "openAria": "Apri dashboard: {{name}}",
+    "sharedAria": "Condivisa",
+    "privateAria": "Privata",
+    "deleteConfirm": "Eliminare \"{{name}}\"?",
+    "deleteAria": "Elimina dashboard {{name}}"
+  },
+  "relations": {
+    "errorKeyLabelRequired": "La chiave e l'etichetta della relazione sono obbligatorie.",
+    "errorAddFailed": "Impossibile aggiungere la relazione",
+    "heading": "Relazioni",
+    "addButton": "+ Aggiungi relazione",
+    "fieldKeyLabel": "Chiave della relazione",
+    "fieldKeyPlaceholder": "es. primary_contact",
+    "fieldLabelLabel": "Etichetta",
+    "fieldLabelPlaceholder": "es. Contatto principale",
+    "fieldEntityLabel": "Entità correlata",
+    "fieldEntityPlaceholder": "es. contatto, opportunità",
+    "fieldCardinalityLabel": "Cardinalità",
+    "cancelButton": "Annulla",
+    "submitButtonPending": "Aggiunta…",
+    "submitButton": "Aggiungi",
+    "emptyState": "Nessuna relazione definita finora."
+  },
+  "chartContainer": {
+    "emptyMessage": "Nessun dato disponibile per questo periodo.",
+    "refresh": "Aggiorna",
+    "regionLabel": "Grafico",
+    "actionsLabel": "Azioni del grafico",
+    "loadingLabel": "Caricamento del grafico"
   }
 }

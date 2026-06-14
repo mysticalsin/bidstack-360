@@ -487,5 +487,28 @@
     "editButton": "Editar",
     "deleteButton": "Excluir",
     "noPermissions": "Sem permissões"
+  },
+  "rfpAnalytics": {
+    "errorMessage": "Falha ao carregar as análises de RFP. Tente novamente.",
+    "kpiSectionLabel": "Métricas principais das análises de RFP",
+    "kpiTotalLabel": "Total de RFPs",
+    "kpiTotalDetail": "de todos os responsáveis",
+    "kpiPipelineLabel": "Valor do pipeline",
+    "kpiPipelineDetail": "valor das oportunidades vinculadas",
+    "kpiWinRateLabel": "Taxa de ganho",
+    "kpiWinRateDetail": "{{won}} ganhas · {{closed}} fechadas",
+    "kpiInFlightLabel": "Em andamento",
+    "kpiInFlightDetail": "ainda não ganhas nem perdidas",
+    "byStatusTitle": "Por status",
+    "loading": "Carregando…",
+    "byStatusEmptyTitle": "Ainda não há RFPs",
+    "byStatusEmptyMessage": "As propostas aparecerão aqui à medida que sua equipe as criar.",
+    "byOwnerTitle": "Por responsável",
+    "byOwnerSubtitle": "Quem é responsável por quê e o valor do pipeline associado.",
+    "byOwnerEmptyTitle": "Ainda não há responsáveis",
+    "byOwnerEmptyMessage": "Atribua propostas para ver o detalhamento por responsável.",
+    "tableOwner": "Responsável",
+    "tableRfps": "RFPs",
+    "tablePipelineValue": "Valor do pipeline"
   }
 }

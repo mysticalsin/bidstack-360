@@ -116,5 +116,13 @@
     "banner": "您正在查看演示数据。",
     "clear": "清除演示数据",
     "confirmClear": "删除所有演示数据？此操作无法撤销。"
+  },
+  "tourStep": {
+    "dialogAriaLabel": "导览步骤 {{current}}/{{total}}：{{title}}",
+    "stepCounter": "{{current}}/{{total}}",
+    "skipTour": "跳过导览",
+    "back": "上一步",
+    "ctaFinish": "邀请你的团队",
+    "ctaNext": "下一步"
   }
 }
