@@ -8,6 +8,8 @@ import { useNavigate } from 'react-router-dom';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
 import { useOnboardingStore, type ChecklistItem } from '@/stores/onboarding';
+import { useOrgSummary } from '@/hooks/useOrgSummary';
+import { useUsers } from '@/hooks/useUsers';
 import { TOUR_STEPS } from '@/data/tour-steps';
 
 interface ChecklistItemDef {
@@ -21,6 +23,18 @@ export function QuickStartPage() {
   const navigate = useNavigate();
   const { completedChecklist, markChecklistItem, skipToStep, startTour, tourActive, openTemplatePicker } =
     useOnboardingStore();
+
+  // Steps backed by real workspace state reflect reality instead of a click, so
+  // the progress bar stops being theatre. The rest stay click-acknowledged —
+  // they kick off an action with no cheap "is it done" signal.
+  const summary = useOrgSummary();
+  const users = useUsers();
+  const derived: Partial<Record<ChecklistItem, boolean>> = {
+    first_lead: (summary.data?.leads ?? 0) > 0,
+    first_deal: (summary.data?.opportunities ?? 0) > 0,
+    invite_team: (users.data?.length ?? 0) > 1,
+  };
+  const isDone = (key: ChecklistItem) => derived[key] ?? completedChecklist.includes(key);
 
   function launchTourAt(stepIndex: number) {
     // Use skipToStep which sets tourActive + currentStepIndex
@@ -80,7 +94,7 @@ export function QuickStartPage() {
     },
   ];
 
-  const completedCount = ITEMS.filter((i) => completedChecklist.includes(i.key)).length;
+  const completedCount = ITEMS.filter((i) => isDone(i.key)).length;
   const progressPct = Math.round((completedCount / ITEMS.length) * 100);
 
   return (
@@ -129,14 +143,16 @@ export function QuickStartPage() {
       {/* Checklist */}
       <ul className="space-y-3" role="list">
         {ITEMS.map((item) => {
-          const done = completedChecklist.includes(item.key);
+          const done = isDone(item.key);
           return (
             <li key={item.key}>
               <button
                 type="button"
                 onClick={() => {
                   item.action();
-                  if (!done) markChecklistItem(item.key);
+                  // Only click-acknowledge non-derived steps; derived ones
+                  // (lead/deal/team) follow the real workspace, not the click.
+                  if (!(item.key in derived) && !done) markChecklistItem(item.key);
                 }}
                 className={cn(
                   'group flex w-full items-start gap-4 rounded-xl border p-4 text-left transition-all',
