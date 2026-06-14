@@ -66,46 +66,5 @@
     "leads": "Sin prospectos por ahora",
     "companies": "Sin empresas por ahora",
     "ctaCreate": "Crea tu primer(a) {{entity}}"
-  },
-  "pipeline": {
-    "title": "Pipeline de ventas",
-    "filterBy": "Filtrar por",
-    "groupBy": "Agrupar por",
-    "allStages": "Todas las etapas",
-    "addOpportunity": "Agregar oportunidad",
-    "dragToMove": "Arrastrar para mover",
-    "totalValue": "Valor total"
-  },
-  "leads": {
-    "title": "Prospectos",
-    "new": "Nuevo prospecto",
-    "qualify": "Calificar",
-    "disqualify": "Descalificar",
-    "convert": "Convertir en oportunidad",
-    "source": "Fuente",
-    "score": "Puntuación",
-    "assignTo": "Asignar a"
-  },
-  "tasks": {
-    "title": "Tareas",
-    "new": "Nueva tarea",
-    "dueToday": "Para hoy",
-    "overdue": "Vencida",
-    "completed": "Completada",
-    "markComplete": "Marcar como completada",
-    "assignedTo": "Asignado a",
-    "relatedTo": "Relacionado con",
-    "addNote": "Agregar nota"
-  },
-  "activities": {
-    "title": "Actividades",
-    "note": "Nota",
-    "call": "Llamada",
-    "email": "Correo",
-    "meeting": "Reunión",
-    "task": "Tarea",
-    "logActivity": "Registrar actividad",
-    "timeline": "Historial",
-    "noActivities": "Sin actividades registradas"
   }
 }
