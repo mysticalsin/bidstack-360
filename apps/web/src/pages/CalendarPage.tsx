@@ -57,7 +57,13 @@ function getWeekDays(anchor: Date): Date[] {
 }
 
 function toIso(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  // Local Y-M-D, NOT toISOString().slice(0,10): the grid renders local days and
+  // hours, so day-bucketing must use the local calendar date. toISOString shifts
+  // across midnight for any non-UTC offset, which put events on the wrong day.
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -105,7 +111,9 @@ export function CalendarPage() {
   function getEventsForDayHour(day: Date, hour: number): CalendarEvent[] {
     return events.filter((ev) => {
       const start = new Date(ev.startAt);
-      return toIso(start) === toIso(day) && start.getUTCHours() === hour;
+      // Local hour — the hour rows are labelled as local time, so an event at
+      // 14:00 local must land in the 14:00 row regardless of UTC offset.
+      return toIso(start) === toIso(day) && start.getHours() === hour;
     });
   }
 
@@ -226,7 +234,9 @@ export function CalendarPage() {
                   const dayHourEvents = getEventsForDayHour(day, hour);
                   const openSlot = () => {
                     const d = new Date(day);
-                    d.setUTCHours(hour);
+                    // Local hour so the new event starts at the clicked slot's
+                    // wall-clock time, matching how the grid is rendered.
+                    d.setHours(hour, 0, 0, 0);
                     setSelectedDate(d);
                     setShowModal(true);
                   };
