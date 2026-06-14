@@ -29,6 +29,7 @@ import { InfoSearchLeadsCard } from '@/components/account-intel/InfoSearchLeadsC
 import { CrossSellCard } from '@/components/account-intel/CrossSellCard';
 import { GovernanceLogCard } from '@/components/account-intel/GovernanceLogCard';
 import { SpotlightRefsCard } from '@/components/account-intel/SpotlightRefsCard';
+import { AccountNewsSignalCard } from '@/components/account-intel/AccountNewsSignalCard';
 import { ContractAgreementsCard } from '@/components/account-intel/ContractAgreementsCard';
 import {
   WinLossReasonsCard,
@@ -203,6 +204,14 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
       <KpiRow cockpit={cockpit} />
       <CommandCenter cockpit={cockpit} />
 
+      <div className="mt-1 flex flex-col gap-1">
+        <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
+          Portfolio sales intelligence
+        </h2>
+        <p className="text-xs text-[var(--fg-tertiary)]">
+          Pipeline, risks, contacts, and records for this account.
+        </p>
+      </div>
       <section className="cockpit-grid" aria-label="Account cockpit">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
           {show('techStack') && (
@@ -260,6 +269,12 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
           {show('contracts') && (
             <Reveal delay={0.24}>
               <ContractAgreementsCard accountKey={cockpit.company.id} />
+            </Reveal>
+          )}
+
+          {show('newsSignals') && (
+            <Reveal delay={0.26}>
+              <AccountNewsSignalCard accountId={companyName ?? cockpit.company.id} />
             </Reveal>
           )}
         </div>

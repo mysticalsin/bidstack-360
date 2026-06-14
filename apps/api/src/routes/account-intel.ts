@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { DocumentExtraction, ExtractDocumentRequest, AccountIntelSnapshot } from '@bidstack/shared';
 import { enqueueDocumentExtract } from '../queues/document-extract.js';
+import { fetchCompanyNewsSignals } from '../providers/company-news-signal.js';
 
 export const accountIntelRoutes: FastifyPluginAsyncZod = async (server) => {
 
@@ -81,6 +82,36 @@ export const accountIntelRoutes: FastifyPluginAsyncZod = async (server) => {
           updatedAt: e.updatedAt.toISOString(),
         })),
       };
+    },
+  );
+
+  // GET /api/accounts/:accountId/news-signals — free, keyless news/intent proxy.
+  // Recent public-web headlines about the account (Google News RSS, no API key).
+  server.get(
+    '/accounts/:accountId/news-signals',
+    {
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+      schema: {
+        params: z.object({ accountId: z.string().min(1).max(255) }),
+        response: {
+          200: z.object({
+            source: z.literal('google-news'),
+            fetchedAt: z.string().datetime(),
+            items: z.array(
+              z.object({
+                title: z.string(),
+                url: z.string(),
+                source: z.string().nullable(),
+                publishedAt: z.string().nullable(),
+              }),
+            ),
+          }),
+        },
+      },
+    },
+    async (req) => {
+      const items = await fetchCompanyNewsSignals(req.params.accountId);
+      return { source: 'google-news' as const, fetchedAt: new Date().toISOString(), items };
     },
   );
 

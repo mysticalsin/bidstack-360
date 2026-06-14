@@ -25,6 +25,7 @@ export const COCKPIT_CARDS: { id: string; label: string; group: 'main' | 'side' 
   { id: 'governance', label: 'Governance log', group: 'main' },
   { id: 'spotlightRefs', label: 'Project references', group: 'main' },
   { id: 'contracts', label: 'Contractual agreements', group: 'main' },
+  { id: 'newsSignals', label: 'News & signals (free)', group: 'main' },
   { id: 'healthScore', label: 'Signal coverage', group: 'side' },
   { id: 'revenueEvolution', label: 'Revenue evolution', group: 'side' },
   { id: 'winLoss', label: 'Win / loss', group: 'side' },
