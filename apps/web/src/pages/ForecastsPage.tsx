@@ -55,6 +55,14 @@ export function ForecastsPage() {
     [chartData],
   );
 
+  // Headline totals for the selected period — so the page answers "what's the
+  // number?" in one glance, led by Commit (the figure the bid team is held to).
+  const totals = useMemo(() => {
+    const t = { pipeline: 0, best_case: 0, commit: 0, closed: 0 };
+    for (const item of filteredItems) t[item.category] += item.amountMicros;
+    return t;
+  }, [filteredItems]);
+
   // ownerId identifies the row being edited — the grid shows every owner's
   // forecasts, so the write MUST carry it through or it silently overwrites the
   // signed-in user's own row instead.
@@ -170,6 +178,38 @@ export function ForecastsPage() {
             <TabsTrigger value="yearly">Yearly</TabsTrigger>
           </TabsList>
         </Tabs>
+      </motion.div>
+
+      {/* ── Headline totals — the page's answer at a glance ── */}
+      <motion.div
+        variants={reducedMotion ? undefined : staggerChild}
+        className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+        aria-label="Forecast totals for the selected period"
+      >
+        {(
+          [
+            { key: 'commit', label: 'Commit', accent: true },
+            { key: 'best_case', label: 'Best case', accent: false },
+            { key: 'pipeline', label: 'Pipeline', accent: false },
+            { key: 'closed', label: 'Closed', accent: false },
+          ] as const
+        ).map((k) => (
+          <div
+            key={k.key}
+            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
+          >
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+              {k.label}
+            </div>
+            <div
+              className={`mt-1 text-lg font-bold tabular-nums ${
+                k.accent ? 'text-[var(--success)]' : 'text-[var(--fg-primary)]'
+              }`}
+            >
+              {formatMoneyMicros(totals[k.key], 'EUR')}
+            </div>
+          </div>
+        ))}
       </motion.div>
 
       {/* ── Chart (desktop only; returns null when empty) ── */}
