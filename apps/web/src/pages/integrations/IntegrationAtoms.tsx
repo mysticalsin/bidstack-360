@@ -8,6 +8,7 @@
  * and keeps each consumer lean.
  */
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -48,13 +49,14 @@ export function ProbeHint({ icon, title, body }: { icon: IconName; title: string
 // ─── EndpointBox ───────────────────────────────────────────────────────────────
 
 export function EndpointBox({ label, value }: { label: string; value: string }) {
+  const { t } = useTranslation('integrations');
   return (
     <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-secondary)]">
           {label}
         </div>
-        <CopyButton value={value} label="Copy endpoint" />
+        <CopyButton value={value} label={t('integrationAtoms.copyEndpoint', 'Copy endpoint')} />
       </div>
       <code className="block overflow-x-auto rounded-md bg-[var(--surface-card)] px-3 py-2 font-mono text-xs text-[var(--fg-primary)]">
         {value}
@@ -66,13 +68,14 @@ export function EndpointBox({ label, value }: { label: string; value: string }) 
 // ─── SnippetBox ────────────────────────────────────────────────────────────────
 
 export function SnippetBox({ label, value }: { label: string; value: string }) {
+  const { t } = useTranslation('integrations');
   return (
     <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-secondary)]">
           {label}
         </div>
-        <CopyButton value={value} label="Copy snippet" />
+        <CopyButton value={value} label={t('integrationAtoms.copySnippet', 'Copy snippet')} />
       </div>
       <pre className="max-h-48 overflow-auto rounded-md bg-[var(--surface-card)] px-3 py-2 text-xs text-[var(--fg-primary)]">
         <code>{value}</code>
@@ -84,6 +87,7 @@ export function SnippetBox({ label, value }: { label: string; value: string }) {
 // ─── CopyButton ────────────────────────────────────────────────────────────────
 
 export function CopyButton({ value, label }: { value: string; label: string }) {
+  const { t } = useTranslation('integrations');
   const [copied, setCopied] = useState(false);
   return (
     <Button
@@ -94,15 +98,24 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
         try {
           await navigator.clipboard.writeText(value);
           setCopied(true);
-          toast.success(copied ? 'Already copied' : 'Copied to clipboard');
+          toast.success(
+            copied
+              ? t('integrationAtoms.alreadyCopied', 'Already copied')
+              : t('integrationAtoms.copiedToClipboard', 'Copied to clipboard'),
+          );
           setTimeout(() => setCopied(false), 1600);
         } catch {
-          toast.error('Copy failed', { description: 'Clipboard access was not available.' });
+          toast.error(t('integrationAtoms.copyFailedTitle', 'Copy failed'), {
+            description: t(
+              'integrationAtoms.copyFailedDescription',
+              'Clipboard access was not available.',
+            ),
+          });
         }
       }}
     >
       <Icon name={copied ? 'checkCircle' : 'copy'} size={14} />
-      {copied ? 'Copied' : 'Copy'}
+      {copied ? t('integrationAtoms.copied', 'Copied') : t('integrationAtoms.copy', 'Copy')}
     </Button>
   );
 }
@@ -110,6 +123,7 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
 // ─── ProbeResultCard ───────────────────────────────────────────────────────────
 
 export function ProbeResultCard({ result }: { result: IntegrationProbeResult }) {
+  const { t } = useTranslation('integrations');
   return (
     <div
       className={`rounded-lg border p-4 ${
@@ -140,9 +154,13 @@ export function ProbeResultCard({ result }: { result: IntegrationProbeResult }) 
         </div>
         <div className="flex flex-wrap gap-2">
           <Badge tone={result.ok ? 'jade' : 'amber'}>
-            {result.status ? `HTTP ${result.status}` : 'No response'}
+            {result.status
+              ? t('integrationAtoms.httpStatus', 'HTTP {{status}}', { status: result.status })
+              : t('integrationAtoms.noResponse', 'No response')}
           </Badge>
-          <Badge tone="gray">{result.latencyMs}ms</Badge>
+          <Badge tone="gray">
+            {t('integrationAtoms.latencyMs', '{{latency}}ms', { latency: result.latencyMs })}
+          </Badge>
         </div>
       </div>
       {result.warnings.length > 0 ? (

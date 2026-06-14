@@ -1170,7 +1170,7 @@
     "deleteRuleConfirmDescription": "This routing rule will be deactivated."
   },
   "pipeline": {
-    "heading": "Pipeline",
+    "heading": "Open pipeline",
     "subtitle": "Drag a card between columns, or focus a card and use ← / → to move stages.",
     "stageFilterLabel": "Stage",
     "stageFilterAriaLabel": "Filter pipeline by stage",
@@ -1192,7 +1192,12 @@
     "movedToStageToast": "Moved to {{stage}}",
     "movedOpportunityToast": "Moved \"{{name}}\" to {{stage}}",
     "moveErrorToastTitle": "Could not move opportunity",
-    "moveErrorToastDescription": "The server rejected the request."
+    "moveErrorToastDescription": "The server rejected the request.",
+    "openOpportunitiesLabel": "Open opportunities",
+    "openCount_one": "{{count}} open opportunity",
+    "openCount_other": "{{count}} open opportunities",
+    "emptyStageValue": "No stage value yet",
+    "chartAriaLabel": "Pipeline stage value distribution"
   },
   "auditLogTable": {
     "evidenceStreamTitle": "Evidence stream",
@@ -2943,5 +2948,108 @@
     "sectionRecentInteractions": "Recent Interactions",
     "cost": "Cost: ${{amount}}",
     "emptyState": "Generate an AI-powered brief covering attendees, open deals, talking points, and suggested questions for this meeting."
+  },
+  "intake": {
+    "title": "Intake",
+    "subtitle": "Receive documents, extract intelligence, review, and publish to account profiles.",
+    "toastExtractionComplete": "Extraction complete",
+    "toastSelectDocument": "Select at least one document",
+    "toastExtractionFailed": "Extraction failed"
+  },
+  "healthScore": {
+    "regionLabel": "Account signal coverage",
+    "title": "Signal coverage",
+    "signalsScored": "{{count}} account signals scored",
+    "gaugeLabel": "Account signal coverage {{score}} out of 100",
+    "coverage": "Coverage",
+    "strongestBand": "Strongest coverage band",
+    "noSignal": "No signal",
+    "healthBands": "Health bands",
+    "whatDrivesScore": "What drives this score",
+    "scoreFactors": "Score factors",
+    "nextLabel": "Next: ",
+    "band": {
+      "strong": "Strong",
+      "good": "Good",
+      "needsAttention": "Needs attention",
+      "critical": "Critical"
+    }
+  },
+  "objectSettingsForm": {
+    "updateFailed": "Update failed",
+    "heading": "Object Settings",
+    "saved": "Saved.",
+    "singularLabel": "Singular label",
+    "pluralLabel": "Plural label",
+    "description": "Description",
+    "color": "Color",
+    "selectColor": "Select color {{color}}",
+    "apiKeyLabel": "API key:",
+    "apiKeyImmutable": "(immutable)",
+    "saving": "Saving…",
+    "saveChanges": "Save changes"
+  },
+  "contactContextMenu": {
+    "copySuccess": "Copied {{label}}",
+    "copyError": "Copy failed",
+    "menuAriaLabel": "Actions for {{name}}",
+    "editContact": "Edit contact",
+    "emailLabel": "email",
+    "copyEmail": "Copy email",
+    "phoneLabel": "phone",
+    "copyPhone": "Copy phone",
+    "deleteContact": "Delete contact"
+  },
+  "dataTrust": {
+    "regionLabel": "Data trust and attribution",
+    "title": "Data trust",
+    "caption": "Key fields include available source attribution",
+    "attributionConfidence": "Attribution confidence",
+    "attributedSources": "{{count}} attributed sources",
+    "checkLegalIdentity": "Legal identity",
+    "checkLogo": "Logo",
+    "checkFreshness": "Freshness",
+    "valueAttributed": "Attributed",
+    "valuePending": "Pending",
+    "sourceReceipts": "Source receipts",
+    "emptySources": "Run data verification to attach registry, logo, and market data sources.",
+    "logoSourceLogoDev": "Logo.dev",
+    "logoSourceOfficial": "Official",
+    "logoSourceBrandfetch": "Brandfetch",
+    "logoSourceWikimedia": "Wikimedia",
+    "logoSourceFavicon": "Favicon",
+    "logoSourceManual": "Manual",
+    "logoSourceInitials": "Initials"
+  },
+  "topbarSearch": {
+    "label": "Search opportunities, contacts, tasks",
+    "placeholder": "Search or jump to…",
+    "recentSearchesAriaLabel": "Recent searches",
+    "recentHeading": "Recent",
+    "clear": "Clear"
+  },
+  "newReference": {
+    "titleRequired": "A reference title is required.",
+    "dialogTitle": "New reference",
+    "dialogDescription": "Capture a reusable customer reference — case study, testimonial, or win story — for proposals and bids.",
+    "titleLabel": "Title",
+    "titlePlaceholder": "Acme Corp — 40% faster onboarding",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "What was delivered, the outcome, and why it's quotable…",
+    "industryLabel": "Industry",
+    "industryPlaceholder": "Software",
+    "dealValueLabel": "Deal value",
+    "dealValuePlaceholder": "250000",
+    "contactNameLabel": "Contact name",
+    "contactNamePlaceholder": "Jane Doe",
+    "contactEmailLabel": "Contact email",
+    "contactEmailPlaceholder": "jane@acme.com",
+    "documentUrlLabel": "Document URL",
+    "tagsLabel": "Tags",
+    "tagsHelper": "Comma-separated",
+    "tagsPlaceholder": "case-study, enterprise, emea",
+    "cancel": "Cancel",
+    "creating": "Creating…",
+    "create": "Create reference"
   }
 }

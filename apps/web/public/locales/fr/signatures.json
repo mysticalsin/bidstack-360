@@ -78,5 +78,17 @@
     "successTitle": "Demande de signature envoyée !",
     "successMessage": "Les destinataires recevront un e-mail pour signer le document.",
     "doneButton": "Terminé"
+  },
+  "recipientStatusTimeline": {
+    "eventLabel": {
+      "sent": "Envoyé",
+      "delivered": "Remis",
+      "viewed": "Ouvert",
+      "signed": "Signé",
+      "declined": "Refusé",
+      "voided": "Annulé"
+    },
+    "recipientEventsAriaLabel": "Événements pour {{name}}",
+    "noEventsYet": "Aucun événement pour le moment"
   }
 }

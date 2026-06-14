@@ -575,5 +575,24 @@
     "badgeNeedsAttention": "Richiede attenzione",
     "badgeLive": "Attivo",
     "openButton": "Apri"
+  },
+  "tags": {
+    "toastCreated": "Tag creato",
+    "toastCreateFailed": "Creazione del tag non riuscita",
+    "confirmDelete": "Eliminare il tag \"{{name}}\"?",
+    "confirmDeleteWithUsage": "\"{{name}}\" è su {{count}} record. Rimuovendolo verrà tolto il tag da ognuno. Continuare?",
+    "toastRemoved": "Tag rimosso",
+    "createHeading": "Crea un tag",
+    "namePlaceholder": "es. Lead caldo",
+    "createButton": "Crea",
+    "libraryHeading": "Libreria",
+    "loading": "Caricamento…",
+    "emptyTitle": "Ancora nessun tag",
+    "emptyMessage": "Crea il tuo primo tag qui sopra.",
+    "libraryAriaLabel": "Libreria dei tag",
+    "usageCount": "{{count}} record",
+    "deleteButton": "Elimina",
+    "colorGroupAriaLabel": "Colore del tag",
+    "colorSwatchAriaLabel": "Colore {{color}}"
   }
 }

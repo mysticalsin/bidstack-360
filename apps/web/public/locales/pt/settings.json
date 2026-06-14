@@ -575,5 +575,24 @@
     "badgeNeedsAttention": "Requer atenção",
     "badgeLive": "Ativo",
     "openButton": "Abrir"
+  },
+  "tags": {
+    "toastCreated": "Etiqueta criada",
+    "toastCreateFailed": "Falha ao criar a etiqueta",
+    "confirmDelete": "Excluir a etiqueta \"{{name}}\"?",
+    "confirmDeleteWithUsage": "\"{{name}}\" está em {{count}} registros. Removê-la desmarcará todos. Continuar?",
+    "toastRemoved": "Etiqueta removida",
+    "createHeading": "Criar uma etiqueta",
+    "namePlaceholder": "ex. Lead quente",
+    "createButton": "Criar",
+    "libraryHeading": "Biblioteca",
+    "loading": "Carregando…",
+    "emptyTitle": "Ainda não há etiquetas",
+    "emptyMessage": "Crie sua primeira etiqueta acima.",
+    "libraryAriaLabel": "Biblioteca de etiquetas",
+    "usageCount": "{{count}} registros",
+    "deleteButton": "Excluir",
+    "colorGroupAriaLabel": "Cor da etiqueta",
+    "colorSwatchAriaLabel": "Cor {{color}}"
   }
 }

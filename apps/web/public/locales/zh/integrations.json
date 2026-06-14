@@ -444,5 +444,54 @@
       "probeFailed": "端点探测失败。",
       "blockedTitle": "探测被阻止"
     }
+  },
+  "integrationHero": {
+    "eyebrowBadge": "集成结构",
+    "eyebrowChannels": "MCP、REST、Webhook、Dust",
+    "title": "集成",
+    "subtitle": "通过清晰的设置路径、范围受限的凭据和实时健康检查，连接代理、API、ERP 系统和事件流，与平台的其余部分无缝契合。",
+    "posture": {
+      "refreshing": "正在刷新集成状态…"
+    },
+    "actions": {
+      "createApiKey": "创建 API 密钥",
+      "addWebhook": "添加 Webhook"
+    },
+    "metrics": {
+      "readyPaths": {
+        "label": "就绪路径",
+        "helperCurrent": "当前视图",
+        "helperOverview": "概览标签页"
+      },
+      "dustAgents": {
+        "label": "Dust 代理"
+      },
+      "webhookEvents": {
+        "label": "Webhook 事件",
+        "helperNeedReview": "{{count}} 项需要审查",
+        "helperNoErrors": "未加载事件错误"
+      },
+      "activeMcpTools": {
+        "label": "活跃的 MCP 工具",
+        "helper": "面向 Dust 的 crm_* 工具"
+      },
+      "controlPlane": {
+        "label": "控制平面",
+        "helper": "最小权限配置"
+      }
+    }
+  },
+  "integrationAtoms": {
+    "copyEndpoint": "复制端点",
+    "copySnippet": "复制代码片段",
+    "alreadyCopied": "已复制",
+    "copiedToClipboard": "已复制到剪贴板",
+    "copyFailedTitle": "复制失败",
+    "copyFailedDescription": "无法访问剪贴板。",
+    "copied": "已复制",
+    "copy": "复制",
+    "httpStatus": "HTTP {{status}}",
+    "noResponse": "无响应",
+    "latencyMs": "{{latency}}毫秒"
   }
 }

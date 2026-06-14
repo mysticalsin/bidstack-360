@@ -575,5 +575,24 @@
     "badgeNeedsAttention": "需要关注",
     "badgeLive": "运行中",
     "openButton": "打开"
+  },
+  "tags": {
+    "toastCreated": "标签已创建",
+    "toastCreateFailed": "标签创建失败",
+    "confirmDelete": "删除标签“{{name}}”？",
+    "confirmDeleteWithUsage": "“{{name}}”用于 {{count}} 条记录。移除它将取消所有记录的标签。是否继续？",
+    "toastRemoved": "标签已移除",
+    "createHeading": "创建标签",
+    "namePlaceholder": "例如：热门线索",
+    "createButton": "创建",
+    "libraryHeading": "标签库",
+    "loading": "加载中…",
+    "emptyTitle": "暂无标签",
+    "emptyMessage": "在上方创建您的第一个标签。",
+    "libraryAriaLabel": "标签库",
+    "usageCount": "{{count}} 条记录",
+    "deleteButton": "删除",
+    "colorGroupAriaLabel": "标签颜色",
+    "colorSwatchAriaLabel": "颜色 {{color}}"
   }
 }

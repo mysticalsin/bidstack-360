@@ -434,5 +434,54 @@
       "probeFailed": "La comprobación del endpoint falló.",
       "blockedTitle": "Comprobación bloqueada"
     }
+  },
+  "integrationHero": {
+    "eyebrowBadge": "Tejido de integración",
+    "eyebrowChannels": "MCP, REST, webhooks, Dust",
+    "title": "Integraciones",
+    "subtitle": "Conecta agentes, API, sistemas ERP y flujos de eventos con rutas de configuración claras, credenciales con alcance definido y comprobaciones de estado en vivo que encajan con el resto de la plataforma.",
+    "posture": {
+      "refreshing": "Actualizando el estado de la integración..."
+    },
+    "actions": {
+      "createApiKey": "Crear clave de API",
+      "addWebhook": "Añadir webhook"
+    },
+    "metrics": {
+      "readyPaths": {
+        "label": "Rutas listas",
+        "helperCurrent": "Vista actual",
+        "helperOverview": "Pestaña de resumen"
+      },
+      "dustAgents": {
+        "label": "Agentes de Dust"
+      },
+      "webhookEvents": {
+        "label": "Eventos de webhook",
+        "helperNeedReview": "{{count}} requieren revisión",
+        "helperNoErrors": "No se cargaron errores de eventos"
+      },
+      "activeMcpTools": {
+        "label": "Herramientas MCP activas",
+        "helper": "Herramientas crm_* orientadas a Dust"
+      },
+      "controlPlane": {
+        "label": "Plano de control",
+        "helper": "Configuración de privilegio mínimo"
+      }
+    }
+  },
+  "integrationAtoms": {
+    "copyEndpoint": "Copiar endpoint",
+    "copySnippet": "Copiar fragmento",
+    "alreadyCopied": "Ya copiado",
+    "copiedToClipboard": "Copiado al portapapeles",
+    "copyFailedTitle": "Error al copiar",
+    "copyFailedDescription": "No se pudo acceder al portapapeles.",
+    "copied": "Copiado",
+    "copy": "Copiar",
+    "httpStatus": "HTTP {{status}}",
+    "noResponse": "Sin respuesta",
+    "latencyMs": "{{latency}}ms"
   }
 }

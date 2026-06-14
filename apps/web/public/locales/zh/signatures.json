@@ -78,5 +78,17 @@
     "successTitle": "签名请求已发送！",
     "successMessage": "收件人将收到一封电子邮件以签署文档。",
     "doneButton": "完成"
+  },
+  "recipientStatusTimeline": {
+    "eventLabel": {
+      "sent": "已发送",
+      "delivered": "已送达",
+      "viewed": "已打开",
+      "signed": "已签署",
+      "declined": "已拒绝",
+      "voided": "已作废"
+    },
+    "recipientEventsAriaLabel": "{{name}} 的事件",
+    "noEventsYet": "暂无事件"
   }
 }

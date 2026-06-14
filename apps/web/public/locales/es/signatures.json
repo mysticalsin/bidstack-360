@@ -78,5 +78,17 @@
     "successTitle": "¡Solicitud de firma enviada!",
     "successMessage": "Los destinatarios recibirán un correo electrónico para firmar el documento.",
     "doneButton": "Listo"
+  },
+  "recipientStatusTimeline": {
+    "eventLabel": {
+      "sent": "Enviado",
+      "delivered": "Entregado",
+      "viewed": "Abierto",
+      "signed": "Firmado",
+      "declined": "Rechazado",
+      "voided": "Anulado"
+    },
+    "recipientEventsAriaLabel": "Eventos de {{name}}",
+    "noEventsYet": "Aún no hay eventos"
   }
 }

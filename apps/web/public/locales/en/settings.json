@@ -556,5 +556,24 @@
     "badgeNeedsAttention": "Needs attention",
     "badgeLive": "Live",
     "openButton": "Open"
+  },
+  "tags": {
+    "toastCreated": "Tag created",
+    "toastCreateFailed": "Tag create failed",
+    "confirmDelete": "Delete tag \"{{name}}\"?",
+    "confirmDeleteWithUsage": "\"{{name}}\" is on {{count}} records. Removing it will untag every one. Continue?",
+    "toastRemoved": "Tag removed",
+    "createHeading": "Create a tag",
+    "namePlaceholder": "e.g. Hot Lead",
+    "createButton": "Create",
+    "libraryHeading": "Library",
+    "loading": "Loading…",
+    "emptyTitle": "No tags yet",
+    "emptyMessage": "Create your first tag above.",
+    "libraryAriaLabel": "Tag library",
+    "usageCount": "{{count}} records",
+    "deleteButton": "Delete",
+    "colorGroupAriaLabel": "Tag colour",
+    "colorSwatchAriaLabel": "Colour {{color}}"
   }
 }

@@ -78,5 +78,17 @@
     "successTitle": "Signature request sent!",
     "successMessage": "Recipients will receive an email to sign the document.",
     "doneButton": "Done"
+  },
+  "recipientStatusTimeline": {
+    "eventLabel": {
+      "sent": "Sent",
+      "delivered": "Delivered",
+      "viewed": "Opened",
+      "signed": "Signed",
+      "declined": "Declined",
+      "voided": "Voided"
+    },
+    "recipientEventsAriaLabel": "Events for {{name}}",
+    "noEventsYet": "No events yet"
   }
 }

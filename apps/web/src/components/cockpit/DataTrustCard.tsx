@@ -1,5 +1,7 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
@@ -15,6 +17,7 @@ interface Props {
 
 export const DataTrustCard = memo(function DataTrustCard({ cockpit }: Props) {
   const reducedMotion = useReducedMotion();
+  const { t } = useTranslation('crm');
   const company = cockpit.company;
   const sources = company.sourceAttribution.slice(0, 4);
   const sourceCount = company.sourceAttribution.length;
@@ -25,32 +28,43 @@ export const DataTrustCard = memo(function DataTrustCard({ cockpit }: Props) {
 
   const checks: Array<{ label: string; value: string; tone: BadgeTone }> = [
     {
-      label: 'Legal identity',
-      value: company.legalName ? 'Attributed' : 'Pending',
+      label: t('dataTrust.checkLegalIdentity', 'Legal identity'),
+      value: company.legalName
+        ? t('dataTrust.valueAttributed', 'Attributed')
+        : t('dataTrust.valuePending', 'Pending'),
       tone: company.legalName ? 'jade' : 'amber',
     },
     {
-      label: 'Logo',
-      value: company.logo ? logoSourceLabel(company.logo.source) : 'Initials',
+      label: t('dataTrust.checkLogo', 'Logo'),
+      value: company.logo
+        ? logoSourceLabel(company.logo.source, t)
+        : t('dataTrust.logoSourceInitials', 'Initials'),
       tone: company.logo?.url ? 'jade' : 'gray',
     },
     {
-      label: 'Freshness',
+      label: t('dataTrust.checkFreshness', 'Freshness'),
       value: relativeTime(latestFetch),
       tone: isFresh(latestFetch) ? 'jade' : 'amber',
     },
   ];
 
   return (
-    <Card role="region" aria-label="Data trust and attribution">
-      <SectionHeader title="Data trust" caption="Key fields include available source attribution" />
+    <Card role="region" aria-label={t('dataTrust.regionLabel', 'Data trust and attribution')}>
+      <SectionHeader
+        title={t('dataTrust.title', 'Data trust')}
+        caption={t('dataTrust.caption', 'Key fields include available source attribution')}
+      />
       <div className="data-trust">
         <div className="data-trust-score">
-          <span>Attribution confidence</span>
+          <span>{t('dataTrust.attributionConfidence', 'Attribution confidence')}</span>
           <strong>
             <AnimatedMetric value={`${Math.round(averageConfidence * 100)}%`} />
           </strong>
-          <small>{sourceCount} attributed sources</small>
+          <small>
+            {t('dataTrust.attributedSources', '{{count}} attributed sources', {
+              count: sourceCount,
+            })}
+          </small>
         </div>
 
         <div className="data-trust-checks">
@@ -67,10 +81,13 @@ export const DataTrustCard = memo(function DataTrustCard({ cockpit }: Props) {
           ))}
         </div>
 
-        <div className="data-trust-sources" aria-label="Source receipts">
+        <div className="data-trust-sources" aria-label={t('dataTrust.sourceReceipts', 'Source receipts')}>
           {sources.length === 0 ? (
             <div className="data-trust-empty">
-              Run data verification to attach registry, logo, and market data sources.
+              {t(
+                'dataTrust.emptySources',
+                'Run data verification to attach registry, logo, and market data sources.',
+              )}
             </div>
           ) : (
             sources.map((source, index) => (
@@ -150,12 +167,12 @@ function isFresh(iso: string): boolean {
   return Date.now() - new Date(iso).getTime() < 1000 * 60 * 60 * 24 * 30;
 }
 
-function logoSourceLabel(source: CrmLogoSource): string {
-  if (source === 'logo_dev') return 'Logo.dev';
-  if (source === 'official_website') return 'Official';
-  if (source === 'brandfetch') return 'Brandfetch';
-  if (source === 'wikimedia') return 'Wikimedia';
-  if (source === 'favicon') return 'Favicon';
-  if (source === 'manual') return 'Manual';
-  return 'Initials';
+function logoSourceLabel(source: CrmLogoSource, t: TFunction): string {
+  if (source === 'logo_dev') return t('dataTrust.logoSourceLogoDev', 'Logo.dev');
+  if (source === 'official_website') return t('dataTrust.logoSourceOfficial', 'Official');
+  if (source === 'brandfetch') return t('dataTrust.logoSourceBrandfetch', 'Brandfetch');
+  if (source === 'wikimedia') return t('dataTrust.logoSourceWikimedia', 'Wikimedia');
+  if (source === 'favicon') return t('dataTrust.logoSourceFavicon', 'Favicon');
+  if (source === 'manual') return t('dataTrust.logoSourceManual', 'Manual');
+  return t('dataTrust.logoSourceInitials', 'Initials');
 }

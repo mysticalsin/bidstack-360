@@ -444,5 +444,54 @@
       "probeFailed": "La sonda dell'endpoint non è riuscita.",
       "blockedTitle": "Sonda bloccata"
     }
+  },
+  "integrationHero": {
+    "eyebrowBadge": "Tessuto di integrazione",
+    "eyebrowChannels": "MCP, REST, webhook, Dust",
+    "title": "Integrazioni",
+    "subtitle": "Collega agenti, API, sistemi ERP e flussi di eventi con percorsi di configurazione chiari, credenziali con ambito definito e controlli di stato in tempo reale integrati con il resto della piattaforma.",
+    "posture": {
+      "refreshing": "Aggiornamento dello stato dell'integrazione..."
+    },
+    "actions": {
+      "createApiKey": "Crea chiave API",
+      "addWebhook": "Aggiungi webhook"
+    },
+    "metrics": {
+      "readyPaths": {
+        "label": "Percorsi pronti",
+        "helperCurrent": "Vista corrente",
+        "helperOverview": "Scheda panoramica"
+      },
+      "dustAgents": {
+        "label": "Agenti Dust"
+      },
+      "webhookEvents": {
+        "label": "Eventi webhook",
+        "helperNeedReview": "{{count}} da rivedere",
+        "helperNoErrors": "Nessun errore di evento caricato"
+      },
+      "activeMcpTools": {
+        "label": "Strumenti MCP attivi",
+        "helper": "Strumenti crm_* rivolti a Dust"
+      },
+      "controlPlane": {
+        "label": "Piano di controllo",
+        "helper": "Configurazione con privilegi minimi"
+      }
+    }
+  },
+  "integrationAtoms": {
+    "copyEndpoint": "Copia endpoint",
+    "copySnippet": "Copia snippet",
+    "alreadyCopied": "Già copiato",
+    "copiedToClipboard": "Copiato negli appunti",
+    "copyFailedTitle": "Copia non riuscita",
+    "copyFailedDescription": "L'accesso agli appunti non era disponibile.",
+    "copied": "Copiato",
+    "copy": "Copia",
+    "httpStatus": "HTTP {{status}}",
+    "noResponse": "Nessuna risposta",
+    "latencyMs": "{{latency}}ms"
   }
 }

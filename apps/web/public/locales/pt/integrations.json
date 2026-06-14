@@ -444,5 +444,54 @@
       "probeFailed": "A sondagem do endpoint falhou.",
       "blockedTitle": "Sondagem bloqueada"
     }
+  },
+  "integrationHero": {
+    "eyebrowBadge": "Malha de integração",
+    "eyebrowChannels": "MCP, REST, webhooks, Dust",
+    "title": "Integrações",
+    "subtitle": "Conecte agentes, APIs, sistemas ERP e fluxos de eventos com caminhos de configuração claros, credenciais com escopo definido e verificações de integridade ao vivo que se encaixam no restante da plataforma.",
+    "posture": {
+      "refreshing": "Atualizando o estado da integração..."
+    },
+    "actions": {
+      "createApiKey": "Criar chave de API",
+      "addWebhook": "Adicionar webhook"
+    },
+    "metrics": {
+      "readyPaths": {
+        "label": "Caminhos prontos",
+        "helperCurrent": "Visualização atual",
+        "helperOverview": "Aba de visão geral"
+      },
+      "dustAgents": {
+        "label": "Agentes do Dust"
+      },
+      "webhookEvents": {
+        "label": "Eventos de webhook",
+        "helperNeedReview": "{{count}} precisam de revisão",
+        "helperNoErrors": "Nenhum erro de evento carregado"
+      },
+      "activeMcpTools": {
+        "label": "Ferramentas MCP ativas",
+        "helper": "Ferramentas crm_* voltadas ao Dust"
+      },
+      "controlPlane": {
+        "label": "Plano de controle",
+        "helper": "Configuração de privilégio mínimo"
+      }
+    }
+  },
+  "integrationAtoms": {
+    "copyEndpoint": "Copiar endpoint",
+    "copySnippet": "Copiar trecho",
+    "alreadyCopied": "Já copiado",
+    "copiedToClipboard": "Copiado para a área de transferência",
+    "copyFailedTitle": "Falha ao copiar",
+    "copyFailedDescription": "O acesso à área de transferência não estava disponível.",
+    "copied": "Copiado",
+    "copy": "Copiar",
+    "httpStatus": "HTTP {{status}}",
+    "noResponse": "Sem resposta",
+    "latencyMs": "{{latency}}ms"
   }
 }

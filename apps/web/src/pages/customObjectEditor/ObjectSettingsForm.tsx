@@ -3,6 +3,7 @@
  * Owns all form state; accepts the already-loaded `def` and the update mutation.
  */
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { type useUpdateCustomObjectDef } from '@/hooks/useCustomObjects';
 import { cn } from '@/lib/cn';
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export function ObjectSettingsForm({ def, updateDef }: Props) {
+  const { t } = useTranslation('crm');
   const [labelSingular, setLabelSingular] = useState('');
   const [labelPlural, setLabelPlural] = useState('');
   const [description, setDescription] = useState('');
@@ -52,14 +54,16 @@ export function ObjectSettingsForm({ def, updateDef }: Props) {
       });
       setUpdateSuccess(true);
     } catch (err) {
-      setUpdateError(err instanceof Error ? err.message : 'Update failed');
+      setUpdateError(
+        err instanceof Error ? err.message : t('objectSettingsForm.updateFailed', 'Update failed'),
+      );
     }
   }
 
   return (
     <section aria-labelledby="edit-def-heading">
       <h2 id="edit-def-heading" className="text-lg font-semibold text-[var(--text-primary)] mb-4">
-        Object Settings
+        {t('objectSettingsForm.heading', 'Object Settings')}
       </h2>
       <form
         onSubmit={(e) => {
@@ -74,7 +78,7 @@ export function ObjectSettingsForm({ def, updateDef }: Props) {
         )}
         {updateSuccess && (
           <p role="status" className="text-sm text-emerald-600 dark:text-emerald-400">
-            Saved.
+            {t('objectSettingsForm.saved', 'Saved.')}
           </p>
         )}
 
@@ -84,7 +88,7 @@ export function ObjectSettingsForm({ def, updateDef }: Props) {
               htmlFor="ed-singular"
               className="block text-sm font-medium text-[var(--text-primary)] mb-1"
             >
-              Singular label
+              {t('objectSettingsForm.singularLabel', 'Singular label')}
             </label>
             <input
               id="ed-singular"
@@ -100,7 +104,7 @@ export function ObjectSettingsForm({ def, updateDef }: Props) {
               htmlFor="ed-plural"
               className="block text-sm font-medium text-[var(--text-primary)] mb-1"
             >
-              Plural label
+              {t('objectSettingsForm.pluralLabel', 'Plural label')}
             </label>
             <input
               id="ed-plural"
@@ -118,7 +122,7 @@ export function ObjectSettingsForm({ def, updateDef }: Props) {
             htmlFor="ed-description"
             className="block text-sm font-medium text-[var(--text-primary)] mb-1"
           >
-            Description
+            {t('objectSettingsForm.description', 'Description')}
           </label>
           <textarea
             id="ed-description"
@@ -131,7 +135,9 @@ export function ObjectSettingsForm({ def, updateDef }: Props) {
         </div>
 
         <fieldset>
-          <legend className="text-sm font-medium text-[var(--text-primary)] mb-1">Color</legend>
+          <legend className="text-sm font-medium text-[var(--text-primary)] mb-1">
+            {t('objectSettingsForm.color', 'Color')}
+          </legend>
           <div className="flex gap-2 flex-wrap">
             {PRESET_COLORS.map((c) => (
               <button
@@ -143,7 +149,9 @@ export function ObjectSettingsForm({ def, updateDef }: Props) {
                   color === c ? 'border-white ring-2 ring-[var(--ring)]' : 'border-transparent',
                 )}
                 style={{ backgroundColor: c }}
-                aria-label={`Select color ${c}`}
+                aria-label={t('objectSettingsForm.selectColor', 'Select color {{color}}', {
+                  color: c,
+                })}
                 aria-pressed={color === c}
               />
             ))}
@@ -152,14 +160,18 @@ export function ObjectSettingsForm({ def, updateDef }: Props) {
 
         <div className="flex justify-between items-center pt-1">
           <p className="text-xs text-[var(--text-tertiary)]">
-            API key: <code className="font-mono">{def.key}</code> (immutable)
+            {t('objectSettingsForm.apiKeyLabel', 'API key:')}{' '}
+            <code className="font-mono">{def.key}</code>{' '}
+            {t('objectSettingsForm.apiKeyImmutable', '(immutable)')}
           </p>
           <button
             type="submit"
             disabled={updateDef.isPending}
             className="px-4 py-2 rounded-lg bg-[var(--accent)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
           >
-            {updateDef.isPending ? 'Saving…' : 'Save changes'}
+            {updateDef.isPending
+              ? t('objectSettingsForm.saving', 'Saving…')
+              : t('objectSettingsForm.saveChanges', 'Save changes')}
           </button>
         </div>
       </form>

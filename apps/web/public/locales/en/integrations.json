@@ -444,5 +444,54 @@
       "probeFailed": "Endpoint probe failed.",
       "blockedTitle": "Probe blocked"
     }
+  },
+  "integrationHero": {
+    "eyebrowBadge": "Integration fabric",
+    "eyebrowChannels": "MCP, REST, webhooks, Dust",
+    "title": "Integrations",
+    "subtitle": "Connect agents, APIs, ERP systems and event streams with clear setup paths, scoped credentials and live health checks that fit the rest of the platform.",
+    "posture": {
+      "refreshing": "Refreshing integration posture..."
+    },
+    "actions": {
+      "createApiKey": "Create API key",
+      "addWebhook": "Add webhook"
+    },
+    "metrics": {
+      "readyPaths": {
+        "label": "Ready paths",
+        "helperCurrent": "Current view",
+        "helperOverview": "Overview tab"
+      },
+      "dustAgents": {
+        "label": "Dust agents"
+      },
+      "webhookEvents": {
+        "label": "Webhook events",
+        "helperNeedReview": "{{count}} need review",
+        "helperNoErrors": "No event errors loaded"
+      },
+      "activeMcpTools": {
+        "label": "Active MCP tools",
+        "helper": "Dust-facing crm_* tools"
+      },
+      "controlPlane": {
+        "label": "Control plane",
+        "helper": "Least-privilege setup"
+      }
+    }
+  },
+  "integrationAtoms": {
+    "copyEndpoint": "Copy endpoint",
+    "copySnippet": "Copy snippet",
+    "alreadyCopied": "Already copied",
+    "copiedToClipboard": "Copied to clipboard",
+    "copyFailedTitle": "Copy failed",
+    "copyFailedDescription": "Clipboard access was not available.",
+    "copied": "Copied",
+    "copy": "Copy",
+    "httpStatus": "HTTP {{status}}",
+    "noResponse": "No response",
+    "latencyMs": "{{latency}}ms"
   }
 }

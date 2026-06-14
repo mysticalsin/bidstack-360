@@ -3,6 +3,7 @@
 // so label/htmlFor wiring, aria-invalid linkage, dark mode, and 44px touch
 // targets come for free. Wired to the existing POST /references endpoint.
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { Input } from '@/components/ui/Input';
@@ -26,6 +27,7 @@ interface Props {
 }
 
 export function NewReferenceDialog({ onClose, onCreate, isPending }: Props) {
+  const { t } = useTranslation('crm');
   const [title, setTitle] = useState('');
   const [industry, setIndustry] = useState('');
   const [description, setDescription] = useState('');
@@ -39,7 +41,7 @@ export function NewReferenceDialog({ onClose, onCreate, isPending }: Props) {
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
-      setTitleError('A reference title is required.');
+      setTitleError(t('newReference.titleRequired', 'A reference title is required.'));
       return;
     }
     setTitleError(undefined);
@@ -69,13 +71,16 @@ export function NewReferenceDialog({ onClose, onCreate, isPending }: Props) {
       }}
     >
       <DialogContent
-        title="New reference"
-        description="Capture a reusable customer reference — case study, testimonial, or win story — for proposals and bids."
+        title={t('newReference.dialogTitle', 'New reference')}
+        description={t(
+          'newReference.dialogDescription',
+          'Capture a reusable customer reference — case study, testimonial, or win story — for proposals and bids.',
+        )}
       >
         <form onSubmit={submit} className="space-y-4">
           <Input
-            label="Title"
-            placeholder="Acme Corp — 40% faster onboarding"
+            label={t('newReference.titleLabel', 'Title')}
+            placeholder={t('newReference.titlePlaceholder', 'Acme Corp — 40% faster onboarding')}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             error={titleError}
@@ -84,12 +89,15 @@ export function NewReferenceDialog({ onClose, onCreate, isPending }: Props) {
           />
           <div className="flex flex-col gap-1">
             <label htmlFor="ref-desc" className="text-xs font-medium text-[var(--fg-secondary)]">
-              Description
+              {t('newReference.descriptionLabel', 'Description')}
             </label>
             <textarea
               id="ref-desc"
               className="input w-full min-h-[88px]"
-              placeholder="What was delivered, the outcome, and why it's quotable…"
+              placeholder={t(
+                'newReference.descriptionPlaceholder',
+                "What was delivered, the outcome, and why it's quotable…",
+              )}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               disabled={isPending}
@@ -97,17 +105,17 @@ export function NewReferenceDialog({ onClose, onCreate, isPending }: Props) {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Input
-              label="Industry"
-              placeholder="Software"
+              label={t('newReference.industryLabel', 'Industry')}
+              placeholder={t('newReference.industryPlaceholder', 'Software')}
               value={industry}
               onChange={(e) => setIndustry(e.target.value)}
               disabled={isPending}
             />
             <Input
-              label="Deal value"
+              label={t('newReference.dealValueLabel', 'Deal value')}
               type="number"
               min={0}
-              placeholder="250000"
+              placeholder={t('newReference.dealValuePlaceholder', '250000')}
               value={value}
               onChange={(e) => setValue(e.target.value)}
               disabled={isPending}
@@ -115,23 +123,23 @@ export function NewReferenceDialog({ onClose, onCreate, isPending }: Props) {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Input
-              label="Contact name"
-              placeholder="Jane Doe"
+              label={t('newReference.contactNameLabel', 'Contact name')}
+              placeholder={t('newReference.contactNamePlaceholder', 'Jane Doe')}
               value={contactName}
               onChange={(e) => setContactName(e.target.value)}
               disabled={isPending}
             />
             <Input
-              label="Contact email"
+              label={t('newReference.contactEmailLabel', 'Contact email')}
               type="email"
-              placeholder="jane@acme.com"
+              placeholder={t('newReference.contactEmailPlaceholder', 'jane@acme.com')}
               value={contactEmail}
               onChange={(e) => setContactEmail(e.target.value)}
               disabled={isPending}
             />
           </div>
           <Input
-            label="Document URL"
+            label={t('newReference.documentUrlLabel', 'Document URL')}
             type="url"
             placeholder="https://…"
             value={documentUrl}
@@ -139,19 +147,21 @@ export function NewReferenceDialog({ onClose, onCreate, isPending }: Props) {
             disabled={isPending}
           />
           <Input
-            label="Tags"
-            helper="Comma-separated"
-            placeholder="case-study, enterprise, emea"
+            label={t('newReference.tagsLabel', 'Tags')}
+            helper={t('newReference.tagsHelper', 'Comma-separated')}
+            placeholder={t('newReference.tagsPlaceholder', 'case-study, enterprise, emea')}
             value={tags}
             onChange={(e) => setTags(e.target.value)}
             disabled={isPending}
           />
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="secondary" type="button" onClick={onClose} disabled={isPending}>
-              Cancel
+              {t('newReference.cancel', 'Cancel')}
             </Button>
             <Button type="submit" disabled={isPending}>
-              {isPending ? 'Creating…' : 'Create reference'}
+              {isPending
+                ? t('newReference.creating', 'Creating…')
+                : t('newReference.create', 'Create reference')}
             </Button>
           </div>
         </form>

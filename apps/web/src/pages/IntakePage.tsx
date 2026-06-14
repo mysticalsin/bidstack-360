@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 import { useFiles } from '@/hooks/useFiles';
 import { useAccountIntel, useExtractDocument } from '@/hooks/useAccountIntel';
@@ -28,6 +29,7 @@ export function IntakePage() {
   const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set());
   const [extractingDocIds, setExtractingDocIds] = useState<Set<string>>(new Set());
   const reducedMotion = useReducedMotion();
+  const { t } = useTranslation('crm');
 
   const files = useFiles(accountId || undefined);
   const extract = useExtractDocument(accountId || undefined);
@@ -49,10 +51,10 @@ export function IntakePage() {
       setTimeout(() => {
         setExtractingDocIds(new Set());
         setStep('review');
-        toast.success('Extraction complete');
+        toast.success(t('intake.toastExtractionComplete', 'Extraction complete'));
       }, 0);
     }
-  }, [intel.data, hasPendingExtractions]);
+  }, [intel.data, hasPendingExtractions, t]);
 
   const toggleDoc = (id: string) => {
     setSelectedDocs((prev) => {
@@ -65,7 +67,7 @@ export function IntakePage() {
 
   const runExtraction = () => {
     if (selectedDocs.size === 0) {
-      toast.info('Select at least one document');
+      toast.info(t('intake.toastSelectDocument', 'Select at least one document'));
       return;
     }
     setExtractingDocIds(new Set(selectedDocs));
@@ -74,7 +76,7 @@ export function IntakePage() {
         { documentId: docId },
         {
           onError: (err) =>
-            toast.error('Extraction failed', {
+            toast.error(t('intake.toastExtractionFailed', 'Extraction failed'), {
               description: err instanceof Error ? err.message : '',
             }),
         },
@@ -96,9 +98,14 @@ export function IntakePage() {
       animate="animate"
     >
       <motion.header variants={reducedMotion ? undefined : staggerChild}>
-        <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">Intake</h1>
+        <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
+          {t('intake.title', 'Intake')}
+        </h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          Receive documents, extract intelligence, review, and publish to account profiles.
+          {t(
+            'intake.subtitle',
+            'Receive documents, extract intelligence, review, and publish to account profiles.',
+          )}
         </p>
       </motion.header>
 

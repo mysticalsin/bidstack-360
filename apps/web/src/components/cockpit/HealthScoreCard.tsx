@@ -1,5 +1,7 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { memo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge } from '@/components/ui/Badge';
@@ -15,6 +17,7 @@ interface Props {
 }
 
 export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props) {
+  const { t } = useTranslation('crm');
   const reducedMotion = useReducedMotion();
   const total = ORDER.reduce((acc, key) => acc + (cockpit.health.counts[key] ?? 0), 0) || 1;
   const scorePct = Math.max(0, Math.min(100, cockpit.health.score)) / 100;
@@ -26,12 +29,18 @@ export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props)
   const strongest = [...segments].sort((a, b) => b.count - a.count)[0] ?? segments[0];
 
   return (
-    <Card role="region" aria-label="Account signal coverage" className="health-score-card">
+    <Card
+      role="region"
+      aria-label={t('healthScore.regionLabel', 'Account signal coverage')}
+      className="health-score-card"
+    >
       <SectionHeader
-        title="Signal coverage"
-        caption={`${total} account signals scored`}
+        title={t('healthScore.title', 'Signal coverage')}
+        caption={t('healthScore.signalsScored', '{{count}} account signals scored', { count: total })}
         action={
-          <Badge tone={badgeTone(cockpit.health.band)}>{labelForHealth(cockpit.health.band)}</Badge>
+          <Badge tone={badgeTone(cockpit.health.band)}>
+            {labelForHealth(cockpit.health.band, t)}
+          </Badge>
         }
       />
       <div className="health-card-body">
@@ -40,7 +49,9 @@ export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props)
           initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={springSoft}
-          aria-label={`Account signal coverage ${cockpit.health.score} out of 100`}
+          aria-label={t('healthScore.gaugeLabel', 'Account signal coverage {{score}} out of 100', {
+            score: cockpit.health.score,
+          })}
           role="img"
         >
           <svg className="health-gauge" viewBox="0 0 180 180" aria-hidden>
@@ -66,7 +77,7 @@ export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props)
             />
           </svg>
           <div className="health-core">
-            <span>Coverage</span>
+            <span>{t('healthScore.coverage', 'Coverage')}</span>
             <strong>
               <AnimatedMetric value={cockpit.health.score.toLocaleString()} />
             </strong>
@@ -76,10 +87,12 @@ export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props)
         </motion.div>
         <div className="health-summary">
           <div className="health-summary-head">
-            <span>Strongest coverage band</span>
-            <strong>{strongest ? labelForHealth(strongest.key) : 'No signal'}</strong>
+            <span>{t('healthScore.strongestBand', 'Strongest coverage band')}</span>
+            <strong>
+              {strongest ? labelForHealth(strongest.key, t) : t('healthScore.noSignal', 'No signal')}
+            </strong>
           </div>
-          <ul className="health-legend" aria-label="Health bands">
+          <ul className="health-legend" aria-label={t('healthScore.healthBands', 'Health bands')}>
             {segments.map((segment, index) => (
               <motion.li
                 key={segment.key}
@@ -88,7 +101,7 @@ export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props)
                 transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.04 }}
               >
                 <span className={`legend-dot ${segment.key}`} aria-hidden />
-                <span>{labelForHealth(segment.key)}</span>
+                <span>{labelForHealth(segment.key, t)}</span>
                 <span className="health-band-track" aria-hidden>
                   <motion.span
                     className={`health-band-fill ${segment.key}`}
@@ -119,6 +132,7 @@ function SignalFactorPanel({
 }: {
   factors: NonNullable<AccountCockpitSnapshot['health']['factors']>;
 }) {
+  const { t } = useTranslation('crm');
   const [open, setOpen] = useState(false);
   if (factors.length === 0) return null;
   return (
@@ -129,11 +143,11 @@ function SignalFactorPanel({
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        <span>What drives this score</span>
+        <span>{t('healthScore.whatDrivesScore', 'What drives this score')}</span>
         <span aria-hidden>{open ? '−' : '+'}</span>
       </button>
       {open ? (
-        <ul className="space-y-3" aria-label="Score factors">
+        <ul className="space-y-3" aria-label={t('healthScore.scoreFactors', 'Score factors')}>
           {factors.map((f) => (
             <li key={f.key} className="text-sm">
               <div className="flex items-center justify-between gap-2">
@@ -142,12 +156,12 @@ function SignalFactorPanel({
                   <span className="text-xs tabular-nums text-[var(--fg-tertiary)]">
                     {f.score}/100
                   </span>
-                  <Badge tone={badgeTone(f.band)}>{labelForHealth(f.band)}</Badge>
+                  <Badge tone={badgeTone(f.band)}>{labelForHealth(f.band, t)}</Badge>
                 </span>
               </div>
               <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">{f.whatItMeasures}</p>
               <p className="mt-0.5 text-xs text-[var(--fg-secondary)]">
-                <span className="font-medium">Next: </span>
+                <span className="font-medium">{t('healthScore.nextLabel', 'Next: ')}</span>
                 {f.recommendedAction}
               </p>
             </li>
@@ -158,11 +172,11 @@ function SignalFactorPanel({
   );
 }
 
-function labelForHealth(key: (typeof ORDER)[number]): string {
-  if (key === 'strong') return 'Strong';
-  if (key === 'good') return 'Good';
-  if (key === 'needs_attention') return 'Needs attention';
-  return 'Critical';
+function labelForHealth(key: (typeof ORDER)[number], t: TFunction): string {
+  if (key === 'strong') return t('healthScore.band.strong', 'Strong');
+  if (key === 'good') return t('healthScore.band.good', 'Good');
+  if (key === 'needs_attention') return t('healthScore.band.needsAttention', 'Needs attention');
+  return t('healthScore.band.critical', 'Critical');
 }
 
 function badgeTone(key: (typeof ORDER)[number]) {

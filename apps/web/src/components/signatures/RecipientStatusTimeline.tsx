@@ -6,6 +6,9 @@
  * A plain table loses the temporal ordering that makes the story clear.
  */
 
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
+
 import { cn } from '@/lib/cn';
 import type { SignatureEvent, SignatureEventType, SignatureRecipient } from '@bidstack/shared';
 
@@ -20,14 +23,17 @@ const EVENT_COLOR: Record<SignatureEventType, string> = {
   VOIDED: 'bg-[var(--tag-amber-bg)] text-[var(--tag-amber-fg)] border-[var(--tag-amber-fg)]',
 };
 
-const EVENT_LABEL: Record<SignatureEventType, string> = {
-  SENT: 'Sent',
-  DELIVERED: 'Delivered',
-  VIEWED: 'Opened',
-  SIGNED: 'Signed',
-  DECLINED: 'Declined',
-  VOIDED: 'Voided',
-};
+function eventLabel(t: TFunction, type: SignatureEventType): string {
+  const labels: Record<SignatureEventType, string> = {
+    SENT: t('recipientStatusTimeline.eventLabel.sent', 'Sent'),
+    DELIVERED: t('recipientStatusTimeline.eventLabel.delivered', 'Delivered'),
+    VIEWED: t('recipientStatusTimeline.eventLabel.viewed', 'Opened'),
+    SIGNED: t('recipientStatusTimeline.eventLabel.signed', 'Signed'),
+    DECLINED: t('recipientStatusTimeline.eventLabel.declined', 'Declined'),
+    VOIDED: t('recipientStatusTimeline.eventLabel.voided', 'Voided'),
+  };
+  return labels[type];
+}
 
 // ─── Dot indicator ───────────────────────────────────────────────────────────
 
@@ -46,6 +52,7 @@ function EventDot({ type }: { type: SignatureEventType }) {
 // ─── Single event row ─────────────────────────────────────────────────────────
 
 function EventRow({ event }: { event: SignatureEvent }) {
+  const { t } = useTranslation('signatures');
   return (
     <li className="flex items-start gap-3 py-2">
       <div className="flex flex-col items-center gap-1 pt-0.5">
@@ -58,7 +65,7 @@ function EventRow({ event }: { event: SignatureEvent }) {
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-[var(--fg-primary)]">
-          {EVENT_LABEL[event.type]}
+          {eventLabel(t, event.type)}
           {event.recipientEmail ? (
             <span className="ml-1 font-normal text-[var(--fg-secondary)]">
               — {event.recipientEmail}
@@ -95,8 +102,14 @@ function RecipientBlock({
   recipient: SignatureRecipient;
   events: SignatureEvent[];
 }) {
+  const { t } = useTranslation('signatures');
   return (
-    <section aria-label={`Events for ${recipient.name}`} className="mb-6 last:mb-0">
+    <section
+      aria-label={t('recipientStatusTimeline.recipientEventsAriaLabel', 'Events for {{name}}', {
+        name: recipient.name,
+      })}
+      className="mb-6 last:mb-0"
+    >
       <header className="mb-2 flex items-center gap-2">
         <div
           aria-hidden="true"
@@ -113,7 +126,9 @@ function RecipientBlock({
       </header>
 
       {events.length === 0 ? (
-        <p className="ml-9 text-xs text-[var(--fg-tertiary)]">No events yet</p>
+        <p className="ml-9 text-xs text-[var(--fg-tertiary)]">
+          {t('recipientStatusTimeline.noEventsYet', 'No events yet')}
+        </p>
       ) : (
         <ol className="ml-9 list-none" role="list">
           {events.map((e) => (

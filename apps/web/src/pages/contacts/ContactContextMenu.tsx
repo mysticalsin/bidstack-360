@@ -19,6 +19,7 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useRef } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { toast } from '@/components/ui/Toast';
 import type { Contact } from '@bidstack/shared';
@@ -38,6 +39,7 @@ export function ContactContextMenu({
   onEdit: (c: Contact) => void;
   onDelete: (c: Contact) => void;
 }) {
+  const { t } = useTranslation('crm');
   const menuRef = useRef<HTMLUListElement>(null);
   // WHY useReducedMotion: users who have "reduce motion" set in their OS
   // should not see scale spring animations — they can cause vestibular
@@ -77,8 +79,11 @@ export function ContactContextMenu({
 
   const copy = (text: string, label: string) => {
     void navigator.clipboard.writeText(text).then(
-      () => toast.success(`Copied ${label}`, { duration: 1500 }),
-      () => toast.error('Copy failed'),
+      () =>
+        toast.success(t('contactContextMenu.copySuccess', 'Copied {{label}}', { label }), {
+          duration: 1500,
+        }),
+      () => toast.error(t('contactContextMenu.copyError', 'Copy failed')),
     );
     onClose();
   };
@@ -115,7 +120,9 @@ export function ContactContextMenu({
     <motion.ul
       ref={menuRef}
       role="menu"
-      aria-label={`Actions for ${contact.name}`}
+      aria-label={t('contactContextMenu.menuAriaLabel', 'Actions for {{name}}', {
+        name: contact.name,
+      })}
       onKeyDown={handleKeyDown}
       initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -126,15 +133,25 @@ export function ContactContextMenu({
       // the menu before the item's onClick fires.
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <ContextItem onClick={() => onEdit(contact)}>Edit contact</ContextItem>
+      <ContextItem onClick={() => onEdit(contact)}>
+        {t('contactContextMenu.editContact', 'Edit contact')}
+      </ContextItem>
       {contact.email ? (
-        <ContextItem onClick={() => copy(contact.email!, 'email')}>Copy email</ContextItem>
+        <ContextItem
+          onClick={() => copy(contact.email!, t('contactContextMenu.emailLabel', 'email'))}
+        >
+          {t('contactContextMenu.copyEmail', 'Copy email')}
+        </ContextItem>
       ) : null}
       {contact.phone ? (
-        <ContextItem onClick={() => copy(contact.phone!, 'phone')}>Copy phone</ContextItem>
+        <ContextItem
+          onClick={() => copy(contact.phone!, t('contactContextMenu.phoneLabel', 'phone'))}
+        >
+          {t('contactContextMenu.copyPhone', 'Copy phone')}
+        </ContextItem>
       ) : null}
       <ContextItem onClick={() => onDelete(contact)} tone="danger">
-        Delete contact
+        {t('contactContextMenu.deleteContact', 'Delete contact')}
       </ContextItem>
     </motion.ul>
   );

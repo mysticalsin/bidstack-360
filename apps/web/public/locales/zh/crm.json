@@ -1170,7 +1170,7 @@
     "deleteRuleConfirmDescription": "此路由规则将被停用。"
   },
   "pipeline": {
-    "heading": "管道",
+    "heading": "未结管道",
     "subtitle": "在列之间拖动卡片，或选中卡片并使用 ← / → 切换阶段。",
     "stageFilterLabel": "阶段",
     "stageFilterAriaLabel": "按阶段筛选管道",
@@ -1192,7 +1192,12 @@
     "movedToStageToast": "已移至 {{stage}}",
     "movedOpportunityToast": "已将“{{name}}”移至 {{stage}}",
     "moveErrorToastTitle": "无法移动机会",
-    "moveErrorToastDescription": "服务器拒绝了该请求。"
+    "moveErrorToastDescription": "服务器拒绝了该请求。",
+    "openOpportunitiesLabel": "未结商机",
+    "openCount_one": "{{count}} 个未结商机",
+    "openCount_other": "{{count}} 个未结商机",
+    "emptyStageValue": "暂无阶段数值",
+    "chartAriaLabel": "管道各阶段数值分布"
   },
   "auditLogTable": {
     "evidenceStreamTitle": "证据流",
@@ -2943,5 +2948,108 @@
     "sectionRecentInteractions": "最近的互动",
     "cost": "费用：${{amount}}",
     "emptyState": "为本次会议生成 AI 简报，涵盖与会者、进行中的交易、谈话要点和建议提问。"
+  },
+  "intake": {
+    "title": "接收",
+    "subtitle": "接收文档、提取情报、审核并发布到客户档案。",
+    "toastExtractionComplete": "提取完成",
+    "toastSelectDocument": "请至少选择一个文档",
+    "toastExtractionFailed": "提取失败"
+  },
+  "healthScore": {
+    "regionLabel": "客户信号覆盖率",
+    "title": "信号覆盖率",
+    "signalsScored": "已评分 {{count}} 个客户信号",
+    "gaugeLabel": "客户信号覆盖率 {{score}}（满分 100）",
+    "coverage": "覆盖率",
+    "strongestBand": "最强覆盖区间",
+    "noSignal": "无信号",
+    "healthBands": "健康区间",
+    "whatDrivesScore": "影响此评分的因素",
+    "scoreFactors": "评分因素",
+    "nextLabel": "下一步：",
+    "band": {
+      "strong": "强",
+      "good": "良好",
+      "needsAttention": "需关注",
+      "critical": "严重"
+    }
+  },
+  "objectSettingsForm": {
+    "updateFailed": "更新失败",
+    "heading": "对象设置",
+    "saved": "已保存。",
+    "singularLabel": "单数标签",
+    "pluralLabel": "复数标签",
+    "description": "描述",
+    "color": "颜色",
+    "selectColor": "选择颜色 {{color}}",
+    "apiKeyLabel": "API 密钥：",
+    "apiKeyImmutable": "（不可更改）",
+    "saving": "保存中…",
+    "saveChanges": "保存更改"
+  },
+  "contactContextMenu": {
+    "copySuccess": "已复制{{label}}",
+    "copyError": "复制失败",
+    "menuAriaLabel": "{{name}}的操作",
+    "editContact": "编辑联系人",
+    "emailLabel": "电子邮件",
+    "copyEmail": "复制电子邮件",
+    "phoneLabel": "电话",
+    "copyPhone": "复制电话",
+    "deleteContact": "删除联系人"
+  },
+  "dataTrust": {
+    "regionLabel": "数据可信度与来源归属",
+    "title": "数据可信度",
+    "caption": "关键字段包含可用的来源归属",
+    "attributionConfidence": "归属置信度",
+    "attributedSources": "{{count}} 个已归属来源",
+    "checkLegalIdentity": "法律主体",
+    "checkLogo": "标识",
+    "checkFreshness": "时效性",
+    "valueAttributed": "已归属",
+    "valuePending": "待处理",
+    "sourceReceipts": "来源凭证",
+    "emptySources": "运行数据验证以附加注册、标识和市场数据来源。",
+    "logoSourceLogoDev": "Logo.dev",
+    "logoSourceOfficial": "官方",
+    "logoSourceBrandfetch": "Brandfetch",
+    "logoSourceWikimedia": "Wikimedia",
+    "logoSourceFavicon": "网站图标",
+    "logoSourceManual": "手动",
+    "logoSourceInitials": "首字母"
+  },
+  "topbarSearch": {
+    "label": "搜索商机、联系人、任务",
+    "placeholder": "搜索或跳转到…",
+    "recentSearchesAriaLabel": "最近搜索",
+    "recentHeading": "最近",
+    "clear": "清除"
+  },
+  "newReference": {
+    "titleRequired": "参考标题为必填项。",
+    "dialogTitle": "新参考",
+    "dialogDescription": "为提案和投标捕获可复用的客户参考——案例研究、客户证言或成功案例。",
+    "titleLabel": "标题",
+    "titlePlaceholder": "Acme Corp——入职速度提升 40%",
+    "descriptionLabel": "描述",
+    "descriptionPlaceholder": "交付了什么、结果如何，以及为何值得引用……",
+    "industryLabel": "行业",
+    "industryPlaceholder": "软件",
+    "dealValueLabel": "交易金额",
+    "dealValuePlaceholder": "250000",
+    "contactNameLabel": "联系人姓名",
+    "contactNamePlaceholder": "张三",
+    "contactEmailLabel": "联系人邮箱",
+    "contactEmailPlaceholder": "jane@acme.com",
+    "documentUrlLabel": "文档链接",
+    "tagsLabel": "标签",
+    "tagsHelper": "以逗号分隔",
+    "tagsPlaceholder": "case-study, enterprise, emea",
+    "cancel": "取消",
+    "creating": "创建中……",
+    "create": "创建参考"
   }
 }

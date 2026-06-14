@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { TagChip } from '@/components/tags/TagChip';
 import { Button } from '@/components/ui/Button';
@@ -16,6 +17,7 @@ import { TAG_COLORS, type Tag } from '@bidstack/shared';
  * delete confirms when the tag has usage.
  */
 export function TagsSection() {
+  const { t } = useTranslation('settings');
   const { data, isLoading } = useTags();
   const create = useCreateTag();
   const update = useUpdateTag();
@@ -33,9 +35,9 @@ export function TagsSection() {
       await create.mutateAsync({ name, color: draftColor });
       setDraftName('');
       setDraftColor(TAG_COLORS[0]);
-      toast.success('Tag created');
+      toast.success(t('tags.toastCreated', 'Tag created'));
     } catch {
-      toast.error('Tag create failed');
+      toast.error(t('tags.toastCreateFailed', 'Tag create failed'));
     }
   };
 
@@ -48,30 +50,36 @@ export function TagsSection() {
     await update.mutateAsync({ id: t.id, patch: { name } });
   };
 
-  const handleDelete = async (t: Tag) => {
-    const usage = t.usageCount ?? 0;
+  const handleDelete = async (tag: Tag) => {
+    const usage = tag.usageCount ?? 0;
     const ok = confirm(
       usage === 0
-        ? `Delete tag "${t.name}"?`
-        : `"${t.name}" is on ${usage} record${usage === 1 ? '' : 's'}. Removing it will untag every one. Continue?`,
+        ? t('tags.confirmDelete', 'Delete tag "{{name}}"?', { name: tag.name })
+        : t(
+            'tags.confirmDeleteWithUsage',
+            '"{{name}}" is on {{count}} records. Removing it will untag every one. Continue?',
+            { name: tag.name, count: usage },
+          ),
     );
     if (!ok) return;
-    await del.mutateAsync(t.id);
-    toast.success('Tag removed');
+    await del.mutateAsync(tag.id);
+    toast.success(t('tags.toastRemoved', 'Tag removed'));
   };
 
   return (
     <div className="space-y-4">
       <Card>
         <div className="p-4">
-          <h3 className="mb-2 text-sm font-semibold text-[var(--fg-primary)]">Create a tag</h3>
+          <h3 className="mb-2 text-sm font-semibold text-[var(--fg-primary)]">
+            {t('tags.createHeading', 'Create a tag')}
+          </h3>
           <div className="flex flex-wrap items-center gap-2">
             <input
               type="text"
               maxLength={32}
               value={draftName}
               onChange={(e) => setDraftName(e.target.value)}
-              placeholder="e.g. Hot Lead"
+              placeholder={t('tags.namePlaceholder', 'e.g. Hot Lead')}
               className="flex-1 min-w-[180px] rounded-md border border-[var(--border-default)] bg-[var(--surface-input)] px-2.5 py-1.5 text-sm text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -82,7 +90,7 @@ export function TagsSection() {
             />
             <ColorSwatch value={draftColor} onChange={setDraftColor} />
             <Button onClick={() => void handleCreate()} disabled={!draftName.trim()}>
-              Create
+              {t('tags.createButton', 'Create')}
             </Button>
           </div>
         </div>
@@ -91,35 +99,42 @@ export function TagsSection() {
       <Card>
         <div className="border-b border-[var(--border-subtle)] px-4 py-2">
           <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
-            Library <span className="font-normal text-[var(--fg-tertiary)]">({tags.length})</span>
+            {t('tags.libraryHeading', 'Library')}{' '}
+            <span className="font-normal text-[var(--fg-tertiary)]">({tags.length})</span>
           </h3>
         </div>
         {isLoading ? (
-          <div className="p-6 text-sm text-[var(--fg-secondary)]">Loading…</div>
+          <div className="p-6 text-sm text-[var(--fg-secondary)]">{t('tags.loading', 'Loading…')}</div>
         ) : tags.length === 0 ? (
           <div className="p-6">
-            <EmptyState title="No tags yet" message="Create your first tag above." />
+            <EmptyState
+              title={t('tags.emptyTitle', 'No tags yet')}
+              message={t('tags.emptyMessage', 'Create your first tag above.')}
+            />
           </div>
         ) : (
-          <ul className="divide-y divide-[var(--border-subtle)]" aria-label="Tag library">
-            {tags.map((t) => (
-              <li key={t.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
+          <ul
+            className="divide-y divide-[var(--border-subtle)]"
+            aria-label={t('tags.libraryAriaLabel', 'Tag library')}
+          >
+            {tags.map((tag) => (
+              <li key={tag.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
                 <div className="flex-1 min-w-[160px]">
                   <input
                     type="text"
-                    defaultValue={t.name}
+                    defaultValue={tag.name}
                     maxLength={32}
-                    onBlur={(e) => void handleRename(t, e.currentTarget.value.trim())}
+                    onBlur={(e) => void handleRename(tag, e.currentTarget.value.trim())}
                     className="w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm text-[var(--fg-primary)] hover:border-[var(--border-default)] focus-visible:border-[var(--brand-primary)] focus-visible:outline-none"
                   />
                 </div>
-                <TagChip tag={t} />
-                <ColorSwatch value={t.color} onChange={(c) => void handleColor(t, c)} compact />
+                <TagChip tag={tag} />
+                <ColorSwatch value={tag.color} onChange={(c) => void handleColor(tag, c)} compact />
                 <span className="text-xs text-[var(--fg-tertiary)] min-w-[80px] text-right">
-                  {t.usageCount ?? 0} record{t.usageCount === 1 ? '' : 's'}
+                  {t('tags.usageCount', '{{count}} records', { count: tag.usageCount ?? 0 })}
                 </span>
-                <Button variant="ghost" size="sm" onClick={() => void handleDelete(t)}>
-                  Delete
+                <Button variant="ghost" size="sm" onClick={() => void handleDelete(tag)}>
+                  {t('tags.deleteButton', 'Delete')}
                 </Button>
               </li>
             ))}
@@ -139,10 +154,11 @@ function ColorSwatch({
   onChange: (color: string) => void;
   compact?: boolean;
 }) {
+  const { t } = useTranslation('settings');
   return (
     <div
       role="radiogroup"
-      aria-label="Tag colour"
+      aria-label={t('tags.colorGroupAriaLabel', 'Tag colour')}
       className={cn('flex flex-wrap items-center gap-1.5', compact && 'gap-1')}
     >
       {TAG_COLORS.map((c) => (
@@ -151,7 +167,7 @@ function ColorSwatch({
           type="button"
           role="radio"
           aria-checked={c === value}
-          aria-label={`Colour ${c}`}
+          aria-label={t('tags.colorSwatchAriaLabel', 'Colour {{color}}', { color: c })}
           onClick={() => onChange(c)}
           className={cn(
             'h-5 w-5 rounded-full border-2 transition-transform hover:scale-110',

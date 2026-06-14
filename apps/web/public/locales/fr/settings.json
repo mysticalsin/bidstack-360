@@ -575,5 +575,24 @@
     "badgeNeedsAttention": "Nécessite une attention",
     "badgeLive": "Actif",
     "openButton": "Ouvrir"
+  },
+  "tags": {
+    "toastCreated": "Étiquette créée",
+    "toastCreateFailed": "Échec de la création de l'étiquette",
+    "confirmDelete": "Supprimer l'étiquette « {{name}} » ?",
+    "confirmDeleteWithUsage": "« {{name}} » est sur {{count}} enregistrements. La supprimer retirera l'étiquette de chacun. Continuer ?",
+    "toastRemoved": "Étiquette supprimée",
+    "createHeading": "Créer une étiquette",
+    "namePlaceholder": "ex. Prospect chaud",
+    "createButton": "Créer",
+    "libraryHeading": "Bibliothèque",
+    "loading": "Chargement…",
+    "emptyTitle": "Aucune étiquette pour l'instant",
+    "emptyMessage": "Créez votre première étiquette ci-dessus.",
+    "libraryAriaLabel": "Bibliothèque d'étiquettes",
+    "usageCount": "{{count}} enregistrements",
+    "deleteButton": "Supprimer",
+    "colorGroupAriaLabel": "Couleur de l'étiquette",
+    "colorSwatchAriaLabel": "Couleur {{color}}"
   }
 }

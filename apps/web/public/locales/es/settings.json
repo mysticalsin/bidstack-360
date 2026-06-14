@@ -578,5 +578,24 @@
     "badgeNeedsAttention": "Requiere atención",
     "badgeLive": "Activo",
     "openButton": "Abrir"
+  },
+  "tags": {
+    "toastCreated": "Etiqueta creada",
+    "toastCreateFailed": "Error al crear la etiqueta",
+    "confirmDelete": "¿Eliminar la etiqueta \"{{name}}\"?",
+    "confirmDeleteWithUsage": "\"{{name}}\" está en {{count}} registros. Eliminarla quitará la etiqueta de todos. ¿Continuar?",
+    "toastRemoved": "Etiqueta eliminada",
+    "createHeading": "Crear una etiqueta",
+    "namePlaceholder": "p. ej. Cliente potencial caliente",
+    "createButton": "Crear",
+    "libraryHeading": "Biblioteca",
+    "loading": "Cargando…",
+    "emptyTitle": "Aún no hay etiquetas",
+    "emptyMessage": "Crea tu primera etiqueta arriba.",
+    "libraryAriaLabel": "Biblioteca de etiquetas",
+    "usageCount": "{{count}} registros",
+    "deleteButton": "Eliminar",
+    "colorGroupAriaLabel": "Color de la etiqueta",
+    "colorSwatchAriaLabel": "Color {{color}}"
   }
 }

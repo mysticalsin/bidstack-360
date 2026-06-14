@@ -78,5 +78,17 @@
     "successTitle": "Solicitação de assinatura enviada!",
     "successMessage": "Os destinatários receberão um e-mail para assinar o documento.",
     "doneButton": "Concluído"
+  },
+  "recipientStatusTimeline": {
+    "eventLabel": {
+      "sent": "Enviado",
+      "delivered": "Entregue",
+      "viewed": "Aberto",
+      "signed": "Assinado",
+      "declined": "Recusado",
+      "voided": "Anulado"
+    },
+    "recipientEventsAriaLabel": "Eventos de {{name}}",
+    "noEventsYet": "Ainda não há eventos"
   }
 }

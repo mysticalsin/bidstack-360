@@ -8,6 +8,7 @@
  */
 import { type CSSProperties } from 'react';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 import { GlassCard } from '@/components/ui/GlassCard';
 import { springSoft } from '@/lib/motion';
@@ -35,6 +36,7 @@ export function PipelineCard({
   stages: PipelineStagePoint[];
   reduced: boolean | null;
 }) {
+  const { t } = useTranslation('crm');
   const chartPoints =
     stages.length > 0
       ? stages.map((stage) => ({
@@ -42,18 +44,26 @@ export function PipelineCard({
           value: stage.valueSum,
           color: stageColor(stage.stage),
         }))
-      : [{ label: 'Open opportunities', value: count, color: 'var(--tag-teal-fg)' }];
+      : [
+          {
+            label: t('pipeline.openOpportunitiesLabel', 'Open opportunities'),
+            value: count,
+            color: 'var(--tag-teal-fg)',
+          },
+        ];
 
   return (
     <GlassCard className="text-center" hoverable={false}>
       <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-        Open pipeline
+        {t('pipeline.heading', 'Open pipeline')}
       </div>
       <div className="mt-2 text-3xl font-bold tabular-nums text-[var(--fg-primary)]">
         {formatMoney(value, currency)}
       </div>
       <div className="mt-1 text-xs text-[var(--fg-secondary)]">
-        {count} open opportunit{count === 1 ? 'y' : 'ies'}
+        {count === 1
+          ? t('pipeline.openCount_one', '{{count}} open opportunity', { count })
+          : t('pipeline.openCount_other', '{{count}} open opportunities', { count })}
       </div>
       <PipelineLiveChart points={chartPoints} reduced={reduced} />
     </GlassCard>
@@ -69,12 +79,13 @@ function PipelineLiveChart({
   points: SignalPoint[];
   reduced: boolean | null;
 }) {
+  const { t } = useTranslation('crm');
   const visible = points.filter((point) => Number.isFinite(point.value) && point.value > 0);
 
   if (visible.length === 0) {
     return (
       <div className="pipeline-live-empty">
-        <span>No stage value yet</span>
+        <span>{t('pipeline.emptyStageValue', 'No stage value yet')}</span>
       </div>
     );
   }
@@ -99,7 +110,11 @@ function PipelineLiveChart({
   } Z`;
 
   return (
-    <div className="pipeline-live-visual" role="img" aria-label="Pipeline stage value distribution">
+    <div
+      className="pipeline-live-visual"
+      role="img"
+      aria-label={t('pipeline.chartAriaLabel', 'Pipeline stage value distribution')}
+    >
       <svg viewBox={`0 0 ${width} ${height}`} className="pipeline-live-chart" aria-hidden>
         <defs>
           <linearGradient id="pipeline-live-fill" x1="0" x2="0" y1="0" y2="1">

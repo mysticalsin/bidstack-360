@@ -1170,7 +1170,7 @@
     "deleteRuleConfirmDescription": "Esta regra de roteamento será desativada."
   },
   "pipeline": {
-    "heading": "Pipeline",
+    "heading": "Pipeline aberto",
     "subtitle": "Arraste um cartão entre colunas, ou selecione um e use ← / → para mudar de etapa.",
     "stageFilterLabel": "Etapa",
     "stageFilterAriaLabel": "Filtrar o pipeline por etapa",
@@ -1192,7 +1192,12 @@
     "movedToStageToast": "Movido para {{stage}}",
     "movedOpportunityToast": "\"{{name}}\" movido para {{stage}}",
     "moveErrorToastTitle": "Não foi possível mover a oportunidade",
-    "moveErrorToastDescription": "O servidor rejeitou a solicitação."
+    "moveErrorToastDescription": "O servidor rejeitou a solicitação.",
+    "openOpportunitiesLabel": "Oportunidades abertas",
+    "openCount_one": "{{count}} oportunidade aberta",
+    "openCount_other": "{{count}} oportunidades abertas",
+    "emptyStageValue": "Ainda sem valor por etapa",
+    "chartAriaLabel": "Distribuição do valor por etapa do pipeline"
   },
   "auditLogTable": {
     "evidenceStreamTitle": "Fluxo de evidências",
@@ -2943,5 +2948,108 @@
     "sectionRecentInteractions": "Interações recentes",
     "cost": "Custo: ${{amount}}",
     "emptyState": "Gere um resumo com IA cobrindo participantes, negócios abertos, tópicos de discussão e perguntas sugeridas para esta reunião."
+  },
+  "intake": {
+    "title": "Recepção",
+    "subtitle": "Receba documentos, extraia inteligência, revise e publique nos perfis de conta.",
+    "toastExtractionComplete": "Extração concluída",
+    "toastSelectDocument": "Selecione pelo menos um documento",
+    "toastExtractionFailed": "Falha na extração"
+  },
+  "healthScore": {
+    "regionLabel": "Cobertura de sinais da conta",
+    "title": "Cobertura de sinais",
+    "signalsScored": "{{count}} sinais da conta avaliados",
+    "gaugeLabel": "Cobertura de sinais da conta {{score}} de 100",
+    "coverage": "Cobertura",
+    "strongestBand": "Faixa de cobertura mais forte",
+    "noSignal": "Sem sinal",
+    "healthBands": "Faixas de saúde",
+    "whatDrivesScore": "O que determina esta pontuação",
+    "scoreFactors": "Fatores da pontuação",
+    "nextLabel": "Próximo: ",
+    "band": {
+      "strong": "Forte",
+      "good": "Bom",
+      "needsAttention": "Requer atenção",
+      "critical": "Crítico"
+    }
+  },
+  "objectSettingsForm": {
+    "updateFailed": "Falha na atualização",
+    "heading": "Configurações do objeto",
+    "saved": "Salvo.",
+    "singularLabel": "Rótulo singular",
+    "pluralLabel": "Rótulo plural",
+    "description": "Descrição",
+    "color": "Cor",
+    "selectColor": "Selecionar cor {{color}}",
+    "apiKeyLabel": "Chave de API:",
+    "apiKeyImmutable": "(imutável)",
+    "saving": "Salvando…",
+    "saveChanges": "Salvar alterações"
+  },
+  "contactContextMenu": {
+    "copySuccess": "{{label}} copiado",
+    "copyError": "Falha ao copiar",
+    "menuAriaLabel": "Ações para {{name}}",
+    "editContact": "Editar contato",
+    "emailLabel": "e-mail",
+    "copyEmail": "Copiar e-mail",
+    "phoneLabel": "telefone",
+    "copyPhone": "Copiar telefone",
+    "deleteContact": "Excluir contato"
+  },
+  "dataTrust": {
+    "regionLabel": "Confiança e atribuição de dados",
+    "title": "Confiança de dados",
+    "caption": "Os campos principais incluem a atribuição de fontes disponível",
+    "attributionConfidence": "Confiança de atribuição",
+    "attributedSources": "{{count}} fontes atribuídas",
+    "checkLegalIdentity": "Identidade jurídica",
+    "checkLogo": "Logotipo",
+    "checkFreshness": "Atualidade",
+    "valueAttributed": "Atribuído",
+    "valuePending": "Pendente",
+    "sourceReceipts": "Comprovantes de fontes",
+    "emptySources": "Execute a verificação de dados para anexar fontes de registro, logotipo e dados de mercado.",
+    "logoSourceLogoDev": "Logo.dev",
+    "logoSourceOfficial": "Oficial",
+    "logoSourceBrandfetch": "Brandfetch",
+    "logoSourceWikimedia": "Wikimedia",
+    "logoSourceFavicon": "Favicon",
+    "logoSourceManual": "Manual",
+    "logoSourceInitials": "Iniciais"
+  },
+  "topbarSearch": {
+    "label": "Pesquisar oportunidades, contatos, tarefas",
+    "placeholder": "Pesquisar ou ir para…",
+    "recentSearchesAriaLabel": "Pesquisas recentes",
+    "recentHeading": "Recentes",
+    "clear": "Limpar"
+  },
+  "newReference": {
+    "titleRequired": "É necessário um título de referência.",
+    "dialogTitle": "Nova referência",
+    "dialogDescription": "Capture uma referência de cliente reutilizável — estudo de caso, depoimento ou história de sucesso — para propostas e licitações.",
+    "titleLabel": "Título",
+    "titlePlaceholder": "Acme Corp — integração 40% mais rápida",
+    "descriptionLabel": "Descrição",
+    "descriptionPlaceholder": "O que foi entregue, o resultado e por que é citável…",
+    "industryLabel": "Setor",
+    "industryPlaceholder": "Software",
+    "dealValueLabel": "Valor do negócio",
+    "dealValuePlaceholder": "250000",
+    "contactNameLabel": "Nome do contato",
+    "contactNamePlaceholder": "Maria Silva",
+    "contactEmailLabel": "E-mail do contato",
+    "contactEmailPlaceholder": "jane@acme.com",
+    "documentUrlLabel": "URL do documento",
+    "tagsLabel": "Etiquetas",
+    "tagsHelper": "Separadas por vírgulas",
+    "tagsPlaceholder": "case-study, enterprise, emea",
+    "cancel": "Cancelar",
+    "creating": "Criando…",
+    "create": "Criar referência"
   }
 }

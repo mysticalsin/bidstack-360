@@ -1,12 +1,14 @@
 // Topbar search bar with recent-search dropdown.
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useState, useRef, useEffect, useLayoutEffect, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { Icon } from '@/components/ui/Icon';
 import { useRecentSearches } from '@/stores/recentSearches';
 
 export function SearchBar() {
+  const { t } = useTranslation('crm');
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -81,12 +83,12 @@ export function SearchBar() {
     <form onSubmit={onSubmit} className="tb-search relative" role="search">
       <Icon name="search" size={14} ariaHidden />
       <label htmlFor="tb-search-input" className="sr-only">
-        Search opportunities, contacts, tasks
+        {t('topbarSearch.label', 'Search opportunities, contacts, tasks')}
       </label>
       <input
         id="tb-search-input"
         type="search"
-        placeholder="Search or jump to…"
+        placeholder={t('topbarSearch.placeholder', 'Search or jump to…')}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onFocus={() => setOpen(true)}
@@ -102,7 +104,7 @@ export function SearchBar() {
         {open && !query && recents.length > 0 && (
           <motion.div
             role="listbox"
-            aria-label="Recent searches"
+            aria-label={t('topbarSearch.recentSearchesAriaLabel', 'Recent searches')}
             initial={reduced ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={reduced ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.98 }}
@@ -110,7 +112,7 @@ export function SearchBar() {
             className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 rounded-lg glass-menu p-1.5 focus:outline-none"
           >
             <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-2.5 py-1.5 mb-1 text-[10px] uppercase tracking-wider text-[var(--fg-tertiary)]">
-              <span>Recent</span>
+              <span>{t('topbarSearch.recentHeading', 'Recent')}</span>
               <button
                 type="button"
                 onMouseDown={(e) => {
@@ -121,7 +123,7 @@ export function SearchBar() {
                 }}
                 className="text-[10px] hover:text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] rounded px-1 py-0.5"
               >
-                Clear
+                {t('topbarSearch.clear', 'Clear')}
               </button>
             </div>
             <ul className="flex flex-col gap-0.5">
