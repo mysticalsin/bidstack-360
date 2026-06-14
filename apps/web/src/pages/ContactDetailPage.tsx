@@ -1,6 +1,7 @@
 // /contacts/:id — contact detail with related opportunities, tasks, and notes.
 
 import { Link, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
@@ -15,6 +16,7 @@ import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNote
 import { formatDate } from '@/lib/format';
 
 export function ContactDetailPage() {
+  const { t } = useTranslation('crm');
   const { id } = useParams<{ id: string }>();
   const contact = useContact(id);
   const allOpps = useOpportunities({ limit: 100 });
@@ -25,22 +27,25 @@ export function ContactDetailPage() {
   if (contact.isError)
     return (
       <ErrorState
-        title="Couldn't load contact"
+        title={t('contactDetail.errorTitle', "Couldn't load contact")}
         message={
           contact.error instanceof Error
             ? contact.error.message
-            : 'The contact may have been deleted.'
+            : t('contactDetail.errorMessage', 'The contact may have been deleted.')
         }
       />
     );
   if (!contact.data) {
     return (
       <EmptyState
-        title="Contact not found"
-        message="The contact may have been deleted or you may not have access to it."
+        title={t('contactDetail.notFoundTitle', 'Contact not found')}
+        message={t(
+          'contactDetail.notFoundMessage',
+          'The contact may have been deleted or you may not have access to it.',
+        )}
         action={
           <Link to="/contacts" className="btn btn-secondary">
-            Back to contacts
+            {t('contactDetail.backToContacts', 'Back to contacts')}
           </Link>
         }
       />
@@ -56,11 +61,11 @@ export function ContactDetailPage() {
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
-      <nav aria-label="Breadcrumb">
+      <nav aria-label={t('contactDetail.breadcrumbLabel', 'Breadcrumb')}>
         <ol className="flex items-center gap-2 text-xs text-[var(--fg-tertiary)]">
           <li>
             <Link to="/contacts" className="hover:text-[var(--fg-primary)]">
-              Contacts
+              {t('contactDetail.contacts', 'Contacts')}
             </Link>
           </li>
           <li aria-hidden>/</li>
@@ -76,7 +81,7 @@ export function ContactDetailPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-[var(--fg-primary)]">{c.name}</h1>
             <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-              {c.role ?? 'No role'}
+              {c.role ?? t('contactDetail.noRole', 'No role')}
               {c.customer ? (
                 <>
                   {' · '}
@@ -106,7 +111,11 @@ export function ContactDetailPage() {
                   </a>
                 </span>
               ) : null}
-              {c.influence ? <span>Influence: {c.influence}/5</span> : null}
+              {c.influence ? (
+                <span>
+                  {t('contactDetail.influence', 'Influence: {{value}}/5', { value: c.influence })}
+                </span>
+              ) : null}
               {c.sentiment ? (
                 <span
                   className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
@@ -126,7 +135,7 @@ export function ContactDetailPage() {
           </div>
           <div className="text-right">
             <div className="text-[11px] uppercase tracking-wider text-[var(--fg-tertiary)]">
-              Added
+              {t('contactDetail.added', 'Added')}
             </div>
             <div className="text-sm text-[var(--fg-primary)]">{formatDate(c.createdAt)}</div>
           </div>
@@ -137,10 +146,17 @@ export function ContactDetailPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Opportunities */}
         <Card>
-          <SectionHeader title="Opportunities" caption={`${relatedOpps.length} related`} />
+          <SectionHeader
+            title={t('contactDetail.opportunitiesTitle', 'Opportunities')}
+            caption={t('contactDetail.relatedCount', '{{count}} related', {
+              count: relatedOpps.length,
+            })}
+          />
           {relatedOpps.length === 0 ? (
             <div className="p-5 text-sm text-[var(--fg-secondary)]">
-              No opportunities for {c.customer}.
+              {t('contactDetail.noOpportunities', 'No opportunities for {{customer}}.', {
+                customer: c.customer,
+              })}
             </div>
           ) : (
             <ul className="divide-y divide-[var(--border-subtle)]">
@@ -167,32 +183,43 @@ export function ContactDetailPage() {
 
         {/* Tasks */}
         <Card>
-          <SectionHeader title="Tasks" caption={`${relatedTasks.length} related`} />
+          <SectionHeader
+            title={t('contactDetail.tasksTitle', 'Tasks')}
+            caption={t('contactDetail.relatedCount', '{{count}} related', {
+              count: relatedTasks.length,
+            })}
+          />
           {relatedTasks.length === 0 ? (
-            <div className="p-5 text-sm text-[var(--fg-secondary)]">No related tasks.</div>
+            <div className="p-5 text-sm text-[var(--fg-secondary)]">
+              {t('contactDetail.noTasks', 'No related tasks.')}
+            </div>
           ) : (
             <ul className="divide-y divide-[var(--border-subtle)]">
-              {relatedTasks.map((t) => (
-                <li key={t.id} className="flex items-center justify-between gap-3 px-5 py-3">
+              {relatedTasks.map((task) => (
+                <li key={task.id} className="flex items-center justify-between gap-3 px-5 py-3">
                   <div>
-                    <div className="text-sm text-[var(--fg-primary)]">{t.title}</div>
+                    <div className="text-sm text-[var(--fg-primary)]">{task.title}</div>
                     <div className="text-xs text-[var(--fg-tertiary)]">
-                      {t.dueDate ? `Due ${formatDate(t.dueDate)}` : 'No due date'}
-                      {t.assignee ? ` · ${t.assignee}` : null}
+                      {task.dueDate
+                        ? t('contactDetail.dueDate', 'Due {{date}}', {
+                            date: formatDate(task.dueDate),
+                          })
+                        : t('contactDetail.noDueDate', 'No due date')}
+                      {task.assignee ? ` · ${task.assignee}` : null}
                     </div>
                   </div>
                   <span
                     className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
-                      t.status === 'done'
+                      task.status === 'done'
                         ? 'bg-[var(--success-tint)] text-[var(--success)]'
-                        : t.status === 'in_progress'
+                        : task.status === 'in_progress'
                           ? 'bg-[var(--info-tint)] text-[var(--info)]'
-                          : t.status === 'blocked'
+                          : task.status === 'blocked'
                             ? 'bg-[var(--danger-tint)] text-[var(--danger)]'
                             : 'bg-[var(--surface-subtle)] text-[var(--fg-secondary)]'
                     }`}
                   >
-                    {t.status.replace('_', ' ')}
+                    {task.status.replace('_', ' ')}
                   </span>
                 </li>
               ))}
@@ -202,16 +229,24 @@ export function ContactDetailPage() {
 
         {/* Notes */}
         <Card>
-          <SectionHeader title="Notes" caption={`${relatedNotes.length} related`} />
+          <SectionHeader
+            title={t('contactDetail.notesTitle', 'Notes')}
+            caption={t('contactDetail.relatedCount', '{{count}} related', {
+              count: relatedNotes.length,
+            })}
+          />
           {relatedNotes.length === 0 ? (
-            <div className="p-5 text-sm text-[var(--fg-secondary)]">No notes for this account.</div>
+            <div className="p-5 text-sm text-[var(--fg-secondary)]">
+              {t('contactDetail.noNotes', 'No notes for this account.')}
+            </div>
           ) : (
             <ul className="divide-y divide-[var(--border-subtle)]">
               {relatedNotes.map((n) => (
                 <li key={n.id} className="px-5 py-3">
                   <div className="text-sm font-medium text-[var(--fg-primary)]">{n.title}</div>
                   <div className="text-xs text-[var(--fg-tertiary)]">
-                    {n.authorEmail ?? 'Unknown'} · {formatDate(n.createdAt)}
+                    {n.authorEmail ?? t('contactDetail.unknownAuthor', 'Unknown')} ·{' '}
+                    {formatDate(n.createdAt)}
                   </div>
                 </li>
               ))}
@@ -227,7 +262,7 @@ export function ContactDetailPage() {
         entityType="contact"
         entityId={id}
         fieldKey="notes"
-        label="Live collaboration"
+        label={t('contactDetail.liveCollaboration', 'Live collaboration')}
       />
     </div>
   );

@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -16,6 +17,7 @@ import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
 
 export function KeyAccountsPage() {
+  const { t } = useTranslation('crm');
   const reducedMotion = useReducedMotion();
   const [search, setSearch] = useState('');
   const [industry, setIndustry] = useState<string>('');
@@ -40,11 +42,13 @@ export function KeyAccountsPage() {
     >
       <motion.header variants={reducedMotion ? undefined : staggerChild}>
         <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
-          Strategic Accounts
+          {t('keyAccounts.title', 'Strategic Accounts')}
         </h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          Regional strategic accounts owned for pipeline, coverage, and executive follow-through —
-          distinct from the curated global Top 10.
+          {t(
+            'keyAccounts.subtitle',
+            'Regional strategic accounts owned for pipeline, coverage, and executive follow-through — distinct from the curated global Top 10.',
+          )}
         </p>
       </motion.header>
 
@@ -55,7 +59,7 @@ export function KeyAccountsPage() {
       >
         <div className="relative flex-1 min-w-[200px]">
           <label htmlFor="key-accounts-search" className="sr-only">
-            Search key accounts
+            {t('keyAccounts.searchLabel', 'Search key accounts')}
           </label>
           <Icon
             name="search"
@@ -66,25 +70,27 @@ export function KeyAccountsPage() {
           <input
             id="key-accounts-search"
             type="search"
-            placeholder="Search key accounts..."
+            placeholder={t('keyAccounts.searchPlaceholder', 'Search key accounts...')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="input w-full pl-9"
           />
         </div>
         <label htmlFor="key-accounts-industry" className="sr-only">
-          Filter key accounts by industry
+          {t('keyAccounts.industryFilterLabel', 'Filter key accounts by industry')}
         </label>
         <select
           id="key-accounts-industry"
-          aria-label="Filter key accounts by industry"
+          aria-label={t('keyAccounts.industryFilterLabel', 'Filter key accounts by industry')}
           aria-describedby={industries.isError ? 'key-accounts-industry-error' : undefined}
           value={industry}
           onChange={(e) => setIndustry(e.target.value)}
           className="input"
         >
           <option value="">
-            {industries.isError ? 'Industries unavailable' : 'All industries'}
+            {industries.isError
+              ? t('keyAccounts.industriesUnavailable', 'Industries unavailable')
+              : t('keyAccounts.allIndustries', 'All industries')}
           </option>
           {(industries.data?.items ?? []).map((i) => (
             <option key={i} value={i}>
@@ -98,13 +104,16 @@ export function KeyAccountsPage() {
             role="alert"
             className="flex items-center gap-2 text-xs text-[var(--danger)]"
           >
-            <span>{industryError ?? 'Could not load industry filters.'}</span>
+            <span>
+              {industryError ??
+                t('keyAccounts.industryFilterError', 'Could not load industry filters.')}
+            </span>
             <button
               type="button"
               className="rounded-md px-2 py-1 font-semibold text-[var(--danger)] hover:bg-[var(--danger-tint)]"
               onClick={() => void industries.refetch()}
             >
-              Retry
+              {t('keyAccounts.retry', 'Retry')}
             </button>
           </div>
         ) : null}
@@ -113,7 +122,11 @@ export function KeyAccountsPage() {
       {/* sr-only live region — announces filter result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {!accounts.isLoading && accounts.data
-          ? `${items.length} account${items.length === 1 ? '' : 's'}${industry ? ` · ${industry}` : ''}`
+          ? `${
+              items.length === 1
+                ? t('keyAccounts.resultCount_one', '{{count}} account', { count: items.length })
+                : t('keyAccounts.resultCount_other', '{{count}} accounts', { count: items.length })
+            }${industry ? ` · ${industry}` : ''}`
           : ''}
       </p>
 
@@ -123,16 +136,22 @@ export function KeyAccountsPage() {
           variants={reducedMotion ? undefined : staggerChild}
           className="grid grid-cols-2 sm:grid-cols-4 gap-3"
         >
-          <StatCard label="Key accounts" value={items.length} />
+          <StatCard label={t('keyAccounts.statKeyAccounts', 'Key accounts')} value={items.length} />
           <StatCard
-            label="Total pipeline"
+            label={t('keyAccounts.statTotalPipeline', 'Total pipeline')}
             value={formatMoney(
               items.reduce((s, a) => s + a.totalValue, 0),
               'EUR',
             )}
           />
-          <StatCard label="Open deals" value={items.reduce((s, a) => s + a.openDeals, 0)} />
-          <StatCard label="Contacts" value={items.reduce((s, a) => s + a.contactCount, 0)} />
+          <StatCard
+            label={t('keyAccounts.statOpenDeals', 'Open deals')}
+            value={items.reduce((s, a) => s + a.openDeals, 0)}
+          />
+          <StatCard
+            label={t('keyAccounts.statContacts', 'Contacts')}
+            value={items.reduce((s, a) => s + a.contactCount, 0)}
+          />
         </motion.div>
       ) : null}
 
@@ -141,22 +160,28 @@ export function KeyAccountsPage() {
         <LoadingSkeleton rows={4} />
       ) : accounts.isError ? (
         <ErrorState
-          title="Couldn't load key accounts"
-          message={accountError ?? 'The key accounts endpoint did not respond.'}
+          title={t('keyAccounts.errorTitle', "Couldn't load key accounts")}
+          message={
+            accountError ??
+            t('keyAccounts.errorMessage', 'The key accounts endpoint did not respond.')
+          }
           action={
             <button
               type="button"
               className="btn btn-secondary"
               onClick={() => void accounts.refetch()}
             >
-              Retry
+              {t('keyAccounts.retry', 'Retry')}
             </button>
           }
         />
       ) : items.length === 0 ? (
         <EmptyState
-          title="No key accounts yet"
-          message="Flag strategically important companies as Key Accounts from the Companies page."
+          title={t('keyAccounts.emptyTitle', 'No key accounts yet')}
+          message={t(
+            'keyAccounts.emptyMessage',
+            'Flag strategically important companies as Key Accounts from the Companies page.',
+          )}
         />
       ) : (
         <div className="grid grid-cols-1 gap-4">
@@ -195,19 +220,19 @@ export function KeyAccountsPage() {
                         <span className="font-medium text-[var(--fg-primary)]">
                           {formatMoney(account.totalValue, 'EUR')}
                         </span>{' '}
-                        pipeline
+                        {t('keyAccounts.metricPipeline', 'pipeline')}
                       </span>
                       <span className="text-[var(--fg-secondary)]">
                         <span className="font-medium text-[var(--fg-primary)]">
                           {account.openDeals}
                         </span>{' '}
-                        open deals
+                        {t('keyAccounts.metricOpenDeals', 'open deals')}
                       </span>
                       <span className="text-[var(--fg-secondary)]">
                         <span className="font-medium text-[var(--fg-primary)]">
                           {account.contactCount}
                         </span>{' '}
-                        contacts
+                        {t('keyAccounts.metricContacts', 'contacts')}
                       </span>
                     </div>
                   </div>

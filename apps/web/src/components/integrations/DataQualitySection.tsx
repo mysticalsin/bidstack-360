@@ -4,6 +4,7 @@
 // missing deal owners, invalid domain syntax. We render a counts strip
 // + a sortable issue list so an admin can triage during weekly cleanup.
 
+import { useTranslation } from 'react-i18next';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -13,13 +14,43 @@ import { useDataQuality } from '@/hooks/useCrmIntegrations';
 import { relativeTime } from '@/lib/format';
 import type { DataQualityIssue } from '@bidstack/shared';
 
-const KIND_LABEL: Record<DataQualityIssue['kind'], string> = {
-  duplicate_company: 'Duplicate company',
-  stale_data: 'Stale data',
-  missing_owner: 'Missing owner',
-  invalid_domain: 'Invalid domain',
-  missing_logo: 'Missing logo',
-};
+type TFunc = ReturnType<typeof useTranslation>['t'];
+
+// Code-level kind order used to drive the counts strip; display labels are
+// resolved through `kindLabel(t, kind)` so they can be translated.
+const KIND_ORDER: DataQualityIssue['kind'][] = [
+  'duplicate_company',
+  'stale_data',
+  'missing_owner',
+  'invalid_domain',
+  'missing_logo',
+];
+
+function kindLabel(t: TFunc, kind: DataQualityIssue['kind']): string {
+  switch (kind) {
+    case 'duplicate_company':
+      return t('dataQuality.kind.duplicateCompany', 'Duplicate company');
+    case 'stale_data':
+      return t('dataQuality.kind.staleData', 'Stale data');
+    case 'missing_owner':
+      return t('dataQuality.kind.missingOwner', 'Missing owner');
+    case 'invalid_domain':
+      return t('dataQuality.kind.invalidDomain', 'Invalid domain');
+    case 'missing_logo':
+      return t('dataQuality.kind.missingLogo', 'Missing logo');
+  }
+}
+
+function severityLabel(t: TFunc, severity: DataQualityIssue['severity']): string {
+  switch (severity) {
+    case 'high':
+      return t('dataQuality.severity.high', 'high');
+    case 'medium':
+      return t('dataQuality.severity.medium', 'medium');
+    case 'low':
+      return t('dataQuality.severity.low', 'low');
+  }
+}
 
 const SEVERITY_TONE: Record<DataQualityIssue['severity'], BadgeTone> = {
   low: 'gray',
@@ -34,6 +65,7 @@ const SEVERITY_ORDER: Record<DataQualityIssue['severity'], number> = {
 };
 
 export function DataQualitySection() {
+  const { t } = useTranslation('integrations');
   const { data, isLoading, isError, error, refetch } = useDataQuality();
 
   const issues = data ? [...data.issues].sort(byPriority) : [];
@@ -44,13 +76,17 @@ export function DataQualitySection() {
   return (
     <Card className="overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-primary)]">
       <SectionHeader
-        title="Data quality"
+        title={t('dataQuality.title', 'Data quality')}
         caption={
           data
-            ? `Report generated ${relativeTime(data.generatedAt)} · ${issues.length} issue${
-                issues.length === 1 ? '' : 's'
-              }`
-            : 'Detects duplicate companies, stale data, missing owners, and bad domains.'
+            ? t('dataQuality.caption.generated', 'Report generated {{time}} · {{count}} issue', {
+                time: relativeTime(data.generatedAt),
+                count: issues.length,
+              })
+            : t(
+                'dataQuality.caption.idle',
+                'Detects duplicate companies, stale data, missing owners, and bad domains.',
+              )
         }
         action={
           <Badge tone={score >= 90 ? 'jade' : score >= 70 ? 'amber' : 'tomato'}>
@@ -64,43 +100,46 @@ export function DataQualitySection() {
         </div>
       ) : isError ? (
         <ErrorState
-          title="Could not load data quality report"
+          title={t('dataQuality.error.title', 'Could not load data quality report')}
           message={error instanceof Error ? error.message : undefined}
           action={
             <Button variant="secondary" size="sm" onClick={() => refetch()}>
-              Try again
+              {t('dataQuality.error.retry', 'Try again')}
             </Button>
           }
         />
       ) : !data ? (
         <EmptyState
-          title="No data quality scan"
-          message="Run the data quality scan to see duplicate domains, stale records, missing owners, invalid domains, and logo coverage."
+          title={t('dataQuality.emptyScan.title', 'No data quality scan')}
+          message={t(
+            'dataQuality.emptyScan.message',
+            'Run the data quality scan to see duplicate domains, stale records, missing owners, invalid domains, and logo coverage.',
+          )}
         />
       ) : (
         <>
           <div className="grid gap-3 p-5 md:grid-cols-4">
             <DataQualityStat
               icon="shield"
-              label="Quality score"
+              label={t('dataQuality.stat.qualityScore', 'Quality score')}
               value={`${score}/100`}
               tone={score >= 90 ? 'jade' : score >= 70 ? 'amber' : 'tomato'}
             />
             <DataQualityStat
               icon="warning"
-              label="High severity"
+              label={t('dataQuality.stat.highSeverity', 'High severity')}
               value={String(highCount)}
               tone={highCount > 0 ? 'tomato' : 'gray'}
             />
             <DataQualityStat
               icon="clock"
-              label="Medium severity"
+              label={t('dataQuality.stat.mediumSeverity', 'Medium severity')}
               value={String(mediumCount)}
               tone={mediumCount > 0 ? 'amber' : 'gray'}
             />
             <DataQualityStat
               icon="reports"
-              label="Total issues"
+              label={t('dataQuality.stat.totalIssues', 'Total issues')}
               value={String(issues.length)}
               tone="blue"
             />
@@ -108,17 +147,20 @@ export function DataQualitySection() {
           {issues.length === 0 ? (
             <div className="border-t border-[var(--border-subtle)]">
               <EmptyState
-                title="No data quality issues"
-                message="No duplicate domains, stale data, missing owners, invalid domains, or missing logos were detected in this scan."
+                title={t('dataQuality.noIssues.title', 'No data quality issues')}
+                message={t(
+                  'dataQuality.noIssues.message',
+                  'No duplicate domains, stale data, missing owners, invalid domains, or missing logos were detected in this scan.',
+                )}
               />
             </div>
           ) : (
             <>
               <div className="grid grid-cols-2 gap-3 border-t border-[var(--border-subtle)] px-5 pt-4 sm:grid-cols-5">
-                {(Object.keys(KIND_LABEL) as DataQualityIssue['kind'][]).map((kind) => (
+                {KIND_ORDER.map((kind) => (
                   <KindStat
                     key={kind}
-                    label={KIND_LABEL[kind]}
+                    label={kindLabel(t, kind)}
                     count={data.counts[kind] ?? 0}
                     kind={kind}
                   />
@@ -148,6 +190,7 @@ function DataQualityStat({
   value: string;
   tone: BadgeTone;
 }) {
+  const { t } = useTranslation('integrations');
   return (
     <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4">
       <div className="flex items-center justify-between gap-3">
@@ -162,13 +205,14 @@ function DataQualityStat({
         {value}
       </div>
       <Badge tone={tone} className="mt-2">
-        data
+        {t('dataQuality.stat.badge', 'data')}
       </Badge>
     </div>
   );
 }
 
 function IssueRow({ issue }: { issue: DataQualityIssue }) {
+  const { t } = useTranslation('integrations');
   return (
     <li className="flex flex-wrap items-start justify-between gap-4 px-5 py-4 transition hover:bg-[var(--surface-secondary)]/70">
       <div className="min-w-0 flex-1">
@@ -177,16 +221,18 @@ function IssueRow({ issue }: { issue: DataQualityIssue }) {
             <Icon name={issue.severity === 'high' ? 'warning' : 'info'} className="size-4" />
           </span>
           <span className="text-sm font-medium text-[var(--fg-primary)]">{issue.title}</span>
-          <Badge tone="gray">{KIND_LABEL[issue.kind]}</Badge>
+          <Badge tone="gray">{kindLabel(t, issue.kind)}</Badge>
         </div>
         {issue.detail ? (
           <p className="mt-0.5 text-xs text-[var(--fg-secondary)]">{issue.detail}</p>
         ) : null}
         {issue.companyName ? (
-          <p className="mt-1 text-[11px] text-[var(--fg-tertiary)]">Company: {issue.companyName}</p>
+          <p className="mt-1 text-[11px] text-[var(--fg-tertiary)]">
+            {t('dataQuality.issue.company', 'Company: {{name}}', { name: issue.companyName })}
+          </p>
         ) : null}
       </div>
-      <Badge tone={SEVERITY_TONE[issue.severity]}>{issue.severity}</Badge>
+      <Badge tone={SEVERITY_TONE[issue.severity]}>{severityLabel(t, issue.severity)}</Badge>
     </li>
   );
 }

@@ -76,13 +76,62 @@
     "revoke": "Révoquer",
     "name": "Nom de la clé",
     "created": "Créée le",
-    "lastUsed": "Dernière utilisation",
+    "lastUsed": "Utilisée {{time}}",
     "never": "Jamais utilisée",
     "copyKey": "Copier la clé",
     "confirmRevoke": "Êtes-vous sûr de vouloir révoquer cette clé ? Cette action est irréversible.",
     "noKeys": "Aucune clé API pour le moment.",
     "keyCreated": "Clé API créée. Copiez-la maintenant, elle ne sera plus affichée.",
-    "scopes": "Portées"
+    "scopes": "Portées",
+    "title": "Clés d'API",
+    "caption": "Utilisées par les clients MCP, les appels REST et les tâches CI. Hachées en SHA-256 au repos.",
+    "newKey": "+ Nouvelle clé d'API",
+    "createDialog": {
+      "title": "Créer une clé d'API",
+      "description": "Vous ne verrez le secret qu'une seule fois — copiez-le avant de fermer."
+    },
+    "field": {
+      "name": "Nom",
+      "namePlaceholder": "ex. dust-prod, mcp-cli",
+      "scopes": "Portées"
+    },
+    "scopeHelp": {
+      "read": "Accès en lecture seule à toutes les données de l'organisation.",
+      "write": "Créer / mettre à jour / supprimer des enregistrements.",
+      "mcp": "Activer le transport MCP. Associez-le à lecture ou écriture pour les autorisations d'outils."
+    },
+    "cancel": "Annuler",
+    "creating": "Création…",
+    "createKey": "Créer la clé",
+    "reveal": {
+      "warning": "Copiez votre nouvelle clé maintenant — elle ne sera plus affichée.",
+      "copied": "Copié !",
+      "copy": "Copier",
+      "dismiss": "Ignorer"
+    },
+    "empty": {
+      "title": "Aucune clé d'API pour l'instant",
+      "message": "Créez-en une pour permettre à Dust, à votre client MCP ou à une tâche CI de s'authentifier."
+    },
+    "createdAt": "Créée {{date}}",
+    "neverUsed": "Jamais utilisée",
+    "revokeConfirm": {
+      "title": "Révoquer « {{name}} » ?",
+      "description": "Tout client utilisant cette clé commencera à échouer immédiatement. Cette action est irréversible.",
+      "confirmLabel": "Révoquer la clé"
+    },
+    "toast": {
+      "createdTitle": "Clé d'API créée",
+      "createdDescription": "Copiez le secret maintenant — il ne sera plus affiché.",
+      "revoked": "« {{name}} » révoquée",
+      "revokeFailedTitle": "Échec de la révocation",
+      "revokeFailedDescription": "Le serveur a rejeté la demande."
+    },
+    "error": {
+      "nameRequired": "Le nom est requis",
+      "scopeRequired": "Sélectionnez au moins une portée",
+      "createFailed": "Échec de la création de la clé d'API"
+    }
   },
   "webhooks": {
     "create": "Ajouter un webhook",
@@ -407,5 +456,36 @@
       "title": "Choisissez un modèle à modifier",
       "message": "Ou créez-en un nouveau. Les modèles remplissent les espaces réservés comme {{lead.firstName}} à partir de l'enregistrement actuel."
     }
+  },
+  "roles": {
+    "toastNameRequired": "Le nom du rôle est obligatoire",
+    "toastUpdated": "Rôle mis à jour",
+    "toastCreated": "Rôle créé",
+    "toastUpdateFailed": "Échec de la mise à jour du rôle",
+    "toastCreateFailed": "Échec de la création du rôle",
+    "deleteConfirmTitle": "Supprimer le rôle « {{name}} » ?",
+    "deleteConfirmDescription": "Cela retirera le rôle de tous les utilisateurs assignés.",
+    "deleteConfirmLabel": "Supprimer",
+    "toastDeleted": "Rôle supprimé",
+    "toastDeleteFailed": "Échec de la suppression du rôle",
+    "sectionTitle": "Rôles et autorisations",
+    "sectionCaption": "Gérez les rôles de l'espace de travail et ce que chaque rôle peut faire.",
+    "newRoleButton": "+ Nouveau rôle",
+    "formTitleEdit": "Modifier le rôle",
+    "formTitleCreate": "Créer un rôle",
+    "fieldName": "Nom",
+    "namePlaceholder": "p. ex. Responsable des ventes",
+    "fieldDescription": "Description",
+    "descriptionPlaceholder": "Description facultative",
+    "fieldPermissions": "Autorisations",
+    "saveChangesButton": "Enregistrer les modifications",
+    "createRoleButton": "Créer un rôle",
+    "cancelButton": "Annuler",
+    "emptyTitle": "Aucun rôle pour le moment",
+    "emptyMessage": "Créez votre premier rôle personnalisé.",
+    "systemBadge": "Système",
+    "editButton": "Modifier",
+    "deleteButton": "Supprimer",
+    "noPermissions": "Aucune autorisation"
   }
 }

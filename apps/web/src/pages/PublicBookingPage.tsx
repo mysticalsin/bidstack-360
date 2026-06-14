@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/cn';
 
@@ -28,6 +29,7 @@ function formatSlot(iso: string) {
 }
 
 export function PublicBookingPage() {
+  const { t } = useTranslation('crm');
   const { slug = '' } = useParams<{ slug: string }>();
   const [date, setDate] = useState(() => isoDate(1));
   const [availability, setAvailability] = useState<AvailabilityResponse | null>(null);
@@ -54,14 +56,22 @@ export function PublicBookingPage() {
           signal: controller.signal,
         });
         if (!res.ok) {
-          throw new Error(res.status === 404 ? 'Booking page not found' : 'Availability failed');
+          throw new Error(
+            res.status === 404
+              ? t('publicBooking.errorNotFound', 'Booking page not found')
+              : t('publicBooking.errorAvailabilityFailed', 'Availability failed'),
+          );
         }
         const data = (await res.json()) as AvailabilityResponse;
         setAvailability(data);
       } catch (err) {
         if (!controller.signal.aborted) {
           setAvailability(null);
-          setError(err instanceof Error ? err.message : 'Booking page unavailable');
+          setError(
+            err instanceof Error
+              ? err.message
+              : t('publicBooking.errorUnavailable', 'Booking page unavailable'),
+          );
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -69,7 +79,7 @@ export function PublicBookingPage() {
     }
     void loadAvailability();
     return () => controller.abort();
-  }, [date, slug, timezone]);
+  }, [date, slug, timezone, t]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -87,10 +97,15 @@ export function PublicBookingPage() {
           tz: timezone,
         }),
       });
-      if (!res.ok) throw new Error('That time is no longer available.');
+      if (!res.ok)
+        throw new Error(
+          t('publicBooking.errorSlotTaken', 'That time is no longer available.'),
+        );
       setConfirmed(true);
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Booking failed');
+      setSubmitError(
+        err instanceof Error ? err.message : t('publicBooking.errorBookingFailed', 'Booking failed'),
+      );
     }
   }
 
@@ -99,10 +114,13 @@ export function PublicBookingPage() {
       <main className="grid min-h-screen place-items-center bg-[var(--surface-page)] px-4">
         <section className="max-w-md text-center">
           <h1 className="text-2xl font-semibold text-[var(--fg-primary)]">
-            Booking page not found
+            {t('publicBooking.notFoundTitle', 'Booking page not found')}
           </h1>
           <p className="mt-2 text-sm text-[var(--fg-secondary)]">
-            This scheduling link is invalid or no longer accepting meetings.
+            {t(
+              'publicBooking.notFoundBody',
+              'This scheduling link is invalid or no longer accepting meetings.',
+            )}
           </p>
         </section>
       </main>
@@ -114,10 +132,10 @@ export function PublicBookingPage() {
       <section className="mx-auto max-w-3xl space-y-6">
         <header className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-6 shadow-[var(--shadow-sm)]">
           <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-            BidStack scheduling
+            {t('publicBooking.eyebrow', 'BidStack scheduling')}
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--fg-primary)]">
-            {loading ? 'Loading booking page' : availability?.name}
+            {loading ? t('publicBooking.loadingTitle', 'Loading booking page') : availability?.name}
           </h1>
           {availability?.description && (
             <p className="mt-2 text-sm leading-6 text-[var(--fg-secondary)]">
@@ -128,9 +146,11 @@ export function PublicBookingPage() {
 
         {confirmed ? (
           <section className="rounded-2xl border border-[var(--success)]/30 bg-[var(--success-tint)] p-6 text-center">
-            <h2 className="text-xl font-semibold text-[var(--fg-primary)]">Booking confirmed</h2>
+            <h2 className="text-xl font-semibold text-[var(--fg-primary)]">
+              {t('publicBooking.confirmedTitle', 'Booking confirmed')}
+            </h2>
             <p className="mt-2 text-sm text-[var(--fg-secondary)]">
-              You&apos;re booked. A confirmation email is on its way.
+              {t('publicBooking.confirmedBody', "You're booked. A confirmation email is on its way.")}
             </p>
           </section>
         ) : (
@@ -139,9 +159,11 @@ export function PublicBookingPage() {
               className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4"
               role="grid"
               data-testid="booking-calendar"
-              aria-label="Choose a booking date"
+              aria-label={t('publicBooking.calendarAriaLabel', 'Choose a booking date')}
             >
-              <h2 className="text-sm font-semibold text-[var(--fg-primary)]">Choose a day</h2>
+              <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
+                {t('publicBooking.chooseDayHeading', 'Choose a day')}
+              </h2>
               <div className="mt-3 grid gap-2">
                 {days.map((day) => (
                   <button
@@ -166,7 +188,9 @@ export function PublicBookingPage() {
             </section>
 
             <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4">
-              <h2 className="text-sm font-semibold text-[var(--fg-primary)]">Available times</h2>
+              <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
+                {t('publicBooking.availableTimesHeading', 'Available times')}
+              </h2>
               {loading ? (
                 <div className="mt-4 space-y-2">
                   {[1, 2, 3].map((i) => (
@@ -183,7 +207,9 @@ export function PublicBookingPage() {
                       key={slot}
                       type="button"
                       data-testid="time-slot"
-                      aria-label={`Available slot ${formatSlot(slot)}`}
+                      aria-label={t('publicBooking.slotAriaLabel', 'Available slot {{slot}}', {
+                        slot: formatSlot(slot),
+                      })}
                       onClick={() => setSelectedSlot(slot)}
                       className={cn(
                         'min-h-[44px] rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
@@ -198,14 +224,15 @@ export function PublicBookingPage() {
                 </div>
               ) : (
                 <p className="mt-4 rounded-lg border border-dashed border-[var(--border-subtle)] p-4 text-sm text-[var(--fg-secondary)]">
-                  No available slots on this day. Try another date.
+                  {t('publicBooking.noSlots', 'No available slots on this day. Try another date.')}
                 </p>
               )}
 
               {selectedSlot && (
                 <form onSubmit={handleSubmit} className="mt-6 space-y-3">
                   <p className="text-sm text-[var(--fg-secondary)]">
-                    Selected: <strong>{formatSlot(selectedSlot)}</strong>
+                    {t('publicBooking.selectedLabel', 'Selected:')}{' '}
+                    <strong>{formatSlot(selectedSlot)}</strong>
                   </p>
                   {submitError && (
                     <p role="alert" className="text-sm text-[var(--danger)]">
@@ -213,7 +240,7 @@ export function PublicBookingPage() {
                     </p>
                   )}
                   <label className="block text-sm font-medium text-[var(--fg-primary)]">
-                    Name
+                    {t('publicBooking.nameLabel', 'Name')}
                     <input
                       value={attendeeName}
                       onChange={(e) => setAttendeeName(e.target.value)}
@@ -222,7 +249,7 @@ export function PublicBookingPage() {
                     />
                   </label>
                   <label className="block text-sm font-medium text-[var(--fg-primary)]">
-                    Email
+                    {t('publicBooking.emailLabel', 'Email')}
                     <input
                       type="email"
                       value={attendeeEmail}
@@ -235,7 +262,7 @@ export function PublicBookingPage() {
                     type="submit"
                     className="min-h-[44px] w-full rounded-lg bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
                   >
-                    Confirm booking
+                    {t('publicBooking.confirmButton', 'Confirm booking')}
                   </button>
                 </form>
               )}

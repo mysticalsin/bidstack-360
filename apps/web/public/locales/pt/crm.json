@@ -1968,5 +1968,246 @@
     "briefLegalName": "Razão social",
     "briefFounded": "Fundada",
     "briefConfidence": "Confiança: {{percent}}%"
+  },
+  "publicBooking": {
+    "errorNotFound": "Página de agendamento não encontrada",
+    "errorAvailabilityFailed": "Falha na disponibilidade",
+    "errorUnavailable": "Página de agendamento indisponível",
+    "errorSlotTaken": "Esse horário já não está disponível.",
+    "errorBookingFailed": "Falha no agendamento",
+    "notFoundTitle": "Página de agendamento não encontrada",
+    "notFoundBody": "Este link de agendamento é inválido ou já não aceita reuniões.",
+    "eyebrow": "Agendamento BidStack",
+    "loadingTitle": "Carregando página de agendamento",
+    "confirmedTitle": "Agendamento confirmado",
+    "confirmedBody": "Seu agendamento foi feito. Um e-mail de confirmação está a caminho.",
+    "calendarAriaLabel": "Escolha uma data de agendamento",
+    "chooseDayHeading": "Escolha um dia",
+    "availableTimesHeading": "Horários disponíveis",
+    "slotAriaLabel": "Horário disponível {{slot}}",
+    "noSlots": "Nenhum horário disponível neste dia. Tente outra data.",
+    "selectedLabel": "Selecionado:",
+    "nameLabel": "Nome",
+    "emailLabel": "E-mail",
+    "confirmButton": "Confirmar agendamento"
+  },
+  "oppToolbar": {
+    "kpiOpportunities": "Oportunidades",
+    "kpiRevenue": "Receita",
+    "kpiWeightedRevenue": "RP",
+    "kpiOpen": "Abertas",
+    "kpiRegionLabel": "Resumo de KPIs de oportunidades",
+    "title": "Oportunidades",
+    "resultsFor": "resultados para",
+    "clear": "limpar",
+    "stageOpportunities": "oportunidades {{stage}}",
+    "clearFilter": "limpar filtro",
+    "bidsInFlight": "{{count}} propostas em andamento · clique em qualquer célula para editar em linha.",
+    "exportingLabel": "Exportando oportunidades…",
+    "exportLabel": "Exportar as oportunidades visíveis como CSV",
+    "exporting": "Exportando…",
+    "exportCsv": "Exportar CSV",
+    "stageFilterGroupLabel": "Filtrar oportunidades por etapa",
+    "stageAll": "Todas",
+    "bulkActionsLabel": "Ações em massa",
+    "selectedCount": "{{count}} selecionadas",
+    "moveSelectionLabel": "Mover a seleção para uma etapa",
+    "moveToStage": "Mover para etapa…",
+    "deleteSelected": "Excluir selecionadas",
+    "clearSelection": "Limpar"
+  },
+  "newLead": {
+    "toastNameRequired": "Nome e sobrenome são obrigatórios",
+    "toastCreateFailed": "Falha ao criar o lead",
+    "breadcrumbLabel": "Caminho de navegação",
+    "breadcrumbLeads": "Leads",
+    "breadcrumbCurrent": "Novo lead",
+    "heading": "Novo lead",
+    "subtitle": "Adicione um novo prospecto ao seu pipeline.",
+    "labelFirstName": "Nome",
+    "labelLastName": "Sobrenome",
+    "labelEmail": "E-mail",
+    "labelPhone": "Telefone",
+    "labelCompany": "Empresa",
+    "labelTitle": "Cargo",
+    "labelSource": "Origem",
+    "sourceWebsite": "Site",
+    "sourceReferral": "Indicação",
+    "sourceEvent": "Evento",
+    "sourceColdOutreach": "Abordagem fria",
+    "sourcePartner": "Parceiro",
+    "sourceSocial": "Redes sociais",
+    "sourceOther": "Outro",
+    "labelPriority": "Prioridade",
+    "priorityLow": "Baixa",
+    "priorityMedium": "Média",
+    "priorityHigh": "Alta",
+    "priorityCritical": "Crítica",
+    "labelScore": "Pontuação",
+    "submitPending": "Criando…",
+    "submit": "Criar lead",
+    "cancel": "Cancelar"
+  },
+  "topAccounts": {
+    "heading": "Classificação de contas",
+    "badgeCurated": "Selecionado — top 10 global da Amaris",
+    "badgeAuto": "Classificado automaticamente por valor do pipeline",
+    "subtitleCurated": "O top 10 global, selecionado e ordenado pelos administradores nas Configurações.",
+    "subtitleAuto": "Contas de maior valor classificadas por pipeline total e receita.",
+    "searchLabel": "Pesquisar contas principais",
+    "searchPlaceholder": "Pesquisar contas principais...",
+    "industryLabel": "Filtrar contas principais por setor",
+    "industriesUnavailable": "Setores indisponíveis",
+    "allIndustries": "Todos os setores",
+    "industryLoadError": "Não foi possível carregar os filtros de setor.",
+    "retry": "Tentar novamente",
+    "resultCount": "{{count}} conta",
+    "errorTitle": "Não foi possível carregar as contas principais",
+    "errorMessage": "O endpoint de contas principais não respondeu.",
+    "emptyTitle": "Ainda não há dados de contas",
+    "emptyMessage": "Adicione oportunidades com valores para ver as contas principais classificadas por pipeline.",
+    "totalPipeline": "pipeline total",
+    "won": "ganho",
+    "openDeals": "{{count}} negócios abertos",
+    "contacts": "{{count}} contatos"
+  },
+  "forecasts": {
+    "title": "Previsões de receita",
+    "subtitle": "As propostas que pilotamos vão atingir a meta? Pipeline, melhor caso, comprometido e fechado por período.",
+    "newForecast": "Nova previsão",
+    "periodFilterLabel": "Filtro de período",
+    "periodMonthly": "Mensal",
+    "periodQuarterly": "Trimestral",
+    "periodYearly": "Anual",
+    "totalsLabel": "Totais de previsão para o período selecionado",
+    "totalCommit": "Comprometido",
+    "totalBestCase": "Melhor caso",
+    "totalPipeline": "Pipeline",
+    "totalClosed": "Fechado",
+    "toastUpdated": "Previsão atualizada",
+    "toastUpdateFailed": "Falha ao atualizar a previsão",
+    "toastCreated": "Previsão criada",
+    "toastCreateFailed": "Falha ao criar a previsão",
+    "toastDeleted": "Previsões excluídas",
+    "toastDeleteFailed": "Falha ao excluir as previsões",
+    "deleteConfirmTitle": "Excluir as previsões de {{period}}?",
+    "deleteConfirmDescription": "Isto removerá todas as previsões por categoria deste período e proprietário.",
+    "unknownError": "Erro desconhecido"
+  },
+  "cartesianCharts": {
+    "lineChartAriaLabel": "Gráfico de linhas",
+    "barChartAriaLabel": "Gráfico de barras",
+    "areaChartAriaLabel": "Gráfico de áreas",
+    "funnelChartAriaLabel": "Gráfico de funil",
+    "scatterChartAriaLabel": "Gráfico de dispersão"
+  },
+  "commandCenter": {
+    "region": {
+      "ariaLabel": "Centro de comando BidStack"
+    },
+    "kicker": "Centro de comando BidStack",
+    "actions": {
+      "ariaLabel": "Sinais de decisão da conta"
+    },
+    "badge": {
+      "ready": "{{count}}% pronto",
+      "stackSignals": "{{count}} sinais de stack"
+    },
+    "signal": {
+      "readiness": {
+        "label": "Estimativa de prontidão da proposta",
+        "detailReady": "pronto para revisão executiva",
+        "detailFocus": "precisa de foco de pré-vendas"
+      },
+      "source": {
+        "label": "Cobertura de fontes",
+        "detail": "{{count}} fonte atribuída"
+      },
+      "decision": {
+        "label": "Cobertura de decisão"
+      },
+      "risk": {
+        "label": "Carga de riscos abertos",
+        "valueHigh": "{{count}} alto",
+        "valueOpen": "{{count}} aberto",
+        "detailEscalate": "escalar antes da proposta",
+        "detailManageable": "gerenciável com acompanhamento do responsável"
+      }
+    },
+    "nextMove": {
+      "unblock": "Desbloqueie {{label}} antes do gate da proposta.",
+      "escalateWithOwner": "Escale {{title}} com {{owner}} antes da aprovação da proposta.",
+      "escalate": "Escale {{title}} antes da aprovação da proposta.",
+      "champion": "Use {{name}} como defensor para o próximo marco de pré-vendas.",
+      "refreshSources": "Atualize a verificação de dados para reforçar as provas legais, de logotipo, de mercado e de fonte da conta.",
+      "advance": "Avance a próxima etapa da proposta com o contexto da conta disponível e o alinhamento do responsável."
+    },
+    "committee": {
+      "champions": "{{count}} defensor mapeado",
+      "buyers": "{{count}} comprador mapeado",
+      "stakeholders": "{{count}} parte interessada mapeada",
+      "empty": "mapear comprador e defensor"
+    },
+    "footer": {
+      "primarySignal": {
+        "label": "Sinal comercial principal",
+        "pending": "Pipeline pendente"
+      },
+      "weightedValue": {
+        "label": "Valor ponderado da conta",
+        "notVerified": "Não verificado"
+      },
+      "ownerMap": {
+        "label": "Mapa de responsáveis pela decisão",
+        "contacts": "{{count}} contatos mapeados"
+      }
+    }
+  },
+  "contactDetail": {
+    "errorTitle": "Não foi possível carregar o contato",
+    "errorMessage": "O contato pode ter sido excluído.",
+    "notFoundTitle": "Contato não encontrado",
+    "notFoundMessage": "O contato pode ter sido excluído ou você pode não ter acesso a ele.",
+    "backToContacts": "Voltar aos contatos",
+    "breadcrumbLabel": "Trilha de navegação",
+    "contacts": "Contatos",
+    "noRole": "Sem cargo",
+    "influence": "Influência: {{value}}/5",
+    "added": "Adicionado",
+    "opportunitiesTitle": "Oportunidades",
+    "relatedCount": "{{count}} relacionados",
+    "noOpportunities": "Nenhuma oportunidade para {{customer}}.",
+    "tasksTitle": "Tarefas",
+    "noTasks": "Nenhuma tarefa relacionada.",
+    "dueDate": "Vence {{date}}",
+    "noDueDate": "Sem data de vencimento",
+    "notesTitle": "Notas",
+    "noNotes": "Nenhuma nota para esta conta.",
+    "unknownAuthor": "Desconhecido",
+    "liveCollaboration": "Colaboração ao vivo"
+  },
+  "keyAccounts": {
+    "title": "Contas estratégicas",
+    "subtitle": "Contas estratégicas regionais geridas para pipeline, cobertura e acompanhamento executivo — distintas do Top 10 global selecionado.",
+    "searchLabel": "Pesquisar contas-chave",
+    "searchPlaceholder": "Pesquisar contas-chave...",
+    "industryFilterLabel": "Filtrar contas-chave por setor",
+    "industriesUnavailable": "Setores indisponíveis",
+    "allIndustries": "Todos os setores",
+    "industryFilterError": "Não foi possível carregar os filtros de setor.",
+    "retry": "Tentar novamente",
+    "resultCount_one": "{{count}} conta",
+    "resultCount_other": "{{count}} contas",
+    "statKeyAccounts": "Contas-chave",
+    "statTotalPipeline": "Pipeline total",
+    "statOpenDeals": "Negócios abertos",
+    "statContacts": "Contactos",
+    "errorTitle": "Não foi possível carregar as contas-chave",
+    "errorMessage": "O endpoint de contas-chave não respondeu.",
+    "emptyTitle": "Ainda não há contas-chave",
+    "emptyMessage": "Marque as empresas estrategicamente importantes como contas-chave na página de Empresas.",
+    "metricPipeline": "pipeline",
+    "metricOpenDeals": "negócios abertos",
+    "metricContacts": "contactos"
   }
 }

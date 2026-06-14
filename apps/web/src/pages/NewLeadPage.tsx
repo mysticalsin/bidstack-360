@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/Button';
@@ -8,6 +9,7 @@ import { useCreateLead } from '@/hooks/useLeads';
 import type { LeadCreate } from '@bidstack/shared';
 
 export function NewLeadPage() {
+  const { t } = useTranslation('crm');
   const nav = useNavigate();
   const create = useCreateLead();
   const firstNameRef = useRef<HTMLInputElement>(null);
@@ -33,12 +35,12 @@ export function NewLeadPage() {
       // Move focus to the first invalid field so a keyboard/SR user lands on
       // the problem, not just hears a transient toast.
       (next.firstName ? firstNameRef : lastNameRef).current?.focus();
-      toast.error('First and last name are required');
+      toast.error(t('newLead.toastNameRequired', 'First and last name are required'));
       return;
     }
     setErrors({});
     create.mutate(form, {
-      onError: () => toast.error('Failed to create lead'),
+      onError: () => toast.error(t('newLead.toastCreateFailed', 'Failed to create lead')),
     });
   };
 
@@ -50,25 +52,27 @@ export function NewLeadPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <nav aria-label="Breadcrumb" className="mb-4">
+      <nav aria-label={t('newLead.breadcrumbLabel', 'Breadcrumb')} className="mb-4">
         <ol className="flex items-center gap-2 text-xs text-[var(--fg-tertiary)]">
           <li>
             <Link to="/leads" className="hover:text-[var(--fg-primary)]">
-              Leads
+              {t('newLead.breadcrumbLeads', 'Leads')}
             </Link>
           </li>
           <li aria-hidden>/</li>
           <li aria-current="page" className="text-[var(--fg-primary)]">
-            New lead
+            {t('newLead.breadcrumbCurrent', 'New lead')}
           </li>
         </ol>
       </nav>
 
       <Card>
         <form onSubmit={handleSubmit} className="p-6">
-          <h1 className="text-xl font-semibold text-[var(--fg-primary)]">New lead</h1>
+          <h1 className="text-xl font-semibold text-[var(--fg-primary)]">
+            {t('newLead.heading', 'New lead')}
+          </h1>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            Add a new prospect to your pipeline.
+            {t('newLead.subtitle', 'Add a new prospect to your pipeline.')}
           </p>
 
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -77,7 +81,8 @@ export function NewLeadPage() {
                 htmlFor="lead-first-name"
                 className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
               >
-                First name <span className="text-[var(--danger)]">*</span>
+                {t('newLead.labelFirstName', 'First name')}{' '}
+                <span className="text-[var(--danger)]">*</span>
               </label>
               <input
                 id="lead-first-name"
@@ -97,7 +102,8 @@ export function NewLeadPage() {
                 htmlFor="lead-last-name"
                 className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
               >
-                Last name <span className="text-[var(--danger)]">*</span>
+                {t('newLead.labelLastName', 'Last name')}{' '}
+                <span className="text-[var(--danger)]">*</span>
               </label>
               <input
                 id="lead-last-name"
@@ -117,7 +123,7 @@ export function NewLeadPage() {
                 htmlFor="lead-email"
                 className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
               >
-                Email
+                {t('newLead.labelEmail', 'Email')}
               </label>
               <input
                 id="lead-email"
@@ -132,7 +138,7 @@ export function NewLeadPage() {
                 htmlFor="lead-phone"
                 className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
               >
-                Phone
+                {t('newLead.labelPhone', 'Phone')}
               </label>
               <input
                 id="lead-phone"
@@ -147,7 +153,7 @@ export function NewLeadPage() {
                 htmlFor="lead-company"
                 className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
               >
-                Company
+                {t('newLead.labelCompany', 'Company')}
               </label>
               <input
                 id="lead-company"
@@ -161,7 +167,7 @@ export function NewLeadPage() {
                 htmlFor="lead-title"
                 className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
               >
-                Title
+                {t('newLead.labelTitle', 'Title')}
               </label>
               <input
                 id="lead-title"
@@ -175,7 +181,7 @@ export function NewLeadPage() {
                 htmlFor="lead-source"
                 className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
               >
-                Source
+                {t('newLead.labelSource', 'Source')}
               </label>
               <select
                 id="lead-source"
@@ -183,13 +189,15 @@ export function NewLeadPage() {
                 onChange={field('source')}
                 className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
               >
-                <option value="website">Website</option>
-                <option value="referral">Referral</option>
-                <option value="event">Event</option>
-                <option value="cold_outreach">Cold outreach</option>
-                <option value="partner">Partner</option>
-                <option value="social">Social</option>
-                <option value="other">Other</option>
+                <option value="website">{t('newLead.sourceWebsite', 'Website')}</option>
+                <option value="referral">{t('newLead.sourceReferral', 'Referral')}</option>
+                <option value="event">{t('newLead.sourceEvent', 'Event')}</option>
+                <option value="cold_outreach">
+                  {t('newLead.sourceColdOutreach', 'Cold outreach')}
+                </option>
+                <option value="partner">{t('newLead.sourcePartner', 'Partner')}</option>
+                <option value="social">{t('newLead.sourceSocial', 'Social')}</option>
+                <option value="other">{t('newLead.sourceOther', 'Other')}</option>
               </select>
             </div>
             <div>
@@ -197,7 +205,7 @@ export function NewLeadPage() {
                 htmlFor="lead-priority"
                 className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
               >
-                Priority
+                {t('newLead.labelPriority', 'Priority')}
               </label>
               <select
                 id="lead-priority"
@@ -205,10 +213,10 @@ export function NewLeadPage() {
                 onChange={field('priority')}
                 className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
               >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
+                <option value="low">{t('newLead.priorityLow', 'Low')}</option>
+                <option value="medium">{t('newLead.priorityMedium', 'Medium')}</option>
+                <option value="high">{t('newLead.priorityHigh', 'High')}</option>
+                <option value="critical">{t('newLead.priorityCritical', 'Critical')}</option>
               </select>
             </div>
             <div>
@@ -216,7 +224,7 @@ export function NewLeadPage() {
                 htmlFor="lead-score"
                 className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
               >
-                Score
+                {t('newLead.labelScore', 'Score')}
               </label>
               <input
                 id="lead-score"
@@ -232,10 +240,12 @@ export function NewLeadPage() {
 
           <div className="mt-6 flex items-center gap-2">
             <Button type="submit" disabled={create.isPending}>
-              {create.isPending ? 'Creating…' : 'Create lead'}
+              {create.isPending
+                ? t('newLead.submitPending', 'Creating…')
+                : t('newLead.submit', 'Create lead')}
             </Button>
             <Button variant="ghost" onClick={() => nav('/leads')}>
-              Cancel
+              {t('newLead.cancel', 'Cancel')}
             </Button>
           </div>
         </form>

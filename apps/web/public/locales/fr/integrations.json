@@ -352,5 +352,46 @@
     "detailAgentOverrides": "Remplacements d'agents",
     "agentOverridesConfigured": "{{count}} configurés",
     "agentOverridesDefaults": "Utilisation des valeurs par défaut"
+  },
+  "dataQuality": {
+    "title": "Qualité des données",
+    "caption": {
+      "generated": "Rapport généré {{time}} · {{count}} problème",
+      "idle": "Détecte les entreprises en double, les données obsolètes, les propriétaires manquants et les domaines incorrects."
+    },
+    "error": {
+      "title": "Impossible de charger le rapport de qualité des données",
+      "retry": "Réessayer"
+    },
+    "emptyScan": {
+      "title": "Aucune analyse de qualité des données",
+      "message": "Lancez l'analyse de qualité des données pour voir les domaines en double, les enregistrements obsolètes, les propriétaires manquants, les domaines non valides et la couverture des logos."
+    },
+    "stat": {
+      "qualityScore": "Score de qualité",
+      "highSeverity": "Gravité élevée",
+      "mediumSeverity": "Gravité moyenne",
+      "totalIssues": "Total des problèmes",
+      "badge": "données"
+    },
+    "noIssues": {
+      "title": "Aucun problème de qualité des données",
+      "message": "Aucun domaine en double, donnée obsolète, propriétaire manquant, domaine non valide ou logo manquant n'a été détecté lors de cette analyse."
+    },
+    "issue": {
+      "company": "Entreprise : {{name}}"
+    },
+    "kind": {
+      "duplicateCompany": "Entreprise en double",
+      "staleData": "Données obsolètes",
+      "missingOwner": "Propriétaire manquant",
+      "invalidDomain": "Domaine non valide",
+      "missingLogo": "Logo manquant"
+    },
+    "severity": {
+      "high": "élevée",
+      "medium": "moyenne",
+      "low": "faible"
+    }
   }
 }

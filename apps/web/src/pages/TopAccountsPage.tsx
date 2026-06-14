@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -17,6 +18,7 @@ import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
 
 export function TopAccountsPage() {
+  const { t } = useTranslation('crm');
   const reducedMotion = useReducedMotion();
   const [search, setSearch] = useState('');
   const [industry, setIndustry] = useState<string>('');
@@ -44,23 +46,23 @@ export function TopAccountsPage() {
       <motion.header variants={reducedMotion ? undefined : staggerChild}>
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
-            Account Ranking
+            {t('topAccounts.heading', 'Account Ranking')}
           </h1>
           {!accounts.isLoading && !accounts.isError ? (
             source === 'curated' ? (
               <Badge tone="amber">
                 <Icon name="trophy" size={11} ariaHidden />
-                Curated — Amaris global top 10
+                {t('topAccounts.badgeCurated', 'Curated — Amaris global top 10')}
               </Badge>
             ) : (
-              <Badge tone="gray">Auto-ranked by pipeline value</Badge>
+              <Badge tone="gray">{t('topAccounts.badgeAuto', 'Auto-ranked by pipeline value')}</Badge>
             )
           ) : null}
         </div>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
           {source === 'curated'
-            ? 'The global top 10, hand-picked and ordered by admins in Settings.'
-            : 'Highest-value accounts ranked by total pipeline and revenue.'}
+            ? t('topAccounts.subtitleCurated', 'The global top 10, hand-picked and ordered by admins in Settings.')
+            : t('topAccounts.subtitleAuto', 'Highest-value accounts ranked by total pipeline and revenue.')}
         </p>
       </motion.header>
 
@@ -71,7 +73,7 @@ export function TopAccountsPage() {
       >
         <div className="relative flex-1 min-w-[200px]">
           <label htmlFor="top-accounts-search" className="sr-only">
-            Search top accounts
+            {t('topAccounts.searchLabel', 'Search top accounts')}
           </label>
           <Icon
             name="search"
@@ -82,25 +84,27 @@ export function TopAccountsPage() {
           <input
             id="top-accounts-search"
             type="search"
-            placeholder="Search top accounts..."
+            placeholder={t('topAccounts.searchPlaceholder', 'Search top accounts...')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="input w-full pl-9"
           />
         </div>
         <label htmlFor="top-accounts-industry" className="sr-only">
-          Filter top accounts by industry
+          {t('topAccounts.industryLabel', 'Filter top accounts by industry')}
         </label>
         <select
           id="top-accounts-industry"
-          aria-label="Filter top accounts by industry"
+          aria-label={t('topAccounts.industryLabel', 'Filter top accounts by industry')}
           aria-describedby={industries.isError ? 'top-accounts-industry-error' : undefined}
           value={industry}
           onChange={(e) => setIndustry(e.target.value)}
           className="input"
         >
           <option value="">
-            {industries.isError ? 'Industries unavailable' : 'All industries'}
+            {industries.isError
+              ? t('topAccounts.industriesUnavailable', 'Industries unavailable')
+              : t('topAccounts.allIndustries', 'All industries')}
           </option>
           {(industries.data?.items ?? []).map((i: string) => (
             <option key={i} value={i}>
@@ -114,13 +118,13 @@ export function TopAccountsPage() {
             role="alert"
             className="flex items-center gap-2 text-xs text-[var(--danger)]"
           >
-            <span>{industryError ?? 'Could not load industry filters.'}</span>
+            <span>{industryError ?? t('topAccounts.industryLoadError', 'Could not load industry filters.')}</span>
             <button
               type="button"
               className="rounded-md px-2 py-1 font-semibold text-[var(--danger)] hover:bg-[var(--danger-tint)]"
               onClick={() => void industries.refetch()}
             >
-              Retry
+              {t('topAccounts.retry', 'Retry')}
             </button>
           </div>
         ) : null}
@@ -129,7 +133,7 @@ export function TopAccountsPage() {
       {/* sr-only live region — announces filter result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {!accounts.isLoading && accounts.data
-          ? `${items.length} account${items.length === 1 ? '' : 's'}${industry ? ` · ${industry}` : ''}`
+          ? `${t('topAccounts.resultCount', '{{count}} account', { count: items.length })}${industry ? ` · ${industry}` : ''}`
           : ''}
       </p>
 
@@ -138,22 +142,22 @@ export function TopAccountsPage() {
         <LoadingSkeleton rows={5} />
       ) : accounts.isError ? (
         <ErrorState
-          title="Couldn't load top accounts"
-          message={accountError ?? 'The top accounts endpoint did not respond.'}
+          title={t('topAccounts.errorTitle', "Couldn't load top accounts")}
+          message={accountError ?? t('topAccounts.errorMessage', 'The top accounts endpoint did not respond.')}
           action={
             <button
               type="button"
               className="btn btn-secondary"
               onClick={() => void accounts.refetch()}
             >
-              Retry
+              {t('topAccounts.retry', 'Retry')}
             </button>
           }
         />
       ) : items.length === 0 ? (
         <EmptyState
-          title="No account data yet"
-          message="Add opportunities with values to see top accounts ranked by pipeline."
+          title={t('topAccounts.emptyTitle', 'No account data yet')}
+          message={t('topAccounts.emptyMessage', 'Add opportunities with values to see top accounts ranked by pipeline.')}
         />
       ) : (
         <div className="space-y-3">
@@ -203,19 +207,19 @@ export function TopAccountsPage() {
                         <span className="font-medium text-[var(--fg-primary)]">
                           {formatMoney(account.totalValue, 'EUR')}
                         </span>{' '}
-                        total pipeline
+                        {t('topAccounts.totalPipeline', 'total pipeline')}
                       </span>
                       <span>·</span>
                       <span>
                         <span className="font-medium text-[var(--fg-primary)]">
                           {formatMoney(account.wonValue, 'EUR')}
                         </span>{' '}
-                        won
+                        {t('topAccounts.won', 'won')}
                       </span>
                       <span>·</span>
-                      <span>{account.openDeals} open deals</span>
+                      <span>{t('topAccounts.openDeals', '{{count}} open deals', { count: account.openDeals })}</span>
                       <span>·</span>
-                      <span>{account.contactCount} contacts</span>
+                      <span>{t('topAccounts.contacts', '{{count}} contacts', { count: account.contactCount })}</span>
                     </div>
                   </div>
 

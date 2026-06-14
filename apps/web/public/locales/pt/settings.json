@@ -76,13 +76,62 @@
     "revoke": "Revogar",
     "name": "Nome da chave",
     "created": "Criada em",
-    "lastUsed": "Último uso",
+    "lastUsed": "Usada {{time}}",
     "never": "Nunca utilizada",
     "copyKey": "Copiar chave",
     "confirmRevoke": "Tem a certeza de que pretende revogar esta chave? Esta ação é irreversível.",
     "noKeys": "Nenhuma chave API de momento.",
     "keyCreated": "Chave API criada. Copie-a agora, não será exibida novamente.",
-    "scopes": "Âmbitos"
+    "scopes": "Âmbitos",
+    "title": "Chaves de API",
+    "caption": "Usadas por clientes MCP, chamadas REST e tarefas de CI. Com hash SHA-256 em repouso.",
+    "newKey": "+ Nova chave de API",
+    "createDialog": {
+      "title": "Criar chave de API",
+      "description": "Você verá o segredo apenas uma vez — copie-o antes de fechar."
+    },
+    "field": {
+      "name": "Nome",
+      "namePlaceholder": "ex.: dust-prod, mcp-cli",
+      "scopes": "Escopos"
+    },
+    "scopeHelp": {
+      "read": "Acesso somente leitura a todos os dados da organização.",
+      "write": "Criar / atualizar / excluir registros.",
+      "mcp": "Ativar o transporte MCP. Combine com leitura ou escrita para as permissões de ferramentas."
+    },
+    "cancel": "Cancelar",
+    "creating": "Criando…",
+    "createKey": "Criar chave",
+    "reveal": {
+      "warning": "Copie sua nova chave agora — ela não será exibida novamente.",
+      "copied": "Copiado!",
+      "copy": "Copiar",
+      "dismiss": "Dispensar"
+    },
+    "empty": {
+      "title": "Ainda não há chaves de API",
+      "message": "Crie uma para permitir que o Dust, seu cliente MCP ou uma tarefa de CI se autentiquem."
+    },
+    "createdAt": "Criada {{date}}",
+    "neverUsed": "Nunca usada",
+    "revokeConfirm": {
+      "title": "Revogar \"{{name}}\"?",
+      "description": "Qualquer cliente que use esta chave começará a falhar imediatamente. Isso não pode ser desfeito.",
+      "confirmLabel": "Revogar chave"
+    },
+    "toast": {
+      "createdTitle": "Chave de API criada",
+      "createdDescription": "Copie o segredo agora — ele não será exibido novamente.",
+      "revoked": "\"{{name}}\" revogada",
+      "revokeFailedTitle": "Falha ao revogar",
+      "revokeFailedDescription": "O servidor rejeitou a solicitação."
+    },
+    "error": {
+      "nameRequired": "O nome é obrigatório",
+      "scopeRequired": "Selecione pelo menos um escopo",
+      "createFailed": "Falha ao criar a chave de API"
+    }
   },
   "webhooks": {
     "create": "Adicionar webhook",
@@ -407,5 +456,36 @@
       "title": "Escolha um modelo para editar",
       "message": "Ou crie um novo. Os modelos preenchem espaços reservados como {{lead.firstName}} a partir do registro atual."
     }
+  },
+  "roles": {
+    "toastNameRequired": "O nome da função é obrigatório",
+    "toastUpdated": "Função atualizada",
+    "toastCreated": "Função criada",
+    "toastUpdateFailed": "Falha ao atualizar a função",
+    "toastCreateFailed": "Falha ao criar a função",
+    "deleteConfirmTitle": "Excluir a função \"{{name}}\"?",
+    "deleteConfirmDescription": "Isto removerá a função de todos os usuários atribuídos.",
+    "deleteConfirmLabel": "Excluir",
+    "toastDeleted": "Função excluída",
+    "toastDeleteFailed": "Falha ao excluir a função",
+    "sectionTitle": "Funções e permissões",
+    "sectionCaption": "Gerencie as funções do espaço de trabalho e o que cada função pode fazer.",
+    "newRoleButton": "+ Nova função",
+    "formTitleEdit": "Editar função",
+    "formTitleCreate": "Criar função",
+    "fieldName": "Nome",
+    "namePlaceholder": "ex. Gerente de vendas",
+    "fieldDescription": "Descrição",
+    "descriptionPlaceholder": "Descrição opcional",
+    "fieldPermissions": "Permissões",
+    "saveChangesButton": "Salvar alterações",
+    "createRoleButton": "Criar função",
+    "cancelButton": "Cancelar",
+    "emptyTitle": "Ainda não há funções",
+    "emptyMessage": "Crie sua primeira função personalizada.",
+    "systemBadge": "Sistema",
+    "editButton": "Editar",
+    "deleteButton": "Excluir",
+    "noPermissions": "Sem permissões"
   }
 }

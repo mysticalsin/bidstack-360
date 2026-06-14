@@ -76,13 +76,62 @@
     "revoke": "撤销",
     "name": "密钥名称",
     "created": "创建时间",
-    "lastUsed": "上次使用",
+    "lastUsed": "使用于 {{time}}",
     "never": "从未使用",
     "copyKey": "复制密钥",
     "confirmRevoke": "确定要撤销此密钥吗？此操作不可逆。",
     "noKeys": "暂无 API 密钥。",
     "keyCreated": "API 密钥已创建，请立即复制，此后将不再显示。",
-    "scopes": "权限范围"
+    "scopes": "权限范围",
+    "title": "API 密钥",
+    "caption": "供 MCP 客户端、REST 调用方和 CI 任务使用。静态存储时采用 SHA-256 哈希。",
+    "newKey": "+ 新建 API 密钥",
+    "createDialog": {
+      "title": "创建 API 密钥",
+      "description": "密钥只会显示一次，请在关闭前复制。"
+    },
+    "field": {
+      "name": "名称",
+      "namePlaceholder": "例如 dust-prod、mcp-cli",
+      "scopes": "权限范围"
+    },
+    "scopeHelp": {
+      "read": "对所有组织数据的只读访问权限。",
+      "write": "创建 / 更新 / 删除记录。",
+      "mcp": "启用 MCP 传输。与读取或写入权限搭配以获得工具权限。"
+    },
+    "cancel": "取消",
+    "creating": "正在创建…",
+    "createKey": "创建密钥",
+    "reveal": {
+      "warning": "请立即复制您的新密钥——它不会再次显示。",
+      "copied": "已复制！",
+      "copy": "复制",
+      "dismiss": "关闭"
+    },
+    "empty": {
+      "title": "暂无 API 密钥",
+      "message": "创建一个，以便 Dust、您的 MCP 客户端或 CI 任务进行身份验证。"
+    },
+    "createdAt": "创建于 {{date}}",
+    "neverUsed": "从未使用",
+    "revokeConfirm": {
+      "title": "撤销“{{name}}”？",
+      "description": "任何使用此密钥的客户端将立即开始失败。此操作无法撤销。",
+      "confirmLabel": "撤销密钥"
+    },
+    "toast": {
+      "createdTitle": "已创建 API 密钥",
+      "createdDescription": "请立即复制密钥——它不会再次显示。",
+      "revoked": "已撤销“{{name}}”",
+      "revokeFailedTitle": "撤销失败",
+      "revokeFailedDescription": "服务器拒绝了该请求。"
+    },
+    "error": {
+      "nameRequired": "名称为必填项",
+      "scopeRequired": "请至少选择一个权限范围",
+      "createFailed": "创建 API 密钥失败"
+    }
   },
   "webhooks": {
     "create": "添加 Webhook",
@@ -407,5 +456,36 @@
       "title": "选择要编辑的模板",
       "message": "或新建一个。模板会用当前记录中的值填充 {{lead.firstName}} 之类的占位符。"
     }
+  },
+  "roles": {
+    "toastNameRequired": "角色名称为必填项",
+    "toastUpdated": "角色已更新",
+    "toastCreated": "角色已创建",
+    "toastUpdateFailed": "更新角色失败",
+    "toastCreateFailed": "创建角色失败",
+    "deleteConfirmTitle": "删除角色“{{name}}”？",
+    "deleteConfirmDescription": "这将从所有已分配用户中移除该角色。",
+    "deleteConfirmLabel": "删除",
+    "toastDeleted": "角色已删除",
+    "toastDeleteFailed": "删除角色失败",
+    "sectionTitle": "角色与权限",
+    "sectionCaption": "管理工作区角色以及每个角色可执行的操作。",
+    "newRoleButton": "+ 新建角色",
+    "formTitleEdit": "编辑角色",
+    "formTitleCreate": "创建角色",
+    "fieldName": "名称",
+    "namePlaceholder": "例如：销售经理",
+    "fieldDescription": "描述",
+    "descriptionPlaceholder": "可选描述",
+    "fieldPermissions": "权限",
+    "saveChangesButton": "保存更改",
+    "createRoleButton": "创建角色",
+    "cancelButton": "取消",
+    "emptyTitle": "暂无角色",
+    "emptyMessage": "创建您的第一个自定义角色。",
+    "systemBadge": "系统",
+    "editButton": "编辑",
+    "deleteButton": "删除",
+    "noPermissions": "无权限"
   }
 }

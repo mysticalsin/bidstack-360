@@ -20,6 +20,8 @@ import {
   YAxis,
 } from 'recharts';
 
+import { useTranslation } from 'react-i18next';
+
 import { CHART_COLORS, CHART_GRID_COLOR } from './chartTokens';
 import { type BaseProps, axisProps, tooltipStyle, resolveYKeys } from './chartTypes';
 import { DataTable, ChartEnter } from './chartShared';
@@ -27,9 +29,10 @@ import { DataTable, ChartEnter } from './chartShared';
 // ── LineChart ─────────────────────────────────────────────────────────────────
 
 export function LineChart({ data, xKey, yKey, 'aria-label': ariaLabel, height = 240 }: BaseProps) {
+  const { t } = useTranslation('crm');
   const yKeys = resolveYKeys(yKey);
   return (
-    <div role="img" aria-label={ariaLabel ?? 'Line chart'}>
+    <div role="img" aria-label={ariaLabel ?? t('cartesianCharts.lineChartAriaLabel', 'Line chart')}>
       <DataTable data={data} xKey={xKey} yKeys={yKeys} />
       <ChartEnter height={height}>
         <ResponsiveContainer width="100%" height="100%">
@@ -67,9 +70,10 @@ export function BarChart({
   height = 240,
   stacked = false,
 }: BaseProps & { stacked?: boolean }) {
+  const { t } = useTranslation('crm');
   const yKeys = resolveYKeys(yKey);
   return (
-    <div role="img" aria-label={ariaLabel ?? 'Bar chart'}>
+    <div role="img" aria-label={ariaLabel ?? t('cartesianCharts.barChartAriaLabel', 'Bar chart')}>
       <DataTable data={data} xKey={xKey} yKeys={yKeys} />
       <ChartEnter height={height}>
         <ResponsiveContainer width="100%" height="100%">
@@ -98,9 +102,10 @@ export function BarChart({
 // ── AreaChart ─────────────────────────────────────────────────────────────────
 
 export function AreaChart({ data, xKey, yKey, 'aria-label': ariaLabel, height = 240 }: BaseProps) {
+  const { t } = useTranslation('crm');
   const yKeys = resolveYKeys(yKey);
   return (
-    <div role="img" aria-label={ariaLabel ?? 'Area chart'}>
+    <div role="img" aria-label={ariaLabel ?? t('cartesianCharts.areaChartAriaLabel', 'Area chart')}>
       <DataTable data={data} xKey={xKey} yKeys={yKeys} />
       <ChartEnter height={height}>
         <ResponsiveContainer width="100%" height="100%">
@@ -152,11 +157,12 @@ interface FunnelProps {
 }
 
 export function FunnelChart({ data, 'aria-label': ariaLabel, height = 240 }: FunnelProps) {
+  const { t } = useTranslation('crm');
   // Horizontal bar chart sorted descending — true funnel semantics without
   // adding recharts-funnel-chart as an extra dep.
   const sorted = [...data].sort((a, b) => b.value - a.value);
   return (
-    <div role="img" aria-label={ariaLabel ?? 'Funnel chart'}>
+    <div role="img" aria-label={ariaLabel ?? t('cartesianCharts.funnelChartAriaLabel', 'Funnel chart')}>
       <div className="sr-only">
         <ol>
           {sorted.map((d) => (
@@ -202,8 +208,9 @@ export function ScatterChart({
   'aria-label': ariaLabel,
   height = 240,
 }: ScatterProps) {
+  const { t } = useTranslation('crm');
   return (
-    <div role="img" aria-label={ariaLabel ?? 'Scatter chart'}>
+    <div role="img" aria-label={ariaLabel ?? t('cartesianCharts.scatterChartAriaLabel', 'Scatter chart')}>
       <div className="sr-only">
         <table>
           <thead>

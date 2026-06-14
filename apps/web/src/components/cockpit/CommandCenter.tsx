@@ -1,5 +1,7 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
@@ -26,9 +28,10 @@ interface CommandSignal {
 export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
   const reducedMotion = useReducedMotion();
   const { formatMoneyMicros } = useFormatMoney();
+  const { t } = useTranslation('crm');
   const readiness = deriveReadiness(cockpit);
-  const nextMove = deriveNextMove(cockpit);
-  const committee = deriveCommittee(cockpit);
+  const nextMove = deriveNextMove(cockpit, t);
+  const committee = deriveCommittee(cockpit, t);
   const openRisks = cockpit.risks.filter((risk) => risk.status !== 'mitigated').length;
   const criticalRisks = cockpit.risks.filter(
     (risk) => risk.severity === 'critical' || risk.severity === 'high',
@@ -39,30 +42,41 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
 
   const signals: CommandSignal[] = [
     {
-      label: 'Bid readiness estimate',
+      label: t('commandCenter.signal.readiness.label', 'Bid readiness estimate'),
       value: `${readiness}%`,
-      detail: readiness >= 85 ? 'ready for exec review' : 'needs presales focus',
+      detail:
+        readiness >= 85
+          ? t('commandCenter.signal.readiness.detailReady', 'ready for exec review')
+          : t('commandCenter.signal.readiness.detailFocus', 'needs presales focus'),
       progress: readiness,
       tone: readiness >= 85 ? 'jade' : readiness >= 68 ? 'blue' : 'amber',
     },
     {
-      label: 'Source coverage',
+      label: t('commandCenter.signal.source.label', 'Source coverage'),
       value: proofCount.toLocaleString(),
-      detail: `${cockpit.company.sourceAttribution.length} attributed source${cockpit.company.sourceAttribution.length === 1 ? '' : 's'}`,
+      detail: t(
+        'commandCenter.signal.source.detail',
+        '{{count}} attributed source',
+        { count: cockpit.company.sourceAttribution.length },
+      ),
       progress: Math.min(100, proofCount * 16),
       tone: proofCount >= 5 ? 'jade' : proofCount >= 3 ? 'blue' : 'amber',
     },
     {
-      label: 'Decision coverage',
+      label: t('commandCenter.signal.decision.label', 'Decision coverage'),
       value: `${committee.influence}/5`,
       detail: committee.summary,
       progress: committee.influence * 20,
       tone: committee.influence >= 4 ? 'jade' : committee.influence >= 3 ? 'blue' : 'amber',
     },
     {
-      label: 'Open risk load',
-      value: criticalRisks ? `${criticalRisks} high` : `${openRisks} open`,
-      detail: criticalRisks ? 'escalate before proposal' : 'manageable with owner follow-up',
+      label: t('commandCenter.signal.risk.label', 'Open risk load'),
+      value: criticalRisks
+        ? t('commandCenter.signal.risk.valueHigh', '{{count}} high', { count: criticalRisks })
+        : t('commandCenter.signal.risk.valueOpen', '{{count}} open', { count: openRisks }),
+      detail: criticalRisks
+        ? t('commandCenter.signal.risk.detailEscalate', 'escalate before proposal')
+        : t('commandCenter.signal.risk.detailManageable', 'manageable with owner follow-up'),
       progress: Math.max(8, 100 - criticalRisks * 26 - openRisks * 7),
       tone: criticalRisks ? 'tomato' : openRisks ? 'amber' : 'jade',
     },
@@ -72,7 +86,7 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
     <motion.section
       className="command-center"
       role="region"
-      aria-label="BidStack command center"
+      aria-label={t('commandCenter.region.ariaLabel', 'BidStack command center')}
       initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, filter: 'blur(8px)' }}
       animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
       transition={springSoft}
@@ -85,14 +99,21 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
         </div>
         <div className="command-center-kicker">
           <Icon name="sparkle" size={14} />
-          <span>BidStack command center</span>
+          <span>{t('commandCenter.kicker', 'BidStack command center')}</span>
         </div>
         <h2>{cockpit.company.name}</h2>
         <p>{nextMove}</p>
-        <div className="command-center-actions" aria-label="Account decision signals">
-          <Badge tone={readiness >= 85 ? 'jade' : 'blue'}>{readiness}% ready</Badge>
+        <div
+          className="command-center-actions"
+          aria-label={t('commandCenter.actions.ariaLabel', 'Account decision signals')}
+        >
+          <Badge tone={readiness >= 85 ? 'jade' : 'blue'}>
+            {t('commandCenter.badge.ready', '{{count}}% ready', { count: readiness })}
+          </Badge>
           <Badge tone={healthTone(cockpit.health.band)}>{labelForBand(cockpit.health.band)}</Badge>
-          <Badge tone={stackCount >= 12 ? 'purple' : 'gray'}>{stackCount} stack signals</Badge>
+          <Badge tone={stackCount >= 12 ? 'purple' : 'gray'}>
+            {t('commandCenter.badge.stackSignals', '{{count}} stack signals', { count: stackCount })}
+          </Badge>
         </div>
       </div>
 
@@ -125,22 +146,28 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
 
       <div className="command-center-footer">
         <div>
-          <span>Primary commercial signal</span>
+          <span>{t('commandCenter.footer.primarySignal.label', 'Primary commercial signal')}</span>
           <strong>
-            {primaryKpi ? `${primaryKpi.label}: ${primaryKpi.value}` : 'Pipeline pending'}
+            {primaryKpi
+              ? `${primaryKpi.label}: ${primaryKpi.value}`
+              : t('commandCenter.footer.primarySignal.pending', 'Pipeline pending')}
           </strong>
         </div>
         <div>
-          <span>Weighted account value</span>
+          <span>{t('commandCenter.footer.weightedValue.label', 'Weighted account value')}</span>
           <strong>
             {cockpit.company.annualRevenueMicros
               ? formatMoneyMicros(cockpit.company.annualRevenueMicros, 'EUR')
-              : 'Not verified'}
+              : t('commandCenter.footer.weightedValue.notVerified', 'Not verified')}
           </strong>
         </div>
         <div>
-          <span>Decision owner map</span>
-          <strong>{committee.contacts} contacts mapped</strong>
+          <span>{t('commandCenter.footer.ownerMap.label', 'Decision owner map')}</span>
+          <strong>
+            {t('commandCenter.footer.ownerMap.contacts', '{{count}} contacts mapped', {
+              count: committee.contacts,
+            })}
+          </strong>
         </div>
       </div>
     </motion.section>
@@ -166,30 +193,56 @@ function deriveReadiness(cockpit: AccountCockpitSnapshot): number {
   );
 }
 
-function deriveNextMove(cockpit: AccountCockpitSnapshot): string {
+function deriveNextMove(cockpit: AccountCockpitSnapshot, t: TFunction): string {
   const blocker = cockpit.compliance.find((item) => item.status === 'blocked');
-  if (blocker) return `Unblock ${blocker.label} before the bid gate.`;
+  if (blocker)
+    return t('commandCenter.nextMove.unblock', 'Unblock {{label}} before the bid gate.', {
+      label: blocker.label,
+    });
 
   const urgentRisk = cockpit.risks.find(
     (risk) =>
       risk.status !== 'mitigated' && (risk.severity === 'critical' || risk.severity === 'high'),
   );
   if (urgentRisk) {
-    const owner = urgentRisk.owner ? ` with ${urgentRisk.owner}` : '';
-    return `Escalate ${urgentRisk.title}${owner} before proposal approval.`;
+    return urgentRisk.owner
+      ? t(
+          'commandCenter.nextMove.escalateWithOwner',
+          'Escalate {{title}} with {{owner}} before proposal approval.',
+          { title: urgentRisk.title, owner: urgentRisk.owner },
+        )
+      : t(
+          'commandCenter.nextMove.escalate',
+          'Escalate {{title}} before proposal approval.',
+          { title: urgentRisk.title },
+        );
   }
 
   const champion = cockpit.keyContacts.find((person) => person.roleInDecision === 'champion');
-  if (champion) return `Use ${champion.name} as champion for the next presales milestone.`;
+  if (champion)
+    return t(
+      'commandCenter.nextMove.champion',
+      'Use {{name}} as champion for the next presales milestone.',
+      { name: champion.name },
+    );
 
   if (cockpit.company.sourceAttribution.length < 3) {
-    return 'Refresh data verification to strengthen legal, logo, market, and account-source proof.';
+    return t(
+      'commandCenter.nextMove.refreshSources',
+      'Refresh data verification to strengthen legal, logo, market, and account-source proof.',
+    );
   }
 
-  return 'Advance the next proposal step with available account context and owner alignment.';
+  return t(
+    'commandCenter.nextMove.advance',
+    'Advance the next proposal step with available account context and owner alignment.',
+  );
 }
 
-function deriveCommittee(cockpit: AccountCockpitSnapshot): {
+function deriveCommittee(
+  cockpit: AccountCockpitSnapshot,
+  t: TFunction,
+): {
   contacts: number;
   influence: number;
   summary: string;
@@ -208,12 +261,14 @@ function deriveCommittee(cockpit: AccountCockpitSnapshot): {
   const buyers = cockpit.keyContacts.filter((person) => person.roleInDecision === 'buyer').length;
   const summary =
     champions > 0
-      ? `${champions} champion${champions === 1 ? '' : 's'} mapped`
+      ? t('commandCenter.committee.champions', '{{count}} champion mapped', { count: champions })
       : buyers > 0
-        ? `${buyers} buyer${buyers === 1 ? '' : 's'} mapped`
+        ? t('commandCenter.committee.buyers', '{{count}} buyer mapped', { count: buyers })
         : contacts > 0
-          ? `${contacts} stakeholder${contacts === 1 ? '' : 's'} mapped`
-          : 'map buyer and champion';
+          ? t('commandCenter.committee.stakeholders', '{{count}} stakeholder mapped', {
+              count: contacts,
+            })
+          : t('commandCenter.committee.empty', 'map buyer and champion');
   return { contacts, influence, summary };
 }
 

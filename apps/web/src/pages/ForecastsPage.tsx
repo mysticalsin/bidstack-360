@@ -5,6 +5,7 @@
  */
 import { useMemo, useState, useCallback } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Dialog, DialogTrigger } from '@/components/ui/Dialog';
@@ -30,6 +31,7 @@ import {
 } from './forecasts/forecastsConfig';
 
 export function ForecastsPage() {
+  const { t } = useTranslation('crm');
   const { formatMoneyMicros } = useFormatMoney();
   const reducedMotion = useReducedMotion();
   const forecasts = useForecasts();
@@ -76,10 +78,10 @@ export function ForecastsPage() {
           amountMicros: micros,
           currency: 'EUR',
         });
-        toast.success('Forecast updated');
+        toast.success(t('forecasts.toastUpdated', 'Forecast updated'));
       } catch (err) {
-        toast.error('Failed to update forecast', {
-          description: err instanceof Error ? err.message : 'Unknown error',
+        toast.error(t('forecasts.toastUpdateFailed', 'Failed to update forecast'), {
+          description: err instanceof Error ? err.message : t('forecasts.unknownError', 'Unknown error'),
         });
       }
     },
@@ -92,17 +94,22 @@ export function ForecastsPage() {
       if (ids.length === 0) return;
       if (
         await confirm({
-          title: `Delete forecasts for ${row.period}?`,
-          description: 'This will remove all category forecasts for this period and owner.',
+          title: t('forecasts.deleteConfirmTitle', 'Delete forecasts for {{period}}?', {
+            period: row.period,
+          }),
+          description: t(
+            'forecasts.deleteConfirmDescription',
+            'This will remove all category forecasts for this period and owner.',
+          ),
           destructive: true,
         })
       ) {
         try {
           await Promise.all(ids.map((id) => deleteForecast.mutateAsync(id)));
-          toast.success('Forecasts deleted');
+          toast.success(t('forecasts.toastDeleted', 'Forecasts deleted'));
         } catch (err) {
-          toast.error('Failed to delete forecasts', {
-            description: err instanceof Error ? err.message : 'Unknown error',
+          toast.error(t('forecasts.toastDeleteFailed', 'Failed to delete forecasts'), {
+            description: err instanceof Error ? err.message : t('forecasts.unknownError', 'Unknown error'),
           });
         }
       }
@@ -124,17 +131,19 @@ export function ForecastsPage() {
       >
         <div>
           <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
-            Revenue Forecasts
+            {t('forecasts.title', 'Revenue Forecasts')}
           </h1>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            Will the bids we&apos;re piloting hit the number? Pipeline, best case, commit, and
-            closed by period.
+            {t(
+              'forecasts.subtitle',
+              "Will the bids we're piloting hit the number? Pipeline, best case, commit, and closed by period.",
+            )}
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button size="sm">
-              <Icon name="plus" size={14} /> New Forecast
+              <Icon name="plus" size={14} /> {t('forecasts.newForecast', 'New Forecast')}
             </Button>
           </DialogTrigger>
           <NewForecastDialogContent
@@ -156,11 +165,11 @@ export function ForecastsPage() {
                       }),
                     ),
                 );
-                toast.success('Forecast created');
+                toast.success(t('forecasts.toastCreated', 'Forecast created'));
                 setDialogOpen(false);
               } catch (err) {
-                toast.error('Failed to create forecast', {
-                  description: err instanceof Error ? err.message : 'Unknown error',
+                toast.error(t('forecasts.toastCreateFailed', 'Failed to create forecast'), {
+                  description: err instanceof Error ? err.message : t('forecasts.unknownError', 'Unknown error'),
                 });
               }
             }}
@@ -172,10 +181,10 @@ export function ForecastsPage() {
       {/* ── Period filter ── */}
       <motion.div variants={reducedMotion ? undefined : staggerChild}>
         <Tabs value={periodFilter} onValueChange={(v) => setPeriodFilter(v as PeriodFilter)}>
-          <TabsList aria-label="Period filter">
-            <TabsTrigger value="monthly">Monthly</TabsTrigger>
-            <TabsTrigger value="quarterly">Quarterly</TabsTrigger>
-            <TabsTrigger value="yearly">Yearly</TabsTrigger>
+          <TabsList aria-label={t('forecasts.periodFilterLabel', 'Period filter')}>
+            <TabsTrigger value="monthly">{t('forecasts.periodMonthly', 'Monthly')}</TabsTrigger>
+            <TabsTrigger value="quarterly">{t('forecasts.periodQuarterly', 'Quarterly')}</TabsTrigger>
+            <TabsTrigger value="yearly">{t('forecasts.periodYearly', 'Yearly')}</TabsTrigger>
           </TabsList>
         </Tabs>
       </motion.div>
@@ -184,14 +193,14 @@ export function ForecastsPage() {
       <motion.div
         variants={reducedMotion ? undefined : staggerChild}
         className="grid grid-cols-2 gap-3 sm:grid-cols-4"
-        aria-label="Forecast totals for the selected period"
+        aria-label={t('forecasts.totalsLabel', 'Forecast totals for the selected period')}
       >
         {(
           [
-            { key: 'commit', label: 'Commit', accent: true },
-            { key: 'best_case', label: 'Best case', accent: false },
-            { key: 'pipeline', label: 'Pipeline', accent: false },
-            { key: 'closed', label: 'Closed', accent: false },
+            { key: 'commit', label: t('forecasts.totalCommit', 'Commit'), accent: true },
+            { key: 'best_case', label: t('forecasts.totalBestCase', 'Best case'), accent: false },
+            { key: 'pipeline', label: t('forecasts.totalPipeline', 'Pipeline'), accent: false },
+            { key: 'closed', label: t('forecasts.totalClosed', 'Closed'), accent: false },
           ] as const
         ).map((k) => (
           <div

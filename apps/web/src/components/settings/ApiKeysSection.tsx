@@ -4,6 +4,7 @@
 // raw value is shown exactly once and never re-derivable.
 
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
@@ -24,6 +25,7 @@ import { formatDate, relativeTime } from '@/lib/format';
 const ALL_SCOPES: ApiKeyScope[] = ['read', 'write', 'mcp'];
 
 export function ApiKeysSection() {
+  const { t } = useTranslation('settings');
   const list = useApiKeys();
   const create = useCreateApiKey();
   const revoke = useRevokeApiKey();
@@ -39,40 +41,48 @@ export function ApiKeysSection() {
     const name = String(fd.get('name') ?? '').trim();
     const scopes = ALL_SCOPES.filter((s) => fd.get(`scope-${s}`) === 'on');
     if (!name) {
-      setError('Name is required');
+      setError(t('apiKeys.error.nameRequired', 'Name is required'));
       return;
     }
     if (scopes.length === 0) {
-      setError('Select at least one scope');
+      setError(t('apiKeys.error.scopeRequired', 'Select at least one scope'));
       return;
     }
     try {
       const created = await create.mutateAsync({ name, scopes });
       setRevealed(created);
       setOpen(false);
-      toast.success('API key created', {
-        description: 'Copy the secret now — it will not be shown again.',
+      toast.success(t('apiKeys.toast.createdTitle', 'API key created'), {
+        description: t(
+          'apiKeys.toast.createdDescription',
+          'Copy the secret now — it will not be shown again.',
+        ),
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create API key');
+      setError(err instanceof Error ? err.message : t('apiKeys.error.createFailed', 'Failed to create API key'));
     }
   };
 
   const onRevoke = async (id: string, name: string) => {
     const ok = await confirm({
-      title: `Revoke "${name}"?`,
-      description:
+      title: t('apiKeys.revokeConfirm.title', 'Revoke "{{name}}"?', { name }),
+      description: t(
+        'apiKeys.revokeConfirm.description',
         'Any client using this key will start failing immediately. This cannot be undone.',
-      confirmLabel: 'Revoke key',
+      ),
+      confirmLabel: t('apiKeys.revokeConfirm.confirmLabel', 'Revoke key'),
       destructive: true,
     });
     if (!ok) return;
     try {
       await revoke.mutateAsync(id);
-      toast.success(`Revoked "${name}"`);
+      toast.success(t('apiKeys.toast.revoked', 'Revoked "{{name}}"', { name }));
     } catch (err) {
-      toast.error('Revoke failed', {
-        description: err instanceof Error ? err.message : 'The server rejected the request.',
+      toast.error(t('apiKeys.toast.revokeFailedTitle', 'Revoke failed'), {
+        description:
+          err instanceof Error
+            ? err.message
+            : t('apiKeys.toast.revokeFailedDescription', 'The server rejected the request.'),
       });
     }
   };
@@ -90,35 +100,50 @@ export function ApiKeysSection() {
 
   const items = list.data?.items ?? [];
 
+  const scopeHelp: Record<ApiKeyScope, string> = {
+    read: t('apiKeys.scopeHelp.read', 'Read-only access to all org data.'),
+    write: t('apiKeys.scopeHelp.write', 'Create / update / delete records.'),
+    mcp: t(
+      'apiKeys.scopeHelp.mcp',
+      'Enable MCP transport. Pair with read or write for tool permissions.',
+    ),
+  };
+
   return (
     <Card>
       <SectionHeader
-        title="API keys"
-        caption="Used by MCP clients, REST callers, and CI jobs. SHA-256 hashed at rest."
+        title={t('apiKeys.title', 'API keys')}
+        caption={t(
+          'apiKeys.caption',
+          'Used by MCP clients, REST callers, and CI jobs. SHA-256 hashed at rest.',
+        )}
         action={
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button size="sm">+ New API key</Button>
+              <Button size="sm">{t('apiKeys.newKey', '+ New API key')}</Button>
             </DialogTrigger>
             <DialogContent
-              title="Create API key"
-              description="You'll see the secret exactly once — copy it before closing."
+              title={t('apiKeys.createDialog.title', 'Create API key')}
+              description={t(
+                'apiKeys.createDialog.description',
+                "You'll see the secret exactly once — copy it before closing.",
+              )}
             >
               <form onSubmit={onSubmit} className="space-y-4">
                 <label className="block">
                   <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-                    Name
+                    {t('apiKeys.field.name', 'Name')}
                   </span>
                   <input
                     name="name"
                     required
-                    placeholder="e.g. dust-prod, mcp-cli"
+                    placeholder={t('apiKeys.field.namePlaceholder', 'e.g. dust-prod, mcp-cli')}
                     className="dialog-input"
                   />
                 </label>
                 <fieldset>
                   <legend className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-                    Scopes
+                    {t('apiKeys.field.scopes', 'Scopes')}
                   </legend>
                   <div className="space-y-2">
                     {ALL_SCOPES.map((s) => (
@@ -132,7 +157,7 @@ export function ApiKeysSection() {
                         <span>
                           <span className="font-medium text-[var(--fg-primary)]">{s}</span>
                           <span className="ml-2 text-xs text-[var(--fg-tertiary)]">
-                            {SCOPE_HELP[s]}
+                            {scopeHelp[s]}
                           </span>
                         </span>
                       </label>
@@ -150,11 +175,13 @@ export function ApiKeysSection() {
                 <div className="flex items-center justify-end gap-2 pt-1">
                   <DialogClose asChild>
                     <Button type="button" variant="secondary" size="sm">
-                      Cancel
+                      {t('apiKeys.cancel', 'Cancel')}
                     </Button>
                   </DialogClose>
                   <Button type="submit" size="sm" disabled={create.isPending}>
-                    {create.isPending ? 'Creating…' : 'Create key'}
+                    {create.isPending
+                      ? t('apiKeys.creating', 'Creating…')
+                      : t('apiKeys.createKey', 'Create key')}
                   </Button>
                 </div>
               </form>
@@ -166,17 +193,17 @@ export function ApiKeysSection() {
       {revealed ? (
         <div className="mx-5 mt-4 rounded-md border border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] p-3">
           <div className="text-xs font-semibold text-[var(--fg-primary)]">
-            Copy your new key now — it won&apos;t be shown again.
+            {t('apiKeys.reveal.warning', "Copy your new key now — it won't be shown again.")}
           </div>
           <div className="mt-2 flex items-center gap-2">
             <code className="block flex-1 select-all overflow-x-auto rounded bg-[var(--surface-card)] px-2 py-1 font-mono text-xs text-[var(--fg-primary)]">
               {revealed.secret}
             </code>
             <Button size="sm" variant="secondary" onClick={copySecret}>
-              {copied ? 'Copied!' : 'Copy'}
+              {copied ? t('apiKeys.reveal.copied', 'Copied!') : t('apiKeys.reveal.copy', 'Copy')}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setRevealed(null)}>
-              Dismiss
+              {t('apiKeys.reveal.dismiss', 'Dismiss')}
             </Button>
           </div>
         </div>
@@ -196,8 +223,11 @@ export function ApiKeysSection() {
         </ul>
       ) : items.length === 0 ? (
         <EmptyState
-          title="No API keys yet"
-          message="Create one to let Dust, your MCP client, or a CI job authenticate."
+          title={t('apiKeys.empty.title', 'No API keys yet')}
+          message={t(
+            'apiKeys.empty.message',
+            'Create one to let Dust, your MCP client, or a CI job authenticate.',
+          )}
         />
       ) : (
         <ul className="divide-y divide-[var(--border-subtle)]">
@@ -209,9 +239,13 @@ export function ApiKeysSection() {
                   <code className="font-mono text-xs text-[var(--fg-tertiary)]">{k.prefix}…</code>
                 </div>
                 <div className="mt-0.5 flex items-center gap-2 text-xs text-[var(--fg-tertiary)]">
-                  <span>Created {formatDate(k.createdAt)}</span>
+                  <span>{t('apiKeys.createdAt', 'Created {{date}}', { date: formatDate(k.createdAt) })}</span>
                   <span aria-hidden>·</span>
-                  <span>{k.lastUsedAt ? `Used ${relativeTime(k.lastUsedAt)}` : 'Never used'}</span>
+                  <span>
+                    {k.lastUsedAt
+                      ? t('apiKeys.lastUsed', 'Used {{time}}', { time: relativeTime(k.lastUsedAt) })
+                      : t('apiKeys.neverUsed', 'Never used')}
+                  </span>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -227,7 +261,7 @@ export function ApiKeysSection() {
                   onClick={() => onRevoke(k.id, k.name)}
                   disabled={revoke.isPending}
                 >
-                  Revoke
+                  {t('apiKeys.revoke', 'Revoke')}
                 </Button>
               </div>
             </li>
@@ -237,9 +271,3 @@ export function ApiKeysSection() {
     </Card>
   );
 }
-
-const SCOPE_HELP: Record<ApiKeyScope, string> = {
-  read: 'Read-only access to all org data.',
-  write: 'Create / update / delete records.',
-  mcp: 'Enable MCP transport. Pair with read or write for tool permissions.',
-};

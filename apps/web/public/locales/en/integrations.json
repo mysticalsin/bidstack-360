@@ -352,5 +352,46 @@
     "detailAgentOverrides": "Agent overrides",
     "agentOverridesConfigured": "{{count}} configured",
     "agentOverridesDefaults": "Using defaults"
+  },
+  "dataQuality": {
+    "title": "Data quality",
+    "caption": {
+      "generated": "Report generated {{time}} · {{count}} issue",
+      "idle": "Detects duplicate companies, stale data, missing owners, and bad domains."
+    },
+    "error": {
+      "title": "Could not load data quality report",
+      "retry": "Try again"
+    },
+    "emptyScan": {
+      "title": "No data quality scan",
+      "message": "Run the data quality scan to see duplicate domains, stale records, missing owners, invalid domains, and logo coverage."
+    },
+    "stat": {
+      "qualityScore": "Quality score",
+      "highSeverity": "High severity",
+      "mediumSeverity": "Medium severity",
+      "totalIssues": "Total issues",
+      "badge": "data"
+    },
+    "noIssues": {
+      "title": "No data quality issues",
+      "message": "No duplicate domains, stale data, missing owners, invalid domains, or missing logos were detected in this scan."
+    },
+    "issue": {
+      "company": "Company: {{name}}"
+    },
+    "kind": {
+      "duplicateCompany": "Duplicate company",
+      "staleData": "Stale data",
+      "missingOwner": "Missing owner",
+      "invalidDomain": "Invalid domain",
+      "missingLogo": "Missing logo"
+    },
+    "severity": {
+      "high": "high",
+      "medium": "medium",
+      "low": "low"
+    }
   }
 }

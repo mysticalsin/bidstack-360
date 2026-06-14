@@ -352,5 +352,46 @@
     "detailAgentOverrides": "智能体覆盖",
     "agentOverridesConfigured": "已配置 {{count}} 个",
     "agentOverridesDefaults": "使用默认值"
+  },
+  "dataQuality": {
+    "title": "数据质量",
+    "caption": {
+      "generated": "报告生成于 {{time}} · {{count}} 个问题",
+      "idle": "检测重复公司、过时数据、缺失负责人和无效域名。"
+    },
+    "error": {
+      "title": "无法加载数据质量报告",
+      "retry": "重试"
+    },
+    "emptyScan": {
+      "title": "无数据质量扫描",
+      "message": "运行数据质量扫描以查看重复域名、过时记录、缺失负责人、无效域名和徽标覆盖情况。"
+    },
+    "stat": {
+      "qualityScore": "质量评分",
+      "highSeverity": "高严重性",
+      "mediumSeverity": "中严重性",
+      "totalIssues": "问题总数",
+      "badge": "数据"
+    },
+    "noIssues": {
+      "title": "无数据质量问题",
+      "message": "本次扫描未检测到重复域名、过时数据、缺失负责人、无效域名或缺失徽标。"
+    },
+    "issue": {
+      "company": "公司：{{name}}"
+    },
+    "kind": {
+      "duplicateCompany": "重复公司",
+      "staleData": "过时数据",
+      "missingOwner": "缺失负责人",
+      "invalidDomain": "无效域名",
+      "missingLogo": "缺失徽标"
+    },
+    "severity": {
+      "high": "高",
+      "medium": "中",
+      "low": "低"
+    }
   }
 }

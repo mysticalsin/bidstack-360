@@ -1968,5 +1968,246 @@
     "briefLegalName": "Ragione sociale",
     "briefFounded": "Fondata",
     "briefConfidence": "Affidabilità: {{percent}}%"
+  },
+  "publicBooking": {
+    "errorNotFound": "Pagina di prenotazione non trovata",
+    "errorAvailabilityFailed": "Disponibilità non riuscita",
+    "errorUnavailable": "Pagina di prenotazione non disponibile",
+    "errorSlotTaken": "Quell'orario non è più disponibile.",
+    "errorBookingFailed": "Prenotazione non riuscita",
+    "notFoundTitle": "Pagina di prenotazione non trovata",
+    "notFoundBody": "Questo link di pianificazione non è valido o non accetta più riunioni.",
+    "eyebrow": "Pianificazione BidStack",
+    "loadingTitle": "Caricamento della pagina di prenotazione",
+    "confirmedTitle": "Prenotazione confermata",
+    "confirmedBody": "La prenotazione è fatta. Un'email di conferma è in arrivo.",
+    "calendarAriaLabel": "Scegli una data di prenotazione",
+    "chooseDayHeading": "Scegli un giorno",
+    "availableTimesHeading": "Orari disponibili",
+    "slotAriaLabel": "Orario disponibile {{slot}}",
+    "noSlots": "Nessun orario disponibile in questo giorno. Prova un'altra data.",
+    "selectedLabel": "Selezionato:",
+    "nameLabel": "Nome",
+    "emailLabel": "Email",
+    "confirmButton": "Conferma prenotazione"
+  },
+  "oppToolbar": {
+    "kpiOpportunities": "Opportunità",
+    "kpiRevenue": "Ricavi",
+    "kpiWeightedRevenue": "RP",
+    "kpiOpen": "Aperte",
+    "kpiRegionLabel": "Riepilogo KPI delle opportunità",
+    "title": "Opportunità",
+    "resultsFor": "risultati per",
+    "clear": "cancella",
+    "stageOpportunities": "opportunità {{stage}}",
+    "clearFilter": "cancella filtro",
+    "bidsInFlight": "{{count}} offerte in corso · fai clic su una cella per modificare in linea.",
+    "exportingLabel": "Esportazione delle opportunità…",
+    "exportLabel": "Esporta le opportunità visibili come CSV",
+    "exporting": "Esportazione…",
+    "exportCsv": "Esporta CSV",
+    "stageFilterGroupLabel": "Filtra le opportunità per fase",
+    "stageAll": "Tutte",
+    "bulkActionsLabel": "Azioni in blocco",
+    "selectedCount": "{{count}} selezionate",
+    "moveSelectionLabel": "Sposta la selezione in una fase",
+    "moveToStage": "Sposta nella fase…",
+    "deleteSelected": "Elimina selezionate",
+    "clearSelection": "Cancella"
+  },
+  "newLead": {
+    "toastNameRequired": "Nome e cognome sono obbligatori",
+    "toastCreateFailed": "Creazione del lead non riuscita",
+    "breadcrumbLabel": "Percorso di navigazione",
+    "breadcrumbLeads": "Lead",
+    "breadcrumbCurrent": "Nuovo lead",
+    "heading": "Nuovo lead",
+    "subtitle": "Aggiungi un nuovo potenziale cliente alla tua pipeline.",
+    "labelFirstName": "Nome",
+    "labelLastName": "Cognome",
+    "labelEmail": "E-mail",
+    "labelPhone": "Telefono",
+    "labelCompany": "Azienda",
+    "labelTitle": "Qualifica",
+    "labelSource": "Origine",
+    "sourceWebsite": "Sito web",
+    "sourceReferral": "Segnalazione",
+    "sourceEvent": "Evento",
+    "sourceColdOutreach": "Contatto a freddo",
+    "sourcePartner": "Partner",
+    "sourceSocial": "Social",
+    "sourceOther": "Altro",
+    "labelPriority": "Priorità",
+    "priorityLow": "Bassa",
+    "priorityMedium": "Media",
+    "priorityHigh": "Alta",
+    "priorityCritical": "Critica",
+    "labelScore": "Punteggio",
+    "submitPending": "Creazione…",
+    "submit": "Crea lead",
+    "cancel": "Annulla"
+  },
+  "topAccounts": {
+    "heading": "Classifica account",
+    "badgeCurated": "Selezionati — top 10 globale Amaris",
+    "badgeAuto": "Classificato automaticamente per valore della pipeline",
+    "subtitleCurated": "La top 10 globale, selezionata e ordinata dagli amministratori nelle Impostazioni.",
+    "subtitleAuto": "Account di maggior valore classificati per pipeline totale e ricavi.",
+    "searchLabel": "Cerca account principali",
+    "searchPlaceholder": "Cerca account principali...",
+    "industryLabel": "Filtra account principali per settore",
+    "industriesUnavailable": "Settori non disponibili",
+    "allIndustries": "Tutti i settori",
+    "industryLoadError": "Impossibile caricare i filtri di settore.",
+    "retry": "Riprova",
+    "resultCount": "{{count}} account",
+    "errorTitle": "Impossibile caricare gli account principali",
+    "errorMessage": "L'endpoint degli account principali non ha risposto.",
+    "emptyTitle": "Ancora nessun dato sugli account",
+    "emptyMessage": "Aggiungi opportunità con valori per vedere gli account principali classificati per pipeline.",
+    "totalPipeline": "pipeline totale",
+    "won": "vinto",
+    "openDeals": "{{count}} trattative aperte",
+    "contacts": "{{count}} contatti"
+  },
+  "forecasts": {
+    "title": "Previsioni di ricavi",
+    "subtitle": "Le offerte che pilotiamo raggiungeranno l'obiettivo? Pipeline, caso migliore, impegnato e chiuso per periodo.",
+    "newForecast": "Nuova previsione",
+    "periodFilterLabel": "Filtro periodo",
+    "periodMonthly": "Mensile",
+    "periodQuarterly": "Trimestrale",
+    "periodYearly": "Annuale",
+    "totalsLabel": "Totali di previsione per il periodo selezionato",
+    "totalCommit": "Impegnato",
+    "totalBestCase": "Caso migliore",
+    "totalPipeline": "Pipeline",
+    "totalClosed": "Chiuso",
+    "toastUpdated": "Previsione aggiornata",
+    "toastUpdateFailed": "Impossibile aggiornare la previsione",
+    "toastCreated": "Previsione creata",
+    "toastCreateFailed": "Impossibile creare la previsione",
+    "toastDeleted": "Previsioni eliminate",
+    "toastDeleteFailed": "Impossibile eliminare le previsioni",
+    "deleteConfirmTitle": "Eliminare le previsioni per {{period}}?",
+    "deleteConfirmDescription": "Questo rimuoverà tutte le previsioni per categoria di questo periodo e proprietario.",
+    "unknownError": "Errore sconosciuto"
+  },
+  "cartesianCharts": {
+    "lineChartAriaLabel": "Grafico a linee",
+    "barChartAriaLabel": "Grafico a barre",
+    "areaChartAriaLabel": "Grafico ad area",
+    "funnelChartAriaLabel": "Grafico a imbuto",
+    "scatterChartAriaLabel": "Grafico a dispersione"
+  },
+  "commandCenter": {
+    "region": {
+      "ariaLabel": "Centro di comando BidStack"
+    },
+    "kicker": "Centro di comando BidStack",
+    "actions": {
+      "ariaLabel": "Segnali decisionali dell'account"
+    },
+    "badge": {
+      "ready": "{{count}}% pronto",
+      "stackSignals": "{{count}} segnali di stack"
+    },
+    "signal": {
+      "readiness": {
+        "label": "Stima di prontezza dell'offerta",
+        "detailReady": "pronto per la revisione esecutiva",
+        "detailFocus": "richiede focus pre-vendita"
+      },
+      "source": {
+        "label": "Copertura delle fonti",
+        "detail": "{{count}} fonte attribuita"
+      },
+      "decision": {
+        "label": "Copertura decisionale"
+      },
+      "risk": {
+        "label": "Carico di rischi aperti",
+        "valueHigh": "{{count}} alto",
+        "valueOpen": "{{count}} aperto",
+        "detailEscalate": "escalare prima della proposta",
+        "detailManageable": "gestibile con il follow-up del responsabile"
+      }
+    },
+    "nextMove": {
+      "unblock": "Sblocca {{label}} prima del gate dell'offerta.",
+      "escalateWithOwner": "Escala {{title}} con {{owner}} prima dell'approvazione della proposta.",
+      "escalate": "Escala {{title}} prima dell'approvazione della proposta.",
+      "champion": "Usa {{name}} come sponsor per il prossimo traguardo pre-vendita.",
+      "refreshSources": "Aggiorna la verifica dei dati per rafforzare le prove legali, di logo, di mercato e di fonte dell'account.",
+      "advance": "Avanza il prossimo passo della proposta con il contesto dell'account disponibile e l'allineamento del responsabile."
+    },
+    "committee": {
+      "champions": "{{count}} sponsor mappato",
+      "buyers": "{{count}} acquirente mappato",
+      "stakeholders": "{{count}} stakeholder mappato",
+      "empty": "mappa acquirente e sponsor"
+    },
+    "footer": {
+      "primarySignal": {
+        "label": "Segnale commerciale principale",
+        "pending": "Pipeline in sospeso"
+      },
+      "weightedValue": {
+        "label": "Valore ponderato dell'account",
+        "notVerified": "Non verificato"
+      },
+      "ownerMap": {
+        "label": "Mappa dei responsabili decisionali",
+        "contacts": "{{count}} contatti mappati"
+      }
+    }
+  },
+  "contactDetail": {
+    "errorTitle": "Impossibile caricare il contatto",
+    "errorMessage": "Il contatto potrebbe essere stato eliminato.",
+    "notFoundTitle": "Contatto non trovato",
+    "notFoundMessage": "Il contatto potrebbe essere stato eliminato o non disponi dell'accesso.",
+    "backToContacts": "Torna ai contatti",
+    "breadcrumbLabel": "Percorso di navigazione",
+    "contacts": "Contatti",
+    "noRole": "Nessun ruolo",
+    "influence": "Influenza: {{value}}/5",
+    "added": "Aggiunto",
+    "opportunitiesTitle": "Opportunità",
+    "relatedCount": "{{count}} correlati",
+    "noOpportunities": "Nessuna opportunità per {{customer}}.",
+    "tasksTitle": "Attività",
+    "noTasks": "Nessuna attività correlata.",
+    "dueDate": "Scadenza {{date}}",
+    "noDueDate": "Nessuna scadenza",
+    "notesTitle": "Note",
+    "noNotes": "Nessuna nota per questo account.",
+    "unknownAuthor": "Sconosciuto",
+    "liveCollaboration": "Collaborazione in tempo reale"
+  },
+  "keyAccounts": {
+    "title": "Account strategici",
+    "subtitle": "Account strategici regionali gestiti per pipeline, copertura e follow-up esecutivo — distinti dalla Top 10 globale curata.",
+    "searchLabel": "Cerca account chiave",
+    "searchPlaceholder": "Cerca account chiave...",
+    "industryFilterLabel": "Filtra gli account chiave per settore",
+    "industriesUnavailable": "Settori non disponibili",
+    "allIndustries": "Tutti i settori",
+    "industryFilterError": "Impossibile caricare i filtri di settore.",
+    "retry": "Riprova",
+    "resultCount_one": "{{count}} account",
+    "resultCount_other": "{{count}} account",
+    "statKeyAccounts": "Account chiave",
+    "statTotalPipeline": "Pipeline totale",
+    "statOpenDeals": "Trattative aperte",
+    "statContacts": "Contatti",
+    "errorTitle": "Impossibile caricare gli account chiave",
+    "errorMessage": "L'endpoint degli account chiave non ha risposto.",
+    "emptyTitle": "Nessun account chiave ancora",
+    "emptyMessage": "Contrassegna le aziende strategicamente importanti come account chiave dalla pagina Aziende.",
+    "metricPipeline": "pipeline",
+    "metricOpenDeals": "trattative aperte",
+    "metricContacts": "contatti"
   }
 }

@@ -1968,5 +1968,246 @@
     "briefLegalName": "法定名称",
     "briefFounded": "成立于",
     "briefConfidence": "置信度：{{percent}}%"
+  },
+  "publicBooking": {
+    "errorNotFound": "未找到预约页面",
+    "errorAvailabilityFailed": "可用时段加载失败",
+    "errorUnavailable": "预约页面不可用",
+    "errorSlotTaken": "该时间段已不可用。",
+    "errorBookingFailed": "预约失败",
+    "notFoundTitle": "未找到预约页面",
+    "notFoundBody": "此预约链接无效或已停止接受会议。",
+    "eyebrow": "BidStack 预约",
+    "loadingTitle": "正在加载预约页面",
+    "confirmedTitle": "预约已确认",
+    "confirmedBody": "您已成功预约。确认邮件即将发送。",
+    "calendarAriaLabel": "选择预约日期",
+    "chooseDayHeading": "选择日期",
+    "availableTimesHeading": "可预约时间",
+    "slotAriaLabel": "可预约时间 {{slot}}",
+    "noSlots": "当天没有可预约时间。请尝试其他日期。",
+    "selectedLabel": "已选择：",
+    "nameLabel": "姓名",
+    "emailLabel": "电子邮箱",
+    "confirmButton": "确认预约"
+  },
+  "oppToolbar": {
+    "kpiOpportunities": "商机",
+    "kpiRevenue": "收入",
+    "kpiWeightedRevenue": "加权",
+    "kpiOpen": "进行中",
+    "kpiRegionLabel": "商机关键指标摘要",
+    "title": "商机",
+    "resultsFor": "个结果，搜索",
+    "clear": "清除",
+    "stageOpportunities": "{{stage}}商机",
+    "clearFilter": "清除筛选",
+    "bidsInFlight": "{{count}} 个进行中的投标 · 点击任意单元格即可行内编辑。",
+    "exportingLabel": "正在导出商机…",
+    "exportLabel": "将可见商机导出为 CSV",
+    "exporting": "正在导出…",
+    "exportCsv": "导出 CSV",
+    "stageFilterGroupLabel": "按阶段筛选商机",
+    "stageAll": "全部",
+    "bulkActionsLabel": "批量操作",
+    "selectedCount": "已选择 {{count}} 项",
+    "moveSelectionLabel": "将所选项移至阶段",
+    "moveToStage": "移至阶段…",
+    "deleteSelected": "删除所选项",
+    "clearSelection": "清除"
+  },
+  "newLead": {
+    "toastNameRequired": "名字和姓氏为必填项",
+    "toastCreateFailed": "创建线索失败",
+    "breadcrumbLabel": "面包屑导航",
+    "breadcrumbLeads": "线索",
+    "breadcrumbCurrent": "新线索",
+    "heading": "新线索",
+    "subtitle": "向您的销售管道添加新潜在客户。",
+    "labelFirstName": "名字",
+    "labelLastName": "姓氏",
+    "labelEmail": "电子邮件",
+    "labelPhone": "电话",
+    "labelCompany": "公司",
+    "labelTitle": "职位",
+    "labelSource": "来源",
+    "sourceWebsite": "网站",
+    "sourceReferral": "推荐",
+    "sourceEvent": "活动",
+    "sourceColdOutreach": "陌生开发",
+    "sourcePartner": "合作伙伴",
+    "sourceSocial": "社交媒体",
+    "sourceOther": "其他",
+    "labelPriority": "优先级",
+    "priorityLow": "低",
+    "priorityMedium": "中",
+    "priorityHigh": "高",
+    "priorityCritical": "紧急",
+    "labelScore": "评分",
+    "submitPending": "创建中…",
+    "submit": "创建线索",
+    "cancel": "取消"
+  },
+  "topAccounts": {
+    "heading": "账户排名",
+    "badgeCurated": "精选 — Amaris 全球前 10",
+    "badgeAuto": "按管道价值自动排名",
+    "subtitleCurated": "全球前 10，由管理员在设置中精选并排序。",
+    "subtitleAuto": "按总管道和收入排名的高价值账户。",
+    "searchLabel": "搜索热门账户",
+    "searchPlaceholder": "搜索热门账户...",
+    "industryLabel": "按行业筛选热门账户",
+    "industriesUnavailable": "行业不可用",
+    "allIndustries": "所有行业",
+    "industryLoadError": "无法加载行业筛选器。",
+    "retry": "重试",
+    "resultCount": "{{count}} 个账户",
+    "errorTitle": "无法加载热门账户",
+    "errorMessage": "热门账户接口未响应。",
+    "emptyTitle": "暂无账户数据",
+    "emptyMessage": "添加带数值的商机以查看按管道排名的热门账户。",
+    "totalPipeline": "总管道",
+    "won": "已赢",
+    "openDeals": "{{count}} 个进行中的交易",
+    "contacts": "{{count}} 个联系人"
+  },
+  "forecasts": {
+    "title": "收入预测",
+    "subtitle": "我们正在推进的投标能否达成目标？按周期显示管道、最佳情况、承诺和已成交。",
+    "newForecast": "新建预测",
+    "periodFilterLabel": "周期筛选",
+    "periodMonthly": "月度",
+    "periodQuarterly": "季度",
+    "periodYearly": "年度",
+    "totalsLabel": "所选周期的预测总额",
+    "totalCommit": "承诺",
+    "totalBestCase": "最佳情况",
+    "totalPipeline": "管道",
+    "totalClosed": "已成交",
+    "toastUpdated": "预测已更新",
+    "toastUpdateFailed": "更新预测失败",
+    "toastCreated": "预测已创建",
+    "toastCreateFailed": "创建预测失败",
+    "toastDeleted": "预测已删除",
+    "toastDeleteFailed": "删除预测失败",
+    "deleteConfirmTitle": "删除 {{period}} 的预测？",
+    "deleteConfirmDescription": "这将删除此周期和负责人的所有类别预测。",
+    "unknownError": "未知错误"
+  },
+  "cartesianCharts": {
+    "lineChartAriaLabel": "折线图",
+    "barChartAriaLabel": "条形图",
+    "areaChartAriaLabel": "面积图",
+    "funnelChartAriaLabel": "漏斗图",
+    "scatterChartAriaLabel": "散点图"
+  },
+  "commandCenter": {
+    "region": {
+      "ariaLabel": "BidStack 指挥中心"
+    },
+    "kicker": "BidStack 指挥中心",
+    "actions": {
+      "ariaLabel": "客户决策信号"
+    },
+    "badge": {
+      "ready": "就绪 {{count}}%",
+      "stackSignals": "{{count}} 个技术栈信号"
+    },
+    "signal": {
+      "readiness": {
+        "label": "投标准备度估算",
+        "detailReady": "可供高管审阅",
+        "detailFocus": "需要售前关注"
+      },
+      "source": {
+        "label": "来源覆盖率",
+        "detail": "{{count}} 个归因来源"
+      },
+      "decision": {
+        "label": "决策覆盖率"
+      },
+      "risk": {
+        "label": "未结风险负载",
+        "valueHigh": "{{count}} 个高危",
+        "valueOpen": "{{count}} 个未结",
+        "detailEscalate": "在提案前升级处理",
+        "detailManageable": "通过责任人跟进可控"
+      }
+    },
+    "nextMove": {
+      "unblock": "在投标关卡前解除 {{label}} 的阻塞。",
+      "escalateWithOwner": "在提案获批前与 {{owner}} 一起升级处理 {{title}}。",
+      "escalate": "在提案获批前升级处理 {{title}}。",
+      "champion": "在下一个售前里程碑中以 {{name}} 作为内部支持者。",
+      "refreshSources": "刷新数据验证，以强化法律、标识、市场和客户来源的证明。",
+      "advance": "借助现有客户背景和责任人共识推进提案的下一步。"
+    },
+    "committee": {
+      "champions": "已识别 {{count}} 位内部支持者",
+      "buyers": "已识别 {{count}} 位采购方",
+      "stakeholders": "已识别 {{count}} 位相关方",
+      "empty": "识别采购方与内部支持者"
+    },
+    "footer": {
+      "primarySignal": {
+        "label": "主要商业信号",
+        "pending": "管道待定"
+      },
+      "weightedValue": {
+        "label": "加权客户价值",
+        "notVerified": "未验证"
+      },
+      "ownerMap": {
+        "label": "决策责任人图谱",
+        "contacts": "已映射 {{count}} 个联系人"
+      }
+    }
+  },
+  "contactDetail": {
+    "errorTitle": "无法加载联系人",
+    "errorMessage": "该联系人可能已被删除。",
+    "notFoundTitle": "未找到联系人",
+    "notFoundMessage": "该联系人可能已被删除，或者您没有访问权限。",
+    "backToContacts": "返回联系人",
+    "breadcrumbLabel": "面包屑导航",
+    "contacts": "联系人",
+    "noRole": "无职位",
+    "influence": "影响力：{{value}}/5",
+    "added": "添加于",
+    "opportunitiesTitle": "商机",
+    "relatedCount": "{{count}} 个相关",
+    "noOpportunities": "{{customer}} 没有商机。",
+    "tasksTitle": "任务",
+    "noTasks": "没有相关任务。",
+    "dueDate": "截止 {{date}}",
+    "noDueDate": "无截止日期",
+    "notesTitle": "备注",
+    "noNotes": "此账户没有备注。",
+    "unknownAuthor": "未知",
+    "liveCollaboration": "实时协作"
+  },
+  "keyAccounts": {
+    "title": "战略客户",
+    "subtitle": "由本地团队负责管理的区域战略客户，涵盖销售管道、覆盖和高管跟进，区别于精选的全球前十客户。",
+    "searchLabel": "搜索关键客户",
+    "searchPlaceholder": "搜索关键客户...",
+    "industryFilterLabel": "按行业筛选关键客户",
+    "industriesUnavailable": "行业不可用",
+    "allIndustries": "所有行业",
+    "industryFilterError": "无法加载行业筛选器。",
+    "retry": "重试",
+    "resultCount_one": "{{count}} 个客户",
+    "resultCount_other": "{{count}} 个客户",
+    "statKeyAccounts": "关键客户",
+    "statTotalPipeline": "销售管道总额",
+    "statOpenDeals": "进行中的交易",
+    "statContacts": "联系人",
+    "errorTitle": "无法加载关键客户",
+    "errorMessage": "关键客户接口未响应。",
+    "emptyTitle": "暂无关键客户",
+    "emptyMessage": "在公司页面将具有战略重要性的公司标记为关键客户。",
+    "metricPipeline": "销售管道",
+    "metricOpenDeals": "进行中的交易",
+    "metricContacts": "联系人"
   }
 }

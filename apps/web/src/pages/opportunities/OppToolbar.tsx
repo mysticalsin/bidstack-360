@@ -18,27 +18,29 @@ import { Button } from '@/components/ui/Button';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { cn } from '@/lib/cn';
 import { formatStage } from '@/lib/format';
+import { useTranslation } from 'react-i18next';
 
 import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
 // ── OppKpiBar ─────────────────────────────────────────────────────────────────
 
 export function OppKpiBar({ opps }: { opps: Opportunity[] }) {
+  const { t } = useTranslation('crm');
   const { formatMoney } = useFormatMoney();
   const totalValue = opps.reduce((acc, o) => acc + o.value, 0);
   const openOpps = opps.filter((o) => !o.pipelineStage?.isWon && !o.pipelineStage?.isLost);
   const openValue = openOpps.reduce((acc, o) => acc + o.value, 0);
   const weighted = openOpps.reduce((acc, o) => acc + o.value * (o.probability / 100), 0);
   const kpis = [
-    { label: 'Opportunities', value: String(opps.length) },
-    { label: 'Revenue', value: formatMoney(totalValue, 'EUR') },
-    { label: 'WR', value: formatMoney(weighted, 'EUR') },
-    { label: 'Open', value: formatMoney(openValue, 'EUR') },
+    { label: t('oppToolbar.kpiOpportunities', 'Opportunities'), value: String(opps.length) },
+    { label: t('oppToolbar.kpiRevenue', 'Revenue'), value: formatMoney(totalValue, 'EUR') },
+    { label: t('oppToolbar.kpiWeightedRevenue', 'WR'), value: formatMoney(weighted, 'EUR') },
+    { label: t('oppToolbar.kpiOpen', 'Open'), value: formatMoney(openValue, 'EUR') },
   ];
   return (
     <div
       role="region"
-      aria-label="Opportunities KPI summary"
+      aria-label={t('oppToolbar.kpiRegionLabel', 'Opportunities KPI summary')}
       className="grid grid-cols-2 gap-3 sm:grid-cols-4"
     >
       {kpis.map((kpi) => (
@@ -80,6 +82,7 @@ export function OppPageHeader({
   onClearStageFilter: () => void;
   onExportCsv: () => void;
 }) {
+  const { t } = useTranslation('crm');
   const clearBtnClass =
     'ml-2 rounded text-xs text-[var(--fg-tertiary)] underline hover:text-[var(--brand-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]';
 
@@ -87,29 +90,36 @@ export function OppPageHeader({
     <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
         <h1 className="gradient-text text-2xl font-bold tracking-tight text-[var(--fg-primary)]">
-          Opportunities
+          {t('oppToolbar.title', 'Opportunities')}
         </h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
           {search ? (
             <>
-              <span className="font-medium text-[var(--fg-primary)]">{itemCount}</span> results for{' '}
+              <span className="font-medium text-[var(--fg-primary)]">{itemCount}</span>{' '}
+              {t('oppToolbar.resultsFor', 'results for')}{' '}
               <span className="rounded bg-[var(--surface-sunken)] px-1.5 py-0.5 font-mono text-xs">
                 &ldquo;{search}&rdquo;
               </span>{' '}
               <button type="button" onClick={onClearSearch} className={clearBtnClass}>
-                clear
+                {t('oppToolbar.clear', 'clear')}
               </button>
             </>
           ) : stageFilter ? (
             <>
               <span className="font-medium text-[var(--fg-primary)]">{itemCount}</span>{' '}
-              {formatStage(stageFilter).toLowerCase()} opportunities
+              {t('oppToolbar.stageOpportunities', '{{stage}} opportunities', {
+                stage: formatStage(stageFilter).toLowerCase(),
+              })}
               <button type="button" onClick={onClearStageFilter} className={clearBtnClass}>
-                clear filter
+                {t('oppToolbar.clearFilter', 'clear filter')}
               </button>
             </>
           ) : (
-            <>{itemCount} bids in flight · click any cell to edit inline.</>
+            <>
+              {t('oppToolbar.bidsInFlight', '{{count}} bids in flight · click any cell to edit inline.', {
+                count: itemCount,
+              })}
+            </>
           )}
         </p>
       </div>
@@ -122,10 +132,14 @@ export function OppPageHeader({
           onClick={onExportCsv}
           disabled={!hasData || isExporting}
           aria-label={
-            isExporting ? 'Exporting opportunities…' : 'Export visible opportunities as CSV'
+            isExporting
+              ? t('oppToolbar.exportingLabel', 'Exporting opportunities…')
+              : t('oppToolbar.exportLabel', 'Export visible opportunities as CSV')
           }
         >
-          {isExporting ? 'Exporting…' : 'Export CSV'}
+          {isExporting
+            ? t('oppToolbar.exporting', 'Exporting…')
+            : t('oppToolbar.exportCsv', 'Export CSV')}
         </Button>
         <CreateOpportunityDialog />
       </div>
@@ -144,6 +158,7 @@ export function OppStageChips({
   stageOptions: PipelineStage[];
   onSetStageFilter: (id: string | null) => void;
 }) {
+  const { t } = useTranslation('crm');
   // WHY cn() over template literal: cn() handles class merging correctly and
   // avoids whitespace artifacts from string interpolation.
   const chipClass = (active: boolean) =>
@@ -158,7 +173,7 @@ export function OppStageChips({
   return (
     <div
       role="group"
-      aria-label="Filter opportunities by stage"
+      aria-label={t('oppToolbar.stageFilterGroupLabel', 'Filter opportunities by stage')}
       className="flex flex-wrap items-center gap-1.5"
     >
       <button
@@ -167,7 +182,7 @@ export function OppStageChips({
         onClick={() => onSetStageFilter(null)}
         className={chipClass(!stageFilter)}
       >
-        All
+        {t('oppToolbar.stageAll', 'All')}
       </button>
       {stageOptions.map((s) => (
         <button
@@ -202,16 +217,19 @@ export function OppBulkBar({
   /** P1 #24: disable controls while a stage-move or delete is in-flight */
   isPending?: boolean;
 }) {
+  const { t } = useTranslation('crm');
   return (
     <div
       role="region"
-      aria-label="Bulk actions"
+      aria-label={t('oppToolbar.bulkActionsLabel', 'Bulk actions')}
       className="sticky top-2 z-20 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] px-3 py-2 text-xs shadow-[var(--shadow-sm)] backdrop-blur"
     >
-      <span className="font-medium text-[var(--fg-primary)]">{selectedCount} selected</span>
+      <span className="font-medium text-[var(--fg-primary)]">
+        {t('oppToolbar.selectedCount', '{{count}} selected', { count: selectedCount })}
+      </span>
       <div className="flex items-center gap-2">
         <select
-          aria-label="Move selection to stage"
+          aria-label={t('oppToolbar.moveSelectionLabel', 'Move selection to stage')}
           defaultValue=""
           disabled={isPending}
           onChange={(e) => {
@@ -223,7 +241,7 @@ export function OppBulkBar({
           }}
           className="dialog-input disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <option value="">Move to stage…</option>
+          <option value="">{t('oppToolbar.moveToStage', 'Move to stage…')}</option>
           {stageOptions.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
@@ -237,10 +255,10 @@ export function OppBulkBar({
           disabled={isPending}
           className="text-[var(--danger)] hover:text-[var(--danger)]"
         >
-          Delete selected
+          {t('oppToolbar.deleteSelected', 'Delete selected')}
         </Button>
         <Button size="sm" variant="ghost" onClick={onClearSelection} disabled={isPending}>
-          Clear
+          {t('oppToolbar.clearSelection', 'Clear')}
         </Button>
       </div>
     </div>

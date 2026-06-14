@@ -76,13 +76,62 @@
     "revoke": "Revoca",
     "name": "Nome chiave",
     "created": "Creata il",
-    "lastUsed": "Ultimo utilizzo",
+    "lastUsed": "Usata {{time}}",
     "never": "Mai utilizzata",
     "copyKey": "Copia chiave",
     "confirmRevoke": "Sei sicuro di voler revocare questa chiave? L'azione è irreversibile.",
     "noKeys": "Nessuna chiave API al momento.",
     "keyCreated": "Chiave API creata. Copiala ora, non sarà mostrata di nuovo.",
-    "scopes": "Ambiti"
+    "scopes": "Ambiti",
+    "title": "Chiavi API",
+    "caption": "Usate da client MCP, chiamate REST e job CI. Con hash SHA-256 a riposo.",
+    "newKey": "+ Nuova chiave API",
+    "createDialog": {
+      "title": "Crea chiave API",
+      "description": "Vedrai il segreto una sola volta: copialo prima di chiudere."
+    },
+    "field": {
+      "name": "Nome",
+      "namePlaceholder": "es. dust-prod, mcp-cli",
+      "scopes": "Ambiti"
+    },
+    "scopeHelp": {
+      "read": "Accesso in sola lettura a tutti i dati dell'organizzazione.",
+      "write": "Creare / aggiornare / eliminare record.",
+      "mcp": "Abilita il trasporto MCP. Abbinalo a lettura o scrittura per i permessi degli strumenti."
+    },
+    "cancel": "Annulla",
+    "creating": "Creazione…",
+    "createKey": "Crea chiave",
+    "reveal": {
+      "warning": "Copia ora la tua nuova chiave: non verrà più mostrata.",
+      "copied": "Copiato!",
+      "copy": "Copia",
+      "dismiss": "Ignora"
+    },
+    "empty": {
+      "title": "Ancora nessuna chiave API",
+      "message": "Creane una per consentire l'autenticazione a Dust, al tuo client MCP o a un job CI."
+    },
+    "createdAt": "Creata {{date}}",
+    "neverUsed": "Mai usata",
+    "revokeConfirm": {
+      "title": "Revocare \"{{name}}\"?",
+      "description": "Qualsiasi client che usa questa chiave inizierà a fallire immediatamente. L'operazione non può essere annullata.",
+      "confirmLabel": "Revoca chiave"
+    },
+    "toast": {
+      "createdTitle": "Chiave API creata",
+      "createdDescription": "Copia ora il segreto: non verrà più mostrato.",
+      "revoked": "\"{{name}}\" revocata",
+      "revokeFailedTitle": "Revoca non riuscita",
+      "revokeFailedDescription": "Il server ha rifiutato la richiesta."
+    },
+    "error": {
+      "nameRequired": "Il nome è obbligatorio",
+      "scopeRequired": "Seleziona almeno un ambito",
+      "createFailed": "Creazione della chiave API non riuscita"
+    }
   },
   "webhooks": {
     "create": "Aggiungi webhook",
@@ -407,5 +456,36 @@
       "title": "Scegli un modello da modificare",
       "message": "Oppure creane uno nuovo. I modelli compilano segnaposto come {{lead.firstName}} dal record corrente."
     }
+  },
+  "roles": {
+    "toastNameRequired": "Il nome del ruolo è obbligatorio",
+    "toastUpdated": "Ruolo aggiornato",
+    "toastCreated": "Ruolo creato",
+    "toastUpdateFailed": "Impossibile aggiornare il ruolo",
+    "toastCreateFailed": "Impossibile creare il ruolo",
+    "deleteConfirmTitle": "Eliminare il ruolo \"{{name}}\"?",
+    "deleteConfirmDescription": "Questo rimuoverà il ruolo da tutti gli utenti assegnati.",
+    "deleteConfirmLabel": "Elimina",
+    "toastDeleted": "Ruolo eliminato",
+    "toastDeleteFailed": "Impossibile eliminare il ruolo",
+    "sectionTitle": "Ruoli e autorizzazioni",
+    "sectionCaption": "Gestisci i ruoli dello spazio di lavoro e cosa può fare ciascun ruolo.",
+    "newRoleButton": "+ Nuovo ruolo",
+    "formTitleEdit": "Modifica ruolo",
+    "formTitleCreate": "Crea ruolo",
+    "fieldName": "Nome",
+    "namePlaceholder": "es. Responsabile vendite",
+    "fieldDescription": "Descrizione",
+    "descriptionPlaceholder": "Descrizione facoltativa",
+    "fieldPermissions": "Autorizzazioni",
+    "saveChangesButton": "Salva modifiche",
+    "createRoleButton": "Crea ruolo",
+    "cancelButton": "Annulla",
+    "emptyTitle": "Nessun ruolo ancora",
+    "emptyMessage": "Crea il tuo primo ruolo personalizzato.",
+    "systemBadge": "Sistema",
+    "editButton": "Modifica",
+    "deleteButton": "Elimina",
+    "noPermissions": "Nessuna autorizzazione"
   }
 }

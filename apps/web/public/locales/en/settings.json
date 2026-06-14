@@ -384,5 +384,89 @@
       "title": "Pick a template to edit",
       "message": "Or start a new one. Templates fill placeholders like {{lead.firstName}} from the current record."
     }
+  },
+  "apiKeys": {
+    "title": "API keys",
+    "caption": "Used by MCP clients, REST callers, and CI jobs. SHA-256 hashed at rest.",
+    "newKey": "+ New API key",
+    "createDialog": {
+      "title": "Create API key",
+      "description": "You'll see the secret exactly once — copy it before closing."
+    },
+    "field": {
+      "name": "Name",
+      "namePlaceholder": "e.g. dust-prod, mcp-cli",
+      "scopes": "Scopes"
+    },
+    "scopeHelp": {
+      "read": "Read-only access to all org data.",
+      "write": "Create / update / delete records.",
+      "mcp": "Enable MCP transport. Pair with read or write for tool permissions."
+    },
+    "cancel": "Cancel",
+    "creating": "Creating…",
+    "createKey": "Create key",
+    "reveal": {
+      "warning": "Copy your new key now — it won't be shown again.",
+      "copied": "Copied!",
+      "copy": "Copy",
+      "dismiss": "Dismiss"
+    },
+    "empty": {
+      "title": "No API keys yet",
+      "message": "Create one to let Dust, your MCP client, or a CI job authenticate."
+    },
+    "createdAt": "Created {{date}}",
+    "lastUsed": "Used {{time}}",
+    "neverUsed": "Never used",
+    "revoke": "Revoke",
+    "revokeConfirm": {
+      "title": "Revoke \"{{name}}\"?",
+      "description": "Any client using this key will start failing immediately. This cannot be undone.",
+      "confirmLabel": "Revoke key"
+    },
+    "toast": {
+      "createdTitle": "API key created",
+      "createdDescription": "Copy the secret now — it will not be shown again.",
+      "revoked": "Revoked \"{{name}}\"",
+      "revokeFailedTitle": "Revoke failed",
+      "revokeFailedDescription": "The server rejected the request."
+    },
+    "error": {
+      "nameRequired": "Name is required",
+      "scopeRequired": "Select at least one scope",
+      "createFailed": "Failed to create API key"
+    }
+  },
+  "roles": {
+    "toastNameRequired": "Role name is required",
+    "toastUpdated": "Role updated",
+    "toastCreated": "Role created",
+    "toastUpdateFailed": "Failed to update role",
+    "toastCreateFailed": "Failed to create role",
+    "deleteConfirmTitle": "Delete role \"{{name}}\"?",
+    "deleteConfirmDescription": "This will remove the role from all assigned users.",
+    "deleteConfirmLabel": "Delete",
+    "toastDeleted": "Role deleted",
+    "toastDeleteFailed": "Failed to delete role",
+    "sectionTitle": "Roles & Permissions",
+    "sectionCaption": "Manage workspace roles and what each role can do.",
+    "newRoleButton": "+ New role",
+    "formTitleEdit": "Edit role",
+    "formTitleCreate": "Create role",
+    "fieldName": "Name",
+    "namePlaceholder": "e.g. Sales Manager",
+    "fieldDescription": "Description",
+    "descriptionPlaceholder": "Optional description",
+    "fieldPermissions": "Permissions",
+    "saveChangesButton": "Save changes",
+    "createRoleButton": "Create role",
+    "cancelButton": "Cancel",
+    "emptyTitle": "No roles yet",
+    "emptyMessage": "Create your first custom role.",
+    "systemBadge": "System",
+    "editButton": "Edit",
+    "deleteButton": "Delete",
+    "noPermissions": "No permissions"
   }
 }

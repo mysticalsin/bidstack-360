@@ -352,5 +352,46 @@
     "detailAgentOverrides": "Substituições de agentes",
     "agentOverridesConfigured": "{{count}} configurados",
     "agentOverridesDefaults": "Usando os padrões"
+  },
+  "dataQuality": {
+    "title": "Qualidade dos dados",
+    "caption": {
+      "generated": "Relatório gerado {{time}} · {{count}} problema",
+      "idle": "Detecta empresas duplicadas, dados desatualizados, proprietários ausentes e domínios inválidos."
+    },
+    "error": {
+      "title": "Não foi possível carregar o relatório de qualidade dos dados",
+      "retry": "Tentar novamente"
+    },
+    "emptyScan": {
+      "title": "Nenhuma verificação de qualidade dos dados",
+      "message": "Execute a verificação de qualidade dos dados para ver domínios duplicados, registros desatualizados, proprietários ausentes, domínios inválidos e cobertura de logotipos."
+    },
+    "stat": {
+      "qualityScore": "Pontuação de qualidade",
+      "highSeverity": "Gravidade alta",
+      "mediumSeverity": "Gravidade média",
+      "totalIssues": "Total de problemas",
+      "badge": "dados"
+    },
+    "noIssues": {
+      "title": "Nenhum problema de qualidade dos dados",
+      "message": "Nenhum domínio duplicado, dado desatualizado, proprietário ausente, domínio inválido ou logotipo ausente foi detectado nesta verificação."
+    },
+    "issue": {
+      "company": "Empresa: {{name}}"
+    },
+    "kind": {
+      "duplicateCompany": "Empresa duplicada",
+      "staleData": "Dados desatualizados",
+      "missingOwner": "Proprietário ausente",
+      "invalidDomain": "Domínio inválido",
+      "missingLogo": "Logotipo ausente"
+    },
+    "severity": {
+      "high": "alta",
+      "medium": "média",
+      "low": "baixa"
+    }
   }
 }

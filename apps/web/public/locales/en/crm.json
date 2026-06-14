@@ -1968,5 +1968,246 @@
     "briefLegalName": "Legal name",
     "briefFounded": "Founded",
     "briefConfidence": "Confidence: {{percent}}%"
+  },
+  "publicBooking": {
+    "errorNotFound": "Booking page not found",
+    "errorAvailabilityFailed": "Availability failed",
+    "errorUnavailable": "Booking page unavailable",
+    "errorSlotTaken": "That time is no longer available.",
+    "errorBookingFailed": "Booking failed",
+    "notFoundTitle": "Booking page not found",
+    "notFoundBody": "This scheduling link is invalid or no longer accepting meetings.",
+    "eyebrow": "BidStack scheduling",
+    "loadingTitle": "Loading booking page",
+    "confirmedTitle": "Booking confirmed",
+    "confirmedBody": "You're booked. A confirmation email is on its way.",
+    "calendarAriaLabel": "Choose a booking date",
+    "chooseDayHeading": "Choose a day",
+    "availableTimesHeading": "Available times",
+    "slotAriaLabel": "Available slot {{slot}}",
+    "noSlots": "No available slots on this day. Try another date.",
+    "selectedLabel": "Selected:",
+    "nameLabel": "Name",
+    "emailLabel": "Email",
+    "confirmButton": "Confirm booking"
+  },
+  "oppToolbar": {
+    "kpiOpportunities": "Opportunities",
+    "kpiRevenue": "Revenue",
+    "kpiWeightedRevenue": "WR",
+    "kpiOpen": "Open",
+    "kpiRegionLabel": "Opportunities KPI summary",
+    "title": "Opportunities",
+    "resultsFor": "results for",
+    "clear": "clear",
+    "stageOpportunities": "{{stage}} opportunities",
+    "clearFilter": "clear filter",
+    "bidsInFlight": "{{count}} bids in flight · click any cell to edit inline.",
+    "exportingLabel": "Exporting opportunities…",
+    "exportLabel": "Export visible opportunities as CSV",
+    "exporting": "Exporting…",
+    "exportCsv": "Export CSV",
+    "stageFilterGroupLabel": "Filter opportunities by stage",
+    "stageAll": "All",
+    "bulkActionsLabel": "Bulk actions",
+    "selectedCount": "{{count}} selected",
+    "moveSelectionLabel": "Move selection to stage",
+    "moveToStage": "Move to stage…",
+    "deleteSelected": "Delete selected",
+    "clearSelection": "Clear"
+  },
+  "newLead": {
+    "toastNameRequired": "First and last name are required",
+    "toastCreateFailed": "Failed to create lead",
+    "breadcrumbLabel": "Breadcrumb",
+    "breadcrumbLeads": "Leads",
+    "breadcrumbCurrent": "New lead",
+    "heading": "New lead",
+    "subtitle": "Add a new prospect to your pipeline.",
+    "labelFirstName": "First name",
+    "labelLastName": "Last name",
+    "labelEmail": "Email",
+    "labelPhone": "Phone",
+    "labelCompany": "Company",
+    "labelTitle": "Title",
+    "labelSource": "Source",
+    "sourceWebsite": "Website",
+    "sourceReferral": "Referral",
+    "sourceEvent": "Event",
+    "sourceColdOutreach": "Cold outreach",
+    "sourcePartner": "Partner",
+    "sourceSocial": "Social",
+    "sourceOther": "Other",
+    "labelPriority": "Priority",
+    "priorityLow": "Low",
+    "priorityMedium": "Medium",
+    "priorityHigh": "High",
+    "priorityCritical": "Critical",
+    "labelScore": "Score",
+    "submitPending": "Creating…",
+    "submit": "Create lead",
+    "cancel": "Cancel"
+  },
+  "topAccounts": {
+    "heading": "Account Ranking",
+    "badgeCurated": "Curated — Amaris global top 10",
+    "badgeAuto": "Auto-ranked by pipeline value",
+    "subtitleCurated": "The global top 10, hand-picked and ordered by admins in Settings.",
+    "subtitleAuto": "Highest-value accounts ranked by total pipeline and revenue.",
+    "searchLabel": "Search top accounts",
+    "searchPlaceholder": "Search top accounts...",
+    "industryLabel": "Filter top accounts by industry",
+    "industriesUnavailable": "Industries unavailable",
+    "allIndustries": "All industries",
+    "industryLoadError": "Could not load industry filters.",
+    "retry": "Retry",
+    "resultCount": "{{count}} account",
+    "errorTitle": "Couldn't load top accounts",
+    "errorMessage": "The top accounts endpoint did not respond.",
+    "emptyTitle": "No account data yet",
+    "emptyMessage": "Add opportunities with values to see top accounts ranked by pipeline.",
+    "totalPipeline": "total pipeline",
+    "won": "won",
+    "openDeals": "{{count}} open deals",
+    "contacts": "{{count}} contacts"
+  },
+  "forecasts": {
+    "title": "Revenue Forecasts",
+    "subtitle": "Will the bids we're piloting hit the number? Pipeline, best case, commit, and closed by period.",
+    "newForecast": "New Forecast",
+    "periodFilterLabel": "Period filter",
+    "periodMonthly": "Monthly",
+    "periodQuarterly": "Quarterly",
+    "periodYearly": "Yearly",
+    "totalsLabel": "Forecast totals for the selected period",
+    "totalCommit": "Commit",
+    "totalBestCase": "Best case",
+    "totalPipeline": "Pipeline",
+    "totalClosed": "Closed",
+    "toastUpdated": "Forecast updated",
+    "toastUpdateFailed": "Failed to update forecast",
+    "toastCreated": "Forecast created",
+    "toastCreateFailed": "Failed to create forecast",
+    "toastDeleted": "Forecasts deleted",
+    "toastDeleteFailed": "Failed to delete forecasts",
+    "deleteConfirmTitle": "Delete forecasts for {{period}}?",
+    "deleteConfirmDescription": "This will remove all category forecasts for this period and owner.",
+    "unknownError": "Unknown error"
+  },
+  "cartesianCharts": {
+    "lineChartAriaLabel": "Line chart",
+    "barChartAriaLabel": "Bar chart",
+    "areaChartAriaLabel": "Area chart",
+    "funnelChartAriaLabel": "Funnel chart",
+    "scatterChartAriaLabel": "Scatter chart"
+  },
+  "commandCenter": {
+    "region": {
+      "ariaLabel": "BidStack command center"
+    },
+    "kicker": "BidStack command center",
+    "actions": {
+      "ariaLabel": "Account decision signals"
+    },
+    "badge": {
+      "ready": "{{count}}% ready",
+      "stackSignals": "{{count}} stack signals"
+    },
+    "signal": {
+      "readiness": {
+        "label": "Bid readiness estimate",
+        "detailReady": "ready for exec review",
+        "detailFocus": "needs presales focus"
+      },
+      "source": {
+        "label": "Source coverage",
+        "detail": "{{count}} attributed source"
+      },
+      "decision": {
+        "label": "Decision coverage"
+      },
+      "risk": {
+        "label": "Open risk load",
+        "valueHigh": "{{count}} high",
+        "valueOpen": "{{count}} open",
+        "detailEscalate": "escalate before proposal",
+        "detailManageable": "manageable with owner follow-up"
+      }
+    },
+    "nextMove": {
+      "unblock": "Unblock {{label}} before the bid gate.",
+      "escalateWithOwner": "Escalate {{title}} with {{owner}} before proposal approval.",
+      "escalate": "Escalate {{title}} before proposal approval.",
+      "champion": "Use {{name}} as champion for the next presales milestone.",
+      "refreshSources": "Refresh data verification to strengthen legal, logo, market, and account-source proof.",
+      "advance": "Advance the next proposal step with available account context and owner alignment."
+    },
+    "committee": {
+      "champions": "{{count}} champion mapped",
+      "buyers": "{{count}} buyer mapped",
+      "stakeholders": "{{count}} stakeholder mapped",
+      "empty": "map buyer and champion"
+    },
+    "footer": {
+      "primarySignal": {
+        "label": "Primary commercial signal",
+        "pending": "Pipeline pending"
+      },
+      "weightedValue": {
+        "label": "Weighted account value",
+        "notVerified": "Not verified"
+      },
+      "ownerMap": {
+        "label": "Decision owner map",
+        "contacts": "{{count}} contacts mapped"
+      }
+    }
+  },
+  "contactDetail": {
+    "errorTitle": "Couldn't load contact",
+    "errorMessage": "The contact may have been deleted.",
+    "notFoundTitle": "Contact not found",
+    "notFoundMessage": "The contact may have been deleted or you may not have access to it.",
+    "backToContacts": "Back to contacts",
+    "breadcrumbLabel": "Breadcrumb",
+    "contacts": "Contacts",
+    "noRole": "No role",
+    "influence": "Influence: {{value}}/5",
+    "added": "Added",
+    "opportunitiesTitle": "Opportunities",
+    "relatedCount": "{{count}} related",
+    "noOpportunities": "No opportunities for {{customer}}.",
+    "tasksTitle": "Tasks",
+    "noTasks": "No related tasks.",
+    "dueDate": "Due {{date}}",
+    "noDueDate": "No due date",
+    "notesTitle": "Notes",
+    "noNotes": "No notes for this account.",
+    "unknownAuthor": "Unknown",
+    "liveCollaboration": "Live collaboration"
+  },
+  "keyAccounts": {
+    "title": "Strategic Accounts",
+    "subtitle": "Regional strategic accounts owned for pipeline, coverage, and executive follow-through — distinct from the curated global Top 10.",
+    "searchLabel": "Search key accounts",
+    "searchPlaceholder": "Search key accounts...",
+    "industryFilterLabel": "Filter key accounts by industry",
+    "industriesUnavailable": "Industries unavailable",
+    "allIndustries": "All industries",
+    "industryFilterError": "Could not load industry filters.",
+    "retry": "Retry",
+    "resultCount_one": "{{count}} account",
+    "resultCount_other": "{{count}} accounts",
+    "statKeyAccounts": "Key accounts",
+    "statTotalPipeline": "Total pipeline",
+    "statOpenDeals": "Open deals",
+    "statContacts": "Contacts",
+    "errorTitle": "Couldn't load key accounts",
+    "errorMessage": "The key accounts endpoint did not respond.",
+    "emptyTitle": "No key accounts yet",
+    "emptyMessage": "Flag strategically important companies as Key Accounts from the Companies page.",
+    "metricPipeline": "pipeline",
+    "metricOpenDeals": "open deals",
+    "metricContacts": "contacts"
   }
 }

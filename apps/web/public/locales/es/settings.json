@@ -79,13 +79,62 @@
     "revoke": "Revocar",
     "name": "Nombre de la clave",
     "created": "Creada el",
-    "lastUsed": "Último uso",
+    "lastUsed": "Usada {{time}}",
     "never": "Nunca usada",
     "copyKey": "Copiar clave",
     "confirmRevoke": "¿Seguro que quieres revocar esta clave? Esta acción es irreversible.",
     "noKeys": "Sin claves API por ahora.",
     "keyCreated": "Clave API creada. Cópiala ahora; no se mostrará de nuevo.",
-    "scopes": "Alcances"
+    "scopes": "Alcances",
+    "title": "Claves de API",
+    "caption": "Usadas por clientes MCP, llamadas REST y trabajos de CI. Cifradas con SHA-256 en reposo.",
+    "newKey": "+ Nueva clave de API",
+    "createDialog": {
+      "title": "Crear clave de API",
+      "description": "Verás el secreto una sola vez: cópialo antes de cerrar."
+    },
+    "field": {
+      "name": "Nombre",
+      "namePlaceholder": "p. ej. dust-prod, mcp-cli",
+      "scopes": "Ámbitos"
+    },
+    "scopeHelp": {
+      "read": "Acceso de solo lectura a todos los datos de la organización.",
+      "write": "Crear / actualizar / eliminar registros.",
+      "mcp": "Habilitar el transporte MCP. Combínalo con lectura o escritura para los permisos de herramientas."
+    },
+    "cancel": "Cancelar",
+    "creating": "Creando…",
+    "createKey": "Crear clave",
+    "reveal": {
+      "warning": "Copia tu nueva clave ahora: no se volverá a mostrar.",
+      "copied": "¡Copiado!",
+      "copy": "Copiar",
+      "dismiss": "Descartar"
+    },
+    "empty": {
+      "title": "Aún no hay claves de API",
+      "message": "Crea una para que Dust, tu cliente MCP o un trabajo de CI puedan autenticarse."
+    },
+    "createdAt": "Creada {{date}}",
+    "neverUsed": "Nunca usada",
+    "revokeConfirm": {
+      "title": "¿Revocar «{{name}}»?",
+      "description": "Cualquier cliente que use esta clave empezará a fallar de inmediato. Esto no se puede deshacer.",
+      "confirmLabel": "Revocar clave"
+    },
+    "toast": {
+      "createdTitle": "Clave de API creada",
+      "createdDescription": "Copia el secreto ahora: no se volverá a mostrar.",
+      "revoked": "«{{name}}» revocada",
+      "revokeFailedTitle": "Error al revocar",
+      "revokeFailedDescription": "El servidor rechazó la solicitud."
+    },
+    "error": {
+      "nameRequired": "El nombre es obligatorio",
+      "scopeRequired": "Selecciona al menos un ámbito",
+      "createFailed": "No se pudo crear la clave de API"
+    }
   },
   "webhooks": {
     "create": "Añadir webhook",
@@ -410,5 +459,36 @@
       "title": "Elige una plantilla para editar",
       "message": "O crea uno nuevo. Las plantillas rellenan marcadores como {{lead.firstName}} a partir del registro actual."
     }
+  },
+  "roles": {
+    "toastNameRequired": "El nombre del rol es obligatorio",
+    "toastUpdated": "Rol actualizado",
+    "toastCreated": "Rol creado",
+    "toastUpdateFailed": "Error al actualizar el rol",
+    "toastCreateFailed": "Error al crear el rol",
+    "deleteConfirmTitle": "¿Eliminar el rol \"{{name}}\"?",
+    "deleteConfirmDescription": "Esto eliminará el rol de todos los usuarios asignados.",
+    "deleteConfirmLabel": "Eliminar",
+    "toastDeleted": "Rol eliminado",
+    "toastDeleteFailed": "Error al eliminar el rol",
+    "sectionTitle": "Roles y permisos",
+    "sectionCaption": "Administra los roles del espacio de trabajo y lo que puede hacer cada uno.",
+    "newRoleButton": "+ Nuevo rol",
+    "formTitleEdit": "Editar rol",
+    "formTitleCreate": "Crear rol",
+    "fieldName": "Nombre",
+    "namePlaceholder": "p. ej. Gerente de ventas",
+    "fieldDescription": "Descripción",
+    "descriptionPlaceholder": "Descripción opcional",
+    "fieldPermissions": "Permisos",
+    "saveChangesButton": "Guardar cambios",
+    "createRoleButton": "Crear rol",
+    "cancelButton": "Cancelar",
+    "emptyTitle": "Aún no hay roles",
+    "emptyMessage": "Crea tu primer rol personalizado.",
+    "systemBadge": "Sistema",
+    "editButton": "Editar",
+    "deleteButton": "Eliminar",
+    "noPermissions": "Sin permisos"
   }
 }
