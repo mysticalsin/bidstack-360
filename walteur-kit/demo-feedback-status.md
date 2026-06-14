@@ -41,11 +41,32 @@ removed (§8).
 
 ## CONSTRAINTS — status
 
-- **Pre-sales piloting tool, NOT a CRM (§9a):** product framed as Bid/pre-sales; verify no residual "CRM" UI strings before the group demo.
+- **Pre-sales piloting tool, NOT a CRM (§9a):** product framed as Bid/pre-sales. **DONE 2026-06-14:** audited the UI; reframed all residual user-facing "CRM" copy → pre-sales/platform/data (Workflows, Settings, Webhooks, Audit-log, Dust-agents, Integrations). Kept "External CRM" connector labels (they name external source systems, not BidStack). Apollo refs in the UI tree are code comments only — no user-facing brand leak.
 - **Access governance (§9b):** M7 group-mirrored scoping + RBAC enforced; opportunity detail-by-id leak closed this session.
 - **No open external firehose (§9d):** curated/validated integrations only.
 - **Azure/security gate (§9e):** env-var config + infra/azure docs in place; **hard gate before real client data** = group Data + AI + Security validation (Jérôme / Clément Robin). Not yet done.
 - **Scope discipline (§9f):** kept — built only what was verifiable; blocked items surfaced, not invented.
+
+## RECONCILED 2026-06-14 (since the 06-13 pass)
+
+Verified the 06-13 classification still holds against current code, and extended it:
+
+- **§1a data-trust / "le vrai du faux":** reinforced — the new account **News & signals**
+  card is source-tagged External / "Free · Open web (Google News)", explicitly "verify
+  before treating as a Mantu fact". Keyless company enrichment (Wikidata/Wikipedia) is
+  on by default; Apollo stays Settings/MCP-only.
+- **§1d contractual management:** extended — MSA/rate-card **document upload + OCR→LLM
+  extraction → review → prefill**, hosted/linked on the account; rate-card lines; the
+  extractor is provider-agnostic (any active LLM, live-proven on NVIDIA NIM).
+- **§2 sector / §3 dashboard:** the territories view now breaks opportunities down by
+  **industry and account**, not just region (generic `/territories/segments`).
+- **Vendor independence (cross-cutting):** per-org active **LLM provider switch**
+  (Claude/GPT/Kimi/NIM/Gemma) + live test-call — no single-vendor lock for the AI layer.
+- **§9b/§9e security:** closed 4 verified findings (WS cross-tenant leak, DocuSign HMAC,
+  Yjs sync, prune); added custom-object RBAC + server-side value validation. The group
+  Data+AI+Security validation gate (§9e) is still the hard prerequisite to beta.
+
+Still BLOCKED exactly as above — all need Tony's decisions/data, none faked.
 
 ## NEXT DECISIONS FOR TONY
 
