@@ -14,6 +14,7 @@ import { useEffect } from 'react';
 import { create } from 'zustand';
 
 import { springModal } from '@/lib/motion';
+import { useUiSound } from '@/hooks/useUiSound';
 
 export type ToastTone = 'success' | 'error' | 'info' | 'warning';
 
@@ -138,11 +139,21 @@ const TONE_STYLE: Record<ToastTone, { bar: string; icon: string }> = {
 function ToastCard({ item }: { item: ToastItem }) {
   const dismiss = useToastStore((s) => s.dismiss);
   const reduced = useReducedMotion();
+  const play = useUiSound();
 
   useEffect(() => {
     const handle = window.setTimeout(() => dismiss(item.id), item.duration);
     return () => window.clearTimeout(handle);
   }, [item.id, item.duration, dismiss]);
+
+  // Audible confirmation when a toast appears — a rising chime for success, a
+  // low two-note for error/warning. Keyed on item.id so it plays once per toast,
+  // not again if the volume changes while it is on screen.
+  useEffect(() => {
+    if (item.tone === 'success') play('success');
+    else if (item.tone === 'error' || item.tone === 'warning') play('error');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.id]);
 
   const style = TONE_STYLE[item.tone];
 

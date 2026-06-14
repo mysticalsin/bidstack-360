@@ -1,8 +1,9 @@
 import { motion, useReducedMotion, type HTMLMotionProps } from 'framer-motion';
-import { forwardRef } from 'react';
+import { forwardRef, type MouseEvent } from 'react';
 
 import { cn } from '@/lib/cn';
 import { springSnap } from '@/lib/motion';
+import { useUiSound } from '@/hooks/useUiSound';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'destructive' | 'success';
 type Size = 'sm' | 'md' | 'lg';
@@ -19,7 +20,7 @@ const VARIANT: Record<Variant, string> = {
   primary:
     'bg-[var(--brand-primary)] text-white hover:bg-[var(--brand-primary-hover)] active:bg-[var(--brand-primary-press)] shadow-[var(--shadow-xs)] ' +
     'dark:bg-gradient-to-r dark:from-[var(--brand-gradient-start)] dark:to-[var(--brand-gradient-end)] ' +
-    'dark:shadow-[0_0_16px_var(--btn-brand-glow)] dark:hover:shadow-[0_0_24px_var(--btn-brand-glow-strong)] dark:pulse-glow',
+    'dark:shadow-[var(--shadow-xs)] dark:hover:shadow-[var(--shadow-sm)]',
   secondary:
     'bg-[var(--surface-card)] text-[var(--fg-primary)] border border-[var(--border-default)] hover:bg-[var(--surface-sunken)] hover:border-[var(--border-strong)] active:bg-[var(--border-subtle)] active:scale-[0.98] ' +
     'dark:bg-[var(--surface-glass)] dark:backdrop-blur-md dark:hover:border-[var(--border-glow-strong)] dark:hover:shadow-[0_0_16px_var(--border-glow)]',
@@ -59,13 +60,21 @@ const PRESS_SCALE: Record<Size, number> = {
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'primary', size = 'md', type = 'button', disabled, ...rest }, ref) => {
+  ({ className, variant = 'primary', size = 'md', type = 'button', disabled, onClick, ...rest }, ref) => {
     const reduced = useReducedMotion();
+    const playSound = useUiSound();
+    // Tactile confirmation: a short click on press (gated by the Sound setting),
+    // then the consumer's own handler. Sound is the audible twin of whileTap.
+    const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
+      playSound('click');
+      onClick?.(event);
+    };
     return (
       <motion.button
         ref={ref}
         type={type}
         disabled={disabled}
+        onClick={handleClick}
         // Spring on tap mirrors UIButton's tactile feel on iOS. Disable when
         // the user has reduced-motion on or the button is disabled.
         whileTap={reduced || disabled ? undefined : { scale: PRESS_SCALE[size] }}

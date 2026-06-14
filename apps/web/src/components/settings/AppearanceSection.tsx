@@ -3,6 +3,7 @@
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { useThemeStore } from '@/stores/theme';
 import { usePreferences, type Density, type MotionPref } from '@/stores/preferences';
+import { playUiSound, type UiSoundKind } from '@/lib/soundEngine';
 import { cn } from '@/lib/cn';
 
 export function AppearanceSection() {
@@ -13,6 +14,10 @@ export function AppearanceSection() {
   const setMotion = usePreferences((s) => s.setMotion);
   const visualEffects = usePreferences((s) => s.visualEffects);
   const setVisualEffects = usePreferences((s) => s.setVisualEffects);
+  const sound = usePreferences((s) => s.sound);
+  const setSound = usePreferences((s) => s.setSound);
+  const soundVolume = usePreferences((s) => s.soundVolume);
+  const setSoundVolume = usePreferences((s) => s.setSoundVolume);
 
   return (
     <div className="space-y-6">
@@ -132,7 +137,90 @@ export function AppearanceSection() {
           </fieldset>
         </div>
       </Card>
+
+      <Card>
+        <SectionHeader
+          title="Sound"
+          caption="Short, tactile UI sounds on clicks and confirmations. Interaction-only — never ambient."
+        />
+        <div className="space-y-4 p-5">
+          <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border border-[var(--border-default)] p-3 transition-colors hover:bg-[var(--surface-sunken)]">
+            <input
+              type="checkbox"
+              checked={sound}
+              onChange={(event) => setSound(event.target.checked)}
+              className="mt-1 accent-[var(--brand-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
+            />
+            <span>
+              <span className="block text-sm font-medium text-[var(--fg-primary)]">
+                Sound effects
+              </span>
+              <span className="block text-xs text-[var(--fg-secondary)]">
+                Play a soft click on button presses and a chime on save / error.
+              </span>
+            </span>
+          </label>
+
+          <div className={cn('transition-opacity', sound ? 'opacity-100' : 'opacity-50')}>
+            <label
+              htmlFor="sound-volume"
+              className="flex items-center justify-between text-sm font-medium text-[var(--fg-primary)]"
+            >
+              Volume
+              <span className="font-mono text-xs text-[var(--fg-secondary)]">
+                {Math.round(soundVolume * 100)}%
+              </span>
+            </label>
+            <input
+              id="sound-volume"
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={Math.round(soundVolume * 100)}
+              disabled={!sound}
+              onChange={(event) => setSoundVolume(Number(event.target.value) / 100)}
+              className="mt-2 h-2 w-full cursor-pointer accent-[var(--brand-primary)] disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
+              aria-label="Sound volume"
+            />
+          </div>
+
+          <div>
+            <div className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
+              Preview
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <SoundTestChip kind="click" label="Click" volume={soundVolume} />
+              <SoundTestChip kind="success" label="Success" volume={soundVolume} />
+              <SoundTestChip kind="error" label="Error" volume={soundVolume} />
+            </div>
+          </div>
+        </div>
+      </Card>
     </div>
+  );
+}
+
+// Previews a single UI sound at the current volume, regardless of the on/off
+// toggle — pressing it IS the intent, so it always plays (volume 0 stays silent).
+function SoundTestChip({
+  kind,
+  label,
+  volume,
+}: {
+  kind: UiSoundKind;
+  label: string;
+  volume: number;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => playUiSound(kind, volume)}
+      className="inline-flex min-h-9 items-center gap-1.5 rounded-md dark:rounded-full border border-[var(--border-default)] bg-[var(--surface-card)] px-3 text-xs font-medium text-[var(--fg-secondary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] dark:bg-[var(--surface-glass)] dark:backdrop-blur-md"
+    >
+      <span aria-hidden>▶</span>
+      {label}
+    </button>
   );
 }
 

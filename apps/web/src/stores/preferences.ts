@@ -19,13 +19,35 @@ interface PersistedState {
   density: Density;
   motion: MotionPref;
   visualEffects: boolean;
+  // UI sound effects (click / success / error). Interaction-triggered only —
+  // never ambient. Volume is 0..1; the sound engine scales its master gain by it.
+  sound: boolean;
+  soundVolume: number;
 }
 
 const DEFAULTS: PersistedState = {
   density: 'comfortable',
   motion: 'system',
   visualEffects: true,
+  sound: true,
+  soundVolume: 0.4,
 };
+
+function clamp01(n: number): number {
+  return Math.min(1, Math.max(0, n));
+}
+
+// One place builds the full persisted snapshot from store state, so adding a
+// preference doesn't mean editing every setter.
+function snapshot(s: PersistedState): PersistedState {
+  return {
+    density: s.density,
+    motion: s.motion,
+    visualEffects: s.visualEffects,
+    sound: s.sound,
+    soundVolume: s.soundVolume,
+  };
+}
 
 let activeStorageKey = STORAGE_PREFIX;
 
@@ -42,6 +64,11 @@ function parsePersisted(raw: string | null): PersistedState | null {
       motion: parsed.motion ?? DEFAULTS.motion,
       visualEffects:
         typeof parsed.visualEffects === 'boolean' ? parsed.visualEffects : DEFAULTS.visualEffects,
+      sound: typeof parsed.sound === 'boolean' ? parsed.sound : DEFAULTS.sound,
+      soundVolume:
+        typeof parsed.soundVolume === 'number'
+          ? clamp01(parsed.soundVolume)
+          : DEFAULTS.soundVolume,
     };
   } catch {
     return null;
@@ -67,12 +94,15 @@ function applyToDom(state: PersistedState): void {
   document.documentElement.dataset.density = state.density;
   document.documentElement.dataset.motion = state.motion;
   document.documentElement.dataset.visualEffects = state.visualEffects ? 'on' : 'off';
+  document.documentElement.dataset.sound = state.sound ? 'on' : 'off';
 }
 
 interface PreferencesStore extends PersistedState {
   setDensity: (d: Density) => void;
   setMotion: (m: MotionPref) => void;
   setVisualEffects: (enabled: boolean) => void;
+  setSound: (enabled: boolean) => void;
+  setSoundVolume: (volume: number) => void;
   scopeToUser: (userId: string | null) => void;
 }
 
@@ -82,33 +112,42 @@ applyToDom(initial);
 export const usePreferences = create<PreferencesStore>((set, get) => ({
   ...initial,
   setDensity: (density) => {
-    const next = { density, motion: get().motion, visualEffects: get().visualEffects };
+    const next = { ...snapshot(get()), density };
     write(next);
     applyToDom(next);
     set({ density });
   },
   setMotion: (motion) => {
-    const next = { density: get().density, motion, visualEffects: get().visualEffects };
+    const next = { ...snapshot(get()), motion };
     write(next);
     applyToDom(next);
     set({ motion });
   },
   setVisualEffects: (visualEffects) => {
-    const next = { density: get().density, motion: get().motion, visualEffects };
+    const next = { ...snapshot(get()), visualEffects };
     write(next);
     applyToDom(next);
     set({ visualEffects });
+  },
+  setSound: (sound) => {
+    const next = { ...snapshot(get()), sound };
+    write(next);
+    applyToDom(next);
+    set({ sound });
+  },
+  setSoundVolume: (volume) => {
+    const soundVolume = clamp01(volume);
+    const next = { ...snapshot(get()), soundVolume };
+    write(next);
+    applyToDom(next);
+    set({ soundVolume });
   },
   scopeToUser: (userId) => {
     const nextKey = storageKeyForUser(userId);
     if (nextKey === activeStorageKey) return;
 
     const previousKey = activeStorageKey;
-    const current = {
-      density: get().density,
-      motion: get().motion,
-      visualEffects: get().visualEffects,
-    };
+    const current = snapshot(get());
 
     const migratedFallback =
       userId && previousKey === STORAGE_PREFIX ? read(STORAGE_PREFIX, current) : DEFAULTS;
