@@ -2242,5 +2242,304 @@
     "metricPipeline": "pipeline",
     "metricOpenDeals": "oportunidades abiertas",
     "metricContacts": "contactos"
+  },
+  "companyTabs": {
+    "contacts": {
+      "emptyTitle": "Aún no hay contactos",
+      "emptyMessage": "Agrega contactos desde la página de Contactos.",
+      "colName": "Nombre",
+      "colRole": "Cargo",
+      "colEmail": "Correo electrónico",
+      "colPhone": "Teléfono"
+    },
+    "opportunities": {
+      "emptyTitle": "Aún no hay oportunidades",
+      "emptyMessage": "Crea oportunidades vinculadas a esta empresa.",
+      "colCode": "Código",
+      "colName": "Nombre",
+      "colStage": "Etapa",
+      "colValue": "Valor",
+      "colProbability": "Probabilidad"
+    },
+    "cases": {
+      "emptyTitle": "No hay casos abiertos",
+      "emptyMessage": "Todo en orden: no hay casos de soporte activos.",
+      "colNumber": "Número",
+      "colSubject": "Asunto",
+      "colStatus": "Estado",
+      "colPriority": "Prioridad"
+    },
+    "notes": {
+      "emptyTitle": "Aún no hay notas",
+      "emptyMessage": "Las notas vinculadas a esta empresa aparecerán aquí.",
+      "byAuthor": "por {{author}}"
+    },
+    "hierarchy": {
+      "directChildren": "Filiales directas",
+      "errorTitle": "No se pudo cargar la jerarquía",
+      "errorMessage": "No se pudo obtener la jerarquía de cuentas."
+    }
+  },
+  "oppInlineEditCells": {
+    "unknownStage": "Desconocido",
+    "stageTriggerAria": "Etapa: {{stage}}. Haz clic para cambiar.",
+    "numberTriggerAria": "{{value}}. Haz clic para editar.",
+    "dateTriggerAria": "Vence {{date}}. Haz clic para editar."
+  },
+  "liveDataMesh": {
+    "availabilityAvailable": "{{count}} disponibles",
+    "availabilityConnected": "{{enabled}}/{{total}} conectados",
+    "regionLabel": "Fuentes de datos conectadas",
+    "titleAvailable": "Fuentes de datos disponibles",
+    "titleConnected": "Fuentes de datos conectadas",
+    "captionAvailable": "Fuentes disponibles tras configurar credenciales o el conector",
+    "captionConnected": "APIs configuradas, widgets y fuentes de datos verificadas",
+    "kicker": "Disponibilidad de fuentes",
+    "publicSources": "fuentes públicas",
+    "connectorStatus": "Estado del conector",
+    "signalsLabel": "Señales de fuentes disponibles",
+    "loading": "Comprobando fuentes configuradas...",
+    "error": "Registro de conectores cargado; la verificación de fuentes devolvió un error.",
+    "empty": "Aún no se ha devuelto ninguna señal pública para esta cuenta.",
+    "connectorAria": "{{name}} está {{status}}"
+  },
+  "serviceDesk": {
+    "title": "Centro de servicio",
+    "searchPlaceholder": "Buscar casos…",
+    "searchAriaLabel": "Buscar casos",
+    "exportCsv": "Exportar CSV",
+    "filterByStatusAriaLabel": "Filtrar por estado",
+    "filterByPriorityAriaLabel": "Filtrar por prioridad",
+    "statusOption": {
+      "all": "Todos",
+      "new": "Nuevo",
+      "open": "Abierto",
+      "waitingCustomer": "Esperando al cliente",
+      "waitingInternal": "Esperando interno",
+      "resolved": "Resuelto",
+      "closed": "Cerrado",
+      "escalated": "Escalado"
+    },
+    "priorityOption": {
+      "all": "Todas",
+      "low": "Baja",
+      "medium": "Media",
+      "high": "Alta",
+      "critical": "Crítica"
+    },
+    "csv": {
+      "caseNumber": "N.º de caso",
+      "subject": "Asunto",
+      "status": "Estado",
+      "priority": "Prioridad",
+      "owner": "Responsable",
+      "source": "Origen",
+      "satisfaction": "Satisfacción",
+      "created": "Creado",
+      "resolved": "Resuelto"
+    },
+    "error": {
+      "title": "No se pudieron cargar los casos"
+    },
+    "retry": "Reintentar",
+    "empty": {
+      "title": "Aún no hay casos",
+      "message": "Los casos de servicio aparecerán aquí."
+    },
+    "column": {
+      "subject": "Asunto",
+      "status": "Estado",
+      "priority": "Prioridad",
+      "owner": "Responsable",
+      "source": "Origen"
+    },
+    "resultCount": {
+      "one": "{{count}} caso",
+      "other": "{{count}} casos"
+    },
+    "resultMatching": " que coinciden con \"{{search}}\""
+  },
+  "widgetConfig": {
+    "title": "Configurar widget",
+    "closeAriaLabel": "Cerrar",
+    "titleLabel": "Título",
+    "titlePlaceholder": "Título del widget",
+    "dataSourceLabel": "Fuente de datos (informe)",
+    "dataSourceNone": "— Ninguna (demo estática) —",
+    "chartTypeLabel": "Tipo de gráfico",
+    "type": {
+      "kpi": {
+        "label": "Tarjeta de KPI",
+        "description": "Métrica única con tendencia"
+      },
+      "line": {
+        "label": "Gráfico de líneas",
+        "description": "Tendencia a lo largo del tiempo"
+      },
+      "bar": {
+        "label": "Gráfico de barras",
+        "description": "Comparar categorías"
+      },
+      "area": {
+        "label": "Gráfico de áreas",
+        "description": "Volumen a lo largo del tiempo"
+      },
+      "pie": {
+        "label": "Gráfico circular",
+        "description": "Distribución (≤6 secciones)"
+      },
+      "donut": {
+        "label": "Gráfico de anillos",
+        "description": "Distribución con valor central"
+      },
+      "funnel": {
+        "label": "Embudo",
+        "description": "Pérdida por etapa del pipeline"
+      },
+      "gauge": {
+        "label": "Indicador",
+        "description": "Progreso hacia el objetivo"
+      },
+      "table": {
+        "label": "Tabla",
+        "description": "Cuadrícula de datos tabulares"
+      },
+      "scatter": {
+        "label": "Dispersión",
+        "description": "Correlación entre dos métricas"
+      },
+      "radar": {
+        "label": "Radar",
+        "description": "Comparación multidimensional"
+      },
+      "heatmap": {
+        "label": "Mapa de calor",
+        "description": "Densidad de actividad a lo largo del tiempo"
+      }
+    },
+    "xAxisLabel": "Campo del eje X",
+    "yAxisLabel": "Campo del eje Y",
+    "cancel": "Cancelar",
+    "save": "Guardar widget"
+  },
+  "auditLogInsights": {
+    "activityCadenceTitle": "Cadencia de actividad",
+    "activityCadenceSubtitle": "Volumen real de eventos de la página de evidencias cargada actualmente.",
+    "attentionEventsBadge": "{{percent}}% de eventos de atención",
+    "eventVolumeChartLabel": "Gráfico de volumen de eventos de auditoría",
+    "bucketTooltip": "{{label}}: {{count}} eventos",
+    "forensicWatchlistTitle": "Lista de vigilancia forense",
+    "forensicWatchlistSubtitle": "Triaje rápido del conjunto de evidencias cargado.",
+    "topActorLabel": "Actor principal",
+    "hottestTargetLabel": "Objetivo más activo",
+    "reviewQueueLabel": "Cola de revisión",
+    "noneValue": "Ninguno",
+    "eventsCount": "{{count}} eventos",
+    "noLoadedEvents": "Sin eventos cargados",
+    "attentionEventsValue": "{{count}} eventos de atención",
+    "reviewQueueDetail": "{{destructive}} destructivos, {{security}} seguridad/API",
+    "evidenceQualityTitle": "Calidad de la evidencia",
+    "evidenceQualitySubtitle": "Señales de cobertura que hacen defendibles las auditorías.",
+    "scoreOutOf": "{{score}}/100",
+    "structuredDiffsLabel": "Diferencias estructuradas",
+    "eventsRatioDetail": "{{count}}/{{total}} eventos",
+    "targetReferencesLabel": "Referencias de objetivo",
+    "linkedRatioDetail": "{{count}}/{{total}} vinculados",
+    "actorAttributionLabel": "Atribución de actor",
+    "attributedRatioDetail": "{{count}}/{{total}} atribuidos",
+    "healthRowProgressLabel": "{{label}}: {{value}} %"
+  },
+  "scheduleReview": {
+    "errorPickDateTime": "Elige una fecha y hora",
+    "toastScheduledTitle": "Revisión programada",
+    "toastScheduledWithLink": "Enlace de la reunión añadido a la pestaña Llamadas.",
+    "toastScheduledNoLink": "Añadido a la pestaña Llamadas.",
+    "errorServerRejected": "El servidor rechazó la solicitud.",
+    "errorProviderUnreachable": "No se pudo conectar con {{provider}}. Conéctalo en Configuración → Integraciones o elige otro proveedor.",
+    "triggerButton": "Programar revisión",
+    "dialogTitle": "Programar una revisión",
+    "dialogDescription": "Crea una reunión de revisión Go/No-Go o de RFP en un calendario conectado.",
+    "fieldTopic": "Tema",
+    "placeholderTopic": "Revisión Go/No-Go",
+    "fieldProvider": "Proveedor",
+    "fieldDuration": "Duración (min)",
+    "fieldStart": "Inicio",
+    "fieldAttendees": "Asistentes (correos separados por comas)",
+    "cancel": "Cancelar",
+    "submitting": "Programando…",
+    "submit": "Programar"
+  },
+  "search": {
+    "heading": "Buscar",
+    "form": {
+      "ariaLabel": "Búsqueda en el espacio de trabajo"
+    },
+    "input": {
+      "placeholder": "Busca en oportunidades, contactos, empresas, tareas, notas y pedidos…",
+      "ariaLabel": "Buscar en el espacio de trabajo"
+    },
+    "tab": {
+      "all": "Todo",
+      "opportunity": "Oportunidades",
+      "lead": "Clientes potenciales",
+      "contact": "Contactos",
+      "company": "Empresas",
+      "task": "Tareas",
+      "note": "Notas"
+    },
+    "type": {
+      "opportunity": "Oportunidad",
+      "lead": "Cliente potencial",
+      "contact": "Contacto",
+      "company": "Empresa",
+      "task": "Tarea",
+      "note": "Nota"
+    },
+    "results": {
+      "ariaLabel": "Resultados de búsqueda",
+      "countOne": "{{count}} resultado",
+      "countOther": "{{count}} resultados"
+    },
+    "error": {
+      "title": "La búsqueda falló",
+      "message": "Algo salió mal"
+    },
+    "empty": {
+      "title": "No se encontraron resultados",
+      "message": "No encontramos nada que coincida con \"{{query}}\". Prueba con otras palabras clave o revisa la ortografía."
+    },
+    "guidance": {
+      "ariaLabel": "Guía de búsqueda",
+      "title": "Busca en todo tu espacio de trabajo",
+      "message": "Escribe una palabra clave arriba para encontrar oportunidades, contactos, empresas, tareas, notas y pedidos de venta."
+    }
+  },
+  "createWebhook": {
+    "adminOnlyBadge": "Solo administradores",
+    "editTitle": "Editar suscripción de webhook",
+    "createTitle": "Nueva suscripción de webhook",
+    "subtitle": "Usa un endpoint HTTPS de producción. BidStack firma cada entrega con HMAC-SHA256.",
+    "closeAriaLabel": "Cerrar",
+    "endpointUrlLabel": "URL del endpoint",
+    "endpointUrlPlaceholder": "https://your-app.com/webhooks/bidstack",
+    "endpointUrlHelp": "Se requiere HTTPS. Se rechazan localhost, IPs privadas y nombres de host internos.",
+    "eventsLabel": "Eventos",
+    "eventsHelp": "Elige solo los eventos que tu receptor realmente gestiona.",
+    "selectAll": "Seleccionar todo",
+    "clear": "Borrar",
+    "securityContractTitle": "Contrato de seguridad",
+    "securityReturn2xx": "Devuelve un estado 2xx en 10 segundos.",
+    "securityVerifyHeader": "Verifica la cabecera X-BidStack-Signature.",
+    "securityRejectOld": "Rechaza firmas con más de 5 minutos de antigüedad.",
+    "securityAsync": "Procesa el trabajo pesado de forma asíncrona tras confirmar.",
+    "selectedEventsLabel": "Eventos seleccionados",
+    "selectedNone": "Elige al menos un evento.",
+    "selectedOne": "Se entregará un evento.",
+    "selectedMany": "Se entregarán {{count}} eventos.",
+    "cancel": "Cancelar",
+    "saving": "Guardando...",
+    "creating": "Creando...",
+    "saveSubscription": "Guardar suscripción",
+    "createSubscription": "Crear suscripción"
   }
 }

@@ -6,6 +6,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/cn';
 import { fadeScale } from '@/lib/motion';
@@ -35,6 +36,7 @@ interface Props {
 }
 
 export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props) {
+  const { t } = useTranslation('crm');
   const { data: reports = [] } = useAnalyticsReportsList();
 
   const [type, setType] = useState<WidgetType>(initial?.type ?? 'bar');
@@ -81,11 +83,11 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
           >
             <div className="flex items-center justify-between mb-5">
               <Dialog.Title className="text-base font-semibold text-[var(--fg-primary)]">
-                Configure Widget
+                {t('widgetConfig.title', 'Configure Widget')}
               </Dialog.Title>
               <Dialog.Close asChild>
                 <button
-                  aria-label="Close"
+                  aria-label={t('widgetConfig.closeAriaLabel', 'Close')}
                   className={cn(
                     'flex items-center justify-center rounded-lg w-8 h-8',
                     'text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)]',
@@ -102,13 +104,13 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
               {/* Title */}
               <div>
                 <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1.5">
-                  Title
+                  {t('widgetConfig.titleLabel', 'Title')}
                 </label>
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Widget title"
+                  placeholder={t('widgetConfig.titlePlaceholder', 'Widget title')}
                   className={inputCls}
                 />
               </div>
@@ -117,14 +119,14 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
               {reports.length > 0 && (
                 <div>
                   <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1.5">
-                    Data source (report)
+                    {t('widgetConfig.dataSourceLabel', 'Data source (report)')}
                   </label>
                   <select
                     value={reportId}
                     onChange={(e) => setReportId(e.target.value)}
                     className={inputCls}
                   >
-                    <option value="">— None (static demo) —</option>
+                    <option value="">{t('widgetConfig.dataSourceNone', '— None (static demo) —')}</option>
                     {reports.map((r) => (
                       <option key={r.id} value={r.id}>
                         {r.name}
@@ -136,7 +138,7 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
 
               {/* Type picker */}
               <div>
-                <p className="text-xs font-medium text-[var(--fg-secondary)] mb-2">Chart type</p>
+                <p className="text-xs font-medium text-[var(--fg-secondary)] mb-2">{t('widgetConfig.chartTypeLabel', 'Chart type')}</p>
                 <div className="grid grid-cols-3 gap-2">
                   {WIDGET_TYPES.map((w) => (
                     <button
@@ -149,9 +151,11 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
                           : 'border-[var(--border-subtle)] hover:border-[var(--border-default)] text-[var(--fg-secondary)]',
                       )}
                     >
-                      <span className="text-xs font-semibold leading-tight">{w.label}</span>
+                      <span className="text-xs font-semibold leading-tight">
+                        {t(`widgetConfig.type.${w.type}.label`, w.label)}
+                      </span>
                       <span className="text-[10px] text-[var(--fg-tertiary)] mt-0.5 leading-tight">
-                        {w.description}
+                        {t(`widgetConfig.type.${w.type}.description`, w.description)}
                       </span>
                     </button>
                   ))}
@@ -163,7 +167,7 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1.5">
-                      X-axis field
+                      {t('widgetConfig.xAxisLabel', 'X-axis field')}
                     </label>
                     <input
                       type="text"
@@ -175,7 +179,7 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1.5">
-                      Y-axis field
+                      {t('widgetConfig.yAxisLabel', 'Y-axis field')}
                     </label>
                     <input
                       type="text"
@@ -198,7 +202,7 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
                       'transition-colors min-h-[44px]',
                     )}
                   >
-                    Cancel
+                    {t('widgetConfig.cancel', 'Cancel')}
                   </button>
                 </Dialog.Close>
                 <button
@@ -209,7 +213,7 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
                     'transition-colors min-h-[44px]',
                   )}
                 >
-                  Save widget
+                  {t('widgetConfig.save', 'Save widget')}
                 </button>
               </div>
             </div>

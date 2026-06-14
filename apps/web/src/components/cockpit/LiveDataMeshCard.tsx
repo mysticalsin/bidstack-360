@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export const LiveDataMeshCard = memo(function LiveDataMeshCard({ cockpit }: Props) {
+  const { t } = useTranslation('crm');
   const reducedMotion = useReducedMotion();
   const ticker = tickerForCompany(cockpit.company.name);
   const liveData = useOpenDataSignals({
@@ -30,32 +32,44 @@ export const LiveDataMeshCard = memo(function LiveDataMeshCard({ cockpit }: Prop
     ? 0
     : visibleConnectors.filter((c) => c.status === 'healthy').length;
   const availabilityLabel = usingFallbackConnectors
-    ? `${visibleConnectors.length} available`
-    : `${enabledConnectors}/${visibleConnectors.length} connected`;
+    ? t('liveDataMesh.availabilityAvailable', '{{count}} available', {
+        count: visibleConnectors.length,
+      })
+    : t('liveDataMesh.availabilityConnected', '{{enabled}}/{{total}} connected', {
+        enabled: enabledConnectors,
+        total: visibleConnectors.length,
+      });
 
   return (
-    <Card role="region" aria-label="Connected data sources">
+    <Card role="region" aria-label={t('liveDataMesh.regionLabel', 'Connected data sources')}>
       <SectionHeader
-        title={usingFallbackConnectors ? 'Available data sources' : 'Connected data sources'}
+        title={
+          usingFallbackConnectors
+            ? t('liveDataMesh.titleAvailable', 'Available data sources')
+            : t('liveDataMesh.titleConnected', 'Connected data sources')
+        }
         caption={
           usingFallbackConnectors
-            ? 'Sources available after credentials or connector setup'
-            : 'Configured APIs, widgets, and verified data feeds'
+            ? t(
+                'liveDataMesh.captionAvailable',
+                'Sources available after credentials or connector setup',
+              )
+            : t('liveDataMesh.captionConnected', 'Configured APIs, widgets, and verified data feeds')
         }
       />
       <div className="data-mesh">
         <div className="mesh-hero">
           <div>
-            <div className="mesh-kicker">Source availability</div>
+            <div className="mesh-kicker">{t('liveDataMesh.kicker', 'Source availability')}</div>
             <strong>{availabilityLabel}</strong>
           </div>
           <div className="mesh-stat">
             <span>{openConnectors}</span>
-            <small>public sources</small>
+            <small>{t('liveDataMesh.publicSources', 'public sources')}</small>
           </div>
         </div>
 
-        <div className="mesh-connectors" aria-label="Connector status">
+        <div className="mesh-connectors" aria-label={t('liveDataMesh.connectorStatus', 'Connector status')}>
           {visibleConnectors.slice(0, 6).map((connector, index) => (
             <ConnectorPill
               key={connector.id}
@@ -66,15 +80,25 @@ export const LiveDataMeshCard = memo(function LiveDataMeshCard({ cockpit }: Prop
           ))}
         </div>
 
-        <div className="mesh-signals" aria-label="Available source signals">
+        <div
+          className="mesh-signals"
+          aria-label={t('liveDataMesh.signalsLabel', 'Available source signals')}
+        >
           {liveData.isLoading ? (
-            <div className="mesh-empty">Checking configured sources...</div>
+            <div className="mesh-empty">
+              {t('liveDataMesh.loading', 'Checking configured sources...')}
+            </div>
           ) : liveData.isError ? (
             <div className="mesh-empty">
-              Connector registry loaded; source check returned an error.
+              {t(
+                'liveDataMesh.error',
+                'Connector registry loaded; source check returned an error.',
+              )}
             </div>
           ) : signals.length === 0 ? (
-            <div className="mesh-empty">No public signal returned for this account yet.</div>
+            <div className="mesh-empty">
+              {t('liveDataMesh.empty', 'No public signal returned for this account yet.')}
+            </div>
           ) : (
             signals
               .slice(0, 3)
@@ -102,13 +126,17 @@ function ConnectorPill({
   index: number;
   reducedMotion: boolean;
 }) {
+  const { t } = useTranslation('crm');
   return (
     <motion.a
       className="mesh-connector"
       href={connector.docsUrl}
       target="_blank"
       rel="noreferrer"
-      aria-label={`${connector.name} is ${connector.status}`}
+      aria-label={t('liveDataMesh.connectorAria', '{{name}} is {{status}}', {
+        name: connector.name,
+        status: connector.status,
+      })}
       title={connector.message ?? connector.name}
       initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}

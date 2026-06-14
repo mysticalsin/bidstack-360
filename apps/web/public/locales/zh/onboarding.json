@@ -32,9 +32,13 @@
     }
   },
   "quickStart": {
-    "title": "快速开始",
-    "subtitle": "完成以下步骤，充分利用 BidStack 360°",
-    "progress": "已完成 {{done}} / {{total}} 步",
+    "title": "快速入门",
+    "subtitle": "从零开始驾驭你的第一次投标。",
+    "progress": {
+      "count": "已完成 {{completed}} / {{total}}",
+      "percent": "{{percent}}%",
+      "ariaLabel": "入门进度"
+    },
     "steps": {
       "createOpportunity": {
         "label": "创建商机",
@@ -59,7 +63,46 @@
     },
     "completed": "快速开始完成！",
     "completedBody": "您已掌握 BidStack 360° 的基础知识，祝您投标顺利。",
-    "dismiss": "关闭"
+    "dismiss": "关闭",
+    "tourButton": "参加 2 分钟产品导览",
+    "items": {
+      "profile": {
+        "label": "完善你的个人资料",
+        "description": "添加你的姓名、照片和时区，方便同事找到你。"
+      },
+      "template": {
+        "label": "选择一个模板管道",
+        "description": "选择 B2B SaaS、代理、企业或内部销售作为起点。"
+      },
+      "firstLead": {
+        "label": "添加你的第一个潜在客户",
+        "description": "捕获入站兴趣，让 BidStack 自动评分。"
+      },
+      "firstActivity": {
+        "label": "记录你的第一项活动",
+        "description": "为任意联系人记录通话、电子邮件或备注。"
+      },
+      "firstBidNoBid": {
+        "label": "进行你的第一次投标/不投标决策",
+        "description": "在投入前从契合度、价值和胜率为机会评分。"
+      },
+      "firstRfp": {
+        "label": "开始你的第一份 RFP 响应",
+        "description": "创建结构化响应，让智能体起草初稿。"
+      },
+      "firstDeal": {
+        "label": "创建你的第一笔交易",
+        "description": "转化潜在客户或直接将交易添加到管道。"
+      },
+      "inviteTeam": {
+        "label": "邀请你的团队",
+        "description": "整个团队集中在一处协作效果最佳。"
+      }
+    },
+    "complete": {
+      "title": "一切就绪！",
+      "message": "你的工作区已准备好驾驭投标。"
+    }
   },
   "templates": {
     "title": "模板",

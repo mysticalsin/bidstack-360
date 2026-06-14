@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 import { Icon } from '@/components/ui/Icon';
 import { Badge } from '@/components/ui/Badge';
@@ -29,16 +30,8 @@ const TYPE_ICONS: Record<string, string> = {
   note: 'note',
 };
 
-const TYPE_LABELS: Record<string, string> = {
-  opportunity: 'Opportunity',
-  lead: 'Lead',
-  contact: 'Contact',
-  company: 'Company',
-  task: 'Task',
-  note: 'Note',
-};
-
 export function SearchPage() {
+  const { t } = useTranslation('crm');
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') ?? '';
   const activeTab = (searchParams.get('type') as TabKey) ?? 'all';
@@ -46,6 +39,25 @@ export function SearchPage() {
   const inputValue = draft.query === query ? draft.value : query;
 
   const { data, isLoading, isError, error } = useGlobalSearch(query);
+
+  const tabLabels: Record<TabKey, string> = {
+    all: t('search.tab.all', 'All'),
+    opportunity: t('search.tab.opportunity', 'Opportunities'),
+    lead: t('search.tab.lead', 'Leads'),
+    contact: t('search.tab.contact', 'Contacts'),
+    company: t('search.tab.company', 'Companies'),
+    task: t('search.tab.task', 'Tasks'),
+    note: t('search.tab.note', 'Notes'),
+  };
+
+  const typeLabels: Record<string, string> = {
+    opportunity: t('search.type.opportunity', 'Opportunity'),
+    lead: t('search.type.lead', 'Lead'),
+    contact: t('search.type.contact', 'Contact'),
+    company: t('search.type.company', 'Company'),
+    task: t('search.type.task', 'Task'),
+    note: t('search.type.note', 'Note'),
+  };
 
   const filtered = useMemo(() => {
     if (!data?.items) return [];
@@ -75,22 +87,25 @@ export function SearchPage() {
   return (
     <div className="page">
       <div className="max-w-3xl mx-auto w-full">
-        <h1 className="sr-only">Search</h1>
+        <h1 className="sr-only">{t('search.heading', 'Search')}</h1>
         <form
           onSubmit={onSubmit}
           className="relative mb-6"
           role="search"
-          aria-label="Workspace search"
+          aria-label={t('search.form.ariaLabel', 'Workspace search')}
         >
           <div className="flex items-center gap-3 rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] px-4 py-3 shadow-[var(--shadow-sm)] focus-within:ring-2 focus-within:ring-[var(--brand-primary)] focus-within:border-[var(--brand-primary)] transition-all">
             <Icon name="search" size={18} ariaHidden />
             <input
               type="search"
               className="flex-1 bg-transparent text-lg text-[var(--fg-primary)] placeholder:text-[var(--fg-tertiary)] outline-none"
-              placeholder="Search across opportunities, contacts, companies, tasks, notes, and orders…"
+              placeholder={t(
+                'search.input.placeholder',
+                'Search across opportunities, contacts, companies, tasks, notes, and orders…',
+              )}
               value={inputValue}
               onChange={(e) => setDraft({ query, value: e.target.value })}
-              aria-label="Search workspace"
+              aria-label={t('search.input.ariaLabel', 'Search workspace')}
               autoFocus
             />
             {isLoading && (
@@ -115,7 +130,7 @@ export function SearchPage() {
                   )}
                   aria-pressed={activeTab === tab.key}
                 >
-                  {tab.label}
+                  {tabLabels[tab.key]}
                   {counts[tab.key] ? (
                     <span
                       className={cn(
@@ -130,18 +145,26 @@ export function SearchPage() {
               ))}
             </div>
 
-            <section role="region" aria-label="Search results" aria-live="polite">
+            <section
+              role="region"
+              aria-label={t('search.results.ariaLabel', 'Search results')}
+              aria-live="polite"
+            >
               {isError ? (
                 <ErrorState
-                  title="Search failed"
-                  message={error?.message ?? 'Something went wrong'}
+                  title={t('search.error.title', 'Search failed')}
+                  message={error?.message ?? t('search.error.message', 'Something went wrong')}
                 />
               ) : isLoading ? (
                 <SearchSkeleton />
               ) : filtered.length === 0 ? (
                 <EmptyState
-                  title="No results found"
-                  message={`We couldn't find anything matching "${query}". Try different keywords or check your spelling.`}
+                  title={t('search.empty.title', 'No results found')}
+                  message={t(
+                    'search.empty.message',
+                    'We couldn\'t find anything matching "{{query}}". Try different keywords or check your spelling.',
+                    { query },
+                  )}
                 />
               ) : (
                 <motion.div
@@ -151,7 +174,11 @@ export function SearchPage() {
                   className="space-y-1"
                 >
                   <p className="mb-2 text-xs text-[var(--fg-tertiary)]">
-                    {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+                    {filtered.length === 1
+                      ? t('search.results.countOne', '{{count}} result', { count: filtered.length })
+                      : t('search.results.countOther', '{{count}} results', {
+                          count: filtered.length,
+                        })}
                   </p>
                   {filtered.map((item) => (
                     <Link
@@ -167,7 +194,7 @@ export function SearchPage() {
                           <span className="truncate text-sm font-medium text-[var(--fg-primary)]">
                             {item.title}
                           </span>
-                          <Badge tone="gray">{TYPE_LABELS[item.type] ?? item.type}</Badge>
+                          <Badge tone="gray">{typeLabels[item.type] ?? item.type}</Badge>
                         </div>
                         <p className="truncate text-xs text-[var(--fg-secondary)]">
                           {item.subtitle}
@@ -188,10 +215,13 @@ export function SearchPage() {
         )}
 
         {!query && !isLoading && (
-          <section role="region" aria-label="Search guidance">
+          <section role="region" aria-label={t('search.guidance.ariaLabel', 'Search guidance')}>
             <EmptyState
-              title="Search across your workspace"
-              message="Type a keyword above to find opportunities, contacts, companies, tasks, notes, and sales orders."
+              title={t('search.guidance.title', 'Search across your workspace')}
+              message={t(
+                'search.guidance.message',
+                'Type a keyword above to find opportunities, contacts, companies, tasks, notes, and sales orders.',
+              )}
             />
           </section>
         )}

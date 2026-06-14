@@ -1,5 +1,6 @@
 import { useDeferredValue, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -9,26 +10,35 @@ import { useServiceCases } from '@/hooks/useServiceCases';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import type { CasePriority, CaseStatus } from '@bidstack/shared';
 
-const STATUS_OPTIONS: { value: CaseStatus | ''; label: string }[] = [
-  { value: '', label: 'All' },
-  { value: 'new', label: 'New' },
-  { value: 'open', label: 'Open' },
-  { value: 'waiting_customer', label: 'Waiting customer' },
-  { value: 'waiting_internal', label: 'Waiting internal' },
-  { value: 'resolved', label: 'Resolved' },
-  { value: 'closed', label: 'Closed' },
-  { value: 'escalated', label: 'Escalated' },
+const STATUS_OPTIONS: { value: CaseStatus | ''; labelKey: string; labelEn: string }[] = [
+  { value: '', labelKey: 'serviceDesk.statusOption.all', labelEn: 'All' },
+  { value: 'new', labelKey: 'serviceDesk.statusOption.new', labelEn: 'New' },
+  { value: 'open', labelKey: 'serviceDesk.statusOption.open', labelEn: 'Open' },
+  {
+    value: 'waiting_customer',
+    labelKey: 'serviceDesk.statusOption.waitingCustomer',
+    labelEn: 'Waiting customer',
+  },
+  {
+    value: 'waiting_internal',
+    labelKey: 'serviceDesk.statusOption.waitingInternal',
+    labelEn: 'Waiting internal',
+  },
+  { value: 'resolved', labelKey: 'serviceDesk.statusOption.resolved', labelEn: 'Resolved' },
+  { value: 'closed', labelKey: 'serviceDesk.statusOption.closed', labelEn: 'Closed' },
+  { value: 'escalated', labelKey: 'serviceDesk.statusOption.escalated', labelEn: 'Escalated' },
 ];
 
-const PRIORITY_OPTIONS: { value: CasePriority | ''; label: string }[] = [
-  { value: '', label: 'All' },
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
-  { value: 'critical', label: 'Critical' },
+const PRIORITY_OPTIONS: { value: CasePriority | ''; labelKey: string; labelEn: string }[] = [
+  { value: '', labelKey: 'serviceDesk.priorityOption.all', labelEn: 'All' },
+  { value: 'low', labelKey: 'serviceDesk.priorityOption.low', labelEn: 'Low' },
+  { value: 'medium', labelKey: 'serviceDesk.priorityOption.medium', labelEn: 'Medium' },
+  { value: 'high', labelKey: 'serviceDesk.priorityOption.high', labelEn: 'High' },
+  { value: 'critical', labelKey: 'serviceDesk.priorityOption.critical', labelEn: 'Critical' },
 ];
 
 export function ServiceDeskPage() {
+  const { t } = useTranslation('crm');
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
   const [status, setStatus] = useState<CaseStatus | ''>('');
@@ -45,17 +55,17 @@ export function ServiceDeskPage() {
   return (
     <div className="page">
       <div className="page-head">
-        <h1 className="page-title">Service Desk</h1>
+        <h1 className="page-title">{t('serviceDesk.title', 'Service Desk')}</h1>
       </div>
 
       <Card className="mb-4">
         <div className="flex flex-wrap items-center gap-3 p-3">
           <input
             type="text"
-            placeholder="Search cases…"
+            placeholder={t('serviceDesk.searchPlaceholder', 'Search cases…')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            aria-label="Search cases"
+            aria-label={t('serviceDesk.searchAriaLabel', 'Search cases')}
             className="min-w-[200px] flex-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
           />
           <Button
@@ -63,42 +73,42 @@ export function ServiceDeskPage() {
             size="sm"
             onClick={() => {
               const csv = rowsToCsv(items, [
-                { key: 'number', label: 'Case #' },
-                { key: 'subject', label: 'Subject' },
-                { key: 'status', label: 'Status' },
-                { key: 'priority', label: 'Priority' },
-                { key: 'ownerName', label: 'Owner' },
-                { key: 'source', label: 'Source' },
-                { key: 'satisfaction', label: 'Satisfaction' },
-                { key: 'createdAt', label: 'Created' },
-                { key: 'resolvedAt', label: 'Resolved' },
+                { key: 'number', label: t('serviceDesk.csv.caseNumber', 'Case #') },
+                { key: 'subject', label: t('serviceDesk.csv.subject', 'Subject') },
+                { key: 'status', label: t('serviceDesk.csv.status', 'Status') },
+                { key: 'priority', label: t('serviceDesk.csv.priority', 'Priority') },
+                { key: 'ownerName', label: t('serviceDesk.csv.owner', 'Owner') },
+                { key: 'source', label: t('serviceDesk.csv.source', 'Source') },
+                { key: 'satisfaction', label: t('serviceDesk.csv.satisfaction', 'Satisfaction') },
+                { key: 'createdAt', label: t('serviceDesk.csv.created', 'Created') },
+                { key: 'resolvedAt', label: t('serviceDesk.csv.resolved', 'Resolved') },
               ]);
               downloadCsv(`service-desk-${new Date().toISOString().slice(0, 10)}`, csv);
             }}
           >
-            Export CSV
+            {t('serviceDesk.exportCsv', 'Export CSV')}
           </Button>
           <select
-            aria-label="Filter by status"
+            aria-label={t('serviceDesk.filterByStatusAriaLabel', 'Filter by status')}
             value={status}
             onChange={(e) => setStatus(e.target.value as CaseStatus | '')}
             className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
           >
             {STATUS_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
-                {o.label}
+                {t(o.labelKey, o.labelEn)}
               </option>
             ))}
           </select>
           <select
-            aria-label="Filter by priority"
+            aria-label={t('serviceDesk.filterByPriorityAriaLabel', 'Filter by priority')}
             value={priority}
             onChange={(e) => setPriority(e.target.value as CasePriority | '')}
             className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
           >
             {PRIORITY_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
-                {o.label}
+                {t(o.labelKey, o.labelEn)}
               </option>
             ))}
           </select>
@@ -108,20 +118,27 @@ export function ServiceDeskPage() {
       {/* sr-only live region — announces filter result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {!isLoading && data
-          ? `${items.length} case${items.length === 1 ? '' : 's'}${search ? ` matching "${search}"` : ''}${status ? ` · ${status}` : ''}${priority ? ` · ${priority}` : ''}`
+          ? `${
+              items.length === 1
+                ? t('serviceDesk.resultCount.one', '{{count}} case', { count: items.length })
+                : t('serviceDesk.resultCount.other', '{{count}} cases', { count: items.length })
+            }${search ? t('serviceDesk.resultMatching', ' matching "{{search}}"', { search }) : ''}${status ? ` · ${status}` : ''}${priority ? ` · ${priority}` : ''}`
           : ''}
       </p>
 
       {isError ? (
         <ErrorState
-          title="Failed to load cases"
+          title={t('serviceDesk.error.title', 'Failed to load cases')}
           message={error?.message}
-          action={<Button onClick={() => refetch()}>Retry</Button>}
+          action={<Button onClick={() => refetch()}>{t('serviceDesk.retry', 'Retry')}</Button>}
         />
       ) : isLoading ? (
         <TableSkeleton rows={8} />
       ) : items.length === 0 ? (
-        <EmptyState title="No cases yet" message="Service cases will appear here." />
+        <EmptyState
+          title={t('serviceDesk.empty.title', 'No cases yet')}
+          message={t('serviceDesk.empty.message', 'Service cases will appear here.')}
+        />
       ) : (
         <Card>
           <table className="w-full text-left text-sm">
@@ -131,19 +148,19 @@ export function ServiceDeskPage() {
                   #
                 </th>
                 <th scope="col" className="px-4 py-3 font-medium">
-                  Subject
+                  {t('serviceDesk.column.subject', 'Subject')}
                 </th>
                 <th scope="col" className="px-4 py-3 font-medium">
-                  Status
+                  {t('serviceDesk.column.status', 'Status')}
                 </th>
                 <th scope="col" className="px-4 py-3 font-medium">
-                  Priority
+                  {t('serviceDesk.column.priority', 'Priority')}
                 </th>
                 <th scope="col" className="px-4 py-3 font-medium">
-                  Owner
+                  {t('serviceDesk.column.owner', 'Owner')}
                 </th>
                 <th scope="col" className="px-4 py-3 font-medium">
-                  Source
+                  {t('serviceDesk.column.source', 'Source')}
                 </th>
               </tr>
             </thead>

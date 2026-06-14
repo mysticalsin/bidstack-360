@@ -6,6 +6,7 @@
 // to connect one.
 
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/Dialog';
@@ -30,6 +31,7 @@ interface Props {
 }
 
 export function ScheduleReviewDialog({ entityType, entityId, defaultTopic, trigger }: Props) {
+  const { t } = useTranslation('crm');
   const [open, setOpen] = useState(false);
   const schedule = useScheduleCall();
 
@@ -53,7 +55,7 @@ export function ScheduleReviewDialog({ entityType, entityId, defaultTopic, trigg
     e.preventDefault();
     setError(null);
     if (!startsAt) {
-      setError('Pick a date and time');
+      setError(t('scheduleReview.errorPickDateTime', 'Pick a date and time'));
       return;
     }
     const attendeeEmails = attendees
@@ -73,14 +75,20 @@ export function ScheduleReviewDialog({ entityType, entityId, defaultTopic, trigg
       });
       setOpen(false);
       reset();
-      toast.success('Review scheduled', {
-        description: res.joinUrl ? 'Meeting link added to the Calls tab.' : 'Added to the Calls tab.',
+      toast.success(t('scheduleReview.toastScheduledTitle', 'Review scheduled'), {
+        description: res.joinUrl
+          ? t('scheduleReview.toastScheduledWithLink', 'Meeting link added to the Calls tab.')
+          : t('scheduleReview.toastScheduledNoLink', 'Added to the Calls tab.'),
       });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'The server rejected the request.';
+      const msg = err instanceof Error ? err.message : t('scheduleReview.errorServerRejected', 'The server rejected the request.');
       // The provider call fails (503) when no account is connected.
       const friendly = /schedule call via/i.test(msg)
-        ? `Couldn't reach ${PROVIDERS.find((p) => p.value === provider)?.label}. Connect it in Settings → Integrations, or pick another provider.`
+        ? t(
+            'scheduleReview.errorProviderUnreachable',
+            "Couldn't reach {{provider}}. Connect it in Settings → Integrations, or pick another provider.",
+            { provider: PROVIDERS.find((p) => p.value === provider)?.label },
+          )
         : msg;
       setError(friendly);
     }
@@ -97,31 +105,34 @@ export function ScheduleReviewDialog({ entityType, entityId, defaultTopic, trigg
       <DialogTrigger asChild>
         {trigger ?? (
           <button type="button" className="btn btn-secondary">
-            Schedule review
+            {t('scheduleReview.triggerButton', 'Schedule review')}
           </button>
         )}
       </DialogTrigger>
       {open ? (
         <DialogContent
-          title="Schedule a review"
-          description="Create a Go/No-Go or RFP review meeting on a connected calendar."
+          title={t('scheduleReview.dialogTitle', 'Schedule a review')}
+          description={t(
+            'scheduleReview.dialogDescription',
+            'Create a Go/No-Go or RFP review meeting on a connected calendar.',
+          )}
         >
           <form onSubmit={submit} className="space-y-3">
-            <Field label="Topic" htmlFor="rev-topic">
+            <Field label={t('scheduleReview.fieldTopic', 'Topic')} htmlFor="rev-topic">
               <input
                 id="rev-topic"
                 type="text"
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
                 maxLength={200}
-                placeholder="Go/No-Go review"
+                placeholder={t('scheduleReview.placeholderTopic', 'Go/No-Go review')}
                 autoFocus
                 className="dialog-input"
               />
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Provider" htmlFor="rev-provider">
+              <Field label={t('scheduleReview.fieldProvider', 'Provider')} htmlFor="rev-provider">
                 <Select
                   id="rev-provider"
                   value={provider}
@@ -134,7 +145,7 @@ export function ScheduleReviewDialog({ entityType, entityId, defaultTopic, trigg
                   ))}
                 </Select>
               </Field>
-              <Field label="Duration (min)" htmlFor="rev-duration">
+              <Field label={t('scheduleReview.fieldDuration', 'Duration (min)')} htmlFor="rev-duration">
                 <input
                   id="rev-duration"
                   type="number"
@@ -148,7 +159,7 @@ export function ScheduleReviewDialog({ entityType, entityId, defaultTopic, trigg
               </Field>
             </div>
 
-            <Field label="Start" htmlFor="rev-start" required>
+            <Field label={t('scheduleReview.fieldStart', 'Start')} htmlFor="rev-start" required>
               <input
                 id="rev-start"
                 type="datetime-local"
@@ -159,7 +170,10 @@ export function ScheduleReviewDialog({ entityType, entityId, defaultTopic, trigg
               />
             </Field>
 
-            <Field label="Attendees (comma-separated emails)" htmlFor="rev-attendees">
+            <Field
+              label={t('scheduleReview.fieldAttendees', 'Attendees (comma-separated emails)')}
+              htmlFor="rev-attendees"
+            >
               <input
                 id="rev-attendees"
                 type="text"
@@ -184,10 +198,12 @@ export function ScheduleReviewDialog({ entityType, entityId, defaultTopic, trigg
                 onClick={() => setOpen(false)}
                 disabled={schedule.isPending}
               >
-                Cancel
+                {t('scheduleReview.cancel', 'Cancel')}
               </Button>
               <Button type="submit" size="sm" disabled={schedule.isPending}>
-                {schedule.isPending ? 'Scheduling…' : 'Schedule'}
+                {schedule.isPending
+                  ? t('scheduleReview.submitting', 'Scheduling…')
+                  : t('scheduleReview.submit', 'Schedule')}
               </Button>
             </div>
           </form>

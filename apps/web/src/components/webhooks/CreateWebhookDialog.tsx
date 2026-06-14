@@ -1,5 +1,6 @@
 import { WEBHOOK_EVENT_GROUPS } from '@bidstack/shared';
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -24,6 +25,7 @@ export function CreateWebhookDialog({
   onSubmit: (body: { url: string; events: string[] }) => void;
   isPending: boolean;
 }) {
+  const { t } = useTranslation('crm');
   const [url, setUrl] = useState(initialUrl);
   const [selected, setSelected] = useState<string[]>(initialEvents);
   const selectedSet = useMemo(() => new Set(selected), [selected]);
@@ -50,21 +52,26 @@ export function CreateWebhookDialog({
         <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-[var(--border-subtle)] bg-[var(--surface-card)] px-6 py-4">
           <div>
             <Badge tone="purple" className="mb-2">
-              Admin only
+              {t('createWebhook.adminOnlyBadge', 'Admin only')}
             </Badge>
             <h2
               id="webhook-dialog-title"
               className="text-lg font-semibold text-[var(--fg-primary)]"
             >
-              {isEditing ? 'Edit webhook subscription' : 'New webhook subscription'}
+              {isEditing
+                ? t('createWebhook.editTitle', 'Edit webhook subscription')
+                : t('createWebhook.createTitle', 'New webhook subscription')}
             </h2>
             <p className="mt-1 text-xs text-[var(--fg-secondary)]">
-              Use a production HTTPS endpoint. BidStack signs every delivery with HMAC-SHA256.
+              {t(
+                'createWebhook.subtitle',
+                'Use a production HTTPS endpoint. BidStack signs every delivery with HMAC-SHA256.',
+              )}
             </p>
           </div>
           <button
             type="button"
-            aria-label="Close"
+            aria-label={t('createWebhook.closeAriaLabel', 'Close')}
             onClick={onClose}
             className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
           >
@@ -79,20 +86,27 @@ export function CreateWebhookDialog({
                 htmlFor="webhook-url"
                 className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
               >
-                Endpoint URL <span className="text-[var(--error-fg)]">*</span>
+                {t('createWebhook.endpointUrlLabel', 'Endpoint URL')}{' '}
+                <span className="text-[var(--error-fg)]">*</span>
               </label>
               <input
                 id="webhook-url"
                 type="url"
                 value={url}
                 onChange={(event) => setUrl(event.target.value)}
-                placeholder="https://your-app.com/webhooks/bidstack"
+                placeholder={t(
+                  'createWebhook.endpointUrlPlaceholder',
+                  'https://your-app.com/webhooks/bidstack',
+                )}
                 required
                 autoFocus
                 className="w-full rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] px-3 py-3 text-sm text-[var(--fg-primary)] outline-none transition-colors focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
               />
               <p className="mt-2 text-xs text-[var(--fg-tertiary)]">
-                HTTPS is required. Localhost, private IPs, and internal hostnames are rejected.
+                {t(
+                  'createWebhook.endpointUrlHelp',
+                  'HTTPS is required. Localhost, private IPs, and internal hostnames are rejected.',
+                )}
               </p>
             </div>
 
@@ -100,18 +114,22 @@ export function CreateWebhookDialog({
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <label className="text-xs font-medium text-[var(--fg-secondary)]">
-                    Events <span className="text-[var(--error-fg)]">*</span>
+                    {t('createWebhook.eventsLabel', 'Events')}{' '}
+                    <span className="text-[var(--error-fg)]">*</span>
                   </label>
                   <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
-                    Choose only the events your receiver actually handles.
+                    {t(
+                      'createWebhook.eventsHelp',
+                      'Choose only the events your receiver actually handles.',
+                    )}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button type="button" variant="ghost" size="sm" onClick={selectAll}>
-                    Select all
+                    {t('createWebhook.selectAll', 'Select all')}
                   </Button>
                   <Button type="button" variant="ghost" size="sm" onClick={clearAll}>
-                    Clear
+                    {t('createWebhook.clear', 'Clear')}
                   </Button>
                 </div>
               </div>
@@ -172,44 +190,55 @@ export function CreateWebhookDialog({
             <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-4">
               <div className="flex items-center gap-2 text-sm font-semibold text-[var(--fg-primary)]">
                 <Icon name="shield" size={16} />
-                Security contract
+                {t('createWebhook.securityContractTitle', 'Security contract')}
               </div>
               <ul className="mt-3 space-y-2 text-xs leading-5 text-[var(--fg-secondary)]">
-                <li>Return a 2xx status within 10 seconds.</li>
-                <li>Verify the X-BidStack-Signature header.</li>
-                <li>Reject signatures older than 5 minutes.</li>
-                <li>Process heavy work asynchronously after acknowledging.</li>
+                <li>{t('createWebhook.securityReturn2xx', 'Return a 2xx status within 10 seconds.')}</li>
+                <li>
+                  {t('createWebhook.securityVerifyHeader', 'Verify the X-BidStack-Signature header.')}
+                </li>
+                <li>
+                  {t('createWebhook.securityRejectOld', 'Reject signatures older than 5 minutes.')}
+                </li>
+                <li>
+                  {t(
+                    'createWebhook.securityAsync',
+                    'Process heavy work asynchronously after acknowledging.',
+                  )}
+                </li>
               </ul>
             </div>
             <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-4">
               <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-                Selected events
+                {t('createWebhook.selectedEventsLabel', 'Selected events')}
               </div>
               <div className="mt-2 text-2xl font-semibold tabular-nums text-[var(--fg-primary)]">
                 {selected.length}
               </div>
               <p className="mt-1 text-xs text-[var(--fg-secondary)]">
                 {selected.length === 0
-                  ? 'Pick at least one event.'
+                  ? t('createWebhook.selectedNone', 'Pick at least one event.')
                   : selected.length === 1
-                    ? 'One event will be delivered.'
-                    : `${selected.length} events will be delivered.`}
+                    ? t('createWebhook.selectedOne', 'One event will be delivered.')
+                    : t('createWebhook.selectedMany', '{{count}} events will be delivered.', {
+                        count: selected.length,
+                      })}
               </p>
             </div>
           </aside>
 
           <div className="flex justify-end gap-3 border-t border-[var(--border-subtle)] pt-4 lg:col-span-2">
             <Button type="button" variant="secondary" onClick={onClose}>
-              Cancel
+              {t('createWebhook.cancel', 'Cancel')}
             </Button>
             <Button type="submit" disabled={isPending || !url.trim() || selected.length === 0}>
               {isPending
                 ? isEditing
-                  ? 'Saving...'
-                  : 'Creating...'
+                  ? t('createWebhook.saving', 'Saving...')
+                  : t('createWebhook.creating', 'Creating...')
                 : isEditing
-                  ? 'Save subscription'
-                  : 'Create subscription'}
+                  ? t('createWebhook.saveSubscription', 'Save subscription')
+                  : t('createWebhook.createSubscription', 'Create subscription')}
             </Button>
           </div>
         </form>

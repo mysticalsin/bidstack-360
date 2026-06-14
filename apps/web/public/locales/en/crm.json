@@ -2209,5 +2209,304 @@
     "metricPipeline": "pipeline",
     "metricOpenDeals": "open deals",
     "metricContacts": "contacts"
+  },
+  "companyTabs": {
+    "contacts": {
+      "emptyTitle": "No contacts yet",
+      "emptyMessage": "Add contacts from the Contacts page.",
+      "colName": "Name",
+      "colRole": "Role",
+      "colEmail": "Email",
+      "colPhone": "Phone"
+    },
+    "opportunities": {
+      "emptyTitle": "No opportunities yet",
+      "emptyMessage": "Create opportunities linked to this company.",
+      "colCode": "Code",
+      "colName": "Name",
+      "colStage": "Stage",
+      "colValue": "Value",
+      "colProbability": "Probability"
+    },
+    "cases": {
+      "emptyTitle": "No open cases",
+      "emptyMessage": "All clear — no active support cases.",
+      "colNumber": "Number",
+      "colSubject": "Subject",
+      "colStatus": "Status",
+      "colPriority": "Priority"
+    },
+    "notes": {
+      "emptyTitle": "No notes yet",
+      "emptyMessage": "Notes linked to this company will appear here.",
+      "byAuthor": "by {{author}}"
+    },
+    "hierarchy": {
+      "directChildren": "Direct Children",
+      "errorTitle": "Couldn't load hierarchy",
+      "errorMessage": "Unable to fetch account hierarchy."
+    }
+  },
+  "oppInlineEditCells": {
+    "unknownStage": "Unknown",
+    "stageTriggerAria": "Stage: {{stage}}. Click to change.",
+    "numberTriggerAria": "{{value}}. Click to edit.",
+    "dateTriggerAria": "Due {{date}}. Click to edit."
+  },
+  "liveDataMesh": {
+    "availabilityAvailable": "{{count}} available",
+    "availabilityConnected": "{{enabled}}/{{total}} connected",
+    "regionLabel": "Connected data sources",
+    "titleAvailable": "Available data sources",
+    "titleConnected": "Connected data sources",
+    "captionAvailable": "Sources available after credentials or connector setup",
+    "captionConnected": "Configured APIs, widgets, and verified data feeds",
+    "kicker": "Source availability",
+    "publicSources": "public sources",
+    "connectorStatus": "Connector status",
+    "signalsLabel": "Available source signals",
+    "loading": "Checking configured sources...",
+    "error": "Connector registry loaded; source check returned an error.",
+    "empty": "No public signal returned for this account yet.",
+    "connectorAria": "{{name}} is {{status}}"
+  },
+  "serviceDesk": {
+    "title": "Service Desk",
+    "searchPlaceholder": "Search cases…",
+    "searchAriaLabel": "Search cases",
+    "exportCsv": "Export CSV",
+    "filterByStatusAriaLabel": "Filter by status",
+    "filterByPriorityAriaLabel": "Filter by priority",
+    "statusOption": {
+      "all": "All",
+      "new": "New",
+      "open": "Open",
+      "waitingCustomer": "Waiting customer",
+      "waitingInternal": "Waiting internal",
+      "resolved": "Resolved",
+      "closed": "Closed",
+      "escalated": "Escalated"
+    },
+    "priorityOption": {
+      "all": "All",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "critical": "Critical"
+    },
+    "csv": {
+      "caseNumber": "Case #",
+      "subject": "Subject",
+      "status": "Status",
+      "priority": "Priority",
+      "owner": "Owner",
+      "source": "Source",
+      "satisfaction": "Satisfaction",
+      "created": "Created",
+      "resolved": "Resolved"
+    },
+    "error": {
+      "title": "Failed to load cases"
+    },
+    "retry": "Retry",
+    "empty": {
+      "title": "No cases yet",
+      "message": "Service cases will appear here."
+    },
+    "column": {
+      "subject": "Subject",
+      "status": "Status",
+      "priority": "Priority",
+      "owner": "Owner",
+      "source": "Source"
+    },
+    "resultCount": {
+      "one": "{{count}} case",
+      "other": "{{count}} cases"
+    },
+    "resultMatching": " matching \"{{search}}\""
+  },
+  "widgetConfig": {
+    "title": "Configure Widget",
+    "closeAriaLabel": "Close",
+    "titleLabel": "Title",
+    "titlePlaceholder": "Widget title",
+    "dataSourceLabel": "Data source (report)",
+    "dataSourceNone": "— None (static demo) —",
+    "chartTypeLabel": "Chart type",
+    "type": {
+      "kpi": {
+        "label": "KPI Card",
+        "description": "Single metric with trend"
+      },
+      "line": {
+        "label": "Line Chart",
+        "description": "Trend over time"
+      },
+      "bar": {
+        "label": "Bar Chart",
+        "description": "Compare categories"
+      },
+      "area": {
+        "label": "Area Chart",
+        "description": "Volume over time"
+      },
+      "pie": {
+        "label": "Pie Chart",
+        "description": "Distribution (≤6 slices)"
+      },
+      "donut": {
+        "label": "Donut Chart",
+        "description": "Distribution with center value"
+      },
+      "funnel": {
+        "label": "Funnel",
+        "description": "Pipeline stage drop-off"
+      },
+      "gauge": {
+        "label": "Gauge",
+        "description": "Progress toward target"
+      },
+      "table": {
+        "label": "Table",
+        "description": "Tabular data grid"
+      },
+      "scatter": {
+        "label": "Scatter",
+        "description": "Correlation between two metrics"
+      },
+      "radar": {
+        "label": "Radar",
+        "description": "Multi-dimensional comparison"
+      },
+      "heatmap": {
+        "label": "Heatmap",
+        "description": "Activity density over time"
+      }
+    },
+    "xAxisLabel": "X-axis field",
+    "yAxisLabel": "Y-axis field",
+    "cancel": "Cancel",
+    "save": "Save widget"
+  },
+  "auditLogInsights": {
+    "activityCadenceTitle": "Activity cadence",
+    "activityCadenceSubtitle": "Real event volume from the currently loaded evidence page.",
+    "attentionEventsBadge": "{{percent}}% attention events",
+    "eventVolumeChartLabel": "Audit event volume chart",
+    "bucketTooltip": "{{label}}: {{count}} events",
+    "forensicWatchlistTitle": "Forensic watchlist",
+    "forensicWatchlistSubtitle": "Fast triage from the loaded evidence set.",
+    "topActorLabel": "Top actor",
+    "hottestTargetLabel": "Hottest target",
+    "reviewQueueLabel": "Review queue",
+    "noneValue": "None",
+    "eventsCount": "{{count}} events",
+    "noLoadedEvents": "No loaded events",
+    "attentionEventsValue": "{{count}} attention events",
+    "reviewQueueDetail": "{{destructive}} destructive, {{security}} security/API",
+    "evidenceQualityTitle": "Evidence quality",
+    "evidenceQualitySubtitle": "Coverage signals that make audits defensible.",
+    "scoreOutOf": "{{score}}/100",
+    "structuredDiffsLabel": "Structured diffs",
+    "eventsRatioDetail": "{{count}}/{{total}} events",
+    "targetReferencesLabel": "Target references",
+    "linkedRatioDetail": "{{count}}/{{total}} linked",
+    "actorAttributionLabel": "Actor attribution",
+    "attributedRatioDetail": "{{count}}/{{total}} attributed",
+    "healthRowProgressLabel": "{{label}}: {{value}}%"
+  },
+  "scheduleReview": {
+    "errorPickDateTime": "Pick a date and time",
+    "toastScheduledTitle": "Review scheduled",
+    "toastScheduledWithLink": "Meeting link added to the Calls tab.",
+    "toastScheduledNoLink": "Added to the Calls tab.",
+    "errorServerRejected": "The server rejected the request.",
+    "errorProviderUnreachable": "Couldn't reach {{provider}}. Connect it in Settings → Integrations, or pick another provider.",
+    "triggerButton": "Schedule review",
+    "dialogTitle": "Schedule a review",
+    "dialogDescription": "Create a Go/No-Go or RFP review meeting on a connected calendar.",
+    "fieldTopic": "Topic",
+    "placeholderTopic": "Go/No-Go review",
+    "fieldProvider": "Provider",
+    "fieldDuration": "Duration (min)",
+    "fieldStart": "Start",
+    "fieldAttendees": "Attendees (comma-separated emails)",
+    "cancel": "Cancel",
+    "submitting": "Scheduling…",
+    "submit": "Schedule"
+  },
+  "search": {
+    "heading": "Search",
+    "form": {
+      "ariaLabel": "Workspace search"
+    },
+    "input": {
+      "placeholder": "Search across opportunities, contacts, companies, tasks, notes, and orders…",
+      "ariaLabel": "Search workspace"
+    },
+    "tab": {
+      "all": "All",
+      "opportunity": "Opportunities",
+      "lead": "Leads",
+      "contact": "Contacts",
+      "company": "Companies",
+      "task": "Tasks",
+      "note": "Notes"
+    },
+    "type": {
+      "opportunity": "Opportunity",
+      "lead": "Lead",
+      "contact": "Contact",
+      "company": "Company",
+      "task": "Task",
+      "note": "Note"
+    },
+    "results": {
+      "ariaLabel": "Search results",
+      "countOne": "{{count}} result",
+      "countOther": "{{count}} results"
+    },
+    "error": {
+      "title": "Search failed",
+      "message": "Something went wrong"
+    },
+    "empty": {
+      "title": "No results found",
+      "message": "We couldn't find anything matching \"{{query}}\". Try different keywords or check your spelling."
+    },
+    "guidance": {
+      "ariaLabel": "Search guidance",
+      "title": "Search across your workspace",
+      "message": "Type a keyword above to find opportunities, contacts, companies, tasks, notes, and sales orders."
+    }
+  },
+  "createWebhook": {
+    "adminOnlyBadge": "Admin only",
+    "editTitle": "Edit webhook subscription",
+    "createTitle": "New webhook subscription",
+    "subtitle": "Use a production HTTPS endpoint. BidStack signs every delivery with HMAC-SHA256.",
+    "closeAriaLabel": "Close",
+    "endpointUrlLabel": "Endpoint URL",
+    "endpointUrlPlaceholder": "https://your-app.com/webhooks/bidstack",
+    "endpointUrlHelp": "HTTPS is required. Localhost, private IPs, and internal hostnames are rejected.",
+    "eventsLabel": "Events",
+    "eventsHelp": "Choose only the events your receiver actually handles.",
+    "selectAll": "Select all",
+    "clear": "Clear",
+    "securityContractTitle": "Security contract",
+    "securityReturn2xx": "Return a 2xx status within 10 seconds.",
+    "securityVerifyHeader": "Verify the X-BidStack-Signature header.",
+    "securityRejectOld": "Reject signatures older than 5 minutes.",
+    "securityAsync": "Process heavy work asynchronously after acknowledging.",
+    "selectedEventsLabel": "Selected events",
+    "selectedNone": "Pick at least one event.",
+    "selectedOne": "One event will be delivered.",
+    "selectedMany": "{{count}} events will be delivered.",
+    "cancel": "Cancel",
+    "saving": "Saving...",
+    "creating": "Creating...",
+    "saveSubscription": "Save subscription",
+    "createSubscription": "Create subscription"
   }
 }

@@ -33,8 +33,12 @@
   },
   "quickStart": {
     "title": "Inicio rápido",
-    "subtitle": "Completa estos pasos para sacar el máximo partido a BidStack 360°",
-    "progress": "{{done}} de {{total}} pasos completados",
+    "subtitle": "Pasa de cero a pilotar tu primera licitación.",
+    "progress": {
+      "count": "{{completed}} de {{total}} completados",
+      "percent": "{{percent}}%",
+      "ariaLabel": "Progreso de incorporación"
+    },
     "steps": {
       "createOpportunity": {
         "label": "Crear una oportunidad",
@@ -59,7 +63,46 @@
     },
     "completed": "¡Inicio rápido completado!",
     "completedBody": "Ya dominas lo esencial de BidStack 360°. Mucha suerte con tus licitaciones.",
-    "dismiss": "Ocultar"
+    "dismiss": "Ocultar",
+    "tourButton": "Haz el recorrido del producto de 2 minutos",
+    "items": {
+      "profile": {
+        "label": "Completa tu perfil",
+        "description": "Añade tu nombre, foto y zona horaria para que tus compañeros te encuentren."
+      },
+      "template": {
+        "label": "Elige una plantilla de pipeline",
+        "description": "Elige B2B SaaS, Agencia, Empresa o Ventas internas como punto de partida."
+      },
+      "firstLead": {
+        "label": "Añade tu primer prospecto",
+        "description": "Captura el interés entrante y deja que BidStack lo puntúe automáticamente."
+      },
+      "firstActivity": {
+        "label": "Registra tu primera actividad",
+        "description": "Registra una llamada, un correo o una nota en cualquier contacto."
+      },
+      "firstBidNoBid": {
+        "label": "Ejecuta tu primer pujar/no pujar",
+        "description": "Puntúa una oportunidad según ajuste, valor y probabilidad de ganar antes de comprometerte."
+      },
+      "firstRfp": {
+        "label": "Inicia tu primera respuesta a RFP",
+        "description": "Crea una respuesta estructurada y deja que los agentes redacten el primer borrador."
+      },
+      "firstDeal": {
+        "label": "Crea tu primer trato",
+        "description": "Convierte un prospecto o añade un trato directamente al pipeline."
+      },
+      "inviteTeam": {
+        "label": "Invita a tu equipo",
+        "description": "La colaboración funciona mejor con todo el equipo en un solo lugar."
+      }
+    },
+    "complete": {
+      "title": "¡Todo listo!",
+      "message": "Tu espacio de trabajo está listo para pilotar licitaciones."
+    }
   },
   "sampleData": {
     "banner": "Estás viendo datos de demostración.",

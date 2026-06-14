@@ -4,6 +4,7 @@
 // Progress bar reflects completedChecklist from the onboarding store.
 
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
@@ -21,6 +22,7 @@ interface ChecklistItemDef {
 
 export function QuickStartPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation('onboarding');
   const { completedChecklist, markChecklistItem, skipToStep, startTour, tourActive, openTemplatePicker } =
     useOnboardingStore();
 
@@ -45,51 +47,75 @@ export function QuickStartPage() {
   const ITEMS: ChecklistItemDef[] = [
     {
       key: 'profile',
-      label: 'Complete your profile',
-      description: 'Add your name, photo, and timezone so teammates can find you.',
+      label: t('quickStart.items.profile.label', 'Complete your profile'),
+      description: t(
+        'quickStart.items.profile.description',
+        'Add your name, photo, and timezone so teammates can find you.',
+      ),
       action: () => navigate('/settings'),
     },
     {
       key: 'template',
-      label: 'Pick a template pipeline',
-      description: 'Choose B2B SaaS, Agency, Enterprise, or Inside Sales as a starting point.',
+      label: t('quickStart.items.template.label', 'Pick a template pipeline'),
+      description: t(
+        'quickStart.items.template.description',
+        'Choose B2B SaaS, Agency, Enterprise, or Inside Sales as a starting point.',
+      ),
       action: () => openTemplatePicker(),
     },
     {
       key: 'first_lead',
-      label: 'Add your first lead',
-      description: 'Capture inbound interest and let BidStack score it automatically.',
+      label: t('quickStart.items.firstLead.label', 'Add your first lead'),
+      description: t(
+        'quickStart.items.firstLead.description',
+        'Capture inbound interest and let BidStack score it automatically.',
+      ),
       action: () => launchTourAt(TOUR_STEPS.findIndex((s) => s.id === 'add-lead')),
     },
     {
       key: 'first_activity',
-      label: 'Log your first activity',
-      description: 'Record a call, email, or note against any contact.',
+      label: t('quickStart.items.firstActivity.label', 'Log your first activity'),
+      description: t(
+        'quickStart.items.firstActivity.description',
+        'Record a call, email, or note against any contact.',
+      ),
       action: () => launchTourAt(TOUR_STEPS.findIndex((s) => s.id === 'activity-timeline')),
     },
     {
       // key is a stable legacy id; the step now frames the actual product job.
       key: 'first_email',
-      label: 'Run your first bid/no-bid',
-      description: 'Score an opportunity on fit, value, and win probability before you commit.',
+      label: t('quickStart.items.firstBidNoBid.label', 'Run your first bid/no-bid'),
+      description: t(
+        'quickStart.items.firstBidNoBid.description',
+        'Score an opportunity on fit, value, and win probability before you commit.',
+      ),
       action: () => navigate('/bid-matrix'),
     },
     {
       key: 'connect_email',
-      label: 'Start your first RFP response',
-      description: 'Spin up a structured response and let the agents draft the first pass.',
+      label: t('quickStart.items.firstRfp.label', 'Start your first RFP response'),
+      description: t(
+        'quickStart.items.firstRfp.description',
+        'Spin up a structured response and let the agents draft the first pass.',
+      ),
       action: () => navigate('/proposals'),
     },
     {
       key: 'first_deal',
-      label: 'Create your first deal',
-      description: 'Convert a lead or add a deal directly to the pipeline.',
+      label: t('quickStart.items.firstDeal.label', 'Create your first deal'),
+      description: t(
+        'quickStart.items.firstDeal.description',
+        'Convert a lead or add a deal directly to the pipeline.',
+      ),
       action: () => launchTourAt(TOUR_STEPS.findIndex((s) => s.id === 'pipeline-kanban')),
     },
     {
       key: 'invite_team',
-      label: 'Invite your team',
-      description: 'Collaboration works best with the whole team in one place.',
+      label: t('quickStart.items.inviteTeam.label', 'Invite your team'),
+      description: t(
+        'quickStart.items.inviteTeam.description',
+        'Collaboration works best with the whole team in one place.',
+      ),
       action: () => navigate('/settings'),
     },
   ];
@@ -101,9 +127,9 @@ export function QuickStartPage() {
     <div className="mx-auto max-w-2xl px-4 py-10">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-[var(--fg-primary)]">Quick Start</h1>
+        <h1 className="text-2xl font-bold text-[var(--fg-primary)]">{t('quickStart.title', 'Quick Start')}</h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          Get from zero to piloting your first bid.
+          {t('quickStart.subtitle', 'Get from zero to piloting your first bid.')}
         </p>
       </div>
 
@@ -111,9 +137,12 @@ export function QuickStartPage() {
       <div className="mb-8">
         <div className="mb-1.5 flex items-center justify-between text-xs text-[var(--fg-secondary)]">
           <span>
-            {completedCount} of {ITEMS.length} complete
+            {t('quickStart.progress.count', '{{completed}} of {{total}} complete', {
+              completed: completedCount,
+              total: ITEMS.length,
+            })}
           </span>
-          <span>{progressPct}%</span>
+          <span>{t('quickStart.progress.percent', '{{percent}}%', { percent: progressPct })}</span>
         </div>
         <div className="h-2 overflow-hidden rounded-full bg-[var(--surface-sunken)]">
           <div
@@ -123,7 +152,7 @@ export function QuickStartPage() {
             aria-valuenow={progressPct}
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-label="Onboarding progress"
+            aria-label={t('quickStart.progress.ariaLabel', 'Onboarding progress')}
           />
         </div>
       </div>
@@ -136,7 +165,7 @@ export function QuickStartPage() {
           className="mb-8 inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[var(--brand)] px-4 py-3 text-sm font-medium text-[var(--brand)] transition-colors hover:bg-[var(--brand)]/8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
         >
           <Icon name="play" size={16} />
-          Take the 2-minute product tour
+          {t('quickStart.tourButton', 'Take the 2-minute product tour')}
         </button>
       )}
 
@@ -216,9 +245,9 @@ export function QuickStartPage() {
             className="mx-auto mb-2 text-[var(--brand)]"
             ariaHidden
           />
-          <p className="font-semibold text-[var(--fg-primary)]">You&apos;re all set!</p>
+          <p className="font-semibold text-[var(--fg-primary)]">{t('quickStart.complete.title', "You're all set!")}</p>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            Your workspace is ready to pilot bids.
+            {t('quickStart.complete.message', 'Your workspace is ready to pilot bids.')}
           </p>
         </div>
       )}

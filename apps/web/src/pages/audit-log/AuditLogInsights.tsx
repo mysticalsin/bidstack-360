@@ -7,6 +7,7 @@
  * a visual unit that sits between the hero and the filter bar.
  */
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { AuditLogEntry } from '@bidstack/shared';
 
@@ -28,6 +29,7 @@ import {
 // ─── AuditInsightStrip ────────────────────────────────────────────────────────
 
 export function AuditInsightStrip({ rows }: { rows: AuditLogEntry[] }) {
+  const { t } = useTranslation('crm');
   const buckets = useMemo(() => buildActivityBuckets(rows), [rows]);
   const stats = useMemo(() => buildStats(rows), [rows]);
   const evidenceHealth = useMemo(() => buildEvidenceHealth(rows), [rows]);
@@ -45,16 +47,26 @@ export function AuditInsightStrip({ rows }: { rows: AuditLogEntry[] }) {
       <Card className="border-[var(--border-subtle)] bg-[var(--surface-primary)] p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-base font-semibold text-[var(--text-primary)]">Activity cadence</h2>
+            <h2 className="text-base font-semibold text-[var(--text-primary)]">
+              {t('auditLogInsights.activityCadenceTitle', 'Activity cadence')}
+            </h2>
             <p className="mt-1 text-sm text-[var(--text-muted)]">
-              Real event volume from the currently loaded evidence page.
+              {t(
+                'auditLogInsights.activityCadenceSubtitle',
+                'Real event volume from the currently loaded evidence page.',
+              )}
             </p>
           </div>
           <Badge tone={riskRatio >= 25 ? 'tomato' : riskRatio >= 10 ? 'amber' : 'jade'}>
-            {riskRatio}% attention events
+            {t('auditLogInsights.attentionEventsBadge', '{{percent}}% attention events', {
+              percent: riskRatio,
+            })}
           </Badge>
         </div>
-        <div className="mt-5 flex h-28 items-end gap-1.5" aria-label="Audit event volume chart">
+        <div
+          className="mt-5 flex h-28 items-end gap-1.5"
+          aria-label={t('auditLogInsights.eventVolumeChartLabel', 'Audit event volume chart')}
+        >
           {buckets.map((bucket) => {
             const height =
               bucket.count === 0 ? 8 : Math.max(14, Math.round((bucket.count / maxBucket) * 100));
@@ -71,7 +83,10 @@ export function AuditInsightStrip({ rows }: { rows: AuditLogEntry[] }) {
                           : 'bg-[var(--accent-primary)]/70',
                     )}
                     style={{ height: `${height}%` }}
-                    title={`${bucket.label}: ${bucket.count} events`}
+                    title={t('auditLogInsights.bucketTooltip', '{{label}}: {{count}} events', {
+                      label: bucket.label,
+                      count: bucket.count,
+                    })}
                   />
                 </div>
                 <span className="max-w-full truncate text-[10px] font-medium text-[var(--text-muted)]">
@@ -87,10 +102,10 @@ export function AuditInsightStrip({ rows }: { rows: AuditLogEntry[] }) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold text-[var(--text-primary)]">
-              Forensic watchlist
+              {t('auditLogInsights.forensicWatchlistTitle', 'Forensic watchlist')}
             </h2>
             <p className="mt-1 text-sm text-[var(--text-muted)]">
-              Fast triage from the loaded evidence set.
+              {t('auditLogInsights.forensicWatchlistSubtitle', 'Fast triage from the loaded evidence set.')}
             </p>
           </div>
           <span className="grid size-9 place-items-center rounded-2xl bg-[var(--surface-secondary)] text-[var(--text-secondary)]">
@@ -99,19 +114,33 @@ export function AuditInsightStrip({ rows }: { rows: AuditLogEntry[] }) {
         </div>
         <div className="mt-4 grid gap-3">
           <AuditWatchItem
-            label="Top actor"
-            value={topActor?.value ?? 'None'}
-            detail={topActor ? `${topActor.count} events` : 'No loaded events'}
+            label={t('auditLogInsights.topActorLabel', 'Top actor')}
+            value={topActor?.value ?? t('auditLogInsights.noneValue', 'None')}
+            detail={
+              topActor
+                ? t('auditLogInsights.eventsCount', '{{count}} events', { count: topActor.count })
+                : t('auditLogInsights.noLoadedEvents', 'No loaded events')
+            }
           />
           <AuditWatchItem
-            label="Hottest target"
-            value={humanizeKey(topTarget?.value ?? 'None')}
-            detail={topTarget ? `${topTarget.count} events` : 'No loaded events'}
+            label={t('auditLogInsights.hottestTargetLabel', 'Hottest target')}
+            value={humanizeKey(topTarget?.value ?? t('auditLogInsights.noneValue', 'None'))}
+            detail={
+              topTarget
+                ? t('auditLogInsights.eventsCount', '{{count}} events', { count: topTarget.count })
+                : t('auditLogInsights.noLoadedEvents', 'No loaded events')
+            }
           />
           <AuditWatchItem
-            label="Review queue"
-            value={`${riskTotal} attention events`}
-            detail={`${stats.destructive} destructive, ${stats.security} security/API`}
+            label={t('auditLogInsights.reviewQueueLabel', 'Review queue')}
+            value={t('auditLogInsights.attentionEventsValue', '{{count}} attention events', {
+              count: riskTotal,
+            })}
+            detail={t(
+              'auditLogInsights.reviewQueueDetail',
+              '{{destructive}} destructive, {{security}} security/API',
+              { destructive: stats.destructive, security: stats.security },
+            )}
           />
         </div>
       </Card>
@@ -124,34 +153,46 @@ export function AuditInsightStrip({ rows }: { rows: AuditLogEntry[] }) {
 // ─── EvidenceHealthCard ───────────────────────────────────────────────────────
 
 function EvidenceHealthCard({ health }: { health: EvidenceHealth }) {
+  const { t } = useTranslation('crm');
   return (
     <Card className="border-[var(--border-subtle)] bg-[var(--surface-primary)] p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-[var(--text-primary)]">Evidence quality</h2>
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">
+            {t('auditLogInsights.evidenceQualityTitle', 'Evidence quality')}
+          </h2>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Coverage signals that make audits defensible.
+            {t('auditLogInsights.evidenceQualitySubtitle', 'Coverage signals that make audits defensible.')}
           </p>
         </div>
         <Badge tone={health.score >= 85 ? 'jade' : health.score >= 65 ? 'amber' : 'tomato'}>
-          {health.score}/100
+          {t('auditLogInsights.scoreOutOf', '{{score}}/100', { score: health.score })}
         </Badge>
       </div>
       <div className="mt-4 grid gap-3">
         <EvidenceHealthRow
-          label="Structured diffs"
+          label={t('auditLogInsights.structuredDiffsLabel', 'Structured diffs')}
           value={health.diffPct}
-          detail={`${health.withDiff}/${health.total} events`}
+          detail={t('auditLogInsights.eventsRatioDetail', '{{count}}/{{total}} events', {
+            count: health.withDiff,
+            total: health.total,
+          })}
         />
         <EvidenceHealthRow
-          label="Target references"
+          label={t('auditLogInsights.targetReferencesLabel', 'Target references')}
           value={health.targetPct}
-          detail={`${health.withTarget}/${health.total} linked`}
+          detail={t('auditLogInsights.linkedRatioDetail', '{{count}}/{{total}} linked', {
+            count: health.withTarget,
+            total: health.total,
+          })}
         />
         <EvidenceHealthRow
-          label="Actor attribution"
+          label={t('auditLogInsights.actorAttributionLabel', 'Actor attribution')}
           value={health.actorPct}
-          detail={`${health.withActor}/${health.total} attributed`}
+          detail={t('auditLogInsights.attributedRatioDetail', '{{count}}/{{total}} attributed', {
+            count: health.withActor,
+            total: health.total,
+          })}
         />
       </div>
     </Card>
@@ -169,6 +210,7 @@ function EvidenceHealthRow({
   value: number;
   detail: string;
 }) {
+  const { t } = useTranslation('crm');
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between gap-3">
@@ -183,7 +225,10 @@ function EvidenceHealthRow({
         aria-valuenow={value}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label={`${label}: ${value}%`}
+        aria-label={t('auditLogInsights.healthRowProgressLabel', '{{label}}: {{value}}%', {
+          label,
+          value,
+        })}
       >
         <div
           className="h-full rounded-full bg-[var(--accent-primary)] transition-[width] duration-500"

@@ -5,6 +5,7 @@
  */
 import { motion } from 'framer-motion';
 import { useState, type ChangeEvent, type FocusEvent, type KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge, stageTone } from '@/components/ui/Badge';
 import { cn } from '@/lib/cn';
@@ -25,8 +26,10 @@ export function StageCell({
   /** True while the PATCH for this field is in flight (P1 #22). */
   isSaving?: boolean;
 }) {
+  const { t } = useTranslation('crm');
   const [editing, setEditing] = useState(false);
   const value = stage?.id ?? '';
+  const stageName = stage?.name ?? t('oppInlineEditCells.unknownStage', 'Unknown');
   if (!editing) {
     return (
       <button
@@ -38,7 +41,9 @@ export function StageCell({
           'inline-edit-trigger',
           isSaving && 'opacity-50 cursor-wait pointer-events-none',
         )}
-        aria-label={`Stage: ${stage?.name ?? 'Unknown'}. Click to change.`}
+        aria-label={t('oppInlineEditCells.stageTriggerAria', 'Stage: {{stage}}. Click to change.', {
+          stage: stageName,
+        })}
       >
         {/* Key on `value` so the badge remounts when the stage changes —
             the spring plays from scale 0.85 → 1, signalling the update.
@@ -50,7 +55,7 @@ export function StageCell({
           transition={{ type: 'spring', stiffness: 360, damping: 22 }}
           className="inline-block"
         >
-          <Badge tone={stageTone(stage?.name ?? '')}>{stage?.name ?? 'Unknown'}</Badge>
+          <Badge tone={stageTone(stage?.name ?? '')}>{stageName}</Badge>
         </motion.span>
       </button>
     );
@@ -105,6 +110,7 @@ export function NumberCell({
   /** True while the PATCH for this field is in flight (P1 #22). */
   isSaving?: boolean;
 }) {
+  const { t } = useTranslation('crm');
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(value));
 
@@ -132,7 +138,9 @@ export function NumberCell({
           align === 'right' && 'text-right',
           isSaving && 'opacity-50 cursor-wait pointer-events-none',
         )}
-        aria-label={`${format(value)}. Click to edit.`}
+        aria-label={t('oppInlineEditCells.numberTriggerAria', '{{value}}. Click to edit.', {
+          value: format(value),
+        })}
       >
         {format(value)}
       </button>
@@ -177,6 +185,7 @@ export function DateCell({
   /** True while the PATCH for this field is in flight (P1 #22). */
   isSaving?: boolean;
 }) {
+  const { t } = useTranslation('crm');
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? '');
 
@@ -201,7 +210,9 @@ export function DateCell({
           'inline-edit-trigger text-[var(--fg-secondary)]',
           isSaving && 'opacity-50 cursor-wait pointer-events-none',
         )}
-        aria-label={`Due ${format(value)}. Click to edit.`}
+        aria-label={t('oppInlineEditCells.dateTriggerAria', 'Due {{date}}. Click to edit.', {
+          date: format(value),
+        })}
       >
         {format(value)}
       </button>

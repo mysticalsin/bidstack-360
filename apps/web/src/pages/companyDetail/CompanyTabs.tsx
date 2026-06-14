@@ -2,6 +2,7 @@
 // Each tab receives fully resolved data — no data-fetching hooks, no mutations.
 // Display hooks (currency, i18n) are fine.
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -31,17 +32,23 @@ export function ContactTab({
     phone: string | null;
   }>;
 }) {
+  const { t } = useTranslation('crm');
   if (contacts.length === 0)
-    return <EmptyState title="No contacts yet" message="Add contacts from the Contacts page." />;
+    return (
+      <EmptyState
+        title={t('companyTabs.contacts.emptyTitle', 'No contacts yet')}
+        message={t('companyTabs.contacts.emptyMessage', 'Add contacts from the Contacts page.')}
+      />
+    );
   return (
     <div className="card overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Role</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Phone</TableHead>
+            <TableHead>{t('companyTabs.contacts.colName', 'Name')}</TableHead>
+            <TableHead>{t('companyTabs.contacts.colRole', 'Role')}</TableHead>
+            <TableHead>{t('companyTabs.contacts.colEmail', 'Email')}</TableHead>
+            <TableHead>{t('companyTabs.contacts.colPhone', 'Phone')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -81,11 +88,15 @@ export function OpportunityTab({
   // currency and respects the currency store, so the value column stays
   // consistent with every other money figure in the app.
   const { formatMoneyMicros } = useFormatMoney();
+  const { t } = useTranslation('crm');
   if (opportunities.length === 0)
     return (
       <EmptyState
-        title="No opportunities yet"
-        message="Create opportunities linked to this company."
+        title={t('companyTabs.opportunities.emptyTitle', 'No opportunities yet')}
+        message={t(
+          'companyTabs.opportunities.emptyMessage',
+          'Create opportunities linked to this company.',
+        )}
       />
     );
   return (
@@ -93,11 +104,11 @@ export function OpportunityTab({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Code</TableHead>
-            <TableHead>Name</TableHead>
-            <TableHead>Stage</TableHead>
-            <TableHead>Value</TableHead>
-            <TableHead>Probability</TableHead>
+            <TableHead>{t('companyTabs.opportunities.colCode', 'Code')}</TableHead>
+            <TableHead>{t('companyTabs.opportunities.colName', 'Name')}</TableHead>
+            <TableHead>{t('companyTabs.opportunities.colStage', 'Stage')}</TableHead>
+            <TableHead>{t('companyTabs.opportunities.colValue', 'Value')}</TableHead>
+            <TableHead>{t('companyTabs.opportunities.colProbability', 'Probability')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -129,17 +140,23 @@ export function CasesTab({
 }: {
   cases: Array<{ id: string; number: string; subject: string; status: string; priority: string }>;
 }) {
+  const { t } = useTranslation('crm');
   if (cases.length === 0)
-    return <EmptyState title="No open cases" message="All clear — no active support cases." />;
+    return (
+      <EmptyState
+        title={t('companyTabs.cases.emptyTitle', 'No open cases')}
+        message={t('companyTabs.cases.emptyMessage', 'All clear — no active support cases.')}
+      />
+    );
   return (
     <div className="card overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Number</TableHead>
-            <TableHead>Subject</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Priority</TableHead>
+            <TableHead>{t('companyTabs.cases.colNumber', 'Number')}</TableHead>
+            <TableHead>{t('companyTabs.cases.colSubject', 'Subject')}</TableHead>
+            <TableHead>{t('companyTabs.cases.colStatus', 'Status')}</TableHead>
+            <TableHead>{t('companyTabs.cases.colPriority', 'Priority')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -170,9 +187,16 @@ export function NotesTab({
 }: {
   notes: Array<{ id: string; title: string; authorName: string | null; createdAt: string }>;
 }) {
+  const { t } = useTranslation('crm');
   if (notes.length === 0)
     return (
-      <EmptyState title="No notes yet" message="Notes linked to this company will appear here." />
+      <EmptyState
+        title={t('companyTabs.notes.emptyTitle', 'No notes yet')}
+        message={t(
+          'companyTabs.notes.emptyMessage',
+          'Notes linked to this company will appear here.',
+        )}
+      />
     );
   return (
     <div className="space-y-3">
@@ -185,7 +209,9 @@ export function NotesTab({
             </span>
           </div>
           {n.authorName && (
-            <p className="mt-1 text-xs text-[var(--fg-secondary)]">by {n.authorName}</p>
+            <p className="mt-1 text-xs text-[var(--fg-secondary)]">
+              {t('companyTabs.notes.byAuthor', 'by {{author}}', { author: n.authorName })}
+            </p>
           )}
         </Card>
       ))}
@@ -201,11 +227,14 @@ export function HierarchyTab({
   childrenList: Array<{ id: string; name: string }>;
   companyId: string;
 }) {
+  const { t } = useTranslation('crm');
   return (
     <div className="space-y-6">
       {childrenList.length > 0 && (
         <div className="card p-4">
-          <h3 className="text-sm font-semibold text-[var(--fg-primary)] mb-3">Direct Children</h3>
+          <h3 className="text-sm font-semibold text-[var(--fg-primary)] mb-3">
+            {t('companyTabs.hierarchy.directChildren', 'Direct Children')}
+          </h3>
           <div className="flex flex-wrap gap-2">
             {childrenList.map((child) => (
               <Link
@@ -222,7 +251,10 @@ export function HierarchyTab({
       )}
       {hierarchy.isLoading && <DetailPageSkeleton tabs={false} columns={1} cards={1} />}
       {hierarchy.isError && (
-        <ErrorState title="Couldn't load hierarchy" message="Unable to fetch account hierarchy." />
+        <ErrorState
+          title={t('companyTabs.hierarchy.errorTitle', "Couldn't load hierarchy")}
+          message={t('companyTabs.hierarchy.errorMessage', 'Unable to fetch account hierarchy.')}
+        />
       )}
       {hierarchy.data && <AccountHierarchyTree tree={hierarchy.data.tree} />}
     </div>

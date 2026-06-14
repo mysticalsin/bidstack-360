@@ -2209,5 +2209,304 @@
     "metricPipeline": "销售管道",
     "metricOpenDeals": "进行中的交易",
     "metricContacts": "联系人"
+  },
+  "companyTabs": {
+    "contacts": {
+      "emptyTitle": "暂无联系人",
+      "emptyMessage": "从联系人页面添加联系人。",
+      "colName": "姓名",
+      "colRole": "职位",
+      "colEmail": "电子邮件",
+      "colPhone": "电话"
+    },
+    "opportunities": {
+      "emptyTitle": "暂无商机",
+      "emptyMessage": "创建与此公司关联的商机。",
+      "colCode": "编号",
+      "colName": "名称",
+      "colStage": "阶段",
+      "colValue": "金额",
+      "colProbability": "概率"
+    },
+    "cases": {
+      "emptyTitle": "无未结案例",
+      "emptyMessage": "一切正常 — 没有进行中的支持案例。",
+      "colNumber": "编号",
+      "colSubject": "主题",
+      "colStatus": "状态",
+      "colPriority": "优先级"
+    },
+    "notes": {
+      "emptyTitle": "暂无备注",
+      "emptyMessage": "与此公司关联的备注将显示在此处。",
+      "byAuthor": "由 {{author}}"
+    },
+    "hierarchy": {
+      "directChildren": "直接子公司",
+      "errorTitle": "无法加载层级结构",
+      "errorMessage": "无法获取客户层级结构。"
+    }
+  },
+  "oppInlineEditCells": {
+    "unknownStage": "未知",
+    "stageTriggerAria": "阶段：{{stage}}。点击以更改。",
+    "numberTriggerAria": "{{value}}。点击以编辑。",
+    "dateTriggerAria": "到期 {{date}}。点击以编辑。"
+  },
+  "liveDataMesh": {
+    "availabilityAvailable": "{{count}} 个可用",
+    "availabilityConnected": "已连接 {{enabled}}/{{total}}",
+    "regionLabel": "已连接的数据源",
+    "titleAvailable": "可用数据源",
+    "titleConnected": "已连接的数据源",
+    "captionAvailable": "配置凭据或连接器后可用的数据源",
+    "captionConnected": "已配置的 API、小组件和已验证的数据源",
+    "kicker": "数据源可用性",
+    "publicSources": "公开数据源",
+    "connectorStatus": "连接器状态",
+    "signalsLabel": "可用数据源信号",
+    "loading": "正在检查已配置的数据源...",
+    "error": "连接器注册表已加载；数据源检查返回错误。",
+    "empty": "尚未返回此账户的公开信号。",
+    "connectorAria": "{{name}} 状态为 {{status}}"
+  },
+  "serviceDesk": {
+    "title": "服务台",
+    "searchPlaceholder": "搜索工单…",
+    "searchAriaLabel": "搜索工单",
+    "exportCsv": "导出 CSV",
+    "filterByStatusAriaLabel": "按状态筛选",
+    "filterByPriorityAriaLabel": "按优先级筛选",
+    "statusOption": {
+      "all": "全部",
+      "new": "新建",
+      "open": "进行中",
+      "waitingCustomer": "等待客户",
+      "waitingInternal": "等待内部",
+      "resolved": "已解决",
+      "closed": "已关闭",
+      "escalated": "已升级"
+    },
+    "priorityOption": {
+      "all": "全部",
+      "low": "低",
+      "medium": "中",
+      "high": "高",
+      "critical": "紧急"
+    },
+    "csv": {
+      "caseNumber": "工单编号",
+      "subject": "主题",
+      "status": "状态",
+      "priority": "优先级",
+      "owner": "负责人",
+      "source": "来源",
+      "satisfaction": "满意度",
+      "created": "创建时间",
+      "resolved": "解决时间"
+    },
+    "error": {
+      "title": "无法加载工单"
+    },
+    "retry": "重试",
+    "empty": {
+      "title": "暂无工单",
+      "message": "服务工单将显示在此处。"
+    },
+    "column": {
+      "subject": "主题",
+      "status": "状态",
+      "priority": "优先级",
+      "owner": "负责人",
+      "source": "来源"
+    },
+    "resultCount": {
+      "one": "{{count}} 个工单",
+      "other": "{{count}} 个工单"
+    },
+    "resultMatching": " 匹配 \"{{search}}\""
+  },
+  "widgetConfig": {
+    "title": "配置小组件",
+    "closeAriaLabel": "关闭",
+    "titleLabel": "标题",
+    "titlePlaceholder": "小组件标题",
+    "dataSourceLabel": "数据源（报表）",
+    "dataSourceNone": "— 无（静态演示）—",
+    "chartTypeLabel": "图表类型",
+    "type": {
+      "kpi": {
+        "label": "KPI 卡片",
+        "description": "带趋势的单一指标"
+      },
+      "line": {
+        "label": "折线图",
+        "description": "随时间变化的趋势"
+      },
+      "bar": {
+        "label": "柱状图",
+        "description": "比较类别"
+      },
+      "area": {
+        "label": "面积图",
+        "description": "随时间变化的量"
+      },
+      "pie": {
+        "label": "饼图",
+        "description": "分布（≤6 个扇区）"
+      },
+      "donut": {
+        "label": "环形图",
+        "description": "带中心值的分布"
+      },
+      "funnel": {
+        "label": "漏斗图",
+        "description": "管道阶段流失"
+      },
+      "gauge": {
+        "label": "仪表盘",
+        "description": "目标进度"
+      },
+      "table": {
+        "label": "表格",
+        "description": "表格数据网格"
+      },
+      "scatter": {
+        "label": "散点图",
+        "description": "两个指标之间的相关性"
+      },
+      "radar": {
+        "label": "雷达图",
+        "description": "多维度比较"
+      },
+      "heatmap": {
+        "label": "热力图",
+        "description": "随时间变化的活动密度"
+      }
+    },
+    "xAxisLabel": "X 轴字段",
+    "yAxisLabel": "Y 轴字段",
+    "cancel": "取消",
+    "save": "保存小组件"
+  },
+  "auditLogInsights": {
+    "activityCadenceTitle": "活动节奏",
+    "activityCadenceSubtitle": "当前加载的证据页面的真实事件量。",
+    "attentionEventsBadge": "{{percent}}% 需关注事件",
+    "eventVolumeChartLabel": "审计事件量图表",
+    "bucketTooltip": "{{label}}：{{count}} 个事件",
+    "forensicWatchlistTitle": "取证监视列表",
+    "forensicWatchlistSubtitle": "从已加载的证据集进行快速分流。",
+    "topActorLabel": "主要操作者",
+    "hottestTargetLabel": "最活跃目标",
+    "reviewQueueLabel": "审查队列",
+    "noneValue": "无",
+    "eventsCount": "{{count}} 个事件",
+    "noLoadedEvents": "无已加载事件",
+    "attentionEventsValue": "{{count}} 个需关注事件",
+    "reviewQueueDetail": "{{destructive}} 个破坏性，{{security}} 个安全/API",
+    "evidenceQualityTitle": "证据质量",
+    "evidenceQualitySubtitle": "使审计可经得起质疑的覆盖信号。",
+    "scoreOutOf": "{{score}}/100",
+    "structuredDiffsLabel": "结构化差异",
+    "eventsRatioDetail": "{{count}}/{{total}} 个事件",
+    "targetReferencesLabel": "目标引用",
+    "linkedRatioDetail": "{{count}}/{{total}} 个已关联",
+    "actorAttributionLabel": "操作者归属",
+    "attributedRatioDetail": "{{count}}/{{total}} 个已归属",
+    "healthRowProgressLabel": "{{label}}：{{value}}%"
+  },
+  "scheduleReview": {
+    "errorPickDateTime": "选择日期和时间",
+    "toastScheduledTitle": "评审已安排",
+    "toastScheduledWithLink": "会议链接已添加到通话标签页。",
+    "toastScheduledNoLink": "已添加到通话标签页。",
+    "errorServerRejected": "服务器拒绝了该请求。",
+    "errorProviderUnreachable": "无法连接到 {{provider}}。请在“设置 → 集成”中连接，或选择其他提供商。",
+    "triggerButton": "安排评审",
+    "dialogTitle": "安排评审",
+    "dialogDescription": "在已连接的日历上创建 Go/No-Go 或 RFP 评审会议。",
+    "fieldTopic": "主题",
+    "placeholderTopic": "Go/No-Go 评审",
+    "fieldProvider": "提供商",
+    "fieldDuration": "时长（分钟）",
+    "fieldStart": "开始",
+    "fieldAttendees": "参与者（逗号分隔的电子邮件）",
+    "cancel": "取消",
+    "submitting": "安排中…",
+    "submit": "安排"
+  },
+  "search": {
+    "heading": "搜索",
+    "form": {
+      "ariaLabel": "工作区搜索"
+    },
+    "input": {
+      "placeholder": "在商机、联系人、公司、任务、备注和订单中搜索…",
+      "ariaLabel": "搜索工作区"
+    },
+    "tab": {
+      "all": "全部",
+      "opportunity": "商机",
+      "lead": "潜在客户",
+      "contact": "联系人",
+      "company": "公司",
+      "task": "任务",
+      "note": "备注"
+    },
+    "type": {
+      "opportunity": "商机",
+      "lead": "潜在客户",
+      "contact": "联系人",
+      "company": "公司",
+      "task": "任务",
+      "note": "备注"
+    },
+    "results": {
+      "ariaLabel": "搜索结果",
+      "countOne": "{{count}} 个结果",
+      "countOther": "{{count}} 个结果"
+    },
+    "error": {
+      "title": "搜索失败",
+      "message": "出现错误"
+    },
+    "empty": {
+      "title": "未找到结果",
+      "message": "未找到与 \"{{query}}\" 匹配的内容。请尝试其他关键词或检查拼写。"
+    },
+    "guidance": {
+      "ariaLabel": "搜索指引",
+      "title": "在整个工作区中搜索",
+      "message": "在上方输入关键词以查找商机、联系人、公司、任务、备注和销售订单。"
+    }
+  },
+  "createWebhook": {
+    "adminOnlyBadge": "仅限管理员",
+    "editTitle": "编辑 Webhook 订阅",
+    "createTitle": "新建 Webhook 订阅",
+    "subtitle": "请使用生产环境的 HTTPS 端点。BidStack 使用 HMAC-SHA256 对每次投递进行签名。",
+    "closeAriaLabel": "关闭",
+    "endpointUrlLabel": "端点 URL",
+    "endpointUrlPlaceholder": "https://your-app.com/webhooks/bidstack",
+    "endpointUrlHelp": "必须使用 HTTPS。localhost、私有 IP 和内部主机名将被拒绝。",
+    "eventsLabel": "事件",
+    "eventsHelp": "仅选择接收方实际处理的事件。",
+    "selectAll": "全选",
+    "clear": "清除",
+    "securityContractTitle": "安全约定",
+    "securityReturn2xx": "在 10 秒内返回 2xx 状态。",
+    "securityVerifyHeader": "验证 X-BidStack-Signature 标头。",
+    "securityRejectOld": "拒绝超过 5 分钟的签名。",
+    "securityAsync": "确认后异步处理繁重的工作。",
+    "selectedEventsLabel": "已选事件",
+    "selectedNone": "请至少选择一个事件。",
+    "selectedOne": "将投递一个事件。",
+    "selectedMany": "将投递 {{count}} 个事件。",
+    "cancel": "取消",
+    "saving": "正在保存…",
+    "creating": "正在创建…",
+    "saveSubscription": "保存订阅",
+    "createSubscription": "创建订阅"
   }
 }
