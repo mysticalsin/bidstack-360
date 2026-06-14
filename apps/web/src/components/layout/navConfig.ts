@@ -87,7 +87,8 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: 'checkCircle',
     items: [
       { to: '/bid-matrix', label: 'Bid/No-Bid Matrix', icon: 'checkCircle' },
-      { to: '/rfp-response', label: 'RFP Response Hub', icon: 'note' },
+      // RFP Response Hub (a read-only roll-up) folded into Proposals — the
+      // actual work surface. /rfp-response now redirects there.
       { to: '/proposals', label: 'Proposals', icon: 'receipt' },
       { to: '/agent-studio', label: 'Agent Studio', icon: 'sparkle' },
     ],
@@ -100,7 +101,6 @@ export const NAV_SECTIONS: NavSection[] = [
       { to: '/tasks', label: 'Tasks', icon: 'tasks', badgeKey: 'overdueTasks' },
       { to: '/calendar', label: 'Calendar', icon: 'clock' },
       { to: '/calls', label: 'Calls', icon: 'phone' },
-      { to: '/service-desk', label: 'Service Desk', icon: 'messageCircle' },
       { to: '/workflows', label: 'Workflows', icon: 'git-branch' },
       { to: '/custom-objects', label: 'Custom Objects', icon: 'sliders' },
       { to: '/intake', label: 'Document Intake', icon: 'download' },

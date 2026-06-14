@@ -54,7 +54,6 @@ export const OrgDashboard = memo(function OrgDashboard() {
     const openOpportunities = s?.openOpportunities ?? 0;
     const tasks = s?.tasks ?? 0;
     const overdueTasks = s?.overdueTasks ?? 0;
-    const openServiceCases = s?.openServiceCases ?? 0;
     const activeTasks = Math.max(0, tasks - overdueTasks);
     const stageSignals =
       pipelineStages.length > 0
@@ -76,7 +75,6 @@ export const OrgDashboard = memo(function OrgDashboard() {
         signal: [
           { label: 'Accounts', value: companies, color: 'var(--tag-blue-fg)' },
           { label: 'Open deals', value: openOpportunities, color: 'var(--tag-teal-fg)' },
-          { label: 'Cases', value: openServiceCases, color: 'var(--tag-rose-fg)' },
         ],
       },
       {
@@ -137,7 +135,6 @@ export const OrgDashboard = memo(function OrgDashboard() {
         signal: [
           { label: 'Active', value: activeTasks, color: 'var(--tag-teal-fg)' },
           { label: 'Overdue', value: overdueTasks, color: 'var(--tag-rose-fg)' },
-          { label: 'Cases', value: openServiceCases, color: 'var(--tag-amber-fg)' },
         ],
       },
     ] satisfies OrgKpi[];
@@ -212,7 +209,6 @@ export const OrgDashboard = memo(function OrgDashboard() {
           detail="weighted"
         />
         <SourceStat label="Overdue" value={String(s?.overdueTasks ?? 0)} detail="tasks" />
-        <SourceStat label="Cases" value={String(s?.openServiceCases ?? 0)} detail="open" />
       </section>
 
       {/* Main cockpit grid */}
@@ -284,17 +280,6 @@ export const OrgDashboard = memo(function OrgDashboard() {
           </Reveal>
 
           <Reveal delay={0.1}>
-            <AlertCard
-              tone="amber"
-              icon="life-ring"
-              label="Open cases"
-              value={s?.openServiceCases ?? 0}
-              total={s?.serviceCases ?? 0}
-              href="/service-desk"
-            />
-          </Reveal>
-
-          <Reveal delay={0.12}>
             <QuickActionsCard />
           </Reveal>
 

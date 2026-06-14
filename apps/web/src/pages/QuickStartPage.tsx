@@ -64,7 +64,7 @@ export function QuickStartPage() {
       key: 'connect_email',
       label: 'Start your first RFP response',
       description: 'Spin up a structured response and let the agents draft the first pass.',
-      action: () => navigate('/rfp-response'),
+      action: () => navigate('/proposals'),
     },
     {
       key: 'first_deal',

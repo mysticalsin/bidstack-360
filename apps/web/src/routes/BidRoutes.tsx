@@ -6,7 +6,7 @@
  * returns a fragment lets the framework see the inner Route elements; wrapping
  * them in a component would hide them.
  */
-import { Route } from 'react-router-dom';
+import { Navigate, Route } from 'react-router-dom';
 
 import { PageTransition } from '@/components/motion/PageTransition';
 import {
@@ -16,7 +16,6 @@ import {
   ProposalsPage,
   ReferencesPage,
   RfpPipelinePage,
-  RfpResponseHubPage,
 } from './lazyPages';
 import { RequireAuth } from './AuthGuards';
 
@@ -31,14 +30,10 @@ export function bidRouteElements() {
           </RequireAuth>
         }
       />
-      <Route
-        path="/rfp-response"
-        element={
-          <RequireAuth>
-            <RfpResponseHubPage />
-          </RequireAuth>
-        }
-      />
+      {/* RFP Response Hub merged into Proposals (the work surface). The hub was
+          a read-only roll-up; its rail door was removed and the route now
+          redirects so existing links/bookmarks land on Proposals. */}
+      <Route path="/rfp-response" element={<Navigate to="/proposals" replace />} />
       <Route
         path="/rfp/:id/pipeline"
         element={

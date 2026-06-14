@@ -60,7 +60,6 @@ export const NAV_TARGETS: NavTarget[] = [
   { to: '/sales-toolkits', label: 'Go to Sales Toolkits', hint: '' },
   // Bids + proposals
   { to: '/bid-matrix', label: 'Go to Bid/No-Bid Matrix', hint: '' },
-  { to: '/rfp-response', label: 'Go to RFP Response Hub', hint: '' },
   { to: '/proposals', label: 'Go to Proposals', hint: '' },
   { to: '/intake', label: 'Go to Document Intake', hint: '' },
   { to: '/agent-studio', label: 'Go to Agent Studio', hint: '' },
@@ -68,7 +67,6 @@ export const NAV_TARGETS: NavTarget[] = [
   { to: '/tasks', label: 'Go to Tasks', hint: 'g t' },
   { to: '/calendar', label: 'Go to Calendar', hint: '' },
   { to: '/calls', label: 'Go to Calls', hint: '' },
-  { to: '/service-desk', label: 'Go to Service Desk', hint: '' },
   { to: '/workflows', label: 'Go to Workflows', hint: '' },
   { to: '/custom-objects', label: 'Go to Custom Objects', hint: '' },
   { to: '/quick-start', label: 'Go to Quick Start', hint: '' },
