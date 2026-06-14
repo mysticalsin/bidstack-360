@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { ConnectorsSection } from '@/components/integrations/ConnectorsSection';
 import { DataQualitySection } from '@/components/integrations/DataQualitySection';
 import { ErpConnectorCard } from '@/components/integrations/ErpConnectorCard';
+import { DataSourceCredentialsCard } from '@/components/settings/DataSourceCredentialsCard';
 import { ProviderHealthSection } from '@/components/integrations/ProviderHealthSection';
 import { ApiKeysSection } from '@/components/settings/ApiKeysSection';
 import { WebhooksSection } from '@/components/settings/WebhooksSection';
@@ -123,6 +124,7 @@ export function IntegrationsSection() {
           />
           <ConnectionTester guide={setupGuide.data} isLoading={setupGuide.isLoading} />
           <ProviderHealthSection />
+          <DataSourceCredentialsCard />
           <WebhookEventsCard events={events.data?.items ?? []} isLoading={events.isLoading} />
         </TabsContent>
 

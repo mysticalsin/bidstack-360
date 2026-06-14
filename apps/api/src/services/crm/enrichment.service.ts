@@ -7,6 +7,7 @@ import {
   fetchOpenCompanyProfile,
 } from '../../providers/company-open-enrichment.js';
 import { fetchSeamlessCompany } from '../../providers/company-seamless-enrichment.js';
+import { resolveDataProviderApiKey } from '../../lib/data-provider-credentials.js';
 import { enqueueApolloEnrich } from '../../queues/company-enrich-apollo.js';
 import {
   attribution,
@@ -55,18 +56,26 @@ export async function upsertVerifiedCompanyEnrichment({
   // Preferred EXTERNAL source: Seamless.AI (paid, verified) when a key is set.
   // Falls back to the keyless open (Wikidata/Wikipedia) path otherwise. Both are
   // source-attributed so the account view keeps the External/Internal split.
-  const seamlessProfile =
-    process.env.NODE_ENV === 'test' || !process.env.SEAMLESS_API_KEY
+  // Key precedence: the org's encrypted Settings key → deployment env. Either
+  // activates Seamless without touching code.
+  const seamlessApiKey =
+    process.env.NODE_ENV === 'test'
       ? null
-      : await fetchSeamlessCompany({
-          name,
-          domain: requestedDomain,
-          website: requestedWebsite,
-          now,
-        }).catch((err) => {
-          log.warn({ err, company: name }, 'seamless enrichment failed');
-          return null;
-        });
+      : ((await resolveDataProviderApiKey(orgId, 'seamless').catch(() => null)) ??
+        process.env.SEAMLESS_API_KEY ??
+        null);
+  const seamlessProfile = seamlessApiKey
+    ? await fetchSeamlessCompany({
+        name,
+        domain: requestedDomain,
+        website: requestedWebsite,
+        now,
+        apiKey: seamlessApiKey,
+      }).catch((err) => {
+        log.warn({ err, company: name }, 'seamless enrichment failed');
+        return null;
+      })
+    : null;
   const openProfile =
     seamlessProfile ??
     (process.env.NODE_ENV === 'test' || process.env.BIDSTACK_OPEN_ENRICHMENT_DISABLED === '1'
