@@ -33,8 +33,12 @@
   },
   "quickStart": {
     "title": "Avvio rapido",
-    "subtitle": "Completa questi passaggi per sfruttare al massimo BidStack 360°",
-    "progress": "{{done}} di {{total}} passaggi completati",
+    "subtitle": "Passa da zero a pilotare la tua prima offerta.",
+    "progress": {
+      "count": "{{completed}} di {{total}} completati",
+      "percent": "{{percent}}%",
+      "ariaLabel": "Avanzamento onboarding"
+    },
     "steps": {
       "createOpportunity": {
         "label": "Crea un'opportunità",
@@ -59,7 +63,46 @@
     },
     "completed": "Avvio rapido completato!",
     "completedBody": "Ora conosci le basi di BidStack 360°. Buona fortuna con le tue offerte.",
-    "dismiss": "Ignora"
+    "dismiss": "Ignora",
+    "tourButton": "Fai il tour del prodotto di 2 minuti",
+    "items": {
+      "profile": {
+        "label": "Completa il tuo profilo",
+        "description": "Aggiungi nome, foto e fuso orario così i colleghi possono trovarti."
+      },
+      "template": {
+        "label": "Scegli una pipeline modello",
+        "description": "Scegli come punto di partenza B2B SaaS, Agenzia, Enterprise o Inside Sales."
+      },
+      "firstLead": {
+        "label": "Aggiungi il tuo primo lead",
+        "description": "Cattura l'interesse in entrata e lascia che BidStack lo valuti automaticamente."
+      },
+      "firstActivity": {
+        "label": "Registra la tua prima attività",
+        "description": "Registra una chiamata, un'email o una nota su qualsiasi contatto."
+      },
+      "firstBidNoBid": {
+        "label": "Esegui la tua prima decisione offrire/non offrire",
+        "description": "Valuta un'opportunità su idoneità, valore e probabilità di vittoria prima di impegnarti."
+      },
+      "firstRfp": {
+        "label": "Avvia la tua prima risposta a una RFP",
+        "description": "Crea una risposta strutturata e lascia che gli agenti scrivano la prima bozza."
+      },
+      "firstDeal": {
+        "label": "Crea la tua prima trattativa",
+        "description": "Converti un lead o aggiungi una trattativa direttamente alla pipeline."
+      },
+      "inviteTeam": {
+        "label": "Invita il tuo team",
+        "description": "La collaborazione funziona meglio con tutto il team in un unico posto."
+      }
+    },
+    "complete": {
+      "title": "Tutto pronto!",
+      "message": "Il tuo spazio di lavoro è pronto a pilotare le offerte."
+    }
   },
   "templates": {
     "title": "Modelli",
@@ -73,5 +116,37 @@
     "banner": "Stai visualizzando dati dimostrativi.",
     "clear": "Cancella dati dimostrativi",
     "confirmClear": "Eliminare tutti i dati dimostrativi? Questa azione non può essere annullata."
+  },
+  "tourStep": {
+    "dialogAriaLabel": "Passaggio {{current}} di {{total}} del tour: {{title}}",
+    "stepCounter": "{{current}} di {{total}}",
+    "skipTour": "Salta il tour",
+    "back": "Indietro",
+    "ctaFinish": "Invita il tuo team",
+    "ctaNext": "Avanti"
+  },
+  "templatePicker": {
+    "title": "Scegli una pipeline iniziale",
+    "subtitle": "Ogni modello imposta una pipeline con fasi e alcuni record di esempio così puoi esplorare subito. Puoi rimuovere i dati di esempio in qualsiasi momento.",
+    "loadErrorTitle": "Impossibile caricare i modelli",
+    "tryAgain": "Riprova.",
+    "stageCount": "{{count}} fasi",
+    "cancel": "Annulla",
+    "installing": "Installazione…",
+    "install": "Installa pipeline",
+    "toastInstalledTitle": "Pipeline installata",
+    "toastInstalledDescription": "{{stages}} fasi, {{deals}} trattative di esempio, {{leads}} lead.",
+    "toastConflictTitle": "Una pipeline è già installata",
+    "toastConflictDescription": "Rimuovi prima i dati di esempio esistenti oppure parti dalla tua pipeline attiva.",
+    "toastErrorTitle": "Impossibile installare il modello"
+  },
+  "sampleDataBanner": {
+    "title": "I dati di esempio sono attivi",
+    "description": "I record demo sono visibili in questa area di lavoro. Nascondi questo avviso o rimuovi completamente i record di esempio prima delle demo per dirigenti o clienti.",
+    "hide": "Nascondi",
+    "remove": "Rimuovi dati di esempio",
+    "removing": "Rimozione…",
+    "removedToast": "Dati di esempio rimossi",
+    "removeErrorToast": "Impossibile rimuovere i dati di esempio"
   }
 }
