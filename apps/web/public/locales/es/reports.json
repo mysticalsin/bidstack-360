@@ -63,5 +63,199 @@
     "calls": "Calls",
     "emails": "Emails",
     "meetings": "Meetings"
+  },
+  "reportBuilder": {
+    "toast": {
+      "previewFailed": "Error en la vista previa",
+      "nameRequired": "Asigna un nombre a tu informe antes de guardar.",
+      "updated": "Informe actualizado",
+      "created": "Informe creado",
+      "saveFailed": "No se pudo guardar"
+    },
+    "backToReports": "Volver a los informes",
+    "title": {
+      "edit": "Editar informe",
+      "new": "Nuevo informe"
+    },
+    "subtitle": "Crea una consulta, previsualízala en vivo y luego guárdala.",
+    "saveButton": {
+      "saving": "Guardando…",
+      "saveChanges": "Guardar cambios",
+      "create": "Crear informe"
+    },
+    "details": {
+      "title": "Detalles del informe",
+      "nameLabel": "Nombre",
+      "namePlaceholder": "p. ej. Negocios ganados por mes",
+      "nameAria": "Nombre del informe",
+      "descriptionLabel": "Descripción",
+      "descriptionPlaceholder": "Opcional",
+      "descriptionAria": "Descripción del informe",
+      "dataSourceLabel": "Fuente de datos",
+      "dataSourceAria": "Entidad del informe"
+    },
+    "filters": {
+      "title": "Filtros",
+      "caption": "Limita qué registros se incluyen."
+    },
+    "measures": {
+      "title": "Medidas",
+      "caption": "Valores agregados (deja vacío para listar filas)."
+    },
+    "groupBy": {
+      "title": "Agrupar por",
+      "caption": "Desglosa las medidas por dimensión."
+    },
+    "sortLimit": {
+      "title": "Ordenar y limitar",
+      "rowLimitLabel": "Límite de filas",
+      "rowLimitAria": "Límite de filas"
+    },
+    "visualization": {
+      "title": "Visualización",
+      "chartTypeAria": "Tipo de gráfico"
+    },
+    "preview": {
+      "running": "Ejecutando…",
+      "run": "Ejecutar vista previa"
+    },
+    "sort": {
+      "label": "Ordenar",
+      "fieldAria": "Campo de ordenación",
+      "pickColumn": "Elegir columna…",
+      "directionAria": "Dirección de ordenación",
+      "ascending": "Ascendente",
+      "descending": "Descendente",
+      "removeAria": "Eliminar ordenación",
+      "add": "+ Añadir orden"
+    },
+    "error": {
+      "notFoundTitle": "Informe no encontrado",
+      "notFoundMessage": "Es posible que se haya eliminado."
+    }
+  },
+  "filterBuilder": {
+    "valueAriaLabel": "Valor del filtro",
+    "pickOption": "— Elegir —",
+    "dateValueAriaLabel": "Valor de fecha del filtro",
+    "numericValueAriaLabel": "Valor numérico del filtro",
+    "valuePlaceholder": "Valor",
+    "fieldPlaceholder": "Campo…",
+    "operatorAriaLabel": "Operador",
+    "removeConditionAriaLabel": "Eliminar condición",
+    "toggleLogicAriaLabel": "Alternar lógica — actualmente {{logic}}",
+    "noConditions": "Aún no hay condiciones",
+    "conditionCount": "{{count}} condición",
+    "removeGroupAriaLabel": "Eliminar grupo",
+    "addCondition": "Condición",
+    "addGroup": "Grupo"
+  },
+  "reports": {
+    "heading": "Informes",
+    "subtitle": "Análisis de pipeline, leads, centro de servicio y tareas.",
+    "tab": {
+      "pipeline": "Pipeline",
+      "leads": "Leads",
+      "service-desk": "Centro de servicio",
+      "tasks": "Tareas"
+    },
+    "tabAriaLabel": "Pestaña de informe {{label}}",
+    "error": {
+      "title": "No se pudo cargar el informe"
+    },
+    "byStatus": "Por estado",
+    "pipeline": {
+      "byStage": "Pipeline por etapa",
+      "weighted": "Pipeline ponderado",
+      "totalOpen": "Total abiertos",
+      "closedThisQuarter": "Cerrados este trimestre"
+    },
+    "leads": {
+      "total": "Total de leads",
+      "converted": "Convertidos",
+      "conversionRate": "Tasa de conversión",
+      "avgScore": "Puntuación media",
+      "bySource": "Por origen"
+    },
+    "serviceDesk": {
+      "totalCases": "Total de casos",
+      "open": "Abiertos",
+      "resolvedThisMonth": "Resueltos este mes",
+      "avgSatisfaction": "Satisfacción media",
+      "byPriority": "Por prioridad"
+    },
+    "tasks": {
+      "total": "Total de tareas",
+      "completed": "Completadas",
+      "overdue": "Vencidas",
+      "completionRate": "Tasa de finalización"
+    }
+  },
+  "reportsList": {
+    "errorTitle": "Error al cargar los informes",
+    "heading": "Informes",
+    "savedCount": "{{count}} informes guardados",
+    "newReport": "Nuevo informe",
+    "searchPlaceholder": "Buscar informes…",
+    "searchAriaLabel": "Buscar informes",
+    "resultsCountMatching": "{{count}} informes que coinciden con \"{{search}}\"",
+    "resultsCount": "{{count}} informes",
+    "emptyTitle": "No se encontraron informes",
+    "emptySearchMessage": "Prueba con otra búsqueda.",
+    "emptyMessage": "Crea tu primer informe analítico.",
+    "tableAriaLabel": "Informes",
+    "columnName": "Nombre",
+    "columnEntity": "Entidad",
+    "columnLastRun": "Última ejecución",
+    "columnSchedule": "Programación",
+    "columnActions": "Acciones",
+    "runAriaLabel": "Ejecutar informe {{name}}",
+    "editAriaLabel": "Editar informe {{name}}",
+    "duplicateAriaLabel": "Duplicar informe {{name}}",
+    "deleteConfirm": "¿Eliminar \"{{name}}\"?",
+    "deleteAriaLabel": "Eliminar informe {{name}}"
+  },
+  "fieldPicker": {
+    "placeholder": "Elige un campo…",
+    "listboxLabel": "Opciones de campo",
+    "searchPlaceholder": "Buscar campos…",
+    "empty": "No se encontraron campos."
+  },
+  "reportPreview": {
+    "title": "Vista previa en vivo",
+    "rowCountOne": "{{count}} fila",
+    "rowCountOther": "{{count}} filas",
+    "emptyMessage": "Aún no hay filas que coincidan con esta consulta.",
+    "chartAriaLabel": "Vista previa del informe",
+    "rowsAriaLabel": "Filas de la vista previa del informe",
+    "runPrompt": "Crea tu consulta y luego ejecuta una vista previa para ver los resultados aquí.",
+    "chartShapeMismatch": "Este tipo de gráfico no se ajusta a la forma de la consulta actual. La tabla siguiente muestra las filas sin procesar.",
+    "queryFailed": "La consulta falló"
+  },
+  "aggregatePicker": {
+    "functionCount": "Recuento",
+    "functionCountDistinct": "Recuento distinto",
+    "functionSum": "Suma",
+    "functionAverage": "Promedio",
+    "functionMin": "Mín",
+    "functionMax": "Máx",
+    "functionAriaLabel": "Función de agregación",
+    "fieldPlaceholder": "Elegir campo…",
+    "aliasPlaceholder": "Alias (opcional)",
+    "aliasAriaLabel": "Alias de agregación",
+    "removeAriaLabel": "Eliminar agregación",
+    "addButton": "+ Añadir agregación"
+  },
+  "groupByPicker": {
+    "fieldPlaceholder": "Elegir campo…",
+    "timeBucketLabel": "Intervalo de tiempo",
+    "noTimeBucket": "Sin intervalo de tiempo",
+    "timeBucketDay": "Día",
+    "timeBucketWeek": "Semana",
+    "timeBucketMonth": "Mes",
+    "timeBucketQuarter": "Trimestre",
+    "timeBucketYear": "Año",
+    "removeField": "Quitar campo de agrupación",
+    "addGroupBy": "+ Añadir agrupación"
   }
 }
