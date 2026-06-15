@@ -33,8 +33,12 @@
   },
   "quickStart": {
     "title": "Démarrage rapide",
-    "subtitle": "Complétez ces étapes pour tirer parti de BidStack 360°",
-    "progress": "{{done}} sur {{total}} étapes complétées",
+    "subtitle": "Passez de zéro au pilotage de votre première offre.",
+    "progress": {
+      "count": "{{completed}} sur {{total}} terminés",
+      "percent": "{{percent}} %",
+      "ariaLabel": "Progression de l'intégration"
+    },
     "steps": {
       "createOpportunity": {
         "label": "Créer une opportunité",
@@ -59,7 +63,46 @@
     },
     "completed": "Démarrage rapide terminé !",
     "completedBody": "Vous maîtrisez maintenant l'essentiel de BidStack 360°. Bonne chance pour vos appels d'offres.",
-    "dismiss": "Masquer"
+    "dismiss": "Masquer",
+    "tourButton": "Suivez la visite guidée de 2 minutes du produit",
+    "items": {
+      "profile": {
+        "label": "Complétez votre profil",
+        "description": "Ajoutez votre nom, votre photo et votre fuseau horaire pour que vos collègues vous trouvent."
+      },
+      "template": {
+        "label": "Choisissez un pipeline modèle",
+        "description": "Choisissez B2B SaaS, Agence, Entreprise ou Inside Sales comme point de départ."
+      },
+      "firstLead": {
+        "label": "Ajoutez votre premier prospect",
+        "description": "Capturez l'intérêt entrant et laissez BidStack l'évaluer automatiquement."
+      },
+      "firstActivity": {
+        "label": "Enregistrez votre première activité",
+        "description": "Enregistrez un appel, un e-mail ou une note pour n'importe quel contact."
+      },
+      "firstBidNoBid": {
+        "label": "Lancez votre première décision soumissionner ou non",
+        "description": "Évaluez une opportunité selon l'adéquation, la valeur et la probabilité de gain avant de vous engager."
+      },
+      "firstRfp": {
+        "label": "Démarrez votre première réponse à appel d'offres",
+        "description": "Lancez une réponse structurée et laissez les agents rédiger la première version."
+      },
+      "firstDeal": {
+        "label": "Créez votre première affaire",
+        "description": "Convertissez un prospect ou ajoutez une affaire directement au pipeline."
+      },
+      "inviteTeam": {
+        "label": "Invitez votre équipe",
+        "description": "La collaboration fonctionne mieux avec toute l'équipe au même endroit."
+      }
+    },
+    "complete": {
+      "title": "Vous êtes prêt !",
+      "message": "Votre espace de travail est prêt à piloter des offres."
+    }
   },
   "templates": {
     "title": "Modèles",
@@ -73,5 +116,37 @@
     "banner": "Vous visualisez des données de démonstration.",
     "clear": "Supprimer les données de démo",
     "confirmClear": "Supprimer toutes les données de démonstration ? Cette action est irréversible."
+  },
+  "tourStep": {
+    "dialogAriaLabel": "Étape {{current}} sur {{total}} de la visite : {{title}}",
+    "stepCounter": "{{current}} sur {{total}}",
+    "skipTour": "Passer la visite",
+    "back": "Retour",
+    "ctaFinish": "Invitez votre équipe",
+    "ctaNext": "Suivant"
+  },
+  "templatePicker": {
+    "title": "Choisissez un pipeline de départ",
+    "subtitle": "Chaque modèle crée un pipeline avec des étapes et quelques enregistrements d'exemple pour que vous puissiez explorer immédiatement. Vous pouvez supprimer les données d'exemple à tout moment.",
+    "loadErrorTitle": "Impossible de charger les modèles",
+    "tryAgain": "Veuillez réessayer.",
+    "stageCount": "{{count}} étapes",
+    "cancel": "Annuler",
+    "installing": "Installation…",
+    "install": "Installer le pipeline",
+    "toastInstalledTitle": "Pipeline installé",
+    "toastInstalledDescription": "{{stages}} étapes, {{deals}} affaires d'exemple, {{leads}} leads.",
+    "toastConflictTitle": "Un pipeline est déjà installé",
+    "toastConflictDescription": "Supprimez d'abord les données d'exemple existantes ou partez de votre pipeline en production.",
+    "toastErrorTitle": "Impossible d'installer le modèle"
+  },
+  "sampleDataBanner": {
+    "title": "Les données d'exemple sont activées",
+    "description": "Des enregistrements de démonstration sont visibles dans cet espace de travail. Masquez cet avis ou supprimez entièrement les enregistrements d'exemple avant les démonstrations destinées aux dirigeants ou aux clients.",
+    "hide": "Masquer",
+    "remove": "Supprimer les données d'exemple",
+    "removing": "Suppression…",
+    "removedToast": "Données d'exemple supprimées",
+    "removeErrorToast": "Impossible de supprimer les données d'exemple"
   }
 }
