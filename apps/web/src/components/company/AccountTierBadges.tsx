@@ -3,23 +3,29 @@
 // Key account  = regional strategic account      → star + purple (brand tone).
 // Use these everywhere both concepts can appear so they are never confused.
 
+import { useTranslation } from 'react-i18next';
+
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 
 export function TopAccountBadge({ rank }: { rank?: number | null }) {
+  const { t } = useTranslation('crm');
   return (
     <Badge tone="amber">
       <Icon name="trophy" size={11} ariaHidden />
-      {rank ? `Top #${rank}` : 'Top'}
+      {rank
+        ? t('accountTierBadges.topRanked', 'Top #{{rank}}', { rank })
+        : t('accountTierBadges.top', 'Top')}
     </Badge>
   );
 }
 
 export function KeyAccountBadge() {
+  const { t } = useTranslation('crm');
   return (
     <Badge tone="purple">
       <Icon name="star" size={11} ariaHidden />
-      Key
+      {t('accountTierBadges.key', 'Key')}
     </Badge>
   );
 }

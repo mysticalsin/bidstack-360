@@ -96,5 +96,10 @@
     "title": "Analyses des appels d'offres",
     "subtitle": "Chaque appel d'offres de l'organisation, sa valeur et la répartition par responsable.",
     "viewAllProposals": "Voir toutes les propositions"
+  },
+  "aiDisclosureBadge": {
+    "ariaLabel": "Ce contenu a été généré avec l'assistance de l'IA",
+    "title": "Brouillon assisté par IA — à vérifier avant l'envoi",
+    "label": "Brouillon assisté par IA"
   }
 }

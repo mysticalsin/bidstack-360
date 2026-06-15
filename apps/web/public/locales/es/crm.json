@@ -3880,5 +3880,18 @@
   "offlineIndicator": {
     "statusLabel": "Sin conexión",
     "retryMessage": "— los guardados se reintentarán cuando vuelvas a conectarte"
+  },
+  "accountTierBadges": {
+    "top": "Top",
+    "topRanked": "Top n.º {{rank}}",
+    "key": "Clave"
+  },
+  "stubAuthBypass": {
+    "devModeSkipToDashboard": "Modo de desarrollo — Saltar al panel"
+  },
+  "upsellFiles": {
+    "title": "Archivos",
+    "emptyTitle": "Elige una cuenta",
+    "emptyMessage": "Abre una cuenta desde /accounts para adjuntar propuestas, acuerdos de confidencialidad y arquitecturas de referencia."
   }
 }

@@ -802,5 +802,9 @@
     "predictiveScoringTitle": "Predictive lead & deal scoring",
     "predictiveScoringCaption": "Review trained model versions, metrics, and retrain history.",
     "openPredictiveScoring": "Open predictive scoring"
+  },
+  "dataImport": {
+    "title": "Data import",
+    "caption": "Bring companies, contacts, leads, and opportunities in from a CSV export of your previous CRM. Map your columns, choose how duplicates are handled, then import."
   }
 }

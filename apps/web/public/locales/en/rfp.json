@@ -223,5 +223,10 @@
     "title": "RFP Analytics",
     "subtitle": "Every RFP across the organisation, its value, and the per-owner breakdown.",
     "viewAllProposals": "View all proposals"
+  },
+  "aiDisclosureBadge": {
+    "ariaLabel": "This content was generated with AI assistance",
+    "title": "AI-assisted draft — review before sending",
+    "label": "AI-assisted draft"
   }
 }

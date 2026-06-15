@@ -96,5 +96,10 @@
     "title": "Análise de RFP",
     "subtitle": "Cada RFP da organização, o seu valor e a divisão por responsável.",
     "viewAllProposals": "Ver todas as propostas"
+  },
+  "aiDisclosureBadge": {
+    "ariaLabel": "Este conteúdo foi gerado com assistência de IA",
+    "title": "Rascunho assistido por IA — revise antes de enviar",
+    "label": "Rascunho assistido por IA"
   }
 }

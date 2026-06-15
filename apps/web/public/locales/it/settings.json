@@ -821,5 +821,9 @@
     "predictiveScoringTitle": "Punteggio predittivo di lead e trattative",
     "predictiveScoringCaption": "Esamina le versioni dei modelli addestrati, le metriche e la cronologia dei riaddestramenti.",
     "openPredictiveScoring": "Apri il punteggio predittivo"
+  },
+  "dataImport": {
+    "title": "Importazione dati",
+    "caption": "Importa aziende, contatti, lead e opportunità da un'esportazione CSV del tuo CRM precedente. Mappa le colonne, scegli come gestire i duplicati, quindi importa."
   }
 }

@@ -3847,5 +3847,18 @@
   "offlineIndicator": {
     "statusLabel": "Offline",
     "retryMessage": "— saves will retry when you reconnect"
+  },
+  "accountTierBadges": {
+    "top": "Top",
+    "topRanked": "Top #{{rank}}",
+    "key": "Key"
+  },
+  "stubAuthBypass": {
+    "devModeSkipToDashboard": "Dev Mode — Skip to Dashboard"
+  },
+  "upsellFiles": {
+    "title": "Files",
+    "emptyTitle": "Pick an account",
+    "emptyMessage": "Open an account from /accounts to attach proposals, NDAs, and reference architectures."
   }
 }

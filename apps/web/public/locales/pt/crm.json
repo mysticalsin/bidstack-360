@@ -3847,5 +3847,18 @@
   "offlineIndicator": {
     "statusLabel": "Offline",
     "retryMessage": "— os salvamentos serão repetidos quando você reconectar"
+  },
+  "accountTierBadges": {
+    "top": "Top",
+    "topRanked": "Top n.º {{rank}}",
+    "key": "Chave"
+  },
+  "stubAuthBypass": {
+    "devModeSkipToDashboard": "Modo de desenvolvimento — Ir para o painel"
+  },
+  "upsellFiles": {
+    "title": "Arquivos",
+    "emptyTitle": "Escolha uma conta",
+    "emptyMessage": "Abra uma conta em /accounts para anexar propostas, NDAs e arquiteturas de referência."
   }
 }

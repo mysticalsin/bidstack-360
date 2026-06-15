@@ -1,8 +1,10 @@
 import { motion, useReducedMotion } from 'motion/react';
 import { Sparkles } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export function HeroBadge() {
   const shouldReduceMotion = useReducedMotion();
+  const { t } = useTranslation('auth');
   return (
     <motion.div
       className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/60 backdrop-blur-md border border-white/20 mx-auto mb-3 w-fit"
@@ -11,7 +13,7 @@ export function HeroBadge() {
       transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.6, ease: 'easeOut' }}
     >
       <Sparkles className="w-4 h-4 text-[rgba(30,50,90,0.8)]" />
-      <span className="text-[14px] font-normal text-[rgba(30,50,90,0.9)]">Enterprise Bid Intelligence</span>
+      <span className="text-[14px] font-normal text-[rgba(30,50,90,0.9)]">{t('heroBadge.label', 'Enterprise Bid Intelligence')}</span>
     </motion.div>
   );
 }

@@ -821,5 +821,9 @@
     "predictiveScoringTitle": "Scoring prédictif des leads et des affaires",
     "predictiveScoringCaption": "Consultez les versions des modèles entraînés, les métriques et l'historique de réentraînement.",
     "openPredictiveScoring": "Ouvrir le scoring prédictif"
+  },
+  "dataImport": {
+    "title": "Importation de données",
+    "caption": "Importez des entreprises, contacts, prospects et opportunités depuis un export CSV de votre ancien CRM. Mappez vos colonnes, choisissez le traitement des doublons, puis importez."
   }
 }

@@ -3902,5 +3902,18 @@
   "offlineIndicator": {
     "statusLabel": "Hors ligne",
     "retryMessage": "— les enregistrements seront réessayés à la reconnexion"
+  },
+  "accountTierBadges": {
+    "top": "Top",
+    "topRanked": "Top n° {{rank}}",
+    "key": "Clé"
+  },
+  "stubAuthBypass": {
+    "devModeSkipToDashboard": "Mode développeur — Aller au tableau de bord"
+  },
+  "upsellFiles": {
+    "title": "Fichiers",
+    "emptyTitle": "Choisissez un compte",
+    "emptyMessage": "Ouvrez un compte depuis /accounts pour joindre des propositions, des accords de confidentialité et des architectures de référence."
   }
 }

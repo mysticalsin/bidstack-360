@@ -3847,5 +3847,18 @@
   "offlineIndicator": {
     "statusLabel": "Offline",
     "retryMessage": "— i salvataggi verranno ritentati alla riconnessione"
+  },
+  "accountTierBadges": {
+    "top": "Top",
+    "topRanked": "Top n. {{rank}}",
+    "key": "Chiave"
+  },
+  "stubAuthBypass": {
+    "devModeSkipToDashboard": "Modalità sviluppatore — Vai alla dashboard"
+  },
+  "upsellFiles": {
+    "title": "File",
+    "emptyTitle": "Scegli un account",
+    "emptyMessage": "Apri un account da /accounts per allegare proposte, accordi di riservatezza e architetture di riferimento."
   }
 }

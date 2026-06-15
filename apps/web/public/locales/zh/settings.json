@@ -821,5 +821,9 @@
     "predictiveScoringTitle": "潜在客户和交易预测评分",
     "predictiveScoringCaption": "查看已训练的模型版本、指标和重新训练历史。",
     "openPredictiveScoring": "打开预测评分"
+  },
+  "dataImport": {
+    "title": "数据导入",
+    "caption": "从您以前的 CRM 的 CSV 导出文件中导入公司、联系人、潜在客户和商机。映射列、选择重复项的处理方式，然后导入。"
   }
 }

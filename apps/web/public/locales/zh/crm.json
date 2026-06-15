@@ -3847,5 +3847,18 @@
   "offlineIndicator": {
     "statusLabel": "离线",
     "retryMessage": "— 重新连接后将重试保存"
+  },
+  "accountTierBadges": {
+    "top": "顶级",
+    "topRanked": "顶级 #{{rank}}",
+    "key": "关键"
+  },
+  "stubAuthBypass": {
+    "devModeSkipToDashboard": "开发模式 — 跳转到仪表板"
+  },
+  "upsellFiles": {
+    "title": "文件",
+    "emptyTitle": "选择一个客户",
+    "emptyMessage": "从 /accounts 打开一个客户，以附加提案、保密协议和参考架构。"
   }
 }

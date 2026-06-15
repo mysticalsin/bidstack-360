@@ -824,5 +824,9 @@
     "predictiveScoringTitle": "Puntuación predictiva de leads y oportunidades",
     "predictiveScoringCaption": "Revisa las versiones de modelos entrenados, las métricas y el historial de reentrenamiento.",
     "openPredictiveScoring": "Abrir puntuación predictiva"
+  },
+  "dataImport": {
+    "title": "Importación de datos",
+    "caption": "Importa empresas, contactos, prospectos y oportunidades desde una exportación CSV de tu CRM anterior. Asigna tus columnas, elige cómo se gestionan los duplicados y luego importa."
   }
 }
