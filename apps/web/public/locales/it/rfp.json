@@ -61,5 +61,12 @@
       "won": "Vinto",
       "lost": "Perso"
     }
+  },
+  "sectionEditor": {
+    "ariaLabelEditSection": "Modifica sezione: {{title}}",
+    "statusReviewed": "✓ Revisionato",
+    "statusNotReviewed": "Non ancora revisionato",
+    "saving": "Salvataggio…",
+    "saveAndMarkReviewed": "Salva e segna come revisionato"
   }
 }

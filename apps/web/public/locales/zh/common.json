@@ -364,5 +364,8 @@
   },
   "sortableHeader": {
     "ariaLabel": "按 {{label}} 排序。当前排序：{{current}}。激活以进行 {{next}} 排序。"
+  },
+  "upgradeBanner": {
+    "actionLabel": "升级"
   }
 }

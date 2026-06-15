@@ -3801,5 +3801,18 @@
   },
   "customObjectNavItem": {
     "recordCountLabel": "{{count}} registros"
+  },
+  "alert": {
+    "ofTotal": "de {{total}}"
+  },
+  "pipelineByStage": {
+    "regionLabel": "Cartera de oportunidades por etapa",
+    "title": "Cartera de oportunidades",
+    "caption": "Pipeline de todas las cuentas por etapa"
+  },
+  "accountDashboardWidgets": {
+    "railAriaLabel": "Estado de integración del CRM",
+    "railLabel": "Actividad de integración",
+    "railCaption": "ERP, CRM externo, conectores de datos verificados"
   }
 }

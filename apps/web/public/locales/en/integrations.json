@@ -493,5 +493,37 @@
     "httpStatus": "HTTP {{status}}",
     "noResponse": "No response",
     "latencyMs": "{{latency}}ms"
+  },
+  "dustAgents": {
+    "title": "Dust agents",
+    "caption": "Workspace agents available for account data verification workflows",
+    "statusDegraded": "degraded",
+    "statusConfigured": "configured",
+    "statusDisabled": "disabled",
+    "notConfigured": "Add Dust credentials to list available workspace agents.",
+    "empty": "Dust is configured, but no accessible agents were returned for this workspace.",
+    "badgeAgent": "agent"
+  },
+  "connectionRunway": {
+    "sectionLabel": "Integration setup workflow",
+    "stepBadge": "Step {{number}}",
+    "steps": {
+      "pickSurface": {
+        "title": "Pick the surface",
+        "body": "Choose MCP for agents, REST for sync, webhooks for events, or connectors for ERP."
+      },
+      "scopeAccess": {
+        "title": "Scope access",
+        "body": "Create read/write keys only for the exact workflow and keep secrets server-side."
+      },
+      "probeBeforeSave": {
+        "title": "Probe before save",
+        "body": "Run a safe reachability check with SSRF protection and no bearer tokens sent."
+      },
+      "monitorEvidence": {
+        "title": "Monitor evidence",
+        "body": "Review provider health and webhook events without leaving the integration hub."
+      }
+    }
   }
 }

@@ -61,5 +61,12 @@
       "won": "已赢得",
       "lost": "已失去"
     }
+  },
+  "sectionEditor": {
+    "ariaLabelEditSection": "编辑章节：{{title}}",
+    "statusReviewed": "✓ 已审核",
+    "statusNotReviewed": "尚未审核",
+    "saving": "保存中…",
+    "saveAndMarkReviewed": "保存并标记为已审核"
   }
 }

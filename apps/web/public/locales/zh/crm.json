@@ -3768,5 +3768,18 @@
   },
   "customObjectNavItem": {
     "recordCountLabel": "{{count}} 条记录"
+  },
+  "alert": {
+    "ofTotal": "/ {{total}}"
+  },
+  "pipelineByStage": {
+    "regionLabel": "按阶段划分的组合管道",
+    "title": "组合管道",
+    "caption": "所有客户按阶段划分的管道"
+  },
+  "accountDashboardWidgets": {
+    "railAriaLabel": "CRM 集成状态",
+    "railLabel": "集成活动",
+    "railCaption": "ERP、外部 CRM、已验证的数据连接器"
   }
 }

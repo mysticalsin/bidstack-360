@@ -1,5 +1,6 @@
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import { useTranslation } from 'react-i18next';
 
 import { AiDisclosureBadge } from '@/components/rfp/shared/AiDisclosureBadge';
 import type { DraftSection } from '@/hooks/rfp/useRfpDraft';
@@ -11,6 +12,7 @@ interface SectionEditorProps {
 }
 
 export function SectionEditor({ section, onSave, isSaving }: SectionEditorProps) {
+  const { t } = useTranslation('rfp');
   const editor = useEditor({
     extensions: [StarterKit],
     content: section.content,
@@ -19,7 +21,9 @@ export function SectionEditor({ section, onSave, isSaving }: SectionEditorProps)
         // Accessible rich text editor region
         role: 'textbox',
         'aria-multiline': 'true',
-        'aria-label': `Edit section: ${section.title}`,
+        'aria-label': t('sectionEditor.ariaLabelEditSection', 'Edit section: {{title}}', {
+          title: section.title,
+        }),
         class: [
           'min-h-[120px] p-3 text-sm text-[var(--fg-primary)] focus:outline-none',
           'prose prose-sm max-w-none dark:prose-invert',
@@ -44,7 +48,9 @@ export function SectionEditor({ section, onSave, isSaving }: SectionEditorProps)
       </div>
       <div className="flex items-center justify-between">
         <span className="text-xs text-[var(--fg-tertiary)]">
-          {section.humanReviewed ? '✓ Reviewed' : 'Not yet reviewed'}
+          {section.humanReviewed
+            ? t('sectionEditor.statusReviewed', '✓ Reviewed')
+            : t('sectionEditor.statusNotReviewed', 'Not yet reviewed')}
         </span>
         <button
           type="button"
@@ -52,7 +58,9 @@ export function SectionEditor({ section, onSave, isSaving }: SectionEditorProps)
           onClick={handleSave}
           className="min-h-[44px] rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--brand-primary)]/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isSaving ? 'Saving…' : 'Save & Mark Reviewed'}
+          {isSaving
+            ? t('sectionEditor.saving', 'Saving…')
+            : t('sectionEditor.saveAndMarkReviewed', 'Save & Mark Reviewed')}
         </button>
       </div>
     </div>

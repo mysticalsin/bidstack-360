@@ -61,5 +61,12 @@
       "won": "Gagné",
       "lost": "Perdu"
     }
+  },
+  "sectionEditor": {
+    "ariaLabelEditSection": "Modifier la section : {{title}}",
+    "statusReviewed": "✓ Révisé",
+    "statusNotReviewed": "Pas encore révisé",
+    "saving": "Enregistrement…",
+    "saveAndMarkReviewed": "Enregistrer et marquer comme révisé"
   }
 }

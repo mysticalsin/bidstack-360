@@ -806,5 +806,18 @@
     "statusLabel": "Estado",
     "signedIn": "Sesión iniciada",
     "signedOut": "Sesión cerrada"
+  },
+  "workspaceSection": {
+    "original": {
+      "title": "Espacio de trabajo",
+      "caption": "La organización en la que te has autenticado y la identidad de usuario asociada a ella.",
+      "workspaceIdLabel": "ID del espacio de trabajo",
+      "environmentLabel": "Entorno",
+      "authProviderLabel": "Proveedor de autenticación",
+      "authProviderClerk": "Clerk",
+      "authProviderStub": "Stub (desarrollo)",
+      "signedInAsLabel": "Sesión iniciada como",
+      "notSignedIn": "Sesión no iniciada"
+    }
   }
 }

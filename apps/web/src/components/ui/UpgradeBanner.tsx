@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
@@ -16,23 +17,25 @@ interface UpgradeBannerProps {
 export function UpgradeBanner({
   title,
   message,
-  actionLabel = 'Upgrade',
+  actionLabel,
   href,
   onAction,
   icon = 'sparkle',
   className,
 }: UpgradeBannerProps) {
+  const { t } = useTranslation('common');
+  const resolvedActionLabel = actionLabel ?? t('upgradeBanner.actionLabel', 'Upgrade');
   const actionClassName =
     'inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[var(--brand-primary)] px-4 text-sm font-semibold text-white shadow-[var(--shadow-xs)] transition-colors hover:bg-[var(--brand-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] active:bg-[var(--brand-primary-press)]';
   const action =
     href !== undefined ? (
       <a href={href} className={actionClassName}>
-        {actionLabel}
+        {resolvedActionLabel}
         <Icon name="arrow" size={16} ariaHidden />
       </a>
     ) : onAction ? (
       <button type="button" onClick={onAction} className={actionClassName}>
-        {actionLabel}
+        {resolvedActionLabel}
         <Icon name="arrow" size={16} ariaHidden />
       </button>
     ) : null;

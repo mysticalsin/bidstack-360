@@ -364,5 +364,8 @@
   },
   "sortableHeader": {
     "ariaLabel": "Sort by {{label}}. Current sort: {{current}}. Activate to sort {{next}}."
+  },
+  "upgradeBanner": {
+    "actionLabel": "Upgrade"
   }
 }

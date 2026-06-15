@@ -803,5 +803,18 @@
     "statusLabel": "Stato",
     "signedIn": "Accesso effettuato",
     "signedOut": "Disconnesso"
+  },
+  "workspaceSection": {
+    "original": {
+      "title": "Area di lavoro",
+      "caption": "L'organizzazione con cui sei autenticato e l'identità utente associata.",
+      "workspaceIdLabel": "ID area di lavoro",
+      "environmentLabel": "Ambiente",
+      "authProviderLabel": "Provider di autenticazione",
+      "authProviderClerk": "Clerk",
+      "authProviderStub": "Stub (dev)",
+      "signedInAsLabel": "Accesso effettuato come",
+      "notSignedIn": "Accesso non effettuato"
+    }
   }
 }

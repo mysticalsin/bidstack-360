@@ -4,11 +4,13 @@
 // out-of-scope for v1 — Clerk owns invites in production, and the stub user
 // is a single seat in dev.
 
+import { useTranslation } from 'react-i18next';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useAuth, useUser } from '@/lib/auth';
 
 export function WorkspaceSection() {
+  const { t } = useTranslation('settings');
   const { isSignedIn } = useAuth();
   const { user } = useUser();
   const workspaceId = import.meta.env.VITE_BIDSTACK_WORKSPACE_ID ?? 'mantu-presales';
@@ -18,22 +20,29 @@ export function WorkspaceSection() {
   return (
     <Card>
       <SectionHeader
-        title="Workspace"
-        caption="The org you're authenticated against and the user identity scoped to it."
+        title={t('workspaceSection.original.title', 'Workspace')}
+        caption={t(
+          'workspaceSection.original.caption',
+          "The org you're authenticated against and the user identity scoped to it.",
+        )}
       />
       <dl className="divide-y divide-[var(--border-subtle)] text-sm">
-        <Row label="Workspace ID">
+        <Row label={t('workspaceSection.original.workspaceIdLabel', 'Workspace ID')}>
           <code className="font-mono text-xs text-[var(--fg-primary)]">{workspaceId}</code>
         </Row>
-        <Row label="Environment">
+        <Row label={t('workspaceSection.original.environmentLabel', 'Environment')}>
           <Badge tone={env === 'production' ? 'jade' : env === 'staging' ? 'amber' : 'gray'}>
             {env}
           </Badge>
         </Row>
-        <Row label="Auth provider">
-          <Badge tone={usingClerk ? 'jade' : 'gray'}>{usingClerk ? 'Clerk' : 'Stub (dev)'}</Badge>
+        <Row label={t('workspaceSection.original.authProviderLabel', 'Auth provider')}>
+          <Badge tone={usingClerk ? 'jade' : 'gray'}>
+            {usingClerk
+              ? t('workspaceSection.original.authProviderClerk', 'Clerk')
+              : t('workspaceSection.original.authProviderStub', 'Stub (dev)')}
+          </Badge>
         </Row>
-        <Row label="Signed in as">
+        <Row label={t('workspaceSection.original.signedInAsLabel', 'Signed in as')}>
           {isSignedIn && user ? (
             <div className="text-right">
               <div className="font-medium text-[var(--fg-primary)]">
@@ -46,7 +55,9 @@ export function WorkspaceSection() {
               ) : null}
             </div>
           ) : (
-            <span className="text-[var(--fg-tertiary)]">Not signed in</span>
+            <span className="text-[var(--fg-tertiary)]">
+              {t('workspaceSection.original.notSignedIn', 'Not signed in')}
+            </span>
           )}
         </Row>
       </dl>

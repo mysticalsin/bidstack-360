@@ -803,5 +803,18 @@
     "statusLabel": "Statut",
     "signedIn": "Connecté",
     "signedOut": "Déconnecté"
+  },
+  "workspaceSection": {
+    "original": {
+      "title": "Espace de travail",
+      "caption": "L'organisation auprès de laquelle vous êtes authentifié et l'identité utilisateur qui lui est rattachée.",
+      "workspaceIdLabel": "ID de l'espace de travail",
+      "environmentLabel": "Environnement",
+      "authProviderLabel": "Fournisseur d'authentification",
+      "authProviderClerk": "Clerk",
+      "authProviderStub": "Stub (dév)",
+      "signedInAsLabel": "Connecté en tant que",
+      "notSignedIn": "Non connecté"
+    }
   }
 }

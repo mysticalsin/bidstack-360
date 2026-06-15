@@ -483,5 +483,37 @@
     "httpStatus": "HTTP {{status}}",
     "noResponse": "Sin respuesta",
     "latencyMs": "{{latency}}ms"
+  },
+  "dustAgents": {
+    "title": "Agentes de Dust",
+    "caption": "Agentes del espacio de trabajo disponibles para flujos de verificación de datos de cuenta",
+    "statusDegraded": "degradado",
+    "statusConfigured": "configurado",
+    "statusDisabled": "deshabilitado",
+    "notConfigured": "Agrega credenciales de Dust para mostrar los agentes disponibles del espacio de trabajo.",
+    "empty": "Dust está configurado, pero no se devolvieron agentes accesibles para este espacio de trabajo.",
+    "badgeAgent": "agente"
+  },
+  "connectionRunway": {
+    "sectionLabel": "Flujo de configuración de integración",
+    "stepBadge": "Paso {{number}}",
+    "steps": {
+      "pickSurface": {
+        "title": "Elige la superficie",
+        "body": "Elige MCP para agentes, REST para sincronización, webhooks para eventos o conectores para ERP."
+      },
+      "scopeAccess": {
+        "title": "Limita el acceso",
+        "body": "Crea claves de lectura/escritura solo para el flujo de trabajo exacto y mantén los secretos en el servidor."
+      },
+      "probeBeforeSave": {
+        "title": "Prueba antes de guardar",
+        "body": "Ejecuta una comprobación de accesibilidad segura con protección SSRF y sin enviar tokens de portador."
+      },
+      "monitorEvidence": {
+        "title": "Supervisa la evidencia",
+        "body": "Revisa el estado del proveedor y los eventos de webhook sin salir del centro de integraciones."
+      }
+    }
   }
 }

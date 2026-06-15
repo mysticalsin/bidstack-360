@@ -364,5 +364,8 @@
   },
   "sortableHeader": {
     "ariaLabel": "Ordenar por {{label}}. Orden actual: {{current}}. Activar para ordenar {{next}}."
+  },
+  "upgradeBanner": {
+    "actionLabel": "Mejorar"
   }
 }

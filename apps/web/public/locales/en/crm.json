@@ -3768,5 +3768,18 @@
   },
   "customObjectNavItem": {
     "recordCountLabel": "{{count}} records"
+  },
+  "alert": {
+    "ofTotal": "of {{total}}"
+  },
+  "pipelineByStage": {
+    "regionLabel": "Portfolio pipeline by stage",
+    "title": "Portfolio pipeline",
+    "caption": "All-account pipeline by stage"
+  },
+  "accountDashboardWidgets": {
+    "railAriaLabel": "CRM integration status",
+    "railLabel": "Integration activity",
+    "railCaption": "ERP, External CRM, verified data connectors"
   }
 }

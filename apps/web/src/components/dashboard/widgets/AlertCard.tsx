@@ -6,6 +6,7 @@
  * + href) that appears twice in the sidebar with different props. Extracting
  * it makes future alert types a one-liner in OrgDashboard.
  */
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -30,6 +31,7 @@ export function AlertCard({
   total: number;
   href: string;
 }) {
+  const { t } = useTranslation('crm');
   return (
     <GlassCard hoverable={false}>
       <Link
@@ -55,7 +57,9 @@ export function AlertCard({
             <span className="text-xl font-bold tabular-nums" style={{ color: TONE_FG[tone] }}>
               {value}
             </span>
-            <span className="text-xs text-[var(--fg-secondary)]">of {total}</span>
+            <span className="text-xs text-[var(--fg-secondary)]">
+              {t('alert.ofTotal', 'of {{total}}', { total })}
+            </span>
           </div>
         </div>
       </Link>

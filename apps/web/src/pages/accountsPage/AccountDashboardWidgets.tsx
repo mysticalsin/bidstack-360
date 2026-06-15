@@ -3,6 +3,7 @@
 // both tiny and only used by AccountsPage — splitting them into separate files
 // would add navigation overhead without any clarity benefit.
 import type { CSSProperties } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 
@@ -33,6 +34,7 @@ export function IntegrationMotionRail({
 }: {
   providers: Array<{ name: string; status: string }>;
 }) {
+  const { t } = useTranslation('crm');
   const visible = providers.length
     ? providers.slice(0, 8)
     : [
@@ -42,8 +44,13 @@ export function IntegrationMotionRail({
         { name: 'Market data', status: 'healthy' },
       ];
   return (
-    <div className="integration-motion-rail" aria-label="CRM integration status">
-      <span className="rail-label">Integration activity</span>
+    <div
+      className="integration-motion-rail"
+      aria-label={t('accountDashboardWidgets.railAriaLabel', 'CRM integration status')}
+    >
+      <span className="rail-label">
+        {t('accountDashboardWidgets.railLabel', 'Integration activity')}
+      </span>
       <div className="rail-track" aria-hidden>
         {visible.map((provider, index) => (
           <span
@@ -55,7 +62,9 @@ export function IntegrationMotionRail({
           </span>
         ))}
       </div>
-      <span className="rail-caption">ERP, External CRM, verified data connectors</span>
+      <span className="rail-caption">
+        {t('accountDashboardWidgets.railCaption', 'ERP, External CRM, verified data connectors')}
+      </span>
     </div>
   );
 }

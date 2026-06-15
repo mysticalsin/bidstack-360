@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge } from '@/components/ui/Badge';
@@ -17,10 +18,14 @@ interface Props {
 export const PipelineByStageCard = memo(function PipelineByStageCard({ report }: Props) {
   const reducedMotion = useReducedMotion();
   const { formatMoney } = useFormatMoney();
+  const { t } = useTranslation('crm');
   const maxValue = report ? Math.max(1, ...report.byStage.map((stage) => stage.valueSum)) : 1;
   return (
-    <Card role="region" aria-label="Portfolio pipeline by stage">
-      <SectionHeader title="Portfolio pipeline" caption="All-account pipeline by stage" />
+    <Card role="region" aria-label={t('pipelineByStage.regionLabel', 'Portfolio pipeline by stage')}>
+      <SectionHeader
+        title={t('pipelineByStage.title', 'Portfolio pipeline')}
+        caption={t('pipelineByStage.caption', 'All-account pipeline by stage')}
+      />
       <div style={{ padding: '14px 18px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {!report ? (
           <LoadingSkeleton rows={4} />

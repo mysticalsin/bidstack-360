@@ -188,5 +188,12 @@
       "won": "Won",
       "lost": "Lost"
     }
+  },
+  "sectionEditor": {
+    "ariaLabelEditSection": "Edit section: {{title}}",
+    "statusReviewed": "✓ Reviewed",
+    "statusNotReviewed": "Not yet reviewed",
+    "saving": "Saving…",
+    "saveAndMarkReviewed": "Save & Mark Reviewed"
   }
 }

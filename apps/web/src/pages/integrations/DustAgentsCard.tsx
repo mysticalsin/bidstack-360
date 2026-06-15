@@ -6,6 +6,8 @@
  * loading/error/empty/populated state logic. Extracting it keeps the agents
  * tab clean and makes the card independently reusable.
  */
+import { useTranslation } from 'react-i18next';
+
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
@@ -13,18 +15,22 @@ import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import type { DustStatus } from './types';
 
 export function DustAgentsCard({ data, isLoading }: { data?: DustStatus; isLoading: boolean }) {
+  const { t } = useTranslation('integrations');
   return (
     <Card>
       <SectionHeader
-        title="Dust agents"
-        caption="Workspace agents available for account data verification workflows"
+        title={t('dustAgents.title', 'Dust agents')}
+        caption={t(
+          'dustAgents.caption',
+          'Workspace agents available for account data verification workflows',
+        )}
         action={
           data?.agentsError ? (
-            <Badge tone="tomato">degraded</Badge>
+            <Badge tone="tomato">{t('dustAgents.statusDegraded', 'degraded')}</Badge>
           ) : data?.configured ? (
-            <Badge tone="jade">configured</Badge>
+            <Badge tone="jade">{t('dustAgents.statusConfigured', 'configured')}</Badge>
           ) : (
-            <Badge tone="amber">disabled</Badge>
+            <Badge tone="amber">{t('dustAgents.statusDisabled', 'disabled')}</Badge>
           )
         }
       />
@@ -34,7 +40,7 @@ export function DustAgentsCard({ data, isLoading }: { data?: DustStatus; isLoadi
         </div>
       ) : !data?.configured ? (
         <div className="px-5 py-6 text-sm text-[var(--fg-secondary)]">
-          Add Dust credentials to list available workspace agents.
+          {t('dustAgents.notConfigured', 'Add Dust credentials to list available workspace agents.')}
         </div>
       ) : data.agentsError ? (
         <div className="mx-5 my-5 rounded-md bg-[var(--danger-tint)] px-3 py-2 text-xs text-[var(--danger)]">
@@ -42,7 +48,10 @@ export function DustAgentsCard({ data, isLoading }: { data?: DustStatus; isLoadi
         </div>
       ) : data.agents.length === 0 ? (
         <div className="px-5 py-6 text-sm text-[var(--fg-secondary)]">
-          Dust is configured, but no accessible agents were returned for this workspace.
+          {t(
+            'dustAgents.empty',
+            'Dust is configured, but no accessible agents were returned for this workspace.',
+          )}
         </div>
       ) : (
         <ul className="divide-y divide-[var(--border-subtle)]">
@@ -57,7 +66,7 @@ export function DustAgentsCard({ data, isLoading }: { data?: DustStatus; isLoadi
                   <p className="mt-1 text-xs text-[var(--fg-secondary)]">{agent.description}</p>
                 ) : null}
               </div>
-              <Badge tone="purple">agent</Badge>
+              <Badge tone="purple">{t('dustAgents.badgeAgent', 'agent')}</Badge>
             </li>
           ))}
         </ul>

@@ -3823,5 +3823,18 @@
   },
   "customObjectNavItem": {
     "recordCountLabel": "{{count}} enregistrements"
+  },
+  "alert": {
+    "ofTotal": "sur {{total}}"
+  },
+  "pipelineByStage": {
+    "regionLabel": "Pipeline du portefeuille par étape",
+    "title": "Pipeline du portefeuille",
+    "caption": "Pipeline de tous les comptes par étape"
+  },
+  "accountDashboardWidgets": {
+    "railAriaLabel": "État d'intégration du CRM",
+    "railLabel": "Activité d'intégration",
+    "railCaption": "ERP, CRM externe, connecteurs de données vérifiés"
   }
 }

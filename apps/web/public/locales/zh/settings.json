@@ -803,5 +803,18 @@
     "statusLabel": "状态",
     "signedIn": "已登录",
     "signedOut": "已退出"
+  },
+  "workspaceSection": {
+    "original": {
+      "title": "工作区",
+      "caption": "您已通过身份验证的组织以及与之关联的用户身份。",
+      "workspaceIdLabel": "工作区 ID",
+      "environmentLabel": "环境",
+      "authProviderLabel": "身份验证提供商",
+      "authProviderClerk": "Clerk",
+      "authProviderStub": "桩 (开发)",
+      "signedInAsLabel": "登录身份",
+      "notSignedIn": "未登录"
+    }
   }
 }

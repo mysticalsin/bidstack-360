@@ -493,5 +493,37 @@
     "httpStatus": "HTTP {{status}}",
     "noResponse": "无响应",
     "latencyMs": "{{latency}}毫秒"
+  },
+  "dustAgents": {
+    "title": "Dust 代理",
+    "caption": "可用于账户数据验证工作流的工作区代理",
+    "statusDegraded": "降级",
+    "statusConfigured": "已配置",
+    "statusDisabled": "已禁用",
+    "notConfigured": "添加 Dust 凭据以列出可用的工作区代理。",
+    "empty": "Dust 已配置，但此工作区未返回任何可访问的代理。",
+    "badgeAgent": "代理"
+  },
+  "connectionRunway": {
+    "sectionLabel": "集成设置工作流",
+    "stepBadge": "第 {{number}} 步",
+    "steps": {
+      "pickSurface": {
+        "title": "选择接入方式",
+        "body": "为代理选择 MCP，为同步选择 REST，为事件选择 webhooks，或为 ERP 选择连接器。"
+      },
+      "scopeAccess": {
+        "title": "限定访问范围",
+        "body": "仅为特定工作流创建读/写密钥，并将密钥保存在服务器端。"
+      },
+      "probeBeforeSave": {
+        "title": "保存前先探测",
+        "body": "运行安全的可达性检查，启用 SSRF 防护且不发送 bearer 令牌。"
+      },
+      "monitorEvidence": {
+        "title": "监控证据",
+        "body": "无需离开集成中心即可查看提供商运行状况和 webhook 事件。"
+      }
+    }
   }
 }

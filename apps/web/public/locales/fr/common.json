@@ -364,5 +364,8 @@
   },
   "sortableHeader": {
     "ariaLabel": "Trier par {{label}}. Tri actuel : {{current}}. Activer pour trier {{next}}."
+  },
+  "upgradeBanner": {
+    "actionLabel": "Mettre à niveau"
   }
 }

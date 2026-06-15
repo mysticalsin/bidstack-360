@@ -784,5 +784,18 @@
     "statusLabel": "Status",
     "signedIn": "Signed in",
     "signedOut": "Signed out"
+  },
+  "workspaceSection": {
+    "original": {
+      "title": "Workspace",
+      "caption": "The org you're authenticated against and the user identity scoped to it.",
+      "workspaceIdLabel": "Workspace ID",
+      "environmentLabel": "Environment",
+      "authProviderLabel": "Auth provider",
+      "authProviderClerk": "Clerk",
+      "authProviderStub": "Stub (dev)",
+      "signedInAsLabel": "Signed in as",
+      "notSignedIn": "Not signed in"
+    }
   }
 }
