@@ -2,6 +2,8 @@
  * ForecastChart — stacked bar chart showing pipeline / best-case / commit /
  * closed revenue per period. Pure display; no data fetching.
  */
+import { useTranslation } from 'react-i18next';
+
 import { Card, SectionHeader } from '@/components/ui/Card';
 
 import { CATEGORIES, CATEGORY_COLOR, CATEGORY_LABELS, type ChartDatum } from './forecastsConfig';
@@ -13,12 +15,17 @@ interface ForecastChartProps {
 }
 
 export function ForecastChart({ chartData, maxTotal, formatMoneyMicros }: ForecastChartProps) {
+  const { t } = useTranslation('crm');
+
   if (chartData.length === 0) return null;
 
   return (
     <div className="hidden md:block">
       <Card>
-        <SectionHeader title="Forecast Breakdown" caption="Stacked by category across periods" />
+        <SectionHeader
+          title={t('forecastChart.title', 'Forecast Breakdown')}
+          caption={t('forecastChart.caption', 'Stacked by category across periods')}
+        />
         <div className="px-5 pb-5 pt-2">
           <div className="flex items-end gap-4" style={{ height: 220 }}>
             {chartData.map((d) => {

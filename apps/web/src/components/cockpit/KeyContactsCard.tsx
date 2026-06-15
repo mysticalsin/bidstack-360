@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
@@ -14,10 +15,11 @@ interface Props {
 
 export const KeyContactsCard = memo(function KeyContactsCard({ cockpit }: Props) {
   const reducedMotion = useReducedMotion();
+  const { t } = useTranslation('crm');
   if (cockpit.keyContacts.length === 0) return null;
   return (
     <Card>
-      <SectionHeader title="Key contacts" />
+      <SectionHeader title={t('keyContacts.title', 'Key contacts')} />
       <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
         {cockpit.keyContacts.slice(0, 5).map((person, index) => (
           <motion.li
@@ -52,7 +54,7 @@ export const KeyContactsCard = memo(function KeyContactsCard({ cockpit }: Props)
                 {person.name}
               </div>
               <div style={{ fontSize: 11.5, color: 'var(--fg-tertiary)' }}>
-                {person.title ?? person.email ?? 'n/a'}
+                {person.title ?? person.email ?? t('keyContacts.noTitleOrEmail', 'n/a')}
               </div>
             </div>
             {person.roleInDecision ? (

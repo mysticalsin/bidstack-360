@@ -7,6 +7,7 @@
  * each be restyled or swapped independently.
  */
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 import { GlassCard } from '@/components/ui/GlassCard';
 import { springSoft } from '@/lib/motion';
@@ -27,13 +28,14 @@ export function PipelineByStageMini({
   currency: string;
   convert: (amount: number, from: string) => number;
 }) {
+  const { t } = useTranslation('crm');
   if (!report || report.byStage.length === 0) return null;
   const maxValue = Math.max(1, ...report.byStage.map((s) => convert(s.valueSum, 'EUR')));
 
   return (
     <GlassCard padding="sm" hoverable={false}>
       <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)] px-1 pt-1 pb-2">
-        Pipeline by stage
+        {t('pipelineByStageMini.heading', 'Pipeline by stage')}
       </div>
       <div className="flex flex-col gap-2">
         {report.byStage.map((s, i) => (

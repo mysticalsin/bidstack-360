@@ -3799,5 +3799,29 @@
     "modelMeta": "Modèle {{model}} · {{tokens}} jetons",
     "copy": "Copier",
     "regenerate": "Régénérer"
+  },
+  "forecastChart": {
+    "title": "Répartition des prévisions",
+    "caption": "Empilé par catégorie sur les périodes"
+  },
+  "techStack": {
+    "regionLabel": "Aperçu de la pile technique",
+    "title": "Aperçu de la pile technique",
+    "caption": "Issu de la découverte et de la vérification",
+    "emptyTitle": "Aucune donnée de pile pour le moment",
+    "emptyMessage": "Enrichissez ce compte pour découvrir sa pile."
+  },
+  "keyContacts": {
+    "title": "Contacts clés",
+    "noTitleOrEmail": "s.o."
+  },
+  "pipelineByStageMini": {
+    "heading": "Pipeline par étape"
+  },
+  "microsoftSignInButton": {
+    "label": "Se connecter avec Microsoft"
+  },
+  "customObjectNavItem": {
+    "recordCountLabel": "{{count}} enregistrements"
   }
 }

@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { TechLogo } from '@/components/company/TechLogo';
 import { Card, SectionHeader } from '@/components/ui/Card';
@@ -17,22 +18,26 @@ interface Props {
 // when sibling cards (notes, files) fetch.
 export const TechStackCard = memo(function TechStackCard({ cockpit }: Props) {
   const reducedMotion = useReducedMotion();
+  const { t } = useTranslation('crm');
   if (cockpit.technicalStack.length === 0) {
     return (
-      <Card role="region" aria-label="Technical Stack Overview">
-        <SectionHeader title="Technical Stack Overview" />
+      <Card role="region" aria-label={t('techStack.regionLabel', 'Technical Stack Overview')}>
+        <SectionHeader title={t('techStack.title', 'Technical Stack Overview')} />
         <div style={{ padding: '14px 18px 18px' }}>
           <EmptyState
-            title="No stack data yet"
-            message="Enrich this account to discover its stack."
+            title={t('techStack.emptyTitle', 'No stack data yet')}
+            message={t('techStack.emptyMessage', 'Enrich this account to discover its stack.')}
           />
         </div>
       </Card>
     );
   }
   return (
-    <Card role="region" aria-label="Technical Stack Overview">
-      <SectionHeader title="Technical Stack Overview" caption="From discovery & verification" />
+    <Card role="region" aria-label={t('techStack.regionLabel', 'Technical Stack Overview')}>
+      <SectionHeader
+        title={t('techStack.title', 'Technical Stack Overview')}
+        caption={t('techStack.caption', 'From discovery & verification')}
+      />
       <div style={{ padding: '14px 18px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         {cockpit.technicalStack.slice(0, 3).map((cat) => (
           <div key={cat.label}>

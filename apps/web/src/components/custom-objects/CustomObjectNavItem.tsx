@@ -9,6 +9,7 @@
  * active-state aria-current. Touch target ≥ 44×44px per WCAG 2.2.
  */
 import { NavLink } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 
 interface CustomObjectNavItemProps {
@@ -27,6 +28,7 @@ export function CustomObjectNavItem({
   recordCount,
   collapsed = false,
 }: CustomObjectNavItemProps) {
+  const { t } = useTranslation('crm');
   return (
     <NavLink
       to={`/o/${objectKey}`}
@@ -55,7 +57,7 @@ export function CustomObjectNavItem({
           {recordCount !== undefined && recordCount > 0 && (
             <span
               className="ml-auto text-xs font-medium tabular-nums text-[var(--sidebar-badge-fg)] bg-[var(--sidebar-badge-bg)] rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center"
-              aria-label={`${recordCount} records`}
+              aria-label={t('customObjectNavItem.recordCountLabel', '{{count}} records', { count: recordCount })}
             >
               {recordCount > 999 ? '999+' : recordCount}
             </span>

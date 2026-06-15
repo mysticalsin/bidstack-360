@@ -15,6 +15,8 @@
 // so it reads identically everywhere. (RfpStatusChip remains the source of
 // truth for the PipelineStage enum — do not duplicate that here.)
 
+import { useTranslation } from 'react-i18next';
+
 export type ProposalStatus = 'draft' | 'review' | 'approved' | 'submitted' | 'won' | 'lost';
 
 // Token tag palette only (light + dark safe) — mirrors the Hub's deliberate
@@ -64,11 +66,12 @@ export function ProposalStatusChip({
   status: ProposalStatus;
   className?: string;
 }) {
+  const { t } = useTranslation('rfp');
   return (
     <span
       className={`inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold ${PROPOSAL_STATUS_TONE[status]} ${className}`}
     >
-      {PROPOSAL_STATUS_LABELS[status]}
+      {t(`proposalStatusChip.label.${status}`, PROPOSAL_STATUS_LABELS[status])}
     </span>
   );
 }

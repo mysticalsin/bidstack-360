@@ -1,4 +1,5 @@
 import { lazy } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface MicrosoftSignInButtonProps {
   label?: string;
@@ -8,10 +9,14 @@ interface MicrosoftSignInButtonProps {
 export const MicrosoftSignInButton = lazy(() =>
   import('@clerk/clerk-react').then((m) => ({
     default: function MicrosoftSignInButtonImpl({
-      label = 'Sign in with Microsoft',
+      label,
       variant = 'primary',
     }: MicrosoftSignInButtonProps) {
       const { signIn, isLoaded } = m.useSignIn();
+      const { t } = useTranslation('crm');
+      const resolvedLabel =
+        label ??
+        t('microsoftSignInButton.label', 'Sign in with Microsoft');
 
       const baseClasses =
         'inline-flex w-full items-center justify-center gap-2.5 rounded-full px-5 py-3 text-sm font-medium font-body transition-all hover:brightness-110 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 cursor-pointer';
@@ -29,7 +34,7 @@ export const MicrosoftSignInButton = lazy(() =>
             className={`${baseClasses} ${variantClasses} opacity-60 cursor-not-allowed`}
           >
             <MicrosoftLogo />
-            {label}
+            {resolvedLabel}
           </button>
         );
       }
@@ -45,10 +50,10 @@ export const MicrosoftSignInButton = lazy(() =>
             });
           }}
           className={`${baseClasses} ${variantClasses}`}
-          aria-label="Sign in with Microsoft"
+          aria-label={resolvedLabel}
         >
           <MicrosoftLogo />
-          {label}
+          {resolvedLabel}
         </button>
       );
     },

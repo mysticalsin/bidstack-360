@@ -3744,5 +3744,29 @@
     "modelMeta": "模型 {{model}} · {{tokens}} 个 token",
     "copy": "复制",
     "regenerate": "重新生成"
+  },
+  "forecastChart": {
+    "title": "预测明细",
+    "caption": "按类别跨周期堆叠"
+  },
+  "techStack": {
+    "regionLabel": "技术栈概览",
+    "title": "技术栈概览",
+    "caption": "来自发现与验证",
+    "emptyTitle": "尚无技术栈数据",
+    "emptyMessage": "充实此客户以发现其技术栈。"
+  },
+  "keyContacts": {
+    "title": "关键联系人",
+    "noTitleOrEmail": "无"
+  },
+  "pipelineByStageMini": {
+    "heading": "按阶段划分的销售管道"
+  },
+  "microsoftSignInButton": {
+    "label": "使用 Microsoft 登录"
+  },
+  "customObjectNavItem": {
+    "recordCountLabel": "{{count}} 条记录"
   }
 }

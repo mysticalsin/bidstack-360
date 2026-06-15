@@ -3777,5 +3777,29 @@
     "modelMeta": "Modelo {{model}} · {{tokens}} tokens",
     "copy": "Copiar",
     "regenerate": "Regenerar"
+  },
+  "forecastChart": {
+    "title": "Desglose de previsión",
+    "caption": "Apilado por categoría a lo largo de los periodos"
+  },
+  "techStack": {
+    "regionLabel": "Resumen de la pila técnica",
+    "title": "Resumen de la pila técnica",
+    "caption": "De la detección y verificación",
+    "emptyTitle": "Aún no hay datos de la pila",
+    "emptyMessage": "Enriquece esta cuenta para descubrir su pila."
+  },
+  "keyContacts": {
+    "title": "Contactos clave",
+    "noTitleOrEmail": "n/d"
+  },
+  "pipelineByStageMini": {
+    "heading": "Pipeline por etapa"
+  },
+  "microsoftSignInButton": {
+    "label": "Iniciar sesión con Microsoft"
+  },
+  "customObjectNavItem": {
+    "recordCountLabel": "{{count}} registros"
   }
 }

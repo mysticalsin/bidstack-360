@@ -51,5 +51,15 @@
     "statusOverseeing": "Supervisione",
     "viewRoleDetailsAria": "{{role}} — visualizza i dettagli del ruolo",
     "moveToStageAria": "Sposta {{role}} a un'altra fase. Usa i tasti freccia sinistra e destra."
+  },
+  "proposalStatusChip": {
+    "label": {
+      "draft": "Bozza",
+      "review": "In revisione",
+      "approved": "Approvato",
+      "submitted": "Inviato",
+      "won": "Vinto",
+      "lost": "Perso"
+    }
   }
 }

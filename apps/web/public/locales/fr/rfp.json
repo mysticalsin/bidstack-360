@@ -51,5 +51,15 @@
     "statusOverseeing": "Supervision",
     "viewRoleDetailsAria": "{{role}} — voir les détails du rôle",
     "moveToStageAria": "Déplacer {{role}} vers une autre étape. Utilisez les touches fléchées gauche et droite."
+  },
+  "proposalStatusChip": {
+    "label": {
+      "draft": "Brouillon",
+      "review": "En révision",
+      "approved": "Approuvé",
+      "submitted": "Soumis",
+      "won": "Gagné",
+      "lost": "Perdu"
+    }
   }
 }

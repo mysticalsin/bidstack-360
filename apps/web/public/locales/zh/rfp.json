@@ -51,5 +51,15 @@
     "statusOverseeing": "监督中",
     "viewRoleDetailsAria": "{{role}} — 查看角色详情",
     "moveToStageAria": "将 {{role}} 移至其他阶段。使用左右方向键。"
+  },
+  "proposalStatusChip": {
+    "label": {
+      "draft": "草稿",
+      "review": "审核中",
+      "approved": "已批准",
+      "submitted": "已提交",
+      "won": "已赢得",
+      "lost": "已失去"
+    }
   }
 }

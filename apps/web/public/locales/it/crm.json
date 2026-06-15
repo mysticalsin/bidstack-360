@@ -3744,5 +3744,29 @@
     "modelMeta": "Modello {{model}} · {{tokens}} token",
     "copy": "Copia",
     "regenerate": "Rigenera"
+  },
+  "forecastChart": {
+    "title": "Ripartizione delle previsioni",
+    "caption": "Impilato per categoria nei periodi"
+  },
+  "techStack": {
+    "regionLabel": "Panoramica dello stack tecnico",
+    "title": "Panoramica dello stack tecnico",
+    "caption": "Da scoperta e verifica",
+    "emptyTitle": "Ancora nessun dato sullo stack",
+    "emptyMessage": "Arricchisci questo account per scoprire il suo stack."
+  },
+  "keyContacts": {
+    "title": "Contatti chiave",
+    "noTitleOrEmail": "n/d"
+  },
+  "pipelineByStageMini": {
+    "heading": "Pipeline per fase"
+  },
+  "microsoftSignInButton": {
+    "label": "Accedi con Microsoft"
+  },
+  "customObjectNavItem": {
+    "recordCountLabel": "{{count}} record"
   }
 }

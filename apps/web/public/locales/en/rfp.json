@@ -178,5 +178,15 @@
     "statusOverseeing": "Overseeing",
     "viewRoleDetailsAria": "{{role}} — view role details",
     "moveToStageAria": "Move {{role}} to another stage. Use left and right arrow keys."
+  },
+  "proposalStatusChip": {
+    "label": {
+      "draft": "Draft",
+      "review": "In review",
+      "approved": "Approved",
+      "submitted": "Submitted",
+      "won": "Won",
+      "lost": "Lost"
+    }
   }
 }
