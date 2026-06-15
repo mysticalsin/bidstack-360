@@ -125,5 +125,108 @@
     "emptyTitle": "No competitor findings yet",
     "emptyMessage": "Pick a competitor and run research. We only surface claims we can link to a public source — including real federal award pricing from USASpending.",
     "error": "Couldn't load competitor findings."
+  },
+  "proposalDetail": {
+    "loadingAriaLabel": "Caricamento proposta",
+    "errorTitle": "Impossibile caricare la proposta",
+    "errorRetry": "Riprova tra un momento.",
+    "backToProposals": "Torna alle proposte",
+    "notFound": "Proposta non trovata.",
+    "backToProposalsAriaLabel": "Torna alle proposte",
+    "version": "v{{version}}",
+    "due": "Scadenza {{date}}",
+    "requiredBadge": "Obbligatorio",
+    "aiDraftedBadge": "Redatto dall'IA",
+    "wordCount": "{{count}} parole",
+    "draftingSectionAriaLabel": "Redazione di {{title}}…",
+    "aiDraftSectionAriaLabel": "Bozza IA per {{title}}",
+    "drafting": "Redazione…",
+    "aiDraft": "Bozza IA",
+    "editSectionAriaLabel": "Modifica la sezione {{title}}",
+    "editContentAriaLabel": "Modifica il contenuto di {{title}}",
+    "cancel": "Annulla",
+    "saving": "Salvataggio…",
+    "save": "Salva",
+    "emptyContent": "Ancora nessun contenuto. Usa Bozza IA per generare una prima versione."
+  },
+  "proposals": {
+    "title": "Proposte",
+    "subtitle": "Area RFP — redigi, rivedi e invia proposte vincenti.",
+    "newProposal": "Nuova proposta",
+    "createProposal": "Crea proposta",
+    "nameLabel": "Nome della proposta",
+    "namePlaceholder": "Nome della proposta…",
+    "creating": "Creazione…",
+    "create": "Crea",
+    "cancel": "Annulla",
+    "createError": "Impossibile creare la proposta.",
+    "filterByStatus": "Filtra per stato",
+    "resultCount": "{{count}} proposte",
+    "loading": "Caricamento delle proposte",
+    "loadError": "Impossibile caricare le proposte",
+    "loadErrorRetry": "Riprova tra un momento.",
+    "emptyTitle": "Ancora nessuna proposta.",
+    "emptyMessage": "Crea la tua prima proposta per iniziare.",
+    "viewProposal": "Visualizza proposta: {{name}}",
+    "version": "v{{version}}",
+    "due": "Scadenza {{date}}"
+  },
+  "rfpCrew": {
+    "statusWaiting": "In attesa",
+    "statusWorking": "In corso",
+    "statusDone": "Completato",
+    "statusOverseeing": "Supervisione",
+    "viewRoleDetailsAria": "{{role}} — visualizza i dettagli del ruolo",
+    "moveToStageAria": "Sposta {{role}} a un'altra fase. Usa i tasti freccia sinistra e destra."
+  },
+  "proposalStatusChip": {
+    "label": {
+      "draft": "Bozza",
+      "review": "In revisione",
+      "approved": "Approvato",
+      "submitted": "Inviato",
+      "won": "Vinto",
+      "lost": "Perso"
+    }
+  },
+  "sectionEditor": {
+    "ariaLabelEditSection": "Modifica sezione: {{title}}",
+    "statusReviewed": "✓ Revisionato",
+    "statusNotReviewed": "Non ancora revisionato",
+    "saving": "Salvataggio…",
+    "saveAndMarkReviewed": "Salva e segna come revisionato"
+  },
+  "rfpStatusChip": {
+    "stageIdle": "Inattivo",
+    "stageQueued": "In coda",
+    "stageExtracting": "Estrazione",
+    "stageStoryMatching": "Abbinamento storie",
+    "stageSectionDrafting": "Stesura",
+    "stageComplianceFill": "Conformità",
+    "stageLegalScan": "Team di revisione",
+    "stageQaReview": "Revisione QA",
+    "stageAwaitingApproval": "In attesa di approvazione",
+    "stageApproved": "Approvato",
+    "stageCompleted": "Completato",
+    "stageFailed": "Non riuscito",
+    "stageRejected": "Rifiutato",
+    "stageTimeout": "Tempo scaduto",
+    "ariaPipelineStatus": "Stato della pipeline: {{status}}"
+  },
+  "requirementRow": {
+    "pageRefAria": "Trovato a pagina {{page}}",
+    "confidenceAria": "Affidabilità IA: {{percent}}%",
+    "confidenceLabel": "{{percent}}% di affidabilità"
+  },
+  "adminRfp": {
+    "eyebrow": "Amministrazione",
+    "title": "Analisi RFP",
+    "subtitle": "Ogni RFP dell'organizzazione, il suo valore e la ripartizione per responsabile.",
+    "viewAllProposals": "Visualizza tutte le proposte"
+  },
+  "aiDisclosureBadge": {
+    "ariaLabel": "Questo contenuto è stato generato con l'assistenza dell'IA",
+    "title": "Bozza assistita dall'IA — rivedere prima di inviare",
+    "label": "Bozza assistita dall'IA"
   }
 }
