@@ -53,5 +53,101 @@
     "cancel": "Cancelar solicitud",
     "viewCertificate": "Ver certificado",
     "confirmCancel": "¿Cancelar esta solicitud de firma? Se notificará a los firmantes."
+  },
+  "signaturePad": {
+    "modeTablistLabel": "Método de firma",
+    "modeDraw": "Dibujar",
+    "modeType": "Escribir",
+    "drawPlaceholder": "Firme aquí",
+    "canvasLabel": "Área de dibujo de la firma. Use el ratón o el dedo para dibujar su firma.",
+    "typedNameLabel": "Escriba su nombre completo",
+    "typedNamePlaceholder": "Su nombre",
+    "clearButtonLabel": "Borrar firma",
+    "clearButton": "Borrar",
+    "undoButtonLabel": "Deshacer último trazo",
+    "undoButton": "Deshacer"
+  },
+  "sendForSignature": {
+    "stepsNavLabel": "Pasos de envío",
+    "step": {
+      "template": "Plantilla",
+      "recipients": "Destinatarios",
+      "reviewSend": "Revisar y enviar"
+    },
+    "dialogTitle": "Enviar para firma",
+    "successTitle": "¡Solicitud de firma enviada!",
+    "successMessage": "Los destinatarios recibirán un correo electrónico para firmar el documento.",
+    "doneButton": "Listo"
+  },
+  "recipientStatusTimeline": {
+    "eventLabel": {
+      "sent": "Enviado",
+      "delivered": "Entregado",
+      "viewed": "Abierto",
+      "signed": "Firmado",
+      "declined": "Rechazado",
+      "voided": "Anulado"
+    },
+    "recipientEventsAriaLabel": "Eventos de {{name}}",
+    "noEventsYet": "Aún no hay eventos"
+  },
+  "recipientsStep": {
+    "listAriaLabel": "Destinatarios",
+    "nameLabel": "Nombre",
+    "namePlaceholder": "Jane Smith",
+    "emailLabel": "Correo electrónico",
+    "emailPlaceholder": "jane@example.com",
+    "roleLabel": "Rol",
+    "roleSigner": "Firmante",
+    "roleCc": "CC",
+    "removeRecipientAriaLabel": "Eliminar destinatario {{recipient}}",
+    "addRecipient": "+ Añadir destinatario",
+    "back": "Atrás",
+    "nextReview": "Siguiente: Revisar"
+  },
+  "signatureGuide": {
+    "title": "Verificación de firma",
+    "introBefore": "Cada entrega incluye un",
+    "introAfter": "encabezado. Verifícalo antes de confiar en la carga útil. Formato:",
+    "languageTablistLabel": "Lenguaje de verificación de firma",
+    "copyCodeLabel": "Copiar código",
+    "replayBefore": "Rechaza los eventos donde",
+    "replayAfter": "segundos para prevenir ataques de repetición. Usa siempre una comparación de tiempo constante."
+  },
+  "templateStep": {
+    "kindFilterLabel": "Tipo de plantilla",
+    "allTypesOption": "Todos los tipos",
+    "documentTemplateLabel": "Plantilla de documento",
+    "selectTemplatePlaceholder": "Selecciona una plantilla…",
+    "templateVariablesHeading": "Variables de la plantilla",
+    "nextButton": "Siguiente: Destinatarios"
+  },
+  "reviewStep": {
+    "previewTitle": "Vista previa del documento",
+    "messageLabel": "Mensaje para los destinatarios (opcional)",
+    "messagePlaceholder": "Revise y firme el documento adjunto…",
+    "recipientsHeading": "Destinatarios ({{count}})",
+    "recipientSummaryAria": "Resumen de destinatarios",
+    "back": "Atrás",
+    "sending": "Enviando…",
+    "send": "Enviar para firma"
+  },
+  "documentPreviewIframe": {
+    "regionAriaLabel": "Vista previa del documento",
+    "emptyMessage": "No hay vista previa del documento disponible",
+    "errorMessage": "No se pudo cargar la vista previa del documento.",
+    "openInNewTab": "Abrir documento en una pestaña nueva",
+    "regionAriaLabelTitled": "Vista previa del documento: {{title}}",
+    "loading": "Cargando documento…",
+    "iframeAriaLabel": "Vista previa de {{title}}"
+  },
+  "signatureStatusBadge": {
+    "statusDraft": "Borrador",
+    "statusSent": "Enviado",
+    "statusViewed": "Visto",
+    "statusSigned": "Firmado",
+    "statusDeclined": "Rechazado",
+    "statusVoided": "Anulado",
+    "statusExpired": "Caducado"
   }
 }
