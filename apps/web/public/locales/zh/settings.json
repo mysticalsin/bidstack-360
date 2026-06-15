@@ -684,5 +684,32 @@
     "savingButton": "保存中…",
     "saveButton": "保存筛选规则",
     "fieldPlaceholder": "例如：网络安全、云、数据"
+  },
+  "currencyLocale": {
+    "title": "货币与区域设置",
+    "caption": "工作区的默认货币、日期格式和时区。",
+    "currencyLabel": "默认货币",
+    "currency": {
+      "cad": "CAD — 加拿大元",
+      "usd": "USD — 美元",
+      "eur": "EUR — 欧元",
+      "gbp": "GBP — 英镑",
+      "aud": "AUD — 澳元",
+      "jpy": "JPY — 日元"
+    },
+    "dateFormatLabel": "日期格式",
+    "timezoneLabel": "时区"
+  },
+  "userRolesManager": {
+    "heading": "{{userName}} 的角色",
+    "errorLoading": "无法加载此用户的角色。",
+    "loading": "正在加载角色…",
+    "empty": "尚未分配自定义角色。",
+    "revokeAriaLabel": "撤销 {{userName}} 的 {{roleName}}",
+    "assignLabel": "为 {{userName}} 分配角色",
+    "allAssigned": "所有角色已分配",
+    "selectPlaceholder": "选择要分配的角色…",
+    "assigning": "正在分配…",
+    "assign": "分配"
   }
 }

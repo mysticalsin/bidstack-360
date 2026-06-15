@@ -3581,5 +3581,92 @@
     "title": "HUD DEV",
     "hideButtonLabel": "Masquer le HUD de développement",
     "fetchMutLabel": "requêtes / mutations"
+  },
+  "settings": {
+    "pageTitle": "Paramètres",
+    "pageSubtitle": "Gérez votre compte, les contrôles de l'espace de travail, le modèle de données et l'accès développeur.",
+    "sectionOverview": "Aperçu",
+    "sectionProfile": "Profil",
+    "sectionAppearance": "Apparence et langue",
+    "sectionLanguage": "Langue",
+    "sectionNotifications": "Notifications",
+    "sectionSecurity": "Profil et sécurité",
+    "sectionWorkspace": "Espace de travail",
+    "sectionCrm": "Configuration des données",
+    "sectionDataImport": "Importation de données",
+    "sectionTopAccounts": "Comptes principaux",
+    "sectionGroups": "Groupes d'accès",
+    "sectionOpportunityFilters": "Filtres d'opportunités",
+    "sectionRfpAnalytics": "Analyse des appels d'offres",
+    "sectionIntegrations": "Intégrations",
+    "sectionWebhooks": "Webhooks",
+    "sectionAuditLog": "Journal d'audit",
+    "sectionDeveloper": "Accès développeur"
+  },
+  "override": {
+    "title": "Le score est inférieur au seuil de soumission",
+    "description": "Cette évaluation calcule {{totalScore}}/100 — {{verdict}}. Enregistrez-la telle quelle, ou passez outre la recommandation pour poursuivre la soumission. Les dérogations exigent une justification et sont consignées pour examen par le directeur/VP.",
+    "justificationLabel": "Justification de la dérogation",
+    "justificationPlaceholder": "Pourquoi soumissionnons-nous malgré le score ? Compte stratégique, entrée sur le marché, accord-cadre imposé…",
+    "hintReady": "{{count}} caractères — prêt à envoyer.",
+    "hintMore": "Minimum {{min}} caractères ({{remaining}} de plus requis).",
+    "followAriaLabel": "Enregistrer le score et suivre la recommandation",
+    "followButton": "Enregistrer et suivre la recommandation",
+    "overrideAriaLabel": "Passer outre la recommandation et poursuivre la soumission",
+    "saving": "Enregistrement…",
+    "overrideButton": "Passer outre et poursuivre la soumission"
+  },
+  "kpiSidebar": {
+    "title": "État de la plateforme",
+    "caption": "Dernières métriques BidStack disponibles",
+    "releaseScore": "Score de version",
+    "providersHealthy": "Fournisseurs en bonne santé",
+    "queueBacklog": "File d'attente en attente",
+    "overdueTasks": "Tâches en retard"
+  },
+  "inlineTaskAdd": {
+    "toastAddedTitle": "Tâche ajoutée",
+    "toastErrorTitle": "Impossible d'ajouter la tâche",
+    "toastErrorDescription": "Le serveur a rejeté la requête.",
+    "titlePlaceholder": "Ajouter une tâche rapide — Entrée pour enregistrer",
+    "titleAriaLabel": "Titre de la tâche à ajout rapide",
+    "dueDateAriaLabel": "Date d'échéance facultative",
+    "submitButton": "Ajouter"
+  },
+  "recentOpportunities": {
+    "accountTitle": "Opportunités du compte",
+    "recentTitle": "Opportunités récentes",
+    "accountCaption": "Opportunités ouvertes liées à {{accountName}}",
+    "recentCaption": "Dernière activité du portefeuille pour tous les clients",
+    "openPipeline": "Ouvrir le pipeline",
+    "viewAll": "Tout voir",
+    "emptyAccountTitle": "Aucune opportunité pour ce compte pour l'instant",
+    "emptyTitle": "Aucune opportunité pour l'instant",
+    "emptyAccountMessage": "Créez une opportunité depuis l'en-tête du compte pour démarrer un espace de travail d'offre."
+  },
+  "spotlightRefs": {
+    "regionLabel": "Références Spotlight",
+    "sectionTitle": "Références de projets",
+    "sectionCaption": "Références Spotlight Ref validées pour ce compte",
+    "errorTitle": "Impossible de charger les références",
+    "errorMessage": "Réessayez dans un instant.",
+    "emptyTitle": "Aucune référence pour le moment",
+    "emptyMessage": "Les références validées arrivent depuis Spotlight Ref une fois qu'un consultant les soumet et qu'un manager les approuve.",
+    "statusDraft": "Brouillon",
+    "statusManagerReview": "En attente de validation",
+    "statusValidated": "Validé",
+    "statusDispatched": "Envoyé",
+    "toastValidatedTitle": "Référence validée",
+    "toastValidationFailedTitle": "Échec de la validation",
+    "validateButton": "Valider"
+  },
+  "cockpitCustomizeMenu": {
+    "groupMain": "Colonne principale",
+    "groupSide": "Barre latérale",
+    "triggerLabel": "Personnaliser",
+    "hiddenCount": "({{count}} masqués)",
+    "menuAriaLabel": "Personnaliser les blocs du cockpit",
+    "showBlocks": "Afficher les blocs",
+    "reset": "Réinitialiser"
   }
 }

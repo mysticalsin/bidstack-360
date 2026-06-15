@@ -245,5 +245,17 @@
     "aliasAriaLabel": "Aggregate alias",
     "removeAriaLabel": "Remove aggregate",
     "addButton": "+ Add aggregate"
+  },
+  "groupByPicker": {
+    "fieldPlaceholder": "Pick field…",
+    "timeBucketLabel": "Time bucket",
+    "noTimeBucket": "No time bucket",
+    "timeBucketDay": "Day",
+    "timeBucketWeek": "Week",
+    "timeBucketMonth": "Month",
+    "timeBucketQuarter": "Quarter",
+    "timeBucketYear": "Year",
+    "removeField": "Remove group-by field",
+    "addGroupBy": "+ Add group by"
   }
 }

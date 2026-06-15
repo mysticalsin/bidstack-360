@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
@@ -16,6 +17,7 @@ interface Props {
  * roles to the product — assign a role here and the user's permissions change.
  */
 export function UserRolesManager({ userId, userName }: Props) {
+  const { t } = useTranslation('settings');
   const assignedQuery = useUserRoles(userId);
   const allRoles = useRoles();
   const assign = useAssignUserRole(userId);
@@ -34,15 +36,21 @@ export function UserRolesManager({ userId, userName }: Props) {
   return (
     <div className="rounded-md bg-[var(--surface-sunken)] p-4">
       <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
-        Roles for {userName}
+        {t('userRolesManager.heading', 'Roles for {{userName}}', { userName })}
       </p>
 
       {assignedQuery.isError ? (
-        <p className="text-sm text-[var(--danger)]">Could not load this user&rsquo;s roles.</p>
+        <p className="text-sm text-[var(--danger)]">
+          {t('userRolesManager.errorLoading', 'Could not load this user’s roles.')}
+        </p>
       ) : assignedQuery.isLoading ? (
-        <p className="text-sm text-[var(--fg-secondary)]">Loading roles…</p>
+        <p className="text-sm text-[var(--fg-secondary)]">
+          {t('userRolesManager.loading', 'Loading roles…')}
+        </p>
       ) : assigned.length === 0 ? (
-        <p className="text-sm text-[var(--fg-secondary)]">No custom roles assigned yet.</p>
+        <p className="text-sm text-[var(--fg-secondary)]">
+          {t('userRolesManager.empty', 'No custom roles assigned yet.')}
+        </p>
       ) : (
         <div className="flex flex-wrap gap-2">
           {assigned.map((r) => (
@@ -51,7 +59,10 @@ export function UserRolesManager({ userId, userName }: Props) {
               <button
                 type="button"
                 className="iconbtn h-6 w-6"
-                aria-label={`Revoke ${r.name} from ${userName}`}
+                aria-label={t('userRolesManager.revokeAriaLabel', 'Revoke {{roleName}} from {{userName}}', {
+                  roleName: r.name,
+                  userName,
+                })}
                 disabled={revoke.isPending}
                 onClick={() => revoke.mutate(r.roleId)}
               >
@@ -64,7 +75,7 @@ export function UserRolesManager({ userId, userName }: Props) {
 
       <div className="mt-3 flex items-center gap-2">
         <label className="sr-only" htmlFor={`assign-role-${userId}`}>
-          Assign a role to {userName}
+          {t('userRolesManager.assignLabel', 'Assign a role to {{userName}}', { userName })}
         </label>
         <select
           id={`assign-role-${userId}`}
@@ -74,7 +85,9 @@ export function UserRolesManager({ userId, userName }: Props) {
           disabled={allRoles.isLoading || assignable.length === 0}
         >
           <option value="">
-            {assignable.length === 0 ? 'All roles assigned' : 'Select a role to assign…'}
+            {assignable.length === 0
+              ? t('userRolesManager.allAssigned', 'All roles assigned')
+              : t('userRolesManager.selectPlaceholder', 'Select a role to assign…')}
           </option>
           {assignable.map((r) => (
             <option key={r.id} value={r.id}>
@@ -88,7 +101,9 @@ export function UserRolesManager({ userId, userName }: Props) {
           disabled={!pickerValue || assign.isPending}
           onClick={onAssign}
         >
-          {assign.isPending ? 'Assigning…' : 'Assign'}
+          {assign.isPending
+            ? t('userRolesManager.assigning', 'Assigning…')
+            : t('userRolesManager.assign', 'Assign')}
         </button>
       </div>
     </div>

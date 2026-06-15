@@ -3526,5 +3526,92 @@
     "title": "HUD DI SVILUPPO",
     "hideButtonLabel": "Nascondi HUD di sviluppo",
     "fetchMutLabel": "fetch / mutazioni"
+  },
+  "settings": {
+    "pageTitle": "Impostazioni",
+    "pageSubtitle": "Gestisci il tuo account, i controlli dell'area di lavoro, il modello di dati e l'accesso per gli sviluppatori.",
+    "sectionOverview": "Panoramica",
+    "sectionProfile": "Profilo",
+    "sectionAppearance": "Aspetto e lingua",
+    "sectionLanguage": "Lingua",
+    "sectionNotifications": "Notifiche",
+    "sectionSecurity": "Profilo e sicurezza",
+    "sectionWorkspace": "Area di lavoro",
+    "sectionCrm": "Configurazione dei dati",
+    "sectionDataImport": "Importazione dati",
+    "sectionTopAccounts": "Account principali",
+    "sectionGroups": "Gruppi di accesso",
+    "sectionOpportunityFilters": "Filtri delle opportunità",
+    "sectionRfpAnalytics": "Analisi RFP",
+    "sectionIntegrations": "Integrazioni",
+    "sectionWebhooks": "Webhook",
+    "sectionAuditLog": "Registro di controllo",
+    "sectionDeveloper": "Accesso sviluppatore"
+  },
+  "override": {
+    "title": "Il punteggio è inferiore alla soglia di gara",
+    "description": "Questa valutazione calcola {{totalScore}}/100 — {{verdict}}. Salvala così com'è, oppure ignora la raccomandazione per procedere con la gara. Le deroghe richiedono una giustificazione e vengono registrate per la revisione del direttore/VP.",
+    "justificationLabel": "Giustificazione della deroga",
+    "justificationPlaceholder": "Perché partecipiamo alla gara nonostante il punteggio? Account strategico, ingresso nel mercato, accordo quadro obbligatorio…",
+    "hintReady": "{{count}} caratteri — pronto per l'invio.",
+    "hintMore": "Minimo {{min}} caratteri (ne servono altri {{remaining}}).",
+    "followAriaLabel": "Salva il punteggio e segui la raccomandazione",
+    "followButton": "Salva e segui la raccomandazione",
+    "overrideAriaLabel": "Ignora la raccomandazione e procedi con la gara",
+    "saving": "Salvataggio…",
+    "overrideButton": "Ignora e procedi con la gara"
+  },
+  "kpiSidebar": {
+    "title": "Stato della piattaforma",
+    "caption": "Ultime metriche BidStack disponibili",
+    "releaseScore": "Punteggio di rilascio",
+    "providersHealthy": "Provider integri",
+    "queueBacklog": "Arretrato della coda",
+    "overdueTasks": "Attività scadute"
+  },
+  "inlineTaskAdd": {
+    "toastAddedTitle": "Attività aggiunta",
+    "toastErrorTitle": "Impossibile aggiungere l'attività",
+    "toastErrorDescription": "Il server ha rifiutato la richiesta.",
+    "titlePlaceholder": "Aggiungi un'attività rapida — Invio per salvare",
+    "titleAriaLabel": "Titolo dell'attività ad aggiunta rapida",
+    "dueDateAriaLabel": "Data di scadenza facoltativa",
+    "submitButton": "Aggiungi"
+  },
+  "recentOpportunities": {
+    "accountTitle": "Opportunità dell'account",
+    "recentTitle": "Opportunità recenti",
+    "accountCaption": "Opportunità aperte collegate a {{accountName}}",
+    "recentCaption": "Ultima attività del portafoglio per tutti i clienti",
+    "openPipeline": "Apri pipeline",
+    "viewAll": "Vedi tutto",
+    "emptyAccountTitle": "Ancora nessuna opportunità per questo account",
+    "emptyTitle": "Ancora nessuna opportunità",
+    "emptyAccountMessage": "Crea un'opportunità dall'intestazione dell'account per avviare uno spazio di lavoro per l'offerta."
+  },
+  "spotlightRefs": {
+    "regionLabel": "Riferimenti Spotlight",
+    "sectionTitle": "Riferimenti di progetto",
+    "sectionCaption": "Riferimenti Spotlight Ref convalidati per questo account",
+    "errorTitle": "Impossibile caricare i riferimenti",
+    "errorMessage": "Riprova tra poco.",
+    "emptyTitle": "Nessun riferimento ancora",
+    "emptyMessage": "I riferimenti convalidati arrivano da Spotlight Ref dopo che un consulente li invia e un manager li approva.",
+    "statusDraft": "Bozza",
+    "statusManagerReview": "In attesa di convalida",
+    "statusValidated": "Convalidato",
+    "statusDispatched": "Inviato",
+    "toastValidatedTitle": "Riferimento convalidato",
+    "toastValidationFailedTitle": "Convalida non riuscita",
+    "validateButton": "Convalida"
+  },
+  "cockpitCustomizeMenu": {
+    "groupMain": "Colonna principale",
+    "groupSide": "Barra laterale",
+    "triggerLabel": "Personalizza",
+    "hiddenCount": "({{count}} nascosti)",
+    "menuAriaLabel": "Personalizza i blocchi del cockpit",
+    "showBlocks": "Mostra blocchi",
+    "reset": "Reimposta"
   }
 }

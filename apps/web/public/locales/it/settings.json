@@ -684,5 +684,32 @@
     "savingButton": "Salvataggio…",
     "saveButton": "Salva le regole di filtro",
     "fieldPlaceholder": "es. Cybersecurity, Cloud, Dati"
+  },
+  "currencyLocale": {
+    "title": "Valuta e impostazioni locali",
+    "caption": "Valuta, formato data e fuso orario predefiniti per il tuo spazio di lavoro.",
+    "currencyLabel": "Valuta predefinita",
+    "currency": {
+      "cad": "CAD — Dollaro canadese",
+      "usd": "USD — Dollaro statunitense",
+      "eur": "EUR — Euro",
+      "gbp": "GBP — Sterlina britannica",
+      "aud": "AUD — Dollaro australiano",
+      "jpy": "JPY — Yen giapponese"
+    },
+    "dateFormatLabel": "Formato data",
+    "timezoneLabel": "Fuso orario"
+  },
+  "userRolesManager": {
+    "heading": "Ruoli di {{userName}}",
+    "errorLoading": "Impossibile caricare i ruoli di questo utente.",
+    "loading": "Caricamento dei ruoli…",
+    "empty": "Nessun ruolo personalizzato ancora assegnato.",
+    "revokeAriaLabel": "Revoca {{roleName}} da {{userName}}",
+    "assignLabel": "Assegna un ruolo a {{userName}}",
+    "allAssigned": "Tutti i ruoli assegnati",
+    "selectPlaceholder": "Seleziona un ruolo da assegnare…",
+    "assigning": "Assegnazione…",
+    "assign": "Assegna"
   }
 }

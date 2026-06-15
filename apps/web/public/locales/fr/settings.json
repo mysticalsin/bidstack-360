@@ -684,5 +684,32 @@
     "savingButton": "Enregistrement…",
     "saveButton": "Enregistrer les règles de filtre",
     "fieldPlaceholder": "par ex. Cybersécurité, Cloud, Données"
+  },
+  "currencyLocale": {
+    "title": "Devise et paramètres régionaux",
+    "caption": "Devise, format de date et fuseau horaire par défaut de votre espace de travail.",
+    "currencyLabel": "Devise par défaut",
+    "currency": {
+      "cad": "CAD — Dollar canadien",
+      "usd": "USD — Dollar américain",
+      "eur": "EUR — Euro",
+      "gbp": "GBP — Livre sterling",
+      "aud": "AUD — Dollar australien",
+      "jpy": "JPY — Yen japonais"
+    },
+    "dateFormatLabel": "Format de date",
+    "timezoneLabel": "Fuseau horaire"
+  },
+  "userRolesManager": {
+    "heading": "Rôles de {{userName}}",
+    "errorLoading": "Impossible de charger les rôles de cet utilisateur.",
+    "loading": "Chargement des rôles…",
+    "empty": "Aucun rôle personnalisé attribué pour le moment.",
+    "revokeAriaLabel": "Révoquer {{roleName}} de {{userName}}",
+    "assignLabel": "Attribuer un rôle à {{userName}}",
+    "allAssigned": "Tous les rôles attribués",
+    "selectPlaceholder": "Sélectionnez un rôle à attribuer…",
+    "assigning": "Attribution…",
+    "assign": "Attribuer"
   }
 }

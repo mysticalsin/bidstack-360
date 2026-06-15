@@ -1,4 +1,5 @@
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { SettingsLayout, type SettingsSection } from '@/components/settings/SettingsLayout';
 import { SettingsOverviewSection } from '@/components/settings/SettingsOverviewSection';
 import { ProfileSection } from '@/components/settings/ProfileSection';
@@ -18,27 +19,30 @@ import { RfpAnalyticsSection } from '@/components/settings/RfpAnalyticsSection';
 import { AccessGroupsSection } from '@/components/settings/AccessGroupsSection';
 import { OpportunityFiltersSection } from '@/components/settings/OpportunityFiltersSection';
 
-const SECTION_TITLES: Record<SettingsSection, string> = {
-  overview: 'Overview',
-  profile: 'Profile',
-  appearance: 'Appearance & Language',
-  language: 'Language',
-  notifications: 'Notifications',
-  security: 'Profile & Security',
-  workspace: 'Workspace',
-  crm: 'Data configuration',
-  'data-import': 'Data import',
-  'top-accounts': 'Top accounts',
-  groups: 'Access groups',
-  'opportunity-filters': 'Opportunity filters',
-  'rfp-analytics': 'RFP Analytics',
-  integrations: 'Integrations',
-  webhooks: 'Webhooks',
-  'audit-log': 'Audit log',
-  developer: 'Developer access',
+// Each entry maps a section code to its [i18n key suffix, English default].
+// The English default is passed to t() so the UI never shows a raw key.
+const SECTION_TITLES: Record<SettingsSection, [string, string]> = {
+  overview: ['sectionOverview', 'Overview'],
+  profile: ['sectionProfile', 'Profile'],
+  appearance: ['sectionAppearance', 'Appearance & Language'],
+  language: ['sectionLanguage', 'Language'],
+  notifications: ['sectionNotifications', 'Notifications'],
+  security: ['sectionSecurity', 'Profile & Security'],
+  workspace: ['sectionWorkspace', 'Workspace'],
+  crm: ['sectionCrm', 'Data configuration'],
+  'data-import': ['sectionDataImport', 'Data import'],
+  'top-accounts': ['sectionTopAccounts', 'Top accounts'],
+  groups: ['sectionGroups', 'Access groups'],
+  'opportunity-filters': ['sectionOpportunityFilters', 'Opportunity filters'],
+  'rfp-analytics': ['sectionRfpAnalytics', 'RFP Analytics'],
+  integrations: ['sectionIntegrations', 'Integrations'],
+  webhooks: ['sectionWebhooks', 'Webhooks'],
+  'audit-log': ['sectionAuditLog', 'Audit log'],
+  developer: ['sectionDeveloper', 'Developer access'],
 };
 
 export function SettingsPage() {
+  const { t } = useTranslation('crm');
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = (searchParams.get('tab') as SettingsSection) || 'overview';
 
@@ -82,16 +86,21 @@ export function SettingsPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">Settings</h1>
+        <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
+          {t('settings.pageTitle', 'Settings')}
+        </h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          Manage your account, workspace controls, data model, and developer access.
+          {t(
+            'settings.pageSubtitle',
+            'Manage your account, workspace controls, data model, and developer access.',
+          )}
         </p>
       </header>
 
       <SettingsLayout active={activeTab} onChange={setActive}>
         <div className="mb-4">
           <h2 className="text-lg font-semibold text-[var(--fg-primary)]">
-            {SECTION_TITLES[activeTab]}
+            {t(`settings.${SECTION_TITLES[activeTab][0]}`, SECTION_TITLES[activeTab][1])}
           </h2>
         </div>
         {sections[activeTab]}

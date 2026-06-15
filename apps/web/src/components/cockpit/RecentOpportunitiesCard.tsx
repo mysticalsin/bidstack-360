@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
@@ -25,19 +26,30 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
 }: Props) {
   const reducedMotion = useReducedMotion();
   const { formatMoney } = useFormatMoney();
+  const { t } = useTranslation('crm');
   const visibleItems = items ?? opps.data?.items ?? [];
   const accountScoped = Boolean(accountName);
   return (
     <Card
       role="region"
-      aria-label={accountScoped ? 'Account opportunities' : 'Recent opportunities'}
+      aria-label={
+        accountScoped
+          ? t('recentOpportunities.accountTitle', 'Account opportunities')
+          : t('recentOpportunities.recentTitle', 'Recent opportunities')
+      }
     >
       <SectionHeader
-        title={accountScoped ? 'Account opportunities' : 'Recent opportunities'}
+        title={
+          accountScoped
+            ? t('recentOpportunities.accountTitle', 'Account opportunities')
+            : t('recentOpportunities.recentTitle', 'Recent opportunities')
+        }
         caption={
           accountScoped
-            ? `Open opportunities linked to ${accountName}`
-            : 'Latest portfolio activity across all customers'
+            ? t('recentOpportunities.accountCaption', 'Open opportunities linked to {{accountName}}', {
+                accountName,
+              })
+            : t('recentOpportunities.recentCaption', 'Latest portfolio activity across all customers')
         }
         action={
           <Link
@@ -48,7 +60,10 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
             }
             className="link-arrow"
           >
-            {accountScoped ? 'Open pipeline' : 'View all'} <Icon name="arrow" size={12} />
+            {accountScoped
+              ? t('recentOpportunities.openPipeline', 'Open pipeline')
+              : t('recentOpportunities.viewAll', 'View all')}{' '}
+            <Icon name="arrow" size={12} />
           </Link>
         }
       />
@@ -56,10 +71,17 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
         <LoadingSkeleton rows={3} />
       ) : visibleItems.length === 0 ? (
         <EmptyState
-          title={accountScoped ? 'No opportunities for this account yet' : 'No opportunities yet'}
+          title={
+            accountScoped
+              ? t('recentOpportunities.emptyAccountTitle', 'No opportunities for this account yet')
+              : t('recentOpportunities.emptyTitle', 'No opportunities yet')
+          }
           message={
             accountScoped
-              ? 'Create an opportunity from the account header to start a bid workspace.'
+              ? t(
+                  'recentOpportunities.emptyAccountMessage',
+                  'Create an opportunity from the account header to start a bid workspace.',
+                )
               : undefined
           }
         />

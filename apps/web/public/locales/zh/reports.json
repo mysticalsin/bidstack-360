@@ -245,5 +245,17 @@
     "aliasAriaLabel": "聚合别名",
     "removeAriaLabel": "移除聚合",
     "addButton": "+ 添加聚合"
+  },
+  "groupByPicker": {
+    "fieldPlaceholder": "选择字段…",
+    "timeBucketLabel": "时间区间",
+    "noTimeBucket": "无时间区间",
+    "timeBucketDay": "日",
+    "timeBucketWeek": "周",
+    "timeBucketMonth": "月",
+    "timeBucketQuarter": "季度",
+    "timeBucketYear": "年",
+    "removeField": "移除分组字段",
+    "addGroupBy": "+ 添加分组"
   }
 }

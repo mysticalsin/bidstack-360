@@ -665,5 +665,32 @@
     "savingButton": "Saving…",
     "saveButton": "Save filter rules",
     "fieldPlaceholder": "e.g. Cybersecurity, Cloud, Data"
+  },
+  "currencyLocale": {
+    "title": "Currency & locale",
+    "caption": "Default currency, date format, and timezone for your workspace.",
+    "currencyLabel": "Default currency",
+    "currency": {
+      "cad": "CAD — Canadian Dollar",
+      "usd": "USD — US Dollar",
+      "eur": "EUR — Euro",
+      "gbp": "GBP — British Pound",
+      "aud": "AUD — Australian Dollar",
+      "jpy": "JPY — Japanese Yen"
+    },
+    "dateFormatLabel": "Date format",
+    "timezoneLabel": "Timezone"
+  },
+  "userRolesManager": {
+    "heading": "Roles for {{userName}}",
+    "errorLoading": "Could not load this user’s roles.",
+    "loading": "Loading roles…",
+    "empty": "No custom roles assigned yet.",
+    "revokeAriaLabel": "Revoke {{roleName}} from {{userName}}",
+    "assignLabel": "Assign a role to {{userName}}",
+    "allAssigned": "All roles assigned",
+    "selectPlaceholder": "Select a role to assign…",
+    "assigning": "Assigning…",
+    "assign": "Assign"
   }
 }

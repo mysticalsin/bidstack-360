@@ -3526,5 +3526,92 @@
     "title": "DEV HUD",
     "hideButtonLabel": "Hide dev HUD",
     "fetchMutLabel": "fetch / mut"
+  },
+  "settings": {
+    "pageTitle": "Settings",
+    "pageSubtitle": "Manage your account, workspace controls, data model, and developer access.",
+    "sectionOverview": "Overview",
+    "sectionProfile": "Profile",
+    "sectionAppearance": "Appearance & Language",
+    "sectionLanguage": "Language",
+    "sectionNotifications": "Notifications",
+    "sectionSecurity": "Profile & Security",
+    "sectionWorkspace": "Workspace",
+    "sectionCrm": "Data configuration",
+    "sectionDataImport": "Data import",
+    "sectionTopAccounts": "Top accounts",
+    "sectionGroups": "Access groups",
+    "sectionOpportunityFilters": "Opportunity filters",
+    "sectionRfpAnalytics": "RFP Analytics",
+    "sectionIntegrations": "Integrations",
+    "sectionWebhooks": "Webhooks",
+    "sectionAuditLog": "Audit log",
+    "sectionDeveloper": "Developer access"
+  },
+  "override": {
+    "title": "Score is below the bid threshold",
+    "description": "This evaluation computes {{totalScore}}/100 — {{verdict}}. Save it as-is, or override the recommendation to proceed with the bid. Overrides require a justification and are logged for director/VP review.",
+    "justificationLabel": "Override justification",
+    "justificationPlaceholder": "Why are we bidding despite the score? Strategic account, market entry, mandated framework…",
+    "hintReady": "{{count}} characters — ready to submit.",
+    "hintMore": "Minimum {{min}} characters ({{remaining}} more needed).",
+    "followAriaLabel": "Save score and follow the recommendation",
+    "followButton": "Save & follow recommendation",
+    "overrideAriaLabel": "Override the recommendation and proceed with the bid",
+    "saving": "Saving…",
+    "overrideButton": "Override & proceed with bid"
+  },
+  "kpiSidebar": {
+    "title": "Platform status",
+    "caption": "Latest available BidStack metrics",
+    "releaseScore": "Release score",
+    "providersHealthy": "Providers healthy",
+    "queueBacklog": "Queue backlog",
+    "overdueTasks": "Overdue tasks"
+  },
+  "inlineTaskAdd": {
+    "toastAddedTitle": "Task added",
+    "toastErrorTitle": "Could not add task",
+    "toastErrorDescription": "The server rejected the request.",
+    "titlePlaceholder": "Add a quick task — Enter to save",
+    "titleAriaLabel": "Quick-add task title",
+    "dueDateAriaLabel": "Optional due date",
+    "submitButton": "Add"
+  },
+  "recentOpportunities": {
+    "accountTitle": "Account opportunities",
+    "recentTitle": "Recent opportunities",
+    "accountCaption": "Open opportunities linked to {{accountName}}",
+    "recentCaption": "Latest portfolio activity across all customers",
+    "openPipeline": "Open pipeline",
+    "viewAll": "View all",
+    "emptyAccountTitle": "No opportunities for this account yet",
+    "emptyTitle": "No opportunities yet",
+    "emptyAccountMessage": "Create an opportunity from the account header to start a bid workspace."
+  },
+  "spotlightRefs": {
+    "regionLabel": "Spotlight references",
+    "sectionTitle": "Project references",
+    "sectionCaption": "Validated Spotlight Ref references for this account",
+    "errorTitle": "Could not load references",
+    "errorMessage": "Try again shortly.",
+    "emptyTitle": "No references yet",
+    "emptyMessage": "Validated references arrive from Spotlight Ref once a consultant submits and a manager approves them.",
+    "statusDraft": "Draft",
+    "statusManagerReview": "Awaiting validation",
+    "statusValidated": "Validated",
+    "statusDispatched": "Dispatched",
+    "toastValidatedTitle": "Reference validated",
+    "toastValidationFailedTitle": "Validation failed",
+    "validateButton": "Validate"
+  },
+  "cockpitCustomizeMenu": {
+    "groupMain": "Main column",
+    "groupSide": "Sidebar",
+    "triggerLabel": "Customize",
+    "hiddenCount": "({{count}} hidden)",
+    "menuAriaLabel": "Customize cockpit blocks",
+    "showBlocks": "Show blocks",
+    "reset": "Reset"
   }
 }

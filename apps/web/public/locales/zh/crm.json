@@ -3526,5 +3526,92 @@
     "title": "开发 HUD",
     "hideButtonLabel": "隐藏开发 HUD",
     "fetchMutLabel": "请求 / 变更"
+  },
+  "settings": {
+    "pageTitle": "设置",
+    "pageSubtitle": "管理您的账户、工作区控制、数据模型和开发者访问权限。",
+    "sectionOverview": "概览",
+    "sectionProfile": "个人资料",
+    "sectionAppearance": "外观与语言",
+    "sectionLanguage": "语言",
+    "sectionNotifications": "通知",
+    "sectionSecurity": "个人资料与安全",
+    "sectionWorkspace": "工作区",
+    "sectionCrm": "数据配置",
+    "sectionDataImport": "数据导入",
+    "sectionTopAccounts": "重点客户",
+    "sectionGroups": "访问组",
+    "sectionOpportunityFilters": "商机筛选器",
+    "sectionRfpAnalytics": "RFP 分析",
+    "sectionIntegrations": "集成",
+    "sectionWebhooks": "Webhook",
+    "sectionAuditLog": "审计日志",
+    "sectionDeveloper": "开发者访问"
+  },
+  "override": {
+    "title": "评分低于投标阈值",
+    "description": "本次评估得分为 {{totalScore}}/100 — {{verdict}}。可按原样保存，或推翻建议以继续投标。推翻操作需提供理由，并会被记录以供总监/副总裁审查。",
+    "justificationLabel": "推翻理由",
+    "justificationPlaceholder": "为何尽管评分不高仍要投标？战略客户、市场进入、强制框架协议……",
+    "hintReady": "{{count}} 个字符 — 可以提交。",
+    "hintMore": "至少需要 {{min}} 个字符（还需 {{remaining}} 个）。",
+    "followAriaLabel": "保存评分并遵循建议",
+    "followButton": "保存并遵循建议",
+    "overrideAriaLabel": "推翻建议并继续投标",
+    "saving": "保存中…",
+    "overrideButton": "推翻并继续投标"
+  },
+  "kpiSidebar": {
+    "title": "平台状态",
+    "caption": "最新可用的 BidStack 指标",
+    "releaseScore": "发布评分",
+    "providersHealthy": "健康的提供商",
+    "queueBacklog": "队列积压",
+    "overdueTasks": "逾期任务"
+  },
+  "inlineTaskAdd": {
+    "toastAddedTitle": "任务已添加",
+    "toastErrorTitle": "无法添加任务",
+    "toastErrorDescription": "服务器拒绝了该请求。",
+    "titlePlaceholder": "添加快速任务 — 按回车保存",
+    "titleAriaLabel": "快速添加任务标题",
+    "dueDateAriaLabel": "可选截止日期",
+    "submitButton": "添加"
+  },
+  "recentOpportunities": {
+    "accountTitle": "客户机会",
+    "recentTitle": "近期机会",
+    "accountCaption": "与 {{accountName}} 关联的开放机会",
+    "recentCaption": "所有客户的最新组合动态",
+    "openPipeline": "打开管道",
+    "viewAll": "查看全部",
+    "emptyAccountTitle": "此客户暂无机会",
+    "emptyTitle": "暂无机会",
+    "emptyAccountMessage": "从客户标题创建机会以启动投标工作区。"
+  },
+  "spotlightRefs": {
+    "regionLabel": "Spotlight 参考项目",
+    "sectionTitle": "项目参考",
+    "sectionCaption": "此客户的已验证 Spotlight Ref 参考",
+    "errorTitle": "无法加载参考",
+    "errorMessage": "请稍后重试。",
+    "emptyTitle": "暂无参考",
+    "emptyMessage": "顾问提交且经理批准后，已验证的参考将从 Spotlight Ref 送达。",
+    "statusDraft": "草稿",
+    "statusManagerReview": "等待验证",
+    "statusValidated": "已验证",
+    "statusDispatched": "已发送",
+    "toastValidatedTitle": "参考已验证",
+    "toastValidationFailedTitle": "验证失败",
+    "validateButton": "验证"
+  },
+  "cockpitCustomizeMenu": {
+    "groupMain": "主栏",
+    "groupSide": "侧边栏",
+    "triggerLabel": "自定义",
+    "hiddenCount": "（已隐藏 {{count}} 个）",
+    "menuAriaLabel": "自定义驾驶舱模块",
+    "showBlocks": "显示模块",
+    "reset": "重置"
   }
 }

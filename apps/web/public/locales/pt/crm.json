@@ -3526,5 +3526,92 @@
     "title": "HUD DE DESENVOLVIMENTO",
     "hideButtonLabel": "Ocultar HUD de desenvolvimento",
     "fetchMutLabel": "buscas / mutações"
+  },
+  "settings": {
+    "pageTitle": "Configurações",
+    "pageSubtitle": "Gerencie sua conta, controles do espaço de trabalho, modelo de dados e acesso de desenvolvedores.",
+    "sectionOverview": "Visão geral",
+    "sectionProfile": "Perfil",
+    "sectionAppearance": "Aparência e idioma",
+    "sectionLanguage": "Idioma",
+    "sectionNotifications": "Notificações",
+    "sectionSecurity": "Perfil e segurança",
+    "sectionWorkspace": "Espaço de trabalho",
+    "sectionCrm": "Configuração de dados",
+    "sectionDataImport": "Importação de dados",
+    "sectionTopAccounts": "Principais contas",
+    "sectionGroups": "Grupos de acesso",
+    "sectionOpportunityFilters": "Filtros de oportunidades",
+    "sectionRfpAnalytics": "Análise de RFP",
+    "sectionIntegrations": "Integrações",
+    "sectionWebhooks": "Webhooks",
+    "sectionAuditLog": "Registro de auditoria",
+    "sectionDeveloper": "Acesso de desenvolvedor"
+  },
+  "override": {
+    "title": "A pontuação está abaixo do limite de proposta",
+    "description": "Esta avaliação calcula {{totalScore}}/100 — {{verdict}}. Guarde-a como está ou ignore a recomendação para prosseguir com a proposta. As substituições exigem uma justificação e são registadas para revisão do diretor/VP.",
+    "justificationLabel": "Justificação da substituição",
+    "justificationPlaceholder": "Por que estamos a concorrer apesar da pontuação? Conta estratégica, entrada no mercado, acordo-quadro obrigatório…",
+    "hintReady": "{{count}} caracteres — pronto para enviar.",
+    "hintMore": "Mínimo de {{min}} caracteres (faltam {{remaining}}).",
+    "followAriaLabel": "Guardar a pontuação e seguir a recomendação",
+    "followButton": "Guardar e seguir a recomendação",
+    "overrideAriaLabel": "Ignorar a recomendação e prosseguir com a proposta",
+    "saving": "A guardar…",
+    "overrideButton": "Ignorar e prosseguir com a proposta"
+  },
+  "kpiSidebar": {
+    "title": "Estado da plataforma",
+    "caption": "Métricas mais recentes disponíveis do BidStack",
+    "releaseScore": "Pontuação de lançamento",
+    "providersHealthy": "Provedores saudáveis",
+    "queueBacklog": "Fila pendente",
+    "overdueTasks": "Tarefas atrasadas"
+  },
+  "inlineTaskAdd": {
+    "toastAddedTitle": "Tarefa adicionada",
+    "toastErrorTitle": "Não foi possível adicionar a tarefa",
+    "toastErrorDescription": "O servidor rejeitou a solicitação.",
+    "titlePlaceholder": "Adicione uma tarefa rápida — Enter para salvar",
+    "titleAriaLabel": "Título da tarefa de adição rápida",
+    "dueDateAriaLabel": "Data de vencimento opcional",
+    "submitButton": "Adicionar"
+  },
+  "recentOpportunities": {
+    "accountTitle": "Oportunidades da conta",
+    "recentTitle": "Oportunidades recentes",
+    "accountCaption": "Oportunidades abertas vinculadas a {{accountName}}",
+    "recentCaption": "Atividade mais recente da carteira de todos os clientes",
+    "openPipeline": "Abrir pipeline",
+    "viewAll": "Ver tudo",
+    "emptyAccountTitle": "Ainda não há oportunidades para esta conta",
+    "emptyTitle": "Ainda não há oportunidades",
+    "emptyAccountMessage": "Crie uma oportunidade no cabeçalho da conta para iniciar um espaço de trabalho de proposta."
+  },
+  "spotlightRefs": {
+    "regionLabel": "Referências do Spotlight",
+    "sectionTitle": "Referências de projetos",
+    "sectionCaption": "Referências do Spotlight Ref validadas para esta conta",
+    "errorTitle": "Não foi possível carregar as referências",
+    "errorMessage": "Tente novamente em breve.",
+    "emptyTitle": "Ainda não há referências",
+    "emptyMessage": "As referências validadas chegam do Spotlight Ref depois que um consultor as envia e um gerente as aprova.",
+    "statusDraft": "Rascunho",
+    "statusManagerReview": "Aguardando validação",
+    "statusValidated": "Validado",
+    "statusDispatched": "Enviado",
+    "toastValidatedTitle": "Referência validada",
+    "toastValidationFailedTitle": "Falha na validação",
+    "validateButton": "Validar"
+  },
+  "cockpitCustomizeMenu": {
+    "groupMain": "Coluna principal",
+    "groupSide": "Barra lateral",
+    "triggerLabel": "Personalizar",
+    "hiddenCount": "({{count}} ocultos)",
+    "menuAriaLabel": "Personalizar blocos do painel",
+    "showBlocks": "Mostrar blocos",
+    "reset": "Redefinir"
   }
 }

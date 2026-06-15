@@ -1,6 +1,7 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { memo } from 'react';
 import type { CSSProperties } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Card, SectionHeader } from '@/components/ui/Card';
@@ -21,6 +22,7 @@ export const KpiSidebar = memo(function KpiSidebar({
   overdueCount,
   tasksLoading,
 }: Props) {
+  const { t } = useTranslation('crm');
   const reducedMotion = useReducedMotion();
   const queueWaiting = snapshot.queueHealth.reduce((acc, q) => acc + q.waiting + q.active, 0);
   const providers = snapshot.providerHealth.length;
@@ -28,10 +30,13 @@ export const KpiSidebar = memo(function KpiSidebar({
 
   return (
     <Card>
-      <SectionHeader title="Platform status" caption="Latest available BidStack metrics" />
+      <SectionHeader
+        title={t('kpiSidebar.title', 'Platform status')}
+        caption={t('kpiSidebar.caption', 'Latest available BidStack metrics')}
+      />
       <div className="pulse-stack">
         <PulseRow
-          label="Release score"
+          label={t('kpiSidebar.releaseScore', 'Release score')}
           value={`${snapshot.releaseScore.total}/100`}
           tone={snapshot.releaseScore.passed ? 'jade' : 'amber'}
           progress={snapshot.releaseScore.total}
@@ -39,7 +44,7 @@ export const KpiSidebar = memo(function KpiSidebar({
           reducedMotion={Boolean(reducedMotion)}
         />
         <PulseRow
-          label="Providers healthy"
+          label={t('kpiSidebar.providersHealthy', 'Providers healthy')}
           value={`${healthyProviders}/${providers}`}
           tone={healthyProviders === providers ? 'jade' : 'amber'}
           progress={providers ? (healthyProviders / providers) * 100 : 0}
@@ -47,7 +52,7 @@ export const KpiSidebar = memo(function KpiSidebar({
           reducedMotion={Boolean(reducedMotion)}
         />
         <PulseRow
-          label="Queue backlog"
+          label={t('kpiSidebar.queueBacklog', 'Queue backlog')}
           value={queueWaiting.toString()}
           tone={queueWaiting > 50 ? 'rose' : queueWaiting > 0 ? 'amber' : 'jade'}
           progress={Math.min(100, queueWaiting * 2)}
@@ -55,7 +60,7 @@ export const KpiSidebar = memo(function KpiSidebar({
           reducedMotion={Boolean(reducedMotion)}
         />
         <PulseRow
-          label="Overdue tasks"
+          label={t('kpiSidebar.overdueTasks', 'Overdue tasks')}
           value={tasksLoading ? '...' : overdueCount.toString()}
           tone={overdueCount > 0 ? 'rose' : 'jade'}
           progress={Math.min(100, overdueCount * 18)}

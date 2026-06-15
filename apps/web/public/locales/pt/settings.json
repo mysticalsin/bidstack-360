@@ -684,5 +684,32 @@
     "savingButton": "Salvando…",
     "saveButton": "Salvar regras de filtro",
     "fieldPlaceholder": "ex.: Cibersegurança, Cloud, Dados"
+  },
+  "currencyLocale": {
+    "title": "Moeda e localização",
+    "caption": "Moeda, formato de data e fuso horário padrão do seu espaço de trabalho.",
+    "currencyLabel": "Moeda padrão",
+    "currency": {
+      "cad": "CAD — Dólar canadense",
+      "usd": "USD — Dólar americano",
+      "eur": "EUR — Euro",
+      "gbp": "GBP — Libra esterlina",
+      "aud": "AUD — Dólar australiano",
+      "jpy": "JPY — Iene japonês"
+    },
+    "dateFormatLabel": "Formato de data",
+    "timezoneLabel": "Fuso horário"
+  },
+  "userRolesManager": {
+    "heading": "Funções de {{userName}}",
+    "errorLoading": "Não foi possível carregar as funções deste usuário.",
+    "loading": "Carregando funções…",
+    "empty": "Nenhuma função personalizada atribuída ainda.",
+    "revokeAriaLabel": "Revogar {{roleName}} de {{userName}}",
+    "assignLabel": "Atribuir uma função a {{userName}}",
+    "allAssigned": "Todas as funções atribuídas",
+    "selectPlaceholder": "Selecione uma função para atribuir…",
+    "assigning": "Atribuindo…",
+    "assign": "Atribuir"
   }
 }

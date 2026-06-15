@@ -3559,5 +3559,92 @@
     "title": "HUD DE DESARROLLO",
     "hideButtonLabel": "Ocultar HUD de desarrollo",
     "fetchMutLabel": "consultas / mutaciones"
+  },
+  "settings": {
+    "pageTitle": "Configuración",
+    "pageSubtitle": "Gestiona tu cuenta, los controles del espacio de trabajo, el modelo de datos y el acceso de desarrolladores.",
+    "sectionOverview": "Resumen",
+    "sectionProfile": "Perfil",
+    "sectionAppearance": "Apariencia e idioma",
+    "sectionLanguage": "Idioma",
+    "sectionNotifications": "Notificaciones",
+    "sectionSecurity": "Perfil y seguridad",
+    "sectionWorkspace": "Espacio de trabajo",
+    "sectionCrm": "Configuración de datos",
+    "sectionDataImport": "Importación de datos",
+    "sectionTopAccounts": "Cuentas principales",
+    "sectionGroups": "Grupos de acceso",
+    "sectionOpportunityFilters": "Filtros de oportunidades",
+    "sectionRfpAnalytics": "Análisis de RFP",
+    "sectionIntegrations": "Integraciones",
+    "sectionWebhooks": "Webhooks",
+    "sectionAuditLog": "Registro de auditoría",
+    "sectionDeveloper": "Acceso de desarrollador"
+  },
+  "override": {
+    "title": "La puntuación está por debajo del umbral de licitación",
+    "description": "Esta evaluación calcula {{totalScore}}/100 — {{verdict}}. Guárdala tal cual, o anula la recomendación para continuar con la licitación. Las anulaciones requieren una justificación y se registran para revisión de director/VP.",
+    "justificationLabel": "Justificación de la anulación",
+    "justificationPlaceholder": "¿Por qué licitamos a pesar de la puntuación? Cuenta estratégica, entrada al mercado, acuerdo marco obligatorio…",
+    "hintReady": "{{count}} caracteres — listo para enviar.",
+    "hintMore": "Mínimo {{min}} caracteres (faltan {{remaining}}).",
+    "followAriaLabel": "Guardar la puntuación y seguir la recomendación",
+    "followButton": "Guardar y seguir la recomendación",
+    "overrideAriaLabel": "Anular la recomendación y continuar con la licitación",
+    "saving": "Guardando…",
+    "overrideButton": "Anular y continuar con la licitación"
+  },
+  "kpiSidebar": {
+    "title": "Estado de la plataforma",
+    "caption": "Últimas métricas disponibles de BidStack",
+    "releaseScore": "Puntuación de lanzamiento",
+    "providersHealthy": "Proveedores en buen estado",
+    "queueBacklog": "Cola pendiente",
+    "overdueTasks": "Tareas vencidas"
+  },
+  "inlineTaskAdd": {
+    "toastAddedTitle": "Tarea añadida",
+    "toastErrorTitle": "No se pudo añadir la tarea",
+    "toastErrorDescription": "El servidor rechazó la solicitud.",
+    "titlePlaceholder": "Añade una tarea rápida — Intro para guardar",
+    "titleAriaLabel": "Título de tarea de adición rápida",
+    "dueDateAriaLabel": "Fecha de vencimiento opcional",
+    "submitButton": "Añadir"
+  },
+  "recentOpportunities": {
+    "accountTitle": "Oportunidades de la cuenta",
+    "recentTitle": "Oportunidades recientes",
+    "accountCaption": "Oportunidades abiertas vinculadas a {{accountName}}",
+    "recentCaption": "Última actividad de la cartera de todos los clientes",
+    "openPipeline": "Abrir pipeline",
+    "viewAll": "Ver todo",
+    "emptyAccountTitle": "Aún no hay oportunidades para esta cuenta",
+    "emptyTitle": "Aún no hay oportunidades",
+    "emptyAccountMessage": "Crea una oportunidad desde el encabezado de la cuenta para iniciar un espacio de trabajo de oferta."
+  },
+  "spotlightRefs": {
+    "regionLabel": "Referencias de Spotlight",
+    "sectionTitle": "Referencias de proyectos",
+    "sectionCaption": "Referencias de Spotlight Ref validadas para esta cuenta",
+    "errorTitle": "No se pudieron cargar las referencias",
+    "errorMessage": "Inténtalo de nuevo en breve.",
+    "emptyTitle": "Aún no hay referencias",
+    "emptyMessage": "Las referencias validadas llegan desde Spotlight Ref una vez que un consultor las envía y un responsable las aprueba.",
+    "statusDraft": "Borrador",
+    "statusManagerReview": "Pendiente de validación",
+    "statusValidated": "Validado",
+    "statusDispatched": "Enviado",
+    "toastValidatedTitle": "Referencia validada",
+    "toastValidationFailedTitle": "Error de validación",
+    "validateButton": "Validar"
+  },
+  "cockpitCustomizeMenu": {
+    "groupMain": "Columna principal",
+    "groupSide": "Barra lateral",
+    "triggerLabel": "Personalizar",
+    "hiddenCount": "({{count}} ocultos)",
+    "menuAriaLabel": "Personalizar bloques del panel",
+    "showBlocks": "Mostrar bloques",
+    "reset": "Restablecer"
   }
 }

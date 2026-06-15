@@ -245,5 +245,17 @@
     "aliasAriaLabel": "Alias di aggregazione",
     "removeAriaLabel": "Rimuovi aggregazione",
     "addButton": "+ Aggiungi aggregazione"
+  },
+  "groupByPicker": {
+    "fieldPlaceholder": "Scegli un campo…",
+    "timeBucketLabel": "Intervallo temporale",
+    "noTimeBucket": "Nessun intervallo temporale",
+    "timeBucketDay": "Giorno",
+    "timeBucketWeek": "Settimana",
+    "timeBucketMonth": "Mese",
+    "timeBucketQuarter": "Trimestre",
+    "timeBucketYear": "Anno",
+    "removeField": "Rimuovi campo di raggruppamento",
+    "addGroupBy": "+ Aggiungi raggruppamento"
   }
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, SectionHeader } from '@/components/ui/Card';
 
 const STORAGE_KEY = 'bidstack:currency-locale';
@@ -20,6 +21,7 @@ function load(): CurrencyLocale {
 }
 
 export function CurrencyLocaleSection() {
+  const { t } = useTranslation('settings');
   const [values, setValues] = useState(load);
 
   const update = (patch: Partial<CurrencyLocale>) => {
@@ -35,30 +37,33 @@ export function CurrencyLocaleSection() {
   return (
     <Card>
       <SectionHeader
-        title="Currency & locale"
-        caption="Default currency, date format, and timezone for your workspace."
+        title={t('currencyLocale.title', 'Currency & locale')}
+        caption={t(
+          'currencyLocale.caption',
+          'Default currency, date format, and timezone for your workspace.',
+        )}
       />
       <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
           <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1">
-            Default currency
+            {t('currencyLocale.currencyLabel', 'Default currency')}
           </label>
           <select
             className="input w-full"
             value={values.currency}
             onChange={(e) => update({ currency: e.target.value })}
           >
-            <option value="CAD">CAD — Canadian Dollar</option>
-            <option value="USD">USD — US Dollar</option>
-            <option value="EUR">EUR — Euro</option>
-            <option value="GBP">GBP — British Pound</option>
-            <option value="AUD">AUD — Australian Dollar</option>
-            <option value="JPY">JPY — Japanese Yen</option>
+            <option value="CAD">{t('currencyLocale.currency.cad', 'CAD — Canadian Dollar')}</option>
+            <option value="USD">{t('currencyLocale.currency.usd', 'USD — US Dollar')}</option>
+            <option value="EUR">{t('currencyLocale.currency.eur', 'EUR — Euro')}</option>
+            <option value="GBP">{t('currencyLocale.currency.gbp', 'GBP — British Pound')}</option>
+            <option value="AUD">{t('currencyLocale.currency.aud', 'AUD — Australian Dollar')}</option>
+            <option value="JPY">{t('currencyLocale.currency.jpy', 'JPY — Japanese Yen')}</option>
           </select>
         </div>
         <div>
           <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1">
-            Date format
+            {t('currencyLocale.dateFormatLabel', 'Date format')}
           </label>
           <select
             className="input w-full"
@@ -73,7 +78,7 @@ export function CurrencyLocaleSection() {
         </div>
         <div>
           <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1">
-            Timezone
+            {t('currencyLocale.timezoneLabel', 'Timezone')}
           </label>
           <select
             className="input w-full"

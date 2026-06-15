@@ -3,11 +3,13 @@
 // choosing blocks per user"). Backed by the per-user useCockpitLayout store
 // (localStorage, scoped by userId) — no server round-trip.
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Icon } from '@/components/ui/Icon';
 import { COCKPIT_CARDS, useCockpitLayout } from '@/stores/cockpitLayout';
 
 export function CockpitCustomizeMenu() {
+  const { t } = useTranslation('crm');
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const visibleCards = useCockpitLayout((s) => s.visibleCards);
@@ -24,8 +26,8 @@ export function CockpitCustomizeMenu() {
 
   const hiddenCount = COCKPIT_CARDS.filter((c) => visibleCards[c.id] === false).length;
   const groups: { key: 'main' | 'side'; label: string }[] = [
-    { key: 'main', label: 'Main column' },
-    { key: 'side', label: 'Sidebar' },
+    { key: 'main', label: t('cockpitCustomizeMenu.groupMain', 'Main column') },
+    { key: 'side', label: t('cockpitCustomizeMenu.groupSide', 'Sidebar') },
   ];
 
   return (
@@ -38,26 +40,30 @@ export function CockpitCustomizeMenu() {
         onClick={() => setOpen((v) => !v)}
       >
         <Icon name="sliders" size={15} ariaHidden />
-        <span className="hidden sm:inline">Customize</span>
+        <span className="hidden sm:inline">{t('cockpitCustomizeMenu.triggerLabel', 'Customize')}</span>
         {hiddenCount > 0 && (
-          <span className="text-xs text-[var(--fg-tertiary)]">({hiddenCount} hidden)</span>
+          <span className="text-xs text-[var(--fg-tertiary)]">
+            {t('cockpitCustomizeMenu.hiddenCount', '({{count}} hidden)', { count: hiddenCount })}
+          </span>
         )}
       </button>
 
       {open && (
         <div
           role="menu"
-          aria-label="Customize cockpit blocks"
+          aria-label={t('cockpitCustomizeMenu.menuAriaLabel', 'Customize cockpit blocks')}
           className="absolute right-0 top-[calc(100%+6px)] z-30 max-h-[70vh] w-72 overflow-y-auto rounded-lg glass-menu p-1.5"
         >
           <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-3 py-2">
-            <span className="text-sm font-semibold text-[var(--fg-primary)]">Show blocks</span>
+            <span className="text-sm font-semibold text-[var(--fg-primary)]">
+              {t('cockpitCustomizeMenu.showBlocks', 'Show blocks')}
+            </span>
             <button
               type="button"
               className="text-xs text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:underline"
               onClick={() => resetLayout()}
             >
-              Reset
+              {t('cockpitCustomizeMenu.reset', 'Reset')}
             </button>
           </div>
           {groups.map((g) => (

@@ -1,17 +1,18 @@
 // GroupByPicker — select fields to group by, with optional time bucketing.
 
 import { Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/cn';
 import type { GroupBy, ReportEntityType, TimeBucket } from '@/hooks/useAnalyticsReports';
 import { FieldPicker } from './FieldPicker';
 
-const TIME_BUCKETS: { bucket: TimeBucket; label: string }[] = [
-  { bucket: 'DAY', label: 'Day' },
-  { bucket: 'WEEK', label: 'Week' },
-  { bucket: 'MONTH', label: 'Month' },
-  { bucket: 'QUARTER', label: 'Quarter' },
-  { bucket: 'YEAR', label: 'Year' },
+const TIME_BUCKETS: { bucket: TimeBucket; labelKey: string; labelEn: string }[] = [
+  { bucket: 'DAY', labelKey: 'groupByPicker.timeBucketDay', labelEn: 'Day' },
+  { bucket: 'WEEK', labelKey: 'groupByPicker.timeBucketWeek', labelEn: 'Week' },
+  { bucket: 'MONTH', labelKey: 'groupByPicker.timeBucketMonth', labelEn: 'Month' },
+  { bucket: 'QUARTER', labelKey: 'groupByPicker.timeBucketQuarter', labelEn: 'Quarter' },
+  { bucket: 'YEAR', labelKey: 'groupByPicker.timeBucketYear', labelEn: 'Year' },
 ];
 
 interface Props {
@@ -21,6 +22,8 @@ interface Props {
 }
 
 export function GroupByPicker({ entity, groupBy, onChange }: Props) {
+  const { t } = useTranslation('reports');
+
   const add = () => {
     onChange([...groupBy, { field: '' }]);
   };
@@ -48,7 +51,7 @@ export function GroupByPicker({ entity, groupBy, onChange }: Props) {
             entity={entity}
             value={g.field}
             onChange={(key) => update(i, { field: key })}
-            placeholder="Pick field…"
+            placeholder={t('groupByPicker.fieldPlaceholder', 'Pick field…')}
             className="flex-1"
           />
           {/* Time bucket — only shown after field selected */}
@@ -58,20 +61,20 @@ export function GroupByPicker({ entity, groupBy, onChange }: Props) {
               onChange={(e) =>
                 update(i, { timeBucket: (e.target.value as TimeBucket) || undefined })
               }
-              aria-label="Time bucket"
+              aria-label={t('groupByPicker.timeBucketLabel', 'Time bucket')}
               className={selectCls}
             >
-              <option value="">No time bucket</option>
+              <option value="">{t('groupByPicker.noTimeBucket', 'No time bucket')}</option>
               {TIME_BUCKETS.map((b) => (
                 <option key={b.bucket} value={b.bucket}>
-                  {b.label}
+                  {t(b.labelKey, b.labelEn)}
                 </option>
               ))}
             </select>
           )}
           <button
             onClick={() => remove(i)}
-            aria-label="Remove group-by field"
+            aria-label={t('groupByPicker.removeField', 'Remove group-by field')}
             className={cn(
               'flex items-center justify-center rounded-lg text-[var(--fg-tertiary)]',
               'hover:text-[var(--danger)] hover:bg-[var(--danger-tint)] transition-colors',
@@ -91,7 +94,7 @@ export function GroupByPicker({ entity, groupBy, onChange }: Props) {
           'min-h-[44px]',
         )}
       >
-        + Add group by
+        {t('groupByPicker.addGroupBy', '+ Add group by')}
       </button>
     </div>
   );
