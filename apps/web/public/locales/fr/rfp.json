@@ -125,5 +125,108 @@
     "emptyTitle": "No competitor findings yet",
     "emptyMessage": "Pick a competitor and run research. We only surface claims we can link to a public source — including real federal award pricing from USASpending.",
     "error": "Couldn't load competitor findings."
+  },
+  "proposalDetail": {
+    "loadingAriaLabel": "Chargement de la proposition",
+    "errorTitle": "Échec du chargement de la proposition",
+    "errorRetry": "Veuillez réessayer dans un instant.",
+    "backToProposals": "Retour aux propositions",
+    "notFound": "Proposition introuvable.",
+    "backToProposalsAriaLabel": "Retour aux propositions",
+    "version": "v{{version}}",
+    "due": "Échéance {{date}}",
+    "requiredBadge": "Obligatoire",
+    "aiDraftedBadge": "Rédigé par IA",
+    "wordCount": "{{count}} mots",
+    "draftingSectionAriaLabel": "Rédaction de {{title}}…",
+    "aiDraftSectionAriaLabel": "Brouillon IA pour {{title}}",
+    "drafting": "Rédaction…",
+    "aiDraft": "Brouillon IA",
+    "editSectionAriaLabel": "Modifier la section {{title}}",
+    "editContentAriaLabel": "Modifier le contenu de {{title}}",
+    "cancel": "Annuler",
+    "saving": "Enregistrement…",
+    "save": "Enregistrer",
+    "emptyContent": "Aucun contenu pour l'instant. Utilisez le brouillon IA pour générer une première version."
+  },
+  "proposals": {
+    "title": "Propositions",
+    "subtitle": "Espace RFP — rédigez, révisez et soumettez des propositions gagnantes.",
+    "newProposal": "Nouvelle proposition",
+    "createProposal": "Créer une proposition",
+    "nameLabel": "Nom de la proposition",
+    "namePlaceholder": "Nom de la proposition…",
+    "creating": "Création…",
+    "create": "Créer",
+    "cancel": "Annuler",
+    "createError": "Échec de la création de la proposition.",
+    "filterByStatus": "Filtrer par statut",
+    "resultCount": "{{count}} propositions",
+    "loading": "Chargement des propositions",
+    "loadError": "Échec du chargement des propositions",
+    "loadErrorRetry": "Veuillez réessayer dans un instant.",
+    "emptyTitle": "Aucune proposition pour le moment.",
+    "emptyMessage": "Créez votre première proposition pour commencer.",
+    "viewProposal": "Voir la proposition : {{name}}",
+    "version": "v{{version}}",
+    "due": "Échéance {{date}}"
+  },
+  "rfpCrew": {
+    "statusWaiting": "En attente",
+    "statusWorking": "En cours",
+    "statusDone": "Terminé",
+    "statusOverseeing": "Supervision",
+    "viewRoleDetailsAria": "{{role}} — voir les détails du rôle",
+    "moveToStageAria": "Déplacer {{role}} vers une autre étape. Utilisez les touches fléchées gauche et droite."
+  },
+  "proposalStatusChip": {
+    "label": {
+      "draft": "Brouillon",
+      "review": "En révision",
+      "approved": "Approuvé",
+      "submitted": "Soumis",
+      "won": "Gagné",
+      "lost": "Perdu"
+    }
+  },
+  "sectionEditor": {
+    "ariaLabelEditSection": "Modifier la section : {{title}}",
+    "statusReviewed": "✓ Révisé",
+    "statusNotReviewed": "Pas encore révisé",
+    "saving": "Enregistrement…",
+    "saveAndMarkReviewed": "Enregistrer et marquer comme révisé"
+  },
+  "rfpStatusChip": {
+    "stageIdle": "Inactif",
+    "stageQueued": "En file d'attente",
+    "stageExtracting": "Extraction",
+    "stageStoryMatching": "Correspondance des récits",
+    "stageSectionDrafting": "Rédaction",
+    "stageComplianceFill": "Conformité",
+    "stageLegalScan": "Équipe de révision",
+    "stageQaReview": "Contrôle qualité",
+    "stageAwaitingApproval": "En attente d'approbation",
+    "stageApproved": "Approuvé",
+    "stageCompleted": "Terminé",
+    "stageFailed": "Échoué",
+    "stageRejected": "Rejeté",
+    "stageTimeout": "Expiré",
+    "ariaPipelineStatus": "Statut du pipeline : {{status}}"
+  },
+  "requirementRow": {
+    "pageRefAria": "Trouvé à la page {{page}}",
+    "confidenceAria": "Confiance de l'IA : {{percent}} %",
+    "confidenceLabel": "{{percent}} % de confiance"
+  },
+  "adminRfp": {
+    "eyebrow": "Administration",
+    "title": "Analyses des appels d'offres",
+    "subtitle": "Chaque appel d'offres de l'organisation, sa valeur et la répartition par responsable.",
+    "viewAllProposals": "Voir toutes les propositions"
+  },
+  "aiDisclosureBadge": {
+    "ariaLabel": "Ce contenu a été généré avec l'assistance de l'IA",
+    "title": "Brouillon assisté par IA — à vérifier avant l'envoi",
+    "label": "Brouillon assisté par IA"
   }
 }
