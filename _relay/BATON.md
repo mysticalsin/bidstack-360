@@ -1,5 +1,41 @@
 # BATON — BidStack demo-feedback program (WALTEUR)
 
+## 2026-06-14 Claude (Opus 4.8) — i18n sweep COMPLETE + push + security reconciliation
+
+**Shift:** Claude (Opus 4.8) · 2026-06-14 · branch `demo` · /goal "Salesforce-level".
+
+- **i18n externalization sweep COMPLETE.** Rounds 4→26 driven autonomously (one Workflow/round, ~12 files each, one agent/file; merge → typecheck + lint gate → plain commit per round). Coverage **294/362 = 81.2%** (from 5.6% at kickoff). Full web suite green **287/287 (45 files)**.
+- **Remaining 68 uncovered are NOT translatable** — do not chase to 100% blindly: ~54 no-string files (motion utils, SVG partner logos, barrel re-exports, route-redirect pages, thin Clerk/layout wrappers — tracked in `apps/web/scripts/_i18n_skip.txt`) + **14 git-dirty Codex WIP `.tsx`** (KpiRow, Hero, Card, ProviderHealthSection, MeetingNotesImportDialog, ReceiveStep, WebhookEventsCard, OpportunityRow, PipelineCard, StageColumn, main.tsx + tests) excluded every round because the builder skips dirty files. **Never sweep those into an i18n commit** (MISTAKES ledger).
+- **2 latent test fixes** from interpolation/init: `b8cdc407` (CurrencySelector), `f13be2d3` (RfpStatusChip). Rule: any test inspecting translated/interpolated UI must `import '@/i18n'`.
+- **PUSHED:** all 50 ahead commits `demo → origin/demo` (HEAD `f13be2d3`). Working tree still holds **uncommitted Codex WIP** (the 14 files above + opportunities/*, pipeline-stages, api.ts, hooks) — left local on purpose, NOT this shift's work, do not fold into any i18n commit.
+- **Sweep tooling reusable** (untracked): `apps/web/scripts/_i18n_*` (build_round / driver / merge / skip). To finish 100% once Codex commits its WIP: `python apps/web/scripts/_i18n_build_round.py 14` → Workflow `_i18n_driver.js` → `_i18n_merge.py` → gate → commit.
+
+### Reconciliation — security findings #5–#17 (CORRECTS BATON.bidcrm.md)
+`BATON.bidcrm.md` / vault `log.md` (Antigravity, 2026-06-14) claim "#5–#17 remain open / unimplemented in source." **That is STALE — verified false against `demo` source this shift.** `ISSUES.md` is authoritative: 8 false-positive, 5 real **FIXED & pushed** (commit `3df6db8e fix(security): close 4 verified Baton findings`):
+- #12 WS cross-tenant leak — `realtime.ts:90` (orgId embedded in channel + must match caller) + `realtime.validateChannel.test.ts` (cross-tenant denial regression).
+- #13 Yjs phantom/empty doc — `loadYDocById(ydocId, orgId)` `yjs-persistence.service.ts:118`, org-scoped at `yjs-collab.ts:225` (NOT_FOUND when absent).
+- #14 DocuSign HMAC — raw-body parser in `signatures.ts`.
+- #16 Yjs compaction batched delete + `@@index([createdAt])` — migration `20260613160000` still needs `migrate deploy` on clean envs.
+
+**Blocked — need Tony (not surgical):** MS Graph live review meetings (Azure app + Graph creds); `pnpm db:migrate` for notif_prefs on clean envs; rotate chat-exposed Seamless/Kimi keys; set stable `INTEGRATION_TOKEN_KEY` in `.env`.
+
+---
+
+## 2026-06-13 Codex idle-session + UX/UI hardening update
+
+- Repo: `D:\BIDCRM`.
+- Fixed: Vite dev optimizer target, stub-auth direct local entry, shared dark-mode glow/shimmer, sign-out icon, pipeline Kanban column cramping, phantom cockpit customization toggle, idle auth recovery, React Query focus/reconnect recovery, and Vitest exchange-rate teardown noise.
+- Idle-session fix: `apps/web/src/lib/api.ts` retries one `401/403` with `{ forceRefresh: true }`; `apps/web/src/lib/auth.tsx` maps that to Clerk `getToken({ skipCache: true })`; `apps/web/src/main.tsx` refetches stale queries on focus/reconnect.
+- Test-noise fix: `apps/web/src/hooks/useFormatMoney.ts` and `apps/web/src/hooks/useDisplayMoney.ts` skip only automatic exchange-rate fetches in test mode; currency-store tests still call `fetchRates()` explicitly.
+- Verification green: `pnpm --filter @bidstack/web test` (43 files / 282 tests, no teardown AbortError), `pnpm --filter @bidstack/web typecheck`, `pnpm --filter @bidstack/web lint`, `pnpm --filter @bidstack/web build`, and `pnpm --filter @bidstack/web exec playwright test e2e/performance/bundle-size-budget.spec.ts --reporter=line` (4/4).
+- Browser audit clean: `http://localhost:5173/dashboard`, `/pipeline`, `/opportunities`; no app console errors; only expected Framer reduced-motion warning in reduced-motion browser; no desktop/mobile page-level horizontal overflow at `390x844`; pipeline rail intentionally scrolls with `280px` columns.
+- Audit report: `D:\BIDCRM\docs\audits\2026-06-13-ux-ui-premium-audit.md`.
+- Evidence: `D:\BIDCRM\artifacts\ux-audit-2026-06-13\`.
+- Solution notes: `D:\BIDCRM\docs\solutions\idle-auth-refresh-and-focus-refetch.md`, `D:\BIDCRM\docs\solutions\test-owned-exchange-rate-fetches.md`.
+- Concrete next action: dedicated performance hardening for large chunks (`vendor`, `editor`, `motion`, `index`) with browser coverage for analytics/editor routes before any deeper manual chunk split.
+
+---
+
 **Shift:** Claude (Fable 5) - 2026-06-13 - branch `demo` - /goal "Salesforce-level" (extended)
 **Goal:** Autonomous quality climb vs best-in-class. Benchmark in `walteur-kit/salesforce-gap.json` (scores updated this shift).
 
