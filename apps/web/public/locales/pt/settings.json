@@ -711,5 +711,79 @@
     "selectPlaceholder": "Selecione uma função para atribuir…",
     "assigning": "Atribuindo…",
     "assign": "Atribuir"
+  },
+  "leadRot": {
+    "status": {
+      "new": "Novo",
+      "contacted": "Contactado",
+      "qualified": "Qualificado",
+      "nurture": "Nutrição",
+      "disqualified": "Desqualificado",
+      "converted": "Convertido"
+    },
+    "toast": {
+      "saved": "Salvo — {{label}} apodrece após {{count}} dias",
+      "saveFailed": "Falha ao salvar"
+    },
+    "loading": "Carregando…",
+    "heading": "Limite de apodrecimento por status",
+    "subtitle": "Um lead que permanece em um status além do seu limite exibe um selo \"Apodrecido\" no kanban e aciona ações de recuperação sugeridas por IA.",
+    "listLabel": "Limites de apodrecimento",
+    "daysLabel": "Dias",
+    "inputAriaLabel": "Dias de apodrecimento para {{label}}"
+  },
+  "security": {
+    "authentication": {
+      "title": "Autenticação",
+      "caption": "Como você entra neste espaço de trabalho."
+    },
+    "signInMethod": {
+      "label": "Método de início de sessão",
+      "microsoftSso": "SSO da Microsoft",
+      "clerk": "Clerk",
+      "devStub": "Stub de desenvolvimento"
+    },
+    "authProvider": {
+      "label": "Provedor de autenticação",
+      "clerk": "Clerk",
+      "localStub": "Stub local (desenvolvimento)"
+    },
+    "status": {
+      "label": "Estado",
+      "activeSession": "Sessão ativa",
+      "noSession": "Sem sessão"
+    },
+    "email": {
+      "label": "E-mail"
+    },
+    "allowedDomains": {
+      "label": "Domínios permitidos",
+      "any": "Qualquer domínio"
+    },
+    "workspace": {
+      "label": "Espaço de trabalho"
+    },
+    "microsoftSso": {
+      "title": "SSO da Microsoft",
+      "caption": "A sua identidade Microsoft está vinculada a esta conta.",
+      "connected": "Conta Microsoft conectada",
+      "signedInAs": "Sessão iniciada como {{email}}",
+      "active": "Ativo"
+    }
+  },
+  "notificationPrefs": {
+    "title": "Notificações",
+    "caption": "Escolha quais eventos disparam alertas no app e e-mails. Salvos na sua conta, então acompanham você em todos os dispositivos.",
+    "errorTitle": "Não foi possível carregar as preferências de notificação",
+    "errorMessage": "Seus alertas não são afetados; o painel de preferências não pôde ser carregado.",
+    "retry": "Tentar novamente",
+    "emailDigestLabel": "E-mail de resumo diário",
+    "emailDigestDesc": "Um resumo do seu pipeline, tarefas e menções todas as manhãs.",
+    "mentionPushLabel": "Notificações de menções",
+    "mentionPushDesc": "Seja notificado quando alguém @mencionar você em um comentário ou nota.",
+    "taskDueSoonLabel": "Lembretes de tarefas",
+    "taskDueSoonDesc": "Alertar quando uma tarefa vence em 24 horas.",
+    "dealStageChangeLabel": "Mudanças de estágio do negócio",
+    "dealStageChangeDesc": "Notificar quando uma oportunidade sob sua responsabilidade passa para um novo estágio."
   }
 }

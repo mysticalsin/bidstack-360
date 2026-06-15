@@ -3613,5 +3613,79 @@
     "menuAriaLabel": "Personalizar blocos do painel",
     "showBlocks": "Mostrar blocos",
     "reset": "Redefinir"
+  },
+  "insightsBar": {
+    "heading": "Sinais prioritários",
+    "overdueTasks": "{{count}} tarefas atrasadas",
+    "stalledOpps": "{{count}} oportunidades paradas",
+    "newLeads": "{{count}} novos leads esta semana",
+    "pipelineValue": "{{value}} M€ de valor do pipeline"
+  },
+  "importOpportunities": {
+    "trigger": "Importar",
+    "dialog": {
+      "title": "Importar oportunidades",
+      "description": "Cole um array JSON de oportunidades. Os códigos são gerados automaticamente se omitidos."
+    },
+    "cancel": "Cancelar",
+    "submit": "Importar",
+    "submitLoading": "Importando…",
+    "toast": {
+      "invalidJson": "JSON inválido",
+      "successOne": "{{count}} oportunidade importada",
+      "successOther": "{{count}} oportunidades importadas",
+      "rowsFailedOne": "{{count}} linha falhou",
+      "rowsFailedOther": "{{count}} linhas falharam",
+      "failed": "Falha na importação",
+      "unknownError": "Erro desconhecido"
+    }
+  },
+  "winRate": {
+    "heading": "Taxa de vitória",
+    "emptyNoClosedBids": "Nenhuma proposta fechada",
+    "wonCount": "{{count}} ganhas",
+    "lostCount": "{{count}} perdidas"
+  },
+  "businessSnapshot": {
+    "title": "Resumo do negócio",
+    "caption": "Saúde: {{band}} - pontuação {{score}}/100",
+    "region": {
+      "ariaLabel": "Resumo do negócio"
+    },
+    "row": {
+      "legalName": "Razão social",
+      "founded": "Fundada",
+      "headquarters": "Sede",
+      "annualRevenue": "Receita anual",
+      "employees": "Funcionários",
+      "intentTopics": "Tópicos de intenção",
+      "hiringMovement": "Movimento de contratação",
+      "leadershipChanges": "Mudanças na liderança",
+      "externalSync": "Sincronização externa",
+      "sourceReceipts": "Comprovantes de origem",
+      "lastRefreshed": "Última atualização",
+      "confidence": "Confiança"
+    },
+    "value": {
+      "notVerified": "Não verificado",
+      "notSynced": "Não sincronizado",
+      "hiringSummary": "{{trend}} ({{count}} sinais)",
+      "leadershipSummary": "{{count}} sinais de nível C",
+      "sourceCount_one": "{{count}} fonte",
+      "sourceCount_other": "{{count}} fontes"
+    }
+  },
+  "savedViewsBar": {
+    "namePromptTitle": "Nomeie esta visualização",
+    "namePromptPlaceholder": "ex.: \"Minhas atrasadas de hoje\"",
+    "namePromptConfirm": "Salvar visualização",
+    "savedToast": "Visualização \"{{name}}\" salva",
+    "recallAriaLabel": "Abrir visualização salva",
+    "selectPlaceholder": "Visualizações salvas…",
+    "saveViewButton": "Salvar visualização",
+    "removeConfirmTitle": "Remover visualização salva?",
+    "removeConfirmDescription": "Isso remove \"{{name}}\" dos seus atalhos de tarefas.",
+    "removeConfirmButton": "Remover",
+    "removeButtonTitle": "Remover a visualização salva mais recente"
   }
 }

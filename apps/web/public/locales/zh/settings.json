@@ -711,5 +711,79 @@
     "selectPlaceholder": "选择要分配的角色…",
     "assigning": "正在分配…",
     "assign": "分配"
+  },
+  "leadRot": {
+    "status": {
+      "new": "新建",
+      "contacted": "已联系",
+      "qualified": "已确认",
+      "nurture": "培育中",
+      "disqualified": "已淘汰",
+      "converted": "已转化"
+    },
+    "toast": {
+      "saved": "已保存 — {{label}} 在 {{count}} 天后过期",
+      "saveFailed": "保存失败"
+    },
+    "loading": "加载中…",
+    "heading": "各状态的过期阈值",
+    "subtitle": "在某状态停留时间超过阈值的潜在客户会在看板上显示“过期”标记，并触发 AI 推荐的挽回动作。",
+    "listLabel": "过期阈值",
+    "daysLabel": "天数",
+    "inputAriaLabel": "{{label}} 的过期天数"
+  },
+  "security": {
+    "authentication": {
+      "title": "身份验证",
+      "caption": "您如何登录此工作区。"
+    },
+    "signInMethod": {
+      "label": "登录方式",
+      "microsoftSso": "Microsoft 单点登录",
+      "clerk": "Clerk",
+      "devStub": "开发存根"
+    },
+    "authProvider": {
+      "label": "身份验证提供商",
+      "clerk": "Clerk",
+      "localStub": "本地存根（开发）"
+    },
+    "status": {
+      "label": "状态",
+      "activeSession": "活动会话",
+      "noSession": "无会话"
+    },
+    "email": {
+      "label": "电子邮件"
+    },
+    "allowedDomains": {
+      "label": "允许的域名",
+      "any": "任何域名"
+    },
+    "workspace": {
+      "label": "工作区"
+    },
+    "microsoftSso": {
+      "title": "Microsoft 单点登录",
+      "caption": "您的 Microsoft 身份已关联到此账户。",
+      "connected": "已连接 Microsoft 账户",
+      "signedInAs": "已登录为 {{email}}",
+      "active": "活动"
+    }
+  },
+  "notificationPrefs": {
+    "title": "通知",
+    "caption": "选择哪些事件触发应用内提醒和电子邮件。保存到您的账户，因此可在所有设备上同步。",
+    "errorTitle": "无法加载通知偏好设置",
+    "errorMessage": "您的提醒不受影响；偏好设置面板无法加载。",
+    "retry": "重试",
+    "emailDigestLabel": "每日摘要邮件",
+    "emailDigestDesc": "每天早上为您汇总您的销售管道、任务和提及。",
+    "mentionPushLabel": "提及通知",
+    "mentionPushDesc": "当有人在评论或备注中@提及您时收到通知。",
+    "taskDueSoonLabel": "任务提醒",
+    "taskDueSoonDesc": "任务将在 24 小时内到期时提醒。",
+    "dealStageChangeLabel": "交易阶段变更",
+    "dealStageChangeDesc": "当您负责的商机进入新阶段时通知您。"
   }
 }

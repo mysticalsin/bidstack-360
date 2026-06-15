@@ -358,5 +358,11 @@
     "auditLog": "Audit log",
     "login": "Sign in",
     "ariaLabel": "Breadcrumb"
+  },
+  "progressRing": {
+    "ariaLabelPercentComplete": "{{percent}}% complete"
+  },
+  "sortableHeader": {
+    "ariaLabel": "Sort by {{label}}. Current sort: {{current}}. Activate to sort {{next}}."
   }
 }

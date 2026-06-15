@@ -711,5 +711,79 @@
     "selectPlaceholder": "Sélectionnez un rôle à attribuer…",
     "assigning": "Attribution…",
     "assign": "Attribuer"
+  },
+  "leadRot": {
+    "status": {
+      "new": "Nouveau",
+      "contacted": "Contacté",
+      "qualified": "Qualifié",
+      "nurture": "Maturation",
+      "disqualified": "Disqualifié",
+      "converted": "Converti"
+    },
+    "toast": {
+      "saved": "Enregistré — {{label}} pourrit après {{count}} jours",
+      "saveFailed": "Échec de l'enregistrement"
+    },
+    "loading": "Chargement…",
+    "heading": "Seuil de péremption par statut",
+    "subtitle": "Un prospect qui reste dans un statut au-delà de son seuil affiche un badge « Périmé » sur le kanban et déclenche des actions de relance suggérées par l'IA.",
+    "listLabel": "Seuils de péremption",
+    "daysLabel": "Jours",
+    "inputAriaLabel": "Jours de péremption pour {{label}}"
+  },
+  "security": {
+    "authentication": {
+      "title": "Authentification",
+      "caption": "Comment vous vous connectez à cet espace de travail."
+    },
+    "signInMethod": {
+      "label": "Méthode de connexion",
+      "microsoftSso": "SSO Microsoft",
+      "clerk": "Clerk",
+      "devStub": "Stub de développement"
+    },
+    "authProvider": {
+      "label": "Fournisseur d'authentification",
+      "clerk": "Clerk",
+      "localStub": "Stub local (développement)"
+    },
+    "status": {
+      "label": "Statut",
+      "activeSession": "Session active",
+      "noSession": "Aucune session"
+    },
+    "email": {
+      "label": "E-mail"
+    },
+    "allowedDomains": {
+      "label": "Domaines autorisés",
+      "any": "Tout domaine"
+    },
+    "workspace": {
+      "label": "Espace de travail"
+    },
+    "microsoftSso": {
+      "title": "SSO Microsoft",
+      "caption": "Votre identité Microsoft est liée à ce compte.",
+      "connected": "Compte Microsoft connecté",
+      "signedInAs": "Connecté en tant que {{email}}",
+      "active": "Actif"
+    }
+  },
+  "notificationPrefs": {
+    "title": "Notifications",
+    "caption": "Choisissez les événements qui déclenchent des alertes dans l'application et des e-mails. Enregistrés sur votre compte, ils vous suivent sur tous vos appareils.",
+    "errorTitle": "Impossible de charger les préférences de notification",
+    "errorMessage": "Vos alertes ne sont pas affectées ; le panneau des préférences n'a pas pu se charger.",
+    "retry": "Réessayer",
+    "emailDigestLabel": "E-mail de résumé quotidien",
+    "emailDigestDesc": "Un résumé de votre pipeline, de vos tâches et de vos mentions chaque matin.",
+    "mentionPushLabel": "Notifications de mentions",
+    "mentionPushDesc": "Soyez averti lorsque quelqu'un vous @mentionne dans un commentaire ou une note.",
+    "taskDueSoonLabel": "Rappels de tâches",
+    "taskDueSoonDesc": "Alerter lorsqu'une tâche est due dans les 24 heures.",
+    "dealStageChangeLabel": "Changements d'étape de l'affaire",
+    "dealStageChangeDesc": "Notifier lorsqu'une opportunité dont vous êtes responsable passe à une nouvelle étape."
   }
 }

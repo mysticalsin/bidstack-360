@@ -3613,5 +3613,79 @@
     "menuAriaLabel": "Customize cockpit blocks",
     "showBlocks": "Show blocks",
     "reset": "Reset"
+  },
+  "insightsBar": {
+    "heading": "Priority signals",
+    "overdueTasks": "{{count}} tasks overdue",
+    "stalledOpps": "{{count}} opportunities stalled",
+    "newLeads": "{{count}} new leads this week",
+    "pipelineValue": "€{{value}}M pipeline value"
+  },
+  "importOpportunities": {
+    "trigger": "Import",
+    "dialog": {
+      "title": "Import Opportunities",
+      "description": "Paste a JSON array of opportunities. Codes are auto-minted if omitted."
+    },
+    "cancel": "Cancel",
+    "submit": "Import",
+    "submitLoading": "Importing…",
+    "toast": {
+      "invalidJson": "Invalid JSON",
+      "successOne": "Imported {{count}} opportunity",
+      "successOther": "Imported {{count}} opportunities",
+      "rowsFailedOne": "{{count}} row failed",
+      "rowsFailedOther": "{{count}} rows failed",
+      "failed": "Import failed",
+      "unknownError": "Unknown error"
+    }
+  },
+  "winRate": {
+    "heading": "Win rate",
+    "emptyNoClosedBids": "No closed bids",
+    "wonCount": "{{count}} won",
+    "lostCount": "{{count}} lost"
+  },
+  "businessSnapshot": {
+    "title": "Business snapshot",
+    "caption": "Health: {{band}} - score {{score}}/100",
+    "region": {
+      "ariaLabel": "Business snapshot"
+    },
+    "row": {
+      "legalName": "Legal name",
+      "founded": "Founded",
+      "headquarters": "Headquarters",
+      "annualRevenue": "Annual revenue",
+      "employees": "Employees",
+      "intentTopics": "Intent topics",
+      "hiringMovement": "Hiring movement",
+      "leadershipChanges": "Leadership changes",
+      "externalSync": "External sync",
+      "sourceReceipts": "Source receipts",
+      "lastRefreshed": "Last refreshed",
+      "confidence": "Confidence"
+    },
+    "value": {
+      "notVerified": "Not verified",
+      "notSynced": "Not synced",
+      "hiringSummary": "{{trend}} ({{count}} signals)",
+      "leadershipSummary": "{{count}} C-level signals",
+      "sourceCount_one": "{{count}} source",
+      "sourceCount_other": "{{count}} sources"
+    }
+  },
+  "savedViewsBar": {
+    "namePromptTitle": "Name this view",
+    "namePromptPlaceholder": "e.g. \"My overdue today\"",
+    "namePromptConfirm": "Save View",
+    "savedToast": "Saved view \"{{name}}\"",
+    "recallAriaLabel": "Recall saved view",
+    "selectPlaceholder": "Saved views…",
+    "saveViewButton": "Save view",
+    "removeConfirmTitle": "Remove saved view?",
+    "removeConfirmDescription": "This removes \"{{name}}\" from your task shortcuts.",
+    "removeConfirmButton": "Remove",
+    "removeButtonTitle": "Remove most-recent saved view"
   }
 }

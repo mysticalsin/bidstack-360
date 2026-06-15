@@ -1,11 +1,14 @@
 // Settings → Security. Surfaces SSO status, auth provider details,
 // and workspace domain restrictions.
 
+import { useTranslation } from 'react-i18next';
+
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useAuth, useUser } from '@/lib/auth';
 
 export function SecuritySection() {
+  const { t } = useTranslation('settings');
   const { isSignedIn } = useAuth();
   const { user } = useUser();
   const usingClerk = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
@@ -16,36 +19,43 @@ export function SecuritySection() {
   return (
     <div className="space-y-6">
       <Card>
-        <SectionHeader title="Authentication" caption="How you sign in to this workspace." />
+        <SectionHeader
+          title={t('security.authentication.title', 'Authentication')}
+          caption={t('security.authentication.caption', 'How you sign in to this workspace.')}
+        />
         <dl className="divide-y divide-[var(--border-subtle)] text-sm">
-          <DetailRow label="Sign-in method">
+          <DetailRow label={t('security.signInMethod.label', 'Sign-in method')}>
             {microsoftEnabled ? (
-              <Badge tone="jade">Microsoft SSO</Badge>
+              <Badge tone="jade">{t('security.signInMethod.microsoftSso', 'Microsoft SSO')}</Badge>
             ) : usingClerk ? (
-              <Badge tone="blue">Clerk</Badge>
+              <Badge tone="blue">{t('security.signInMethod.clerk', 'Clerk')}</Badge>
             ) : (
-              <Badge tone="gray">Dev stub</Badge>
+              <Badge tone="gray">{t('security.signInMethod.devStub', 'Dev stub')}</Badge>
             )}
           </DetailRow>
-          <DetailRow label="Auth provider">
+          <DetailRow label={t('security.authProvider.label', 'Auth provider')}>
             <span className="text-[var(--fg-secondary)]">
-              {usingClerk ? 'Clerk' : 'Local stub (development)'}
+              {usingClerk
+                ? t('security.authProvider.clerk', 'Clerk')
+                : t('security.authProvider.localStub', 'Local stub (development)')}
             </span>
           </DetailRow>
-          <DetailRow label="Status">
+          <DetailRow label={t('security.status.label', 'Status')}>
             <Badge tone={isSignedIn ? 'jade' : 'gray'}>
-              {isSignedIn ? 'Active session' : 'No session'}
+              {isSignedIn
+                ? t('security.status.activeSession', 'Active session')
+                : t('security.status.noSession', 'No session')}
             </Badge>
           </DetailRow>
-          <DetailRow label="Email">
+          <DetailRow label={t('security.email.label', 'Email')}>
             {user?.primaryEmailAddress?.emailAddress ?? '—'}
           </DetailRow>
-          <DetailRow label="Allowed domains">
+          <DetailRow label={t('security.allowedDomains.label', 'Allowed domains')}>
             <span className="text-[var(--fg-secondary)]">
-              {ssoDomains === 'any' ? 'Any domain' : ssoDomains}
+              {ssoDomains === 'any' ? t('security.allowedDomains.any', 'Any domain') : ssoDomains}
             </span>
           </DetailRow>
-          <DetailRow label="Workspace">
+          <DetailRow label={t('security.workspace.label', 'Workspace')}>
             <code className="font-mono text-xs">{workspaceId}</code>
           </DetailRow>
         </dl>
@@ -53,19 +63,29 @@ export function SecuritySection() {
 
       {microsoftEnabled && (
         <Card>
-          <SectionHeader title="Microsoft SSO" caption="Your Microsoft identity is linked to this account." />
+          <SectionHeader
+            title={t('security.microsoftSso.title', 'Microsoft SSO')}
+            caption={t(
+              'security.microsoftSso.caption',
+              'Your Microsoft identity is linked to this account.',
+            )}
+          />
           <div className="p-5">
             <div className="flex items-center gap-3">
               <span className="text-2xl">🪟</span>
               <div>
                 <div className="text-sm font-medium text-[var(--fg-primary)]">
-                  Microsoft account connected
+                  {t('security.microsoftSso.connected', 'Microsoft account connected')}
                 </div>
                 <div className="text-xs text-[var(--fg-secondary)]">
-                  Signed in as {user?.primaryEmailAddress?.emailAddress ?? '—'}
+                  {t('security.microsoftSso.signedInAs', 'Signed in as {{email}}', {
+                    email: user?.primaryEmailAddress?.emailAddress ?? '—',
+                  })}
                 </div>
               </div>
-              <Badge tone="jade" className="ml-auto">Active</Badge>
+              <Badge tone="jade" className="ml-auto">
+                {t('security.microsoftSso.active', 'Active')}
+              </Badge>
             </div>
           </div>
         </Card>

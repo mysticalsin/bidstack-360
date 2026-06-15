@@ -8,6 +8,7 @@
 // Pair with `useTableSort` for the state + comparator.
 
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export type SortDir = 'asc' | 'desc' | null;
 
@@ -43,6 +44,7 @@ export function SortableHeader<K extends string>({
   align = 'left',
   children,
 }: Props<K>) {
+  const { t } = useTranslation('common');
   const isActive = state.key === columnKey;
   const dir: SortDir = isActive ? state.dir : null;
 
@@ -63,7 +65,11 @@ export function SortableHeader<K extends string>({
     <button
       type="button"
       onClick={cycle}
-      aria-label={`Sort by ${labelText}. Current sort: ${currentLabel}. Activate to sort ${nextLabel}.`}
+      aria-label={t(
+        'sortableHeader.ariaLabel',
+        'Sort by {{label}}. Current sort: {{current}}. Activate to sort {{next}}.',
+        { label: labelText, current: currentLabel, next: nextLabel },
+      )}
       // Header buttons inherit the th's padding via the parent; here we just
       // need a flex container that aligns chevron + label tightly together.
       className={`group inline-flex w-full items-center gap-1 text-inherit ${

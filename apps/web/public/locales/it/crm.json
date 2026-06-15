@@ -3613,5 +3613,79 @@
     "menuAriaLabel": "Personalizza i blocchi del cockpit",
     "showBlocks": "Mostra blocchi",
     "reset": "Reimposta"
+  },
+  "insightsBar": {
+    "heading": "Segnali prioritari",
+    "overdueTasks": "{{count}} attività in ritardo",
+    "stalledOpps": "{{count}} opportunità in stallo",
+    "newLeads": "{{count}} nuovi lead questa settimana",
+    "pipelineValue": "{{value}} Mln € di valore della pipeline"
+  },
+  "importOpportunities": {
+    "trigger": "Importa",
+    "dialog": {
+      "title": "Importa opportunità",
+      "description": "Incolla un array JSON di opportunità. I codici vengono generati automaticamente se omessi."
+    },
+    "cancel": "Annulla",
+    "submit": "Importa",
+    "submitLoading": "Importazione…",
+    "toast": {
+      "invalidJson": "JSON non valido",
+      "successOne": "{{count}} opportunità importata",
+      "successOther": "{{count}} opportunità importate",
+      "rowsFailedOne": "{{count}} riga non riuscita",
+      "rowsFailedOther": "{{count}} righe non riuscite",
+      "failed": "Importazione non riuscita",
+      "unknownError": "Errore sconosciuto"
+    }
+  },
+  "winRate": {
+    "heading": "Tasso di vittoria",
+    "emptyNoClosedBids": "Nessuna offerta chiusa",
+    "wonCount": "{{count}} vinte",
+    "lostCount": "{{count}} perse"
+  },
+  "businessSnapshot": {
+    "title": "Panoramica aziendale",
+    "caption": "Salute: {{band}} - punteggio {{score}}/100",
+    "region": {
+      "ariaLabel": "Panoramica aziendale"
+    },
+    "row": {
+      "legalName": "Denominazione legale",
+      "founded": "Fondata",
+      "headquarters": "Sede centrale",
+      "annualRevenue": "Ricavi annuali",
+      "employees": "Dipendenti",
+      "intentTopics": "Argomenti di intento",
+      "hiringMovement": "Andamento delle assunzioni",
+      "leadershipChanges": "Cambiamenti nella leadership",
+      "externalSync": "Sincronizzazione esterna",
+      "sourceReceipts": "Ricevute delle fonti",
+      "lastRefreshed": "Ultimo aggiornamento",
+      "confidence": "Affidabilità"
+    },
+    "value": {
+      "notVerified": "Non verificato",
+      "notSynced": "Non sincronizzato",
+      "hiringSummary": "{{trend}} ({{count}} segnali)",
+      "leadershipSummary": "{{count}} segnali di livello C",
+      "sourceCount_one": "{{count}} fonte",
+      "sourceCount_other": "{{count}} fonti"
+    }
+  },
+  "savedViewsBar": {
+    "namePromptTitle": "Assegna un nome a questa vista",
+    "namePromptPlaceholder": "es. \"Le mie scadute oggi\"",
+    "namePromptConfirm": "Salva vista",
+    "savedToast": "Vista \"{{name}}\" salvata",
+    "recallAriaLabel": "Richiama vista salvata",
+    "selectPlaceholder": "Viste salvate…",
+    "saveViewButton": "Salva vista",
+    "removeConfirmTitle": "Rimuovere la vista salvata?",
+    "removeConfirmDescription": "Questo rimuove \"{{name}}\" dalle scorciatoie delle attività.",
+    "removeConfirmButton": "Rimuovi",
+    "removeButtonTitle": "Rimuovi la vista salvata più recente"
   }
 }

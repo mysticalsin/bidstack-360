@@ -7,6 +7,7 @@
  * by real cohort data when the Reports module ships.
  */
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 import { GlassCard } from '@/components/ui/GlassCard';
 
@@ -24,18 +25,19 @@ export function WinRateCard({
   lost: number;
   reduced: boolean | null;
 }) {
+  const { t } = useTranslation('crm');
   const total = won + lost;
   const rate = total > 0 ? Math.round((won / total) * 100) : 0;
 
   return (
     <GlassCard padding="sm" hoverable={false}>
       <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)] px-1 pt-1 pb-2">
-        Win rate
+        {t('winRate.heading', 'Win rate')}
       </div>
       <div className="flex items-center gap-3">
         {total === 0 ? (
           <div className="flex h-[60px] w-[60px] items-center justify-center rounded-full border border-dashed border-[var(--border-default)] text-center text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-            No closed bids
+            {t('winRate.emptyNoClosedBids', 'No closed bids')}
           </div>
         ) : (
           <div className="win-rate-ring">
@@ -74,11 +76,11 @@ export function WinRateCard({
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2 text-xs">
             <span className="w-2 h-2 rounded-full bg-[var(--success)]" />
-            <span className="text-[var(--fg-secondary)]">{won} won</span>
+            <span className="text-[var(--fg-secondary)]">{t('winRate.wonCount', '{{count}} won', { count: won })}</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
             <span className="w-2 h-2 rounded-full bg-[var(--tag-rose-fg)]" />
-            <span className="text-[var(--fg-secondary)]">{lost} lost</span>
+            <span className="text-[var(--fg-secondary)]">{t('winRate.lostCount', '{{count}} lost', { count: lost })}</span>
           </div>
         </div>
       </div>

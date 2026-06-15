@@ -3668,5 +3668,79 @@
     "menuAriaLabel": "Personnaliser les blocs du cockpit",
     "showBlocks": "Afficher les blocs",
     "reset": "Réinitialiser"
+  },
+  "insightsBar": {
+    "heading": "Signaux prioritaires",
+    "overdueTasks": "{{count}} tâches en retard",
+    "stalledOpps": "{{count}} opportunités au point mort",
+    "newLeads": "{{count}} nouveaux prospects cette semaine",
+    "pipelineValue": "{{value}} M€ de valeur du pipeline"
+  },
+  "importOpportunities": {
+    "trigger": "Importer",
+    "dialog": {
+      "title": "Importer des opportunités",
+      "description": "Collez un tableau JSON d'opportunités. Les codes sont générés automatiquement s'ils sont omis."
+    },
+    "cancel": "Annuler",
+    "submit": "Importer",
+    "submitLoading": "Importation…",
+    "toast": {
+      "invalidJson": "JSON non valide",
+      "successOne": "{{count}} opportunité importée",
+      "successOther": "{{count}} opportunités importées",
+      "rowsFailedOne": "{{count}} ligne a échoué",
+      "rowsFailedOther": "{{count}} lignes ont échoué",
+      "failed": "Échec de l'importation",
+      "unknownError": "Erreur inconnue"
+    }
+  },
+  "winRate": {
+    "heading": "Taux de réussite",
+    "emptyNoClosedBids": "Aucune offre clôturée",
+    "wonCount": "{{count}} gagnées",
+    "lostCount": "{{count}} perdues"
+  },
+  "businessSnapshot": {
+    "title": "Aperçu de l'entreprise",
+    "caption": "Santé : {{band}} - score {{score}}/100",
+    "region": {
+      "ariaLabel": "Aperçu de l'entreprise"
+    },
+    "row": {
+      "legalName": "Raison sociale",
+      "founded": "Fondée",
+      "headquarters": "Siège social",
+      "annualRevenue": "Chiffre d'affaires annuel",
+      "employees": "Effectifs",
+      "intentTopics": "Sujets d'intention",
+      "hiringMovement": "Mouvement de recrutement",
+      "leadershipChanges": "Changements de direction",
+      "externalSync": "Synchronisation externe",
+      "sourceReceipts": "Justificatifs de source",
+      "lastRefreshed": "Dernière actualisation",
+      "confidence": "Confiance"
+    },
+    "value": {
+      "notVerified": "Non vérifié",
+      "notSynced": "Non synchronisé",
+      "hiringSummary": "{{trend}} ({{count}} signaux)",
+      "leadershipSummary": "{{count}} signaux de niveau C",
+      "sourceCount_one": "{{count}} source",
+      "sourceCount_other": "{{count}} sources"
+    }
+  },
+  "savedViewsBar": {
+    "namePromptTitle": "Nommer cette vue",
+    "namePromptPlaceholder": "ex. « Mes tâches en retard aujourd'hui »",
+    "namePromptConfirm": "Enregistrer la vue",
+    "savedToast": "Vue « {{name}} » enregistrée",
+    "recallAriaLabel": "Rappeler une vue enregistrée",
+    "selectPlaceholder": "Vues enregistrées…",
+    "saveViewButton": "Enregistrer la vue",
+    "removeConfirmTitle": "Supprimer la vue enregistrée ?",
+    "removeConfirmDescription": "Cela supprime « {{name}} » de vos raccourcis de tâches.",
+    "removeConfirmButton": "Supprimer",
+    "removeButtonTitle": "Supprimer la vue enregistrée la plus récente"
   }
 }

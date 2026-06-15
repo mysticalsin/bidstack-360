@@ -714,5 +714,79 @@
     "selectPlaceholder": "Selecciona un rol para asignar…",
     "assigning": "Asignando…",
     "assign": "Asignar"
+  },
+  "leadRot": {
+    "status": {
+      "new": "Nuevo",
+      "contacted": "Contactado",
+      "qualified": "Calificado",
+      "nurture": "Cultivo",
+      "disqualified": "Descalificado",
+      "converted": "Convertido"
+    },
+    "toast": {
+      "saved": "Guardado — {{label}} caduca tras {{count}} días",
+      "saveFailed": "Error al guardar"
+    },
+    "loading": "Cargando…",
+    "heading": "Umbral de caducidad por estado",
+    "subtitle": "Un cliente potencial que permanece en un estado más tiempo que su umbral muestra una insignia «Caducado» en el kanban y activa jugadas de recuperación sugeridas por IA.",
+    "listLabel": "Umbrales de caducidad",
+    "daysLabel": "Días",
+    "inputAriaLabel": "Días de caducidad para {{label}}"
+  },
+  "security": {
+    "authentication": {
+      "title": "Autenticación",
+      "caption": "Cómo inicias sesión en este espacio de trabajo."
+    },
+    "signInMethod": {
+      "label": "Método de inicio de sesión",
+      "microsoftSso": "SSO de Microsoft",
+      "clerk": "Clerk",
+      "devStub": "Stub de desarrollo"
+    },
+    "authProvider": {
+      "label": "Proveedor de autenticación",
+      "clerk": "Clerk",
+      "localStub": "Stub local (desarrollo)"
+    },
+    "status": {
+      "label": "Estado",
+      "activeSession": "Sesión activa",
+      "noSession": "Sin sesión"
+    },
+    "email": {
+      "label": "Correo electrónico"
+    },
+    "allowedDomains": {
+      "label": "Dominios permitidos",
+      "any": "Cualquier dominio"
+    },
+    "workspace": {
+      "label": "Espacio de trabajo"
+    },
+    "microsoftSso": {
+      "title": "SSO de Microsoft",
+      "caption": "Tu identidad de Microsoft está vinculada a esta cuenta.",
+      "connected": "Cuenta de Microsoft conectada",
+      "signedInAs": "Sesión iniciada como {{email}}",
+      "active": "Activo"
+    }
+  },
+  "notificationPrefs": {
+    "title": "Notificaciones",
+    "caption": "Elige qué eventos generan alertas en la app y correos. Se guardan en tu cuenta, por lo que te siguen en todos los dispositivos.",
+    "errorTitle": "No se pudieron cargar las preferencias de notificación",
+    "errorMessage": "Tus alertas no se ven afectadas; el panel de preferencias no se pudo cargar.",
+    "retry": "Reintentar",
+    "emailDigestLabel": "Correo de resumen diario",
+    "emailDigestDesc": "Un resumen de tu pipeline, tareas y menciones cada mañana.",
+    "mentionPushLabel": "Notificaciones de menciones",
+    "mentionPushDesc": "Recibe una notificación cuando alguien te @menciona en un comentario o nota.",
+    "taskDueSoonLabel": "Recordatorios de tareas",
+    "taskDueSoonDesc": "Avisar cuando una tarea vence en 24 horas.",
+    "dealStageChangeLabel": "Cambios de etapa del trato",
+    "dealStageChangeDesc": "Notificar cuando una oportunidad de tu propiedad pasa a una nueva etapa."
   }
 }

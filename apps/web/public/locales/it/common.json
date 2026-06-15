@@ -358,5 +358,11 @@
     "auditLog": "Registro di controllo",
     "login": "Accedi",
     "ariaLabel": "Percorso di navigazione"
+  },
+  "progressRing": {
+    "ariaLabelPercentComplete": "{{percent}}% completato"
+  },
+  "sortableHeader": {
+    "ariaLabel": "Ordina per {{label}}. Ordinamento attuale: {{current}}. Attiva per ordinare {{next}}."
   }
 }

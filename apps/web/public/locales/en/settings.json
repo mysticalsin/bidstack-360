@@ -692,5 +692,79 @@
     "selectPlaceholder": "Select a role to assign…",
     "assigning": "Assigning…",
     "assign": "Assign"
+  },
+  "leadRot": {
+    "status": {
+      "new": "New",
+      "contacted": "Contacted",
+      "qualified": "Qualified",
+      "nurture": "Nurture",
+      "disqualified": "Disqualified",
+      "converted": "Converted"
+    },
+    "toast": {
+      "saved": "Saved — {{label}} rots after {{count}} days",
+      "saveFailed": "Save failed"
+    },
+    "loading": "Loading…",
+    "heading": "Per-status rot threshold",
+    "subtitle": "A lead that sits in a status longer than its threshold shows a “Rot” badge on the kanban and triggers AI-suggested recovery plays.",
+    "listLabel": "Rot thresholds",
+    "daysLabel": "Days",
+    "inputAriaLabel": "Rotten days for {{label}}"
+  },
+  "security": {
+    "authentication": {
+      "title": "Authentication",
+      "caption": "How you sign in to this workspace."
+    },
+    "signInMethod": {
+      "label": "Sign-in method",
+      "microsoftSso": "Microsoft SSO",
+      "clerk": "Clerk",
+      "devStub": "Dev stub"
+    },
+    "authProvider": {
+      "label": "Auth provider",
+      "clerk": "Clerk",
+      "localStub": "Local stub (development)"
+    },
+    "status": {
+      "label": "Status",
+      "activeSession": "Active session",
+      "noSession": "No session"
+    },
+    "email": {
+      "label": "Email"
+    },
+    "allowedDomains": {
+      "label": "Allowed domains",
+      "any": "Any domain"
+    },
+    "workspace": {
+      "label": "Workspace"
+    },
+    "microsoftSso": {
+      "title": "Microsoft SSO",
+      "caption": "Your Microsoft identity is linked to this account.",
+      "connected": "Microsoft account connected",
+      "signedInAs": "Signed in as {{email}}",
+      "active": "Active"
+    }
+  },
+  "notificationPrefs": {
+    "title": "Notifications",
+    "caption": "Choose which events trigger in-app alerts and emails. Saved to your account, so they follow you across devices.",
+    "errorTitle": "Couldn't load notification preferences",
+    "errorMessage": "Your alerts are unaffected; the preference panel could not load.",
+    "retry": "Retry",
+    "emailDigestLabel": "Daily digest email",
+    "emailDigestDesc": "A summary of your pipeline, tasks, and mentions every morning.",
+    "mentionPushLabel": "Mention notifications",
+    "mentionPushDesc": "Get notified when someone @mentions you in a comment or note.",
+    "taskDueSoonLabel": "Task reminders",
+    "taskDueSoonDesc": "Alert when a task is due within 24 hours.",
+    "dealStageChangeLabel": "Deal stage changes",
+    "dealStageChangeDesc": "Notify when an opportunity you own moves to a new stage."
   }
 }

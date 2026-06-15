@@ -3646,5 +3646,79 @@
     "menuAriaLabel": "Personalizar bloques del panel",
     "showBlocks": "Mostrar bloques",
     "reset": "Restablecer"
+  },
+  "insightsBar": {
+    "heading": "Señales prioritarias",
+    "overdueTasks": "{{count}} tareas vencidas",
+    "stalledOpps": "{{count}} oportunidades estancadas",
+    "newLeads": "{{count}} nuevos prospectos esta semana",
+    "pipelineValue": "{{value}} M€ de valor de cartera"
+  },
+  "importOpportunities": {
+    "trigger": "Importar",
+    "dialog": {
+      "title": "Importar oportunidades",
+      "description": "Pega un arreglo JSON de oportunidades. Los códigos se generan automáticamente si se omiten."
+    },
+    "cancel": "Cancelar",
+    "submit": "Importar",
+    "submitLoading": "Importando…",
+    "toast": {
+      "invalidJson": "JSON no válido",
+      "successOne": "Se importó {{count}} oportunidad",
+      "successOther": "Se importaron {{count}} oportunidades",
+      "rowsFailedOne": "{{count}} fila falló",
+      "rowsFailedOther": "{{count}} filas fallaron",
+      "failed": "Error en la importación",
+      "unknownError": "Error desconocido"
+    }
+  },
+  "winRate": {
+    "heading": "Tasa de victorias",
+    "emptyNoClosedBids": "Sin ofertas cerradas",
+    "wonCount": "{{count}} ganadas",
+    "lostCount": "{{count}} perdidas"
+  },
+  "businessSnapshot": {
+    "title": "Resumen del negocio",
+    "caption": "Salud: {{band}} - puntuación {{score}}/100",
+    "region": {
+      "ariaLabel": "Resumen del negocio"
+    },
+    "row": {
+      "legalName": "Razón social",
+      "founded": "Fundada",
+      "headquarters": "Sede",
+      "annualRevenue": "Ingresos anuales",
+      "employees": "Empleados",
+      "intentTopics": "Temas de intención",
+      "hiringMovement": "Movimiento de contratación",
+      "leadershipChanges": "Cambios de liderazgo",
+      "externalSync": "Sincronización externa",
+      "sourceReceipts": "Comprobantes de origen",
+      "lastRefreshed": "Última actualización",
+      "confidence": "Confianza"
+    },
+    "value": {
+      "notVerified": "Sin verificar",
+      "notSynced": "Sin sincronizar",
+      "hiringSummary": "{{trend}} ({{count}} señales)",
+      "leadershipSummary": "{{count}} señales de nivel C",
+      "sourceCount_one": "{{count}} fuente",
+      "sourceCount_other": "{{count}} fuentes"
+    }
+  },
+  "savedViewsBar": {
+    "namePromptTitle": "Nombra esta vista",
+    "namePromptPlaceholder": "p. ej. \"Mis vencidas de hoy\"",
+    "namePromptConfirm": "Guardar vista",
+    "savedToast": "Vista \"{{name}}\" guardada",
+    "recallAriaLabel": "Abrir vista guardada",
+    "selectPlaceholder": "Vistas guardadas…",
+    "saveViewButton": "Guardar vista",
+    "removeConfirmTitle": "¿Eliminar vista guardada?",
+    "removeConfirmDescription": "Esto elimina \"{{name}}\" de tus accesos directos de tareas.",
+    "removeConfirmButton": "Eliminar",
+    "removeButtonTitle": "Eliminar la vista guardada más reciente"
   }
 }

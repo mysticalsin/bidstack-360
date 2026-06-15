@@ -1,12 +1,14 @@
 import { motion, useReducedMotion } from 'motion/react';
 import { ChevronRight, LogIn } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useSignInAction } from '@/lib/auth';
 
 export function BottomRightCorner() {
   const navigate = useNavigate();
   const { signIn } = useSignInAction();
   const shouldReduceMotion = useReducedMotion();
+  const { t } = useTranslation('auth');
 
   const handleLogin = () => {
     signIn(() => {
@@ -31,7 +33,7 @@ export function BottomRightCorner() {
       whileHover={shouldReduceMotion ? undefined : { scale: 1.01 }}
       whileTap={shouldReduceMotion ? undefined : { scale: 0.99 }}
       transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.8, delay: 0.4 }}
-      aria-label="Enter the demo sandbox"
+      aria-label={t('bottomRightCorner.ariaLabel', 'Enter the demo sandbox')}
     >
       {/* Top intersection mask */}
       <div className="absolute -top-[1.5rem] sm:-top-[2rem] md:-top-[3.5rem] right-0 w-[1.5rem] sm:w-[2rem] md:w-[3.5rem] h-[1.5rem] sm:h-[2rem] md:h-[3.5rem] pointer-events-none">
@@ -75,10 +77,10 @@ export function BottomRightCorner() {
       {/* Info column */}
       <div className="flex flex-col">
         <span className="text-[16px] md:text-[20px] font-normal text-[rgba(30,50,90,0.95)] group-hover:text-[#2c4bff] transition-colors duration-200">
-          Enter demo
+          {t('bottomRightCorner.title', 'Enter demo')}
         </span>
         <div className="flex items-center gap-1 text-[rgba(30,50,90,0.6)]">
-          <span className="text-[12px] md:text-[15px] font-normal">Demo Sandbox</span>
+          <span className="text-[12px] md:text-[15px] font-normal">{t('bottomRightCorner.subtitle', 'Demo Sandbox')}</span>
           <ChevronRight
             className="w-3.5 h-3.5 md:w-4 md:h-4 group-hover:translate-x-0.5 transition-transform duration-200"
             aria-hidden="true"

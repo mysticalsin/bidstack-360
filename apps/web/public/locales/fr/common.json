@@ -358,5 +358,11 @@
     "auditLog": "Journal d'audit",
     "login": "Se connecter",
     "ariaLabel": "Fil d'Ariane"
+  },
+  "progressRing": {
+    "ariaLabelPercentComplete": "{{percent}}% terminé"
+  },
+  "sortableHeader": {
+    "ariaLabel": "Trier par {{label}}. Tri actuel : {{current}}. Activer pour trier {{next}}."
   }
 }

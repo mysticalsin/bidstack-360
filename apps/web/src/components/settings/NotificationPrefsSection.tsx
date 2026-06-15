@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
@@ -7,32 +8,47 @@ import {
 } from '@/hooks/useNotificationPrefs';
 import type { NotificationPrefs } from '@bidstack/shared';
 
-const ITEMS: { key: keyof NotificationPrefs; label: string; desc: string }[] = [
+type TFunc = (key: string, defaultValue: string) => string;
+
+const buildItems = (
+  t: TFunc,
+): { key: keyof NotificationPrefs; label: string; desc: string }[] => [
   {
     key: 'emailDigest',
-    label: 'Daily digest email',
-    desc: 'A summary of your pipeline, tasks, and mentions every morning.',
+    label: t('notificationPrefs.emailDigestLabel', 'Daily digest email'),
+    desc: t(
+      'notificationPrefs.emailDigestDesc',
+      'A summary of your pipeline, tasks, and mentions every morning.',
+    ),
   },
   {
     key: 'mentionPush',
-    label: 'Mention notifications',
-    desc: 'Get notified when someone @mentions you in a comment or note.',
+    label: t('notificationPrefs.mentionPushLabel', 'Mention notifications'),
+    desc: t(
+      'notificationPrefs.mentionPushDesc',
+      'Get notified when someone @mentions you in a comment or note.',
+    ),
   },
   {
     key: 'taskDueSoon',
-    label: 'Task reminders',
-    desc: 'Alert when a task is due within 24 hours.',
+    label: t('notificationPrefs.taskDueSoonLabel', 'Task reminders'),
+    desc: t('notificationPrefs.taskDueSoonDesc', 'Alert when a task is due within 24 hours.'),
   },
   {
     key: 'dealStageChange',
-    label: 'Deal stage changes',
-    desc: 'Notify when an opportunity you own moves to a new stage.',
+    label: t('notificationPrefs.dealStageChangeLabel', 'Deal stage changes'),
+    desc: t(
+      'notificationPrefs.dealStageChangeDesc',
+      'Notify when an opportunity you own moves to a new stage.',
+    ),
   },
 ];
 
 export function NotificationPrefsSection() {
+  const { t } = useTranslation('settings');
   const prefs = useNotificationPrefs();
   const update = useUpdateNotificationPrefs();
+  const items = buildItems(t);
 
   const toggle = (key: keyof NotificationPrefs) => {
     if (!prefs.data) return;
@@ -42,24 +58,30 @@ export function NotificationPrefsSection() {
   return (
     <Card>
       <SectionHeader
-        title="Notifications"
-        caption="Choose which events trigger in-app alerts and emails. Saved to your account, so they follow you across devices."
+        title={t('notificationPrefs.title', 'Notifications')}
+        caption={t(
+          'notificationPrefs.caption',
+          'Choose which events trigger in-app alerts and emails. Saved to your account, so they follow you across devices.',
+        )}
       />
       <div className="p-5 space-y-4">
         {prefs.isLoading ? (
           <LoadingSkeleton rows={4} />
         ) : prefs.isError ? (
           <ErrorState
-            title="Couldn't load notification preferences"
-            message="Your alerts are unaffected; the preference panel could not load."
+            title={t('notificationPrefs.errorTitle', "Couldn't load notification preferences")}
+            message={t(
+              'notificationPrefs.errorMessage',
+              'Your alerts are unaffected; the preference panel could not load.',
+            )}
             action={
               <Button size="sm" variant="secondary" onClick={() => void prefs.refetch()}>
-                Retry
+                {t('notificationPrefs.retry', 'Retry')}
               </Button>
             }
           />
         ) : prefs.data ? (
-          ITEMS.map((item) => (
+          items.map((item) => (
             <label
               key={item.key}
               className="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--border-default)] p-3 hover:bg-[var(--surface-sunken)] transition-colors"

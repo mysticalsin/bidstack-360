@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '@/lib/api';
 import { toast } from '@/components/ui/Toast';
 import { Button } from '@/components/ui/Button';
@@ -10,6 +11,7 @@ export function ImportOpportunitiesDialog() {
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const qc = useQueryClient();
+  const { t } = useTranslation('crm');
 
   const handleImport = async () => {
     if (!text.trim()) return;
@@ -17,7 +19,7 @@ export function ImportOpportunitiesDialog() {
     try {
       payload = JSON.parse(text);
     } catch {
-      toast.error('Invalid JSON');
+      toast.error(t('importOpportunities.toast.invalidJson', 'Invalid JSON'));
       return;
     }
     setLoading(true);
@@ -30,14 +32,30 @@ export function ImportOpportunitiesDialog() {
         body: payload,
       });
       if (data.created > 0) {
-        toast.success(`Imported ${data.created} opportunit${data.created === 1 ? 'y' : 'ies'}`);
+        toast.success(
+          data.created === 1
+            ? t('importOpportunities.toast.successOne', 'Imported {{count}} opportunity', {
+                count: data.created,
+              })
+            : t('importOpportunities.toast.successOther', 'Imported {{count}} opportunities', {
+                count: data.created,
+              }),
+        );
         qc.invalidateQueries({ queryKey: ['opportunities'] });
         qc.invalidateQueries({ queryKey: ['opportunityCount'] });
         setOpen(false);
         setText('');
       }
       if (data.errors.length > 0) {
-        toast.error(`${data.errors.length} row${data.errors.length === 1 ? '' : 's'} failed`, {
+        toast.error(
+          data.errors.length === 1
+            ? t('importOpportunities.toast.rowsFailedOne', '{{count}} row failed', {
+                count: data.errors.length,
+              })
+            : t('importOpportunities.toast.rowsFailedOther', '{{count}} rows failed', {
+                count: data.errors.length,
+              }),
+          {
           description: data.errors
             .slice(0, 3)
             .map((e) => `#${e.index}: ${e.message}`)
@@ -45,8 +63,11 @@ export function ImportOpportunitiesDialog() {
         });
       }
     } catch (err) {
-      toast.error('Import failed', {
-        description: err instanceof Error ? err.message : 'Unknown error',
+      toast.error(t('importOpportunities.toast.failed', 'Import failed'), {
+        description:
+          err instanceof Error
+            ? err.message
+            : t('importOpportunities.toast.unknownError', 'Unknown error'),
       });
     } finally {
       setLoading(false);
@@ -57,12 +78,15 @@ export function ImportOpportunitiesDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm" variant="ghost">
-          Import
+          {t('importOpportunities.trigger', 'Import')}
         </Button>
       </DialogTrigger>
       <DialogContent
-        title="Import Opportunities"
-        description="Paste a JSON array of opportunities. Codes are auto-minted if omitted."
+        title={t('importOpportunities.dialog.title', 'Import Opportunities')}
+        description={t(
+          'importOpportunities.dialog.description',
+          'Paste a JSON array of opportunities. Codes are auto-minted if omitted.',
+        )}
       >
         <textarea
           value={text}
@@ -72,7 +96,7 @@ export function ImportOpportunitiesDialog() {
         />
         <div className="flex items-center justify-end gap-2">
           <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
-            Cancel
+            {t('importOpportunities.cancel', 'Cancel')}
           </Button>
           <Button
             size="sm"
@@ -80,7 +104,9 @@ export function ImportOpportunitiesDialog() {
             onClick={handleImport}
             disabled={loading || !text.trim()}
           >
-            {loading ? 'Importing…' : 'Import'}
+            {loading
+              ? t('importOpportunities.submitLoading', 'Importing…')
+              : t('importOpportunities.submit', 'Import')}
           </Button>
         </div>
       </DialogContent>

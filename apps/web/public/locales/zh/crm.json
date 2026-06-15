@@ -3613,5 +3613,79 @@
     "menuAriaLabel": "自定义驾驶舱模块",
     "showBlocks": "显示模块",
     "reset": "重置"
+  },
+  "insightsBar": {
+    "heading": "优先信号",
+    "overdueTasks": "{{count}} 项任务逾期",
+    "stalledOpps": "{{count}} 个机会停滞",
+    "newLeads": "本周 {{count}} 个新线索",
+    "pipelineValue": "管道价值 {{value}} 百万欧元"
+  },
+  "importOpportunities": {
+    "trigger": "导入",
+    "dialog": {
+      "title": "导入商机",
+      "description": "粘贴商机的 JSON 数组。如果省略，将自动生成编码。"
+    },
+    "cancel": "取消",
+    "submit": "导入",
+    "submitLoading": "正在导入…",
+    "toast": {
+      "invalidJson": "JSON 无效",
+      "successOne": "已导入 {{count}} 个商机",
+      "successOther": "已导入 {{count}} 个商机",
+      "rowsFailedOne": "{{count}} 行失败",
+      "rowsFailedOther": "{{count}} 行失败",
+      "failed": "导入失败",
+      "unknownError": "未知错误"
+    }
+  },
+  "winRate": {
+    "heading": "胜率",
+    "emptyNoClosedBids": "无已结标书",
+    "wonCount": "{{count}} 项中标",
+    "lostCount": "{{count}} 项失标"
+  },
+  "businessSnapshot": {
+    "title": "业务概览",
+    "caption": "健康度：{{band}} - 评分 {{score}}/100",
+    "region": {
+      "ariaLabel": "业务概览"
+    },
+    "row": {
+      "legalName": "法定名称",
+      "founded": "成立时间",
+      "headquarters": "总部",
+      "annualRevenue": "年收入",
+      "employees": "员工数",
+      "intentTopics": "意向主题",
+      "hiringMovement": "招聘动向",
+      "leadershipChanges": "领导层变动",
+      "externalSync": "外部同步",
+      "sourceReceipts": "来源凭证",
+      "lastRefreshed": "最后刷新",
+      "confidence": "置信度"
+    },
+    "value": {
+      "notVerified": "未验证",
+      "notSynced": "未同步",
+      "hiringSummary": "{{trend}}（{{count}} 个信号）",
+      "leadershipSummary": "{{count}} 个高管级信号",
+      "sourceCount_one": "{{count}} 个来源",
+      "sourceCount_other": "{{count}} 个来源"
+    }
+  },
+  "savedViewsBar": {
+    "namePromptTitle": "为此视图命名",
+    "namePromptPlaceholder": "例如\"我今天逾期的\"",
+    "namePromptConfirm": "保存视图",
+    "savedToast": "已保存视图\"{{name}}\"",
+    "recallAriaLabel": "调用已保存的视图",
+    "selectPlaceholder": "已保存的视图…",
+    "saveViewButton": "保存视图",
+    "removeConfirmTitle": "移除已保存的视图？",
+    "removeConfirmDescription": "这将从您的任务快捷方式中移除\"{{name}}\"。",
+    "removeConfirmButton": "移除",
+    "removeButtonTitle": "移除最近保存的视图"
   }
 }

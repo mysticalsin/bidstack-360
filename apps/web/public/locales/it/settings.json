@@ -711,5 +711,79 @@
     "selectPlaceholder": "Seleziona un ruolo da assegnare…",
     "assigning": "Assegnazione…",
     "assign": "Assegna"
+  },
+  "leadRot": {
+    "status": {
+      "new": "Nuovo",
+      "contacted": "Contattato",
+      "qualified": "Qualificato",
+      "nurture": "Coltivazione",
+      "disqualified": "Squalificato",
+      "converted": "Convertito"
+    },
+    "toast": {
+      "saved": "Salvato — {{label}} marcisce dopo {{count}} giorni",
+      "saveFailed": "Salvataggio non riuscito"
+    },
+    "loading": "Caricamento…",
+    "heading": "Soglia di marcescenza per stato",
+    "subtitle": "Un lead che resta in uno stato oltre la sua soglia mostra un badge «Marcito» sulla kanban e attiva azioni di recupero suggerite dall'IA.",
+    "listLabel": "Soglie di marcescenza",
+    "daysLabel": "Giorni",
+    "inputAriaLabel": "Giorni di marcescenza per {{label}}"
+  },
+  "security": {
+    "authentication": {
+      "title": "Autenticazione",
+      "caption": "Come accedi a questo spazio di lavoro."
+    },
+    "signInMethod": {
+      "label": "Metodo di accesso",
+      "microsoftSso": "SSO Microsoft",
+      "clerk": "Clerk",
+      "devStub": "Stub di sviluppo"
+    },
+    "authProvider": {
+      "label": "Provider di autenticazione",
+      "clerk": "Clerk",
+      "localStub": "Stub locale (sviluppo)"
+    },
+    "status": {
+      "label": "Stato",
+      "activeSession": "Sessione attiva",
+      "noSession": "Nessuna sessione"
+    },
+    "email": {
+      "label": "E-mail"
+    },
+    "allowedDomains": {
+      "label": "Domini consentiti",
+      "any": "Qualsiasi dominio"
+    },
+    "workspace": {
+      "label": "Spazio di lavoro"
+    },
+    "microsoftSso": {
+      "title": "SSO Microsoft",
+      "caption": "La tua identità Microsoft è collegata a questo account.",
+      "connected": "Account Microsoft connesso",
+      "signedInAs": "Accesso effettuato come {{email}}",
+      "active": "Attivo"
+    }
+  },
+  "notificationPrefs": {
+    "title": "Notifiche",
+    "caption": "Scegli quali eventi attivano avvisi nell'app ed e-mail. Salvati sul tuo account, così ti seguono su tutti i dispositivi.",
+    "errorTitle": "Impossibile caricare le preferenze di notifica",
+    "errorMessage": "I tuoi avvisi non sono interessati; il pannello delle preferenze non è stato caricato.",
+    "retry": "Riprova",
+    "emailDigestLabel": "E-mail di riepilogo giornaliero",
+    "emailDigestDesc": "Un riepilogo della tua pipeline, attività e menzioni ogni mattina.",
+    "mentionPushLabel": "Notifiche di menzioni",
+    "mentionPushDesc": "Ricevi una notifica quando qualcuno ti @menziona in un commento o in una nota.",
+    "taskDueSoonLabel": "Promemoria attività",
+    "taskDueSoonDesc": "Avvisa quando un'attività scade entro 24 ore.",
+    "dealStageChangeLabel": "Cambi di fase della trattativa",
+    "dealStageChangeDesc": "Notifica quando un'opportunità di cui sei titolare passa a una nuova fase."
   }
 }

@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/cn';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
@@ -33,6 +34,7 @@ export function ProgressRing({
   className,
   label,
 }: ProgressRingProps) {
+  const { t } = useTranslation('common');
   const reduced = useReducedMotion();
   const clamped = Math.max(0, Math.min(100, value));
   const radius = (size - strokeWidth) / 2;
@@ -47,7 +49,7 @@ export function ProgressRing({
       aria-valuenow={clamped}
       aria-valuemin={0}
       aria-valuemax={100}
-      aria-label={label ?? `${clamped}% complete`}
+      aria-label={label ?? t('progressRing.ariaLabelPercentComplete', '{{percent}}% complete', { percent: clamped })}
     >
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} fill="none">
         <defs>

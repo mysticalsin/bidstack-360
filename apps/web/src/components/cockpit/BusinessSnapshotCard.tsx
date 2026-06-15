@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Card, SectionHeader } from '@/components/ui/Card';
@@ -20,48 +21,69 @@ interface Props {
 export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit }: Props) {
   const reducedMotion = useReducedMotion();
   const { formatMoney } = useFormatMoney();
+  const { t } = useTranslation('crm');
   const c = cockpit.company;
   const headquarters = headquartersFor(c.name);
   const sourceCount = c.sourceAttribution.length;
+  const notVerified = t('businessSnapshot.value.notVerified', 'Not verified');
   const strategic = c.strategicIntel;
   const intentSummary = strategic?.intentTopics.length
     ? strategic.intentTopics.slice(0, 3).join(', ')
-    : 'Not verified';
+    : notVerified;
   const hiringSummary = strategic
-    ? `${strategic.employeeTrend} (${strategic.hiringSignals.length} signals)`
-    : 'Not verified';
+    ? t('businessSnapshot.value.hiringSummary', '{{trend}} ({{count}} signals)', {
+        trend: strategic.employeeTrend,
+        count: strategic.hiringSignals.length,
+      })
+    : notVerified;
   const leadershipSummary = strategic?.leadershipSignals.length
-    ? `${strategic.leadershipSignals.length} C-level signals`
-    : 'Not verified';
+    ? t('businessSnapshot.value.leadershipSummary', '{{count}} C-level signals', {
+        count: strategic.leadershipSignals.length,
+      })
+    : notVerified;
   const rows: Array<[string, string]> = [
-    ['Legal name', c.legalName ?? c.name],
-    ['Founded', c.incorporationDate ? c.incorporationDate.slice(0, 4) : 'Not verified'],
-    ['Headquarters', headquarters ?? 'Not verified'],
+    [t('businessSnapshot.row.legalName', 'Legal name'), c.legalName ?? c.name],
     [
-      'Annual revenue',
+      t('businessSnapshot.row.founded', 'Founded'),
+      c.incorporationDate ? c.incorporationDate.slice(0, 4) : notVerified,
+    ],
+    [t('businessSnapshot.row.headquarters', 'Headquarters'), headquarters ?? notVerified],
+    [
+      t('businessSnapshot.row.annualRevenue', 'Annual revenue'),
       c.annualRevenueMicros
         ? formatMoney(c.annualRevenueMicros / 1_000_000, 'EUR')
-        : 'Not verified',
+        : notVerified,
     ],
-    ['Employees', c.employeeCount ? c.employeeCount.toLocaleString() : 'Not verified'],
-    ['Intent topics', intentSummary],
-    ['Hiring movement', hiringSummary],
-    ['Leadership changes', leadershipSummary],
     [
-      'External sync',
+      t('businessSnapshot.row.employees', 'Employees'),
+      c.employeeCount ? c.employeeCount.toLocaleString() : notVerified,
+    ],
+    [t('businessSnapshot.row.intentTopics', 'Intent topics'), intentSummary],
+    [t('businessSnapshot.row.hiringMovement', 'Hiring movement'), hiringSummary],
+    [t('businessSnapshot.row.leadershipChanges', 'Leadership changes'), leadershipSummary],
+    [
+      t('businessSnapshot.row.externalSync', 'External sync'),
       strategic?.lastSyncedAt
         ? `${strategic.freshness} - ${relativeTime(strategic.lastSyncedAt)}`
-        : 'Not synced',
+        : t('businessSnapshot.value.notSynced', 'Not synced'),
     ],
-    ['Source receipts', `${sourceCount} ${sourceCount === 1 ? 'source' : 'sources'}`],
-    ['Last refreshed', relativeTime(c.updatedAt)],
-    ['Confidence', `${Math.round(c.confidence * 100)}%`],
+    [
+      t('businessSnapshot.row.sourceReceipts', 'Source receipts'),
+      sourceCount === 1
+        ? t('businessSnapshot.value.sourceCount_one', '{{count}} source', { count: sourceCount })
+        : t('businessSnapshot.value.sourceCount_other', '{{count}} sources', { count: sourceCount }),
+    ],
+    [t('businessSnapshot.row.lastRefreshed', 'Last refreshed'), relativeTime(c.updatedAt)],
+    [t('businessSnapshot.row.confidence', 'Confidence'), `${Math.round(c.confidence * 100)}%`],
   ];
   return (
-    <Card role="region" aria-label="Business snapshot">
+    <Card role="region" aria-label={t('businessSnapshot.region.ariaLabel', 'Business snapshot')}>
       <SectionHeader
-        title="Business snapshot"
-        caption={`Health: ${labelForBand(cockpit.health.band)} - score ${cockpit.health.score}/100`}
+        title={t('businessSnapshot.title', 'Business snapshot')}
+        caption={t('businessSnapshot.caption', 'Health: {{band}} - score {{score}}/100', {
+          band: labelForBand(cockpit.health.band),
+          score: cockpit.health.score,
+        })}
       />
       <div style={{ padding: '14px 18px 18px' }}>
         <dl className="kvlist">

@@ -358,5 +358,11 @@
     "auditLog": "审计日志",
     "login": "登录",
     "ariaLabel": "面包屑导航"
+  },
+  "progressRing": {
+    "ariaLabelPercentComplete": "完成 {{percent}}%"
+  },
+  "sortableHeader": {
+    "ariaLabel": "按 {{label}} 排序。当前排序：{{current}}。激活以进行 {{next}} 排序。"
   }
 }

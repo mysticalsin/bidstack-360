@@ -6,6 +6,7 @@
  * building logic and renders conditionally (returns null when no signals).
  * Extracting it keeps the dashboard shell free of signal-aggregation logic.
  */
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -24,6 +25,8 @@ export function InsightsBar({
   newLeads: number;
   pipelineValue: number;
 }) {
+  const { t } = useTranslation('crm');
+
   const insights: Array<{
     tone: 'rose' | 'amber' | 'jade' | 'blue';
     icon: string;
@@ -35,7 +38,7 @@ export function InsightsBar({
     insights.push({
       tone: 'rose',
       icon: 'alert-circle',
-      message: `${overdueTasks} task${overdueTasks === 1 ? '' : 's'} overdue`,
+      message: t('insightsBar.overdueTasks', '{{count}} tasks overdue', { count: overdueTasks }),
       href: '/tasks?filter=overdue',
     });
   }
@@ -43,7 +46,7 @@ export function InsightsBar({
     insights.push({
       tone: 'amber',
       icon: 'pause-circle',
-      message: `${stalledOpps} opportunit${stalledOpps === 1 ? 'y' : 'ies'} stalled`,
+      message: t('insightsBar.stalledOpps', '{{count}} opportunities stalled', { count: stalledOpps }),
       href: '/opportunities',
     });
   }
@@ -51,7 +54,7 @@ export function InsightsBar({
     insights.push({
       tone: 'jade',
       icon: 'user-plus',
-      message: `${newLeads} new lead${newLeads === 1 ? '' : 's'} this week`,
+      message: t('insightsBar.newLeads', '{{count}} new leads this week', { count: newLeads }),
       href: '/leads',
     });
   }
@@ -59,7 +62,9 @@ export function InsightsBar({
     insights.push({
       tone: 'blue',
       icon: 'trending-up',
-      message: `€${(pipelineValue / 1000000).toFixed(1)}M pipeline value`,
+      message: t('insightsBar.pipelineValue', '€{{value}}M pipeline value', {
+        value: (pipelineValue / 1000000).toFixed(1),
+      }),
       href: '/pipeline',
     });
   }
@@ -70,7 +75,9 @@ export function InsightsBar({
     <GlassCard padding="sm" hoverable={false} className="insights-bar">
       <div className="flex items-center gap-2 mb-2">
         <Icon name="zap" size={14} className="text-[var(--brand-primary)]" />
-        <span className="text-xs font-semibold text-[var(--fg-primary)]">Priority signals</span>
+        <span className="text-xs font-semibold text-[var(--fg-primary)]">
+          {t('insightsBar.heading', 'Priority signals')}
+        </span>
       </div>
       <div className="insights-grid">
         {insights.map((insight) => (
