@@ -44,7 +44,19 @@
     "agents": "Agents Dust",
     "search": "Recherche",
     "references": "Bibliothèque de références",
-    "settingsPage": "Paramètres"
+    "settingsPage": "Paramètres",
+    "home": "Accueil",
+    "bidsRfp": "Appels d'offres & RFP",
+    "quickStart": "Démarrage rapide",
+    "salesToolkits": "Kits de vente",
+    "keyAccounts": "Comptes clés",
+    "topAccounts": "Comptes principaux",
+    "sectorView": "Vue par secteur",
+    "crossSell": "Vente croisée",
+    "agentStudio": "Studio d'agents",
+    "calendar": "Calendrier",
+    "customObjects": "Objets personnalisés",
+    "analyticsReports": "Analyses & rapports"
   },
   "crumbs": {
     "portfolio": "Portefeuille",
@@ -113,7 +125,10 @@
     "deleted": "Supprimé",
     "copied": "Copié dans le presse-papiers",
     "genericError": "Une erreur est survenue. Veuillez réessayer.",
-    "networkError": "Erreur réseau. Vérifiez votre connexion."
+    "networkError": "Erreur réseau. Vérifiez votre connexion.",
+    "regionLabel": "Notifications",
+    "clearAll": "Tout effacer ({{count}})",
+    "dismiss": "Fermer"
   },
   "validation": {
     "required": "Ce champ est obligatoire",
@@ -267,5 +282,105 @@
         "leadRot": "Règles de vieillissement"
       }
     }
+  },
+  "topbar": {
+    "skipToContent": "Aller au contenu",
+    "switchToLight": "Passer en mode clair",
+    "switchToDark": "Passer en mode sombre",
+    "help": "Aide & raccourcis",
+    "helpAria": "Aide et raccourcis clavier",
+    "productTour": "Faire la visite du produit",
+    "signOut": "Se déconnecter",
+    "portfolio": "Portefeuille",
+    "detail": "Détail"
+  },
+  "appRoutes": {
+    "notFoundTitle": "Page introuvable",
+    "notFoundMessage": "La page que vous recherchez n'existe pas.",
+    "goToDashboard": "Aller au tableau de bord"
+  },
+  "select": {
+    "placeholder": "—",
+    "noOptions": "Aucune option"
+  },
+  "lookupFieldPicker": {
+    "placeholder": "Rechercher…",
+    "clearSelection": "Effacer la sélection",
+    "searching": "Recherche…",
+    "noResults": "Aucun résultat.",
+    "typeToSearch": "Saisissez pour rechercher…"
+  },
+  "confirm": {
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "confirm": "Confirmer",
+    "save": "Enregistrer"
+  },
+  "avatar": {
+    "statusOnline": "En ligne",
+    "statusOffline": "Hors ligne"
+  },
+  "helpDrawer": {
+    "title": "Raccourcis clavier",
+    "closeAria": "Fermer les raccourcis",
+    "groupGlobal": "Global",
+    "groupNavigation": "Navigation",
+    "groupRecords": "Enregistrements",
+    "openCommandPalette": "Ouvrir la palette de commandes",
+    "quickAddMenu": "Menu d'ajout rapide",
+    "openThisDrawer": "Ouvrir ce panneau",
+    "closeCurrentDialog": "Fermer la boîte de dialogue actuelle",
+    "goToDashboard": "Aller au tableau de bord",
+    "goToOpportunities": "Aller aux opportunités",
+    "goToPipeline": "Aller au pipeline",
+    "goToContacts": "Aller aux contacts",
+    "goToTasks": "Aller aux tâches",
+    "goToReports": "Aller aux rapports",
+    "goToAccounts": "Aller aux comptes",
+    "goToSettings": "Aller aux paramètres",
+    "goToSearch": "Aller à la recherche",
+    "moveSelectionInLists": "Déplacer la sélection dans les listes",
+    "openRecord": "Ouvrir l'enregistrement",
+    "editSelectedRecord": "Modifier l'enregistrement sélectionné",
+    "deleteWithConfirmation": "Supprimer avec confirmation",
+    "footer": "La plupart des raccourcis fonctionnent partout, sauf dans les champs de texte. Appuyez sur ? à tout moment pour rouvrir ce panneau."
+  },
+  "breadcrumbs": {
+    "dashboard": "Tableau de bord",
+    "accounts": "Comptes",
+    "opportunities": "Opportunités",
+    "pipeline": "Pipeline",
+    "contacts": "Contacts",
+    "tasks": "Tâches",
+    "reports": "Rapports",
+    "integrations": "Intégrations",
+    "settings": "Paramètres",
+    "auditLog": "Journal d'audit",
+    "login": "Se connecter",
+    "ariaLabel": "Fil d'Ariane"
+  },
+  "progressRing": {
+    "ariaLabelPercentComplete": "{{percent}}% terminé"
+  },
+  "sortableHeader": {
+    "ariaLabel": "Trier par {{label}}. Tri actuel : {{current}}. Activer pour trier {{next}}."
+  },
+  "upgradeBanner": {
+    "actionLabel": "Mettre à niveau"
+  },
+  "showMore": {
+    "moreLabel": "Afficher plus",
+    "lessLabel": "Afficher moins"
+  },
+  "bulkActionBar": {
+    "regionLabel": "Actions groupées",
+    "selectedCount": "{{count}} sélectionnés",
+    "exportSelected": "Exporter la sélection",
+    "deleting": "Suppression…",
+    "deleteSelected": "Supprimer la sélection",
+    "clear": "Effacer"
+  },
+  "dialog": {
+    "closeAriaLabel": "Fermer"
   }
 }
