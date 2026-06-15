@@ -3781,5 +3781,35 @@
     "railAriaLabel": "CRM 集成状态",
     "railLabel": "集成活动",
     "railCaption": "ERP、外部 CRM、已验证的数据连接器"
+  },
+  "oppIndustryBreakdown": {
+    "title": "按行业划分的销售管道",
+    "sectorCount": "{{count}} 个行业"
+  },
+  "revenueEvolution": {
+    "regionLabel": "收入演变",
+    "title": "收入演变",
+    "caption": "该客户每月赢单收入",
+    "srSummary": "{{count}} 个月的赢单收入。峰值 {{period}}。",
+    "barsListLabel": "每月赢单收入",
+    "barLabel": "{{period}}：{{amount}}"
+  },
+  "winLoss": {
+    "regionLabel": "赢单 / 输单",
+    "title": "赢单 / 输单",
+    "caption": "此客户已决断的交易",
+    "winRateLabel": "赢单率",
+    "wonCount": "{{count}} 个赢单",
+    "lostCount": "{{count}} 个输单",
+    "barLabel": "{{won}} 个赢单，{{lost}} 个输单 — 赢单率 {{rate}}%",
+    "wonValue": "{{value}} 的赢单金额"
+  },
+  "pipelineViewSwitch": {
+    "ariaLabel": "商机视图",
+    "list": "列表",
+    "board": "看板"
+  },
+  "accountHierarchyTree": {
+    "heading": "客户层级"
   }
 }

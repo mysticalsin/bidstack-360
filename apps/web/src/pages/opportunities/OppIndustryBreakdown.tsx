@@ -3,6 +3,7 @@
 // org's opportunities by their account's industry — "the bids we're working on,
 // split by sector". Collapsed by default so the table stays the focus.
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
@@ -13,6 +14,7 @@ import { TerritorySegmentBreakdown } from '@/components/territories/TerritorySeg
 
 export function OppIndustryBreakdown() {
   const [open, setOpen] = useState(false);
+  const { t } = useTranslation('crm');
   const { formatMoney } = useFormatMoney();
   const segments = useTerritorySegments('industry');
   const totals = segments.data?.totals;
@@ -27,11 +29,13 @@ export function OppIndustryBreakdown() {
       >
         <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-[var(--fg-primary)]">
           <Icon name="globe" size={15} ariaHidden />
-          Pipeline by industry
+          {t('oppIndustryBreakdown.title', 'Pipeline by industry')}
           {totals ? (
             <span className="text-xs font-normal text-[var(--fg-tertiary)]">
-              {totals.totalSegments} sector{totals.totalSegments === 1 ? '' : 's'} ·{' '}
-              {formatMoney(totals.totalValueMicros, 'EUR')}
+              {t('oppIndustryBreakdown.sectorCount', '{{count}} sector', {
+                count: totals.totalSegments,
+              })}{' '}
+              · {formatMoney(totals.totalValueMicros, 'EUR')}
             </span>
           ) : null}
         </span>

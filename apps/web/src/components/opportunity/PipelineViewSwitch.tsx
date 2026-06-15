@@ -4,6 +4,7 @@
 // layout. The active stage filter (pipelineStageId) is preserved across the
 // switch because both views honour it.
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
@@ -11,6 +12,7 @@ import { cn } from '@/lib/cn';
 export function PipelineViewSwitch({ current }: { current: 'list' | 'board' }) {
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const { t } = useTranslation('crm');
 
   const go = (view: 'list' | 'board') => {
     if (view === current) return;
@@ -33,7 +35,7 @@ export function PipelineViewSwitch({ current }: { current: 'list' | 'board' }) {
   return (
     <div
       role="tablist"
-      aria-label="Opportunity view"
+      aria-label={t('pipelineViewSwitch.ariaLabel', 'Opportunity view')}
       className="inline-flex rounded-lg border border-[var(--border-default)] bg-[var(--surface-sunken)] p-0.5"
     >
       <button
@@ -43,7 +45,7 @@ export function PipelineViewSwitch({ current }: { current: 'list' | 'board' }) {
         onClick={() => go('list')}
         className={tab('list')}
       >
-        <Icon name="list" size={14} ariaHidden /> List
+        <Icon name="list" size={14} ariaHidden /> {t('pipelineViewSwitch.list', 'List')}
       </button>
       <button
         type="button"
@@ -52,7 +54,7 @@ export function PipelineViewSwitch({ current }: { current: 'list' | 'board' }) {
         onClick={() => go('board')}
         className={tab('board')}
       >
-        <Icon name="pipeline" size={14} ariaHidden /> Board
+        <Icon name="pipeline" size={14} ariaHidden /> {t('pipelineViewSwitch.board', 'Board')}
       </button>
     </div>
   );

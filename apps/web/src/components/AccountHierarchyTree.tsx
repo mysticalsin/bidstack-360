@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Icon } from '@/components/ui/Icon';
 
 interface HierarchyNode {
@@ -44,9 +45,12 @@ function TreeNode({
 }
 
 export function AccountHierarchyTree({ tree }: { tree: HierarchyNode }) {
+  const { t } = useTranslation('crm');
   return (
     <div className="card p-4">
-      <h3 className="text-sm font-semibold text-[var(--fg-primary)] mb-3">Account Hierarchy</h3>
+      <h3 className="text-sm font-semibold text-[var(--fg-primary)] mb-3">
+        {t('accountHierarchyTree.heading', 'Account Hierarchy')}
+      </h3>
       <ul>
         <TreeNode node={tree} />
       </ul>

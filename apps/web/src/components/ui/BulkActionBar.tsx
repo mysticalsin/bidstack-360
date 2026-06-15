@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button } from './Button';
 
 interface BulkActionBarProps {
@@ -15,23 +16,27 @@ export function BulkActionBar({
   onExport,
   onDelete,
   onClear,
-  deleteLabel = 'Delete selected',
-  exportLabel = 'Export selected',
+  deleteLabel,
+  exportLabel,
   isDeleting,
 }: BulkActionBarProps) {
+  const { t } = useTranslation('common');
+
   if (count === 0) return null;
 
   return (
     <div
       role="region"
-      aria-label="Bulk actions"
+      aria-label={t('bulkActionBar.regionLabel', 'Bulk actions')}
       className="sticky top-2 z-20 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] px-3 py-2 text-xs shadow-[var(--shadow-sm)] backdrop-blur"
     >
-      <span className="font-medium text-[var(--fg-primary)]">{count} selected</span>
+      <span className="font-medium text-[var(--fg-primary)]">
+        {t('bulkActionBar.selectedCount', '{{count}} selected', { count })}
+      </span>
       <div className="flex items-center gap-2">
         {onExport ? (
           <Button size="sm" variant="secondary" onClick={onExport}>
-            {exportLabel}
+            {exportLabel ?? t('bulkActionBar.exportSelected', 'Export selected')}
           </Button>
         ) : null}
         {onDelete ? (
@@ -42,11 +47,13 @@ export function BulkActionBar({
             disabled={isDeleting}
             className="text-[var(--danger)] hover:text-[var(--danger)]"
           >
-            {isDeleting ? 'Deleting…' : deleteLabel}
+            {isDeleting
+              ? t('bulkActionBar.deleting', 'Deleting…')
+              : deleteLabel ?? t('bulkActionBar.deleteSelected', 'Delete selected')}
           </Button>
         ) : null}
         <Button size="sm" variant="ghost" onClick={onClear}>
-          Clear
+          {t('bulkActionBar.clear', 'Clear')}
         </Button>
       </div>
     </div>

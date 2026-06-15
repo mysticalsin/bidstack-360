@@ -3781,5 +3781,35 @@
     "railAriaLabel": "CRM integration status",
     "railLabel": "Integration activity",
     "railCaption": "ERP, External CRM, verified data connectors"
+  },
+  "oppIndustryBreakdown": {
+    "title": "Pipeline by industry",
+    "sectorCount": "{{count}} sector"
+  },
+  "revenueEvolution": {
+    "regionLabel": "Revenue evolution",
+    "title": "Revenue evolution",
+    "caption": "Won-deal revenue with this client by month",
+    "srSummary": "{{count}} months of won-deal revenue. Peak {{period}}.",
+    "barsListLabel": "Won-deal revenue by month",
+    "barLabel": "{{period}}: {{amount}}"
+  },
+  "winLoss": {
+    "regionLabel": "Win / loss",
+    "title": "Win / loss",
+    "caption": "Decided deals on this account",
+    "winRateLabel": "win rate",
+    "wonCount": "{{count}} won",
+    "lostCount": "{{count}} lost",
+    "barLabel": "{{won}} won, {{lost}} lost — {{rate}}% win rate",
+    "wonValue": "{{value}} in won deals"
+  },
+  "pipelineViewSwitch": {
+    "ariaLabel": "Opportunity view",
+    "list": "List",
+    "board": "Board"
+  },
+  "accountHierarchyTree": {
+    "heading": "Account Hierarchy"
   }
 }

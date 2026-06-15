@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { useDisplayMoneyMicros } from '@/hooks/useDisplayMoney';
@@ -16,31 +17,39 @@ interface Props {
  * there are decided deals so a brand-new account shows nothing, not zeros.
  */
 export const WinLossCard = memo(function WinLossCard({ cockpit }: Props) {
+  const { t } = useTranslation('crm');
   const flags = useFeatureFlags();
   const wl = cockpit.winLoss;
   const wonValue = useDisplayMoneyMicros(wl?.wonValueMicros ?? 0, 'EUR', { compact: true });
   if (!flags.winLossDataAvailable || !wl || wl.wonCount + wl.lostCount === 0) return null;
 
   return (
-    <Card role="region" aria-label="Win / loss">
-      <SectionHeader title="Win / loss" caption="Decided deals on this account" />
+    <Card role="region" aria-label={t('winLoss.regionLabel', 'Win / loss')}>
+      <SectionHeader
+        title={t('winLoss.title', 'Win / loss')}
+        caption={t('winLoss.caption', 'Decided deals on this account')}
+      />
       <div className="px-5 pb-5">
         <div className="flex items-end justify-between">
           <div>
             <div className="text-3xl font-semibold tabular-nums text-[var(--fg-primary)]">
               {wl.winRate}%
             </div>
-            <div className="text-xs text-[var(--fg-tertiary)]">win rate</div>
+            <div className="text-xs text-[var(--fg-tertiary)]">{t('winLoss.winRateLabel', 'win rate')}</div>
           </div>
           <div className="text-right text-sm">
-            <div className="text-[var(--success)]">{wl.wonCount} won</div>
-            <div className="text-[var(--danger)]">{wl.lostCount} lost</div>
+            <div className="text-[var(--success)]">{t('winLoss.wonCount', '{{count}} won', { count: wl.wonCount })}</div>
+            <div className="text-[var(--danger)]">{t('winLoss.lostCount', '{{count}} lost', { count: wl.lostCount })}</div>
           </div>
         </div>
         <div
           className="mt-3 flex h-2 overflow-hidden rounded-full bg-[var(--surface-sunken)]"
           role="img"
-          aria-label={`${wl.wonCount} won, ${wl.lostCount} lost — ${wl.winRate}% win rate`}
+          aria-label={t('winLoss.barLabel', '{{won}} won, {{lost}} lost — {{rate}}% win rate', {
+            won: wl.wonCount,
+            lost: wl.lostCount,
+            rate: wl.winRate,
+          })}
         >
           {/* Right border on the won segment keeps the split perceivable at
               0%/100% and without relying on the success/danger hue alone. */}
@@ -51,7 +60,7 @@ export const WinLossCard = memo(function WinLossCard({ cockpit }: Props) {
           <div className="flex-1 bg-[var(--danger)]" />
         </div>
         <p className="mt-3 text-xs text-[var(--fg-tertiary)]">
-          {wonValue} in won deals
+          {t('winLoss.wonValue', '{{value}} in won deals', { value: wonValue })}
         </p>
       </div>
     </Card>

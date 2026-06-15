@@ -367,5 +367,17 @@
   },
   "upgradeBanner": {
     "actionLabel": "Upgrade"
+  },
+  "showMore": {
+    "moreLabel": "Show more",
+    "lessLabel": "Show less"
+  },
+  "bulkActionBar": {
+    "regionLabel": "Bulk actions",
+    "selectedCount": "{{count}} selected",
+    "exportSelected": "Export selected",
+    "deleting": "Deleting…",
+    "deleteSelected": "Delete selected",
+    "clear": "Clear"
   }
 }

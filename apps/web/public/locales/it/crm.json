@@ -3781,5 +3781,35 @@
     "railAriaLabel": "Stato di integrazione del CRM",
     "railLabel": "Attività di integrazione",
     "railCaption": "ERP, CRM esterno, connettori dati verificati"
+  },
+  "oppIndustryBreakdown": {
+    "title": "Pipeline per settore",
+    "sectorCount": "{{count}} settore"
+  },
+  "revenueEvolution": {
+    "regionLabel": "Evoluzione dei ricavi",
+    "title": "Evoluzione dei ricavi",
+    "caption": "Ricavi delle trattative vinte con questo cliente per mese",
+    "srSummary": "{{count}} mesi di ricavi da trattative vinte. Picco {{period}}.",
+    "barsListLabel": "Ricavi delle trattative vinte per mese",
+    "barLabel": "{{period}}: {{amount}}"
+  },
+  "winLoss": {
+    "regionLabel": "Vinte / perse",
+    "title": "Vinte / perse",
+    "caption": "Trattative decise su questo account",
+    "winRateLabel": "tasso di vittoria",
+    "wonCount": "{{count}} vinte",
+    "lostCount": "{{count}} perse",
+    "barLabel": "{{won}} vinte, {{lost}} perse — {{rate}}% tasso di vittoria",
+    "wonValue": "{{value}} in trattative vinte"
+  },
+  "pipelineViewSwitch": {
+    "ariaLabel": "Vista opportunità",
+    "list": "Elenco",
+    "board": "Bacheca"
+  },
+  "accountHierarchyTree": {
+    "heading": "Gerarchia degli account"
   }
 }

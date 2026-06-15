@@ -1,4 +1,5 @@
 import { useId, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
@@ -15,13 +16,17 @@ interface ShowMoreProps {
 export function ShowMore({
   children,
   collapsedHeight = 144,
-  moreLabel = 'Show more',
-  lessLabel = 'Show less',
+  moreLabel,
+  lessLabel,
   className,
   contentClassName,
 }: ShowMoreProps) {
+  const { t } = useTranslation('common');
   const [expanded, setExpanded] = useState(false);
   const contentId = useId();
+
+  const resolvedMoreLabel = moreLabel ?? t('showMore.moreLabel', 'Show more');
+  const resolvedLessLabel = lessLabel ?? t('showMore.lessLabel', 'Show less');
 
   return (
     <div className={cn('space-y-3', className)}>
@@ -49,7 +54,7 @@ export function ShowMore({
         onClick={() => setExpanded((value) => !value)}
         className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-[var(--brand-primary)] transition-colors hover:bg-[var(--brand-primary-tint)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
       >
-        <span>{expanded ? lessLabel : moreLabel}</span>
+        <span>{expanded ? resolvedLessLabel : resolvedMoreLabel}</span>
         <Icon name={expanded ? 'caretup' : 'caret'} size={16} className="shrink-0" ariaHidden />
       </button>
     </div>

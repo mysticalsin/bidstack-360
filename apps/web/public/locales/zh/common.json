@@ -367,5 +367,17 @@
   },
   "upgradeBanner": {
     "actionLabel": "升级"
+  },
+  "showMore": {
+    "moreLabel": "显示更多",
+    "lessLabel": "显示更少"
+  },
+  "bulkActionBar": {
+    "regionLabel": "批量操作",
+    "selectedCount": "已选择 {{count}} 项",
+    "exportSelected": "导出所选项",
+    "deleting": "正在删除…",
+    "deleteSelected": "删除所选项",
+    "clear": "清除"
   }
 }

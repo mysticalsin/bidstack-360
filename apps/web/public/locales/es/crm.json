@@ -3814,5 +3814,35 @@
     "railAriaLabel": "Estado de integración del CRM",
     "railLabel": "Actividad de integración",
     "railCaption": "ERP, CRM externo, conectores de datos verificados"
+  },
+  "oppIndustryBreakdown": {
+    "title": "Cartera por sector",
+    "sectorCount": "{{count}} sector"
+  },
+  "revenueEvolution": {
+    "regionLabel": "Evolución de ingresos",
+    "title": "Evolución de ingresos",
+    "caption": "Ingresos de acuerdos ganados con este cliente por mes",
+    "srSummary": "{{count}} meses de ingresos de acuerdos ganados. Máximo {{period}}.",
+    "barsListLabel": "Ingresos de acuerdos ganados por mes",
+    "barLabel": "{{period}}: {{amount}}"
+  },
+  "winLoss": {
+    "regionLabel": "Ganados / perdidos",
+    "title": "Ganados / perdidos",
+    "caption": "Negocios decididos en esta cuenta",
+    "winRateLabel": "tasa de éxito",
+    "wonCount": "{{count}} ganados",
+    "lostCount": "{{count}} perdidos",
+    "barLabel": "{{won}} ganados, {{lost}} perdidos — {{rate}}% de tasa de éxito",
+    "wonValue": "{{value}} en negocios ganados"
+  },
+  "pipelineViewSwitch": {
+    "ariaLabel": "Vista de oportunidad",
+    "list": "Lista",
+    "board": "Tablero"
+  },
+  "accountHierarchyTree": {
+    "heading": "Jerarquía de cuentas"
   }
 }

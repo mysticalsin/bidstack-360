@@ -367,5 +367,17 @@
   },
   "upgradeBanner": {
     "actionLabel": "Esegui l'upgrade"
+  },
+  "showMore": {
+    "moreLabel": "Mostra altro",
+    "lessLabel": "Mostra meno"
+  },
+  "bulkActionBar": {
+    "regionLabel": "Azioni in blocco",
+    "selectedCount": "{{count}} selezionati",
+    "exportSelected": "Esporta selezionati",
+    "deleting": "Eliminazione…",
+    "deleteSelected": "Elimina selezionati",
+    "clear": "Cancella"
   }
 }

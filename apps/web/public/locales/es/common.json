@@ -367,5 +367,17 @@
   },
   "upgradeBanner": {
     "actionLabel": "Mejorar"
+  },
+  "showMore": {
+    "moreLabel": "Mostrar más",
+    "lessLabel": "Mostrar menos"
+  },
+  "bulkActionBar": {
+    "regionLabel": "Acciones masivas",
+    "selectedCount": "{{count}} seleccionados",
+    "exportSelected": "Exportar seleccionados",
+    "deleting": "Eliminando…",
+    "deleteSelected": "Eliminar seleccionados",
+    "clear": "Limpiar"
   }
 }
