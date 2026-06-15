@@ -51,5 +51,479 @@
     "connectFailed": "La connexion a échoué. Vérifiez vos identifiants.",
     "syncFailed": "La synchronisation a échoué.",
     "disconnectFailed": "La déconnexion a échoué."
+  },
+  "agentProviderCredentials": {
+    "toast": {
+      "activeSet": "{{label}} est désormais le modèle actif",
+      "activeCleared": "Modèle actif effacé",
+      "activeSetDescription": "Chaque étape d'IA utilise ce fournisseur jusqu'au prochain changement, sans redéploiement.",
+      "switchFailedTitle": "Impossible de changer de fournisseur",
+      "serverRejected": "Le serveur a rejeté la requête.",
+      "testAliveTitle": "{{label}} est opérationnel",
+      "testAliveDescription": "{{model}} a répondu en {{latencyMs}} ms.",
+      "testNoResponseTitle": "{{label}} n'a pas répondu",
+      "testNoResponseDescription": "Aucune réponse du fournisseur.",
+      "testFailedTitle": "Échec du test",
+      "savedTitle": "{{label}} enregistré",
+      "savedDescription": "L'état du fournisseur et la disponibilité d'Agent Studio ont été actualisés.",
+      "removedTitle": "Identifiants {{label}} supprimés",
+      "removeFailedTitle": "Échec de la suppression"
+    },
+    "error": {
+      "apiKeyRequired": "Une clé API est requise pour ce fournisseur.",
+      "claudeModelRequired": "Claude nécessite un modèle, par exemple claude-sonnet-4-5.",
+      "saveFailed": "Impossible d'enregistrer les identifiants du fournisseur."
+    },
+    "remove": {
+      "confirmTitle": "Supprimer les identifiants {{label}} ?",
+      "confirmDescription": "Les agents se rabattront sur les identifiants d'environnement de la plateforme s'ils sont disponibles. Les définitions d'agents existantes restent intactes.",
+      "confirmLabel": "Supprimer"
+    },
+    "header": {
+      "title": "Fournisseurs de modèles",
+      "caption": "Restez indépendant des fournisseurs : stockez des clés détenues par l'organisation pour GPT, Claude, Kimi, NVIDIA NIM ou Gemma local, puis choisissez celle qui est active. Le changement de fournisseur actif prend effet à l'étape d'IA suivante, sans redéploiement. Les clés sont chiffrées au repos et ne sont plus jamais affichées.",
+      "addProvider": "Ajouter un fournisseur"
+    },
+    "errorState": {
+      "title": "Impossible de charger les clés des fournisseurs",
+      "message": "La disponibilité du fournisseur utilise toujours le repli d'environnement serveur, mais les clés enregistrées de l'organisation n'ont pas pu être chargées.",
+      "retry": "Réessayer"
+    },
+    "emptyState": {
+      "title": "Aucune liste de fournisseurs renvoyée",
+      "message": "L'API doit toujours renvoyer les fournisseurs directs pris en charge."
+    },
+    "summary": {
+      "savedCountOne": "{{count}} fournisseur d'organisation enregistré",
+      "savedCountOther": "{{count}} fournisseurs d'organisation enregistrés",
+      "activeBadge": "Actif · {{label}}",
+      "noActiveBadge": "Aucun fournisseur actif — utilisation du fournisseur par défaut de la plateforme",
+      "fallbackNote": "Les fournisseurs d'environnement de la plateforme restent disponibles en repli lorsqu'ils sont configurés."
+    },
+    "row": {
+      "activeBadge": "Actif",
+      "orgKeySaved": "Clé d'organisation enregistrée",
+      "noOrgKey": "Aucune clé d'organisation",
+      "activeDescription": "Pilote actuellement chaque étape d'IA pour ce locataire.",
+      "readyDescription": "Enregistré et prêt — activez-le pour y faire transiter l'IA.",
+      "fallbackDescription": "Utilise le repli d'environnement de la plateforme s'il est configuré.",
+      "edit": "Modifier",
+      "connect": "Connecter",
+      "remove": "Supprimer",
+      "inUse": "En cours d'utilisation",
+      "setActive": "Définir comme actif",
+      "testing": "Test en cours…",
+      "test": "Tester",
+      "testAlive": "Opérationnel · {{latencyMs}} ms",
+      "testFailed": "Échec · {{error}}",
+      "testNoResponse": "aucune réponse"
+    },
+    "detail": {
+      "model": "Modèle",
+      "endpoint": "Point de terminaison",
+      "key": "Clé",
+      "keyOptional": "Facultatif",
+      "keyNotSaved": "Non enregistrée",
+      "updated": "Mis à jour",
+      "updatedNever": "Jamais"
+    },
+    "dialog": {
+      "updateTitle": "Mettre à jour {{label}}",
+      "addTitle": "Ajouter un fournisseur de modèles",
+      "description": "La clé API est chiffrée avant stockage et n'est jamais renvoyée au navigateur. Laissez la clé vide lors de la modification pour conserver la clé enregistrée.",
+      "providerLabel": "Fournisseur",
+      "apiKeyLabelOptional": "Clé API (facultative)",
+      "apiKeyLabel": "Clé API",
+      "apiKeyPlaceholderKeep": "Laissez vide pour conserver la clé enregistrée",
+      "apiKeyPlaceholderOptional": "Facultatif pour les environnements d'exécution locaux",
+      "apiKeyPlaceholder": "Collez la clé du fournisseur",
+      "modelLabel": "Modèle",
+      "baseUrlLabel": "URL de base",
+      "baseUrlHintLocal": "Localhost n'est accepté qu'en développement local. La production requiert un https public.",
+      "baseUrlHint": "Doit être un point de terminaison https public.",
+      "cancel": "Annuler",
+      "saving": "Enregistrement...",
+      "save": "Enregistrer le fournisseur"
+    }
+  },
+  "connectors": {
+    "category": {
+      "company": "Données entreprise",
+      "market": "Marché et données ouvertes",
+      "procurement": "Achats et appels d'offres",
+      "logo": "Logos et image de marque",
+      "people": "Personnes et contacts",
+      "ai": "IA et agents"
+    },
+    "header": {
+      "title": "Catalogue de connecteurs",
+      "caption": "Sources de données externes accessibles par BidStack. Les flux ouverts fonctionnent sans clés ; les flux sous licence nécessitent des identifiants.",
+      "sourcesBadge": "{{count}} sources"
+    },
+    "error": {
+      "title": "Impossible de charger les connecteurs",
+      "retry": "Réessayer"
+    },
+    "stat": {
+      "totalSources": "Sources totales",
+      "healthy": "Sains",
+      "needsKey": "Clé requise",
+      "degradedDown": "Dégradés/hors service",
+      "catalogBadge": "catalogue"
+    },
+    "filter": {
+      "groupLabel": "Filtrer les connecteurs par catégorie",
+      "all": "Tous"
+    },
+    "empty": {
+      "title": "Aucun connecteur dans cette catégorie"
+    },
+    "row": {
+      "checkedAt": "Vérifié {{time}}",
+      "docsLink": "Docs ↗",
+      "disconnecting": "Déconnexion...",
+      "disconnect": "Déconnecter",
+      "connecting": "Connexion...",
+      "connect": "Connecter",
+      "requiresKey": "clé requise",
+      "open": "ouvert"
+    },
+    "status": {
+      "healthy": "sain",
+      "degraded": "dégradé",
+      "down": "hors service",
+      "disabled": "désactivé"
+    }
+  },
+  "erpConnector": {
+    "title": "ERP MCP",
+    "caption": "définissez ERP_MCP_URL + ERP_DB pour activer",
+    "status": {
+      "error": "erreur",
+      "checking": "vérification",
+      "notConfigured": "non configuré",
+      "live": "actif",
+      "unreachable": "inaccessible"
+    },
+    "error": {
+      "title": "Impossible d'atteindre le point de terminaison de statut ERP",
+      "message": "Il s'agit d'un problème de connexion, pas d'une configuration manquante. Veuillez réessayer.",
+      "retry": "Réessayer"
+    },
+    "notConfigured": {
+      "set": "Définissez",
+      "andOptionally": "et éventuellement",
+      "tail": "pour atteindre le sidecar ERP MCP. En attendant, BidStack utilise des données vérifiées locales et des connecteurs de données vérifiées."
+    },
+    "stat": {
+      "endpoint": "Point de terminaison",
+      "database": "Base de données",
+      "mcpTools": "Outils MCP",
+      "status": "Statut"
+    },
+    "value": {
+      "na": "n/d",
+      "reachable": "accessible",
+      "unreachable": "inaccessible"
+    },
+    "kit": {
+      "title": "Kit opérationnel d'offre ERP",
+      "subtitle": "Modèles de partenaire, opportunité, devis, activité, document et transfert adaptés à l'avant-vente BidStack.",
+      "badge": {
+        "sidecar": "sidecar",
+        "fixSidecar": "corriger le sidecar",
+        "local": "local"
+      }
+    },
+    "autocomplete": {
+      "title": "Saisie semi-automatique de partenaire",
+      "subtitle": "Recherche d'entité juridique de style ERP avec repli BidStack.",
+      "ariaLabel": "Requête de saisie semi-automatique d'entreprise",
+      "placeholder": "Nom, domaine, TVA ou DUNS",
+      "check": "Vérifier",
+      "empty": "Aucune suggestion d'entreprise pour l'instant. Ajoutez des identifiants ERP MCP ou vérifiez ce compte dans BidStack."
+    },
+    "item": {
+      "vat": "TVA {{value}}",
+      "duns": "DUNS {{value}}",
+      "noRegistryKeys": "Pas encore de clés de registre"
+    }
+  },
+  "connectionCommandCenter": {
+    "path": {
+      "dust": {
+        "title": "Passerelle agent Dust",
+        "eyebrow": "Actions de l'agent",
+        "summary": "Donnez à Dust une boîte à outils CRM côté serveur avec MCP et synchronisation REST."
+      },
+      "mcp": {
+        "title": "Serveur MCP",
+        "eyebrow": "Outils personnalisés",
+        "summary": "Enregistrez BidStack comme serveur MCP pour Dust, Claude Desktop ou des agents internes."
+      },
+      "rest": {
+        "title": "API REST",
+        "eyebrow": "Données bidirectionnelles",
+        "summary": "Utilisez des clés d'API typées pour les tâches ETL, les portails clients et l'automatisation d'entreprise."
+      },
+      "webhooks": {
+        "title": "Webhooks",
+        "eyebrow": "Événements en temps réel",
+        "summary": "Abonnez des systèmes externes aux événements d'affaires, d'appels d'offres, de propositions, de factures et d'agents."
+      }
+    },
+    "readyLabel": "prêt",
+    "needsSetupLabel": "configuration requise",
+    "error": {
+      "title": "Impossible de charger le guide de configuration",
+      "message": "Le point de terminaison du contrat d'intégration n'a pas répondu.",
+      "retry": "Réessayer le guide de configuration"
+    },
+    "readiness": {
+      "dustCredentials": {
+        "label": "Identifiants Dust",
+        "ready": "Prêt",
+        "needsKey": "Clé requise"
+      },
+      "dustAgents": {
+        "label": "Agents Dust",
+        "found": "{{count}} trouvés",
+        "disabled": "Désactivé"
+      },
+      "mcpEndpoint": {
+        "label": "Point de terminaison MCP",
+        "publicUrlSet": "URL publique définie",
+        "localFallback": "Repli local"
+      },
+      "dustDataSource": {
+        "label": "Source de données Dust",
+        "ready": "Prêt",
+        "missing": "Manquant"
+      }
+    },
+    "title": "Centre de commande des connexions",
+    "generatedAt": "Généré {{time}}",
+    "subtitle": "Choisissez une voie, créez la bonne clé, copiez le point de terminaison exact et connectez le système externe avec des permissions de moindre privilège.",
+    "keyVault": "Coffre de clés",
+    "webhookHub": "Hub de webhooks",
+    "tablistLabel": "Voies de configuration d'intégration"
+  },
+  "dustCredentials": {
+    "sectionTitle": "Identifiants Dust",
+    "sectionCaption": "Connectez votre espace de travail Dust une seule fois : les agents d'équipe, la rédaction d'appels d'offres, la conformité et l'intelligence documentaire l'utilisent automatiquement.",
+    "removeButton": "Supprimer",
+    "updateKeysButton": "Mettre à jour les clés",
+    "connectButton": "Connecter Dust",
+    "dialogUpdateTitle": "Mettre à jour les identifiants Dust",
+    "dialogConnectTitle": "Connecter Dust",
+    "dialogDescription": "Nous validons les clés auprès de Dust avant l'enregistrement. La clé API est chiffrée au repos et n'est plus jamais affichée.",
+    "fieldApiKeyLabel": "Clé API",
+    "fieldApiKeyHint": "Depuis Dust → Paramètres → Clés API.",
+    "fieldWorkspaceIdLabel": "ID de l'espace de travail",
+    "fieldDataSourceIdLabel": "ID de la source de données",
+    "fieldDataSourceIdPlaceholder": "Facultatif — active la synchronisation des documents",
+    "fieldBaseUrlLabel": "URL de base",
+    "fieldBaseUrlPlaceholder": "Facultatif — par défaut https://dust.tt/api",
+    "cancelButton": "Annuler",
+    "validatingButton": "Validation…",
+    "validateSaveButton": "Valider et enregistrer",
+    "errorBothRequired": "La clé API et l'ID de l'espace de travail sont tous deux requis.",
+    "errorCouldNotSave": "Impossible d'enregistrer les identifiants.",
+    "toastConnectedTitle": "Dust connecté",
+    "toastConnectedDescription": "Identifiants validés et enregistrés. Les fonctionnalités d'IA utilisent désormais votre espace de travail.",
+    "confirmRemoveTitle": "Supprimer les identifiants Dust ?",
+    "confirmRemoveDescription": "Les fonctionnalités d'IA reviendront à la valeur par défaut de la plateforme (si elle est définie) ou seront suspendues jusqu'à l'ajout de nouvelles clés.",
+    "confirmRemoveLabel": "Supprimer",
+    "toastRemovedTitle": "Identifiants Dust supprimés",
+    "toastRemoveFailedTitle": "Échec de la suppression",
+    "errorServerRejected": "Le serveur a rejeté la requête.",
+    "loadErrorTitle": "Impossible de charger les identifiants Dust",
+    "loadErrorMessage": "Veuillez réessayer.",
+    "retryButton": "Réessayer",
+    "emptyTitle": "Dust n'est pas encore connecté",
+    "emptyMessageAdmin": "Ajoutez votre clé API Dust et l'ID de votre espace de travail pour activer la rédaction par IA, la conformité et les agents d'équipe.",
+    "emptyMessageNonAdmin": "Demandez à un administrateur de connecter votre espace de travail Dust pour activer les fonctionnalités d'IA.",
+    "badgePlatformDefault": "Valeur par défaut de la plateforme",
+    "badgeConnected": "Connecté",
+    "platformKeyNote": "Fonctionne avec la clé Dust partagée de la plateforme. Ajoutez la vôtre ci-dessus pour utiliser votre espace de travail.",
+    "detailWorkspaceId": "ID de l'espace de travail",
+    "detailDataSourceId": "ID de la source de données",
+    "detailBaseUrl": "URL de base",
+    "detailAgentOverrides": "Remplacements d'agents",
+    "agentOverridesConfigured": "{{count}} configurés",
+    "agentOverridesDefaults": "Utilisation des valeurs par défaut"
+  },
+  "dataQuality": {
+    "title": "Qualité des données",
+    "caption": {
+      "generated": "Rapport généré {{time}} · {{count}} problème",
+      "idle": "Détecte les entreprises en double, les données obsolètes, les propriétaires manquants et les domaines incorrects."
+    },
+    "error": {
+      "title": "Impossible de charger le rapport de qualité des données",
+      "retry": "Réessayer"
+    },
+    "emptyScan": {
+      "title": "Aucune analyse de qualité des données",
+      "message": "Lancez l'analyse de qualité des données pour voir les domaines en double, les enregistrements obsolètes, les propriétaires manquants, les domaines non valides et la couverture des logos."
+    },
+    "stat": {
+      "qualityScore": "Score de qualité",
+      "highSeverity": "Gravité élevée",
+      "mediumSeverity": "Gravité moyenne",
+      "totalIssues": "Total des problèmes",
+      "badge": "données"
+    },
+    "noIssues": {
+      "title": "Aucun problème de qualité des données",
+      "message": "Aucun domaine en double, donnée obsolète, propriétaire manquant, domaine non valide ou logo manquant n'a été détecté lors de cette analyse."
+    },
+    "issue": {
+      "company": "Entreprise : {{name}}"
+    },
+    "kind": {
+      "duplicateCompany": "Entreprise en double",
+      "staleData": "Données obsolètes",
+      "missingOwner": "Propriétaire manquant",
+      "invalidDomain": "Domaine non valide",
+      "missingLogo": "Logo manquant"
+    },
+    "severity": {
+      "high": "élevée",
+      "medium": "moyenne",
+      "low": "faible"
+    }
+  },
+  "connectionTester": {
+    "title": "Testeur de connexion",
+    "caption": "Sondez un point de terminaison depuis le service API avant de l'enregistrer. Les secrets et les jetons bearer ne sont jamais envoyés.",
+    "status": {
+      "reachable": "accessible",
+      "needsAttention": "attention requise",
+      "ready": "prêt à tester"
+    },
+    "probeOption": {
+      "mcp": {
+        "label": "MCP",
+        "description": "Points de terminaison des outils d'agent"
+      },
+      "rest": {
+        "label": "API REST",
+        "description": "Points de terminaison de synchronisation des données"
+      },
+      "webhook": {
+        "label": "Webhook",
+        "description": "Récepteurs d'événements"
+      }
+    },
+    "endpointUrlLabel": "URL du point de terminaison",
+    "placeholder": {
+      "loading": "Chargement du contrat de configuration..."
+    },
+    "useDefault": "Utiliser la valeur par défaut",
+    "testing": "Test en cours...",
+    "testEndpoint": "Tester le point de terminaison",
+    "hint": {
+      "noSecrets": {
+        "title": "Aucun secret envoyé",
+        "body": "L'API ne teste que l'accessibilité. Elle supprime les chaînes de requête, les fragments, les noms d'utilisateur et les mots de passe."
+      },
+      "ssrf": {
+        "title": "Protégé contre le SSRF",
+        "body": "Les réseaux privés et les hôtes internes sont bloqués en dehors du développement local avant toute requête."
+      },
+      "timeout": {
+        "title": "Délai d'expiration rapide",
+        "body": "Le sondage s'arrête après 5 secondes et enregistre un événement d'audit délimité pour la traçabilité de l'administrateur."
+      }
+    },
+    "toast": {
+      "missingUrl": "Ajoutez d'abord une URL de point de terminaison",
+      "reachedTitle": "Point de terminaison atteint",
+      "warningTitle": "Sondage terminé avec un avertissement",
+      "probeFailed": "Le sondage du point de terminaison a échoué.",
+      "blockedTitle": "Sondage bloqué"
+    }
+  },
+  "integrationHero": {
+    "eyebrowBadge": "Tissu d'intégration",
+    "eyebrowChannels": "MCP, REST, webhooks, Dust",
+    "title": "Intégrations",
+    "subtitle": "Connectez des agents, des API, des systèmes ERP et des flux d'événements avec des parcours de configuration clairs, des identifiants à portée limitée et des contrôles d'état en direct qui s'intègrent au reste de la plateforme.",
+    "posture": {
+      "refreshing": "Actualisation de l'état de l'intégration..."
+    },
+    "actions": {
+      "createApiKey": "Créer une clé d'API",
+      "addWebhook": "Ajouter un webhook"
+    },
+    "metrics": {
+      "readyPaths": {
+        "label": "Parcours prêts",
+        "helperCurrent": "Vue actuelle",
+        "helperOverview": "Onglet aperçu"
+      },
+      "dustAgents": {
+        "label": "Agents Dust"
+      },
+      "webhookEvents": {
+        "label": "Événements webhook",
+        "helperNeedReview": "{{count}} à examiner",
+        "helperNoErrors": "Aucune erreur d'événement chargée"
+      },
+      "activeMcpTools": {
+        "label": "Outils MCP actifs",
+        "helper": "Outils crm_* exposés à Dust"
+      },
+      "controlPlane": {
+        "label": "Plan de contrôle",
+        "helper": "Configuration à moindre privilège"
+      }
+    }
+  },
+  "integrationAtoms": {
+    "copyEndpoint": "Copier le point de terminaison",
+    "copySnippet": "Copier l'extrait",
+    "alreadyCopied": "Déjà copié",
+    "copiedToClipboard": "Copié dans le presse-papiers",
+    "copyFailedTitle": "Échec de la copie",
+    "copyFailedDescription": "L'accès au presse-papiers n'était pas disponible.",
+    "copied": "Copié",
+    "copy": "Copier",
+    "httpStatus": "HTTP {{status}}",
+    "noResponse": "Aucune réponse",
+    "latencyMs": "{{latency}}ms"
+  },
+  "dustAgents": {
+    "title": "Agents Dust",
+    "caption": "Agents de l'espace de travail disponibles pour les flux de vérification des données de compte",
+    "statusDegraded": "dégradé",
+    "statusConfigured": "configuré",
+    "statusDisabled": "désactivé",
+    "notConfigured": "Ajoutez des identifiants Dust pour répertorier les agents disponibles de l'espace de travail.",
+    "empty": "Dust est configuré, mais aucun agent accessible n'a été renvoyé pour cet espace de travail.",
+    "badgeAgent": "agent"
+  },
+  "connectionRunway": {
+    "sectionLabel": "Flux de configuration de l'intégration",
+    "stepBadge": "Étape {{number}}",
+    "steps": {
+      "pickSurface": {
+        "title": "Choisissez la surface",
+        "body": "Choisissez MCP pour les agents, REST pour la synchronisation, les webhooks pour les événements ou les connecteurs pour l'ERP."
+      },
+      "scopeAccess": {
+        "title": "Limitez l'accès",
+        "body": "Créez des clés de lecture/écriture uniquement pour le flux de travail concerné et conservez les secrets côté serveur."
+      },
+      "probeBeforeSave": {
+        "title": "Testez avant d'enregistrer",
+        "body": "Exécutez une vérification d'accessibilité sécurisée avec protection SSRF et sans envoyer de jetons bearer."
+      },
+      "monitorEvidence": {
+        "title": "Surveillez les preuves",
+        "body": "Consultez l'état du fournisseur et les événements webhook sans quitter le hub d'intégration."
+      }
+    }
   }
 }
