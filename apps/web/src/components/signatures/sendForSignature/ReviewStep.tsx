@@ -1,4 +1,5 @@
 // Step 3: preview document, compose message, review recipients, and send.
+import { useTranslation } from 'react-i18next';
 import { useDocumentTemplate } from '@/hooks/useDocumentTemplates';
 import { DocumentPreviewIframe } from '../DocumentPreviewIframe';
 import { cn } from '@/lib/cn';
@@ -25,6 +26,7 @@ export function ReviewStep({
   onSend,
   isSending,
 }: Props) {
+  const { t } = useTranslation('signatures');
   const { data: template } = useDocumentTemplate(templateId);
 
   // Substitute variables into template body for the live preview.
@@ -42,19 +44,21 @@ export function ReviewStep({
         <DocumentPreviewIframe
           src={previewHtml}
           srcdoc
-          title={template?.name ?? 'Document preview'}
+          title={template?.name ?? t('reviewStep.previewTitle', 'Document preview')}
           height={300}
         />
       )}
 
       {/* Optional message to recipients */}
       <div>
-        <FieldLabel htmlFor="sig-message">Message to recipients (optional)</FieldLabel>
+        <FieldLabel htmlFor="sig-message">
+          {t('reviewStep.messageLabel', 'Message to recipients (optional)')}
+        </FieldLabel>
         <textarea
           id="sig-message"
           value={message}
           onChange={(e) => onChangeMessage(e.target.value)}
-          placeholder="Please review and sign the attached document…"
+          placeholder={t('reviewStep.messagePlaceholder', 'Please review and sign the attached document…')}
           rows={3}
           maxLength={500}
           className={cn(inputClass, 'min-h-[auto] resize-none')}
@@ -65,9 +69,9 @@ export function ReviewStep({
       {/* Recipient summary */}
       <div className="rounded-xl border border-[var(--border-subtle)] p-4">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-          Recipients ({recipients.length})
+          {t('reviewStep.recipientsHeading', 'Recipients ({{count}})', { count: recipients.length })}
         </p>
-        <ul className="flex flex-col gap-1.5" aria-label="Recipient summary">
+        <ul className="flex flex-col gap-1.5" aria-label={t('reviewStep.recipientSummaryAria', 'Recipient summary')}>
           {recipients.map((r) => (
             <li key={r.email} className="flex items-center gap-2 text-sm">
               <span className="font-medium text-[var(--fg-primary)]">{r.name}</span>
@@ -92,7 +96,7 @@ export function ReviewStep({
             'disabled:opacity-40',
           )}
         >
-          Back
+          {t('reviewStep.back', 'Back')}
         </button>
         <button
           type="button"
@@ -106,7 +110,9 @@ export function ReviewStep({
             'disabled:opacity-40 disabled:cursor-not-allowed',
           )}
         >
-          {isSending ? 'Sending…' : 'Send for Signature'}
+          {isSending
+            ? t('reviewStep.sending', 'Sending…')
+            : t('reviewStep.send', 'Send for Signature')}
         </button>
       </div>
     </div>

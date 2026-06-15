@@ -231,5 +231,19 @@
     "runPrompt": "Crie sua consulta e execute uma pré-visualização para ver os resultados aqui.",
     "chartShapeMismatch": "Este tipo de gráfico não se ajusta ao formato da consulta atual. A tabela abaixo mostra as linhas brutas.",
     "queryFailed": "A consulta falhou"
+  },
+  "aggregatePicker": {
+    "functionCount": "Contagem",
+    "functionCountDistinct": "Contagem distinta",
+    "functionSum": "Soma",
+    "functionAverage": "Média",
+    "functionMin": "Mín",
+    "functionMax": "Máx",
+    "functionAriaLabel": "Função de agregação",
+    "fieldPlaceholder": "Escolher campo…",
+    "aliasPlaceholder": "Alias (opcional)",
+    "aliasAriaLabel": "Alias de agregação",
+    "removeAriaLabel": "Remover agregação",
+    "addButton": "+ Adicionar agregação"
   }
 }

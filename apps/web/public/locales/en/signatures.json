@@ -121,5 +121,15 @@
     "selectTemplatePlaceholder": "Select a template…",
     "templateVariablesHeading": "Template variables",
     "nextButton": "Next: Recipients"
+  },
+  "reviewStep": {
+    "previewTitle": "Document preview",
+    "messageLabel": "Message to recipients (optional)",
+    "messagePlaceholder": "Please review and sign the attached document…",
+    "recipientsHeading": "Recipients ({{count}})",
+    "recipientSummaryAria": "Recipient summary",
+    "back": "Back",
+    "sending": "Sending…",
+    "send": "Send for Signature"
   }
 }

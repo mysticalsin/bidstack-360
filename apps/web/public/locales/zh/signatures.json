@@ -121,5 +121,15 @@
     "selectTemplatePlaceholder": "选择一个模板…",
     "templateVariablesHeading": "模板变量",
     "nextButton": "下一步：收件人"
+  },
+  "reviewStep": {
+    "previewTitle": "文档预览",
+    "messageLabel": "给收件人的留言（可选）",
+    "messagePlaceholder": "请审阅并签署所附文件…",
+    "recipientsHeading": "收件人（{{count}}）",
+    "recipientSummaryAria": "收件人摘要",
+    "back": "返回",
+    "sending": "发送中…",
+    "send": "发送以供签署"
   }
 }

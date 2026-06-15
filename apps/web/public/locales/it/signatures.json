@@ -121,5 +121,15 @@
     "selectTemplatePlaceholder": "Seleziona un modello…",
     "templateVariablesHeading": "Variabili del modello",
     "nextButton": "Avanti: Destinatari"
+  },
+  "reviewStep": {
+    "previewTitle": "Anteprima del documento",
+    "messageLabel": "Messaggio ai destinatari (facoltativo)",
+    "messagePlaceholder": "Esamina e firma il documento allegato…",
+    "recipientsHeading": "Destinatari ({{count}})",
+    "recipientSummaryAria": "Riepilogo dei destinatari",
+    "back": "Indietro",
+    "sending": "Invio in corso…",
+    "send": "Invia per la firma"
   }
 }

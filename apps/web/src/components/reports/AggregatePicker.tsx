@@ -2,18 +2,19 @@
 // Used in ReportBuilderPage to configure SELECT aggregates.
 
 import { Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/cn';
 import type { Aggregate, AggregateFunction, ReportEntityType } from '@/hooks/useAnalyticsReports';
 import { FieldPicker } from './FieldPicker';
 
-const FUNCTIONS: { fn: AggregateFunction; label: string }[] = [
-  { fn: 'COUNT', label: 'Count' },
-  { fn: 'COUNT_DISTINCT', label: 'Count distinct' },
-  { fn: 'SUM', label: 'Sum' },
-  { fn: 'AVG', label: 'Average' },
-  { fn: 'MIN', label: 'Min' },
-  { fn: 'MAX', label: 'Max' },
+const FUNCTIONS: { fn: AggregateFunction; labelKey: string; labelDefault: string }[] = [
+  { fn: 'COUNT', labelKey: 'aggregatePicker.functionCount', labelDefault: 'Count' },
+  { fn: 'COUNT_DISTINCT', labelKey: 'aggregatePicker.functionCountDistinct', labelDefault: 'Count distinct' },
+  { fn: 'SUM', labelKey: 'aggregatePicker.functionSum', labelDefault: 'Sum' },
+  { fn: 'AVG', labelKey: 'aggregatePicker.functionAverage', labelDefault: 'Average' },
+  { fn: 'MIN', labelKey: 'aggregatePicker.functionMin', labelDefault: 'Min' },
+  { fn: 'MAX', labelKey: 'aggregatePicker.functionMax', labelDefault: 'Max' },
 ];
 
 interface Props {
@@ -23,6 +24,8 @@ interface Props {
 }
 
 export function AggregatePicker({ entity, aggregates, onChange }: Props) {
+  const { t } = useTranslation('reports');
+
   const add = () => {
     onChange([...aggregates, { fn: 'COUNT', field: '*', alias: '' }]);
   };
@@ -51,12 +54,12 @@ export function AggregatePicker({ entity, aggregates, onChange }: Props) {
           <select
             value={agg.fn}
             onChange={(e) => update(i, { fn: e.target.value as AggregateFunction })}
-            aria-label="Aggregate function"
+            aria-label={t('aggregatePicker.functionAriaLabel', 'Aggregate function')}
             className={selectCls}
           >
             {FUNCTIONS.map((f) => (
               <option key={f.fn} value={f.fn}>
-                {f.label}
+                {t(f.labelKey, f.labelDefault)}
               </option>
             ))}
           </select>
@@ -67,7 +70,7 @@ export function AggregatePicker({ entity, aggregates, onChange }: Props) {
               entity={entity}
               value={agg.field}
               onChange={(key) => update(i, { field: key })}
-              placeholder="Pick field…"
+              placeholder={t('aggregatePicker.fieldPlaceholder', 'Pick field…')}
               className="flex-1"
             />
           )}
@@ -77,14 +80,14 @@ export function AggregatePicker({ entity, aggregates, onChange }: Props) {
             type="text"
             value={agg.alias ?? ''}
             onChange={(e) => update(i, { alias: e.target.value })}
-            placeholder="Alias (optional)"
+            placeholder={t('aggregatePicker.aliasPlaceholder', 'Alias (optional)')}
             className={cn(selectCls, 'flex-1')}
-            aria-label="Aggregate alias"
+            aria-label={t('aggregatePicker.aliasAriaLabel', 'Aggregate alias')}
           />
 
           <button
             onClick={() => remove(i)}
-            aria-label="Remove aggregate"
+            aria-label={t('aggregatePicker.removeAriaLabel', 'Remove aggregate')}
             className={cn(
               'flex items-center justify-center w-8 h-8 rounded-lg text-[var(--fg-tertiary)]',
               'hover:text-[var(--danger)] hover:bg-[var(--danger-tint)] transition-colors',
@@ -104,7 +107,7 @@ export function AggregatePicker({ entity, aggregates, onChange }: Props) {
           'min-h-[44px] px-2',
         )}
       >
-        + Add aggregate
+        {t('aggregatePicker.addButton', '+ Add aggregate')}
       </button>
     </div>
   );

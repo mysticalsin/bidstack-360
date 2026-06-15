@@ -231,5 +231,19 @@
     "runPrompt": "构建查询，然后运行预览以在此处查看结果。",
     "chartShapeMismatch": "此图表类型不适合当前的查询结构。下表显示原始行数据。",
     "queryFailed": "查询失败"
+  },
+  "aggregatePicker": {
+    "functionCount": "计数",
+    "functionCountDistinct": "去重计数",
+    "functionSum": "求和",
+    "functionAverage": "平均值",
+    "functionMin": "最小值",
+    "functionMax": "最大值",
+    "functionAriaLabel": "聚合函数",
+    "fieldPlaceholder": "选择字段…",
+    "aliasPlaceholder": "别名（可选）",
+    "aliasAriaLabel": "聚合别名",
+    "removeAriaLabel": "移除聚合",
+    "addButton": "+ 添加聚合"
   }
 }

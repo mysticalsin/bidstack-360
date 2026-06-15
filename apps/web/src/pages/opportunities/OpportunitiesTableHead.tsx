@@ -7,6 +7,8 @@
  * and bulk-select state. Extracting it keeps OpportunitiesPage under the
  * 400-line cap and makes the column layout independently editable.
  */
+import { useTranslation } from 'react-i18next';
+
 import { getSortableHeaderAriaSort, SortableHeader } from '@/components/ui/SortableHeader';
 
 type OppSortKey = 'code' | 'name' | 'customer' | 'stage' | 'value' | 'probability' | 'dueDate';
@@ -31,12 +33,17 @@ export function OpportunitiesTableHead({
   someSelected,
   toggleAll,
 }: Props) {
+  const { t } = useTranslation('crm');
   return (
     <thead className="sticky top-0 z-10 bg-[var(--surface-sunken)] text-xs uppercase tracking-wider text-[var(--fg-secondary)]">
       <tr>
         <th scope="col" className="w-10 px-5 py-3">
           <label className="table-checkbox-hit">
-            <span className="sr-only">{allSelected ? 'Deselect all' : 'Select all'}</span>
+            <span className="sr-only">
+              {allSelected
+                ? t('opportunitiesTableHead.deselectAll', 'Deselect all')
+                : t('opportunitiesTableHead.selectAll', 'Select all')}
+            </span>
             <input
               type="checkbox"
               checked={allSelected}
@@ -54,7 +61,7 @@ export function OpportunitiesTableHead({
           className="px-5 py-3 font-semibold"
         >
           <SortableHeader columnKey="code" state={sortState} onChange={setSortState}>
-            Code
+            {t('opportunitiesTableHead.columnCode', 'Code')}
           </SortableHeader>
         </th>
         <th
@@ -63,11 +70,11 @@ export function OpportunitiesTableHead({
           className="px-5 py-3 font-semibold"
         >
           <SortableHeader columnKey="name" state={sortState} onChange={setSortState}>
-            Opportunity
+            {t('opportunitiesTableHead.columnOpportunity', 'Opportunity')}
           </SortableHeader>
         </th>
         <th scope="col" className="px-5 py-3 font-semibold">
-          Territory
+          {t('opportunitiesTableHead.columnTerritory', 'Territory')}
         </th>
         <th
           scope="col"
@@ -75,7 +82,7 @@ export function OpportunitiesTableHead({
           className="px-5 py-3 font-semibold"
         >
           <SortableHeader columnKey="stage" state={sortState} onChange={setSortState}>
-            Stage
+            {t('opportunitiesTableHead.columnStage', 'Stage')}
           </SortableHeader>
         </th>
         <th
@@ -84,7 +91,7 @@ export function OpportunitiesTableHead({
           className="px-5 py-3 font-semibold"
         >
           <SortableHeader columnKey="value" state={sortState} onChange={setSortState} align="right">
-            Value
+            {t('opportunitiesTableHead.columnValue', 'Value')}
           </SortableHeader>
         </th>
         <th
@@ -98,7 +105,7 @@ export function OpportunitiesTableHead({
             onChange={setSortState}
             align="right"
           >
-            Probability
+            {t('opportunitiesTableHead.columnProbability', 'Probability')}
           </SortableHeader>
         </th>
         <th
@@ -107,7 +114,7 @@ export function OpportunitiesTableHead({
           className="px-5 py-3 font-semibold"
         >
           <SortableHeader columnKey="dueDate" state={sortState} onChange={setSortState}>
-            Due
+            {t('opportunitiesTableHead.columnDue', 'Due')}
           </SortableHeader>
         </th>
       </tr>

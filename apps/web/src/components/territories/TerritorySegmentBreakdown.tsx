@@ -2,16 +2,11 @@
 // non-geographic counterpart to the world map. Ranked horizontal value bars so
 // the biggest segments read at a glance. All four data states handled.
 
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
 import type { SegmentDimension, TerritorySegment } from '@/hooks/useTerritories';
-
-const DIMENSION_LABEL: Record<SegmentDimension, { noun: string; empty: string }> = {
-  industry: { noun: 'industry', empty: 'Opportunities need an industry to appear here.' },
-  account: { noun: 'account', empty: 'Opportunities need a linked account to appear here.' },
-  country: { noun: 'country', empty: 'Opportunities need a country to appear here.' },
-};
 
 export function TerritorySegmentBreakdown({
   dimension,
@@ -30,12 +25,28 @@ export function TerritorySegmentBreakdown({
   onRetry: () => void;
   formatMoneyMicros: (micros: number, currency: string) => string;
 }) {
+  const { t } = useTranslation('crm');
+
+  // Per-dimension prose: the noun used in titles/overflow, and the empty-state hint.
+  const dimensionNoun: Record<SegmentDimension, string> = {
+    industry: t('territorySegmentBreakdown.nounIndustry', 'industry'),
+    account: t('territorySegmentBreakdown.nounAccount', 'account'),
+    country: t('territorySegmentBreakdown.nounCountry', 'country'),
+  };
+  const dimensionEmpty: Record<SegmentDimension, string> = {
+    industry: t('territorySegmentBreakdown.emptyIndustry', 'Opportunities need an industry to appear here.'),
+    account: t('territorySegmentBreakdown.emptyAccount', 'Opportunities need a linked account to appear here.'),
+    country: t('territorySegmentBreakdown.emptyCountry', 'Opportunities need a country to appear here.'),
+  };
+
   if (isError) {
     return (
       <ErrorState
-        title={`Failed to load ${DIMENSION_LABEL[dimension].noun} breakdown`}
-        message={errorMessage ?? 'The server rejected the request.'}
-        action={<Button onClick={onRetry}>Retry</Button>}
+        title={t('territorySegmentBreakdown.errorTitle', 'Failed to load {{noun}} breakdown', {
+          noun: dimensionNoun[dimension],
+        })}
+        message={errorMessage ?? t('territorySegmentBreakdown.errorMessage', 'The server rejected the request.')}
+        action={<Button onClick={onRetry}>{t('territorySegmentBreakdown.retry', 'Retry')}</Button>}
       />
     );
   }
@@ -49,7 +60,10 @@ export function TerritorySegmentBreakdown({
   if (segments.length === 0) {
     return (
       <div className="h-[420px] flex items-center justify-center">
-        <EmptyState title="No data yet" message={DIMENSION_LABEL[dimension].empty} />
+        <EmptyState
+          title={t('territorySegmentBreakdown.emptyTitle', 'No data yet')}
+          message={dimensionEmpty[dimension]}
+        />
       </div>
     );
   }
@@ -89,10 +103,20 @@ export function TerritorySegmentBreakdown({
               </div>
               <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[var(--fg-secondary)]">
                 <span>
-                  {s.opportunityCount} opp{s.opportunityCount === 1 ? '' : 's'}
+                  {s.opportunityCount === 1
+                    ? t('territorySegmentBreakdown.oppCountOne', '{{count}} opp', {
+                        count: s.opportunityCount,
+                      })
+                    : t('territorySegmentBreakdown.oppCountOther', '{{count}} opps', {
+                        count: s.opportunityCount,
+                      })}
                 </span>
                 <span aria-hidden>·</span>
-                <span>{s.avgProbability}% avg probability</span>
+                <span>
+                  {t('territorySegmentBreakdown.avgProbability', '{{percent}}% avg probability', {
+                    percent: s.avgProbability,
+                  })}
+                </span>
                 {s.ownerNames.length > 0 ? (
                   <>
                     <span aria-hidden>·</span>
@@ -106,8 +130,21 @@ export function TerritorySegmentBreakdown({
       </ul>
       {hidden > 0 ? (
         <p className="mt-3 text-center text-xs text-[var(--fg-tertiary)]">
-          + {hidden} more {DIMENSION_LABEL[dimension].noun}
-          {hidden === 1 ? '' : dimension === 'industry' ? ' segments' : 's'} not shown
+          {hidden === 1
+            ? t('territorySegmentBreakdown.overflowOne', '+ {{count}} more {{noun}} not shown', {
+                count: hidden,
+                noun: dimensionNoun[dimension],
+              })
+            : dimension === 'industry'
+              ? t(
+                  'territorySegmentBreakdown.overflowIndustryOther',
+                  '+ {{count}} more {{noun}} segments not shown',
+                  { count: hidden, noun: dimensionNoun[dimension] },
+                )
+              : t('territorySegmentBreakdown.overflowOther', '+ {{count}} more {{noun}}s not shown', {
+                  count: hidden,
+                  noun: dimensionNoun[dimension],
+                })}
         </p>
       ) : null}
     </div>

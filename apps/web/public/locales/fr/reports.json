@@ -231,5 +231,19 @@
     "runPrompt": "Construisez votre requête, puis lancez un aperçu pour voir les résultats ici.",
     "chartShapeMismatch": "Ce type de graphique ne correspond pas à la forme de la requête actuelle. Le tableau ci-dessous affiche les lignes brutes.",
     "queryFailed": "Échec de la requête"
+  },
+  "aggregatePicker": {
+    "functionCount": "Nombre",
+    "functionCountDistinct": "Nombre distinct",
+    "functionSum": "Somme",
+    "functionAverage": "Moyenne",
+    "functionMin": "Min",
+    "functionMax": "Max",
+    "functionAriaLabel": "Fonction d'agrégation",
+    "fieldPlaceholder": "Choisir un champ…",
+    "aliasPlaceholder": "Alias (facultatif)",
+    "aliasAriaLabel": "Alias d'agrégation",
+    "removeAriaLabel": "Supprimer l'agrégation",
+    "addButton": "+ Ajouter une agrégation"
   }
 }

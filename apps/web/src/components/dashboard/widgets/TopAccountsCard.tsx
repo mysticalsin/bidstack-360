@@ -9,6 +9,7 @@
  */
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
@@ -21,6 +22,7 @@ import { springSoft } from '@/lib/motion';
 // ─── TopAccountsCard ─────────────────────────────────────────────────────────
 
 export function TopAccountsCard() {
+  const { t } = useTranslation('crm');
   const accounts = useTopAccounts({ limit: 5 });
   const items = (accounts.data?.items ?? []).slice(0, 5);
   const source = accounts.data?.source ?? 'auto';
@@ -32,15 +34,17 @@ export function TopAccountsCard() {
           <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--surface-sunken)]">
             <Icon name="trophy" size={13} className="text-[var(--tag-amber-fg)]" />
           </div>
-          <h2 className="text-sm font-semibold text-[var(--fg-primary)]">Top accounts</h2>
+          <h2 className="text-sm font-semibold text-[var(--fg-primary)]">{t('topAccounts.heading', 'Top accounts')}</h2>
           {!accounts.isLoading && !accounts.isError ? (
             <Badge tone={source === 'curated' ? 'amber' : 'gray'}>
-              {source === 'curated' ? 'Curated top 10' : 'Auto-ranked'}
+              {source === 'curated'
+                ? t('topAccounts.sourceCurated', 'Curated top 10')
+                : t('topAccounts.sourceAuto', 'Auto-ranked')}
             </Badge>
           ) : null}
         </div>
         <Link to="/top-accounts" className="text-xs text-[var(--brand-primary)] hover:underline">
-          View all
+          {t('topAccounts.viewAll', 'View all')}
         </Link>
       </div>
 
@@ -52,18 +56,21 @@ export function TopAccountsCard() {
         </div>
       ) : accounts.isError ? (
         <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface-sunken)] px-3 py-2.5">
-          <span className="text-xs text-[var(--fg-secondary)]">Couldn&apos;t load top accounts.</span>
+          <span className="text-xs text-[var(--fg-secondary)]">{t('topAccounts.errorMessage', "Couldn't load top accounts.")}</span>
           <button
             type="button"
             className="min-h-[44px] rounded-md px-3 text-xs font-semibold text-[var(--brand-primary)] hover:bg-[var(--surface-hover)]"
             onClick={() => void accounts.refetch()}
           >
-            Retry
+            {t('topAccounts.retry', 'Retry')}
           </button>
         </div>
       ) : items.length === 0 ? (
         <p className="rounded-lg bg-[var(--surface-sunken)] px-3 py-2.5 text-xs text-[var(--fg-secondary)]">
-          No ranked accounts yet — add opportunity values or curate the Top 10 in Settings.
+          {t(
+            'topAccounts.empty',
+            'No ranked accounts yet — add opportunity values or curate the Top 10 in Settings.',
+          )}
         </p>
       ) : (
         <div className="space-y-1">
@@ -95,7 +102,7 @@ export function TopAccountsCard() {
                       ? account.industry
                       : account.domain
                         ? account.domain
-                        : 'Portfolio account'}
+                        : t('topAccounts.portfolioAccount', 'Portfolio account')}
                   </div>
                 </div>
                 <Icon

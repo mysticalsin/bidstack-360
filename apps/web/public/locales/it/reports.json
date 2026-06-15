@@ -231,5 +231,19 @@
     "runPrompt": "Crea la tua query, poi esegui un'anteprima per vedere i risultati qui.",
     "chartShapeMismatch": "Questo tipo di grafico non si adatta alla forma della query corrente. La tabella sottostante mostra le righe non elaborate.",
     "queryFailed": "Query non riuscita"
+  },
+  "aggregatePicker": {
+    "functionCount": "Conteggio",
+    "functionCountDistinct": "Conteggio distinto",
+    "functionSum": "Somma",
+    "functionAverage": "Media",
+    "functionMin": "Min",
+    "functionMax": "Max",
+    "functionAriaLabel": "Funzione di aggregazione",
+    "fieldPlaceholder": "Scegli un campo…",
+    "aliasPlaceholder": "Alias (facoltativo)",
+    "aliasAriaLabel": "Alias di aggregazione",
+    "removeAriaLabel": "Rimuovi aggregazione",
+    "addButton": "+ Aggiungi aggregazione"
   }
 }

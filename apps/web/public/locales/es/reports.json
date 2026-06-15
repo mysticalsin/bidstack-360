@@ -211,5 +211,19 @@
     "runPrompt": "Crea tu consulta y luego ejecuta una vista previa para ver los resultados aquí.",
     "chartShapeMismatch": "Este tipo de gráfico no se ajusta a la forma de la consulta actual. La tabla siguiente muestra las filas sin procesar.",
     "queryFailed": "La consulta falló"
+  },
+  "aggregatePicker": {
+    "functionCount": "Recuento",
+    "functionCountDistinct": "Recuento distinto",
+    "functionSum": "Suma",
+    "functionAverage": "Promedio",
+    "functionMin": "Mín",
+    "functionMax": "Máx",
+    "functionAriaLabel": "Función de agregación",
+    "fieldPlaceholder": "Elegir campo…",
+    "aliasPlaceholder": "Alias (opcional)",
+    "aliasAriaLabel": "Alias de agregación",
+    "removeAriaLabel": "Eliminar agregación",
+    "addButton": "+ Añadir agregación"
   }
 }

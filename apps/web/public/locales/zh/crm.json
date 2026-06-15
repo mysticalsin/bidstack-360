@@ -2091,7 +2091,7 @@
     "cancel": "取消"
   },
   "topAccounts": {
-    "heading": "账户排名",
+    "heading": "重点客户",
     "badgeCurated": "精选 — Amaris 全球前 10",
     "badgeAuto": "按管道价值自动排名",
     "subtitleCurated": "全球前 10，由管理员在设置中精选并排序。",
@@ -2105,13 +2105,18 @@
     "retry": "重试",
     "resultCount": "{{count}} 个账户",
     "errorTitle": "无法加载热门账户",
-    "errorMessage": "热门账户接口未响应。",
+    "errorMessage": "无法加载重点客户。",
     "emptyTitle": "暂无账户数据",
     "emptyMessage": "添加带数值的商机以查看按管道排名的热门账户。",
     "totalPipeline": "总管道",
     "won": "已赢",
     "openDeals": "{{count}} 个进行中的交易",
-    "contacts": "{{count}} 个联系人"
+    "contacts": "{{count}} 个联系人",
+    "sourceCurated": "精选前10名",
+    "sourceAuto": "自动排名",
+    "viewAll": "查看全部",
+    "empty": "暂无排名客户——请在“设置”中添加商机价值或整理前10名。",
+    "portfolioAccount": "组合客户"
   },
   "forecasts": {
     "title": "收入预测",
@@ -3368,5 +3373,94 @@
     "tableAccounts": "客户数",
     "tableFteVolume": "全职当量",
     "unknownCountry": "未知"
+  },
+  "opportunitiesTableHead": {
+    "selectAll": "全选",
+    "deselectAll": "取消全选",
+    "columnCode": "代码",
+    "columnOpportunity": "商机",
+    "columnTerritory": "地区",
+    "columnStage": "阶段",
+    "columnValue": "金额",
+    "columnProbability": "概率",
+    "columnDue": "到期"
+  },
+  "territorySegmentBreakdown": {
+    "nounIndustry": "行业",
+    "nounAccount": "客户",
+    "nounCountry": "国家/地区",
+    "emptyIndustry": "商机需要指定行业才能显示在此处。",
+    "emptyAccount": "商机需要关联客户才能显示在此处。",
+    "emptyCountry": "商机需要指定国家/地区才能显示在此处。",
+    "errorTitle": "无法加载{{noun}}细分",
+    "errorMessage": "服务器拒绝了该请求。",
+    "retry": "重试",
+    "emptyTitle": "暂无数据",
+    "oppCountOne": "{{count}} 个商机",
+    "oppCountOther": "{{count}} 个商机",
+    "avgProbability": "平均概率 {{percent}}%",
+    "overflowOne": "另有 {{count}} 个{{noun}}未显示",
+    "overflowIndustryOther": "另有 {{count}} 个{{noun}}细分未显示",
+    "overflowOther": "另有 {{count}} 个{{noun}}未显示"
+  },
+  "convertLead": {
+    "title": "转化线索",
+    "description": "这将根据此线索创建一个新商机和联系人。",
+    "opportunityNameLabel": "商机名称",
+    "opportunityNamePlaceholderWithCompany": "{{companyName}} — 商机",
+    "opportunityNamePlaceholder": "商机名称",
+    "valueLabel": "金额（欧元）",
+    "stageLabel": "阶段",
+    "stageDiscovery": "发现",
+    "stageQualified": "已确认",
+    "stageProposal": "提案",
+    "stageNegotiation": "谈判",
+    "stageClosedWon": "赢单",
+    "stageClosedLost": "输单",
+    "converting": "转化中…",
+    "submit": "转化线索",
+    "cancel": "取消"
+  },
+  "bidStack360Logo": {
+    "title": "BidStack 360",
+    "tagline": "招标管理平台"
+  },
+  "leadRow": {
+    "statusNew": "新建",
+    "statusContacted": "已联系",
+    "statusQualified": "已确认",
+    "statusNurture": "培育中",
+    "statusDisqualified": "已淘汰",
+    "statusConverted": "已转化",
+    "priorityLow": "低",
+    "priorityMedium": "中",
+    "priorityHigh": "高",
+    "priorityCritical": "紧急",
+    "deselectLead": "取消选择 {{name}}",
+    "selectLead": "选择 {{name}}",
+    "editStatusLabel": "编辑 {{name}} 的状态",
+    "editPriorityLabel": "编辑 {{name}} 的优先级",
+    "deleteLead": "删除 {{name}}",
+    "delete": "删除"
+  },
+  "companyRow": {
+    "selectCompany": "选择 {{name}}",
+    "deselectCompany": "取消选择 {{name}}",
+    "view": "查看",
+    "delete": "删除",
+    "deleteConfirmTitle": "删除 {{name}}？",
+    "deleteConfirmDescription": "此操作无法撤销。",
+    "deleteConfirmLabel": "删除"
+  },
+  "infoSearchLeads": {
+    "regionLabel": "InfoSearch 潜在客户情报",
+    "title": "InfoSearch 潜在客户",
+    "captionPreview": "示例潜在客户情报 — 连接 InfoSearch (INFOSEARCH_ENABLED) 以获取实时通话名单",
+    "captionLive": "此客户的通话名单和潜在客户情报 — 从 InfoSearch 实时拉取",
+    "errorTitle": "无法访问 InfoSearch",
+    "errorMessage": "无法加载潜在客户情报。",
+    "empty": "没有与此客户匹配的 InfoSearch 潜在客户。",
+    "emailAction": "邮件",
+    "callAction": "拨打"
   }
 }

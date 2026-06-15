@@ -2091,7 +2091,7 @@
     "cancel": "Cancel"
   },
   "topAccounts": {
-    "heading": "Account Ranking",
+    "heading": "Top accounts",
     "badgeCurated": "Curated — Amaris global top 10",
     "badgeAuto": "Auto-ranked by pipeline value",
     "subtitleCurated": "The global top 10, hand-picked and ordered by admins in Settings.",
@@ -2105,13 +2105,18 @@
     "retry": "Retry",
     "resultCount": "{{count}} account",
     "errorTitle": "Couldn't load top accounts",
-    "errorMessage": "The top accounts endpoint did not respond.",
+    "errorMessage": "Couldn't load top accounts.",
     "emptyTitle": "No account data yet",
     "emptyMessage": "Add opportunities with values to see top accounts ranked by pipeline.",
     "totalPipeline": "total pipeline",
     "won": "won",
     "openDeals": "{{count}} open deals",
-    "contacts": "{{count}} contacts"
+    "contacts": "{{count}} contacts",
+    "sourceCurated": "Curated top 10",
+    "sourceAuto": "Auto-ranked",
+    "viewAll": "View all",
+    "empty": "No ranked accounts yet — add opportunity values or curate the Top 10 in Settings.",
+    "portfolioAccount": "Portfolio account"
   },
   "forecasts": {
     "title": "Revenue Forecasts",
@@ -3368,5 +3373,94 @@
     "tableAccounts": "Accounts",
     "tableFteVolume": "FTE volume",
     "unknownCountry": "Unknown"
+  },
+  "opportunitiesTableHead": {
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "columnCode": "Code",
+    "columnOpportunity": "Opportunity",
+    "columnTerritory": "Territory",
+    "columnStage": "Stage",
+    "columnValue": "Value",
+    "columnProbability": "Probability",
+    "columnDue": "Due"
+  },
+  "territorySegmentBreakdown": {
+    "nounIndustry": "industry",
+    "nounAccount": "account",
+    "nounCountry": "country",
+    "emptyIndustry": "Opportunities need an industry to appear here.",
+    "emptyAccount": "Opportunities need a linked account to appear here.",
+    "emptyCountry": "Opportunities need a country to appear here.",
+    "errorTitle": "Failed to load {{noun}} breakdown",
+    "errorMessage": "The server rejected the request.",
+    "retry": "Retry",
+    "emptyTitle": "No data yet",
+    "oppCountOne": "{{count}} opp",
+    "oppCountOther": "{{count}} opps",
+    "avgProbability": "{{percent}}% avg probability",
+    "overflowOne": "+ {{count}} more {{noun}} not shown",
+    "overflowIndustryOther": "+ {{count}} more {{noun}} segments not shown",
+    "overflowOther": "+ {{count}} more {{noun}}s not shown"
+  },
+  "convertLead": {
+    "title": "Convert lead",
+    "description": "This will create a new opportunity and contact from this lead.",
+    "opportunityNameLabel": "Opportunity name",
+    "opportunityNamePlaceholderWithCompany": "{{companyName}} — Opportunity",
+    "opportunityNamePlaceholder": "Opportunity name",
+    "valueLabel": "Value (EUR)",
+    "stageLabel": "Stage",
+    "stageDiscovery": "Discovery",
+    "stageQualified": "Qualified",
+    "stageProposal": "Proposal",
+    "stageNegotiation": "Negotiation",
+    "stageClosedWon": "Closed won",
+    "stageClosedLost": "Closed lost",
+    "converting": "Converting…",
+    "submit": "Convert lead",
+    "cancel": "Cancel"
+  },
+  "bidStack360Logo": {
+    "title": "BidStack 360",
+    "tagline": "BID PILOTING PLATFORM"
+  },
+  "leadRow": {
+    "statusNew": "New",
+    "statusContacted": "Contacted",
+    "statusQualified": "Qualified",
+    "statusNurture": "Nurture",
+    "statusDisqualified": "Disqualified",
+    "statusConverted": "Converted",
+    "priorityLow": "Low",
+    "priorityMedium": "Medium",
+    "priorityHigh": "High",
+    "priorityCritical": "Critical",
+    "deselectLead": "Deselect {{name}}",
+    "selectLead": "Select {{name}}",
+    "editStatusLabel": "Edit status for {{name}}",
+    "editPriorityLabel": "Edit priority for {{name}}",
+    "deleteLead": "Delete {{name}}",
+    "delete": "Delete"
+  },
+  "companyRow": {
+    "selectCompany": "Select {{name}}",
+    "deselectCompany": "Deselect {{name}}",
+    "view": "View",
+    "delete": "Delete",
+    "deleteConfirmTitle": "Delete {{name}}?",
+    "deleteConfirmDescription": "This action cannot be undone.",
+    "deleteConfirmLabel": "Delete"
+  },
+  "infoSearchLeads": {
+    "regionLabel": "InfoSearch lead intel",
+    "title": "InfoSearch leads",
+    "captionPreview": "Sample lead intel — connect InfoSearch (INFOSEARCH_ENABLED) for live call lists",
+    "captionLive": "Call lists and lead intel for this account — pulled live from InfoSearch",
+    "errorTitle": "InfoSearch is unreachable",
+    "errorMessage": "Lead intel could not be loaded.",
+    "empty": "No InfoSearch leads matched this account.",
+    "emailAction": "Email",
+    "callAction": "Call"
   }
 }

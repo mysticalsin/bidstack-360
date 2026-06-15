@@ -4,6 +4,7 @@
  * returns clearly-labelled sample data so the section is never empty.
  */
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
@@ -26,6 +27,7 @@ interface InfoSearchLeadsResponse {
 }
 
 export function InfoSearchLeadsCard({ account }: { account: string }) {
+  const { t } = useTranslation('crm');
   // Always fetch: when InfoSearch is configured we show live leads; when not,
   // the API returns clearly-labelled sample data (preview) so the team sees
   // the populated section rather than nothing.
@@ -43,13 +45,19 @@ export function InfoSearchLeadsCard({ account }: { account: string }) {
   const preview = leads.data?.preview ?? false;
 
   return (
-    <Card role="region" aria-label="InfoSearch lead intel">
+    <Card role="region" aria-label={t('infoSearchLeads.regionLabel', 'InfoSearch lead intel')}>
       <SectionHeader
-        title="InfoSearch leads"
+        title={t('infoSearchLeads.title', 'InfoSearch leads')}
         caption={
           preview
-            ? 'Sample lead intel — connect InfoSearch (INFOSEARCH_ENABLED) for live call lists'
-            : 'Call lists and lead intel for this account — pulled live from InfoSearch'
+            ? t(
+                'infoSearchLeads.captionPreview',
+                'Sample lead intel — connect InfoSearch (INFOSEARCH_ENABLED) for live call lists',
+              )
+            : t(
+                'infoSearchLeads.captionLive',
+                'Call lists and lead intel for this account — pulled live from InfoSearch',
+              )
         }
       />
       <div className="px-5 pb-5">
@@ -57,12 +65,15 @@ export function InfoSearchLeadsCard({ account }: { account: string }) {
           <LoadingSkeleton rows={3} />
         ) : leads.isError ? (
           <ErrorState
-            title="InfoSearch is unreachable"
-            message={leads.error?.message ?? 'Lead intel could not be loaded.'}
+            title={t('infoSearchLeads.errorTitle', 'InfoSearch is unreachable')}
+            message={
+              leads.error?.message ??
+              t('infoSearchLeads.errorMessage', 'Lead intel could not be loaded.')
+            }
           />
         ) : (leads.data?.items.length ?? 0) === 0 ? (
           <p className="text-sm text-[var(--fg-tertiary)]">
-            No InfoSearch leads matched this account.
+            {t('infoSearchLeads.empty', 'No InfoSearch leads matched this account.')}
           </p>
         ) : (
           <ul className="divide-y divide-[var(--border)]">
@@ -87,7 +98,7 @@ export function InfoSearchLeadsCard({ account }: { account: string }) {
                       className="flex min-h-[44px] items-center text-[var(--brand-primary)] hover:underline"
                       href={`mailto:${lead.email}`}
                     >
-                      Email
+                      {t('infoSearchLeads.emailAction', 'Email')}
                     </a>
                   ) : null}
                   {lead.phone ? (
@@ -95,7 +106,7 @@ export function InfoSearchLeadsCard({ account }: { account: string }) {
                       className="flex min-h-[44px] items-center text-[var(--brand-primary)] hover:underline"
                       href={`tel:${lead.phone}`}
                     >
-                      Call
+                      {t('infoSearchLeads.callAction', 'Call')}
                     </a>
                   ) : null}
                 </div>

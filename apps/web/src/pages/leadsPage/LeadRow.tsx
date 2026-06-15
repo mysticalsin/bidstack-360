@@ -1,28 +1,12 @@
 // Lead table row with inline-editable status and priority cells.
+import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { LeadPriorityBadge, LeadStatusBadge } from '@/components/lead/LeadStatusBadge';
 import { SpotlightTableRow } from '@/components/ui/SpotlightTable';
 import { InlineEditSelect } from '@/components/opportunity/InlineEdit';
 import type { LeadPatch, LeadSummary } from '@bidstack/shared';
-
-// Defined at module level to keep component identity stable and avoid creating
-// new arrays on each render.
-const LEAD_STATUS_OPTS = [
-  { value: 'new' as const, label: 'New' },
-  { value: 'contacted' as const, label: 'Contacted' },
-  { value: 'qualified' as const, label: 'Qualified' },
-  { value: 'nurture' as const, label: 'Nurture' },
-  { value: 'disqualified' as const, label: 'Disqualified' },
-  { value: 'converted' as const, label: 'Converted' },
-];
-
-const LEAD_PRIORITY_OPTS = [
-  { value: 'low' as const, label: 'Low' },
-  { value: 'medium' as const, label: 'Medium' },
-  { value: 'high' as const, label: 'High' },
-  { value: 'critical' as const, label: 'Critical' },
-];
 
 export function LeadRow({
   lead,
@@ -40,6 +24,31 @@ export function LeadRow({
   onPatch: (patch: LeadPatch) => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation('crm');
+
+  // Localized option labels, memoized to keep array identity stable across renders.
+  const leadStatusOpts = useMemo(
+    () => [
+      { value: 'new' as const, label: t('leadRow.statusNew', 'New') },
+      { value: 'contacted' as const, label: t('leadRow.statusContacted', 'Contacted') },
+      { value: 'qualified' as const, label: t('leadRow.statusQualified', 'Qualified') },
+      { value: 'nurture' as const, label: t('leadRow.statusNurture', 'Nurture') },
+      { value: 'disqualified' as const, label: t('leadRow.statusDisqualified', 'Disqualified') },
+      { value: 'converted' as const, label: t('leadRow.statusConverted', 'Converted') },
+    ],
+    [t],
+  );
+
+  const leadPriorityOpts = useMemo(
+    () => [
+      { value: 'low' as const, label: t('leadRow.priorityLow', 'Low') },
+      { value: 'medium' as const, label: t('leadRow.priorityMedium', 'Medium') },
+      { value: 'high' as const, label: t('leadRow.priorityHigh', 'High') },
+      { value: 'critical' as const, label: t('leadRow.priorityCritical', 'Critical') },
+    ],
+    [t],
+  );
+
   return (
     <SpotlightTableRow
       query={query}
@@ -51,8 +60,12 @@ export function LeadRow({
         <label className="table-checkbox-hit">
           <span className="sr-only">
             {selected
-              ? `Deselect ${lead.firstName} ${lead.lastName}`
-              : `Select ${lead.firstName} ${lead.lastName}`}
+              ? t('leadRow.deselectLead', 'Deselect {{name}}', {
+                  name: `${lead.firstName} ${lead.lastName}`,
+                })
+              : t('leadRow.selectLead', 'Select {{name}}', {
+                  name: `${lead.firstName} ${lead.lastName}`,
+                })}
           </span>
           <input
             type="checkbox"
@@ -77,9 +90,11 @@ export function LeadRow({
       <td className="px-4 py-3">
         <InlineEditSelect
           value={lead.status}
-          options={LEAD_STATUS_OPTS}
+          options={leadStatusOpts}
           onSave={(next) => onPatch({ status: next })}
-          label={`Edit status for ${lead.firstName} ${lead.lastName}`}
+          label={t('leadRow.editStatusLabel', 'Edit status for {{name}}', {
+            name: `${lead.firstName} ${lead.lastName}`,
+          })}
           display={(v) => <LeadStatusBadge status={v as LeadSummary['status']} />}
         />
       </td>
@@ -87,9 +102,11 @@ export function LeadRow({
       <td className="px-4 py-3">
         <InlineEditSelect
           value={lead.priority}
-          options={LEAD_PRIORITY_OPTS}
+          options={leadPriorityOpts}
           onSave={(next) => onPatch({ priority: next })}
-          label={`Edit priority for ${lead.firstName} ${lead.lastName}`}
+          label={t('leadRow.editPriorityLabel', 'Edit priority for {{name}}', {
+            name: `${lead.firstName} ${lead.lastName}`,
+          })}
           display={(v) => <LeadPriorityBadge priority={v as LeadSummary['priority']} />}
         />
       </td>
@@ -103,9 +120,11 @@ export function LeadRow({
           type="button"
           onClick={onDelete}
           className="rounded-md px-2 py-1 text-xs font-medium text-[var(--danger)] transition-colors hover:bg-[var(--danger-tint)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
-          aria-label={`Delete ${lead.firstName} ${lead.lastName}`}
+          aria-label={t('leadRow.deleteLead', 'Delete {{name}}', {
+            name: `${lead.firstName} ${lead.lastName}`,
+          })}
         >
-          Delete
+          {t('leadRow.delete', 'Delete')}
         </button>
       </td>
     </SpotlightTableRow>

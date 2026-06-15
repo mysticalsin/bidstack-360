@@ -121,5 +121,15 @@
     "selectTemplatePlaceholder": "Sélectionnez un modèle…",
     "templateVariablesHeading": "Variables du modèle",
     "nextButton": "Suivant : Destinataires"
+  },
+  "reviewStep": {
+    "previewTitle": "Aperçu du document",
+    "messageLabel": "Message aux destinataires (facultatif)",
+    "messagePlaceholder": "Veuillez consulter et signer le document ci-joint…",
+    "recipientsHeading": "Destinataires ({{count}})",
+    "recipientSummaryAria": "Résumé des destinataires",
+    "back": "Retour",
+    "sending": "Envoi…",
+    "send": "Envoyer pour signature"
   }
 }

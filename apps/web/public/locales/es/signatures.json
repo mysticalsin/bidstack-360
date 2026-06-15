@@ -121,5 +121,15 @@
     "selectTemplatePlaceholder": "Selecciona una plantilla…",
     "templateVariablesHeading": "Variables de la plantilla",
     "nextButton": "Siguiente: Destinatarios"
+  },
+  "reviewStep": {
+    "previewTitle": "Vista previa del documento",
+    "messageLabel": "Mensaje para los destinatarios (opcional)",
+    "messagePlaceholder": "Revise y firme el documento adjunto…",
+    "recipientsHeading": "Destinatarios ({{count}})",
+    "recipientSummaryAria": "Resumen de destinatarios",
+    "back": "Atrás",
+    "sending": "Enviando…",
+    "send": "Enviar para firma"
   }
 }

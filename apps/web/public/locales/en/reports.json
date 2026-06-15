@@ -231,5 +231,19 @@
     "runPrompt": "Build your query, then run a preview to see results here.",
     "chartShapeMismatch": "This chart type doesn't fit the current query shape. The table below shows the raw rows.",
     "queryFailed": "Query failed"
+  },
+  "aggregatePicker": {
+    "functionCount": "Count",
+    "functionCountDistinct": "Count distinct",
+    "functionSum": "Sum",
+    "functionAverage": "Average",
+    "functionMin": "Min",
+    "functionMax": "Max",
+    "functionAriaLabel": "Aggregate function",
+    "fieldPlaceholder": "Pick field…",
+    "aliasPlaceholder": "Alias (optional)",
+    "aliasAriaLabel": "Aggregate alias",
+    "removeAriaLabel": "Remove aggregate",
+    "addButton": "+ Add aggregate"
   }
 }

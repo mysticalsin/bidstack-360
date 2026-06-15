@@ -2,6 +2,7 @@
 // state changes — avoids repainting the whole table on unrelated row toggles.
 import { memo } from 'react';
 
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { CompanyLogo } from '@/components/company/CompanyLogo';
@@ -26,6 +27,7 @@ export const CompanyRow = memo(function CompanyRow({
   onDelete,
   query,
 }: CompanyRowProps) {
+  const { t } = useTranslation('crm');
   return (
     <SpotlightTableRow
       query={query}
@@ -35,7 +37,9 @@ export const CompanyRow = memo(function CompanyRow({
       <td>
         <label className="table-checkbox-hit">
           <span className="sr-only">
-            {selected ? `Deselect ${company.name}` : `Select ${company.name}`}
+            {selected
+              ? t('companyRow.deselectCompany', 'Deselect {{name}}', { name: company.name })
+              : t('companyRow.selectCompany', 'Select {{name}}', { name: company.name })}
           </span>
           <input
             type="checkbox"
@@ -87,7 +91,7 @@ export const CompanyRow = memo(function CompanyRow({
             to={`/companies/${company.id}`}
             className="btn btn-ghost btn-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
           >
-            View
+            {t('companyRow.view', 'View')}
           </Link>
           <Button
             variant="ghost"
@@ -95,15 +99,20 @@ export const CompanyRow = memo(function CompanyRow({
             className="text-[var(--danger)] hover:text-[var(--danger)]"
             onClick={async () => {
               const ok = await confirmDialog({
-                title: `Delete ${company.name}?`,
-                description: 'This action cannot be undone.',
-                confirmLabel: 'Delete',
+                title: t('companyRow.deleteConfirmTitle', 'Delete {{name}}?', {
+                  name: company.name,
+                }),
+                description: t(
+                  'companyRow.deleteConfirmDescription',
+                  'This action cannot be undone.',
+                ),
+                confirmLabel: t('companyRow.deleteConfirmLabel', 'Delete'),
                 destructive: true,
               });
               if (ok) onDelete(company.id);
             }}
           >
-            Delete
+            {t('companyRow.delete', 'Delete')}
           </Button>
         </div>
       </td>

@@ -2124,7 +2124,7 @@
     "cancel": "Cancelar"
   },
   "topAccounts": {
-    "heading": "Clasificación de cuentas",
+    "heading": "Cuentas principales",
     "badgeCurated": "Seleccionado — top 10 global de Amaris",
     "badgeAuto": "Clasificación automática por valor de pipeline",
     "subtitleCurated": "El top 10 global, seleccionado y ordenado por los administradores en Ajustes.",
@@ -2138,13 +2138,18 @@
     "retry": "Reintentar",
     "resultCount": "{{count}} cuenta",
     "errorTitle": "No se pudieron cargar las cuentas principales",
-    "errorMessage": "El endpoint de cuentas principales no respondió.",
+    "errorMessage": "No se pudieron cargar las cuentas principales.",
     "emptyTitle": "Aún no hay datos de cuentas",
     "emptyMessage": "Añade oportunidades con valores para ver las cuentas principales clasificadas por pipeline.",
     "totalPipeline": "pipeline total",
     "won": "ganado",
     "openDeals": "{{count}} negocios abiertos",
-    "contacts": "{{count}} contactos"
+    "contacts": "{{count}} contactos",
+    "sourceCurated": "Top 10 seleccionado",
+    "sourceAuto": "Clasificación automática",
+    "viewAll": "Ver todo",
+    "empty": "Aún no hay cuentas clasificadas: añade valores de oportunidad o gestiona el Top 10 en Ajustes.",
+    "portfolioAccount": "Cuenta de cartera"
   },
   "forecasts": {
     "title": "Previsiones de ingresos",
@@ -3401,5 +3406,94 @@
     "tableAccounts": "Cuentas",
     "tableFteVolume": "Volumen de FTE",
     "unknownCountry": "Desconocido"
+  },
+  "opportunitiesTableHead": {
+    "selectAll": "Seleccionar todo",
+    "deselectAll": "Deseleccionar todo",
+    "columnCode": "Código",
+    "columnOpportunity": "Oportunidad",
+    "columnTerritory": "Territorio",
+    "columnStage": "Etapa",
+    "columnValue": "Valor",
+    "columnProbability": "Probabilidad",
+    "columnDue": "Vencimiento"
+  },
+  "territorySegmentBreakdown": {
+    "nounIndustry": "industria",
+    "nounAccount": "cuenta",
+    "nounCountry": "país",
+    "emptyIndustry": "Las oportunidades necesitan una industria para aparecer aquí.",
+    "emptyAccount": "Las oportunidades necesitan una cuenta vinculada para aparecer aquí.",
+    "emptyCountry": "Las oportunidades necesitan un país para aparecer aquí.",
+    "errorTitle": "No se pudo cargar el desglose por {{noun}}",
+    "errorMessage": "El servidor rechazó la solicitud.",
+    "retry": "Reintentar",
+    "emptyTitle": "Aún no hay datos",
+    "oppCountOne": "{{count}} oportunidad",
+    "oppCountOther": "{{count}} oportunidades",
+    "avgProbability": "{{percent}}% de probabilidad media",
+    "overflowOne": "+ {{count}} {{noun}} más no mostrada",
+    "overflowIndustryOther": "+ {{count}} segmentos de {{noun}} más no mostrados",
+    "overflowOther": "+ {{count}} {{noun}}s más no mostradas"
+  },
+  "convertLead": {
+    "title": "Convertir cliente potencial",
+    "description": "Esto creará una nueva oportunidad y un contacto a partir de este cliente potencial.",
+    "opportunityNameLabel": "Nombre de la oportunidad",
+    "opportunityNamePlaceholderWithCompany": "{{companyName}} — Oportunidad",
+    "opportunityNamePlaceholder": "Nombre de la oportunidad",
+    "valueLabel": "Valor (EUR)",
+    "stageLabel": "Etapa",
+    "stageDiscovery": "Descubrimiento",
+    "stageQualified": "Cualificado",
+    "stageProposal": "Propuesta",
+    "stageNegotiation": "Negociación",
+    "stageClosedWon": "Cerrado ganado",
+    "stageClosedLost": "Cerrado perdido",
+    "converting": "Convirtiendo…",
+    "submit": "Convertir cliente potencial",
+    "cancel": "Cancelar"
+  },
+  "bidStack360Logo": {
+    "title": "BidStack 360",
+    "tagline": "PLATAFORMA DE PILOTAJE DE LICITACIONES"
+  },
+  "leadRow": {
+    "statusNew": "Nuevo",
+    "statusContacted": "Contactado",
+    "statusQualified": "Cualificado",
+    "statusNurture": "En seguimiento",
+    "statusDisqualified": "Descalificado",
+    "statusConverted": "Convertido",
+    "priorityLow": "Baja",
+    "priorityMedium": "Media",
+    "priorityHigh": "Alta",
+    "priorityCritical": "Crítica",
+    "deselectLead": "Anular selección de {{name}}",
+    "selectLead": "Seleccionar {{name}}",
+    "editStatusLabel": "Editar el estado de {{name}}",
+    "editPriorityLabel": "Editar la prioridad de {{name}}",
+    "deleteLead": "Eliminar {{name}}",
+    "delete": "Eliminar"
+  },
+  "companyRow": {
+    "selectCompany": "Seleccionar {{name}}",
+    "deselectCompany": "Deseleccionar {{name}}",
+    "view": "Ver",
+    "delete": "Eliminar",
+    "deleteConfirmTitle": "¿Eliminar {{name}}?",
+    "deleteConfirmDescription": "Esta acción no se puede deshacer.",
+    "deleteConfirmLabel": "Eliminar"
+  },
+  "infoSearchLeads": {
+    "regionLabel": "Inteligencia de leads de InfoSearch",
+    "title": "Leads de InfoSearch",
+    "captionPreview": "Inteligencia de leads de muestra — conecta InfoSearch (INFOSEARCH_ENABLED) para listas de llamadas en vivo",
+    "captionLive": "Listas de llamadas e inteligencia de leads para esta cuenta — obtenidas en vivo de InfoSearch",
+    "errorTitle": "InfoSearch no está disponible",
+    "errorMessage": "No se pudo cargar la inteligencia de leads.",
+    "empty": "Ningún lead de InfoSearch coincidió con esta cuenta.",
+    "emailAction": "Correo",
+    "callAction": "Llamar"
   }
 }

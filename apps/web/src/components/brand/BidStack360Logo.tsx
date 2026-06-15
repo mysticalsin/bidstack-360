@@ -1,4 +1,5 @@
 import { useId, type ComponentPropsWithoutRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/cn';
 
@@ -32,24 +33,26 @@ const toneClasses: Record<LogoTone, { primary: string; secondary: string; text: 
 export function BidStack360Logo({
   variant = 'full',
   tone = 'default',
-  title = 'BidStack 360',
+  title,
   className,
   ...rest
 }: BidStack360LogoProps) {
+  const { t } = useTranslation('crm');
   const tones = toneClasses[tone];
   const id = useId().replace(/[^a-zA-Z0-9]/g, '');
-  const titleId = title ? `bidstack-360-logo-${id}` : undefined;
+  const resolvedTitle = title ?? t('bidStack360Logo.title', 'BidStack 360');
+  const titleId = resolvedTitle ? `bidstack-360-logo-${id}` : undefined;
 
   return (
     <svg
       viewBox={variant === 'mark' ? '0 0 48 48' : '0 0 188 48'}
-      role={title ? 'img' : undefined}
+      role={resolvedTitle ? 'img' : undefined}
       aria-labelledby={titleId}
-      aria-hidden={title ? undefined : true}
+      aria-hidden={resolvedTitle ? undefined : true}
       className={cn('h-10 w-auto shrink-0', className)}
       {...rest}
     >
-      {title ? <title id={titleId}>{title}</title> : null}
+      {resolvedTitle ? <title id={titleId}>{resolvedTitle}</title> : null}
       <g fill="none" fillRule="evenodd">
         <rect
           x="3"
@@ -104,7 +107,7 @@ export function BidStack360Logo({
             letterSpacing="0"
             className="fill-current opacity-60"
           >
-            BID PILOTING PLATFORM
+            {t('bidStack360Logo.tagline', 'BID PILOTING PLATFORM')}
           </text>
         </g>
       ) : null}

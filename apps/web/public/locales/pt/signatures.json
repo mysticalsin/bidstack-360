@@ -121,5 +121,15 @@
     "selectTemplatePlaceholder": "Selecione um modelo…",
     "templateVariablesHeading": "Variáveis do modelo",
     "nextButton": "Próximo: Destinatários"
+  },
+  "reviewStep": {
+    "previewTitle": "Pré-visualização do documento",
+    "messageLabel": "Mensagem para os destinatários (opcional)",
+    "messagePlaceholder": "Reveja e assine o documento em anexo…",
+    "recipientsHeading": "Destinatários ({{count}})",
+    "recipientSummaryAria": "Resumo dos destinatários",
+    "back": "Voltar",
+    "sending": "A enviar…",
+    "send": "Enviar para assinatura"
   }
 }
