@@ -13,6 +13,10 @@
  */
 import { describe, expect, it, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
+// Initialise i18n (test-mode synchronous init) so the chip's interpolated
+// aria-label ('Pipeline status: {{status}}') resolves with {{status}} filled
+// in, rather than returning the raw default with an un-substituted placeholder.
+import '@/i18n';
 import { RfpStatusChip } from '../shared/RfpStatusChip';
 import type { PipelineStage } from '@/stores/rfpPipeline';
 
