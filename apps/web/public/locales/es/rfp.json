@@ -68,5 +68,22 @@
     "statusNotReviewed": "Aún no revisado",
     "saving": "Guardando…",
     "saveAndMarkReviewed": "Guardar y marcar como revisado"
+  },
+  "rfpStatusChip": {
+    "stageIdle": "Inactivo",
+    "stageQueued": "En cola",
+    "stageExtracting": "Extrayendo",
+    "stageStoryMatching": "Emparejando historias",
+    "stageSectionDrafting": "Redactando",
+    "stageComplianceFill": "Cumplimiento",
+    "stageLegalScan": "Equipo de revisión",
+    "stageQaReview": "Revisión de calidad",
+    "stageAwaitingApproval": "Pendiente de aprobación",
+    "stageApproved": "Aprobado",
+    "stageCompleted": "Completado",
+    "stageFailed": "Fallido",
+    "stageRejected": "Rechazado",
+    "stageTimeout": "Tiempo agotado",
+    "ariaPipelineStatus": "Estado del flujo: {{status}}"
   }
 }

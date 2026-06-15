@@ -68,5 +68,22 @@
     "statusNotReviewed": "尚未审核",
     "saving": "保存中…",
     "saveAndMarkReviewed": "保存并标记为已审核"
+  },
+  "rfpStatusChip": {
+    "stageIdle": "空闲",
+    "stageQueued": "已排队",
+    "stageExtracting": "正在提取",
+    "stageStoryMatching": "匹配案例",
+    "stageSectionDrafting": "起草中",
+    "stageComplianceFill": "合规",
+    "stageLegalScan": "审查团队",
+    "stageQaReview": "质量审查",
+    "stageAwaitingApproval": "等待批准",
+    "stageApproved": "已批准",
+    "stageCompleted": "已完成",
+    "stageFailed": "失败",
+    "stageRejected": "已拒绝",
+    "stageTimeout": "已超时",
+    "ariaPipelineStatus": "流程状态：{{status}}"
   }
 }

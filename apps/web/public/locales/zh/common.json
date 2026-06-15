@@ -379,5 +379,8 @@
     "deleting": "正在删除…",
     "deleteSelected": "删除所选项",
     "clear": "清除"
+  },
+  "dialog": {
+    "closeAriaLabel": "关闭"
   }
 }

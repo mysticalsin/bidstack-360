@@ -139,5 +139,14 @@
     "toastConflictTitle": "已安装一个管道",
     "toastConflictDescription": "请先删除现有的示例数据，或从你的实时管道开始。",
     "toastErrorTitle": "无法安装模板"
+  },
+  "sampleDataBanner": {
+    "title": "示例数据已启用",
+    "description": "演示记录在此工作区中可见。在向高管或客户演示之前，请隐藏此提示或完全删除示例记录。",
+    "hide": "隐藏",
+    "remove": "删除示例数据",
+    "removing": "正在删除…",
+    "removedToast": "示例数据已删除",
+    "removeErrorToast": "无法删除示例数据"
   }
 }

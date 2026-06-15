@@ -1,11 +1,13 @@
 import { motion, useReducedMotion } from 'motion/react';
 import { ArrowUpRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useSignInAction } from '@/lib/auth';
 
 export function BottomLeftCard() {
   const navigate = useNavigate();
   const { signIn } = useSignInAction();
+  const { t } = useTranslation('auth');
   const isStub = !import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
   const shouldReduceMotion = useReducedMotion();
 
@@ -21,14 +23,14 @@ export function BottomLeftCard() {
           98/100
         </span>
         <span className="text-[10px] md:text-[12px] font-normal text-[rgba(30,50,90,0.6)] uppercase tracking-wider">
-          Quality Score
+          {t('bottomLeft.qualityScoreLabel', 'Quality Score')}
         </span>
       </div>
 
       {isStub && (
         <motion.button
           type="button"
-          aria-label="Go to dashboard (dev bypass)"
+          aria-label={t('bottomLeft.devBypassAriaLabel', 'Go to dashboard (dev bypass)')}
           className="flex items-center bg-white rounded-full pl-1.5 pr-5 py-1.5 gap-2 hover:bg-white/90 transition-colors self-start group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(30,50,90,0.3)] rounded-full"
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
@@ -41,7 +43,7 @@ export function BottomLeftCard() {
             <ArrowUpRight className="w-3.5 h-3.5 text-[rgba(30,50,90,0.9)]" />
           </div>
           <span className="text-[14px] font-normal text-[rgba(30,50,90,0.9)]" aria-hidden="true">
-            Dashboard
+            {t('bottomLeft.dashboardButton', 'Dashboard')}
           </span>
         </motion.button>
       )}

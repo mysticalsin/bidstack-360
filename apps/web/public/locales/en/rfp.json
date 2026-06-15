@@ -195,5 +195,22 @@
     "statusNotReviewed": "Not yet reviewed",
     "saving": "Saving…",
     "saveAndMarkReviewed": "Save & Mark Reviewed"
+  },
+  "rfpStatusChip": {
+    "stageIdle": "Idle",
+    "stageQueued": "Queued",
+    "stageExtracting": "Extracting",
+    "stageStoryMatching": "Matching Stories",
+    "stageSectionDrafting": "Drafting",
+    "stageComplianceFill": "Compliance",
+    "stageLegalScan": "Review Crew",
+    "stageQaReview": "QA Review",
+    "stageAwaitingApproval": "Awaiting Approval",
+    "stageApproved": "Approved",
+    "stageCompleted": "Completed",
+    "stageFailed": "Failed",
+    "stageRejected": "Rejected",
+    "stageTimeout": "Timed Out",
+    "ariaPipelineStatus": "Pipeline status: {{status}}"
   }
 }

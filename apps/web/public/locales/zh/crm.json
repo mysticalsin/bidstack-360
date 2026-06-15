@@ -3811,5 +3811,31 @@
   },
   "accountHierarchyTree": {
     "heading": "客户层级"
+  },
+  "keyboardShortcutsHelp": {
+    "title": "键盘快捷键",
+    "description": "按下组合键即可快速导航。",
+    "commandPalette": "命令面板",
+    "helpPanel": "此帮助面板",
+    "goToDashboard": "前往仪表盘",
+    "goToOpportunities": "前往商机",
+    "goToPipeline": "前往管道",
+    "goToContacts": "前往联系人",
+    "goToTasks": "前往任务",
+    "goToReports": "前往报告",
+    "goToSettings": "前往设置",
+    "closeDialog": "关闭任何对话框/面板"
+  },
+  "leadStatusBadge": {
+    "statusNew": "新建",
+    "statusContacted": "已联系",
+    "statusQualified": "已确认",
+    "statusNurture": "培育中",
+    "statusDisqualified": "已淘汰",
+    "statusConverted": "已转化",
+    "priorityLow": "低",
+    "priorityMedium": "中",
+    "priorityHigh": "高",
+    "priorityCritical": "紧急"
   }
 }

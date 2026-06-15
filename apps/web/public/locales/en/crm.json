@@ -3811,5 +3811,31 @@
   },
   "accountHierarchyTree": {
     "heading": "Account Hierarchy"
+  },
+  "keyboardShortcutsHelp": {
+    "title": "Keyboard shortcuts",
+    "description": "Press the key combination to navigate quickly.",
+    "commandPalette": "Command palette",
+    "helpPanel": "This help panel",
+    "goToDashboard": "Go to Dashboard",
+    "goToOpportunities": "Go to Opportunities",
+    "goToPipeline": "Go to Pipeline",
+    "goToContacts": "Go to Contacts",
+    "goToTasks": "Go to Tasks",
+    "goToReports": "Go to Reports",
+    "goToSettings": "Go to Settings",
+    "closeDialog": "Close any dialog/palette"
+  },
+  "leadStatusBadge": {
+    "statusNew": "New",
+    "statusContacted": "Contacted",
+    "statusQualified": "Qualified",
+    "statusNurture": "Nurture",
+    "statusDisqualified": "Disqualified",
+    "statusConverted": "Converted",
+    "priorityLow": "Low",
+    "priorityMedium": "Medium",
+    "priorityHigh": "High",
+    "priorityCritical": "Critical"
   }
 }

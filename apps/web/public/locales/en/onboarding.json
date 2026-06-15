@@ -139,5 +139,14 @@
     "toastConflictTitle": "A pipeline is already installed",
     "toastConflictDescription": "Remove the existing sample data first, or start from your live pipeline.",
     "toastErrorTitle": "Could not install template"
+  },
+  "sampleDataBanner": {
+    "title": "Sample data is on",
+    "description": "Demo records are visible in this workspace. Hide this notice, or remove the sample records entirely before executive or client demos.",
+    "hide": "Hide",
+    "remove": "Remove sample data",
+    "removing": "Removing…",
+    "removedToast": "Sample data removed",
+    "removeErrorToast": "Could not remove sample data"
   }
 }

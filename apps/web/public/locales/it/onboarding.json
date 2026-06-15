@@ -139,5 +139,14 @@
     "toastConflictTitle": "Una pipeline è già installata",
     "toastConflictDescription": "Rimuovi prima i dati di esempio esistenti oppure parti dalla tua pipeline attiva.",
     "toastErrorTitle": "Impossibile installare il modello"
+  },
+  "sampleDataBanner": {
+    "title": "I dati di esempio sono attivi",
+    "description": "I record demo sono visibili in questa area di lavoro. Nascondi questo avviso o rimuovi completamente i record di esempio prima delle demo per dirigenti o clienti.",
+    "hide": "Nascondi",
+    "remove": "Rimuovi dati di esempio",
+    "removing": "Rimozione…",
+    "removedToast": "Dati di esempio rimossi",
+    "removeErrorToast": "Impossibile rimuovere i dati di esempio"
   }
 }

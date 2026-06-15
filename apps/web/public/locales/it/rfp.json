@@ -68,5 +68,22 @@
     "statusNotReviewed": "Non ancora revisionato",
     "saving": "Salvataggio…",
     "saveAndMarkReviewed": "Salva e segna come revisionato"
+  },
+  "rfpStatusChip": {
+    "stageIdle": "Inattivo",
+    "stageQueued": "In coda",
+    "stageExtracting": "Estrazione",
+    "stageStoryMatching": "Abbinamento storie",
+    "stageSectionDrafting": "Stesura",
+    "stageComplianceFill": "Conformità",
+    "stageLegalScan": "Team di revisione",
+    "stageQaReview": "Revisione QA",
+    "stageAwaitingApproval": "In attesa di approvazione",
+    "stageApproved": "Approvato",
+    "stageCompleted": "Completato",
+    "stageFailed": "Non riuscito",
+    "stageRejected": "Rifiutato",
+    "stageTimeout": "Tempo scaduto",
+    "ariaPipelineStatus": "Stato della pipeline: {{status}}"
   }
 }

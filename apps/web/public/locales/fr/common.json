@@ -379,5 +379,8 @@
     "deleting": "Suppression…",
     "deleteSelected": "Supprimer la sélection",
     "clear": "Effacer"
+  },
+  "dialog": {
+    "closeAriaLabel": "Fermer"
   }
 }

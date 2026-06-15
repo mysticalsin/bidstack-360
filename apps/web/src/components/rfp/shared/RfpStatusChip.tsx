@@ -1,3 +1,6 @@
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
+
 import type { PipelineStage } from '@/stores/rfpPipeline';
 
 interface RfpStatusChipProps {
@@ -24,30 +27,35 @@ const STAGE_STYLES: Record<PipelineStage, string> = {
   timeout: 'bg-[var(--tag-gray-bg)] text-[var(--tag-gray-fg)]',
 };
 
-const STAGE_LABELS: Record<PipelineStage, string> = {
-  idle: 'Idle',
-  queued: 'Queued',
-  extracting: 'Extracting',
-  story_matching: 'Matching Stories',
-  section_drafting: 'Drafting',
-  compliance_fill: 'Compliance',
-  legal_scan: 'Review Crew',
-  qa_review: 'QA Review',
-  awaiting_approval: 'Awaiting Approval',
-  approved: 'Approved',
-  completed: 'Completed',
-  failed: 'Failed',
-  rejected: 'Rejected',
-  timeout: 'Timed Out',
-};
+function stageLabels(t: TFunction): Record<PipelineStage, string> {
+  return {
+    idle: t('rfpStatusChip.stageIdle', 'Idle'),
+    queued: t('rfpStatusChip.stageQueued', 'Queued'),
+    extracting: t('rfpStatusChip.stageExtracting', 'Extracting'),
+    story_matching: t('rfpStatusChip.stageStoryMatching', 'Matching Stories'),
+    section_drafting: t('rfpStatusChip.stageSectionDrafting', 'Drafting'),
+    compliance_fill: t('rfpStatusChip.stageComplianceFill', 'Compliance'),
+    legal_scan: t('rfpStatusChip.stageLegalScan', 'Review Crew'),
+    qa_review: t('rfpStatusChip.stageQaReview', 'QA Review'),
+    awaiting_approval: t('rfpStatusChip.stageAwaitingApproval', 'Awaiting Approval'),
+    approved: t('rfpStatusChip.stageApproved', 'Approved'),
+    completed: t('rfpStatusChip.stageCompleted', 'Completed'),
+    failed: t('rfpStatusChip.stageFailed', 'Failed'),
+    rejected: t('rfpStatusChip.stageRejected', 'Rejected'),
+    timeout: t('rfpStatusChip.stageTimeout', 'Timed Out'),
+  };
+}
 
 export function RfpStatusChip({ stage }: RfpStatusChipProps) {
+  const { t } = useTranslation('rfp');
+  const label = stageLabels(t)[stage];
+
   return (
     <span
       className={`inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold ${STAGE_STYLES[stage]}`}
-      aria-label={`Pipeline status: ${STAGE_LABELS[stage]}`}
+      aria-label={t('rfpStatusChip.ariaPipelineStatus', 'Pipeline status: {{status}}', { status: label })}
     >
-      {STAGE_LABELS[stage]}
+      {label}
     </span>
   );
 }

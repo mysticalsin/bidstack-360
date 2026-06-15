@@ -1,5 +1,6 @@
 import * as RadixDialog from '@radix-ui/react-dialog';
 import { forwardRef, type ComponentProps, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/cn';
 
@@ -11,6 +12,7 @@ export const DialogContent = forwardRef<
   HTMLDivElement,
   ComponentProps<typeof RadixDialog.Content> & { title: string; description?: ReactNode }
 >(({ className, children, title, description, ...rest }, ref) => {
+  const { t } = useTranslation('common');
   const hasDesc = Boolean(description);
   return (
     <RadixDialog.Portal>
@@ -30,7 +32,7 @@ export const DialogContent = forwardRef<
             {title}
           </RadixDialog.Title>
           <RadixDialog.Close
-            aria-label="Close"
+            aria-label={t('dialog.closeAriaLabel', 'Close')}
             className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--fg-tertiary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-card)] pointer-coarse:h-11 pointer-coarse:w-11"
           >
             <span aria-hidden className="text-lg leading-none">

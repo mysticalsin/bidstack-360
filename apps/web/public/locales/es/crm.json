@@ -3844,5 +3844,31 @@
   },
   "accountHierarchyTree": {
     "heading": "Jerarquía de cuentas"
+  },
+  "keyboardShortcutsHelp": {
+    "title": "Atajos de teclado",
+    "description": "Pulsa la combinación de teclas para navegar rápidamente.",
+    "commandPalette": "Paleta de comandos",
+    "helpPanel": "Este panel de ayuda",
+    "goToDashboard": "Ir al panel",
+    "goToOpportunities": "Ir a Oportunidades",
+    "goToPipeline": "Ir al pipeline",
+    "goToContacts": "Ir a Contactos",
+    "goToTasks": "Ir a Tareas",
+    "goToReports": "Ir a Informes",
+    "goToSettings": "Ir a Ajustes",
+    "closeDialog": "Cerrar cualquier diálogo o paleta"
+  },
+  "leadStatusBadge": {
+    "statusNew": "Nuevo",
+    "statusContacted": "Contactado",
+    "statusQualified": "Cualificado",
+    "statusNurture": "En desarrollo",
+    "statusDisqualified": "Descalificado",
+    "statusConverted": "Convertido",
+    "priorityLow": "Baja",
+    "priorityMedium": "Media",
+    "priorityHigh": "Alta",
+    "priorityCritical": "Crítica"
   }
 }

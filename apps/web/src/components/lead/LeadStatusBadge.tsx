@@ -1,3 +1,6 @@
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
+
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import type { LeadPriority, LeadStatus } from '@bidstack/shared';
 
@@ -10,14 +13,35 @@ const STATUS_TONE: Record<LeadStatus, BadgeTone> = {
   converted: 'rose',
 };
 
-const STATUS_LABEL: Record<LeadStatus, string> = {
-  new: 'New',
-  contacted: 'Contacted',
-  qualified: 'Qualified',
-  nurture: 'Nurture',
-  disqualified: 'Disqualified',
-  converted: 'Converted',
-};
+function statusLabel(status: LeadStatus, t: TFunction): string {
+  switch (status) {
+    case 'new':
+      return t('leadStatusBadge.statusNew', 'New');
+    case 'contacted':
+      return t('leadStatusBadge.statusContacted', 'Contacted');
+    case 'qualified':
+      return t('leadStatusBadge.statusQualified', 'Qualified');
+    case 'nurture':
+      return t('leadStatusBadge.statusNurture', 'Nurture');
+    case 'disqualified':
+      return t('leadStatusBadge.statusDisqualified', 'Disqualified');
+    case 'converted':
+      return t('leadStatusBadge.statusConverted', 'Converted');
+  }
+}
+
+function priorityLabel(priority: LeadPriority, t: TFunction): string {
+  switch (priority) {
+    case 'low':
+      return t('leadStatusBadge.priorityLow', 'Low');
+    case 'medium':
+      return t('leadStatusBadge.priorityMedium', 'Medium');
+    case 'high':
+      return t('leadStatusBadge.priorityHigh', 'High');
+    case 'critical':
+      return t('leadStatusBadge.priorityCritical', 'Critical');
+  }
+}
 
 const PRIORITY_TONE: Record<LeadPriority, BadgeTone> = {
   low: 'gray',
@@ -31,7 +55,8 @@ interface LeadStatusBadgeProps {
 }
 
 export function LeadStatusBadge({ status }: LeadStatusBadgeProps) {
-  return <Badge tone={STATUS_TONE[status]}>{STATUS_LABEL[status]}</Badge>;
+  const { t } = useTranslation('crm');
+  return <Badge tone={STATUS_TONE[status]}>{statusLabel(status, t)}</Badge>;
 }
 
 interface LeadPriorityBadgeProps {
@@ -39,9 +64,6 @@ interface LeadPriorityBadgeProps {
 }
 
 export function LeadPriorityBadge({ priority }: LeadPriorityBadgeProps) {
-  return (
-    <Badge tone={PRIORITY_TONE[priority]}>
-      {priority.charAt(0).toUpperCase() + priority.slice(1)}
-    </Badge>
-  );
+  const { t } = useTranslation('crm');
+  return <Badge tone={PRIORITY_TONE[priority]}>{priorityLabel(priority, t)}</Badge>;
 }

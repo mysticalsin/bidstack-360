@@ -131,5 +131,14 @@
     "toastConflictTitle": "Ya hay un pipeline instalado",
     "toastConflictDescription": "Elimina primero los datos de ejemplo existentes o empieza desde tu pipeline en vivo.",
     "toastErrorTitle": "No se pudo instalar la plantilla"
+  },
+  "sampleDataBanner": {
+    "title": "Los datos de muestra están activados",
+    "description": "Los registros de demostración son visibles en este espacio de trabajo. Oculta este aviso o elimina por completo los registros de muestra antes de las demostraciones para ejecutivos o clientes.",
+    "hide": "Ocultar",
+    "remove": "Eliminar datos de muestra",
+    "removing": "Eliminando…",
+    "removedToast": "Datos de muestra eliminados",
+    "removeErrorToast": "No se pudieron eliminar los datos de muestra"
   }
 }
