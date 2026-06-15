@@ -53,5 +53,101 @@
     "cancel": "Cancelar pedido",
     "viewCertificate": "Ver certificado",
     "confirmCancel": "Cancelar este pedido de assinatura? Os signatários serão notificados."
+  },
+  "signaturePad": {
+    "modeTablistLabel": "Método de assinatura",
+    "modeDraw": "Desenhar",
+    "modeType": "Digitar",
+    "drawPlaceholder": "Assine aqui",
+    "canvasLabel": "Área de desenho da assinatura. Use o mouse ou o toque para desenhar sua assinatura.",
+    "typedNameLabel": "Digite seu nome completo",
+    "typedNamePlaceholder": "Seu nome",
+    "clearButtonLabel": "Limpar assinatura",
+    "clearButton": "Limpar",
+    "undoButtonLabel": "Desfazer último traço",
+    "undoButton": "Desfazer"
+  },
+  "sendForSignature": {
+    "stepsNavLabel": "Etapas de envio",
+    "step": {
+      "template": "Modelo",
+      "recipients": "Destinatários",
+      "reviewSend": "Revisar e enviar"
+    },
+    "dialogTitle": "Enviar para assinatura",
+    "successTitle": "Solicitação de assinatura enviada!",
+    "successMessage": "Os destinatários receberão um e-mail para assinar o documento.",
+    "doneButton": "Concluído"
+  },
+  "recipientStatusTimeline": {
+    "eventLabel": {
+      "sent": "Enviado",
+      "delivered": "Entregue",
+      "viewed": "Aberto",
+      "signed": "Assinado",
+      "declined": "Recusado",
+      "voided": "Anulado"
+    },
+    "recipientEventsAriaLabel": "Eventos de {{name}}",
+    "noEventsYet": "Ainda não há eventos"
+  },
+  "recipientsStep": {
+    "listAriaLabel": "Destinatários",
+    "nameLabel": "Nome",
+    "namePlaceholder": "Jane Smith",
+    "emailLabel": "E-mail",
+    "emailPlaceholder": "jane@example.com",
+    "roleLabel": "Função",
+    "roleSigner": "Signatário",
+    "roleCc": "Cc",
+    "removeRecipientAriaLabel": "Remover destinatário {{recipient}}",
+    "addRecipient": "+ Adicionar destinatário",
+    "back": "Voltar",
+    "nextReview": "Próximo: Revisar"
+  },
+  "signatureGuide": {
+    "title": "Verificação de assinatura",
+    "introBefore": "Cada entrega inclui um",
+    "introAfter": "cabeçalho. Verifique-o antes de confiar no payload. Formato:",
+    "languageTablistLabel": "Linguagem de verificação de assinatura",
+    "copyCodeLabel": "Copiar código",
+    "replayBefore": "Rejeite os eventos onde",
+    "replayAfter": "segundos para evitar ataques de repetição. Use sempre uma comparação de tempo constante."
+  },
+  "templateStep": {
+    "kindFilterLabel": "Tipo de modelo",
+    "allTypesOption": "Todos os tipos",
+    "documentTemplateLabel": "Modelo de documento",
+    "selectTemplatePlaceholder": "Selecione um modelo…",
+    "templateVariablesHeading": "Variáveis do modelo",
+    "nextButton": "Próximo: Destinatários"
+  },
+  "reviewStep": {
+    "previewTitle": "Pré-visualização do documento",
+    "messageLabel": "Mensagem para os destinatários (opcional)",
+    "messagePlaceholder": "Reveja e assine o documento em anexo…",
+    "recipientsHeading": "Destinatários ({{count}})",
+    "recipientSummaryAria": "Resumo dos destinatários",
+    "back": "Voltar",
+    "sending": "A enviar…",
+    "send": "Enviar para assinatura"
+  },
+  "documentPreviewIframe": {
+    "regionAriaLabel": "Pré-visualização do documento",
+    "emptyMessage": "Nenhuma pré-visualização do documento disponível",
+    "errorMessage": "Não foi possível carregar a pré-visualização do documento.",
+    "openInNewTab": "Abrir documento em uma nova guia",
+    "regionAriaLabelTitled": "Pré-visualização do documento: {{title}}",
+    "loading": "Carregando documento…",
+    "iframeAriaLabel": "Pré-visualização de {{title}}"
+  },
+  "signatureStatusBadge": {
+    "statusDraft": "Rascunho",
+    "statusSent": "Enviado",
+    "statusViewed": "Visualizado",
+    "statusSigned": "Assinado",
+    "statusDeclined": "Recusado",
+    "statusVoided": "Anulado",
+    "statusExpired": "Expirado"
   }
 }
