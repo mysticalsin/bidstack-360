@@ -131,5 +131,14 @@
     "back": "Back",
     "sending": "Sending…",
     "send": "Send for Signature"
+  },
+  "documentPreviewIframe": {
+    "regionAriaLabel": "Document preview",
+    "emptyMessage": "No document preview available",
+    "errorMessage": "Unable to load document preview.",
+    "openInNewTab": "Open document in new tab",
+    "regionAriaLabelTitled": "Document preview: {{title}}",
+    "loading": "Loading document…",
+    "iframeAriaLabel": "Preview of {{title}}"
   }
 }

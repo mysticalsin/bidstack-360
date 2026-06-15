@@ -7,6 +7,7 @@
 
 import { useIsFetching, useIsMutating } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { reportWebVitals, type Metric } from '@/lib/web-vitals';
 
@@ -28,6 +29,7 @@ function flagOn(): boolean {
 }
 
 export function WebVitalsHud() {
+  const { t } = useTranslation('crm');
   const [enabled, setEnabled] = useState(() => flagOn());
   const [metrics, setMetrics] = useState<Record<string, Metric>>({});
   const fetching = useIsFetching();
@@ -47,11 +49,11 @@ export function WebVitalsHud() {
   return (
     <div
       role="region"
-      aria-label="Dev metrics HUD"
+      aria-label={t('webVitalsHud.regionLabel', 'Dev metrics HUD')}
       className="pointer-events-auto fixed bottom-3 left-3 z-50 w-56 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] p-2 text-[10px] font-mono shadow-[var(--shadow-md)]"
     >
       <div className="mb-1 flex items-center justify-between text-[var(--fg-tertiary)]">
-        <span>DEV HUD</span>
+        <span>{t('webVitalsHud.title', 'DEV HUD')}</span>
         <button
           type="button"
           onClick={() => {
@@ -62,7 +64,7 @@ export function WebVitalsHud() {
             }
             setEnabled(false);
           }}
-          aria-label="Hide dev HUD"
+          aria-label={t('webVitalsHud.hideButtonLabel', 'Hide dev HUD')}
           className="hover:text-[var(--fg-primary)]"
         >
           ×
@@ -93,7 +95,7 @@ export function WebVitalsHud() {
         );
       })}
       <div className="mt-1 flex items-center justify-between border-t border-[var(--border-subtle)] pt-1 text-[var(--fg-secondary)]">
-        <span>fetch / mut</span>
+        <span>{t('webVitalsHud.fetchMutLabel', 'fetch / mut')}</span>
         <span className="text-[var(--fg-primary)]">
           {fetching} / {mutating}
         </span>

@@ -131,5 +131,14 @@
     "back": "Retour",
     "sending": "Envoi…",
     "send": "Envoyer pour signature"
+  },
+  "documentPreviewIframe": {
+    "regionAriaLabel": "Aperçu du document",
+    "emptyMessage": "Aucun aperçu du document disponible",
+    "errorMessage": "Impossible de charger l'aperçu du document.",
+    "openInNewTab": "Ouvrir le document dans un nouvel onglet",
+    "regionAriaLabelTitled": "Aperçu du document : {{title}}",
+    "loading": "Chargement du document…",
+    "iframeAriaLabel": "Aperçu de {{title}}"
   }
 }

@@ -3495,5 +3495,69 @@
     "empty": "Ningún lead de InfoSearch coincidió con esta cuenta.",
     "emailAction": "Correo",
     "callAction": "Llamar"
+  },
+  "displayCharts": {
+    "heatmapAriaLabel": "Mapa de calor",
+    "noRows": "No hay filas para mostrar.",
+    "tableAriaLabel": "Tabla de datos"
+  },
+  "newCompany": {
+    "nameRequiredError": "El nombre de la empresa es obligatorio.",
+    "title": "Nueva empresa",
+    "description": "Cree primero el perfil de la cuenta. Podrá enriquecer los datos firmográficos y los contactos una vez que exista el registro.",
+    "nameLabel": "Nombre de la empresa",
+    "namePlaceholder": "Acme Inc.",
+    "domainLabel": "Dominio",
+    "domainPlaceholder": "acme.com",
+    "countryCodeLabel": "Código de país",
+    "countryCodePlaceholder": "CA",
+    "industryLabel": "Sector",
+    "industryPlaceholder": "Software",
+    "cancelButton": "Cancelar",
+    "creatingButton": "Creando…",
+    "createButton": "Crear empresa"
+  },
+  "salesFunnel": {
+    "title": "Embudo de ventas",
+    "viewPipeline": "Ver pipeline",
+    "stageLeads": "Prospectos",
+    "stageOpportunities": "Oportunidades",
+    "stageOpenDeals": "Negocios abiertos",
+    "stagePipeline": "Pipeline"
+  },
+  "customObjectEditor": {
+    "loadError": {
+      "title": "No se pudieron cargar las definiciones de objetos",
+      "message": "El servidor no respondió."
+    },
+    "retry": "Reintentar",
+    "notFound": "Objeto no encontrado.",
+    "backToList": "Volver a la lista",
+    "breadcrumbLabel": "Ruta de navegación",
+    "customObjects": "Objetos personalizados",
+    "viewRecords": "Ver {{labelPlural}} →"
+  },
+  "errorBoundary": {
+    "title": "Algo salió mal",
+    "description": "Lo sentimos, pero ha ocurrido un error inesperado.",
+    "reloadButton": "Recargar página",
+    "clearDataButton": "Borrar datos de la app y recargar"
+  },
+  "newForecast": {
+    "title": "Nueva previsión",
+    "description": "Ingrese los importes para cada categoría.",
+    "periodLabel": "Período",
+    "periodPlaceholder": "p. ej. 2026-05, 2026-T2 o 2026",
+    "ownerLabel": "Propietario",
+    "ownerPlaceholder": "Seleccionar propietario…",
+    "cancel": "Cancelar",
+    "saving": "Guardando…",
+    "save": "Guardar previsión"
+  },
+  "webVitalsHud": {
+    "regionLabel": "HUD de métricas de desarrollo",
+    "title": "HUD DE DESARROLLO",
+    "hideButtonLabel": "Ocultar HUD de desarrollo",
+    "fetchMutLabel": "consultas / mutaciones"
   }
 }

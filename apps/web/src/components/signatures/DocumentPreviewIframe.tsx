@@ -8,6 +8,7 @@
  */
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 
 interface DocumentPreviewIframeProps {
@@ -30,6 +31,7 @@ export function DocumentPreviewIframe({
 }: DocumentPreviewIframeProps) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
+  const { t } = useTranslation('signatures');
 
   const heightValue = typeof height === 'number' ? `${height}px` : height;
 
@@ -42,9 +44,9 @@ export function DocumentPreviewIframe({
         )}
         style={{ height: heightValue }}
         role="region"
-        aria-label="Document preview"
+        aria-label={t('documentPreviewIframe.regionAriaLabel', 'Document preview')}
       >
-        No document preview available
+        {t('documentPreviewIframe.emptyMessage', 'No document preview available')}
       </div>
     );
   }
@@ -59,7 +61,9 @@ export function DocumentPreviewIframe({
         style={{ height: heightValue }}
         role="alert"
       >
-        <span className="text-[var(--fg-secondary)]">Unable to load document preview.</span>
+        <span className="text-[var(--fg-secondary)]">
+          {t('documentPreviewIframe.errorMessage', 'Unable to load document preview.')}
+        </span>
         {!srcdoc && (
           <a
             href={src}
@@ -67,7 +71,7 @@ export function DocumentPreviewIframe({
             rel="noopener noreferrer"
             className="text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
           >
-            Open document in new tab
+            {t('documentPreviewIframe.openInNewTab', 'Open document in new tab')}
           </a>
         )}
       </div>
@@ -79,12 +83,12 @@ export function DocumentPreviewIframe({
       className={cn('relative overflow-hidden rounded-xl border border-[var(--border-subtle)]', className)}
       style={{ height: heightValue }}
       role="region"
-      aria-label={`Document preview: ${title}`}
+      aria-label={t('documentPreviewIframe.regionAriaLabelTitled', 'Document preview: {{title}}', { title })}
     >
       {!loaded && (
         <div className="absolute inset-0 flex items-center justify-center bg-[var(--surface-sunken)]">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--border-default)] border-t-brand" />
-          <span className="sr-only">Loading document…</span>
+          <span className="sr-only">{t('documentPreviewIframe.loading', 'Loading document…')}</span>
         </div>
       )}
       <iframe
@@ -96,7 +100,7 @@ export function DocumentPreviewIframe({
         onLoad={() => setLoaded(true)}
         onError={() => setError(true)}
         className={cn('h-full w-full border-0', !loaded && 'invisible')}
-        aria-label={`Preview of ${title}`}
+        aria-label={t('documentPreviewIframe.iframeAriaLabel', 'Preview of {{title}}', { title })}
       />
     </div>
   );

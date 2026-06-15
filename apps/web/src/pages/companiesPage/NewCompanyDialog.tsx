@@ -7,6 +7,7 @@
 // zero extra lines vs the fieldClass approach but with all accessibility
 // states included.
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { Input } from '@/components/ui/Input';
@@ -26,6 +27,7 @@ interface NewCompanyDialogProps {
 }
 
 export function NewCompanyDialog({ onClose, onCreate, isPending }: NewCompanyDialogProps) {
+  const { t } = useTranslation('crm');
   const [name, setName] = useState('');
   const [domain, setDomain] = useState('');
   const [industry, setIndustry] = useState('');
@@ -35,7 +37,7 @@ export function NewCompanyDialog({ onClose, onCreate, isPending }: NewCompanyDia
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      setNameError('Company name is required.');
+      setNameError(t('newCompany.nameRequiredError', 'Company name is required.'));
       return;
     }
     setNameError(undefined);
@@ -55,13 +57,16 @@ export function NewCompanyDialog({ onClose, onCreate, isPending }: NewCompanyDia
       }}
     >
       <DialogContent
-        title="New company"
-        description="Create the account profile first. You can enrich firmographics and contacts after the record exists."
+        title={t('newCompany.title', 'New company')}
+        description={t(
+          'newCompany.description',
+          'Create the account profile first. You can enrich firmographics and contacts after the record exists.',
+        )}
       >
         <form onSubmit={submit} className="space-y-4">
           <Input
-            label="Company name"
-            placeholder="Acme Inc."
+            label={t('newCompany.nameLabel', 'Company name')}
+            placeholder={t('newCompany.namePlaceholder', 'Acme Inc.')}
             value={name}
             onChange={(e) => setName(e.target.value)}
             error={nameError}
@@ -71,15 +76,15 @@ export function NewCompanyDialog({ onClose, onCreate, isPending }: NewCompanyDia
           />
           <div className="grid grid-cols-2 gap-4">
             <Input
-              label="Domain"
-              placeholder="acme.com"
+              label={t('newCompany.domainLabel', 'Domain')}
+              placeholder={t('newCompany.domainPlaceholder', 'acme.com')}
               value={domain}
               onChange={(e) => setDomain(e.target.value)}
               disabled={isPending}
             />
             <Input
-              label="Country code"
-              placeholder="CA"
+              label={t('newCompany.countryCodeLabel', 'Country code')}
+              placeholder={t('newCompany.countryCodePlaceholder', 'CA')}
               value={countryCode}
               onChange={(e) => setCountryCode(e.target.value.slice(0, 2).toUpperCase())}
               maxLength={2}
@@ -87,18 +92,20 @@ export function NewCompanyDialog({ onClose, onCreate, isPending }: NewCompanyDia
             />
           </div>
           <Input
-            label="Industry"
-            placeholder="Software"
+            label={t('newCompany.industryLabel', 'Industry')}
+            placeholder={t('newCompany.industryPlaceholder', 'Software')}
             value={industry}
             onChange={(e) => setIndustry(e.target.value)}
             disabled={isPending}
           />
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="secondary" type="button" onClick={onClose} disabled={isPending}>
-              Cancel
+              {t('newCompany.cancelButton', 'Cancel')}
             </Button>
             <Button type="submit" disabled={isPending}>
-              {isPending ? 'Creating…' : 'Create company'}
+              {isPending
+                ? t('newCompany.creatingButton', 'Creating…')
+                : t('newCompany.createButton', 'Create company')}
             </Button>
           </div>
         </form>

@@ -344,5 +344,19 @@
     "editSelectedRecord": "Modifier l'enregistrement sélectionné",
     "deleteWithConfirmation": "Supprimer avec confirmation",
     "footer": "La plupart des raccourcis fonctionnent partout, sauf dans les champs de texte. Appuyez sur ? à tout moment pour rouvrir ce panneau."
+  },
+  "breadcrumbs": {
+    "dashboard": "Tableau de bord",
+    "accounts": "Comptes",
+    "opportunities": "Opportunités",
+    "pipeline": "Pipeline",
+    "contacts": "Contacts",
+    "tasks": "Tâches",
+    "reports": "Rapports",
+    "integrations": "Intégrations",
+    "settings": "Paramètres",
+    "auditLog": "Journal d'audit",
+    "login": "Se connecter",
+    "ariaLabel": "Fil d'Ariane"
   }
 }

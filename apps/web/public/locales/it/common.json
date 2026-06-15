@@ -344,5 +344,19 @@
     "editSelectedRecord": "Modifica il record selezionato",
     "deleteWithConfirmation": "Elimina con conferma",
     "footer": "La maggior parte delle scorciatoie funziona ovunque tranne che nei campi di testo. Premi ? in qualsiasi momento per riaprire questo pannello."
+  },
+  "breadcrumbs": {
+    "dashboard": "Dashboard",
+    "accounts": "Account",
+    "opportunities": "Opportunità",
+    "pipeline": "Pipeline",
+    "contacts": "Contatti",
+    "tasks": "Attività",
+    "reports": "Report",
+    "integrations": "Integrazioni",
+    "settings": "Impostazioni",
+    "auditLog": "Registro di controllo",
+    "login": "Accedi",
+    "ariaLabel": "Percorso di navigazione"
   }
 }

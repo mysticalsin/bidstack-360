@@ -9,6 +9,7 @@
  * WCAG 2.2 AA. Dark mode. prefers-reduced-motion respected via CSS.
  */
 import { useParams, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 import {
   useCustomObjectDefs,
@@ -24,6 +25,7 @@ import { FieldsSection } from './customObjectEditor/FieldsSection';
 import { RelationsSection } from './customObjectEditor/RelationsSection';
 
 export function CustomObjectEditorPage() {
+  const { t } = useTranslation('crm');
   const { id = '' } = useParams<{ id: string }>();
   const { data: defsData, isLoading, isError, error, refetch } = useCustomObjectDefs();
   const relationsQuery = useCustomObjectRelations(id);
@@ -47,11 +49,15 @@ export function CustomObjectEditorPage() {
     return (
       <div className="p-6 max-w-3xl mx-auto">
         <ErrorState
-          title="Couldn't load object definitions"
-          message={error instanceof Error ? error.message : 'The server did not respond.'}
+          title={t('customObjectEditor.loadError.title', "Couldn't load object definitions")}
+          message={
+            error instanceof Error
+              ? error.message
+              : t('customObjectEditor.loadError.message', 'The server did not respond.')
+          }
           action={
             <button type="button" className="btn btn-secondary" onClick={() => void refetch()}>
-              Retry
+              {t('customObjectEditor.retry', 'Retry')}
             </button>
           }
         />
@@ -62,9 +68,9 @@ export function CustomObjectEditorPage() {
   if (!def) {
     return (
       <div className="p-6 text-[var(--text-secondary)]">
-        Object not found.{' '}
+        {t('customObjectEditor.notFound', 'Object not found.')}{' '}
         <Link to="/settings/custom-objects" className="underline text-[var(--accent)]">
-          Back to list
+          {t('customObjectEditor.backToList', 'Back to list')}
         </Link>
       </div>
     );
@@ -73,11 +79,11 @@ export function CustomObjectEditorPage() {
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-8">
       {/* Breadcrumb */}
-      <nav aria-label="Breadcrumb">
+      <nav aria-label={t('customObjectEditor.breadcrumbLabel', 'Breadcrumb')}>
         <ol className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
           <li>
             <Link to="/settings/custom-objects" className="hover:text-[var(--accent)] underline">
-              Custom Objects
+              {t('customObjectEditor.customObjects', 'Custom Objects')}
             </Link>
           </li>
           <li aria-hidden="true">/</li>
@@ -97,7 +103,9 @@ export function CustomObjectEditorPage() {
           to={`/o/${def.key}`}
           className="inline-flex items-center gap-2 text-sm text-[var(--accent)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded"
         >
-          View {def.labelPlural} →
+          {t('customObjectEditor.viewRecords', 'View {{labelPlural}} →', {
+            labelPlural: def.labelPlural,
+          })}
         </Link>
       </div>
     </div>

@@ -3462,5 +3462,69 @@
     "empty": "No InfoSearch leads matched this account.",
     "emailAction": "Email",
     "callAction": "Call"
+  },
+  "displayCharts": {
+    "heatmapAriaLabel": "Heatmap",
+    "noRows": "No rows to display.",
+    "tableAriaLabel": "Data table"
+  },
+  "newCompany": {
+    "nameRequiredError": "Company name is required.",
+    "title": "New company",
+    "description": "Create the account profile first. You can enrich firmographics and contacts after the record exists.",
+    "nameLabel": "Company name",
+    "namePlaceholder": "Acme Inc.",
+    "domainLabel": "Domain",
+    "domainPlaceholder": "acme.com",
+    "countryCodeLabel": "Country code",
+    "countryCodePlaceholder": "CA",
+    "industryLabel": "Industry",
+    "industryPlaceholder": "Software",
+    "cancelButton": "Cancel",
+    "creatingButton": "Creating…",
+    "createButton": "Create company"
+  },
+  "salesFunnel": {
+    "title": "Sales funnel",
+    "viewPipeline": "View pipeline",
+    "stageLeads": "Leads",
+    "stageOpportunities": "Opportunities",
+    "stageOpenDeals": "Open Deals",
+    "stagePipeline": "Pipeline"
+  },
+  "customObjectEditor": {
+    "loadError": {
+      "title": "Couldn't load object definitions",
+      "message": "The server did not respond."
+    },
+    "retry": "Retry",
+    "notFound": "Object not found.",
+    "backToList": "Back to list",
+    "breadcrumbLabel": "Breadcrumb",
+    "customObjects": "Custom Objects",
+    "viewRecords": "View {{labelPlural}} →"
+  },
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "description": "We're sorry, but an unexpected error has occurred.",
+    "reloadButton": "Reload page",
+    "clearDataButton": "Clear app data & reload"
+  },
+  "newForecast": {
+    "title": "New Forecast",
+    "description": "Enter amounts for each category.",
+    "periodLabel": "Period",
+    "periodPlaceholder": "e.g. 2026-05, 2026-Q2, or 2026",
+    "ownerLabel": "Owner",
+    "ownerPlaceholder": "Select owner…",
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "save": "Save Forecast"
+  },
+  "webVitalsHud": {
+    "regionLabel": "Dev metrics HUD",
+    "title": "DEV HUD",
+    "hideButtonLabel": "Hide dev HUD",
+    "fetchMutLabel": "fetch / mut"
   }
 }

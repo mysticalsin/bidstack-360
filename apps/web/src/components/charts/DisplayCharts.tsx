@@ -2,6 +2,8 @@
  * DisplayCharts — HeatmapChart (CSS colour cells) and TableChart (HTML table).
  * Neither uses Recharts; both are pure layout-based data displays.
  */
+import { useTranslation } from 'react-i18next';
+
 import type { DataPoint } from './chartTypes';
 
 // ── HeatmapChart ──────────────────────────────────────────────────────────────
@@ -19,11 +21,12 @@ export function HeatmapChart({
   'aria-label': ariaLabel,
   maxValue,
 }: HeatmapProps) {
+  const { t } = useTranslation('crm');
   const max = maxValue ?? Math.max(...data.map((d) => d.value), 1);
   return (
     <div
       role="img"
-      aria-label={ariaLabel ?? 'Heatmap'}
+      aria-label={ariaLabel ?? t('displayCharts.heatmapAriaLabel', 'Heatmap')}
       className="flex flex-wrap gap-1"
       style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}
     >
@@ -63,17 +66,20 @@ interface TableChartProps {
 }
 
 export function TableChart({ data, columns, 'aria-label': ariaLabel }: TableChartProps) {
+  const { t } = useTranslation('crm');
   const cols = columns ?? (data[0] ? Object.keys(data[0]).map((k) => ({ key: k, label: k })) : []);
   if (data.length === 0) {
     return (
-      <p className="text-xs text-[var(--fg-tertiary)] py-4 text-center">No rows to display.</p>
+      <p className="text-xs text-[var(--fg-tertiary)] py-4 text-center">
+        {t('displayCharts.noRows', 'No rows to display.')}
+      </p>
     );
   }
   return (
     <div
       className="overflow-x-auto rounded-lg border border-[var(--border-subtle)]"
       role="region"
-      aria-label={ariaLabel ?? 'Data table'}
+      aria-label={ariaLabel ?? t('displayCharts.tableAriaLabel', 'Data table')}
     >
       <table className="w-full text-xs">
         <thead>

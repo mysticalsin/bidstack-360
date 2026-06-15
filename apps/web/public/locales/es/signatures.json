@@ -131,5 +131,14 @@
     "back": "Atrás",
     "sending": "Enviando…",
     "send": "Enviar para firma"
+  },
+  "documentPreviewIframe": {
+    "regionAriaLabel": "Vista previa del documento",
+    "emptyMessage": "No hay vista previa del documento disponible",
+    "errorMessage": "No se pudo cargar la vista previa del documento.",
+    "openInNewTab": "Abrir documento en una pestaña nueva",
+    "regionAriaLabelTitled": "Vista previa del documento: {{title}}",
+    "loading": "Cargando documento…",
+    "iframeAriaLabel": "Vista previa de {{title}}"
   }
 }

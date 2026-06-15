@@ -131,5 +131,14 @@
     "back": "Voltar",
     "sending": "A enviar…",
     "send": "Enviar para assinatura"
+  },
+  "documentPreviewIframe": {
+    "regionAriaLabel": "Pré-visualização do documento",
+    "emptyMessage": "Nenhuma pré-visualização do documento disponível",
+    "errorMessage": "Não foi possível carregar a pré-visualização do documento.",
+    "openInNewTab": "Abrir documento em uma nova guia",
+    "regionAriaLabelTitled": "Pré-visualização do documento: {{title}}",
+    "loading": "Carregando documento…",
+    "iframeAriaLabel": "Pré-visualização de {{title}}"
   }
 }

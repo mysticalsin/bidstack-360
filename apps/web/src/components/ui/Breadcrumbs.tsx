@@ -4,6 +4,7 @@
 // overridden via the `labelFor` map.
 
 import { Fragment, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useParams } from 'react-router-dom';
 
 import { cn } from '@/lib/cn';
@@ -13,19 +14,23 @@ interface Crumb {
   to?: string;
 }
 
-const PRIMARY: Record<string, string> = {
-  dashboard: 'Dashboard',
-  accounts: 'Accounts',
-  opportunities: 'Opportunities',
-  pipeline: 'Pipeline',
-  contacts: 'Contacts',
-  tasks: 'Tasks',
-  reports: 'Reports',
-  integrations: 'Integrations',
-  settings: 'Settings',
-  'audit-log': 'Audit log',
-  login: 'Sign in',
-};
+type TFunction = ReturnType<typeof useTranslation>['t'];
+
+function primaryLabels(t: TFunction): Record<string, string> {
+  return {
+    dashboard: t('breadcrumbs.dashboard', 'Dashboard'),
+    accounts: t('breadcrumbs.accounts', 'Accounts'),
+    opportunities: t('breadcrumbs.opportunities', 'Opportunities'),
+    pipeline: t('breadcrumbs.pipeline', 'Pipeline'),
+    contacts: t('breadcrumbs.contacts', 'Contacts'),
+    tasks: t('breadcrumbs.tasks', 'Tasks'),
+    reports: t('breadcrumbs.reports', 'Reports'),
+    integrations: t('breadcrumbs.integrations', 'Integrations'),
+    settings: t('breadcrumbs.settings', 'Settings'),
+    'audit-log': t('breadcrumbs.auditLog', 'Audit log'),
+    login: t('breadcrumbs.login', 'Sign in'),
+  };
+}
 
 function humanize(slug: string): string {
   // Slugs from URLs are typically already kebab-case account IDs. Replace
@@ -39,8 +44,10 @@ function humanize(slug: string): string {
 export function Breadcrumbs({ className }: { className?: string }) {
   const { pathname } = useLocation();
   const params = useParams<Record<string, string>>();
+  const { t } = useTranslation('common');
 
   const crumbs = useMemo<Crumb[]>(() => {
+    const primary = primaryLabels(t);
     const segments = pathname.split('/').filter(Boolean);
     if (segments.length === 0) return [];
 
@@ -52,7 +59,7 @@ export function Breadcrumbs({ className }: { className?: string }) {
       // First segment maps from PRIMARY; deeper segments are either UUIDs
       // (humanized) or known sub-routes.
       if (i === 0) {
-        out.push({ label: PRIMARY[seg] ?? humanize(seg), to: accumulated });
+        out.push({ label: primary[seg] ?? humanize(seg), to: accumulated });
         continue;
       }
       // Don't link the last crumb — it's the current page.
@@ -63,12 +70,12 @@ export function Breadcrumbs({ className }: { className?: string }) {
       });
     }
     return out;
-  }, [pathname, params.accountId]);
+  }, [pathname, params.accountId, t]);
 
   if (crumbs.length === 0) return null;
 
   return (
-    <nav aria-label="Breadcrumb" className={cn('flex items-center text-xs', className)}>
+    <nav aria-label={t('breadcrumbs.ariaLabel', 'Breadcrumb')} className={cn('flex items-center text-xs', className)}>
       <ol className="flex items-center gap-1.5">
         {crumbs.map((crumb, i) => {
           const isLast = i === crumbs.length - 1;

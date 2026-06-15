@@ -3462,5 +3462,69 @@
     "empty": "没有与此客户匹配的 InfoSearch 潜在客户。",
     "emailAction": "邮件",
     "callAction": "拨打"
+  },
+  "displayCharts": {
+    "heatmapAriaLabel": "热力图",
+    "noRows": "没有可显示的行。",
+    "tableAriaLabel": "数据表"
+  },
+  "newCompany": {
+    "nameRequiredError": "公司名称为必填项。",
+    "title": "新建公司",
+    "description": "请先创建客户资料。记录创建后即可补充企业属性信息和联系人。",
+    "nameLabel": "公司名称",
+    "namePlaceholder": "Acme Inc.",
+    "domainLabel": "域名",
+    "domainPlaceholder": "acme.com",
+    "countryCodeLabel": "国家代码",
+    "countryCodePlaceholder": "CA",
+    "industryLabel": "行业",
+    "industryPlaceholder": "软件",
+    "cancelButton": "取消",
+    "creatingButton": "创建中…",
+    "createButton": "创建公司"
+  },
+  "salesFunnel": {
+    "title": "销售漏斗",
+    "viewPipeline": "查看管道",
+    "stageLeads": "潜在客户",
+    "stageOpportunities": "商机",
+    "stageOpenDeals": "进行中的交易",
+    "stagePipeline": "管道"
+  },
+  "customObjectEditor": {
+    "loadError": {
+      "title": "无法加载对象定义",
+      "message": "服务器未响应。"
+    },
+    "retry": "重试",
+    "notFound": "未找到对象。",
+    "backToList": "返回列表",
+    "breadcrumbLabel": "面包屑导航",
+    "customObjects": "自定义对象",
+    "viewRecords": "查看 {{labelPlural}} →"
+  },
+  "errorBoundary": {
+    "title": "出错了",
+    "description": "抱歉，发生了意外错误。",
+    "reloadButton": "重新加载页面",
+    "clearDataButton": "清除应用数据并重新加载"
+  },
+  "newForecast": {
+    "title": "新建预测",
+    "description": "输入每个类别的金额。",
+    "periodLabel": "周期",
+    "periodPlaceholder": "例如 2026-05、2026-Q2 或 2026",
+    "ownerLabel": "负责人",
+    "ownerPlaceholder": "选择负责人…",
+    "cancel": "取消",
+    "saving": "保存中…",
+    "save": "保存预测"
+  },
+  "webVitalsHud": {
+    "regionLabel": "开发指标 HUD",
+    "title": "开发 HUD",
+    "hideButtonLabel": "隐藏开发 HUD",
+    "fetchMutLabel": "请求 / 变更"
   }
 }

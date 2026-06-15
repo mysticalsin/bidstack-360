@@ -131,5 +131,14 @@
     "back": "Indietro",
     "sending": "Invio in corso…",
     "send": "Invia per la firma"
+  },
+  "documentPreviewIframe": {
+    "regionAriaLabel": "Anteprima del documento",
+    "emptyMessage": "Nessuna anteprima del documento disponibile",
+    "errorMessage": "Impossibile caricare l'anteprima del documento.",
+    "openInNewTab": "Apri il documento in una nuova scheda",
+    "regionAriaLabelTitled": "Anteprima del documento: {{title}}",
+    "loading": "Caricamento del documento…",
+    "iframeAriaLabel": "Anteprima di {{title}}"
   }
 }

@@ -344,5 +344,19 @@
     "editSelectedRecord": "编辑所选记录",
     "deleteWithConfirmation": "删除并确认",
     "footer": "除文本字段内之外，大多数快捷键在任何地方都有效。随时按 ? 重新打开此面板。"
+  },
+  "breadcrumbs": {
+    "dashboard": "仪表盘",
+    "accounts": "客户",
+    "opportunities": "商机",
+    "pipeline": "管道",
+    "contacts": "联系人",
+    "tasks": "任务",
+    "reports": "报告",
+    "integrations": "集成",
+    "settings": "设置",
+    "auditLog": "审计日志",
+    "login": "登录",
+    "ariaLabel": "面包屑导航"
   }
 }

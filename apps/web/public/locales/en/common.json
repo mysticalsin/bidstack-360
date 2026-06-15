@@ -344,5 +344,19 @@
     "editSelectedRecord": "Edit selected record",
     "deleteWithConfirmation": "Delete with confirmation",
     "footer": "Most shortcuts work everywhere except inside text fields. Press ? any time to reopen this drawer."
+  },
+  "breadcrumbs": {
+    "dashboard": "Dashboard",
+    "accounts": "Accounts",
+    "opportunities": "Opportunities",
+    "pipeline": "Pipeline",
+    "contacts": "Contacts",
+    "tasks": "Tasks",
+    "reports": "Reports",
+    "integrations": "Integrations",
+    "settings": "Settings",
+    "auditLog": "Audit log",
+    "login": "Sign in",
+    "ariaLabel": "Breadcrumb"
   }
 }

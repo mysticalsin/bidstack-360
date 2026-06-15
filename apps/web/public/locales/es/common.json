@@ -344,5 +344,19 @@
     "editSelectedRecord": "Editar el registro seleccionado",
     "deleteWithConfirmation": "Eliminar con confirmación",
     "footer": "La mayoría de los atajos funcionan en todas partes excepto dentro de los campos de texto. Pulsa ? en cualquier momento para volver a abrir este panel."
+  },
+  "breadcrumbs": {
+    "dashboard": "Panel",
+    "accounts": "Cuentas",
+    "opportunities": "Oportunidades",
+    "pipeline": "Embudo",
+    "contacts": "Contactos",
+    "tasks": "Tareas",
+    "reports": "Informes",
+    "integrations": "Integraciones",
+    "settings": "Configuración",
+    "auditLog": "Registro de auditoría",
+    "login": "Iniciar sesión",
+    "ariaLabel": "Ruta de navegación"
   }
 }

@@ -344,5 +344,19 @@
     "editSelectedRecord": "Editar o registro selecionado",
     "deleteWithConfirmation": "Excluir com confirmação",
     "footer": "A maioria dos atalhos funciona em todos os lugares, exceto dentro de campos de texto. Pressione ? a qualquer momento para reabrir este painel."
+  },
+  "breadcrumbs": {
+    "dashboard": "Painel",
+    "accounts": "Contas",
+    "opportunities": "Oportunidades",
+    "pipeline": "Funil",
+    "contacts": "Contatos",
+    "tasks": "Tarefas",
+    "reports": "Relatórios",
+    "integrations": "Integrações",
+    "settings": "Configurações",
+    "auditLog": "Registro de auditoria",
+    "login": "Entrar",
+    "ariaLabel": "Trilha de navegação"
   }
 }

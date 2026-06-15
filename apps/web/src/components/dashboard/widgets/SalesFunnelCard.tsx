@@ -8,6 +8,7 @@
  */
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Icon } from '@/components/ui/Icon';
@@ -30,17 +31,28 @@ export function SalesFunnelCard({
   reduced: boolean | null;
 }) {
   const { formatMoney } = useFormatMoney();
+  const { t } = useTranslation('crm');
   const stages = [
-    { label: 'Leads', count: leads, color: 'var(--tag-purple-fg)', bg: 'var(--tag-purple-bg)' },
     {
-      label: 'Opportunities',
+      label: t('salesFunnel.stageLeads', 'Leads'),
+      count: leads,
+      color: 'var(--tag-purple-fg)',
+      bg: 'var(--tag-purple-bg)',
+    },
+    {
+      label: t('salesFunnel.stageOpportunities', 'Opportunities'),
       count: opportunities,
       color: 'var(--tag-amber-fg)',
       bg: 'var(--tag-amber-bg)',
     },
-    { label: 'Open Deals', count: openOpps, color: 'var(--tag-teal-fg)', bg: 'var(--tag-teal-bg)' },
     {
-      label: 'Pipeline',
+      label: t('salesFunnel.stageOpenDeals', 'Open Deals'),
+      count: openOpps,
+      color: 'var(--tag-teal-fg)',
+      bg: 'var(--tag-teal-bg)',
+    },
+    {
+      label: t('salesFunnel.stagePipeline', 'Pipeline'),
       count: pipelineValue,
       display: formatMoney(pipelineValue, 'EUR'),
       color: 'var(--tag-jade-fg)',
@@ -57,10 +69,12 @@ export function SalesFunnelCard({
           <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--surface-sunken)]">
             <Icon name="filter" size={13} className="text-[var(--brand-primary)]" />
           </div>
-          <h2 className="text-sm font-semibold text-[var(--fg-primary)]">Sales funnel</h2>
+          <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
+            {t('salesFunnel.title', 'Sales funnel')}
+          </h2>
         </div>
         <Link to="/pipeline" className="text-xs text-[var(--brand-primary)] hover:underline">
-          View pipeline
+          {t('salesFunnel.viewPipeline', 'View pipeline')}
         </Link>
       </div>
       <div className="funnel-viz">

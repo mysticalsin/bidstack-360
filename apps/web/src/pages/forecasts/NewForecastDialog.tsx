@@ -4,6 +4,7 @@
  * open/close via the Dialog wrapper; this component renders just the content.
  */
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { DialogContent } from '@/components/ui/Dialog';
@@ -30,6 +31,7 @@ export function NewForecastDialogContent({
   onSubmit,
   isPending,
 }: NewForecastDialogProps) {
+  const { t } = useTranslation('crm');
   const [period, setPeriod] = useState('');
   const [ownerId, setOwnerId] = useState('');
   const [amounts, setAmounts] = useState<Record<Forecast['category'], string>>({
@@ -45,21 +47,24 @@ export function NewForecastDialogContent({
     Object.values(amounts).some((v) => v.trim().length > 0 && Number(v) > 0);
 
   return (
-    <DialogContent title="New Forecast" description="Enter amounts for each category.">
+    <DialogContent
+      title={t('newForecast.title', 'New Forecast')}
+      description={t('newForecast.description', 'Enter amounts for each category.')}
+    >
       <div className="space-y-4">
         <Input
-          label="Period"
-          placeholder="e.g. 2026-05, 2026-Q2, or 2026"
+          label={t('newForecast.periodLabel', 'Period')}
+          placeholder={t('newForecast.periodPlaceholder', 'e.g. 2026-05, 2026-Q2, or 2026')}
           value={period}
           onChange={(e) => setPeriod(e.target.value)}
           required
         />
         <Select
-          label="Owner"
+          label={t('newForecast.ownerLabel', 'Owner')}
           value={ownerId}
           onChange={(e) => setOwnerId(e.target.value)}
           options={[
-            { value: '', label: 'Select owner…' },
+            { value: '', label: t('newForecast.ownerPlaceholder', 'Select owner…') },
             ...users.map((u) => ({ value: u.id, label: u.name ?? u.email })),
           ]}
         />
@@ -78,7 +83,7 @@ export function NewForecastDialogContent({
         </div>
         <div className="flex items-center justify-end gap-2 pt-2">
           <Button variant="secondary" onClick={onClose} disabled={isPending}>
-            Cancel
+            {t('newForecast.cancel', 'Cancel')}
           </Button>
           <Button
             disabled={!canSubmit}
@@ -95,7 +100,9 @@ export function NewForecastDialogContent({
               })
             }
           >
-            {isPending ? 'Saving…' : 'Save Forecast'}
+            {isPending
+              ? t('newForecast.saving', 'Saving…')
+              : t('newForecast.save', 'Save Forecast')}
           </Button>
         </div>
       </div>

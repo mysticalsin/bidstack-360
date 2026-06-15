@@ -131,5 +131,14 @@
     "back": "返回",
     "sending": "发送中…",
     "send": "发送以供签署"
+  },
+  "documentPreviewIframe": {
+    "regionAriaLabel": "文档预览",
+    "emptyMessage": "无可用的文档预览",
+    "errorMessage": "无法加载文档预览。",
+    "openInNewTab": "在新标签页中打开文档",
+    "regionAriaLabelTitled": "文档预览：{{title}}",
+    "loading": "正在加载文档…",
+    "iframeAriaLabel": "{{title}} 的预览"
   }
 }

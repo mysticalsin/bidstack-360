@@ -1,5 +1,6 @@
 import { ErrorBoundary as SentryErrorBoundary } from '@sentry/react';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const IS_DEV = import.meta.env.DEV;
 
@@ -11,6 +12,8 @@ interface FallbackProps {
 }
 
 function FallbackComponent({ error, componentStack }: FallbackProps) {
+  const { t } = useTranslation('crm');
+
   const handleReload = () => {
     window.location.reload();
   };
@@ -54,11 +57,13 @@ function FallbackComponent({ error, componentStack }: FallbackProps) {
               />
             </svg>
           </div>
-          <h1 className="text-lg font-semibold text-fg-primary">Something went wrong</h1>
+          <h1 className="text-lg font-semibold text-fg-primary">
+            {t('errorBoundary.title', 'Something went wrong')}
+          </h1>
         </div>
 
         <p className="mb-4 text-sm text-fg-secondary">
-          We&apos;re sorry, but an unexpected error has occurred.
+          {t('errorBoundary.description', "We're sorry, but an unexpected error has occurred.")}
         </p>
 
         {IS_DEV && (
@@ -76,14 +81,14 @@ function FallbackComponent({ error, componentStack }: FallbackProps) {
             onClick={handleReload}
             className="inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-fg-on-brand transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
           >
-            Reload page
+            {t('errorBoundary.reloadButton', 'Reload page')}
           </button>
           <button
             type="button"
             onClick={handleClear}
             className="inline-flex items-center justify-center rounded-lg border border-border-default bg-surface-card px-4 py-2.5 text-sm font-medium text-fg-secondary transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
           >
-            Clear app data & reload
+            {t('errorBoundary.clearDataButton', 'Clear app data & reload')}
           </button>
         </div>
       </div>
