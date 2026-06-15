@@ -32,9 +32,13 @@
     }
   },
   "quickStart": {
-    "title": "快速开始",
-    "subtitle": "完成以下步骤，充分利用 BidStack 360°",
-    "progress": "已完成 {{done}} / {{total}} 步",
+    "title": "快速入门",
+    "subtitle": "从零开始驾驭你的第一次投标。",
+    "progress": {
+      "count": "已完成 {{completed}} / {{total}}",
+      "percent": "{{percent}}%",
+      "ariaLabel": "入门进度"
+    },
     "steps": {
       "createOpportunity": {
         "label": "创建商机",
@@ -59,7 +63,46 @@
     },
     "completed": "快速开始完成！",
     "completedBody": "您已掌握 BidStack 360° 的基础知识，祝您投标顺利。",
-    "dismiss": "关闭"
+    "dismiss": "关闭",
+    "tourButton": "参加 2 分钟产品导览",
+    "items": {
+      "profile": {
+        "label": "完善你的个人资料",
+        "description": "添加你的姓名、照片和时区，方便同事找到你。"
+      },
+      "template": {
+        "label": "选择一个模板管道",
+        "description": "选择 B2B SaaS、代理、企业或内部销售作为起点。"
+      },
+      "firstLead": {
+        "label": "添加你的第一个潜在客户",
+        "description": "捕获入站兴趣，让 BidStack 自动评分。"
+      },
+      "firstActivity": {
+        "label": "记录你的第一项活动",
+        "description": "为任意联系人记录通话、电子邮件或备注。"
+      },
+      "firstBidNoBid": {
+        "label": "进行你的第一次投标/不投标决策",
+        "description": "在投入前从契合度、价值和胜率为机会评分。"
+      },
+      "firstRfp": {
+        "label": "开始你的第一份 RFP 响应",
+        "description": "创建结构化响应，让智能体起草初稿。"
+      },
+      "firstDeal": {
+        "label": "创建你的第一笔交易",
+        "description": "转化潜在客户或直接将交易添加到管道。"
+      },
+      "inviteTeam": {
+        "label": "邀请你的团队",
+        "description": "整个团队集中在一处协作效果最佳。"
+      }
+    },
+    "complete": {
+      "title": "一切就绪！",
+      "message": "你的工作区已准备好驾驭投标。"
+    }
   },
   "templates": {
     "title": "模板",
@@ -73,5 +116,37 @@
     "banner": "您正在查看演示数据。",
     "clear": "清除演示数据",
     "confirmClear": "删除所有演示数据？此操作无法撤销。"
+  },
+  "tourStep": {
+    "dialogAriaLabel": "导览步骤 {{current}}/{{total}}：{{title}}",
+    "stepCounter": "{{current}}/{{total}}",
+    "skipTour": "跳过导览",
+    "back": "上一步",
+    "ctaFinish": "邀请你的团队",
+    "ctaNext": "下一步"
+  },
+  "templatePicker": {
+    "title": "选择一个入门管道",
+    "subtitle": "每个模板都会创建一个包含阶段和若干示例记录的管道，让你可以立即开始探索。你可以随时删除示例数据。",
+    "loadErrorTitle": "无法加载模板",
+    "tryAgain": "请重试。",
+    "stageCount": "{{count}} 个阶段",
+    "cancel": "取消",
+    "installing": "正在安装…",
+    "install": "安装管道",
+    "toastInstalledTitle": "管道已安装",
+    "toastInstalledDescription": "{{stages}} 个阶段、{{deals}} 个示例交易、{{leads}} 个潜在客户。",
+    "toastConflictTitle": "已安装一个管道",
+    "toastConflictDescription": "请先删除现有的示例数据，或从你的实时管道开始。",
+    "toastErrorTitle": "无法安装模板"
+  },
+  "sampleDataBanner": {
+    "title": "示例数据已启用",
+    "description": "演示记录在此工作区中可见。在向高管或客户演示之前，请隐藏此提示或完全删除示例记录。",
+    "hide": "隐藏",
+    "remove": "删除示例数据",
+    "removing": "正在删除…",
+    "removedToast": "示例数据已删除",
+    "removeErrorToast": "无法删除示例数据"
   }
 }
