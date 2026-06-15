@@ -51,5 +51,479 @@
     "connectFailed": "Connessione non riuscita. Verifica le tue credenziali.",
     "syncFailed": "Sincronizzazione non riuscita.",
     "disconnectFailed": "Disconnessione non riuscita."
+  },
+  "agentProviderCredentials": {
+    "toast": {
+      "activeSet": "{{label}} è ora il modello attivo",
+      "activeCleared": "Modello attivo azzerato",
+      "activeSetDescription": "Ogni passaggio IA usa questo provider finché non cambi di nuovo, senza redeploy.",
+      "switchFailedTitle": "Impossibile cambiare provider",
+      "serverRejected": "Il server ha rifiutato la richiesta.",
+      "testAliveTitle": "{{label}} è attivo",
+      "testAliveDescription": "{{model}} ha risposto in {{latencyMs}} ms.",
+      "testNoResponseTitle": "{{label}} non ha risposto",
+      "testNoResponseDescription": "Nessuna risposta dal provider.",
+      "testFailedTitle": "Test non riuscito",
+      "savedTitle": "{{label}} salvato",
+      "savedDescription": "Lo stato del provider e la disponibilità di Agent Studio sono stati aggiornati.",
+      "removedTitle": "Credenziali di {{label}} rimosse",
+      "removeFailedTitle": "Rimozione non riuscita"
+    },
+    "error": {
+      "apiKeyRequired": "È richiesta una chiave API per questo provider.",
+      "claudeModelRequired": "Claude richiede un modello, ad esempio claude-sonnet-4-5.",
+      "saveFailed": "Impossibile salvare le credenziali del provider."
+    },
+    "remove": {
+      "confirmTitle": "Rimuovere le credenziali di {{label}}?",
+      "confirmDescription": "Gli agenti useranno le credenziali d'ambiente della piattaforma, se disponibili. Le definizioni degli agenti esistenti restano invariate.",
+      "confirmLabel": "Rimuovi"
+    },
+    "header": {
+      "title": "Provider di modelli",
+      "caption": "Resta indipendente dal fornitore: salva chiavi di proprietà dell'organizzazione per GPT, Claude, Kimi, NVIDIA NIM o Gemma locale, poi scegli quella attiva. Il cambio del provider attivo ha effetto al passaggio IA successivo, senza redeploy. Le chiavi sono cifrate a riposo e non vengono più mostrate.",
+      "addProvider": "Aggiungi provider"
+    },
+    "errorState": {
+      "title": "Impossibile caricare le chiavi del provider",
+      "message": "La disponibilità del provider usa ancora il fallback d'ambiente del server, ma non è stato possibile caricare le chiavi salvate dell'organizzazione.",
+      "retry": "Riprova"
+    },
+    "emptyState": {
+      "title": "Nessun elenco di provider restituito",
+      "message": "L'API dovrebbe sempre restituire i provider diretti supportati."
+    },
+    "summary": {
+      "savedCountOne": "{{count}} provider dell'organizzazione salvato",
+      "savedCountOther": "{{count}} provider dell'organizzazione salvati",
+      "activeBadge": "Attivo · {{label}}",
+      "noActiveBadge": "Nessun provider attivo — uso del predefinito della piattaforma",
+      "fallbackNote": "I provider d'ambiente della piattaforma restano disponibili come fallback quando configurati."
+    },
+    "row": {
+      "activeBadge": "Attivo",
+      "orgKeySaved": "Chiave dell'organizzazione salvata",
+      "noOrgKey": "Nessuna chiave dell'organizzazione",
+      "activeDescription": "Guida ogni passaggio IA per questo tenant in questo momento.",
+      "readyDescription": "Salvato e pronto — impostalo come attivo per instradare l'IA tramite esso.",
+      "fallbackDescription": "Usa il fallback d'ambiente della piattaforma se configurato.",
+      "edit": "Modifica",
+      "connect": "Connetti",
+      "remove": "Rimuovi",
+      "inUse": "In uso",
+      "setActive": "Imposta come attivo",
+      "testing": "Test in corso…",
+      "test": "Testa",
+      "testAlive": "Attivo · {{latencyMs}} ms",
+      "testFailed": "Non riuscito · {{error}}",
+      "testNoResponse": "nessuna risposta"
+    },
+    "detail": {
+      "model": "Modello",
+      "endpoint": "Endpoint",
+      "key": "Chiave",
+      "keyOptional": "Facoltativo",
+      "keyNotSaved": "Non salvata",
+      "updated": "Aggiornato",
+      "updatedNever": "Mai"
+    },
+    "dialog": {
+      "updateTitle": "Aggiorna {{label}}",
+      "addTitle": "Aggiungi provider di modelli",
+      "description": "La chiave API viene cifrata prima dell'archiviazione e non viene mai restituita al browser. Lascia vuota la chiave durante la modifica per mantenere quella salvata.",
+      "providerLabel": "Provider",
+      "apiKeyLabelOptional": "Chiave API (facoltativa)",
+      "apiKeyLabel": "Chiave API",
+      "apiKeyPlaceholderKeep": "Lascia vuoto per mantenere la chiave salvata",
+      "apiKeyPlaceholderOptional": "Facoltativo per i runtime locali",
+      "apiKeyPlaceholder": "Incolla la chiave del provider",
+      "modelLabel": "Modello",
+      "baseUrlLabel": "URL di base",
+      "baseUrlHintLocal": "Localhost è accettato solo nello sviluppo locale. La produzione richiede https pubblico.",
+      "baseUrlHint": "Deve essere un endpoint https pubblico.",
+      "cancel": "Annulla",
+      "saving": "Salvataggio...",
+      "save": "Salva provider"
+    }
+  },
+  "connectors": {
+    "category": {
+      "company": "Dati azienda",
+      "market": "Mercato e dati aperti",
+      "procurement": "Approvvigionamento e gare",
+      "logo": "Loghi e branding",
+      "people": "Persone e contatti",
+      "ai": "IA e agenti"
+    },
+    "header": {
+      "title": "Catalogo connettori",
+      "caption": "Fonti di dati esterne raggiungibili da BidStack. I feed aperti funzionano senza chiavi; i feed con licenza richiedono credenziali.",
+      "sourcesBadge": "{{count}} fonti"
+    },
+    "error": {
+      "title": "Impossibile caricare i connettori",
+      "retry": "Riprova"
+    },
+    "stat": {
+      "totalSources": "Fonti totali",
+      "healthy": "Integri",
+      "needsKey": "Richiede chiave",
+      "degradedDown": "Degradati/inattivi",
+      "catalogBadge": "catalogo"
+    },
+    "filter": {
+      "groupLabel": "Filtra i connettori per categoria",
+      "all": "Tutti"
+    },
+    "empty": {
+      "title": "Nessun connettore in questa categoria"
+    },
+    "row": {
+      "checkedAt": "Verificato {{time}}",
+      "docsLink": "Docs ↗",
+      "disconnecting": "Disconnessione...",
+      "disconnect": "Disconnetti",
+      "connecting": "Connessione...",
+      "connect": "Connetti",
+      "requiresKey": "richiede chiave",
+      "open": "aperto"
+    },
+    "status": {
+      "healthy": "integro",
+      "degraded": "degradato",
+      "down": "inattivo",
+      "disabled": "disabilitato"
+    }
+  },
+  "erpConnector": {
+    "title": "ERP MCP",
+    "caption": "imposta ERP_MCP_URL + ERP_DB per abilitare",
+    "status": {
+      "error": "errore",
+      "checking": "verifica in corso",
+      "notConfigured": "non configurato",
+      "live": "attivo",
+      "unreachable": "irraggiungibile"
+    },
+    "error": {
+      "title": "Impossibile raggiungere l'endpoint di stato dell'ERP",
+      "message": "È un problema di connessione, non una configurazione mancante. Riprova.",
+      "retry": "Riprova"
+    },
+    "notConfigured": {
+      "set": "Imposta",
+      "andOptionally": "e facoltativamente",
+      "tail": "per raggiungere il sidecar ERP MCP. Fino ad allora, BidStack usa dati verificati locali e connettori di dati verificati."
+    },
+    "stat": {
+      "endpoint": "Endpoint",
+      "database": "Database",
+      "mcpTools": "Strumenti MCP",
+      "status": "Stato"
+    },
+    "value": {
+      "na": "n/d",
+      "reachable": "raggiungibile",
+      "unreachable": "irraggiungibile"
+    },
+    "kit": {
+      "title": "Kit operativo di offerta ERP",
+      "subtitle": "Modelli di partner, opportunità, preventivo, attività, documento e passaggio di consegne adattati per la prevendita BidStack.",
+      "badge": {
+        "sidecar": "sidecar",
+        "fixSidecar": "correggi sidecar",
+        "local": "locale"
+      }
+    },
+    "autocomplete": {
+      "title": "Completamento automatico partner",
+      "subtitle": "Ricerca di entità legale in stile ERP con fallback BidStack.",
+      "ariaLabel": "Query di completamento automatico azienda",
+      "placeholder": "Nome, dominio, partita IVA o DUNS",
+      "check": "Verifica",
+      "empty": "Nessun suggerimento di azienda ancora. Aggiungi credenziali ERP MCP o verifica questo account in BidStack."
+    },
+    "item": {
+      "vat": "P.IVA {{value}}",
+      "duns": "DUNS {{value}}",
+      "noRegistryKeys": "Nessuna chiave di registro ancora"
+    }
+  },
+  "connectionCommandCenter": {
+    "path": {
+      "dust": {
+        "title": "Ponte agente Dust",
+        "eyebrow": "Azioni dell'agente",
+        "summary": "Fornisci a Dust un set di strumenti CRM lato server con MCP e sincronizzazione REST."
+      },
+      "mcp": {
+        "title": "Server MCP",
+        "eyebrow": "Strumenti personalizzati",
+        "summary": "Registra BidStack come server MCP per Dust, Claude Desktop o agenti interni."
+      },
+      "rest": {
+        "title": "API REST",
+        "eyebrow": "Dati bidirezionali",
+        "summary": "Usa chiavi API tipizzate per processi ETL, portali clienti e automazione aziendale."
+      },
+      "webhooks": {
+        "title": "Webhook",
+        "eyebrow": "Eventi in tempo reale",
+        "summary": "Iscrivi sistemi esterni agli eventi di trattative, gare, proposte, fatture e agenti."
+      }
+    },
+    "readyLabel": "pronto",
+    "needsSetupLabel": "richiede configurazione",
+    "error": {
+      "title": "Impossibile caricare la guida alla configurazione",
+      "message": "L'endpoint del contratto di integrazione non ha risposto.",
+      "retry": "Riprova la guida alla configurazione"
+    },
+    "readiness": {
+      "dustCredentials": {
+        "label": "Credenziali Dust",
+        "ready": "Pronto",
+        "needsKey": "Chiave mancante"
+      },
+      "dustAgents": {
+        "label": "Agenti Dust",
+        "found": "{{count}} trovati",
+        "disabled": "Disabilitato"
+      },
+      "mcpEndpoint": {
+        "label": "Endpoint MCP",
+        "publicUrlSet": "URL pubblico impostato",
+        "localFallback": "Fallback locale"
+      },
+      "dustDataSource": {
+        "label": "Origine dati Dust",
+        "ready": "Pronto",
+        "missing": "Mancante"
+      }
+    },
+    "title": "Centro di comando delle connessioni",
+    "generatedAt": "Generato {{time}}",
+    "subtitle": "Scegli un percorso, crea la chiave giusta, copia l'endpoint esatto e collega il sistema esterno con ambiti a privilegio minimo.",
+    "keyVault": "Cassaforte delle chiavi",
+    "webhookHub": "Hub dei webhook",
+    "tablistLabel": "Percorsi di configurazione dell'integrazione"
+  },
+  "dustCredentials": {
+    "sectionTitle": "Credenziali Dust",
+    "sectionCaption": "Collega il tuo workspace Dust una sola volta: agenti del team, redazione RFP, conformità e intelligenza documentale lo usano automaticamente.",
+    "removeButton": "Rimuovi",
+    "updateKeysButton": "Aggiorna chiavi",
+    "connectButton": "Collega Dust",
+    "dialogUpdateTitle": "Aggiorna credenziali Dust",
+    "dialogConnectTitle": "Collega Dust",
+    "dialogDescription": "Validiamo le chiavi con Dust prima di salvare. La chiave API è cifrata a riposo e non viene più mostrata.",
+    "fieldApiKeyLabel": "Chiave API",
+    "fieldApiKeyHint": "Da Dust → Impostazioni → Chiavi API.",
+    "fieldWorkspaceIdLabel": "ID del workspace",
+    "fieldDataSourceIdLabel": "ID dell'origine dati",
+    "fieldDataSourceIdPlaceholder": "Facoltativo — abilita la sincronizzazione dei documenti",
+    "fieldBaseUrlLabel": "URL di base",
+    "fieldBaseUrlPlaceholder": "Facoltativo — predefinito https://dust.tt/api",
+    "cancelButton": "Annulla",
+    "validatingButton": "Convalida…",
+    "validateSaveButton": "Convalida e salva",
+    "errorBothRequired": "La chiave API e l'ID del workspace sono entrambi obbligatori.",
+    "errorCouldNotSave": "Impossibile salvare le credenziali.",
+    "toastConnectedTitle": "Dust collegato",
+    "toastConnectedDescription": "Credenziali convalidate e salvate. Le funzionalità di IA ora usano il tuo workspace.",
+    "confirmRemoveTitle": "Rimuovere le credenziali Dust?",
+    "confirmRemoveDescription": "Le funzionalità di IA torneranno al valore predefinito della piattaforma (se impostato) o verranno sospese finché non si aggiungono nuove chiavi.",
+    "confirmRemoveLabel": "Rimuovi",
+    "toastRemovedTitle": "Credenziali Dust rimosse",
+    "toastRemoveFailedTitle": "Rimozione non riuscita",
+    "errorServerRejected": "Il server ha rifiutato la richiesta.",
+    "loadErrorTitle": "Impossibile caricare le credenziali Dust",
+    "loadErrorMessage": "Riprova.",
+    "retryButton": "Riprova",
+    "emptyTitle": "Dust non è ancora collegato",
+    "emptyMessageAdmin": "Aggiungi la tua chiave API Dust e l'ID del workspace per attivare la redazione con IA, la conformità e gli agenti del team.",
+    "emptyMessageNonAdmin": "Chiedi a un amministratore di collegare il tuo workspace Dust per abilitare le funzionalità di IA.",
+    "badgePlatformDefault": "Predefinito della piattaforma",
+    "badgeConnected": "Collegato",
+    "platformKeyNote": "In esecuzione con la chiave Dust condivisa della piattaforma. Aggiungi la tua sopra per usare il tuo workspace.",
+    "detailWorkspaceId": "ID del workspace",
+    "detailDataSourceId": "ID dell'origine dati",
+    "detailBaseUrl": "URL di base",
+    "detailAgentOverrides": "Sostituzioni degli agenti",
+    "agentOverridesConfigured": "{{count}} configurati",
+    "agentOverridesDefaults": "Uso dei valori predefiniti"
+  },
+  "dataQuality": {
+    "title": "Qualità dei dati",
+    "caption": {
+      "generated": "Report generato {{time}} · {{count}} problema",
+      "idle": "Rileva aziende duplicate, dati obsoleti, proprietari mancanti e domini errati."
+    },
+    "error": {
+      "title": "Impossibile caricare il report sulla qualità dei dati",
+      "retry": "Riprova"
+    },
+    "emptyScan": {
+      "title": "Nessuna scansione della qualità dei dati",
+      "message": "Esegui la scansione della qualità dei dati per visualizzare domini duplicati, record obsoleti, proprietari mancanti, domini non validi e copertura dei loghi."
+    },
+    "stat": {
+      "qualityScore": "Punteggio di qualità",
+      "highSeverity": "Gravità alta",
+      "mediumSeverity": "Gravità media",
+      "totalIssues": "Problemi totali",
+      "badge": "dati"
+    },
+    "noIssues": {
+      "title": "Nessun problema di qualità dei dati",
+      "message": "In questa scansione non sono stati rilevati domini duplicati, dati obsoleti, proprietari mancanti, domini non validi o loghi mancanti."
+    },
+    "issue": {
+      "company": "Azienda: {{name}}"
+    },
+    "kind": {
+      "duplicateCompany": "Azienda duplicata",
+      "staleData": "Dati obsoleti",
+      "missingOwner": "Proprietario mancante",
+      "invalidDomain": "Dominio non valido",
+      "missingLogo": "Logo mancante"
+    },
+    "severity": {
+      "high": "alta",
+      "medium": "media",
+      "low": "bassa"
+    }
+  },
+  "connectionTester": {
+    "title": "Tester di connessione",
+    "caption": "Sonda un endpoint dal servizio API prima di salvarlo. Segreti e token bearer non vengono mai inviati.",
+    "status": {
+      "reachable": "raggiungibile",
+      "needsAttention": "richiede attenzione",
+      "ready": "pronto per il test"
+    },
+    "probeOption": {
+      "mcp": {
+        "label": "MCP",
+        "description": "Endpoint degli strumenti agente"
+      },
+      "rest": {
+        "label": "API REST",
+        "description": "Endpoint di sincronizzazione dati"
+      },
+      "webhook": {
+        "label": "Webhook",
+        "description": "Ricevitori di eventi"
+      }
+    },
+    "endpointUrlLabel": "URL endpoint",
+    "placeholder": {
+      "loading": "Caricamento del contratto di configurazione..."
+    },
+    "useDefault": "Usa predefinito",
+    "testing": "Test in corso...",
+    "testEndpoint": "Testa endpoint",
+    "hint": {
+      "noSecrets": {
+        "title": "Nessun segreto inviato",
+        "body": "L'API verifica solo la raggiungibilità. Rimuove stringhe di query, frammenti, nomi utente e password."
+      },
+      "ssrf": {
+        "title": "Protetto da SSRF",
+        "body": "Le reti private e gli host interni vengono bloccati al di fuori dello sviluppo locale prima di qualsiasi richiesta."
+      },
+      "timeout": {
+        "title": "Timeout rapido",
+        "body": "La sonda si arresta dopo 5 secondi e registra un evento di audit con ambito per la tracciabilità dell'amministratore."
+      }
+    },
+    "toast": {
+      "missingUrl": "Aggiungi prima un URL dell'endpoint",
+      "reachedTitle": "Endpoint raggiunto",
+      "warningTitle": "Sonda completata con un avviso",
+      "probeFailed": "La sonda dell'endpoint non è riuscita.",
+      "blockedTitle": "Sonda bloccata"
+    }
+  },
+  "integrationHero": {
+    "eyebrowBadge": "Tessuto di integrazione",
+    "eyebrowChannels": "MCP, REST, webhook, Dust",
+    "title": "Integrazioni",
+    "subtitle": "Collega agenti, API, sistemi ERP e flussi di eventi con percorsi di configurazione chiari, credenziali con ambito definito e controlli di stato in tempo reale integrati con il resto della piattaforma.",
+    "posture": {
+      "refreshing": "Aggiornamento dello stato dell'integrazione..."
+    },
+    "actions": {
+      "createApiKey": "Crea chiave API",
+      "addWebhook": "Aggiungi webhook"
+    },
+    "metrics": {
+      "readyPaths": {
+        "label": "Percorsi pronti",
+        "helperCurrent": "Vista corrente",
+        "helperOverview": "Scheda panoramica"
+      },
+      "dustAgents": {
+        "label": "Agenti Dust"
+      },
+      "webhookEvents": {
+        "label": "Eventi webhook",
+        "helperNeedReview": "{{count}} da rivedere",
+        "helperNoErrors": "Nessun errore di evento caricato"
+      },
+      "activeMcpTools": {
+        "label": "Strumenti MCP attivi",
+        "helper": "Strumenti crm_* rivolti a Dust"
+      },
+      "controlPlane": {
+        "label": "Piano di controllo",
+        "helper": "Configurazione con privilegi minimi"
+      }
+    }
+  },
+  "integrationAtoms": {
+    "copyEndpoint": "Copia endpoint",
+    "copySnippet": "Copia snippet",
+    "alreadyCopied": "Già copiato",
+    "copiedToClipboard": "Copiato negli appunti",
+    "copyFailedTitle": "Copia non riuscita",
+    "copyFailedDescription": "L'accesso agli appunti non era disponibile.",
+    "copied": "Copiato",
+    "copy": "Copia",
+    "httpStatus": "HTTP {{status}}",
+    "noResponse": "Nessuna risposta",
+    "latencyMs": "{{latency}}ms"
+  },
+  "dustAgents": {
+    "title": "Agenti Dust",
+    "caption": "Agenti dell'area di lavoro disponibili per i flussi di verifica dei dati account",
+    "statusDegraded": "degradato",
+    "statusConfigured": "configurato",
+    "statusDisabled": "disattivato",
+    "notConfigured": "Aggiungi le credenziali Dust per elencare gli agenti disponibili dell'area di lavoro.",
+    "empty": "Dust è configurato, ma non è stato restituito alcun agente accessibile per questa area di lavoro.",
+    "badgeAgent": "agente"
+  },
+  "connectionRunway": {
+    "sectionLabel": "Flusso di configurazione dell'integrazione",
+    "stepBadge": "Passaggio {{number}}",
+    "steps": {
+      "pickSurface": {
+        "title": "Scegli la superficie",
+        "body": "Scegli MCP per gli agenti, REST per la sincronizzazione, i webhook per gli eventi o i connettori per l'ERP."
+      },
+      "scopeAccess": {
+        "title": "Definisci l'ambito di accesso",
+        "body": "Crea chiavi di lettura/scrittura solo per il flusso di lavoro specifico e mantieni i segreti sul server."
+      },
+      "probeBeforeSave": {
+        "title": "Verifica prima di salvare",
+        "body": "Esegui un controllo di raggiungibilità sicuro con protezione SSRF e senza inviare token bearer."
+      },
+      "monitorEvidence": {
+        "title": "Monitora le evidenze",
+        "body": "Esamina lo stato del provider e gli eventi webhook senza lasciare l'hub di integrazione."
+      }
+    }
   }
 }
