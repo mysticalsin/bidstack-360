@@ -1,6 +1,9 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// Initialise i18n (test-mode synchronous init) so the component's t() calls
+// resolve to their English defaults instead of returning raw keys.
+import '@/i18n';
 import { CurrencySelector } from './CurrencySelector';
 import { SUPPORTED_CURRENCIES, useCurrencyStore } from '@/stores/currency';
 
