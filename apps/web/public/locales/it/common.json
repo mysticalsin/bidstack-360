@@ -44,7 +44,19 @@
     "agents": "Agenti Dust",
     "search": "Cerca",
     "references": "Libreria di riferimenti",
-    "settingsPage": "Impostazioni"
+    "settingsPage": "Impostazioni",
+    "home": "Home",
+    "bidsRfp": "Gare & RFP",
+    "quickStart": "Avvio rapido",
+    "salesToolkits": "Kit di vendita",
+    "keyAccounts": "Account chiave",
+    "topAccounts": "Account principali",
+    "sectorView": "Vista per settore",
+    "crossSell": "Cross-sell",
+    "agentStudio": "Studio agenti",
+    "calendar": "Calendario",
+    "customObjects": "Oggetti personalizzati",
+    "analyticsReports": "Analisi e report"
   },
   "crumbs": {
     "portfolio": "Portfolio",
@@ -113,7 +125,10 @@
     "deleted": "Eliminato",
     "copied": "Copiato negli appunti",
     "genericError": "Qualcosa è andato storto. Riprova.",
-    "networkError": "Errore di rete. Controlla la connessione."
+    "networkError": "Errore di rete. Controlla la connessione.",
+    "regionLabel": "Notifiche",
+    "clearAll": "Cancella tutto ({{count}})",
+    "dismiss": "Ignora"
   },
   "validation": {
     "required": "Questo campo è obbligatorio",
@@ -267,5 +282,105 @@
         "leadRot": "Regole di obsolescenza"
       }
     }
+  },
+  "topbar": {
+    "skipToContent": "Vai al contenuto",
+    "switchToLight": "Passa alla modalità chiara",
+    "switchToDark": "Passa alla modalità scura",
+    "help": "Aiuto e scorciatoie",
+    "helpAria": "Aiuto e scorciatoie da tastiera",
+    "productTour": "Fai il tour del prodotto",
+    "signOut": "Esci",
+    "portfolio": "Portfolio",
+    "detail": "Dettaglio"
+  },
+  "appRoutes": {
+    "notFoundTitle": "Pagina non trovata",
+    "notFoundMessage": "La pagina che stai cercando non esiste.",
+    "goToDashboard": "Vai alla dashboard"
+  },
+  "select": {
+    "placeholder": "—",
+    "noOptions": "Nessuna opzione"
+  },
+  "lookupFieldPicker": {
+    "placeholder": "Cerca…",
+    "clearSelection": "Cancella selezione",
+    "searching": "Ricerca in corso…",
+    "noResults": "Nessun risultato.",
+    "typeToSearch": "Digita per cercare…"
+  },
+  "confirm": {
+    "cancel": "Annulla",
+    "delete": "Elimina",
+    "confirm": "Conferma",
+    "save": "Salva"
+  },
+  "avatar": {
+    "statusOnline": "Online",
+    "statusOffline": "Offline"
+  },
+  "helpDrawer": {
+    "title": "Scorciatoie da tastiera",
+    "closeAria": "Chiudi scorciatoie",
+    "groupGlobal": "Globale",
+    "groupNavigation": "Navigazione",
+    "groupRecords": "Record",
+    "openCommandPalette": "Apri la palette dei comandi",
+    "quickAddMenu": "Menu di aggiunta rapida",
+    "openThisDrawer": "Apri questo pannello",
+    "closeCurrentDialog": "Chiudi la finestra di dialogo corrente",
+    "goToDashboard": "Vai alla dashboard",
+    "goToOpportunities": "Vai alle opportunità",
+    "goToPipeline": "Vai alla pipeline",
+    "goToContacts": "Vai ai contatti",
+    "goToTasks": "Vai alle attività",
+    "goToReports": "Vai ai report",
+    "goToAccounts": "Vai agli account",
+    "goToSettings": "Vai alle impostazioni",
+    "goToSearch": "Vai alla ricerca",
+    "moveSelectionInLists": "Sposta la selezione negli elenchi",
+    "openRecord": "Apri record",
+    "editSelectedRecord": "Modifica il record selezionato",
+    "deleteWithConfirmation": "Elimina con conferma",
+    "footer": "La maggior parte delle scorciatoie funziona ovunque tranne che nei campi di testo. Premi ? in qualsiasi momento per riaprire questo pannello."
+  },
+  "breadcrumbs": {
+    "dashboard": "Dashboard",
+    "accounts": "Account",
+    "opportunities": "Opportunità",
+    "pipeline": "Pipeline",
+    "contacts": "Contatti",
+    "tasks": "Attività",
+    "reports": "Report",
+    "integrations": "Integrazioni",
+    "settings": "Impostazioni",
+    "auditLog": "Registro di controllo",
+    "login": "Accedi",
+    "ariaLabel": "Percorso di navigazione"
+  },
+  "progressRing": {
+    "ariaLabelPercentComplete": "{{percent}}% completato"
+  },
+  "sortableHeader": {
+    "ariaLabel": "Ordina per {{label}}. Ordinamento attuale: {{current}}. Attiva per ordinare {{next}}."
+  },
+  "upgradeBanner": {
+    "actionLabel": "Esegui l'upgrade"
+  },
+  "showMore": {
+    "moreLabel": "Mostra altro",
+    "lessLabel": "Mostra meno"
+  },
+  "bulkActionBar": {
+    "regionLabel": "Azioni in blocco",
+    "selectedCount": "{{count}} selezionati",
+    "exportSelected": "Esporta selezionati",
+    "deleting": "Eliminazione…",
+    "deleteSelected": "Elimina selezionati",
+    "clear": "Cancella"
+  },
+  "dialog": {
+    "closeAriaLabel": "Chiudi"
   }
 }
