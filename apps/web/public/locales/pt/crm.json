@@ -33,7 +33,13 @@
     "weightedPipeline": "Pipeline ponderado",
     "winRate": "Taxa de sucesso",
     "averageDealSize": "Valor médio dos negócios",
-    "newThisWeek": "Novos esta semana"
+    "newThisWeek": "Novos esta semana",
+    "deltaPeriodDefault": "vs o periodo anterior",
+    "loadingAriaLabel": "Carregando KPI",
+    "valueAriaLabel": "{{title}}: {{value}}",
+    "trendUpAriaLabel": "Em alta",
+    "trendDownAriaLabel": "Em baixa",
+    "trendFlatAriaLabel": "Estavel"
   },
   "fields": {
     "name": "Nome",
@@ -47,7 +53,25 @@
     "updatedAt": "Atualizado em",
     "dueDate": "Data limite",
     "status": "Estado",
-    "priority": "Prioridade"
+    "priority": "Prioridade",
+    "heading": "Campos",
+    "addFieldButton": "+ Adicionar campo",
+    "systemFieldsLabel": "Campos do sistema:",
+    "errorKeyLabelRequired": "A chave e o rótulo do campo são obrigatórios.",
+    "errorAddFailed": "Falha ao adicionar o campo",
+    "fieldKeyLabel": "Chave do campo",
+    "fieldKeyPlaceholder": "ex. budget",
+    "labelLabel": "Rótulo",
+    "labelPlaceholder": "ex. Orçamento",
+    "typeLabel": "Tipo",
+    "requiredCheckbox": "Obrigatório",
+    "cancelButton": "Cancelar",
+    "addingButton": "Adicionando…",
+    "addButton": "Adicionar",
+    "loading": "Carregando campos…",
+    "loadError": "Não foi possível carregar os campos. Tente novamente.",
+    "empty": "Ainda não há campos personalizados. Use \"Adicionar campo\" acima para criar o primeiro.",
+    "requiredBadge": "Obrigatório"
   },
   "detail": {
     "opportunity": "Detalhe da oportunidade",
@@ -66,5 +90,3775 @@
     "leads": "Sem potenciais clientes",
     "companies": "Sem empresas",
     "ctaCreate": "Criar o primeiro {{entity}}"
+  },
+  "opportunities": {
+    "toast": {
+      "movedOne": "{{count}} oportunidade movida",
+      "movedMany": "{{count}} oportunidades movidas",
+      "updatesFailedOne": "{{count}} atualização falhou",
+      "updatesFailedMany": "{{count}} atualizações falharam",
+      "updatesFailedDescription": "As movimentações bem-sucedidas foram salvas; tente novamente o restante.",
+      "deletedOne": "{{count}} oportunidade excluída",
+      "deletedMany": "{{count}} oportunidades excluídas",
+      "deletesFailedOne": "{{count}} exclusão falhou",
+      "deletesFailedMany": "{{count}} exclusões falharam",
+      "exportComplete": "Exportação concluída",
+      "exportFailed": "Falha na exportação",
+      "exportFailedDescription": "Tente novamente em instantes."
+    },
+    "confirmDelete": {
+      "titleOne": "Excluir {{count}} oportunidade?",
+      "titleMany": "Excluir {{count}} oportunidades?",
+      "description": "Isto não pode ser desfeito pela interface — o registro de auditoria documenta cada exclusão.",
+      "confirmLabel": "Excluir"
+    },
+    "liveRegion": {
+      "matchingOne": "{{count}} oportunidade correspondente a \"{{search}}\"",
+      "matchingMany": "{{count}} oportunidades correspondentes a \"{{search}}\"",
+      "inStageOne": "{{count}} oportunidade na etapa selecionada",
+      "inStageMany": "{{count}} oportunidades na etapa selecionada",
+      "totalOne": "{{count}} oportunidade",
+      "totalMany": "{{count}} oportunidades"
+    },
+    "error": {
+      "title": "Não foi possível carregar as oportunidades",
+      "message": "Tente novamente em instantes."
+    },
+    "empty": {
+      "title": "Ainda não há oportunidades",
+      "message": "Crie sua primeira oportunidade para começar a acompanhar as propostas."
+    },
+    "caption": {
+      "matching": "Oportunidades correspondentes a \"{{search}}\"",
+      "all": "Todas as oportunidades, ordenadas pela atividade mais recente. As células são editáveis em linha."
+    },
+    "pagerLabel": "oportunidades"
+  },
+  "leads": {
+    "title": "Leads",
+    "actions": {
+      "exportCsv": "Exportar CSV",
+      "newLead": "Novo lead"
+    },
+    "search": {
+      "label": "Pesquisar leads",
+      "placeholder": "Pesquisar leads..."
+    },
+    "filter": {
+      "status": "Filtrar leads por status",
+      "priority": "Filtrar leads por prioridade"
+    },
+    "statusOption": {
+      "all": "Todos os status",
+      "new": "Novo",
+      "contacted": "Contatado",
+      "qualified": "Qualificado",
+      "nurture": "Em nutrição",
+      "disqualified": "Desqualificado",
+      "converted": "Convertido"
+    },
+    "priorityOption": {
+      "all": "Todas as prioridades",
+      "low": "Baixa",
+      "medium": "Média",
+      "high": "Alta",
+      "critical": "Crítica"
+    },
+    "summary": {
+      "label": "Resumo da lista de leads"
+    },
+    "stats": {
+      "filtered": {
+        "label": "Leads filtrados",
+        "detail": "visualização atual"
+      },
+      "highPriority": {
+        "label": "Prioridade alta",
+        "detail": "alta ou crítica"
+      },
+      "pipelineReady": {
+        "label": "Prontos para o pipeline",
+        "detail": "qualificados ou convertidos"
+      },
+      "avgScore": {
+        "label": "Pontuação média",
+        "detail": "pontuação de adequação"
+      }
+    },
+    "liveRegion": {
+      "count": "{{count}} lead",
+      "matching": " correspondentes a \"{{query}}\""
+    },
+    "error": {
+      "title": "Falha ao carregar os leads",
+      "message": "Algo deu errado",
+      "retry": "Tentar novamente"
+    },
+    "empty": {
+      "title": "Ainda não há leads",
+      "message": "Crie seu primeiro lead para começar a acompanhar prospectos."
+    },
+    "table": {
+      "selectAll": "Selecionar tudo",
+      "deselectAll": "Desmarcar tudo",
+      "name": "Nome",
+      "company": "Empresa",
+      "status": "Status",
+      "priority": "Prioridade",
+      "score": "Pontuação",
+      "source": "Origem",
+      "owner": "Responsável",
+      "actions": "Ações"
+    },
+    "pager": {
+      "label": "leads"
+    },
+    "csv": {
+      "name": "Nome",
+      "company": "Empresa",
+      "title": "Cargo",
+      "email": "E-mail",
+      "status": "Status",
+      "priority": "Prioridade",
+      "score": "Pontuação",
+      "scoreRange": "Pontuação (0-10000)",
+      "source": "Origem",
+      "created": "Criado"
+    },
+    "toast": {
+      "nothingToExport": "Nada para exportar",
+      "exported": "{{count}} lead exportado",
+      "deleted": "{{count}} lead excluído",
+      "deleteFailed": "{{count}} exclusão falhou",
+      "leadDeleted": "Lead excluído",
+      "deleteOneFailed": "Falha ao excluir o lead"
+    },
+    "bulkDelete": {
+      "title": "Excluir {{count}} lead?",
+      "description": "Esta ação não pode ser desfeita.",
+      "confirm": "Excluir"
+    },
+    "deleteOne": {
+      "title": "Excluir lead?",
+      "description": "Isso removerá permanentemente {{name}} dos seus leads.",
+      "confirm": "Excluir"
+    }
+  },
+  "tasks": {
+    "title": "Tarefas",
+    "subtitle": "{{count}} acompanhamentos ativos.",
+    "actions": {
+      "exportCsv": "Exportar CSV"
+    },
+    "filters": {
+      "groupLabel": "Filtrar tarefas",
+      "all": "Todas",
+      "today": "Hoje",
+      "overdue": "Atrasadas"
+    },
+    "status": {
+      "open": "Aberta",
+      "in_progress": "Em andamento",
+      "blocked": "Bloqueada",
+      "done": "Concluída"
+    },
+    "view": {
+      "list": "Lista",
+      "listLabel": "Visualização em lista",
+      "calendar": "Calendário",
+      "calendarLabel": "Visualização em calendário"
+    },
+    "sort": {
+      "label": "Ordenar por",
+      "ariaLabel": "Ordenar tarefas",
+      "recent": "Recentes",
+      "dueDate": "Data de vencimento",
+      "status": "Estado"
+    },
+    "error": {
+      "title": "Não foi possível carregar as tarefas",
+      "generic": "Algo deu errado"
+    },
+    "empty": {
+      "title": "Ainda não há tarefas",
+      "filteredTitle": "Nenhuma tarefa corresponde a este filtro",
+      "message": "Crie um acompanhamento para começar."
+    },
+    "reorder": {
+      "announce": "{{title}} movida para a posição {{position}} de {{total}}."
+    },
+    "srCount": "{{count}} tarefa"
+  },
+  "contacts": {
+    "title": "Contatos",
+    "subtitle": "{{count}} pessoas na unidade de decisão.",
+    "actions": {
+      "importCsv": {
+        "aria": "Importar contatos de CSV"
+      },
+      "exportCsv": {
+        "aria": "Exportar todos os contatos visíveis como CSV"
+      },
+      "newContact": {
+        "aria": "Criar um novo contato"
+      },
+      "delete": "Excluir",
+      "undo": "Desfazer"
+    },
+    "search": {
+      "placeholder": "Pesquisar por nome, cliente, e-mail, função…",
+      "aria": "Pesquisar contatos",
+      "clear": {
+        "aria": "Limpar pesquisa"
+      }
+    },
+    "pager": {
+      "label": "contatos"
+    },
+    "column": {
+      "name": "Nome",
+      "role": "Função",
+      "customer": "Cliente",
+      "email": "E-mail",
+      "phone": "Telefone",
+      "influence": "Influência",
+      "sentiment": "Sentimento",
+      "createdAt": "Criado em"
+    },
+    "bulkDelete": {
+      "confirm": {
+        "title": "Excluir {{count}} contatos?",
+        "description": "Eles serão removidos de quaisquer propostas vinculadas. O log de auditoria registra cada exclusão."
+      }
+    },
+    "delete": {
+      "confirm": {
+        "title": "Excluir {{name}}?",
+        "description": "Isso também os remove de quaisquer propostas vinculadas. O log de auditoria mantém um registro."
+      }
+    },
+    "toast": {
+      "restoredCount": "{{count}} contatos restaurados",
+      "deletedCount": "{{count}} contatos excluídos",
+      "deleteFailedCount": {
+        "description": "As exclusões bem-sucedidas foram aplicadas; tente novamente para as restantes."
+      },
+      "nothingToExport": "Nada para exportar",
+      "exportedCount": "{{count}} contatos exportados",
+      "restored": "{{name}} restaurado",
+      "couldNotRestore": "Não foi possível restaurar",
+      "deleted": "{{name}} excluído",
+      "deleteFailed": "Falha ao excluir",
+      "serverRejected": "O servidor rejeitou a solicitação."
+    },
+    "undo": {
+      "deletedCount": "{{count}} contatos excluídos",
+      "deleted": "{{name}} excluído"
+    },
+    "linkedTitle": "Contatos vinculados",
+    "countCaption": "{{count}} contatos",
+    "linkAction": "+ Vincular contato",
+    "selectPlaceholder": "Selecione um contato…",
+    "cancel": "Cancelar",
+    "emptyTitle": "Nenhum contato vinculado",
+    "emptyMessage": "Vincule contatos para acompanhar quem está envolvido neste negócio.",
+    "primaryBadge": "Principal",
+    "noEmail": "sem e-mail",
+    "unsetPrimary": "Remover como principal",
+    "setPrimary": "Definir como principal",
+    "unlinkConfirm": "Desvincular {{name}}?",
+    "remove": "Remover"
+  },
+  "accounts": {
+    "title": "Contas",
+    "error": {
+      "title": "Não foi possível carregar as contas",
+      "message": "O endpoint do painel não respondeu."
+    },
+    "empty": {
+      "title": "Ainda não há contas",
+      "filtered": "Nenhuma conta corresponde aos seus filtros"
+    },
+    "summary": {
+      "companyCount_one": "{{count}} empresa",
+      "companyCount_other": "{{count}} empresas",
+      "openDeals": "{{count}} negócios em aberto",
+      "weightedPipeline": "{{amount}} de pipeline ponderado"
+    },
+    "sync": {
+      "result": "{{enriched}} enriquecidas / {{cached}} em cache",
+      "buttonTitle": "Sincronize os principais clientes sale.order do ERP em contas verificadas do BidStack",
+      "inProgress": "Sincronizando...",
+      "button": "Sincronizar contas do ERP",
+      "errorTitle": "Falha na sincronização das contas do ERP",
+      "errorDescription": "A última extração de clientes do ERP não pôde ser concluída.",
+      "alertFallback": "A última sincronização não conseguiu extrair os 20 principais clientes do ERP.",
+      "retry": "Tentar sincronizar novamente"
+    },
+    "actions": {
+      "newAccount": "Nova conta",
+      "retry": "Tentar novamente"
+    },
+    "stats": {
+      "regionLabel": "Cobertura de fontes de contas",
+      "accounts": {
+        "label": "Contas",
+        "detail": "portfólio"
+      },
+      "openDeals": {
+        "label": "Negócios em aberto",
+        "detail": "Pipeline do CRM externo"
+      },
+      "weightedPipeline": {
+        "label": "Pipeline ponderado",
+        "detail": "licitação e pré-venda"
+      },
+      "logoCoverage": {
+        "label": "Cobertura de logotipos",
+        "detail": "ativos de marca"
+      },
+      "enrichedProfiles": {
+        "label": "Perfis enriquecidos",
+        "detail": "cache de dados verificados"
+      },
+      "sourcesHealthy": {
+        "label": "Fontes saudáveis",
+        "detail": "malha de API"
+      }
+    },
+    "filters": {
+      "regionLabel": "Filtros",
+      "search": {
+        "label": "Pesquisar",
+        "placeholder": "Pesquisar por nome ou domínio…"
+      },
+      "industry": {
+        "label": "Setor",
+        "all": "Todos os setores"
+      },
+      "sort": {
+        "label": "Ordenar",
+        "pipeline": "Ordenar: valor do pipeline",
+        "name": "Ordenar: nome",
+        "health": "Ordenar: saúde",
+        "industry": "Ordenar: setor"
+      }
+    },
+    "liveRegion": {
+      "count_one": "{{count}} conta",
+      "count_other": "{{count}} contas",
+      "matching_one": "{{count}} conta correspondente a \"{{query}}\"",
+      "matching_other": "{{count}} contas correspondentes a \"{{query}}\""
+    },
+    "grid": {
+      "regionLabel": "Cartões de contas"
+    }
+  },
+  "publicSign": {
+    "announceWelcome": "Etapa 1: Revisar documento",
+    "announceSign": "Etapa 2: Assinar",
+    "announceSubmit": "Etapa 3: Revisar e enviar",
+    "announceConfirm": "Assinatura enviada com sucesso",
+    "errorDrawOrType": "Desenhe ou digite sua assinatura antes de continuar.",
+    "errorTypeName": "Digite seu nome para criar uma assinatura.",
+    "errorAcceptTerms": "Você precisa aceitar os termos para continuar.",
+    "errorSignatureMissing": "A assinatura está faltando. Volte e assine novamente.",
+    "signerFallback": "Signatário",
+    "errorSubmitFailed": "Falha no envio. Tente novamente.",
+    "skipToMain": "Pular para o conteúdo principal",
+    "brandSecureSignature": "Assinatura segura",
+    "mainAriaLabel": "Assinatura de documento",
+    "footerLegalNote": "Sua assinatura é juridicamente vinculativa. Esta página não contém tecnologias de rastreamento.",
+    "stepReview": "Revisar",
+    "stepSign": "Assinar",
+    "stepSubmit": "Enviar",
+    "stepDone": "Concluído",
+    "progressAriaLabel": "Progresso",
+    "welcomeHeading": "Você tem um documento para assinar",
+    "welcomeRequestedOn": "solicitou sua assinatura em",
+    "expiresLabel": "Expira:",
+    "documentPreviewLabel": "Visualização do documento",
+    "documentIframeTitle": "Documento a assinar",
+    "documentPreviewUnavailable": "Visualização do documento indisponível — você assinará abaixo.",
+    "reviewAndSignButton": "Revisar e assinar",
+    "signHeading": "Adicione sua assinatura",
+    "signSubtitle": "Desenhe sua assinatura ou digite seu nome.",
+    "signatureModeAriaLabel": "Modo de assinatura",
+    "modeDraw": "Desenhar",
+    "modeTypeName": "Digitar nome",
+    "fullNameLabel": "Nome completo",
+    "fullNamePlaceholder": "Seu nome completo",
+    "signaturePreviewAriaLabel": "Visualização da assinatura: {{name}}",
+    "back": "Voltar",
+    "continue": "Continuar",
+    "submitHeading": "Revisar e enviar",
+    "submitLegalIntro": "Ao enviar, você assina legalmente",
+    "termsAgreement": "Concordo que esta assinatura eletrônica é juridicamente vinculativa e representa minha intenção de assinar este documento. Tive a oportunidade de revisar seu conteúdo.",
+    "submitting": "Enviando…",
+    "submitSignatureButton": "Enviar assinatura",
+    "confirmHeading": "Assinatura enviada",
+    "confirmNotified": "{{senderName}} foi notificado. Uma cópia do documento assinado será enviada para o seu e-mail.",
+    "downloadSignedCopy": "Baixar cópia assinada",
+    "printedLabel": "Impresso:",
+    "loadingAriaLabel": "Carregando documento",
+    "errorLinkInvalidShort": "Este link de assinatura é inválido ou expirou.",
+    "errorLinkExpiredDetail": "Este link de assinatura expirou. Entre em contato com o remetente para reenviar a solicitação.",
+    "errorLinkInvalidDetail": "Este link de assinatura é inválido ou expirou. Entre em contato com o remetente para reenviar a solicitação.",
+    "errorLinkExpiredTitle": "Link expirado",
+    "errorLinkInvalidTitle": "Link de assinatura inválido"
+  },
+  "worldMap": {
+    "preset": {
+      "global": "Global",
+      "northAmerica": "A. do Norte",
+      "europe": "Europa",
+      "asiaPacific": "Ásia-Pac.",
+      "latinAmerica": "A. Latina",
+      "middleEastAfrica": "MO e África"
+    },
+    "zoomIn": "Ampliar",
+    "zoomOut": "Reduzir",
+    "resetView": "Redefinir visualização",
+    "legend": {
+      "pipeline": "Pipeline"
+    },
+    "tooltip": {
+      "opportunityCount": "{{count}} oport.",
+      "opportunityCount_one": "{{count}} oport.",
+      "avgProbability": "Probabilidade média {{probability}}%"
+    }
+  },
+  "territoryPanels": {
+    "countryDetailTitleWithCode": "Detalhe de {{countryCode}}",
+    "countryDetailTitle": "Detalhe do país",
+    "clickCountryHint": "Clique em um país no mapa",
+    "clear": "Limpar",
+    "opportunities": "Oportunidades",
+    "pipeline": "Funil",
+    "globalPipelineShare": "Participação no funil global",
+    "assignedTerritories": "Territórios atribuídos",
+    "noTerritoriesAssigned": "Nenhum território atribuído",
+    "accountOwners": "Responsáveis pela conta",
+    "noActiveOwners": "Nenhum responsável ativo",
+    "noCountrySelected": "Nenhum país selecionado",
+    "noCountrySelectedHint": "Clique em qualquer território ativo no mapa interativo acima para carregar as métricas.",
+    "territories": "Territórios",
+    "countTotal": "{{count}} no total",
+    "failedToLoad": "Falha ao carregar",
+    "retry": "Tentar novamente",
+    "noTerritories": "Nenhum território",
+    "noTerritoriesHint": "Crie seu primeiro território para começar.",
+    "active": "Ativo",
+    "inactive": "Inativo",
+    "global": "Global",
+    "countryCountSummary": "{{count}} países ({{preview}})",
+    "allCountries": "Todos os países",
+    "unassigned": "Não atribuído",
+    "edit": "Editar",
+    "delete": "Excluir",
+    "leadRoutingRules": "Regras de roteamento de leads",
+    "noRoutingRules": "Nenhuma regra de roteamento",
+    "noRoutingRulesHint": "Crie sua primeira regra para atribuir leads automaticamente.",
+    "assignUser": "Usuário",
+    "assignTerritory": "Território",
+    "assignRoundRobin": "Rodízio ({{count}})",
+    "assignNone": "Nenhum",
+    "priority": "Prioridade {{priority}}"
+  },
+  "agentStudio": {
+    "eyebrow": "Propostas e RFP",
+    "title": "Estúdio de agentes",
+    "subtitle": "Agentes de IA por função que respondem a cada etapa de uma RFP.",
+    "subtitleAdmin": "Crie-os aqui.",
+    "subtitleMember": "Execute uma equipe e revise o resultado.",
+    "loading": "Carregando…",
+    "loadStandardAgents": "Carregar agentes padrão",
+    "toastStandardLoaded": "Agentes padrão + equipe de RFP carregados",
+    "toastStandardLoadError": "Não foi possível carregar os agentes padrão",
+    "agentsHeading": "Agentes",
+    "cancel": "Cancelar",
+    "newAgent": "Novo agente",
+    "agentsLoadErrorTitle": "Não foi possível carregar os agentes",
+    "pleaseRetry": "Tente novamente.",
+    "retry": "Tentar novamente",
+    "agentsEmptyTitle": "Ainda não há agentes",
+    "agentsEmptyAdmin": "Carregue os agentes padrão jurídico / financeiro / marketing / vendas para começar, ou crie os seus.",
+    "agentsEmptyMember": "Um administrador ainda não configurou nenhum agente.",
+    "badgeStandard": "PADRÃO",
+    "badgeCustom": "PERSONALIZADO",
+    "deleteAgentConfirmTitle": "Excluir {{role}}?",
+    "deleteAgentConfirmDescription": "Isto remove o agente de todas as equipes que o usam. Esta ação não pode ser desfeita.",
+    "delete": "Excluir",
+    "deleteAgentAriaLabel": "Excluir {{role}}",
+    "toastAgentDeleted": "Agente excluído",
+    "toastAgentDeleteError": "Não foi possível excluir o agente",
+    "agentKeyPlaceholder": "Chave (ex.: security_lead)",
+    "agentKeyAriaLabel": "Chave do agente",
+    "rolePlaceholder": "Função (ex.: Líder de Segurança)",
+    "roleAriaLabel": "Função",
+    "goalPlaceholder": "Objetivo — pelo que este agente é responsável",
+    "goalAriaLabel": "Objetivo",
+    "backstoryPlaceholder": "História — a especialização e o tom que moldam suas respostas",
+    "backstoryAriaLabel": "História",
+    "createAgentError": "Falha ao criar o agente.",
+    "creating": "Criando…",
+    "createAgent": "Criar agente",
+    "crewsHeading": "Equipes",
+    "crewsSubtitle": "Uma equipe executa seus agentes na sua RFP, passo a passo.",
+    "crewsLoadErrorTitle": "Não foi possível carregar as equipes",
+    "crewsEmptyTitle": "Ainda não há equipes",
+    "crewsEmptyMessage": "Quando os agentes existirem, um administrador pode reuni-los em uma equipe. O conjunto padrão inclui uma equipe de resposta a RFP pronta para executar.",
+    "stepCount": "{{count}} etapa",
+    "close": "Fechar",
+    "run": "Executar",
+    "rfpPlaceholder": "Cole o texto da RFP aqui…",
+    "rfpAriaLabel": "Texto da RFP",
+    "starting": "Iniciando…",
+    "runCrew": "Executar equipe",
+    "runStartError": "Falha ao iniciar a execução.",
+    "toastRunStartError": "Não foi possível iniciar a execução",
+    "statusLabel": "Status:",
+    "runAnother": "Executar outra",
+    "runStatusError": "Não foi possível carregar o status da execução — reconectando…",
+    "runFailed": "A execução falhou.",
+    "fallback": "alternativa",
+    "finalResponsePartial": "Resposta final (algumas etapas usaram uma alternativa)",
+    "finalResponse": "Resposta final"
+  },
+  "contractAgreements": {
+    "regionLabel": "Acordos contratuais",
+    "title": "Acordos contratuais",
+    "caption": "MSAs e acordos-quadro, cobertura, descontos e cronograma de revisão de tarifas",
+    "loadErrorTitle": "Não foi possível carregar os acordos contratuais",
+    "tryAgainShortly": "Tente novamente em breve.",
+    "empty": "Ainda não há MSAs ou acordos-quadro registrados para esta conta.",
+    "noCountriesSet": "Nenhum país definido",
+    "rebateSuffix": " · desconto {{pct}}%",
+    "rateReviewSuffix": " · revisão de tarifas {{schedule}}",
+    "nextReviewSuffix": " (próxima {{date}})",
+    "expiresSuffix": " · expira {{date}}",
+    "viewDocument": "Ver documento",
+    "tableRole": "Função",
+    "tableRate": "Tarifa",
+    "toastExtractApplied": "Campos extraídos aplicados — revise antes de salvar",
+    "toastMissingReferenceTitle": "Referência ausente",
+    "toastMissingReferenceDesc": "É necessária uma referência de contrato.",
+    "toastAgreementRecorded": "Acordo registrado",
+    "toastCouldNotSave": "Não foi possível salvar",
+    "addAgreement": "Adicionar acordo",
+    "fieldAgreementType": "Tipo de acordo",
+    "placeholderReference": "Referência (ex.: MSA-2026-001)",
+    "fieldReference": "Referência do contrato",
+    "placeholderCountries": "Países (FR, DE, ES)",
+    "fieldCountries": "Países cobertos",
+    "placeholderRebate": "Desconto global %",
+    "fieldRebate": "Percentual de desconto global",
+    "fieldRateReviewSchedule": "Cronograma de revisão de tarifas",
+    "scheduleAnnual": "Revisão anual de tarifas",
+    "scheduleBiannual": "Revisão semestral de tarifas",
+    "scheduleQuarterly": "Revisão trimestral de tarifas",
+    "scheduleAdhoc": "Revisão de tarifas ad hoc",
+    "fieldExpiryDate": "Data de expiração",
+    "placeholderCurrency": "Moeda (EUR)",
+    "fieldCurrency": "Moeda",
+    "sourceDocument": "Documento de origem",
+    "removeAttachedDocument": "Remover documento anexado",
+    "remove": "remover",
+    "toastExtractStartFailed": "Não foi possível iniciar a extração",
+    "starting": "Iniciando…",
+    "extractFields": "Extrair campos do documento",
+    "applyExtractedFields": "Aplicar campos extraídos (revisar antes de salvar)",
+    "extractionFailedWithReason": "Falha na extração: {{reason}}. Insira os campos manualmente.",
+    "extractionFailed": "Falha na extração. Insira os campos manualmente.",
+    "extracting": "Extraindo… (OCR + análise)",
+    "uploading": "Enviando…",
+    "attachDocument": "Anexar documento de MSA / tabela de tarifas (PDF, imagem)",
+    "toastUploadFailed": "Falha no envio",
+    "rateCard": "Tabela de tarifas",
+    "placeholderRoleProfile": "Função / perfil",
+    "rateLineRole": "Função da linha de tarifa {{n}}",
+    "placeholderRate": "Tarifa",
+    "rateLineRate": "Tarifa da linha de tarifa {{n}}",
+    "rateLineUnit": "Unidade da linha de tarifa {{n}}",
+    "removeRateLine": "Remover a linha de tarifa {{n}}",
+    "addRateLine": "+ Adicionar linha de tarifa",
+    "saving": "Salvando…",
+    "save": "Salvar",
+    "cancel": "Cancelar"
+  },
+  "calls": {
+    "heading": "Chamadas",
+    "count": {
+      "one": "{{count}} chamada",
+      "other": "{{count}} chamadas"
+    },
+    "error": {
+      "title": "Falha ao carregar as chamadas",
+      "fallback": "Algo deu errado"
+    },
+    "empty": {
+      "title": "Nenhuma chamada encontrada",
+      "message": "Tente ajustar os filtros ou inicie uma chamada a partir de uma página de Contato ou Negócio."
+    },
+    "loadMore": {
+      "loading": "Carregando…",
+      "label": "Carregar mais"
+    },
+    "filter": {
+      "groupAria": "Filtrar chamadas",
+      "entityAria": "Filtrar por tipo de entidade",
+      "providerAria": "Filtrar por provedor",
+      "statusAria": "Filtrar por status",
+      "dateAria": "Filtrar por intervalo de datas",
+      "entity": {
+        "all": "Todos os tipos",
+        "deal": "Negócio",
+        "contact": "Contato",
+        "opportunity": "Oportunidade",
+        "lead": "Lead"
+      },
+      "provider": {
+        "all": "Todos os provedores",
+        "zoom": "Zoom",
+        "teams": "Teams",
+        "googleMeet": "Google Meet",
+        "twilioVoice": "Twilio Voice"
+      },
+      "status": {
+        "all": "Todos os status",
+        "scheduled": "Agendada",
+        "live": "Ao vivo",
+        "completed": "Concluída",
+        "failed": "Falhou",
+        "cancelled": "Cancelada"
+      },
+      "date": {
+        "all": "Todo o período",
+        "week": "Esta semana",
+        "month": "Este mês"
+      }
+    },
+    "table": {
+      "aria": "Lista de chamadas",
+      "provider": "Provedor",
+      "entity": "Entidade",
+      "scheduled": "Agendada",
+      "duration": "Duração",
+      "sentiment": "Sentimento",
+      "status": "Status"
+    },
+    "row": {
+      "aria": "{{icon}} Chamada {{provider}} — {{status}}"
+    },
+    "detail": {
+      "title": "Detalhe da chamada",
+      "recordingAria": "Gravação da chamada"
+    }
+  },
+  "customObjectsAdmin": {
+    "title": "Objetos personalizados",
+    "subtitle": "Defina novos tipos de entidade para a sua organização — projetos, fornecedores, ativos e mais.",
+    "newObjectButton": "Novo objeto",
+    "loadingLabel": "Carregando objetos personalizados",
+    "errorLoad": "Falha ao carregar os objetos personalizados. Atualize a página.",
+    "emptyTitle": "Ainda não há objetos personalizados",
+    "emptyDescription": "Clique em \"Novo objeto\" para definir o seu primeiro tipo de entidade personalizada.",
+    "recordCount": "{{count}} registros",
+    "deleteItemLabel": "Excluir {{label}}",
+    "modalTitle": "Novo objeto personalizado",
+    "fieldSingularLabel": "Rótulo singular",
+    "fieldSingularPlaceholder": "ex.: Projeto",
+    "fieldPluralLabel": "Rótulo plural",
+    "fieldPluralPlaceholder": "ex.: Projetos",
+    "fieldKeyLabel": "Chave de API",
+    "fieldKeyAuto": "(automático)",
+    "fieldKeyPlaceholder": "ex.: project",
+    "fieldKeyHint": "Apenas letras minúsculas, dígitos, _ ou -. Imutável após a criação.",
+    "fieldDescriptionLabel": "Descrição",
+    "fieldColorLegend": "Cor",
+    "selectColorLabel": "Selecionar a cor {{color}}",
+    "cancelButton": "Cancelar",
+    "creatingButton": "Criando…",
+    "createButton": "Criar",
+    "errorRequiredFields": "A chave, o rótulo singular e o rótulo plural são obrigatórios.",
+    "errorKeyFormat": "A chave deve começar com uma letra e conter apenas letras minúsculas, dígitos, _ ou -",
+    "toastCreated": "Objeto personalizado criado",
+    "errorCreateFailed": "Falha ao criar",
+    "deleteConfirmTitle": "Excluir objeto personalizado?",
+    "deleteConfirmDescription": "Isto excluirá permanentemente a definição do objeto e todos os registros pertencentes a ele. Esta ação não pode ser desfeita.",
+    "deleteConfirmLabel": "Excluir",
+    "toastDeleteFailedTitle": "Falha ao excluir"
+  },
+  "smsComposer": {
+    "title": "Enviar SMS",
+    "recipientLabel": "Para: {{name}}",
+    "optedOutLabel": "Cancelado:",
+    "optedOutMessage": "Este número solicitou parar de receber SMS. O envio está bloqueado (conformidade TCPA).",
+    "phoneLabel": "Para (formato E.164)",
+    "phoneFormatHint": "Use o formato E.164: +12025550100",
+    "messageLabel": "Mensagem",
+    "charCountMultipart": "{{chars}} caracteres · {{segments}} segmentos ({{remaining}} restantes no segmento)",
+    "charCountSingle": "{{count}}/{{limit}}",
+    "messagePlaceholder": "Digite sua mensagem…",
+    "segmentPreview": "Esta mensagem será enviada em {{count}} segmentos (cobrados por segmento pela Twilio).",
+    "successMessage": "SMS enviado com sucesso!",
+    "cancel": "Cancelar",
+    "checking": "Verificando…",
+    "sending": "Enviando…",
+    "sent": "Enviado!",
+    "send": "Enviar SMS",
+    "errorInvalidE164": "O número de telefone deve estar no formato E.164 (ex.: +12025550100)",
+    "errorEmptyBody": "O corpo da mensagem não pode estar vazio",
+    "errorOptedOut": "Este número cancelou o recebimento de SMS. Não é possível enviar.",
+    "errorSendFailed": "Falha ao enviar o SMS. Tente novamente."
+  },
+  "contactTable": {
+    "announceFiltered": "Mostrando {{count}} de {{total}} contatos correspondentes a {{search}}.",
+    "announceTotal": "Mostrando {{count}} contatos.",
+    "errorTitle": "Não foi possível carregar os contatos",
+    "tryAgain": "Tentar novamente",
+    "emptyFilteredTitle": "Nenhuma correspondência",
+    "emptyTitle": "Ainda não há contatos",
+    "emptyFilteredMessage": "Nada correspondeu a \"{{search}}\".",
+    "emptyMessage": "Adicione o primeiro tomador de decisão para começar a mapear o grupo de compra.",
+    "clearSearch": "Limpar busca",
+    "addFirstContact": "Adicionar primeiro contato",
+    "deselectAll": "Desmarcar todos os contatos",
+    "selectAll": "Selecionar todos os contatos",
+    "colName": "Nome",
+    "colRole": "Cargo",
+    "colCustomer": "Cliente",
+    "colContact": "Contato",
+    "colInfluence": "Influência",
+    "colSentiment": "Sentimento",
+    "colActions": "Ações",
+    "deselectRow": "Desmarcar {{name}}",
+    "selectRow": "Selecionar {{name}}",
+    "editRoleLabel": "Editar cargo de {{name}}",
+    "addRolePlaceholder": "Adicionar cargo…",
+    "editInfluenceLabel": "Editar influência de {{name}}",
+    "editSentimentLabel": "Editar sentimento de {{name}}",
+    "editRowLabel": "Editar {{name}}",
+    "editAction": "Editar",
+    "deleteRowLabel": "Excluir {{name}}",
+    "deleteAction": "Excluir"
+  },
+  "companies": {
+    "title": "Empresas",
+    "subtitleOne": "{{count}} empresa visível.",
+    "subtitleMany": "{{count}} empresas visíveis.",
+    "newCompany": "Nova empresa",
+    "summaryAriaLabel": "Resumo da lista de empresas",
+    "stats": {
+      "visibleLabel": "Empresas visíveis",
+      "visibleDetail": "visualização atual",
+      "domainLabel": "Cobertura de domínios",
+      "domainDetail": "pronto para verificação de dados",
+      "industriesLabel": "Setores",
+      "industriesDetail": "perfis classificados",
+      "countriesLabel": "Países",
+      "countriesDetail": "cobertura de mercado"
+    },
+    "searchPlaceholder": "Pesquisar por nome ou domínio…",
+    "searchAriaLabel": "Pesquisar empresas",
+    "resultsCountOne": "{{count}} resultado para \"{{term}}\"",
+    "resultsCountMany": "{{count}} resultados para \"{{term}}\"",
+    "showingLatest": "Mostrando as últimas 50 empresas",
+    "clear": "Limpar",
+    "error": {
+      "title": "Falha ao carregar as empresas",
+      "fallback": "Algo deu errado"
+    },
+    "empty": {
+      "searchTitle": "Nenhuma empresa corresponde à sua pesquisa",
+      "title": "Nenhuma empresa encontrada",
+      "searchMessage": "Nada correspondeu a \"{{term}}\". Tente um nome de empresa ou domínio.",
+      "message": "Crie a primeira empresa para começar a montar sua lista de contas.",
+      "clearSearch": "Limpar pesquisa",
+      "addCompany": "Adicionar empresa"
+    },
+    "toast": {
+      "nothingToExport": "Nada para exportar",
+      "exportedOne": "{{count}} empresa exportada",
+      "exportedMany": "{{count}} empresas exportadas",
+      "deletedOne": "{{count}} empresa excluída",
+      "deletedMany": "{{count}} empresas excluídas",
+      "deleteFailedOne": "{{count}} exclusão falhou",
+      "deleteFailedMany": "{{count}} exclusões falharam"
+    },
+    "confirmDelete": {
+      "titleOne": "Excluir {{count}} empresa?",
+      "titleMany": "Excluir {{count}} empresas?",
+      "description": "Esta ação não pode ser desfeita.",
+      "confirmLabel": "Excluir"
+    },
+    "table": {
+      "selectAll": "Selecionar tudo",
+      "deselectAll": "Desmarcar tudo",
+      "company": "Empresa",
+      "domain": "Domínio",
+      "industry": "Setor",
+      "employees": "Funcionários",
+      "country": "País",
+      "actions": "Ações"
+    }
+  },
+  "opportunityTabs": {
+    "sectionsAriaLabel": "Seções da oportunidade",
+    "tabDecisionUnit": "Unidade de decisão",
+    "tabContacts": "Contatos",
+    "tabTasks": "Tarefas",
+    "tabDocuments": "Documentos",
+    "tabCalls": "Chamadas",
+    "tabActivity": "Atividade",
+    "decisionUnitErrorTitle": "Não foi possível carregar os contatos da unidade de decisão",
+    "errorMessage": "Tente novamente.",
+    "retry": "Tentar novamente",
+    "decisionUnitEmptyTitle": "Ainda não há membros da unidade de decisão",
+    "decisionUnitEmptyMessage": "Adicione um contato pela página de Contatos ou sincronize a partir do Dust.",
+    "decisionUnitTitle": "Unidade de decisão",
+    "stakeholdersCount": "{{count}} partes interessadas",
+    "dustBadge": "Dust",
+    "influenceAriaLabel": "Influência {{value}} de 5",
+    "tasksEmptyTitle": "Ainda não há tarefas",
+    "tasksEmptyMessage": "Crie um acompanhamento para manter esta proposta em andamento.",
+    "tasksTitle": "Tarefas",
+    "tasksActiveCount": "{{count}} ativas",
+    "taskDue": "Vence em {{date}}",
+    "callsErrorTitle": "Não foi possível carregar as chamadas",
+    "callsEmptyTitle": "Ainda não há chamadas",
+    "callsEmptyMessage": "As chamadas agendadas e concluídas desta oportunidade aparecem aqui.",
+    "callsTitle": "Chamadas",
+    "callsCount": "{{count}} chamada",
+    "callScheduledAt": "Agendada {{date}}",
+    "callDurationMinutes": "{{count}} min",
+    "documentsEmptyTitle": "Nenhum documento anexado",
+    "documentsEmptyMessage": "Envie uma RFP, um SoW ou um rascunho de proposta.",
+    "documentsTitle": "Documentos",
+    "documentsCount": "{{count}} arquivos",
+    "documentUnknownSize": "tamanho desconhecido",
+    "activityEmptyTitle": "Ainda não há atividade",
+    "activityEmptyMessage": "Mudanças de etapa, webhooks do Dust e notas aparecerão aqui.",
+    "activityTitle": "Atividade"
+  },
+  "callTimeline": {
+    "sentimentPositive": "Positivo",
+    "sentimentNeutral": "Neutro",
+    "sentimentNegative": "Negativo",
+    "sentimentScoreTitle": "Pontuação de sentimento: {{pct}}%",
+    "noActionItems": "Nenhuma ação pendente.",
+    "actionItemsAriaLabel": "Itens de ação",
+    "markItemComplete": "Marcar \"{{item}}\" como concluído",
+    "loadError": "Falha ao carregar os detalhes da chamada.",
+    "recordingSectionAriaLabel": "Gravação da chamada",
+    "recordingLabel": "Gravação",
+    "recordingAudioAriaLabel": "Áudio da gravação da chamada",
+    "summarySectionAriaLabel": "Resumo da chamada",
+    "summaryLabel": "Resumo de IA",
+    "actionItemsSectionAriaLabel": "Itens de ação desta chamada",
+    "actionItemsLabel": "Itens de ação",
+    "viewTranscript": "Ver transcrição",
+    "analysing": "Analisando…",
+    "reExtractInsights": "Reextrair insights",
+    "cardAriaLabel": "Chamada {{provider}} — {{status}}",
+    "emptyState": "Nenhuma chamada registrada ainda.",
+    "historyAriaLabel": "Histórico de chamadas",
+    "loadingMore": "Carregando…",
+    "loadMore": "Carregar mais chamadas"
+  },
+  "smartCompany": {
+    "source": {
+      "domainSignal": "Sinal de domínio",
+      "logoPreview": "Pré-visualização do logótipo",
+      "openDataReady": "Dados abertos prontos",
+      "nameSignal": "Sinal de nome"
+    },
+    "autofill": {
+      "legalProfile": "Perfil jurídico",
+      "domain": "Domínio",
+      "website": "Site",
+      "logo": "Logótipo",
+      "sourceReceipts": "Comprovativos de fontes",
+      "value": {
+        "verified": "verificado",
+        "queued": "em fila",
+        "waiting": "à espera",
+        "needed": "necessário",
+        "ready": "pronto",
+        "preview": "pré-visualização",
+        "fallback": "alternativa",
+        "live": "{{count}} ao vivo"
+      },
+      "mapLabel": "Mapa de prontidão do preenchimento automático"
+    },
+    "error": {
+      "nameRequired": "Adicione primeiro um nome de empresa ou um domínio."
+    },
+    "trigger": {
+      "newAccount": "Nova conta"
+    },
+    "dialog": {
+      "title": "Adicionar empresa",
+      "description": "Pré-preencha a conta a partir de fontes verificadas, fornecedores de logótipos e a cache de dados verificados."
+    },
+    "preview": {
+      "companyFallback": "Empresa",
+      "namePlaceholder": "Pré-visualização da empresa",
+      "domainPrompt": "Adicione um domínio para correspondência de logótipo e registo",
+      "confidence": "Confiança"
+    },
+    "field": {
+      "companyOrDomain": "Empresa ou domínio",
+      "companyOrDomainPlaceholder": "Mantu ou mantu.com",
+      "domain": "Domínio",
+      "domainPlaceholder": "empresa.com",
+      "website": "Site",
+      "websitePlaceholder": "https://empresa.com/"
+    },
+    "intel": {
+      "existingAccount": "Conta existente",
+      "newData": "Novos dados",
+      "resolving": "A resolver perfil..."
+    },
+    "alternatives": {
+      "select": "Selecionar {{name}}"
+    },
+    "action": {
+      "cancel": "Cancelar",
+      "openCockpit": "Abrir cockpit",
+      "enriching": "A enriquecer...",
+      "createEnriched": "Criar conta enriquecida"
+    }
+  },
+  "leadDetail": {
+    "toastSaved": "Salvo",
+    "toastSaveFailed": "Falha ao salvar",
+    "errorTitle": "Não foi possível carregar o lead",
+    "errorMessage": "O lead pode ter sido excluído.",
+    "notFoundTitle": "Lead não encontrado",
+    "notFoundMessage": "O lead pode ter sido excluído ou você pode não ter acesso a ele.",
+    "goBack": "Voltar",
+    "toastStatusUpdated": "Status atualizado",
+    "toastPriorityUpdated": "Prioridade atualizada",
+    "toastConverted": "Lead convertido com sucesso",
+    "toastConvertFailed": "Falha ao converter o lead",
+    "deleteConfirmTitle": "Excluir lead?",
+    "deleteConfirmDescription": "Isto removerá permanentemente {{firstName}} {{lastName}} dos seus leads.",
+    "deleteConfirmLabel": "Excluir",
+    "toastDeleted": "Lead excluído",
+    "breadcrumbAriaLabel": "Trilha de navegação",
+    "breadcrumbLeads": "Leads",
+    "convertAction": "Converter em oportunidade",
+    "convertUnavailable": "Conversão de lead indisponível",
+    "deleteAction": "Excluir",
+    "convertedBannerPrefix": "Este lead foi convertido em",
+    "convertedBannerLink": "oportunidade convertida",
+    "statusScoringHeading": "Status e pontuação",
+    "labelStatus": "Status",
+    "labelPriority": "Prioridade",
+    "labelScore": "Pontuação",
+    "labelSource": "Origem",
+    "bantHeading": "Qualificação BANT",
+    "labelBudget": "Orçamento",
+    "placeholderBudget": "ex. € 500 mil",
+    "labelAuthority": "Autoridade",
+    "placeholderAuthority": "Tomador de decisão",
+    "labelNeed": "Necessidade",
+    "placeholderNeed": "Que problema estão tentando resolver?",
+    "labelTimeline": "Cronograma",
+    "placeholderTimeline": "ex. T2 2026",
+    "labelNotes": "Notas",
+    "placeholderNotes": "Adicione notas sobre este lead…",
+    "metaCreated": "Criado em {{date}}",
+    "metaUpdated": "Atualizado em {{date}}",
+    "metaOwner": "Responsável: {{name}}",
+    "liveCollaboration": "Colaboração ao vivo"
+  },
+  "dashboard": {
+    "srHeading": "Painel",
+    "cockpitErrorTitle": "Não foi possível carregar o cockpit da conta",
+    "cockpitErrorMessage": "O endpoint do painel não respondeu.",
+    "retry": "Tentar novamente",
+    "backToAccounts": "Voltar para contas",
+    "liveRefreshFailed": "Aviso: a atualização ao vivo falhou, mostrando o último instantâneo verificado.",
+    "portfolioIntelTitle": "Inteligência de vendas do portfólio",
+    "portfolioIntelSubtitle": "Pipeline, riscos, contatos e registros desta conta.",
+    "accountCockpitAria": "Cockpit da conta",
+    "cockpitDetailsAria": "Detalhes do cockpit"
+  },
+  "leadKanban": {
+    "moveSuccess": "Movido para {{status}}",
+    "moveError": "Não foi possível mover o lead",
+    "boardAriaLabel": "Kanban do funil de leads",
+    "column": {
+      "new": "Novo",
+      "contacted": "Contatado",
+      "qualified": "Qualificado",
+      "nurture": "Nutrição",
+      "disqualified": "Desqualificado",
+      "converted": "Convertido"
+    },
+    "columnAriaLabel": "Coluna {{label}} com {{count}} leads",
+    "emptyColumn": "Sem leads",
+    "columnLeadsAriaLabel": "Leads de {{label}}",
+    "cardAriaLabel": "{{firstName}} {{lastName}}, {{company}}, em {{status}}. Use as setas para a esquerda e para a direita para mover entre colunas.",
+    "daysInStage": "{{count}}d na etapa",
+    "rotBadgeAriaLabel": "Em deterioração: {{count}} dias além do limite. Abrir ações de recuperação.",
+    "rotBadgeLabel": "Deterioração · +{{count}}d",
+    "recoveryMenuAriaLabel": "Ações de recuperação sugeridas",
+    "recoveryHeading": "Recuperação sugerida",
+    "recoveryLoading": "Pensando…",
+    "recoveryEmpty": "Sem sugestões.",
+    "play": {
+      "sendReengagementEmail": "Enviar e-mail de reengajamento",
+      "scheduleCall": "Agendar uma chamada",
+      "addToNurture": "Adicionar à cadência de nutrição",
+      "markLost": "Marcar como perdido"
+    }
+  },
+  "csvImport": {
+    "error": {
+      "noDataRows": "Esse arquivo não tem linhas de dados.",
+      "tooManyRows": "Esse arquivo tem {{count}} linhas — o limite é {{limit}}.",
+      "unreadable": "Não foi possível ler esse arquivo. Verifique se é um CSV em UTF-8."
+    },
+    "upload": {
+      "entityLabel": "O que você está importando?",
+      "chooseFile": "Escolha um arquivo CSV",
+      "maxRows": "Até {{rows}} linhas"
+    },
+    "map": {
+      "summary": "{{rows}} linhas. Associe cada coluna a um campo ou deixe como Não importar.",
+      "colCsvColumn": "Coluna CSV",
+      "colSample": "Amostra",
+      "colMapsTo": "Mapeia para",
+      "mapColumnAria": "Mapear coluna {{header}}",
+      "dontImport": "Não importar",
+      "dedupLabel": "Se um registro já existir",
+      "dedupUpdate": "Atualizá-lo com os novos valores",
+      "dedupSkip": "Ignorar a linha",
+      "dedupDuplicate": "Sempre criar um novo registro",
+      "requiredMissing": "Mapeie uma coluna para: {{fields}}.",
+      "startError": "Não foi possível iniciar a importação. Verifique seus mapeamentos e tente novamente.",
+      "startOver": "Recomeçar",
+      "starting": "Iniciando…",
+      "importRows": "Importar {{rows}} linhas"
+    },
+    "stepHeader": {
+      "upload": "Enviar",
+      "map": "Mapear colunas",
+      "run": "Importar"
+    },
+    "progress": {
+      "starting": "Iniciando a importação…",
+      "statusComplete": "Importação concluída",
+      "statusImporting": "Importando…",
+      "statusCancelled": "Importação cancelada",
+      "statusFailed": "A importação falhou",
+      "errorRows": "Não foi possível importar {{formattedCount}} linhas.",
+      "downloadErrors": "Baixar relatório de erros (CSV)",
+      "importAnother": "Importar outro arquivo"
+    }
+  },
+  "territories": {
+    "pageTitle": "Territórios",
+    "pageSubtitle": "Presença global de oportunidades, cobertura de territórios e roteamento de leads.",
+    "totalsBadge": "{{opportunities}} oportunidades em {{countries}} países",
+    "newRuleButton": "Nova regra",
+    "newTerritoryButton": "Novo território",
+    "kpiTotalPipeline": "Pipeline total",
+    "kpiCountriesActive": "Países ativos",
+    "kpiOpportunities": "Oportunidades",
+    "kpiAvgProbability": "Probabilidade média",
+    "sectionTitleRegion": "Mapa global de oportunidades",
+    "sectionTitleIndustry": "Oportunidades por setor",
+    "sectionTitleAccount": "Oportunidades por conta",
+    "sectionCaptionRegion": "Intensidade do calor = valor total do pipeline. Clique em um país para ver detalhes.",
+    "sectionCaptionSegment": "Classificado pelo valor total do pipeline em todas as oportunidades.",
+    "breakdownTablistLabel": "Dimensão de detalhamento",
+    "tabRegion": "Região",
+    "tabIndustry": "Setor",
+    "tabAccount": "Conta",
+    "mapErrorTitle": "Falha ao carregar os dados do mapa",
+    "retryButton": "Tentar novamente",
+    "mapEmptyTitle": "Sem dados geográficos",
+    "mapEmptyMessage": "As oportunidades precisam de uma atribuição de país ou território para aparecer no mapa.",
+    "deleteTerritoryConfirmTitle": "Excluir \"{{name}}\"?",
+    "deleteTerritoryConfirmDescription": "Este território será desativado.",
+    "deleteRuleConfirmTitle": "Excluir \"{{name}}\"?",
+    "deleteRuleConfirmDescription": "Esta regra de roteamento será desativada."
+  },
+  "pipeline": {
+    "heading": "Pipeline aberto",
+    "subtitle": "Arraste um cartão entre colunas, ou selecione um e use ← / → para mudar de etapa.",
+    "stageFilterLabel": "Etapa",
+    "stageFilterAriaLabel": "Filtrar o pipeline por etapa",
+    "stageFilterAllOption": "Todas",
+    "updatingIndicator": "Atualizando…",
+    "liveRegionCountOne": "{{count}} oportunidade",
+    "liveRegionCountOther": "{{count}} oportunidades",
+    "kpiTotalPipeline": "Pipeline total",
+    "kpiOpenValue": "Valor em aberto",
+    "kpiWinRate": "Taxa de vitória",
+    "winRateNoClosedBids": "Nenhuma proposta fechada",
+    "kpiActiveDeals": "Negócios ativos",
+    "errorTitle": "Não foi possível carregar o pipeline",
+    "errorMessage": "Tente novamente.",
+    "errorReloadButton": "Recarregar",
+    "emptyTitle": "Ainda não há oportunidades",
+    "emptyMessage": "Crie uma oportunidade para começar a construir o seu pipeline.",
+    "emptyGoToOpportunitiesButton": "Ir para Oportunidades",
+    "movedToStageToast": "Movido para {{stage}}",
+    "movedOpportunityToast": "\"{{name}}\" movido para {{stage}}",
+    "moveErrorToastTitle": "Não foi possível mover a oportunidade",
+    "moveErrorToastDescription": "O servidor rejeitou a solicitação.",
+    "openOpportunitiesLabel": "Oportunidades abertas",
+    "openCount_one": "{{count}} oportunidade aberta",
+    "openCount_other": "{{count}} oportunidades abertas",
+    "emptyStageValue": "Ainda sem valor por etapa",
+    "chartAriaLabel": "Distribuição do valor por etapa do pipeline"
+  },
+  "auditLogTable": {
+    "evidenceStreamTitle": "Fluxo de evidências",
+    "evidenceStreamSummary": "Mostrando {{count}} eventos filtrados de {{total}} registros carregados.",
+    "newer": "Mais recentes",
+    "page": "Página {{page}}",
+    "older": "Mais antigos",
+    "emptyTitle": "Nenhuma evidência correspondente",
+    "emptyDescription": "Ajuste a categoria, o tipo de registro ou os termos de pesquisa para ampliar a trilha de auditoria.",
+    "tableRegionLabel": "Tabela de evidências de auditoria",
+    "tableCaption": "Entradas do registro de auditoria, as mais recentes primeiro",
+    "columnEvent": "Evento",
+    "columnActor": "Ator",
+    "columnTarget": "Alvo",
+    "columnTime": "Hora",
+    "columnDetails": "Detalhes",
+    "riskBadge": "Risco {{risk}}",
+    "moreFields": "+{{count}} mais",
+    "systemGenerated": "Gerado pelo sistema",
+    "targetTypeSystem": "sistema",
+    "targetIdLabel": "ID do alvo {{id}}",
+    "noRecordReference": "Sem referência de registro",
+    "open": "Abrir",
+    "copyId": "Copiar ID",
+    "hide": "Ocultar",
+    "inspect": "Inspecionar",
+    "hideDiffLabel": "Ocultar a carga de diferenças de {{action}} por {{actor}}",
+    "inspectDiffLabel": "Inspecionar a carga de diferenças de {{action}} por {{actor}}",
+    "diffPayloadLabel": "Carga de diferenças de {{action}}",
+    "changeSummary": "Resumo das alterações",
+    "noStructuredDiff": "Nenhuma diferença estruturada foi capturada para este evento. Use a carga bruta quando for necessário detalhe forense.",
+    "rawPayloadTitle": "Carga de evidências bruta",
+    "copyJson": "Copiar JSON",
+    "immutable": "Imutável"
+  },
+  "taskRow": {
+    "toast": {
+      "markedDone": "\"{{title}}\" marcada como concluída",
+      "updateFailedTitle": "Não foi possível atualizar a tarefa",
+      "serverRejected": "O servidor rejeitou a solicitação.",
+      "snoozed": "\"{{title}}\" adiada para {{label}}",
+      "snoozeFailedTitle": "Falha ao adiar"
+    },
+    "snooze": {
+      "tomorrow": "Amanhã",
+      "inThreeDays": "Em 3 dias",
+      "nextWeek": "Próxima semana",
+      "button": "Adiar…",
+      "presets": "Opções de adiamento"
+    },
+    "reorderTask": "Reordenar tarefa",
+    "dragToReorder": "Arraste para reordenar",
+    "moveUp": "Mover {{title}} para cima",
+    "up": "Cima",
+    "moveDown": "Mover {{title}} para baixo",
+    "down": "Baixo",
+    "due": "Vence {{date}}",
+    "warning": "aviso",
+    "overdue": "Atrasada: {{count}} d de atraso",
+    "dueIn": "em {{count}} d",
+    "snoozeTask": "Adiar {{title}}",
+    "statusAction": "Status: {{status}}. Ativar para mudar para {{next}}.",
+    "statusTitle": "Ativar para alterar o status para {{next}}"
+  },
+  "collaborativeRichTextEditor": {
+    "editingAnnouncementOne": "{{names}} está editando",
+    "editingAnnouncementOther": "{{names}} estão editando",
+    "loading": "Carregando…",
+    "statusLive": "Ao vivo",
+    "statusConnecting": "Conectando…",
+    "statusOffline": "Offline",
+    "statusError": "Erro"
+  },
+  "notes": {
+    "panelTitle": "Notas",
+    "addButton": "+ Adicionar",
+    "noAccountTitle": "Selecione uma conta para ver as notas",
+    "noAccountMessage": "As notas estão associadas a uma conta de cliente.",
+    "loadErrorTitle": "Não foi possível carregar as notas",
+    "unknownError": "Erro desconhecido",
+    "emptyTitle": "Ainda não há notas",
+    "emptyMessage": "Capture um resumo de reunião ou contexto.",
+    "deleteConfirmTitle": "Excluir esta nota?",
+    "deleteConfirmDescription": "A nota será removida desta conta. O log de auditoria mantém um registro da exclusão.",
+    "deleteConfirmLabel": "Excluir",
+    "deleteSuccess": "Nota excluída",
+    "deleteErrorTitle": "Falha ao excluir",
+    "serverRejected": "O servidor rejeitou a solicitação.",
+    "pinnedBadge": "Fixada",
+    "unknownAuthor": "Desconhecido",
+    "unpinAriaLabel": "Desafixar nota",
+    "pinAriaLabel": "Fixar nota",
+    "unpinTitle": "Desafixar",
+    "pinTitle": "Fixar",
+    "unpinAction": "Desafixar",
+    "pinAction": "Fixar",
+    "editAriaLabel": "Editar nota",
+    "editTitle": "Editar",
+    "editAction": "Editar",
+    "deleteAriaLabel": "Excluir nota",
+    "deleteTitle": "Excluir",
+    "deleteAction": "Excluir",
+    "titleRequired": "O título é obrigatório",
+    "saveFailed": "Falha ao salvar",
+    "titlePlaceholder": "Título",
+    "titleAriaLabel": "Título da nota",
+    "bodyPlaceholder": "Markdown suporta **negrito** e *itálico*",
+    "bodyAriaLabel": "Corpo da nota",
+    "cancelAction": "Cancelar",
+    "savingAction": "Salvando…",
+    "saveAction": "Salvar",
+    "addNoteAction": "Adicionar nota"
+  },
+  "usePaletteItems": {
+    "recentlyVisited": "Visitado recentemente"
+  },
+  "routingRule": {
+    "nameLabel": "Nome",
+    "namePlaceholder": "ex.: leads empresariais dos EUA",
+    "priorityLabel": "Prioridade",
+    "countryFilterLabel": "Filtro de país",
+    "industryFilterLabel": "Filtro de setor",
+    "industryFilterPlaceholder": "tecnologia",
+    "minValueLabel": "Valor mínimo (micros)",
+    "assignmentLabel": "Atribuição",
+    "assignTypeUser": "Usuário",
+    "assignTypeTerritory": "Território",
+    "assignTypeRoundRobin": "Rodízio",
+    "assignToUserLabel": "Atribuir a usuário",
+    "selectUserOption": "Selecione um usuário",
+    "assignToTerritoryLabel": "Atribuir a território",
+    "selectTerritoryOption": "Selecione um território",
+    "roundRobinTeamLabel": "Membros da equipe de rodízio",
+    "noUsersAvailable": "Nenhum usuário disponível",
+    "roundRobinHint": "Selecione um ou mais membros da equipe. O sistema fará o rodízio entre eles.",
+    "activeLabel": "Ativa",
+    "cancelButton": "Cancelar",
+    "saveChangesButton": "Salvar alterações",
+    "createRuleButton": "Criar regra",
+    "editDialogTitle": "Editar regra de roteamento",
+    "newDialogTitle": "Nova regra de roteamento"
+  },
+  "roles": {
+    "access": {
+      "readWrite": "leitura e escrita",
+      "readOnly": "somente leitura",
+      "none": "sem acesso"
+    },
+    "cell": {
+      "readWriteTitle": "Leitura + escrita",
+      "readOnlyTitle": "Somente leitura",
+      "noAccessTitle": "Sem acesso"
+    },
+    "legend": {
+      "label": "Legenda",
+      "readWrite": "Leitura e escrita",
+      "readOnly": "Somente leitura",
+      "noAccess": "Sem acesso"
+    },
+    "tabs": {
+      "matrix": "Matriz de funções do sistema",
+      "custom": "Funções personalizadas"
+    },
+    "header": {
+      "title": "Funções e permissões",
+      "subtitle": "Matriz de permissões padrão para funções do sistema. Os administradores podem criar funções personalizadas abaixo."
+    },
+    "tablist": {
+      "label": "Visualizações de funções"
+    },
+    "table": {
+      "label": "Matriz de permissões para funções do sistema",
+      "resourceHeader": "Recurso"
+    },
+    "card": {
+      "systemBadge": "Sistema",
+      "readCount": "{{count}} de leitura",
+      "writeCount": "{{count}} de escrita",
+      "fullAccess": "Acesso total",
+      "noWriteAccess": "Sem acesso de escrita",
+      "leadFocused": "Focado em leads",
+      "postSale": "Pós-venda",
+      "pipelineOwner": "Proprietário do funil",
+      "teamLead": "Líder de equipe"
+    }
+  },
+  "orgDashboard": {
+    "greetingMorning": "Bom dia",
+    "greetingAfternoon": "Boa tarde",
+    "greetingEvening": "Boa noite",
+    "pageTitle": "Central de comando do espaço de trabalho",
+    "pageSubtitle": "{{companies}} empresas · {{openDeals}} negócios abertos · {{pipeline}} pipeline",
+    "allAccounts": "Todas as contas",
+    "opportunities": "Oportunidades",
+    "errorTitle": "Não foi possível carregar o painel",
+    "errorMessage": "O endpoint de resumo do espaço de trabalho não respondeu.",
+    "retry": "Tentar novamente",
+    "metricsAriaLabel": "Métricas do espaço de trabalho",
+    "cockpitAriaLabel": "Cockpit do espaço de trabalho",
+    "detailsAriaLabel": "Detalhes do espaço de trabalho",
+    "statAccountsLabel": "Contas",
+    "statAccountsDetail": "portfólio",
+    "statContactsLabel": "Contatos",
+    "statContactsDetail": "pessoas",
+    "statOpenDealsLabel": "Negócios abertos",
+    "statOpenDealsDetail": "pipeline",
+    "statPipelineLabel": "Pipeline",
+    "statPipelineDetail": "ponderado",
+    "statOverdueLabel": "Atrasadas",
+    "statOverdueDetail": "tarefas",
+    "kpiCompaniesLabel": "Empresas",
+    "kpiCompaniesDetail": "no portfólio",
+    "kpiContactsLabel": "Contatos",
+    "kpiContactsDetail": "tomadores de decisão",
+    "kpiLeadsLabel": "Leads",
+    "kpiLeadsDetail": "no funil",
+    "kpiOpportunitiesLabel": "Oportunidades",
+    "kpiOpportunitiesDetail": "propostas totais",
+    "kpiOpenPipelineLabel": "Pipeline aberto",
+    "kpiOpenPipelineDetail": "negócios ativos",
+    "kpiTasksLabel": "Tarefas",
+    "kpiTasksDetail": "acompanhamentos",
+    "signalAccounts": "Contas",
+    "signalContacts": "Contatos",
+    "signalLeads": "Leads",
+    "signalOpportunities": "Oportunidades",
+    "signalOpenDeals": "Negócios abertos",
+    "signalOpen": "Abertas",
+    "signalWon": "Ganhas",
+    "signalLost": "Perdidas",
+    "signalActive": "Ativas",
+    "signalOverdue": "Atrasadas",
+    "overdueTasks": "Tarefas atrasadas"
+  },
+  "calendar": {
+    "previousWeek": "Semana anterior",
+    "today": "Hoje",
+    "nextWeek": "Próxima semana",
+    "filterGroup": "Filtro de calendário",
+    "providerAll": "Todos",
+    "providerGoogle": "Google",
+    "providerMicrosoft": "Microsoft",
+    "newEvent": "+ Novo evento",
+    "loading": "Carregando calendário…",
+    "loadError": "Falha ao carregar os eventos do calendário.",
+    "dayMon": "Seg",
+    "dayTue": "Ter",
+    "dayWed": "Qua",
+    "dayThu": "Qui",
+    "dayFri": "Sex",
+    "daySat": "Sáb",
+    "daySun": "Dom",
+    "slotLabel": "Novo evento em {{date}} às {{time}}",
+    "syncConflict": "Conflito de sincronização",
+    "createError": "Não foi possível criar o evento. Tente novamente."
+  },
+  "contactCsvImport": {
+    "triggerButton": "Colar CSV",
+    "dialogTitle": "Importar contatos de CSV",
+    "dialogDescription": "Cole um bloco separado por tabulações ou vírgulas. A primeira linha deve ser um cabeçalho — colunas suportadas:",
+    "textareaLabel": "Linhas de contatos CSV",
+    "guidancePrefix": "Inclua cabeçalhos para pelo menos",
+    "guidanceAnd": "e",
+    "guidanceOptional": "Os cabeçalhos opcionais são",
+    "invalidRowsError": "{{count}} linha precisa de correções antes da importação. Verifique os campos obrigatórios ausentes, o formato do e-mail e os valores de sentimento.",
+    "tableStatusHeader": "status",
+    "rowStatusOk": "ok",
+    "rowStatusIssues": "{{count}} problema",
+    "showingFirstRows": "Mostrando as primeiras 20 de {{count}} linhas.",
+    "footerImporting": "Importando {{done}} de {{total}}…",
+    "footerReady": "{{ready}}/{{total}} prontos para importar",
+    "footerAwaiting": "Aguardando colagem",
+    "cancelButton": "Cancelar",
+    "importButtonImporting": "Importando {{done}} / {{total}}…",
+    "importButton": "Importar {{label}}",
+    "toastImported": "{{count}} contato importado",
+    "toastFailed": "{{count}} importação falhou",
+    "toastFailedDescription": "As linhas bem-sucedidas foram salvas. Revise e tente novamente as restantes."
+  },
+  "bidNoBid": {
+    "title": "Matriz de decisão Concorrer/Não concorrer",
+    "overrideBadge": "Substituição registrada",
+    "subtitle": "Pontue cada critério para obter uma recomendação prosseguir/não prosseguir com IA.",
+    "criteriaRated": "{{rated}}/{{total}} critérios pontuados.",
+    "aiCalibrate": {
+      "aria": "Calibrar pontuações com IA",
+      "pending": "Calibrando…",
+      "label": "Calibração IA"
+    },
+    "defend": {
+      "aria": "Defender pontuação com IA",
+      "pending": "Analisando…",
+      "label": "Defender pontuação"
+    },
+    "save": {
+      "aria": "Salvar pontuação da proposta",
+      "pending": "Salvando…",
+      "label": "Salvar pontuação"
+    },
+    "error": {
+      "saveScore": "Não foi possível salvar a pontuação. Tente novamente.",
+      "aiCalibrate": "A calibração com IA falhou. Tente novamente.",
+      "defend": "Não foi possível gerar a defesa da pontuação. Tente novamente."
+    },
+    "opportunity": {
+      "label": "Oportunidade",
+      "aria": "Selecionar oportunidade",
+      "loading": "Carregando oportunidades…",
+      "loadError": "Não foi possível carregar as oportunidades",
+      "placeholder": "— Selecione uma oportunidade —",
+      "loadFailed": "Falha ao carregar as oportunidades. Atualize para tentar novamente.",
+      "hint": "Selecione uma oportunidade para habilitar o salvamento e a calibração com IA."
+    },
+    "defensePanel": {
+      "title": "Defesa de pontuação por IA"
+    },
+    "notes": {
+      "title": "Notas da decisão",
+      "placeholder": "Adicione justificativa, principais preocupações ou condições para concorrer…",
+      "aria": "Notas da decisão de proposta"
+    }
+  },
+  "opportunityDetail": {
+    "stageS1Lead": "S1 Lead",
+    "stageS1Ongoing": "S1 Em andamento",
+    "stageS2Sent": "S2 Enviado",
+    "stageS3TechnicalIteration": "S3 Iteração técnica",
+    "stageS4Negotiation": "S4 Negociação",
+    "stageClosedWon": "Fechado ganho",
+    "stageClosedLost": "Fechado perdido",
+    "commandCreateTaskLabel": "Criar tarefa para {{name}}",
+    "commandCreateTaskHint": "Adicionar uma tarefa vinculada a esta oportunidade",
+    "commandBriefingLabel": "Abrir briefing de IA para {{name}}",
+    "commandBriefingHint": "Gerar um documento de briefing de IA Dust",
+    "errorTitle": "Não foi possível carregar esta oportunidade",
+    "notFoundTitle": "Oportunidade não encontrada",
+    "notFoundMessage": "A oportunidade pode ter sido excluída ou você pode não ter acesso a ela.",
+    "goBack": "Voltar",
+    "breadcrumbAriaLabel": "Trilha de navegação",
+    "breadcrumbOpportunities": "Oportunidades",
+    "editNameLabel": "Editar nome da oportunidade",
+    "nameRequired": "O nome é obrigatório",
+    "editCustomerLabel": "Editar nome do cliente",
+    "customerRequired": "O cliente é obrigatório",
+    "editIndustryLabel": "Editar setor",
+    "industryPlaceholder": "Setor",
+    "addTaskButton": "+ Tarefa",
+    "rfpPipelineButton": "Pipeline de RFP",
+    "reviewDefaultTopic": "Revisão Go/No-Go — {{name}}",
+    "scheduleReviewButton": "Agendar revisão",
+    "askDustButton": "Perguntar ao Dust",
+    "changeStageLabel": "Alterar etapa",
+    "editValueLabel": "Editar valor do negócio (EUR)",
+    "editProbabilityLabel": "Editar probabilidade",
+    "likely": "provável",
+    "editDueDateLabel": "Editar data de vencimento",
+    "liveCollaborationLabel": "Colaboração ao vivo"
+  },
+  "callSummary": {
+    "meddicEmpty": "Nenhum sinal MEDDIC extraído. A transcrição pode estar muito curta ou ainda não processada.",
+    "meddicTableLabel": "Tabela de sinais MEDDIC",
+    "colDimension": "Dimensão",
+    "colExtractedSignal": "Sinal extraído",
+    "colConfidence": "Confiança",
+    "dimension": {
+      "MEDDIC_METRIC": "Métricas",
+      "MEDDIC_ECONOMIC_BUYER": "Comprador econômico",
+      "MEDDIC_DECISION_CRITERIA": "Critérios de decisão",
+      "MEDDIC_DECISION_PROCESS": "Processo de decisão",
+      "MEDDIC_IDENTIFY_PAIN": "Dor identificada",
+      "MEDDIC_CHAMPION": "Defensor"
+    },
+    "dealSuggestionsLabel": "Atualizações de negócio sugeridas",
+    "dealSuggestionsHeading": "Atualizações de negócio sugeridas",
+    "dealSuggestionsNote": "Estas são apenas sugestões da IA. Revise antes de aplicar ao negócio.",
+    "talkRatioLabel": "Proporção de fala",
+    "talkRatioHeading": "Proporção de fala",
+    "speakerTalkRatio": "Proporção de fala de {{speaker}}",
+    "loadingLabel": "Carregando resumo da chamada",
+    "loadError": "Falha ao carregar o resumo da chamada.",
+    "aiSummaryLabel": "Resumo da IA",
+    "summaryHeading": "Resumo",
+    "actionItemsLabel": "Itens de ação",
+    "actionItemsHeading": "Itens de ação",
+    "meddicSignalsLabel": "Sinais MEDDIC",
+    "meddicSignalsHeading": "Sinais MEDDIC",
+    "analysisNotRun": "A análise de IA ainda não foi executada.",
+    "transcriptUnavailable": "Transcrição indisponível. Os insights serão extraídos após o processamento da gravação.",
+    "analysing": "Analisando…",
+    "extractInsights": "Extrair insights agora",
+    "reAnalysing": "Reanalisando…",
+    "reExtractInsights": "Reextrair insights"
+  },
+  "commandPalette": {
+    "title": "Paleta de comandos",
+    "searchPlaceholder": "Pesquisar contas, contatos, tarefas, oportunidades…",
+    "searchAriaLabel": "Pesquisar em todo o espaço de trabalho",
+    "searching": "Pesquisando…",
+    "noMatches": "Nenhuma correspondência."
+  },
+  "inlineEdit": {
+    "editLabel": "Editar",
+    "mustBeNumber": "Deve ser um número"
+  },
+  "callTranscript": {
+    "emptyNotAvailable": "Transcrição ainda não disponível.",
+    "sectionLabel": "Transcrição da chamada",
+    "searchLabel": "Pesquisar na transcrição",
+    "searchPlaceholder": "Pesquisar na transcrição…",
+    "downloadAriaLabel": "Baixar a transcrição como arquivo de texto",
+    "downloadButton": "Baixar",
+    "resultCountOne": "{{count}} correspondência para \"{{term}}\"",
+    "resultCountOther": "{{count}} correspondências para \"{{term}}\"",
+    "segmentsLabel": "Segmentos da transcrição",
+    "noSegmentsMatch": "Nenhum segmento corresponde à sua pesquisa.",
+    "seekTo": "Ir para {{time}}"
+  },
+  "forecastList": {
+    "sectionTitle": "Detalhes da previsão",
+    "sectionCaption": "{{count}} grupos de previsão",
+    "errorTitle": "Falha ao carregar as previsões",
+    "retry": "Tentar novamente",
+    "emptyTitle": "Nenhuma previsão encontrada",
+    "emptyMessage": "Tente alterar o filtro de período ou crie a sua primeira previsão.",
+    "newForecast": "Nova previsão",
+    "tableLabel": "Previsões de receita",
+    "columnOwner": "Proprietário",
+    "columnPeriod": "Período",
+    "columnPipeline": "Pipeline",
+    "columnBestCase": "Melhor caso",
+    "columnCommit": "Comprometido",
+    "columnClosed": "Fechado",
+    "columnTotal": "Total",
+    "unassigned": "Não atribuído",
+    "cellLabel": "{{category}} para {{period}}",
+    "cellEditLabel": "Editar {{category}} para {{period}}",
+    "deleteLabel": "Excluir as previsões de {{period}}",
+    "totalLabel": "Total:"
+  },
+  "customObjectList": {
+    "createErrorFallback": "Falha ao criar o registro",
+    "notFound": "Objeto personalizado \"{{objectKey}}\" não encontrado.",
+    "manageLink": "Gerenciar objetos personalizados",
+    "totalCount": "{{count}} no total",
+    "newRecordButton": "Novo {{label}}",
+    "loadError": "Falha ao carregar os registros.",
+    "emptyTitle": "Ainda não há {{label}}",
+    "emptyDescription": "Clique em \"Novo {{label}}\" para criar seu primeiro registro.",
+    "columnRecord": "Registro",
+    "columnUpdated": "Atualizado",
+    "paginationLabel": "Paginação",
+    "previous": "← Anterior",
+    "pageOf": "Página {{page}} de {{totalPages}}",
+    "next": "Próximo →",
+    "newRecordTitle": "Novo {{label}}",
+    "nameLabel": "Nome",
+    "cancel": "Cancelar",
+    "creating": "Criando…",
+    "create": "Criar"
+  },
+  "widgetRenderer": {
+    "chartRenderError": "Erro ao renderizar o gráfico",
+    "retry": "Tentar novamente",
+    "configure": "Configurar",
+    "duplicate": "Duplicar",
+    "exportCsv": "Exportar CSV",
+    "delete": "Excluir"
+  },
+  "intelTabs": {
+    "solutionsEmptyTitle": "Ainda não há soluções",
+    "solutionsEmptyMessage": "Carregue documentos e execute a extração para revisar as soluções sugeridas.",
+    "highConfidenceBadge": "Alta confiança",
+    "sourceLabel": "De: {{source}}",
+    "deleteAriaLabel": "Excluir {{name}}",
+    "productsEmptyTitle": "Ainda não há produtos",
+    "productsEmptyMessage": "Carregue documentos e execute a extração para revisar os produtos sugeridos.",
+    "extractionsEmptyTitle": "Nenhum documento",
+    "extractionsEmptyMessage": "Carregue arquivos nesta conta para iniciar a extração.",
+    "extractingButton": "Extraindo…",
+    "reExtractButton": "Reextrair",
+    "extractButton": "Extrair",
+    "extractionSummary": "{{solutionCount}} soluções, {{productCount}} produtos encontrados"
+  },
+  "customFieldValues": {
+    "heading": "Campos personalizados",
+    "definedCount": "{{count}} definidos",
+    "reset": "Redefinir",
+    "save": "Salvar",
+    "saving": "Salvando…",
+    "toastSaved": "Campos personalizados salvos",
+    "toastSaveFailed": "Falha ao salvar os campos personalizados",
+    "selectNone": "—"
+  },
+  "createOpportunity": {
+    "triggerButton": "+ Nova oportunidade",
+    "dialogTitle": "Nova oportunidade",
+    "dialogDescription": "Adicione uma licitação ao seu pipeline. Você pode refinar as informações após a verificação de dados do Dust.",
+    "customerLabel": "Cliente",
+    "customerPlaceholder": "Pesquisar empresas…",
+    "nameLabel": "Nome da oportunidade",
+    "namePlaceholder": "Acme — Modernização de TI",
+    "stageLabel": "Etapa",
+    "industryLabel": "Setor",
+    "valueLabel": "Valor (EUR)",
+    "probabilityLabel": "Probabilidade %",
+    "dueDateLabel": "Data de vencimento",
+    "countryLabel": "País",
+    "cancel": "Cancelar",
+    "submitting": "Criando…",
+    "submit": "Criar oportunidade"
+  },
+  "companyDetail": {
+    "error": {
+      "title": "Não foi possível carregar a empresa",
+      "message": "A empresa pode ter sido excluída."
+    },
+    "notFound": {
+      "title": "Empresa não encontrada",
+      "message": "A empresa pode ter sido excluída ou você pode não ter acesso a ela.",
+      "goBack": "Voltar"
+    },
+    "field": {
+      "companyName": "Nome da empresa",
+      "industry": "Setor",
+      "domain": "Domínio"
+    },
+    "meta": {
+      "employees": "{{count}} funcionários",
+      "taxId": "CNPJ/NIF: {{taxId}}",
+      "parent": "Matriz:"
+    },
+    "action": {
+      "cancel": "Cancelar",
+      "saving": "Salvando…",
+      "save": "Salvar",
+      "edit": "Editar"
+    },
+    "tabs": {
+      "label": "Seções da empresa"
+    },
+    "tab": {
+      "contacts": "Contatos ({{count}})",
+      "opportunities": "Oportunidades ({{count}})",
+      "cases": "Casos ({{count}})",
+      "notes": "Notas ({{count}})",
+      "hierarchy": "Hierarquia"
+    }
+  },
+  "currencySelector": {
+    "statusUpdating": "Atualizando taxas ao vivo",
+    "statusCached": "Usando taxas em cache",
+    "tooltipRatesUnavailable": "Taxas indisponíveis: {{error}}",
+    "tooltipCurrency": "Moeda: {{name}}",
+    "triggerAriaLabel": "Selecionar moeda, atual: {{currency}}",
+    "triggerLabel": "Moeda",
+    "listboxAriaLabel": "Selecionar moeda",
+    "displayCurrencyLabel": "Moeda de exibição",
+    "autoButtonTitle": "Auto seleciona a moeda pela localização do navegador e depois pelo fuso horário",
+    "autoButton": "Auto",
+    "statusLiveRates": "Taxas ao vivo",
+    "statusRatesUpdated": "Taxas atualizadas em {{date}}"
+  },
+  "contact": {
+    "newContactTrigger": "+ Novo contato",
+    "editTitle": "Editar {{name}}",
+    "newTitle": "Novo contato",
+    "editDescription": "A atualização modifica o registro e grava uma entrada de auditoria.",
+    "newDescription": "Adicione uma pessoa à unidade de decisão.",
+    "errorRequired": "Cliente e nome são obrigatórios",
+    "errorSaveFailed": "Falha ao salvar",
+    "fieldCustomer": "Cliente / conta",
+    "fieldName": "Nome",
+    "fieldRole": "Cargo",
+    "rolePlaceholder": "ex. CTO, Diretor de Infraestrutura",
+    "fieldEmail": "E-mail",
+    "fieldPhone": "Telefone",
+    "fieldInfluence": "Influência (1–5)",
+    "fieldSentiment": "Sentimento",
+    "sentiment": {
+      "hot": "Quente",
+      "warm": "Morno",
+      "neutral": "Neutro",
+      "cold": "Frio"
+    },
+    "cancel": "Cancelar",
+    "saving": "Salvando…",
+    "saveChanges": "Salvar alterações",
+    "createContact": "Criar contato"
+  },
+  "references": {
+    "heading": "Biblioteca de referências",
+    "subtitle": "Provas que vencem licitações — o estudo de caso e o depoimento certos para cada proposta.",
+    "newButton": "Nova referência",
+    "searchPlaceholder": "Pesquisar referências...",
+    "searchAriaLabel": "Pesquisar referências",
+    "filterIndustryAriaLabel": "Filtrar por setor",
+    "allIndustries": "Todos os setores",
+    "filterTagAriaLabel": "Filtrar por etiqueta",
+    "allTags": "Todas as etiquetas",
+    "resultCount": "{{count}} referências",
+    "errorTitle": "Não foi possível carregar as referências",
+    "errorMessage": "Tente novamente em instantes.",
+    "emptyTitle": "Ainda não há referências",
+    "emptyMessage": "Adicione referências de clientes para criar sua biblioteca de propostas.",
+    "emptyAction": "Adicionar referência",
+    "lastUsed": "Último uso: {{date}}",
+    "deleteAriaLabel": "Excluir referência: {{title}}",
+    "recording": "Registrando...",
+    "useReference": "Usar referência",
+    "toast": {
+      "created": "Referência adicionada",
+      "createError": "Não foi possível criar a referência",
+      "deleted": "Referência excluída",
+      "deleteError": "Não foi possível excluir a referência"
+    },
+    "deleteConfirm": {
+      "title": "Excluir referência?",
+      "description": "\"{{title}}\" será removido da sua biblioteca. Isso não pode ser desfeito.",
+      "confirmLabel": "Excluir"
+    }
+  },
+  "callButton": {
+    "providerZoom": "Iniciar Zoom",
+    "providerTeams": "Iniciar Teams",
+    "providerGoogleMeet": "Iniciar Google Meet",
+    "providerTwilio": "Ligar via Twilio",
+    "phoneDialAriaLabel": "Insira o número de telefone",
+    "phoneLabel": "Número de telefone (E.164)",
+    "phonePlaceholder": "+1 555 000 0000",
+    "phoneInputAriaLabel": "Número de telefone E.164",
+    "dialling": "Discando…",
+    "dial": "Discar",
+    "cancel": "Cancelar",
+    "starting": "Iniciando…",
+    "startCall": "Iniciar chamada",
+    "menuAriaLabel": "Escolher provedor de chamadas"
+  },
+  "customObjectDetail": {
+    "saveFailed": "Falha ao salvar",
+    "deleteConfirmTitle": "Excluir {{label}}?",
+    "recordFallback": "registro",
+    "deleteConfirmDescription": "{{recordKey}} será excluído temporariamente. Pode ser restaurado pela API.",
+    "thisRecordFallback": "Este registro",
+    "deleteConfirmLabel": "Excluir",
+    "deleteFailedTitle": "Falha ao excluir",
+    "deleteFailedDescription": "Falha ao excluir",
+    "recordNotFound": "Registro não encontrado.",
+    "backToPlural": "Voltar para {{plural}}",
+    "breadcrumbAriaLabel": "Trilha de navegação",
+    "deleteButton": "Excluir",
+    "fieldValuesHeading": "Valores dos campos",
+    "editFieldAriaLabel": "Editar {{field}}",
+    "saving": "…",
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "editFieldValueAriaLabel": "Editar {{field}}: {{value}}",
+    "emptyFields": "Nenhum campo definido ainda. Adicione campos no",
+    "objectEditorLink": "editor de objetos",
+    "emptyFieldsPeriod": ".",
+    "createdAt": "Criado {{time}}",
+    "updatedAt": "Atualizado {{time}}",
+    "deletedAt": "Excluído {{time}}"
+  },
+  "predictiveAdmin": {
+    "modelTableLoadingLabel": "Carregando modelos...",
+    "modelTableEmpty": "Nenhum modelo de {{entityType}} treinado ainda. Clique em \"Retreinar agora\" para treinar o primeiro modelo.",
+    "modelTableCaption": "Histórico do modelo preditivo de {{entityType}}",
+    "colVersion": "Versão",
+    "colAccuracyMetrics": "Métricas de precisão",
+    "colSamples": "Amostras",
+    "colTrained": "Treinado",
+    "colActive": "Ativo",
+    "metricAuc": "AUC",
+    "metricF1": "F1",
+    "metricPrecision": "Prec",
+    "metricRecall": "Rec",
+    "activeModelLabel": "Modelo ativo",
+    "inactiveModelLabel": "Inativo",
+    "sectionHeading": "Modelo de pontuação de {{entityType}}",
+    "sectionSubtitle": "Regressão logística · por organização · retreinado semanalmente",
+    "retrainButtonLabel": "Retreinar o modelo de {{entityType}} agora",
+    "retrainPending": "Na fila…",
+    "retrainButton": "Retreinar agora",
+    "retrainError": "O retreinamento falhou. Tente novamente.",
+    "pageTitle": "Pontuação preditiva",
+    "pageSubtitle": "Pontuação de leads e oportunidades baseada em ML — treinada no histórico de negócios fechados da sua organização. Os modelos são retreinados automaticamente todo domingo às 02:00 UTC.",
+    "dataPrivacyLabel": "Privacidade de dados:",
+    "dataPrivacyBody": "Os artefatos do modelo contêm apenas os pesos aprendidos — nenhum dado bruto de negócios, nomes ou e-mails. Cada organização treina seu próprio modelo isolado. As pontuações ficam em cache por 1 hora no Redis e são invalidadas em atualizações de registros."
+  },
+  "scoreFactors": {
+    "featureLabel": {
+      "dealValue": "Valor do negócio",
+      "pipelineStage": "Etapa do funil",
+      "daysInStage": "Dias na etapa",
+      "dealAge": "Idade do negócio",
+      "daysToClose": "Dias para fechar",
+      "contactCount": "Número de contatos",
+      "meetingsHeld": "Reuniões realizadas",
+      "emailsExchanged": "E-mails trocados",
+      "lastActivity": "Última atividade",
+      "ownerWinRate90d": "Taxa de ganho do proprietário (90d)",
+      "qualificationScore": "Pontuação de qualificação",
+      "contactSeniority": "Senioridade do contato",
+      "engagement30d": "Engajamento (30d)",
+      "emailDomain": "Domínio do e-mail",
+      "companySize": "Tamanho da empresa",
+      "activityRecency": "Recência da atividade",
+      "budget": "Orçamento",
+      "authority": "Autoridade",
+      "need": "Necessidade",
+      "timeline": "Cronograma"
+    },
+    "contributionAria": "Contribuição: {{value}}",
+    "loadingAria": "Carregando fatores de pontuação",
+    "tableCaption": "Fatores que contribuem para a pontuação",
+    "tableHeaderFactor": "Fator",
+    "tableHeaderContribution": "Contribuição",
+    "title": "Análise de pontuação de ML",
+    "chartAria": "Os {{count}} principais fatores que influenciam {{label}}",
+    "footer": "Modelo v{{modelVersion}} · Regressão logística · Atualizado a cada hora",
+    "labelLeadScore": "Pontuação do lead",
+    "labelWinProbability": "Probabilidade de ganho"
+  },
+  "files": {
+    "cardLabel": "Arquivos",
+    "heading": "Arquivos",
+    "attachmentCount": "{{count}} anexo(s)",
+    "uploading": "Enviando…",
+    "upload": "Enviar",
+    "dropzoneLabel": "Arraste arquivos aqui para enviar",
+    "dropPrompt": "Solte os arquivos ou clique para procurar",
+    "acceptedFormats": "PDF, DOCX, XLSX, imagens — até 50 MB",
+    "unsupportedType": "Tipo de arquivo não suportado: {{type}}",
+    "unknownType": "desconhecido",
+    "loadErrorTitle": "Não foi possível carregar os arquivos",
+    "unknownError": "Erro desconhecido",
+    "emptyTitle": "Nenhum arquivo ainda",
+    "emptyMessage": "Envie para anexar documentos a esta conta.",
+    "deleteTitle": "Excluir arquivo?",
+    "deleteDescription": "Isto remove permanentemente \"{{name}}\". Não pode ser desfeito.",
+    "cancel": "Cancelar",
+    "deleting": "Excluindo…",
+    "delete": "Excluir",
+    "downloadTitle": "Baixar {{name}}",
+    "unknownUploader": "desconhecido",
+    "deleteAria": "Excluir {{name}}"
+  },
+  "analyticsDashboard": {
+    "confirmRemoveWidget": "Remover este widget?",
+    "title": "Análises",
+    "switchDashboardAria": "Alternar painel",
+    "selectDashboard": "Selecionar painel",
+    "manageDashboards": "Gerenciar painéis",
+    "reportsLink": "Relatórios",
+    "newReportLink": "Novo relatório",
+    "addWidget": "Adicionar widget",
+    "noDashboardsTitle": "Nenhum painel",
+    "noDashboardsMessage": "Crie seu primeiro painel para começar a visualizar seus dados.",
+    "createDashboard": "Criar painel",
+    "loadWidgetsError": "Falha ao carregar os widgets",
+    "emptyDashboardTitle": "Painel vazio",
+    "emptyDashboardMessage": "Adicione seu primeiro widget para começar a visualizar dados."
+  },
+  "pageHead": {
+    "companyProfileIncomplete": "Perfil da empresa incompleto",
+    "dashboardSubtitle": "Hoje: {{date}} - cockpit de {{company}}",
+    "dashboardTitle": "Painel",
+    "accountStatusSummaryLabel": "Resumo do status da conta",
+    "attributionConfidence": "{{percent}}% de confiança de atribuição",
+    "refreshed": "Atualizado {{time}}",
+    "externalFreshness": "Externo {{freshness}} - {{time}}",
+    "externalNotSynced": "Fonte externa não sincronizada",
+    "opportunityLinked": "Oportunidade vinculada",
+    "noOpportunityLinked": "Nenhuma oportunidade vinculada",
+    "removeFromFavorites": "Remover dos favoritos",
+    "addToFavorites": "Adicionar aos favoritos",
+    "starred": "Destacado",
+    "star": "Destacar",
+    "enrichTitle": "Atualizar as fontes de dados disponíveis",
+    "enriching": "Enriquecendo…",
+    "enrichNow": "Enriquecer agora",
+    "printTitle": "Imprimir o cockpit como um resumo de uma página",
+    "print": "Imprimir",
+    "generateBriefTitle": "Gerar resumo para {{name}}",
+    "generateBrief": "Gerar resumo",
+    "createOpportunityTitle": "Criar uma oportunidade para {{name}}",
+    "createOpportunity": "Criar oportunidade",
+    "briefIndustry": "Setor",
+    "briefHeadcount": "Número de funcionários",
+    "briefDomain": "Domínio",
+    "briefLegalName": "Razão social",
+    "briefFounded": "Fundada",
+    "briefConfidence": "Confiança: {{percent}}%"
+  },
+  "publicBooking": {
+    "errorNotFound": "Página de agendamento não encontrada",
+    "errorAvailabilityFailed": "Falha na disponibilidade",
+    "errorUnavailable": "Página de agendamento indisponível",
+    "errorSlotTaken": "Esse horário já não está disponível.",
+    "errorBookingFailed": "Falha no agendamento",
+    "notFoundTitle": "Página de agendamento não encontrada",
+    "notFoundBody": "Este link de agendamento é inválido ou já não aceita reuniões.",
+    "eyebrow": "Agendamento BidStack",
+    "loadingTitle": "Carregando página de agendamento",
+    "confirmedTitle": "Agendamento confirmado",
+    "confirmedBody": "Seu agendamento foi feito. Um e-mail de confirmação está a caminho.",
+    "calendarAriaLabel": "Escolha uma data de agendamento",
+    "chooseDayHeading": "Escolha um dia",
+    "availableTimesHeading": "Horários disponíveis",
+    "slotAriaLabel": "Horário disponível {{slot}}",
+    "noSlots": "Nenhum horário disponível neste dia. Tente outra data.",
+    "selectedLabel": "Selecionado:",
+    "nameLabel": "Nome",
+    "emailLabel": "E-mail",
+    "confirmButton": "Confirmar agendamento"
+  },
+  "oppToolbar": {
+    "kpiOpportunities": "Oportunidades",
+    "kpiRevenue": "Receita",
+    "kpiWeightedRevenue": "RP",
+    "kpiOpen": "Abertas",
+    "kpiRegionLabel": "Resumo de KPIs de oportunidades",
+    "title": "Oportunidades",
+    "resultsFor": "resultados para",
+    "clear": "limpar",
+    "stageOpportunities": "oportunidades {{stage}}",
+    "clearFilter": "limpar filtro",
+    "bidsInFlight": "{{count}} propostas em andamento · clique em qualquer célula para editar em linha.",
+    "exportingLabel": "Exportando oportunidades…",
+    "exportLabel": "Exportar as oportunidades visíveis como CSV",
+    "exporting": "Exportando…",
+    "exportCsv": "Exportar CSV",
+    "stageFilterGroupLabel": "Filtrar oportunidades por etapa",
+    "stageAll": "Todas",
+    "bulkActionsLabel": "Ações em massa",
+    "selectedCount": "{{count}} selecionadas",
+    "moveSelectionLabel": "Mover a seleção para uma etapa",
+    "moveToStage": "Mover para etapa…",
+    "deleteSelected": "Excluir selecionadas",
+    "clearSelection": "Limpar"
+  },
+  "newLead": {
+    "toastNameRequired": "Nome e sobrenome são obrigatórios",
+    "toastCreateFailed": "Falha ao criar o lead",
+    "breadcrumbLabel": "Caminho de navegação",
+    "breadcrumbLeads": "Leads",
+    "breadcrumbCurrent": "Novo lead",
+    "heading": "Novo lead",
+    "subtitle": "Adicione um novo prospecto ao seu pipeline.",
+    "labelFirstName": "Nome",
+    "labelLastName": "Sobrenome",
+    "labelEmail": "E-mail",
+    "labelPhone": "Telefone",
+    "labelCompany": "Empresa",
+    "labelTitle": "Cargo",
+    "labelSource": "Origem",
+    "sourceWebsite": "Site",
+    "sourceReferral": "Indicação",
+    "sourceEvent": "Evento",
+    "sourceColdOutreach": "Abordagem fria",
+    "sourcePartner": "Parceiro",
+    "sourceSocial": "Redes sociais",
+    "sourceOther": "Outro",
+    "labelPriority": "Prioridade",
+    "priorityLow": "Baixa",
+    "priorityMedium": "Média",
+    "priorityHigh": "Alta",
+    "priorityCritical": "Crítica",
+    "labelScore": "Pontuação",
+    "submitPending": "Criando…",
+    "submit": "Criar lead",
+    "cancel": "Cancelar"
+  },
+  "topAccounts": {
+    "heading": "Principais contas",
+    "badgeCurated": "Selecionado — top 10 global da Amaris",
+    "badgeAuto": "Classificado automaticamente por valor do pipeline",
+    "subtitleCurated": "O top 10 global, selecionado e ordenado pelos administradores nas Configurações.",
+    "subtitleAuto": "Contas de maior valor classificadas por pipeline total e receita.",
+    "searchLabel": "Pesquisar contas principais",
+    "searchPlaceholder": "Pesquisar contas principais...",
+    "industryLabel": "Filtrar contas principais por setor",
+    "industriesUnavailable": "Setores indisponíveis",
+    "allIndustries": "Todos os setores",
+    "industryLoadError": "Não foi possível carregar os filtros de setor.",
+    "retry": "Tentar novamente",
+    "resultCount": "{{count}} conta",
+    "errorTitle": "Não foi possível carregar as contas principais",
+    "errorMessage": "Não foi possível carregar as principais contas.",
+    "emptyTitle": "Ainda não há dados de contas",
+    "emptyMessage": "Adicione oportunidades com valores para ver as contas principais classificadas por pipeline.",
+    "totalPipeline": "pipeline total",
+    "won": "ganho",
+    "openDeals": "{{count}} negócios abertos",
+    "contacts": "{{count}} contatos",
+    "sourceCurated": "Top 10 selecionado",
+    "sourceAuto": "Classificação automática",
+    "viewAll": "Ver tudo",
+    "empty": "Ainda não há contas classificadas — adicione valores de oportunidade ou organize o Top 10 nas Configurações.",
+    "portfolioAccount": "Conta da carteira"
+  },
+  "forecasts": {
+    "title": "Previsões de receita",
+    "subtitle": "As propostas que pilotamos vão atingir a meta? Pipeline, melhor caso, comprometido e fechado por período.",
+    "newForecast": "Nova previsão",
+    "periodFilterLabel": "Filtro de período",
+    "periodMonthly": "Mensal",
+    "periodQuarterly": "Trimestral",
+    "periodYearly": "Anual",
+    "totalsLabel": "Totais de previsão para o período selecionado",
+    "totalCommit": "Comprometido",
+    "totalBestCase": "Melhor caso",
+    "totalPipeline": "Pipeline",
+    "totalClosed": "Fechado",
+    "toastUpdated": "Previsão atualizada",
+    "toastUpdateFailed": "Falha ao atualizar a previsão",
+    "toastCreated": "Previsão criada",
+    "toastCreateFailed": "Falha ao criar a previsão",
+    "toastDeleted": "Previsões excluídas",
+    "toastDeleteFailed": "Falha ao excluir as previsões",
+    "deleteConfirmTitle": "Excluir as previsões de {{period}}?",
+    "deleteConfirmDescription": "Isto removerá todas as previsões por categoria deste período e proprietário.",
+    "unknownError": "Erro desconhecido"
+  },
+  "cartesianCharts": {
+    "lineChartAriaLabel": "Gráfico de linhas",
+    "barChartAriaLabel": "Gráfico de barras",
+    "areaChartAriaLabel": "Gráfico de áreas",
+    "funnelChartAriaLabel": "Gráfico de funil",
+    "scatterChartAriaLabel": "Gráfico de dispersão"
+  },
+  "commandCenter": {
+    "region": {
+      "ariaLabel": "Centro de comando BidStack"
+    },
+    "kicker": "Centro de comando BidStack",
+    "actions": {
+      "ariaLabel": "Sinais de decisão da conta"
+    },
+    "badge": {
+      "ready": "{{count}}% pronto",
+      "stackSignals": "{{count}} sinais de stack"
+    },
+    "signal": {
+      "readiness": {
+        "label": "Estimativa de prontidão da proposta",
+        "detailReady": "pronto para revisão executiva",
+        "detailFocus": "precisa de foco de pré-vendas"
+      },
+      "source": {
+        "label": "Cobertura de fontes",
+        "detail": "{{count}} fonte atribuída"
+      },
+      "decision": {
+        "label": "Cobertura de decisão"
+      },
+      "risk": {
+        "label": "Carga de riscos abertos",
+        "valueHigh": "{{count}} alto",
+        "valueOpen": "{{count}} aberto",
+        "detailEscalate": "escalar antes da proposta",
+        "detailManageable": "gerenciável com acompanhamento do responsável"
+      }
+    },
+    "nextMove": {
+      "unblock": "Desbloqueie {{label}} antes do gate da proposta.",
+      "escalateWithOwner": "Escale {{title}} com {{owner}} antes da aprovação da proposta.",
+      "escalate": "Escale {{title}} antes da aprovação da proposta.",
+      "champion": "Use {{name}} como defensor para o próximo marco de pré-vendas.",
+      "refreshSources": "Atualize a verificação de dados para reforçar as provas legais, de logotipo, de mercado e de fonte da conta.",
+      "advance": "Avance a próxima etapa da proposta com o contexto da conta disponível e o alinhamento do responsável."
+    },
+    "committee": {
+      "champions": "{{count}} defensor mapeado",
+      "buyers": "{{count}} comprador mapeado",
+      "stakeholders": "{{count}} parte interessada mapeada",
+      "empty": "mapear comprador e defensor"
+    },
+    "footer": {
+      "primarySignal": {
+        "label": "Sinal comercial principal",
+        "pending": "Pipeline pendente"
+      },
+      "weightedValue": {
+        "label": "Valor ponderado da conta",
+        "notVerified": "Não verificado"
+      },
+      "ownerMap": {
+        "label": "Mapa de responsáveis pela decisão",
+        "contacts": "{{count}} contatos mapeados"
+      }
+    }
+  },
+  "contactDetail": {
+    "errorTitle": "Não foi possível carregar o contato",
+    "errorMessage": "O contato pode ter sido excluído.",
+    "notFoundTitle": "Contato não encontrado",
+    "notFoundMessage": "O contato pode ter sido excluído ou você pode não ter acesso a ele.",
+    "backToContacts": "Voltar aos contatos",
+    "breadcrumbLabel": "Trilha de navegação",
+    "contacts": "Contatos",
+    "noRole": "Sem cargo",
+    "influence": "Influência: {{value}}/5",
+    "added": "Adicionado",
+    "opportunitiesTitle": "Oportunidades",
+    "relatedCount": "{{count}} relacionados",
+    "noOpportunities": "Nenhuma oportunidade para {{customer}}.",
+    "tasksTitle": "Tarefas",
+    "noTasks": "Nenhuma tarefa relacionada.",
+    "dueDate": "Vence {{date}}",
+    "noDueDate": "Sem data de vencimento",
+    "notesTitle": "Notas",
+    "noNotes": "Nenhuma nota para esta conta.",
+    "unknownAuthor": "Desconhecido",
+    "liveCollaboration": "Colaboração ao vivo"
+  },
+  "keyAccounts": {
+    "title": "Contas estratégicas",
+    "subtitle": "Contas estratégicas regionais geridas para pipeline, cobertura e acompanhamento executivo — distintas do Top 10 global selecionado.",
+    "searchLabel": "Pesquisar contas-chave",
+    "searchPlaceholder": "Pesquisar contas-chave...",
+    "industryFilterLabel": "Filtrar contas-chave por setor",
+    "industriesUnavailable": "Setores indisponíveis",
+    "allIndustries": "Todos os setores",
+    "industryFilterError": "Não foi possível carregar os filtros de setor.",
+    "retry": "Tentar novamente",
+    "resultCount_one": "{{count}} conta",
+    "resultCount_other": "{{count}} contas",
+    "statKeyAccounts": "Contas-chave",
+    "statTotalPipeline": "Pipeline total",
+    "statOpenDeals": "Negócios abertos",
+    "statContacts": "Contactos",
+    "errorTitle": "Não foi possível carregar as contas-chave",
+    "errorMessage": "O endpoint de contas-chave não respondeu.",
+    "emptyTitle": "Ainda não há contas-chave",
+    "emptyMessage": "Marque as empresas estrategicamente importantes como contas-chave na página de Empresas.",
+    "metricPipeline": "pipeline",
+    "metricOpenDeals": "negócios abertos",
+    "metricContacts": "contactos"
+  },
+  "companyTabs": {
+    "contacts": {
+      "emptyTitle": "Ainda não há contatos",
+      "emptyMessage": "Adicione contatos na página de Contatos.",
+      "colName": "Nome",
+      "colRole": "Função",
+      "colEmail": "E-mail",
+      "colPhone": "Telefone"
+    },
+    "opportunities": {
+      "emptyTitle": "Ainda não há oportunidades",
+      "emptyMessage": "Crie oportunidades vinculadas a esta empresa.",
+      "colCode": "Código",
+      "colName": "Nome",
+      "colStage": "Estágio",
+      "colValue": "Valor",
+      "colProbability": "Probabilidade"
+    },
+    "cases": {
+      "emptyTitle": "Nenhum caso aberto",
+      "emptyMessage": "Tudo certo — nenhum caso de suporte ativo.",
+      "colNumber": "Número",
+      "colSubject": "Assunto",
+      "colStatus": "Status",
+      "colPriority": "Prioridade"
+    },
+    "notes": {
+      "emptyTitle": "Ainda não há notas",
+      "emptyMessage": "As notas vinculadas a esta empresa aparecerão aqui.",
+      "byAuthor": "por {{author}}"
+    },
+    "hierarchy": {
+      "directChildren": "Subsidiárias diretas",
+      "errorTitle": "Não foi possível carregar a hierarquia",
+      "errorMessage": "Não foi possível obter a hierarquia de contas."
+    }
+  },
+  "oppInlineEditCells": {
+    "unknownStage": "Desconhecido",
+    "stageTriggerAria": "Estágio: {{stage}}. Clique para alterar.",
+    "numberTriggerAria": "{{value}}. Clique para editar.",
+    "dateTriggerAria": "Vencimento {{date}}. Clique para editar."
+  },
+  "liveDataMesh": {
+    "availabilityAvailable": "{{count}} disponíveis",
+    "availabilityConnected": "{{enabled}}/{{total}} conectados",
+    "regionLabel": "Fontes de dados conectadas",
+    "titleAvailable": "Fontes de dados disponíveis",
+    "titleConnected": "Fontes de dados conectadas",
+    "captionAvailable": "Fontes disponíveis após configurar credenciais ou conector",
+    "captionConnected": "APIs configuradas, widgets e feeds de dados verificados",
+    "kicker": "Disponibilidade de fontes",
+    "publicSources": "fontes públicas",
+    "connectorStatus": "Status do conector",
+    "signalsLabel": "Sinais de fontes disponíveis",
+    "loading": "Verificando fontes configuradas...",
+    "error": "Registro de conectores carregado; a verificação de fontes retornou um erro.",
+    "empty": "Nenhum sinal público retornado para esta conta ainda.",
+    "connectorAria": "{{name}} está {{status}}"
+  },
+  "serviceDesk": {
+    "title": "Central de atendimento",
+    "searchPlaceholder": "Pesquisar casos…",
+    "searchAriaLabel": "Pesquisar casos",
+    "exportCsv": "Exportar CSV",
+    "filterByStatusAriaLabel": "Filtrar por status",
+    "filterByPriorityAriaLabel": "Filtrar por prioridade",
+    "statusOption": {
+      "all": "Todos",
+      "new": "Novo",
+      "open": "Aberto",
+      "waitingCustomer": "Aguardando cliente",
+      "waitingInternal": "Aguardando interno",
+      "resolved": "Resolvido",
+      "closed": "Fechado",
+      "escalated": "Escalonado"
+    },
+    "priorityOption": {
+      "all": "Todas",
+      "low": "Baixa",
+      "medium": "Média",
+      "high": "Alta",
+      "critical": "Crítica"
+    },
+    "csv": {
+      "caseNumber": "N.º do caso",
+      "subject": "Assunto",
+      "status": "Status",
+      "priority": "Prioridade",
+      "owner": "Responsável",
+      "source": "Origem",
+      "satisfaction": "Satisfação",
+      "created": "Criado",
+      "resolved": "Resolvido"
+    },
+    "error": {
+      "title": "Falha ao carregar os casos"
+    },
+    "retry": "Tentar novamente",
+    "empty": {
+      "title": "Ainda não há casos",
+      "message": "Os casos de atendimento aparecerão aqui."
+    },
+    "column": {
+      "subject": "Assunto",
+      "status": "Status",
+      "priority": "Prioridade",
+      "owner": "Responsável",
+      "source": "Origem"
+    },
+    "resultCount": {
+      "one": "{{count}} caso",
+      "other": "{{count}} casos"
+    },
+    "resultMatching": " correspondentes a \"{{search}}\""
+  },
+  "widgetConfig": {
+    "title": "Configurar widget",
+    "closeAriaLabel": "Fechar",
+    "titleLabel": "Título",
+    "titlePlaceholder": "Título do widget",
+    "dataSourceLabel": "Fonte de dados (relatório)",
+    "dataSourceNone": "— Nenhuma (demo estática) —",
+    "chartTypeLabel": "Tipo de gráfico",
+    "type": {
+      "kpi": {
+        "label": "Cartão de KPI",
+        "description": "Métrica única com tendência"
+      },
+      "line": {
+        "label": "Gráfico de linhas",
+        "description": "Tendência ao longo do tempo"
+      },
+      "bar": {
+        "label": "Gráfico de barras",
+        "description": "Comparar categorias"
+      },
+      "area": {
+        "label": "Gráfico de área",
+        "description": "Volume ao longo do tempo"
+      },
+      "pie": {
+        "label": "Gráfico de pizza",
+        "description": "Distribuição (≤6 fatias)"
+      },
+      "donut": {
+        "label": "Gráfico de rosca",
+        "description": "Distribuição com valor central"
+      },
+      "funnel": {
+        "label": "Funil",
+        "description": "Queda por etapa do pipeline"
+      },
+      "gauge": {
+        "label": "Medidor",
+        "description": "Progresso em relação à meta"
+      },
+      "table": {
+        "label": "Tabela",
+        "description": "Grade de dados tabulares"
+      },
+      "scatter": {
+        "label": "Dispersão",
+        "description": "Correlação entre duas métricas"
+      },
+      "radar": {
+        "label": "Radar",
+        "description": "Comparação multidimensional"
+      },
+      "heatmap": {
+        "label": "Mapa de calor",
+        "description": "Densidade de atividade ao longo do tempo"
+      }
+    },
+    "xAxisLabel": "Campo do eixo X",
+    "yAxisLabel": "Campo do eixo Y",
+    "cancel": "Cancelar",
+    "save": "Salvar widget"
+  },
+  "auditLogInsights": {
+    "activityCadenceTitle": "Cadência de atividade",
+    "activityCadenceSubtitle": "Volume real de eventos da página de evidências carregada atualmente.",
+    "attentionEventsBadge": "{{percent}}% de eventos de atenção",
+    "eventVolumeChartLabel": "Gráfico de volume de eventos de auditoria",
+    "bucketTooltip": "{{label}}: {{count}} eventos",
+    "forensicWatchlistTitle": "Lista de vigilância forense",
+    "forensicWatchlistSubtitle": "Triagem rápida do conjunto de evidências carregado.",
+    "topActorLabel": "Ator principal",
+    "hottestTargetLabel": "Alvo mais ativo",
+    "reviewQueueLabel": "Fila de revisão",
+    "noneValue": "Nenhum",
+    "eventsCount": "{{count}} eventos",
+    "noLoadedEvents": "Nenhum evento carregado",
+    "attentionEventsValue": "{{count}} eventos de atenção",
+    "reviewQueueDetail": "{{destructive}} destrutivos, {{security}} segurança/API",
+    "evidenceQualityTitle": "Qualidade da evidência",
+    "evidenceQualitySubtitle": "Sinais de cobertura que tornam as auditorias defensáveis.",
+    "scoreOutOf": "{{score}}/100",
+    "structuredDiffsLabel": "Diferenças estruturadas",
+    "eventsRatioDetail": "{{count}}/{{total}} eventos",
+    "targetReferencesLabel": "Referências de alvo",
+    "linkedRatioDetail": "{{count}}/{{total}} vinculados",
+    "actorAttributionLabel": "Atribuição de ator",
+    "attributedRatioDetail": "{{count}}/{{total}} atribuídos",
+    "healthRowProgressLabel": "{{label}}: {{value}}%"
+  },
+  "scheduleReview": {
+    "errorPickDateTime": "Escolha uma data e hora",
+    "toastScheduledTitle": "Revisão agendada",
+    "toastScheduledWithLink": "Link da reunião adicionado à aba Chamadas.",
+    "toastScheduledNoLink": "Adicionado à aba Chamadas.",
+    "errorServerRejected": "O servidor rejeitou a solicitação.",
+    "errorProviderUnreachable": "Não foi possível conectar com {{provider}}. Conecte-o em Configurações → Integrações ou escolha outro provedor.",
+    "triggerButton": "Agendar revisão",
+    "dialogTitle": "Agendar uma revisão",
+    "dialogDescription": "Crie uma reunião de revisão Go/No-Go ou de RFP em um calendário conectado.",
+    "fieldTopic": "Tópico",
+    "placeholderTopic": "Revisão Go/No-Go",
+    "fieldProvider": "Provedor",
+    "fieldDuration": "Duração (min)",
+    "fieldStart": "Início",
+    "fieldAttendees": "Participantes (e-mails separados por vírgula)",
+    "cancel": "Cancelar",
+    "submitting": "Agendando…",
+    "submit": "Agendar"
+  },
+  "search": {
+    "heading": "Pesquisar",
+    "form": {
+      "ariaLabel": "Pesquisa no espaço de trabalho"
+    },
+    "input": {
+      "placeholder": "Pesquise em oportunidades, contatos, empresas, tarefas, notas e pedidos…",
+      "ariaLabel": "Pesquisar no espaço de trabalho"
+    },
+    "tab": {
+      "all": "Tudo",
+      "opportunity": "Oportunidades",
+      "lead": "Leads",
+      "contact": "Contatos",
+      "company": "Empresas",
+      "task": "Tarefas",
+      "note": "Notas"
+    },
+    "type": {
+      "opportunity": "Oportunidade",
+      "lead": "Lead",
+      "contact": "Contato",
+      "company": "Empresa",
+      "task": "Tarefa",
+      "note": "Nota"
+    },
+    "results": {
+      "ariaLabel": "Resultados da pesquisa",
+      "countOne": "{{count}} resultado",
+      "countOther": "{{count}} resultados"
+    },
+    "error": {
+      "title": "Falha na pesquisa",
+      "message": "Algo deu errado"
+    },
+    "empty": {
+      "title": "Nenhum resultado encontrado",
+      "message": "Não encontramos nada correspondente a \"{{query}}\". Tente palavras-chave diferentes ou verifique a ortografia."
+    },
+    "guidance": {
+      "ariaLabel": "Orientação de pesquisa",
+      "title": "Pesquise em todo o seu espaço de trabalho",
+      "message": "Digite uma palavra-chave acima para encontrar oportunidades, contatos, empresas, tarefas, notas e pedidos de venda."
+    }
+  },
+  "createWebhook": {
+    "adminOnlyBadge": "Apenas administradores",
+    "editTitle": "Editar assinatura de webhook",
+    "createTitle": "Nova assinatura de webhook",
+    "subtitle": "Use um endpoint HTTPS de produção. O BidStack assina cada entrega com HMAC-SHA256.",
+    "closeAriaLabel": "Fechar",
+    "endpointUrlLabel": "URL do endpoint",
+    "endpointUrlPlaceholder": "https://your-app.com/webhooks/bidstack",
+    "endpointUrlHelp": "HTTPS é obrigatório. Localhost, IPs privados e nomes de host internos são rejeitados.",
+    "eventsLabel": "Eventos",
+    "eventsHelp": "Escolha apenas os eventos que o seu receptor realmente trata.",
+    "selectAll": "Selecionar tudo",
+    "clear": "Limpar",
+    "securityContractTitle": "Contrato de segurança",
+    "securityReturn2xx": "Retorne um status 2xx em 10 segundos.",
+    "securityVerifyHeader": "Verifique o cabeçalho X-BidStack-Signature.",
+    "securityRejectOld": "Rejeite assinaturas com mais de 5 minutos.",
+    "securityAsync": "Processe o trabalho pesado de forma assíncrona após confirmar.",
+    "selectedEventsLabel": "Eventos selecionados",
+    "selectedNone": "Escolha pelo menos um evento.",
+    "selectedOne": "Um evento será entregue.",
+    "selectedMany": "{{count}} eventos serão entregues.",
+    "cancel": "Cancelar",
+    "saving": "Salvando...",
+    "creating": "Criando...",
+    "saveSubscription": "Salvar assinatura",
+    "createSubscription": "Criar assinatura"
+  },
+  "governanceLog": {
+    "regionLabel": "Reuniões de governança",
+    "title": "Registro de governança",
+    "caption": "Comitologia — comitês, revisões de alta direção, BRM, SAR",
+    "errorTitle": "Não foi possível carregar o registro de governança",
+    "errorMessage": "Tente novamente em breve.",
+    "empty": "Ainda não há reuniões de governança registradas para esta conta.",
+    "advanceStatusLabel": "Avançar o status de {{description}}",
+    "dateRequired": "Data obrigatória",
+    "meetingRecorded": "Reunião registrada",
+    "couldNotSave": "Não foi possível salvar",
+    "addMeeting": "Adicionar reunião",
+    "meetingTypeLabel": "Tipo de reunião",
+    "meetingDateLabel": "Data da reunião",
+    "participantsPlaceholder": "Participantes (separados por vírgula)",
+    "outcomesPlaceholder": "Resultados / decisões",
+    "saving": "Salvando…",
+    "save": "Salvar",
+    "cancel": "Cancelar"
+  },
+  "polarCharts": {
+    "pieChartAriaLabel": "Gráfico de pizza",
+    "columnName": "Nome",
+    "columnValue": "Valor",
+    "donutChartAriaLabel": "Gráfico de rosca",
+    "radarChartAriaLabel": "Gráfico de radar"
+  },
+  "quickAddMenu": {
+    "title": "Criar",
+    "option": {
+      "opportunity": {
+        "label": "Nova oportunidade",
+        "description": "Adicione uma proposta ao pipeline."
+      },
+      "task": {
+        "label": "Nova tarefa",
+        "description": "Crie um acompanhamento, opcionalmente vinculado a uma oportunidade."
+      },
+      "contact": {
+        "label": "Novo contato",
+        "description": "Adicione um tomador de decisão."
+      },
+      "note": {
+        "label": "Nova nota",
+        "description": "Registre uma ideia na conta atual."
+      }
+    }
+  },
+  "dashboardsList": {
+    "errorTitle": "Falha ao carregar os painéis",
+    "heading": "Painéis",
+    "countOne": "{{count}} painel",
+    "countOther": "{{count}} painéis",
+    "newButton": "Novo painel",
+    "namePlaceholder": "Nome do painel…",
+    "creating": "Criando…",
+    "create": "Criar",
+    "cancel": "Cancelar",
+    "emptyTitle": "Ainda não há painéis",
+    "emptyMessage": "Crie seu primeiro painel para começar a acompanhar o que importa.",
+    "openAria": "Abrir painel: {{name}}",
+    "sharedAria": "Compartilhado",
+    "privateAria": "Privado",
+    "deleteConfirm": "Excluir \"{{name}}\"?",
+    "deleteAria": "Excluir painel {{name}}"
+  },
+  "relations": {
+    "errorKeyLabelRequired": "A chave e o rótulo da relação são obrigatórios.",
+    "errorAddFailed": "Falha ao adicionar a relação",
+    "heading": "Relações",
+    "addButton": "+ Adicionar relação",
+    "fieldKeyLabel": "Chave da relação",
+    "fieldKeyPlaceholder": "ex. primary_contact",
+    "fieldLabelLabel": "Rótulo",
+    "fieldLabelPlaceholder": "ex. Contato principal",
+    "fieldEntityLabel": "Entidade relacionada",
+    "fieldEntityPlaceholder": "ex. contato, oportunidade",
+    "fieldCardinalityLabel": "Cardinalidade",
+    "cancelButton": "Cancelar",
+    "submitButtonPending": "Adicionando…",
+    "submitButton": "Adicionar",
+    "emptyState": "Nenhuma relação definida ainda."
+  },
+  "chartContainer": {
+    "emptyMessage": "Nenhum dado disponível para este período.",
+    "refresh": "Atualizar",
+    "regionLabel": "Gráfico",
+    "actionsLabel": "Ações do gráfico",
+    "loadingLabel": "Carregando gráfico"
+  },
+  "crossSell": {
+    "regionLabel": "Ações de venda cruzada",
+    "title": "Ações de venda cruzada",
+    "caption": "Ações de venda entre países e equipes nesta conta",
+    "errorTitle": "Não foi possível carregar as ações de venda cruzada",
+    "errorRetry": "Tente novamente em breve.",
+    "empty": "Ainda não há ações de venda cruzada registradas para esta conta.",
+    "advanceStatusLabel": "Avançar o status de {{description}}",
+    "advanceStatusHint": "Clique para avançar o status",
+    "status": {
+      "open": "Aberto",
+      "inProgress": "Em andamento",
+      "done": "Concluído"
+    },
+    "logAction": "Registrar ação",
+    "toast": {
+      "missingFieldsTitle": "Campos ausentes",
+      "missingFieldsBody": "A descrição e ambas as unidades são obrigatórias.",
+      "logged": "Ação de venda cruzada registrada",
+      "saveError": "Não foi possível salvar"
+    },
+    "form": {
+      "descriptionPlaceholder": "O que precisa acontecer?",
+      "requestingUnitPlaceholder": "País/equipe solicitante",
+      "assignedUnitPlaceholder": "País/equipe atribuído",
+      "assigneeLabel": "Responsável",
+      "unassigned": "Não atribuído",
+      "dueDateLabel": "Data de vencimento",
+      "saving": "Salvando…",
+      "save": "Salvar",
+      "cancel": "Cancelar"
+    },
+    "subtitle": "Ações de venda entre países e equipes em contas compartilhadas. Gerido pela pré-venda.",
+    "filterGroupLabel": "Filtrar por estado",
+    "filterAll": "Todos",
+    "filterOpen": "Aberto",
+    "filterInProgress": "Em andamento",
+    "filterDone": "Concluído",
+    "errorMessage": "Tente novamente em breve.",
+    "emptyTitle": "Nenhuma ação de venda cruzada",
+    "emptyMessage": "Registe ações entre equipas a partir do painel de qualquer conta — aparecem aqui para toda a organização.",
+    "colAccount": "Conta",
+    "colAction": "Ação",
+    "colRoute": "Rota",
+    "colAssignee": "Responsável",
+    "colDue": "Prazo",
+    "colStatus": "Estado",
+    "updateFailed": "Falha na atualização",
+    "advanceStatusAria": "Avançar o estado de {{description}}",
+    "updating": "a atualizar…"
+  },
+  "auditLogFilters": {
+    "chipSearch": "Pesquisar: {{value}}",
+    "chipRange": "Intervalo: {{value}}",
+    "chipTarget": "Alvo: {{value}}",
+    "chipCategory": "Categoria: {{value}}",
+    "barAriaLabel": "Filtros do registro de auditoria",
+    "searchLabel": "Pesquisar na página de auditoria atual",
+    "searchPlaceholder": "Pesquisar na página atual por ação, ator, alvo ou diferença...",
+    "dateRangeLabel": "Intervalo de datas",
+    "targetTypeLabel": "Tipo de alvo",
+    "exportVisible": "Exportar visíveis",
+    "copyViewLink": "Copiar link da exibição",
+    "refreshing": "Atualizando",
+    "refresh": "Atualizar",
+    "categoryFiltersAriaLabel": "Filtros de categoria de eventos de auditoria",
+    "activeView": "Exibição ativa",
+    "clearFilters": "Limpar filtros"
+  },
+  "createTask": {
+    "errorTitleRequired": "O título é obrigatório",
+    "errorSaveFailed": "Falha ao salvar",
+    "triggerButton": "+ Nova tarefa",
+    "dialogTitle": "Nova tarefa",
+    "dialogDescription": "Crie um acompanhamento — opcionalmente vinculado a uma oportunidade.",
+    "fieldTitle": "Título",
+    "fieldOpportunity": "Oportunidade",
+    "opportunityNone": "— Nenhuma —",
+    "fieldStatus": "Status",
+    "statusOpen": "Aberta",
+    "statusInProgress": "Em andamento",
+    "statusBlocked": "Bloqueada",
+    "statusDone": "Concluída",
+    "fieldDueDate": "Data de vencimento",
+    "cancelButton": "Cancelar",
+    "savingButton": "Salvando…",
+    "submitButton": "Criar tarefa"
+  },
+  "oppWinProbabilityBadge": {
+    "loading": "Carregando probabilidade...",
+    "labelLikely": "Provável",
+    "labelPossible": "Possível",
+    "labelAtRisk": "Em risco",
+    "featureDealValue": "Valor do negócio",
+    "featureOwnerWinRate": "Taxa de ganho do responsável",
+    "featurePipelineStage": "Etapa do funil",
+    "featureQualificationScore": "Pontuação de qualificação",
+    "factorsAriaLabel": "Fatores de probabilidade de ganho",
+    "popoverTitle": "Probabilidade de ganho: {{prob}}%",
+    "keyFactors": "Fatores principais",
+    "badgeAriaLabel": "Probabilidade de ganho: {{prob}}% — {{label}}"
+  },
+  "intelCards": {
+    "dataFreshness": "Inteligência atualizada {{date}} · Fontes: Crunchbase, LinkedIn, registro da UE",
+    "financial": {
+      "title": "Saúde financeira",
+      "private": "Privada",
+      "marketCap": "Capitalização de mercado",
+      "revenueTtm": "Receita (12 meses)",
+      "growth": "Crescimento",
+      "ebitdaMargin": "Margem EBITDA",
+      "creditRating": "Classificação de crédito",
+      "headcount": "Número de funcionários"
+    },
+    "winPrediction": {
+      "title": "Previsão de vitória",
+      "empty": "Nenhuma previsão disponível.",
+      "modelCaption": "Modelo {{version}}",
+      "probability": "probabilidade"
+    },
+    "triggers": {
+      "title": "Gatilhos de compra",
+      "caption": "Sinais ponderados",
+      "unknownSource": "desconhecido",
+      "weightAria": "Peso {{weight}}/10",
+      "empty": "Nenhum gatilho detectado ainda."
+    },
+    "competitors": {
+      "title": "Cenário competitivo",
+      "empty": "Nenhum concorrente mapeado."
+    },
+    "news": {
+      "title": "Notícias recentes",
+      "empty": "Nenhuma notícia obtida."
+    }
+  },
+  "serviceCaseDetail": {
+    "errorTitle": "Falha ao carregar o caso",
+    "errorMessage": "Algo deu errado",
+    "notFoundTitle": "Caso não encontrado",
+    "notFoundMessage": "Este caso pode ter sido excluído.",
+    "noteAddedToast": "Nota adicionada ao caso",
+    "noteErrorToast": "Não foi possível salvar a nota",
+    "ownerLabel": "Responsável: {{name}}",
+    "priorityLabel": "Prioridade: {{priority}}",
+    "sourceLabel": "Origem: {{source}}",
+    "slaLabel": "SLA: {{date}}",
+    "markStatusButton": "Marcar {{status}}",
+    "descriptionHeading": "Descrição",
+    "noDescription": "Nenhuma descrição fornecida.",
+    "addNoteLabel": "Adicionar nota",
+    "notePlaceholder": "Escreva uma nota interna…",
+    "savingButton": "Salvando…",
+    "saveNoteButton": "Salvar nota",
+    "detailsHeading": "Detalhes",
+    "createdLabel": "Criado",
+    "updatedLabel": "Atualizado",
+    "resolvedLabel": "Resolvido",
+    "closedLabel": "Fechado"
+  },
+  "tagPicker": {
+    "addTag": "Etiqueta",
+    "popoverLabel": "Seletor de etiquetas",
+    "searchPlaceholder": "Pesquisar ou criar…",
+    "existingTagsLabel": "Etiquetas existentes",
+    "createNamed": "+ Criar “{{name}}”",
+    "aiSuggestions": "Sugestões de IA",
+    "suggestThinking": "Pensando…",
+    "suggestAction": "Sugerir"
+  },
+  "workflows": {
+    "toastCreated": "Fluxo de trabalho criado",
+    "toastCreateError": "Não foi possível criar o fluxo de trabalho",
+    "toastPaused": "Fluxo de trabalho pausado",
+    "toastActivated": "Fluxo de trabalho ativado",
+    "toastUpdateError": "Não foi possível atualizar o fluxo de trabalho",
+    "toastRunSuccess": "O fluxo de trabalho foi executado com sucesso",
+    "toastRunFailed": "Execução do fluxo de trabalho {{status}}{{detail}}",
+    "toastRunError": "Não foi possível executar o fluxo de trabalho",
+    "deleteConfirmTitle": "Excluir o fluxo de trabalho?",
+    "deleteConfirmDescription": "\"{{name}}\" será removido. Esta ação não pode ser desfeita.",
+    "deleteConfirmLabel": "Excluir",
+    "toastDeleted": "Fluxo de trabalho excluído",
+    "toastDeleteError": "Não foi possível excluir o fluxo de trabalho",
+    "pageTitle": "Fluxos de trabalho",
+    "activeOnly": "Somente ativos",
+    "newWorkflow": "Novo fluxo de trabalho",
+    "countOne": "{{count}} fluxo de trabalho",
+    "countOther": "{{count}} fluxos de trabalho",
+    "activeOnlySuffix": " · somente ativos",
+    "errorTitle": "Falha ao carregar os fluxos de trabalho",
+    "retry": "Tentar novamente",
+    "emptyTitle": "Ainda não há fluxos de trabalho",
+    "emptyMessage": "Automatize seus fluxos de trabalho de pré-vendas.",
+    "statusActive": "Ativo",
+    "statusInactive": "Inativo",
+    "runCount": "{{count}} execuções",
+    "lastRun": "Última execução {{date}}",
+    "statusPaused": "Pausado",
+    "running": "Executando…",
+    "run": "Executar",
+    "deleteAriaLabel": "Excluir fluxo de trabalho: {{name}}"
+  },
+  "topbarNotifications": {
+    "tooltipUnread": "{{count}} notificação não lida",
+    "tooltipTitle": "Notificações",
+    "bellAriaUnread": "Notificações, {{count}} não lidas",
+    "bellAria": "Notificações",
+    "trayAria": "Notificações",
+    "heading": "Notificações",
+    "markAllRead": "Marcar tudo como lido",
+    "errorMessage": "Não foi possível carregar as notificações",
+    "loading": "Carregando…",
+    "empty": "Você está em dia"
+  },
+  "createEvent": {
+    "modalLabel": "Criar evento de calendário",
+    "heading": "Novo evento",
+    "titleLabel": "Título",
+    "titlePlaceholder": "Título do evento",
+    "dateLabel": "Data",
+    "calendarLabel": "Calendário",
+    "providerGoogle": "Google",
+    "providerMicrosoft": "Microsoft",
+    "startLabel": "Início",
+    "endLabel": "Fim",
+    "locationLabel": "Local (opcional)",
+    "locationPlaceholder": "Sala, link do Zoom, endereço…",
+    "cancel": "Cancelar",
+    "saving": "Salvando…",
+    "submit": "Criar evento"
+  },
+  "leadScoreBadge": {
+    "labelHot": "Quente",
+    "labelWarm": "Morno",
+    "labelCold": "Frio",
+    "loading": "Carregando pontuação...",
+    "badgeAriaLabel": "Pontuação do lead: {{score}} de 100 — {{label}}",
+    "popoverAriaLabel": "Fatores de pontuação",
+    "popoverHeading": "Principais fatores de pontuação",
+    "popoverFooter": "Pontuação {{score}}/100 · Modelo de ML"
+  },
+  "winLossReasons": {
+    "regionLabel": "Motivos de ganho/perda",
+    "title": "Motivos de ganho / perda",
+    "caption": "Por que os negócios fecham — e o padrão em toda a organização",
+    "errorTitle": "Não foi possível carregar os padrões de ganho/perda",
+    "errorMessage": "Tente novamente em breve.",
+    "recordedCount": "{{won}} ganhos · {{lost}} perdidos registrados",
+    "patternBadge": "Padrão",
+    "mostLossesCitePrefix": "A maioria das perdas cita ",
+    "noReasonsYet": "Nenhum motivo de perda registrado ainda — registre alguns para revelar padrões.",
+    "toastPickDeal": "Selecione primeiro um negócio fechado",
+    "toastRecorded": "Motivo registrado",
+    "toastSaveError": "Não foi possível salvar",
+    "formHeading": "Registrar um motivo",
+    "closedDealLabel": "Negócio fechado",
+    "selectClosedDeal": "Selecione um negócio fechado…",
+    "reasonLabel": "Motivo",
+    "competitorPlaceholder": "Concorrente (opcional)",
+    "competitorLabel": "Concorrente",
+    "notePlaceholder": "Nota (opcional)",
+    "noteLabel": "Nota",
+    "saving": "Salvando…",
+    "submit": "Registrar motivo"
+  },
+  "accountIntel": {
+    "title": "Inteligência de conta",
+    "caption": "Soluções, produtos e extrações de documentos",
+    "tablistLabel": "Visualizações de inteligência de conta",
+    "tabSolutions": "Soluções ({{count}})",
+    "tabProducts": "Produtos ({{count}})",
+    "tabExtractions": "Extrações ({{count}})",
+    "loadFailed": "Falha ao carregar",
+    "extractQueued": "Extração na fila — a inteligência aparecerá em breve",
+    "extractFailed": "A extração falhou",
+    "unknownError": "Erro desconhecido"
+  },
+  "newWorkflow": {
+    "triggerRecordCreated": "Quando um registro é criado",
+    "triggerRecordUpdated": "Quando um registro é atualizado",
+    "triggerStageChanged": "Quando uma etapa muda",
+    "triggerSchedule": "Em uma programação",
+    "triggerWebhookReceived": "Quando um webhook é recebido",
+    "triggerManual": "Manualmente / sob demanda",
+    "actionSendEmail": "Enviar e-mail",
+    "actionSendSlack": "Enviar mensagem do Slack",
+    "actionCreateTask": "Criar tarefa",
+    "actionUpdateField": "Atualizar campo",
+    "actionCallWebhook": "Chamar webhook",
+    "actionAssignOwner": "Atribuir proprietário",
+    "actionRunDustAgent": "Executar agente Dust",
+    "actionCreateNotification": "Criar notificação",
+    "nameRequiredError": "É necessário um nome de fluxo de trabalho.",
+    "dialogTitle": "Novo fluxo de trabalho",
+    "dialogDescription": "Escolha um gatilho e as ações a executar quando ele disparar. Você pode ajustar cada etapa depois que o fluxo de trabalho existir.",
+    "nameLabel": "Nome do fluxo de trabalho",
+    "namePlaceholder": "Notificar o proprietário quando um negócio chegar à Negociação",
+    "triggerLabel": "Gatilho",
+    "actionsLabel": "Ações",
+    "actionSelectAriaLabel": "Ação {{number}}",
+    "removeActionAriaLabel": "Remover ação {{number}}",
+    "addAction": "Adicionar ação",
+    "descriptionLabel": "Descrição",
+    "descriptionPlaceholder": "O que este fluxo de trabalho faz e quando deve ser executado…",
+    "cancel": "Cancelar",
+    "creating": "Criando…",
+    "submit": "Criar fluxo de trabalho"
+  },
+  "territory": {
+    "fieldName": "Nome",
+    "namePlaceholder": "ex.: DACH Enterprise",
+    "fieldRegion": "Região",
+    "regionPlaceholder": "ex.: Europa",
+    "fieldCountryCodes": "Códigos de país",
+    "countryCodesPlaceholder": "DE, AT, CH",
+    "countryCodesHint": "Códigos ISO-3166 alfa-2 separados por vírgulas.",
+    "fieldPostalCodes": "Códigos postais",
+    "postalCodesPlaceholder": "Opcional",
+    "postalCodesHint": "Códigos postais separados por vírgulas para roteamento detalhado.",
+    "fieldOwner": "Responsável",
+    "ownerPlaceholder": "Selecione um responsável",
+    "fieldActive": "Ativo",
+    "cancel": "Cancelar",
+    "saveChanges": "Salvar alterações",
+    "create": "Criar território",
+    "editTitle": "Editar território",
+    "newTitle": "Novo território"
+  },
+  "meetingPrep": {
+    "ariaLabel": "Preparação de reunião com IA",
+    "title": "✦ Preparação de reunião com IA",
+    "preparing": "Preparando…",
+    "generateButton": "Gerar resumo",
+    "generatingAriaLabel": "Gerando resumo da reunião…",
+    "errorCapReached": "Limite diário de IA atingido. Tente novamente amanhã.",
+    "errorGeneric": "Falha ao preparar o resumo. Tente novamente.",
+    "sectionAttendees": "Participantes",
+    "sectionOpenDeals": "Negócios abertos",
+    "sectionTalkingPoints": "Tópicos de discussão",
+    "sectionSuggestedQuestions": "Perguntas sugeridas",
+    "sectionRecentInteractions": "Interações recentes",
+    "cost": "Custo: ${{amount}}",
+    "emptyState": "Gere um resumo com IA cobrindo participantes, negócios abertos, tópicos de discussão e perguntas sugeridas para esta reunião."
+  },
+  "intake": {
+    "title": "Recepção",
+    "subtitle": "Receba documentos, extraia inteligência, revise e publique nos perfis de conta.",
+    "toastExtractionComplete": "Extração concluída",
+    "toastSelectDocument": "Selecione pelo menos um documento",
+    "toastExtractionFailed": "Falha na extração"
+  },
+  "healthScore": {
+    "regionLabel": "Cobertura de sinais da conta",
+    "title": "Cobertura de sinais",
+    "signalsScored": "{{count}} sinais da conta avaliados",
+    "gaugeLabel": "Cobertura de sinais da conta {{score}} de 100",
+    "coverage": "Cobertura",
+    "strongestBand": "Faixa de cobertura mais forte",
+    "noSignal": "Sem sinal",
+    "healthBands": "Faixas de saúde",
+    "whatDrivesScore": "O que determina esta pontuação",
+    "scoreFactors": "Fatores da pontuação",
+    "nextLabel": "Próximo: ",
+    "band": {
+      "strong": "Forte",
+      "good": "Bom",
+      "needsAttention": "Requer atenção",
+      "critical": "Crítico"
+    }
+  },
+  "objectSettingsForm": {
+    "updateFailed": "Falha na atualização",
+    "heading": "Configurações do objeto",
+    "saved": "Salvo.",
+    "singularLabel": "Rótulo singular",
+    "pluralLabel": "Rótulo plural",
+    "description": "Descrição",
+    "color": "Cor",
+    "selectColor": "Selecionar cor {{color}}",
+    "apiKeyLabel": "Chave de API:",
+    "apiKeyImmutable": "(imutável)",
+    "saving": "Salvando…",
+    "saveChanges": "Salvar alterações"
+  },
+  "contactContextMenu": {
+    "copySuccess": "{{label}} copiado",
+    "copyError": "Falha ao copiar",
+    "menuAriaLabel": "Ações para {{name}}",
+    "editContact": "Editar contato",
+    "emailLabel": "e-mail",
+    "copyEmail": "Copiar e-mail",
+    "phoneLabel": "telefone",
+    "copyPhone": "Copiar telefone",
+    "deleteContact": "Excluir contato"
+  },
+  "dataTrust": {
+    "regionLabel": "Confiança e atribuição de dados",
+    "title": "Confiança de dados",
+    "caption": "Os campos principais incluem a atribuição de fontes disponível",
+    "attributionConfidence": "Confiança de atribuição",
+    "attributedSources": "{{count}} fontes atribuídas",
+    "checkLegalIdentity": "Identidade jurídica",
+    "checkLogo": "Logotipo",
+    "checkFreshness": "Atualidade",
+    "valueAttributed": "Atribuído",
+    "valuePending": "Pendente",
+    "sourceReceipts": "Comprovantes de fontes",
+    "emptySources": "Execute a verificação de dados para anexar fontes de registro, logotipo e dados de mercado.",
+    "logoSourceLogoDev": "Logo.dev",
+    "logoSourceOfficial": "Oficial",
+    "logoSourceBrandfetch": "Brandfetch",
+    "logoSourceWikimedia": "Wikimedia",
+    "logoSourceFavicon": "Favicon",
+    "logoSourceManual": "Manual",
+    "logoSourceInitials": "Iniciais"
+  },
+  "topbarSearch": {
+    "label": "Pesquisar oportunidades, contatos, tarefas",
+    "placeholder": "Pesquisar ou ir para…",
+    "recentSearchesAriaLabel": "Pesquisas recentes",
+    "recentHeading": "Recentes",
+    "clear": "Limpar"
+  },
+  "newReference": {
+    "titleRequired": "É necessário um título de referência.",
+    "dialogTitle": "Nova referência",
+    "dialogDescription": "Capture uma referência de cliente reutilizável — estudo de caso, depoimento ou história de sucesso — para propostas e licitações.",
+    "titleLabel": "Título",
+    "titlePlaceholder": "Acme Corp — integração 40% mais rápida",
+    "descriptionLabel": "Descrição",
+    "descriptionPlaceholder": "O que foi entregue, o resultado e por que é citável…",
+    "industryLabel": "Setor",
+    "industryPlaceholder": "Software",
+    "dealValueLabel": "Valor do negócio",
+    "dealValuePlaceholder": "250000",
+    "contactNameLabel": "Nome do contato",
+    "contactNamePlaceholder": "Maria Silva",
+    "contactEmailLabel": "E-mail do contato",
+    "contactEmailPlaceholder": "jane@acme.com",
+    "documentUrlLabel": "URL do documento",
+    "tagsLabel": "Etiquetas",
+    "tagsHelper": "Separadas por vírgulas",
+    "tagsPlaceholder": "case-study, enterprise, emea",
+    "cancel": "Cancelar",
+    "creating": "Criando…",
+    "create": "Criar referência"
+  },
+  "bidScore": {
+    "title": "Pontuação de licitação/não licitação",
+    "criteriaBreakdownLabel": "Detalhamento dos critérios",
+    "criterionPoints": "{{points}}/{{weight}} pts",
+    "categoryScoresLabel": "Pontuações por categoria",
+    "recBid": "Licitar",
+    "recNoBid": "Não licitar",
+    "recConditionalBid": "Licitação condicional",
+    "loadError": "Não foi possível carregar a pontuação da licitação. Atualize para tentar novamente.",
+    "overallScore": "pontuação geral",
+    "overridden": "Substituído",
+    "detailsButton": "Detalhes",
+    "emptyState": "Ainda não foi registrada nenhuma pontuação de avaliação de licitação para esta oportunidade.",
+    "evaluateButton": "Avaliar agora"
+  },
+  "salesToolkits": {
+    "pageTitle": "Kits de vendas",
+    "pageSubtitle": "Manuais de setor e cursos da Mantu Academy — obtidos ao vivo, filtrados por setor.",
+    "errorTitle": "A Mantu Academy está inacessível",
+    "errorMessage": "O LMS não respondeu. Tente novamente em breve.",
+    "emptyFilteredTitle": "Nenhum curso marcado como \"{{sector}}\"",
+    "emptyTitle": "Nenhum curso publicado ainda",
+    "emptyMessage": "Os cursos aparecem aqui assim que a Mantu Academy os publica com etiquetas de setor.",
+    "resultCount": "{{count}} curso",
+    "resultCountInSector": "{{count}} curso em {{sector}}",
+    "filterGroupLabel": "Filtrar por setor",
+    "allSectors": "Todos os setores",
+    "openInAcademy": "Abrir na Mantu Academy",
+    "sampleDataLabel": "Dados de exemplo.",
+    "sampleDataIntro": "Estes são kits ilustrativos. Defina",
+    "sampleDataOutro": "+ credenciais para obter cursos ao vivo da Mantu Academy."
+  },
+  "reviewStep": {
+    "toastRemoved": "\"{{name}}\" removido",
+    "toastRemoveFailed": "Falha ao remover \"{{name}}\"",
+    "heading": "Revisar dados extraídos",
+    "refresh": "Atualizar",
+    "loading": "Carregando…",
+    "groupSolutions": "Soluções",
+    "groupProducts": "Produtos",
+    "back": "← Voltar",
+    "publish": "Publicar →",
+    "groupHeading": "{{title}} ({{count}})",
+    "empty": "Nenhum {{label}} extraído.",
+    "removeAria": "Remover {{name}}"
+  },
+  "kpiRow": {
+    "workspaceMetricsAriaLabel": "Métricas do espaço de trabalho",
+    "noLiveSignalTitle": "Ainda sem sinal ao vivo"
+  },
+  "taskDetail": {
+    "errorTitle": "Falha ao carregar a tarefa",
+    "errorMessage": "Algo deu errado",
+    "notFoundTitle": "Tarefa não encontrada",
+    "notFoundMessage": "Esta tarefa pode ter sido excluída.",
+    "titleAriaLabel": "Título da tarefa",
+    "opportunityLink": "Oportunidade",
+    "assignedTo": "Atribuído a {{assignee}}",
+    "due": "Vencimento {{date}}",
+    "noDate": "sem data",
+    "cancel": "Cancelar",
+    "save": "Salvar",
+    "edit": "Editar",
+    "statusLabel": "Status",
+    "statusAriaLabel": "Status",
+    "statusOpen": "Aberta",
+    "statusInProgress": "Em andamento",
+    "statusBlocked": "Bloqueada",
+    "statusDone": "Concluída",
+    "idLabel": "ID",
+    "createdLabel": "Criada"
+  },
+  "auditLogHero": {
+    "badge": "Console de governança",
+    "eyebrow": "Trilha de evidências somente leitura",
+    "title": "Registro de auditoria",
+    "subtitle": "Revise as alterações de segurança, agente, fluxo de trabalho e dados com contexto suficiente para explicar quem mudou o quê, quando aconteceu e onde investigar a seguir.",
+    "refreshing": "Atualizando evidências...",
+    "visibleOnPage": "{{count}} visíveis na página {{page}}",
+    "refreshedSuffix": "atualizado {{time}}",
+    "metric": {
+      "eventsLoaded": {
+        "label": "Eventos carregados",
+        "helper": "Página atual do servidor"
+      },
+      "security": {
+        "label": "Segurança/API",
+        "helper": "Chaves, MCP, autenticação, webhooks"
+      },
+      "destructive": {
+        "label": "Destrutivas",
+        "helper": "Exclusões, revogações, cancelamentos"
+      },
+      "dataChanges": {
+        "label": "Alterações de dados",
+        "helper": "Edições de registros de receita"
+      },
+      "latestEvent": {
+        "label": "Último evento",
+        "none": "Nenhum",
+        "noEvents": "Nenhum evento no intervalo"
+      }
+    }
+  },
+  "taskCalendar": {
+    "previousMonth": "Mês anterior",
+    "nextMonth": "Próximo mês",
+    "weekdaySun": "Dom",
+    "weekdayMon": "Seg",
+    "weekdayTue": "Ter",
+    "weekdayWed": "Qua",
+    "weekdayThu": "Qui",
+    "weekdayFri": "Sex",
+    "weekdaySat": "Sáb"
+  },
+  "recentActivity": {
+    "heading": "Atividade recente",
+    "latestUpdates": "Últimas atualizações",
+    "empty": "Nenhuma atividade recente",
+    "viewAll": "Ver todas as {{count}} atividades →"
+  },
+  "extractStep": {
+    "heading": "Executar extração",
+    "processingCount": "Processando {{count}} documentos…",
+    "intro": "Os agentes Dust irão analisar {{count}} documentos e extrair soluções, produtos, capacidades e preços.",
+    "back": "← Voltar",
+    "queuing": "Enfileirando…",
+    "runButton": "Executar extração",
+    "status": {
+      "queued": "Na fila",
+      "pending": "Pendente",
+      "running": "Em execução",
+      "done": "Concluído",
+      "completed": "Concluído",
+      "error": "Erro",
+      "failed": "Falhou"
+    }
+  },
+  "companyLogo": {
+    "ariaLabel": "Logotipo da {{name}}"
+  },
+  "ai-feedback": {
+    "thanks": "Obrigado pelo seu feedback!",
+    "aria-rate-response": "Avalie esta resposta da IA",
+    "was-this-helpful": "Isto foi útil?",
+    "aria-rating": "Avaliação",
+    "aria-star-rating": "{{count}} estrela",
+    "comment-placeholder": "Comentário opcional…",
+    "aria-comment": "Comentário de feedback",
+    "submitting": "Enviando…",
+    "submit": "Enviar feedback",
+    "error": "Falha ao enviar o feedback. Tente novamente."
+  },
+  "contactQuickLook": {
+    "title": "Visualização rápida",
+    "fieldCustomer": "Cliente",
+    "fieldEmail": "E-mail",
+    "fieldPhone": "Telefone",
+    "fieldInfluence": "Influência",
+    "fieldSentiment": "Sentimento",
+    "footerPress": "Pressione",
+    "footerOr": "ou",
+    "footerToClose": "para fechar",
+    "readOnly": "Somente leitura"
+  },
+  "opportunityAccountIntel": {
+    "title": "Inteligência da conta",
+    "errorTitle": "Falha ao carregar",
+    "emptyTitle": "Ainda sem inteligência",
+    "emptyMessage": "Carregue documentos no painel da conta para extrair soluções e produtos.",
+    "caption": "{{solutionCount}} soluções · {{productCount}} produtos",
+    "solutionsHeading": "Soluções",
+    "productsHeading": "Produtos",
+    "moreSolutions": "+{{count}} mais",
+    "moreProducts": "+{{count}} mais"
+  },
+  "account": {
+    "openCockpitAria": "Abrir o cockpit do cliente {{name}}",
+    "unknownIndustry": "Setor desconhecido",
+    "dataSourcesAria": "Fontes de dados de {{name}}",
+    "openDeals": "Negócios abertos",
+    "pipeline": "Pipeline",
+    "totalDeals": "Total de negócios",
+    "employees": "Funcionários",
+    "confidence": "Confiança",
+    "openAccountCockpit": "Abrir o cockpit da conta"
+  },
+  "openIssues": {
+    "regionLabel": "Problemas abertos por gravidade",
+    "title": "Problemas abertos",
+    "captionAllClear": "Tudo certo",
+    "captionItemsToAction": "{{count}} item{{plural}} para tratar",
+    "bucketsLabel": "Grupos de gravidade",
+    "severityCritical": "Crítico",
+    "severityHigh": "Alto",
+    "severityMedium": "Médio",
+    "severityLow": "Baixo",
+    "emptyTitle": "Nenhum problema aberto",
+    "emptyMessage": "Aqui está tudo em ordem.",
+    "unassigned": "Não atribuído",
+    "dueSuffix": " - vence {{dueDate}}",
+    "noOwner": "Sem responsável"
+  },
+  "deliveryHistory": {
+    "heading": "Histórico de entregas",
+    "showingRecent": "Mostrando os 50 mais recentes",
+    "errorTitle": "Falha ao carregar",
+    "errorMessage": "Não foi possível carregar o histórico de entregas.",
+    "empty": "Nenhuma entrega registrada ainda.",
+    "columnEvent": "Evento",
+    "columnStatus": "Status",
+    "columnDuration": "Duração",
+    "columnAttempt": "Tentativa",
+    "columnTime": "Hora",
+    "statusTimeout": "tempo esgotado",
+    "hideError": "Ocultar erro",
+    "showError": "Mostrar erro"
+  },
+  "activityTimeline": {
+    "regionLabel": "Atividade recente",
+    "title": "Atividade recente",
+    "itemCount": "Últimos {{count}} itens",
+    "emptyTitle": "Nada ainda",
+    "emptyMessage": "Tarefas, e-mails e execuções do Dust desta conta aparecerão aqui."
+  },
+  "routeAnnouncer": {
+    "nowOn": "Agora em {{title}}",
+    "accountDetail": "Conta: {{name}}",
+    "opportunityDetail": "Detalhe da oportunidade",
+    "contactDetail": "Detalhe do contato",
+    "leadDetail": "Detalhe do lead",
+    "companyDetail": "Detalhe da empresa",
+    "taskDetail": "Detalhe da tarefa",
+    "serviceDeskCaseDetail": "Detalhe do caso da central de serviços",
+    "routeFallback": "Página",
+    "routeDashboard": "Painel",
+    "routeAccounts": "Contas",
+    "routeKeyAccounts": "Contas-chave",
+    "routeTopAccounts": "Principais contas",
+    "routeCompanies": "Empresas",
+    "routeReferenceLibrary": "Biblioteca de referências",
+    "routeOpportunities": "Oportunidades",
+    "routePipeline": "Funil",
+    "routeBidDecisionMatrix": "Matriz de decisão de proposta",
+    "routeLeads": "Leads",
+    "routeContacts": "Contatos",
+    "routeTasks": "Tarefas",
+    "routeTerritories": "Territórios",
+    "routeServiceDesk": "Central de serviços",
+    "routeWorkflows": "Fluxos de trabalho",
+    "routeDocumentIntake": "Recepção de documentos",
+    "routeReports": "Relatórios",
+    "routeAnalytics": "Análises",
+    "routeDashboards": "Painéis",
+    "routeSearch": "Pesquisar",
+    "routeIntegrations": "Integrações",
+    "routeAuditLog": "Registro de auditoria",
+    "routeSettings": "Configurações",
+    "routeLogin": "Entrar"
+  },
+  "sectorView": {
+    "title": "Visão por setor",
+    "subtitle": "Onde a Amaris atua por setor — contas, países e volume de FTE do ABC.",
+    "errorTitle": "Não foi possível carregar a visão por setor",
+    "errorMessage": "O endpoint de setor não respondeu.",
+    "emptyTitle": "Ainda não há dados de setor",
+    "emptyMessage": "As contas recebem um setor quando a classificação ABC (ou o enriquecimento externo) preenche o seu setor de atividade.",
+    "qualityWarningHeading": "A qualidade dos dados de setor é baixa.",
+    "qualityWarningDetail": "{{classified}} de {{total}} contas têm uma classificação de setor ABC — trate estas divisões como indicativas até a cobertura do ABC melhorar.",
+    "accountCountOne": "{{count}} conta",
+    "accountCountOther": "{{count}} contas",
+    "fteValue": "{{value}} FTE",
+    "fteUnknown": "FTE desconhecido",
+    "fteUnknownTooltip": "Nenhuma conta deste setor tem um número de funcionários conhecido",
+    "countriesBadge": "{{count}} países",
+    "tableCountry": "País",
+    "tableAccounts": "Contas",
+    "tableFteVolume": "Volume de FTE",
+    "unknownCountry": "Desconhecido"
+  },
+  "opportunitiesTableHead": {
+    "selectAll": "Selecionar tudo",
+    "deselectAll": "Desmarcar tudo",
+    "columnCode": "Código",
+    "columnOpportunity": "Oportunidade",
+    "columnTerritory": "Território",
+    "columnStage": "Etapa",
+    "columnValue": "Valor",
+    "columnProbability": "Probabilidade",
+    "columnDue": "Vencimento"
+  },
+  "territorySegmentBreakdown": {
+    "nounIndustry": "indústria",
+    "nounAccount": "conta",
+    "nounCountry": "país",
+    "emptyIndustry": "As oportunidades precisam de uma indústria para aparecer aqui.",
+    "emptyAccount": "As oportunidades precisam de uma conta vinculada para aparecer aqui.",
+    "emptyCountry": "As oportunidades precisam de um país para aparecer aqui.",
+    "errorTitle": "Falha ao carregar a divisão por {{noun}}",
+    "errorMessage": "O servidor rejeitou a solicitação.",
+    "retry": "Tentar novamente",
+    "emptyTitle": "Ainda sem dados",
+    "oppCountOne": "{{count}} oportunidade",
+    "oppCountOther": "{{count}} oportunidades",
+    "avgProbability": "{{percent}}% de probabilidade média",
+    "overflowOne": "+ {{count}} {{noun}} a mais não exibida",
+    "overflowIndustryOther": "+ {{count}} segmentos de {{noun}} adicionais não exibidos",
+    "overflowOther": "+ {{count}} {{noun}}s a mais não exibidas"
+  },
+  "convertLead": {
+    "title": "Converter lead",
+    "description": "Isto criará uma nova oportunidade e um contato a partir deste lead.",
+    "opportunityNameLabel": "Nome da oportunidade",
+    "opportunityNamePlaceholderWithCompany": "{{companyName}} — Oportunidade",
+    "opportunityNamePlaceholder": "Nome da oportunidade",
+    "valueLabel": "Valor (EUR)",
+    "stageLabel": "Estágio",
+    "stageDiscovery": "Descoberta",
+    "stageQualified": "Qualificado",
+    "stageProposal": "Proposta",
+    "stageNegotiation": "Negociação",
+    "stageClosedWon": "Fechado ganho",
+    "stageClosedLost": "Fechado perdido",
+    "converting": "Convertendo…",
+    "submit": "Converter lead",
+    "cancel": "Cancelar"
+  },
+  "bidStack360Logo": {
+    "title": "BidStack 360",
+    "tagline": "PLATAFORMA DE PILOTAGEM DE PROPOSTAS"
+  },
+  "leadRow": {
+    "statusNew": "Novo",
+    "statusContacted": "Contatado",
+    "statusQualified": "Qualificado",
+    "statusNurture": "Em nutrição",
+    "statusDisqualified": "Desqualificado",
+    "statusConverted": "Convertido",
+    "priorityLow": "Baixa",
+    "priorityMedium": "Média",
+    "priorityHigh": "Alta",
+    "priorityCritical": "Crítica",
+    "deselectLead": "Desmarcar {{name}}",
+    "selectLead": "Selecionar {{name}}",
+    "editStatusLabel": "Editar status de {{name}}",
+    "editPriorityLabel": "Editar prioridade de {{name}}",
+    "deleteLead": "Excluir {{name}}",
+    "delete": "Excluir"
+  },
+  "companyRow": {
+    "selectCompany": "Selecionar {{name}}",
+    "deselectCompany": "Desmarcar {{name}}",
+    "view": "Ver",
+    "delete": "Excluir",
+    "deleteConfirmTitle": "Excluir {{name}}?",
+    "deleteConfirmDescription": "Esta ação não pode ser desfeita.",
+    "deleteConfirmLabel": "Excluir"
+  },
+  "infoSearchLeads": {
+    "regionLabel": "Inteligência de leads do InfoSearch",
+    "title": "Leads do InfoSearch",
+    "captionPreview": "Inteligência de leads de amostra — conecte o InfoSearch (INFOSEARCH_ENABLED) para listas de chamadas ao vivo",
+    "captionLive": "Listas de chamadas e inteligência de leads para esta conta — obtidas ao vivo do InfoSearch",
+    "errorTitle": "O InfoSearch está inacessível",
+    "errorMessage": "Não foi possível carregar a inteligência de leads.",
+    "empty": "Nenhum lead do InfoSearch correspondeu a esta conta.",
+    "emailAction": "E-mail",
+    "callAction": "Ligar"
+  },
+  "displayCharts": {
+    "heatmapAriaLabel": "Mapa de calor",
+    "noRows": "Nenhuma linha para exibir.",
+    "tableAriaLabel": "Tabela de dados"
+  },
+  "newCompany": {
+    "nameRequiredError": "O nome da empresa é obrigatório.",
+    "title": "Nova empresa",
+    "description": "Crie primeiro o perfil da conta. Você pode enriquecer os dados firmográficos e os contatos depois que o registro existir.",
+    "nameLabel": "Nome da empresa",
+    "namePlaceholder": "Acme Inc.",
+    "domainLabel": "Domínio",
+    "domainPlaceholder": "acme.com",
+    "countryCodeLabel": "Código do país",
+    "countryCodePlaceholder": "CA",
+    "industryLabel": "Setor",
+    "industryPlaceholder": "Software",
+    "cancelButton": "Cancelar",
+    "creatingButton": "Criando…",
+    "createButton": "Criar empresa"
+  },
+  "salesFunnel": {
+    "title": "Funil de vendas",
+    "viewPipeline": "Ver pipeline",
+    "stageLeads": "Leads",
+    "stageOpportunities": "Oportunidades",
+    "stageOpenDeals": "Negócios abertos",
+    "stagePipeline": "Pipeline"
+  },
+  "customObjectEditor": {
+    "loadError": {
+      "title": "Não foi possível carregar as definições de objetos",
+      "message": "O servidor não respondeu."
+    },
+    "retry": "Tentar novamente",
+    "notFound": "Objeto não encontrado.",
+    "backToList": "Voltar à lista",
+    "breadcrumbLabel": "Trilha de navegação",
+    "customObjects": "Objetos personalizados",
+    "viewRecords": "Ver {{labelPlural}} →"
+  },
+  "errorBoundary": {
+    "title": "Algo deu errado",
+    "description": "Lamentamos, mas ocorreu um erro inesperado.",
+    "reloadButton": "Recarregar página",
+    "clearDataButton": "Limpar dados do app e recarregar"
+  },
+  "newForecast": {
+    "title": "Nova previsão",
+    "description": "Insira os valores para cada categoria.",
+    "periodLabel": "Período",
+    "periodPlaceholder": "ex. 2026-05, 2026-T2 ou 2026",
+    "ownerLabel": "Proprietário",
+    "ownerPlaceholder": "Selecionar proprietário…",
+    "cancel": "Cancelar",
+    "saving": "Salvando…",
+    "save": "Salvar previsão"
+  },
+  "webVitalsHud": {
+    "regionLabel": "HUD de métricas de desenvolvimento",
+    "title": "HUD DE DESENVOLVIMENTO",
+    "hideButtonLabel": "Ocultar HUD de desenvolvimento",
+    "fetchMutLabel": "buscas / mutações"
+  },
+  "settings": {
+    "pageTitle": "Configurações",
+    "pageSubtitle": "Gerencie sua conta, controles do espaço de trabalho, modelo de dados e acesso de desenvolvedores.",
+    "sectionOverview": "Visão geral",
+    "sectionProfile": "Perfil",
+    "sectionAppearance": "Aparência e idioma",
+    "sectionLanguage": "Idioma",
+    "sectionNotifications": "Notificações",
+    "sectionSecurity": "Perfil e segurança",
+    "sectionWorkspace": "Espaço de trabalho",
+    "sectionCrm": "Configuração de dados",
+    "sectionDataImport": "Importação de dados",
+    "sectionTopAccounts": "Principais contas",
+    "sectionGroups": "Grupos de acesso",
+    "sectionOpportunityFilters": "Filtros de oportunidades",
+    "sectionRfpAnalytics": "Análise de RFP",
+    "sectionIntegrations": "Integrações",
+    "sectionWebhooks": "Webhooks",
+    "sectionAuditLog": "Registro de auditoria",
+    "sectionDeveloper": "Acesso de desenvolvedor"
+  },
+  "override": {
+    "title": "A pontuação está abaixo do limite de proposta",
+    "description": "Esta avaliação calcula {{totalScore}}/100 — {{verdict}}. Guarde-a como está ou ignore a recomendação para prosseguir com a proposta. As substituições exigem uma justificação e são registadas para revisão do diretor/VP.",
+    "justificationLabel": "Justificação da substituição",
+    "justificationPlaceholder": "Por que estamos a concorrer apesar da pontuação? Conta estratégica, entrada no mercado, acordo-quadro obrigatório…",
+    "hintReady": "{{count}} caracteres — pronto para enviar.",
+    "hintMore": "Mínimo de {{min}} caracteres (faltam {{remaining}}).",
+    "followAriaLabel": "Guardar a pontuação e seguir a recomendação",
+    "followButton": "Guardar e seguir a recomendação",
+    "overrideAriaLabel": "Ignorar a recomendação e prosseguir com a proposta",
+    "saving": "A guardar…",
+    "overrideButton": "Ignorar e prosseguir com a proposta"
+  },
+  "kpiSidebar": {
+    "title": "Estado da plataforma",
+    "caption": "Métricas mais recentes disponíveis do BidStack",
+    "releaseScore": "Pontuação de lançamento",
+    "providersHealthy": "Provedores saudáveis",
+    "queueBacklog": "Fila pendente",
+    "overdueTasks": "Tarefas atrasadas"
+  },
+  "inlineTaskAdd": {
+    "toastAddedTitle": "Tarefa adicionada",
+    "toastErrorTitle": "Não foi possível adicionar a tarefa",
+    "toastErrorDescription": "O servidor rejeitou a solicitação.",
+    "titlePlaceholder": "Adicione uma tarefa rápida — Enter para salvar",
+    "titleAriaLabel": "Título da tarefa de adição rápida",
+    "dueDateAriaLabel": "Data de vencimento opcional",
+    "submitButton": "Adicionar"
+  },
+  "recentOpportunities": {
+    "accountTitle": "Oportunidades da conta",
+    "recentTitle": "Oportunidades recentes",
+    "accountCaption": "Oportunidades abertas vinculadas a {{accountName}}",
+    "recentCaption": "Atividade mais recente da carteira de todos os clientes",
+    "openPipeline": "Abrir pipeline",
+    "viewAll": "Ver tudo",
+    "emptyAccountTitle": "Ainda não há oportunidades para esta conta",
+    "emptyTitle": "Ainda não há oportunidades",
+    "emptyAccountMessage": "Crie uma oportunidade no cabeçalho da conta para iniciar um espaço de trabalho de proposta."
+  },
+  "spotlightRefs": {
+    "regionLabel": "Referências do Spotlight",
+    "sectionTitle": "Referências de projetos",
+    "sectionCaption": "Referências do Spotlight Ref validadas para esta conta",
+    "errorTitle": "Não foi possível carregar as referências",
+    "errorMessage": "Tente novamente em breve.",
+    "emptyTitle": "Ainda não há referências",
+    "emptyMessage": "As referências validadas chegam do Spotlight Ref depois que um consultor as envia e um gerente as aprova.",
+    "statusDraft": "Rascunho",
+    "statusManagerReview": "Aguardando validação",
+    "statusValidated": "Validado",
+    "statusDispatched": "Enviado",
+    "toastValidatedTitle": "Referência validada",
+    "toastValidationFailedTitle": "Falha na validação",
+    "validateButton": "Validar"
+  },
+  "cockpitCustomizeMenu": {
+    "groupMain": "Coluna principal",
+    "groupSide": "Barra lateral",
+    "triggerLabel": "Personalizar",
+    "hiddenCount": "({{count}} ocultos)",
+    "menuAriaLabel": "Personalizar blocos do painel",
+    "showBlocks": "Mostrar blocos",
+    "reset": "Redefinir"
+  },
+  "insightsBar": {
+    "heading": "Sinais prioritários",
+    "overdueTasks": "{{count}} tarefas atrasadas",
+    "stalledOpps": "{{count}} oportunidades paradas",
+    "newLeads": "{{count}} novos leads esta semana",
+    "pipelineValue": "{{value}} M€ de valor do pipeline"
+  },
+  "importOpportunities": {
+    "trigger": "Importar",
+    "dialog": {
+      "title": "Importar oportunidades",
+      "description": "Cole um array JSON de oportunidades. Os códigos são gerados automaticamente se omitidos."
+    },
+    "cancel": "Cancelar",
+    "submit": "Importar",
+    "submitLoading": "Importando…",
+    "toast": {
+      "invalidJson": "JSON inválido",
+      "successOne": "{{count}} oportunidade importada",
+      "successOther": "{{count}} oportunidades importadas",
+      "rowsFailedOne": "{{count}} linha falhou",
+      "rowsFailedOther": "{{count}} linhas falharam",
+      "failed": "Falha na importação",
+      "unknownError": "Erro desconhecido"
+    }
+  },
+  "winRate": {
+    "heading": "Taxa de vitória",
+    "emptyNoClosedBids": "Nenhuma proposta fechada",
+    "wonCount": "{{count}} ganhas",
+    "lostCount": "{{count}} perdidas"
+  },
+  "businessSnapshot": {
+    "title": "Resumo do negócio",
+    "caption": "Saúde: {{band}} - pontuação {{score}}/100",
+    "region": {
+      "ariaLabel": "Resumo do negócio"
+    },
+    "row": {
+      "legalName": "Razão social",
+      "founded": "Fundada",
+      "headquarters": "Sede",
+      "annualRevenue": "Receita anual",
+      "employees": "Funcionários",
+      "intentTopics": "Tópicos de intenção",
+      "hiringMovement": "Movimento de contratação",
+      "leadershipChanges": "Mudanças na liderança",
+      "externalSync": "Sincronização externa",
+      "sourceReceipts": "Comprovantes de origem",
+      "lastRefreshed": "Última atualização",
+      "confidence": "Confiança"
+    },
+    "value": {
+      "notVerified": "Não verificado",
+      "notSynced": "Não sincronizado",
+      "hiringSummary": "{{trend}} ({{count}} sinais)",
+      "leadershipSummary": "{{count}} sinais de nível C",
+      "sourceCount_one": "{{count}} fonte",
+      "sourceCount_other": "{{count}} fontes"
+    }
+  },
+  "savedViewsBar": {
+    "namePromptTitle": "Nomeie esta visualização",
+    "namePromptPlaceholder": "ex.: \"Minhas atrasadas de hoje\"",
+    "namePromptConfirm": "Salvar visualização",
+    "savedToast": "Visualização \"{{name}}\" salva",
+    "recallAriaLabel": "Abrir visualização salva",
+    "selectPlaceholder": "Visualizações salvas…",
+    "saveViewButton": "Salvar visualização",
+    "removeConfirmTitle": "Remover visualização salva?",
+    "removeConfirmDescription": "Isso remove \"{{name}}\" dos seus atalhos de tarefas.",
+    "removeConfirmButton": "Remover",
+    "removeButtonTitle": "Remover a visualização salva mais recente"
+  },
+  "collaborativeNotes": {
+    "heading": "Colaboração ao vivo",
+    "realTimeBadge": "· em tempo real",
+    "loadingEditor": "Carregando o editor",
+    "placeholder": "Comece a escrever notas colaborativas…"
+  },
+  "tagChip": {
+    "tagLabel": "{{name}}, etiqueta",
+    "removeTag": "Remover etiqueta {{name}}"
+  },
+  "scoreSummaryStrip": {
+    "overallBidScoreLabel": "Pontuação geral da proposta: {{score}}%",
+    "rateCriteriaToBegin": "Avalie os critérios para começar",
+    "weightedScoreSummary": "Pontuação ponderada em {{count}} fatores de decisão"
+  },
+  "accountNewsSignal": {
+    "title": "Notícias e sinais",
+    "caption": "Notícias recentes da web pública sobre esta conta — um sinal de atividade gratuito, não dados internos do projeto.",
+    "badgeFreeOpenWeb": "Grátis · Web aberta",
+    "errorTitle": "Não foi possível carregar as notícias",
+    "errorMessage": "O feed de notícias da web aberta não respondeu. Este é um sinal gratuito de melhor esforço.",
+    "retry": "Tentar novamente",
+    "emptyTitle": "Sem notícias recentes",
+    "emptyMessage": "Nenhuma manchete da web pública correspondeu ao nome desta conta recentemente.",
+    "badgeExternal": "Externo",
+    "sourceNote": "Fonte: Google News · verifique antes de tratar como um fato da Mantu."
+  },
+  "googleSignInButton": {
+    "label": "Entrar com o Google",
+    "ariaLabel": "Entrar com o Google"
+  },
+  "sidebarCards": {
+    "quickActionsHeading": "Ações rápidas",
+    "action": {
+      "newLead": "Novo lead",
+      "openTasks": "Tarefas abertas",
+      "contacts": "Contatos",
+      "companies": "Empresas"
+    },
+    "quickLinksHeading": "Links rápidos",
+    "link": {
+      "pipeline": "Pipeline",
+      "reports": "Relatórios",
+      "tasks": "Tarefas",
+      "settings": "Configurações"
+    }
+  },
+  "briefing": {
+    "title": "Resumo: {{label}}",
+    "description": "Resumo executivo gerado pelo Dust (simulado localmente sem DUST_API_KEY).",
+    "errorTitle": "Não foi possível gerar o resumo",
+    "errorUnknown": "Erro desconhecido",
+    "contentAriaLabel": "Conteúdo do resumo",
+    "modelMeta": "Modelo {{model}} · {{tokens}} tokens",
+    "copy": "Copiar",
+    "regenerate": "Regenerar"
+  },
+  "forecastChart": {
+    "title": "Detalhamento da previsão",
+    "caption": "Empilhado por categoria ao longo dos períodos"
+  },
+  "techStack": {
+    "regionLabel": "Visão geral da pilha técnica",
+    "title": "Visão geral da pilha técnica",
+    "caption": "Da descoberta e verificação",
+    "emptyTitle": "Ainda não há dados da pilha",
+    "emptyMessage": "Enriqueça esta conta para descobrir sua pilha."
+  },
+  "keyContacts": {
+    "title": "Contatos principais",
+    "noTitleOrEmail": "n/d"
+  },
+  "pipelineByStageMini": {
+    "heading": "Pipeline por etapa"
+  },
+  "microsoftSignInButton": {
+    "label": "Entrar com a Microsoft"
+  },
+  "customObjectNavItem": {
+    "recordCountLabel": "{{count}} registros"
+  },
+  "alert": {
+    "ofTotal": "de {{total}}"
+  },
+  "pipelineByStage": {
+    "regionLabel": "Pipeline do portfólio por etapa",
+    "title": "Pipeline do portfólio",
+    "caption": "Pipeline de todas as contas por etapa"
+  },
+  "accountDashboardWidgets": {
+    "railAriaLabel": "Status de integração do CRM",
+    "railLabel": "Atividade de integração",
+    "railCaption": "ERP, CRM externo, conectores de dados verificados"
+  },
+  "oppIndustryBreakdown": {
+    "title": "Pipeline por setor",
+    "sectorCount": "{{count}} setor"
+  },
+  "revenueEvolution": {
+    "regionLabel": "Evolução da receita",
+    "title": "Evolução da receita",
+    "caption": "Receita de negócios ganhos com este cliente por mês",
+    "srSummary": "{{count}} meses de receita de negócios ganhos. Pico {{period}}.",
+    "barsListLabel": "Receita de negócios ganhos por mês",
+    "barLabel": "{{period}}: {{amount}}"
+  },
+  "winLoss": {
+    "regionLabel": "Ganhos / perdas",
+    "title": "Ganhos / perdas",
+    "caption": "Negócios decididos nesta conta",
+    "winRateLabel": "taxa de vitória",
+    "wonCount": "{{count}} ganhos",
+    "lostCount": "{{count}} perdidos",
+    "barLabel": "{{won}} ganhos, {{lost}} perdidos — {{rate}}% de taxa de vitória",
+    "wonValue": "{{value}} em negócios ganhos"
+  },
+  "pipelineViewSwitch": {
+    "ariaLabel": "Visualização de oportunidade",
+    "list": "Lista",
+    "board": "Quadro"
+  },
+  "accountHierarchyTree": {
+    "heading": "Hierarquia de contas"
+  },
+  "keyboardShortcutsHelp": {
+    "title": "Atalhos de teclado",
+    "description": "Pressione a combinação de teclas para navegar rapidamente.",
+    "commandPalette": "Paleta de comandos",
+    "helpPanel": "Este painel de ajuda",
+    "goToDashboard": "Ir para o painel",
+    "goToOpportunities": "Ir para Oportunidades",
+    "goToPipeline": "Ir para o pipeline",
+    "goToContacts": "Ir para Contatos",
+    "goToTasks": "Ir para Tarefas",
+    "goToReports": "Ir para Relatórios",
+    "goToSettings": "Ir para Configurações",
+    "closeDialog": "Fechar qualquer caixa de diálogo/paleta"
+  },
+  "leadStatusBadge": {
+    "statusNew": "Novo",
+    "statusContacted": "Contactado",
+    "statusQualified": "Qualificado",
+    "statusNurture": "Em nutrição",
+    "statusDisqualified": "Desqualificado",
+    "statusConverted": "Convertido",
+    "priorityLow": "Baixa",
+    "priorityMedium": "Média",
+    "priorityHigh": "Alta",
+    "priorityCritical": "Crítica"
+  },
+  "publishStep": {
+    "heading": "Publicado",
+    "summary": "{{solutionCount}} solução{{solutionSuffix}} e {{productCount}} produto{{productSuffix}} já estão ativos no painel da conta.",
+    "backButton": "← Revisar",
+    "startNewButton": "Iniciar nova captura"
+  },
+  "offlineIndicator": {
+    "statusLabel": "Offline",
+    "retryMessage": "— os salvamentos serão repetidos quando você reconectar"
+  },
+  "accountTierBadges": {
+    "top": "Top",
+    "topRanked": "Top n.º {{rank}}",
+    "key": "Chave"
+  },
+  "stubAuthBypass": {
+    "devModeSkipToDashboard": "Modo de desenvolvimento — Ir para o painel"
+  },
+  "upsellFiles": {
+    "title": "Arquivos",
+    "emptyTitle": "Escolha uma conta",
+    "emptyMessage": "Abra uma conta em /accounts para anexar propostas, NDAs e arquiteturas de referência."
   }
 }
