@@ -44,7 +44,19 @@
     "agents": "Agentes Dust",
     "search": "Pesquisar",
     "references": "Biblioteca de referências",
-    "settingsPage": "Configurações"
+    "settingsPage": "Configurações",
+    "home": "Início",
+    "bidsRfp": "Licitações & RFP",
+    "quickStart": "Início rápido",
+    "salesToolkits": "Kits de vendas",
+    "keyAccounts": "Contas-chave",
+    "topAccounts": "Principais contas",
+    "sectorView": "Visão por setor",
+    "crossSell": "Venda cruzada",
+    "agentStudio": "Estúdio de agentes",
+    "calendar": "Calendário",
+    "customObjects": "Objetos personalizados",
+    "analyticsReports": "Análises e relatórios"
   },
   "crumbs": {
     "portfolio": "Carteira",
@@ -113,7 +125,10 @@
     "deleted": "Excluído",
     "copied": "Copiado para a área de transferência",
     "genericError": "Algo deu errado. Por favor, tente novamente.",
-    "networkError": "Erro de rede. Verifique sua conexão."
+    "networkError": "Erro de rede. Verifique sua conexão.",
+    "regionLabel": "Notificações",
+    "clearAll": "Limpar tudo ({{count}})",
+    "dismiss": "Dispensar"
   },
   "validation": {
     "required": "Este campo é obrigatório",
@@ -267,5 +282,105 @@
         "leadRot": "Regras de envelhecimento"
       }
     }
+  },
+  "topbar": {
+    "skipToContent": "Pular para o conteúdo",
+    "switchToLight": "Mudar para o modo claro",
+    "switchToDark": "Mudar para o modo escuro",
+    "help": "Ajuda e atalhos",
+    "helpAria": "Ajuda e atalhos de teclado",
+    "productTour": "Fazer o tour do produto",
+    "signOut": "Sair",
+    "portfolio": "Portfólio",
+    "detail": "Detalhe"
+  },
+  "appRoutes": {
+    "notFoundTitle": "Página não encontrada",
+    "notFoundMessage": "A página que você procura não existe.",
+    "goToDashboard": "Ir para o painel"
+  },
+  "select": {
+    "placeholder": "—",
+    "noOptions": "Sem opções"
+  },
+  "lookupFieldPicker": {
+    "placeholder": "Pesquisar…",
+    "clearSelection": "Limpar seleção",
+    "searching": "Pesquisando…",
+    "noResults": "Sem resultados.",
+    "typeToSearch": "Digite para pesquisar…"
+  },
+  "confirm": {
+    "cancel": "Cancelar",
+    "delete": "Excluir",
+    "confirm": "Confirmar",
+    "save": "Salvar"
+  },
+  "avatar": {
+    "statusOnline": "Online",
+    "statusOffline": "Offline"
+  },
+  "helpDrawer": {
+    "title": "Atalhos de teclado",
+    "closeAria": "Fechar atalhos",
+    "groupGlobal": "Global",
+    "groupNavigation": "Navegação",
+    "groupRecords": "Registros",
+    "openCommandPalette": "Abrir paleta de comandos",
+    "quickAddMenu": "Menu de adição rápida",
+    "openThisDrawer": "Abrir este painel",
+    "closeCurrentDialog": "Fechar o diálogo atual",
+    "goToDashboard": "Ir para o painel",
+    "goToOpportunities": "Ir para Oportunidades",
+    "goToPipeline": "Ir para o funil",
+    "goToContacts": "Ir para Contatos",
+    "goToTasks": "Ir para Tarefas",
+    "goToReports": "Ir para Relatórios",
+    "goToAccounts": "Ir para Contas",
+    "goToSettings": "Ir para Configurações",
+    "goToSearch": "Ir para Pesquisa",
+    "moveSelectionInLists": "Mover a seleção nas listas",
+    "openRecord": "Abrir registro",
+    "editSelectedRecord": "Editar o registro selecionado",
+    "deleteWithConfirmation": "Excluir com confirmação",
+    "footer": "A maioria dos atalhos funciona em todos os lugares, exceto dentro de campos de texto. Pressione ? a qualquer momento para reabrir este painel."
+  },
+  "breadcrumbs": {
+    "dashboard": "Painel",
+    "accounts": "Contas",
+    "opportunities": "Oportunidades",
+    "pipeline": "Funil",
+    "contacts": "Contatos",
+    "tasks": "Tarefas",
+    "reports": "Relatórios",
+    "integrations": "Integrações",
+    "settings": "Configurações",
+    "auditLog": "Registro de auditoria",
+    "login": "Entrar",
+    "ariaLabel": "Trilha de navegação"
+  },
+  "progressRing": {
+    "ariaLabelPercentComplete": "{{percent}}% concluído"
+  },
+  "sortableHeader": {
+    "ariaLabel": "Ordenar por {{label}}. Ordenação atual: {{current}}. Ative para ordenar {{next}}."
+  },
+  "upgradeBanner": {
+    "actionLabel": "Atualizar"
+  },
+  "showMore": {
+    "moreLabel": "Mostrar mais",
+    "lessLabel": "Mostrar menos"
+  },
+  "bulkActionBar": {
+    "regionLabel": "Ações em massa",
+    "selectedCount": "{{count}} selecionados",
+    "exportSelected": "Exportar selecionados",
+    "deleting": "Excluindo…",
+    "deleteSelected": "Excluir selecionados",
+    "clear": "Limpar"
+  },
+  "dialog": {
+    "closeAriaLabel": "Fechar"
   }
 }
