@@ -816,5 +816,10 @@
       "signedInAsLabel": "Connecté en tant que",
       "notSignedIn": "Non connecté"
     }
+  },
+  "crmConfiguration": {
+    "predictiveScoringTitle": "Scoring prédictif des leads et des affaires",
+    "predictiveScoringCaption": "Consultez les versions des modèles entraînés, les métriques et l'historique de réentraînement.",
+    "openPredictiveScoring": "Ouvrir le scoring prédictif"
   }
 }

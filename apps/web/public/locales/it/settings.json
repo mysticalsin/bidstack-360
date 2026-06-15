@@ -816,5 +816,10 @@
       "signedInAsLabel": "Accesso effettuato come",
       "notSignedIn": "Accesso non effettuato"
     }
+  },
+  "crmConfiguration": {
+    "predictiveScoringTitle": "Punteggio predittivo di lead e trattative",
+    "predictiveScoringCaption": "Esamina le versioni dei modelli addestrati, le metriche e la cronologia dei riaddestramenti.",
+    "openPredictiveScoring": "Apri il punteggio predittivo"
   }
 }

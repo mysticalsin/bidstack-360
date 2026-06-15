@@ -85,5 +85,16 @@
     "stageRejected": "已拒绝",
     "stageTimeout": "已超时",
     "ariaPipelineStatus": "流程状态：{{status}}"
+  },
+  "requirementRow": {
+    "pageRefAria": "在第 {{page}} 页找到",
+    "confidenceAria": "AI 置信度：{{percent}}%",
+    "confidenceLabel": "置信度 {{percent}}%"
+  },
+  "adminRfp": {
+    "eyebrow": "管理员",
+    "title": "RFP 分析",
+    "subtitle": "整个组织的每个 RFP、其价值以及按负责人的细分。",
+    "viewAllProposals": "查看所有提案"
   }
 }

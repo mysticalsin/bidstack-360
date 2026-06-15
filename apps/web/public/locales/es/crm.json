@@ -3870,5 +3870,15 @@
     "priorityMedium": "Media",
     "priorityHigh": "Alta",
     "priorityCritical": "Crítica"
+  },
+  "publishStep": {
+    "heading": "Publicado",
+    "summary": "{{solutionCount}} solución{{solutionSuffix}} y {{productCount}} producto{{productSuffix}} ya están activos en el panel de la cuenta.",
+    "backButton": "← Revisar",
+    "startNewButton": "Iniciar nueva captura"
+  },
+  "offlineIndicator": {
+    "statusLabel": "Sin conexión",
+    "retryMessage": "— los guardados se reintentarán cuando vuelvas a conectarte"
   }
 }

@@ -2,6 +2,7 @@
  * PublishStep — success screen confirming published extractions.
  * Step 4: shows counts of published solutions/products and offers restart.
  */
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
@@ -14,6 +15,7 @@ interface PublishStepProps {
 }
 
 export function PublishStep({ accountId, onBack, onDone }: PublishStepProps) {
+  const { t } = useTranslation('crm');
   const intel = useAccountIntel(accountId || undefined);
   const solutions = intel.data?.solutions ?? [];
   const products = intel.data?.products ?? [];
@@ -25,18 +27,28 @@ export function PublishStep({ accountId, onBack, onDone }: PublishStepProps) {
           <Icon name="check" size={20} className="text-[var(--success)]" />
         </div>
         <div>
-          <h2 className="text-sm font-semibold text-[var(--fg-primary)]">Published</h2>
+          <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
+            {t('publishStep.heading', 'Published')}
+          </h2>
           <p className="text-xs text-[var(--fg-secondary)]">
-            {solutions.length} solution{solutions.length === 1 ? '' : 's'} and {products.length}{' '}
-            product{products.length === 1 ? '' : 's'} are now live on the account cockpit.
+            {t(
+              'publishStep.summary',
+              '{{solutionCount}} solution{{solutionSuffix}} and {{productCount}} product{{productSuffix}} are now live on the account cockpit.',
+              {
+                solutionCount: solutions.length,
+                solutionSuffix: solutions.length === 1 ? '' : 's',
+                productCount: products.length,
+                productSuffix: products.length === 1 ? '' : 's',
+              },
+            )}
           </p>
         </div>
       </div>
       <div className="flex items-center gap-2">
         <Button variant="secondary" onClick={onBack}>
-          ← Review
+          {t('publishStep.backButton', '← Review')}
         </Button>
-        <Button onClick={onDone}>Start new intake</Button>
+        <Button onClick={onDone}>{t('publishStep.startNewButton', 'Start new intake')}</Button>
       </div>
     </Card>
   );

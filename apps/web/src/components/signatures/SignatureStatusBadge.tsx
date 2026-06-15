@@ -5,8 +5,12 @@
  * stays consistent without duplicating the colour logic.
  */
 
+import { useTranslation } from 'react-i18next';
+
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import type { SignatureStatus } from '@bidstack/shared';
+
+type TFunction = ReturnType<typeof useTranslation>['t'];
 
 const STATUS_TONE: Record<SignatureStatus, BadgeTone> = {
   DRAFT: 'gray',
@@ -18,15 +22,18 @@ const STATUS_TONE: Record<SignatureStatus, BadgeTone> = {
   EXPIRED: 'rose',
 };
 
-const STATUS_LABEL: Record<SignatureStatus, string> = {
-  DRAFT: 'Draft',
-  SENT: 'Sent',
-  VIEWED: 'Viewed',
-  SIGNED: 'Signed',
-  DECLINED: 'Declined',
-  VOIDED: 'Voided',
-  EXPIRED: 'Expired',
-};
+function getStatusLabel(status: SignatureStatus, t: TFunction): string {
+  const labels: Record<SignatureStatus, string> = {
+    DRAFT: t('signatureStatusBadge.statusDraft', 'Draft'),
+    SENT: t('signatureStatusBadge.statusSent', 'Sent'),
+    VIEWED: t('signatureStatusBadge.statusViewed', 'Viewed'),
+    SIGNED: t('signatureStatusBadge.statusSigned', 'Signed'),
+    DECLINED: t('signatureStatusBadge.statusDeclined', 'Declined'),
+    VOIDED: t('signatureStatusBadge.statusVoided', 'Voided'),
+    EXPIRED: t('signatureStatusBadge.statusExpired', 'Expired'),
+  };
+  return labels[status];
+}
 
 interface SignatureStatusBadgeProps {
   status: SignatureStatus;
@@ -34,9 +41,10 @@ interface SignatureStatusBadgeProps {
 }
 
 export function SignatureStatusBadge({ status, className }: SignatureStatusBadgeProps) {
+  const { t } = useTranslation('signatures');
   return (
     <Badge tone={STATUS_TONE[status]} className={className}>
-      {STATUS_LABEL[status]}
+      {getStatusLabel(status, t)}
     </Badge>
   );
 }

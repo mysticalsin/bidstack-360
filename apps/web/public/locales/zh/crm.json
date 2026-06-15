@@ -3837,5 +3837,15 @@
     "priorityMedium": "中",
     "priorityHigh": "高",
     "priorityCritical": "紧急"
+  },
+  "publishStep": {
+    "heading": "已发布",
+    "summary": "{{solutionCount}} 个解决方案{{solutionSuffix}}和 {{productCount}} 个产品{{productSuffix}}现已在客户驾驶舱中上线。",
+    "backButton": "← 审阅",
+    "startNewButton": "开始新的录入"
+  },
+  "offlineIndicator": {
+    "statusLabel": "离线",
+    "retryMessage": "— 重新连接后将重试保存"
   }
 }

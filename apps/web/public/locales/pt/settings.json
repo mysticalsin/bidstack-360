@@ -816,5 +816,10 @@
       "signedInAsLabel": "Conectado como",
       "notSignedIn": "Não conectado"
     }
+  },
+  "crmConfiguration": {
+    "predictiveScoringTitle": "Pontuação preditiva de leads e negócios",
+    "predictiveScoringCaption": "Revise as versões de modelos treinados, as métricas e o histórico de retreinamento.",
+    "openPredictiveScoring": "Abrir pontuação preditiva"
   }
 }

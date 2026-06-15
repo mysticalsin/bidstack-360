@@ -3837,5 +3837,15 @@
     "priorityMedium": "Media",
     "priorityHigh": "Alta",
     "priorityCritical": "Critica"
+  },
+  "publishStep": {
+    "heading": "Pubblicato",
+    "summary": "{{solutionCount}} soluzione{{solutionSuffix}} e {{productCount}} prodotto{{productSuffix}} sono ora attivi nel cockpit dell'account.",
+    "backButton": "← Rivedi",
+    "startNewButton": "Avvia nuova acquisizione"
+  },
+  "offlineIndicator": {
+    "statusLabel": "Offline",
+    "retryMessage": "— i salvataggi verranno ritentati alla riconnessione"
   }
 }

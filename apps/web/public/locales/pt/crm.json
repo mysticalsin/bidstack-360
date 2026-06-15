@@ -3837,5 +3837,15 @@
     "priorityMedium": "Média",
     "priorityHigh": "Alta",
     "priorityCritical": "Crítica"
+  },
+  "publishStep": {
+    "heading": "Publicado",
+    "summary": "{{solutionCount}} solução{{solutionSuffix}} e {{productCount}} produto{{productSuffix}} já estão ativos no painel da conta.",
+    "backButton": "← Revisar",
+    "startNewButton": "Iniciar nova captura"
+  },
+  "offlineIndicator": {
+    "statusLabel": "Offline",
+    "retryMessage": "— os salvamentos serão repetidos quando você reconectar"
   }
 }

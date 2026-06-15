@@ -3892,5 +3892,15 @@
     "priorityMedium": "Moyenne",
     "priorityHigh": "Élevée",
     "priorityCritical": "Critique"
+  },
+  "publishStep": {
+    "heading": "Publié",
+    "summary": "{{solutionCount}} solution{{solutionSuffix}} et {{productCount}} produit{{productSuffix}} sont maintenant actifs sur le cockpit du compte.",
+    "backButton": "← Réviser",
+    "startNewButton": "Démarrer une nouvelle saisie"
+  },
+  "offlineIndicator": {
+    "statusLabel": "Hors ligne",
+    "retryMessage": "— les enregistrements seront réessayés à la reconnexion"
   }
 }

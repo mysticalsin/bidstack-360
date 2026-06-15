@@ -85,5 +85,16 @@
     "stageRejected": "Rejeitado",
     "stageTimeout": "Tempo esgotado",
     "ariaPipelineStatus": "Status do pipeline: {{status}}"
+  },
+  "requirementRow": {
+    "pageRefAria": "Encontrado na página {{page}}",
+    "confidenceAria": "Confiança da IA: {{percent}}%",
+    "confidenceLabel": "{{percent}}% de confiança"
+  },
+  "adminRfp": {
+    "eyebrow": "Administração",
+    "title": "Análise de RFP",
+    "subtitle": "Cada RFP da organização, o seu valor e a divisão por responsável.",
+    "viewAllProposals": "Ver todas as propostas"
   }
 }

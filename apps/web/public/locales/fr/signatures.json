@@ -140,5 +140,14 @@
     "regionAriaLabelTitled": "Aperçu du document : {{title}}",
     "loading": "Chargement du document…",
     "iframeAriaLabel": "Aperçu de {{title}}"
+  },
+  "signatureStatusBadge": {
+    "statusDraft": "Brouillon",
+    "statusSent": "Envoyé",
+    "statusViewed": "Consulté",
+    "statusSigned": "Signé",
+    "statusDeclined": "Refusé",
+    "statusVoided": "Annulé",
+    "statusExpired": "Expiré"
   }
 }

@@ -140,5 +140,14 @@
     "regionAriaLabelTitled": "Vista previa del documento: {{title}}",
     "loading": "Cargando documento…",
     "iframeAriaLabel": "Vista previa de {{title}}"
+  },
+  "signatureStatusBadge": {
+    "statusDraft": "Borrador",
+    "statusSent": "Enviado",
+    "statusViewed": "Visto",
+    "statusSigned": "Firmado",
+    "statusDeclined": "Rechazado",
+    "statusVoided": "Anulado",
+    "statusExpired": "Caducado"
   }
 }

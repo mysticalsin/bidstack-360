@@ -797,5 +797,10 @@
       "signedInAsLabel": "Signed in as",
       "notSignedIn": "Not signed in"
     }
+  },
+  "crmConfiguration": {
+    "predictiveScoringTitle": "Predictive lead & deal scoring",
+    "predictiveScoringCaption": "Review trained model versions, metrics, and retrain history.",
+    "openPredictiveScoring": "Open predictive scoring"
   }
 }

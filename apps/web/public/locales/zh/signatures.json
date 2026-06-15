@@ -140,5 +140,14 @@
     "regionAriaLabelTitled": "文档预览：{{title}}",
     "loading": "正在加载文档…",
     "iframeAriaLabel": "{{title}} 的预览"
+  },
+  "signatureStatusBadge": {
+    "statusDraft": "草稿",
+    "statusSent": "已发送",
+    "statusViewed": "已查看",
+    "statusSigned": "已签署",
+    "statusDeclined": "已拒绝",
+    "statusVoided": "已作废",
+    "statusExpired": "已过期"
   }
 }

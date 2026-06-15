@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import type { Requirement } from '@/hooks/rfp/useRfpRequirements';
 
 interface RequirementRowProps {
@@ -12,6 +14,7 @@ const PRIORITY_STYLES: Record<Requirement['priority'], string> = {
 };
 
 export function RequirementRow({ requirement }: RequirementRowProps) {
+  const { t } = useTranslation('rfp');
   const confidencePct = Math.round(requirement.aiConfidenceBps / 100);
 
   return (
@@ -29,15 +32,25 @@ export function RequirementRow({ requirement }: RequirementRowProps) {
       <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--fg-tertiary)]">
         <span>{requirement.category}</span>
         {requirement.pageRef !== null && (
-          <span aria-label={`Found on page ${requirement.pageRef}`}>
+          <span
+            aria-label={t('requirementRow.pageRefAria', 'Found on page {{page}}', {
+              page: requirement.pageRef,
+            })}
+          >
             · p. {requirement.pageRef}
           </span>
         )}
         <span
-          aria-label={`AI confidence: ${confidencePct}%`}
-          title={`AI confidence: ${confidencePct}%`}
+          aria-label={t('requirementRow.confidenceAria', 'AI confidence: {{percent}}%', {
+            percent: confidencePct,
+          })}
+          title={t('requirementRow.confidenceAria', 'AI confidence: {{percent}}%', {
+            percent: confidencePct,
+          })}
         >
-          · {confidencePct}% confidence
+          · {t('requirementRow.confidenceLabel', '{{percent}}% confidence', {
+            percent: confidencePct,
+          })}
         </span>
       </div>
     </li>

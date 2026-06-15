@@ -212,5 +212,16 @@
     "stageRejected": "Rejected",
     "stageTimeout": "Timed Out",
     "ariaPipelineStatus": "Pipeline status: {{status}}"
+  },
+  "requirementRow": {
+    "pageRefAria": "Found on page {{page}}",
+    "confidenceAria": "AI confidence: {{percent}}%",
+    "confidenceLabel": "{{percent}}% confidence"
+  },
+  "adminRfp": {
+    "eyebrow": "Admin",
+    "title": "RFP Analytics",
+    "subtitle": "Every RFP across the organisation, its value, and the per-owner breakdown.",
+    "viewAllProposals": "View all proposals"
   }
 }

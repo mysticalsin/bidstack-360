@@ -140,5 +140,14 @@
     "regionAriaLabelTitled": "Anteprima del documento: {{title}}",
     "loading": "Caricamento del documento…",
     "iframeAriaLabel": "Anteprima di {{title}}"
+  },
+  "signatureStatusBadge": {
+    "statusDraft": "Bozza",
+    "statusSent": "Inviato",
+    "statusViewed": "Visualizzato",
+    "statusSigned": "Firmato",
+    "statusDeclined": "Rifiutato",
+    "statusVoided": "Annullato",
+    "statusExpired": "Scaduto"
   }
 }

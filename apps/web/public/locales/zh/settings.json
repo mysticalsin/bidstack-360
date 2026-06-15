@@ -816,5 +816,10 @@
       "signedInAsLabel": "登录身份",
       "notSignedIn": "未登录"
     }
+  },
+  "crmConfiguration": {
+    "predictiveScoringTitle": "潜在客户和交易预测评分",
+    "predictiveScoringCaption": "查看已训练的模型版本、指标和重新训练历史。",
+    "openPredictiveScoring": "打开预测评分"
   }
 }

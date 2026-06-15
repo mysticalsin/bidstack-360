@@ -819,5 +819,10 @@
       "signedInAsLabel": "Sesión iniciada como",
       "notSignedIn": "Sesión no iniciada"
     }
+  },
+  "crmConfiguration": {
+    "predictiveScoringTitle": "Puntuación predictiva de leads y oportunidades",
+    "predictiveScoringCaption": "Revisa las versiones de modelos entrenados, las métricas y el historial de reentrenamiento.",
+    "openPredictiveScoring": "Abrir puntuación predictiva"
   }
 }

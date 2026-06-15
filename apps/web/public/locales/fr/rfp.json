@@ -85,5 +85,16 @@
     "stageRejected": "Rejeté",
     "stageTimeout": "Expiré",
     "ariaPipelineStatus": "Statut du pipeline : {{status}}"
+  },
+  "requirementRow": {
+    "pageRefAria": "Trouvé à la page {{page}}",
+    "confidenceAria": "Confiance de l'IA : {{percent}} %",
+    "confidenceLabel": "{{percent}} % de confiance"
+  },
+  "adminRfp": {
+    "eyebrow": "Administration",
+    "title": "Analyses des appels d'offres",
+    "subtitle": "Chaque appel d'offres de l'organisation, sa valeur et la répartition par responsable.",
+    "viewAllProposals": "Voir toutes les propositions"
   }
 }
