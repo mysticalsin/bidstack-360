@@ -51,5 +51,479 @@
     "connectFailed": "连接失败，请检查您的凭据。",
     "syncFailed": "同步失败。",
     "disconnectFailed": "断开连接失败。"
+  },
+  "agentProviderCredentials": {
+    "toast": {
+      "activeSet": "{{label}} 现在是活动模型",
+      "activeCleared": "已清除活动模型",
+      "activeSetDescription": "在你再次切换之前，每个 AI 步骤都使用此提供商，无需重新部署。",
+      "switchFailedTitle": "无法切换提供商",
+      "serverRejected": "服务器拒绝了该请求。",
+      "testAliveTitle": "{{label}} 已就绪",
+      "testAliveDescription": "{{model}} 在 {{latencyMs}} 毫秒内响应。",
+      "testNoResponseTitle": "{{label}} 未响应",
+      "testNoResponseDescription": "提供商无响应。",
+      "testFailedTitle": "测试失败",
+      "savedTitle": "{{label}} 已保存",
+      "savedDescription": "已刷新提供商状态和 Agent Studio 就绪情况。",
+      "removedTitle": "已移除 {{label}} 凭据",
+      "removeFailedTitle": "移除失败"
+    },
+    "error": {
+      "apiKeyRequired": "此提供商需要 API 密钥。",
+      "claudeModelRequired": "Claude 需要指定模型，例如 claude-sonnet-4-5。",
+      "saveFailed": "无法保存提供商凭据。"
+    },
+    "remove": {
+      "confirmTitle": "移除 {{label}} 凭据？",
+      "confirmDescription": "如可用，代理将回退到平台环境凭据。现有代理定义保持不变。",
+      "confirmLabel": "移除"
+    },
+    "header": {
+      "title": "模型提供商",
+      "caption": "保持厂商中立：为 GPT、Claude、Kimi、NVIDIA NIM 或本地 Gemma 存储组织自有密钥，然后选择活动项。切换活动提供商会在下一个 AI 步骤生效，无需重新部署。密钥在静态下加密存储，且不会再次显示。",
+      "addProvider": "添加提供商"
+    },
+    "errorState": {
+      "title": "无法加载提供商密钥",
+      "message": "提供商就绪情况仍使用服务器环境回退，但无法加载已保存的组织密钥。",
+      "retry": "重试"
+    },
+    "emptyState": {
+      "title": "未返回提供商列表",
+      "message": "该 API 应始终返回受支持的直连提供商。"
+    },
+    "summary": {
+      "savedCountOne": "已保存 {{count}} 个组织提供商",
+      "savedCountOther": "已保存 {{count}} 个组织提供商",
+      "activeBadge": "活动 · {{label}}",
+      "noActiveBadge": "无活动提供商 — 使用平台默认值",
+      "fallbackNote": "配置后，平台环境提供商仍可作为回退使用。"
+    },
+    "row": {
+      "activeBadge": "活动",
+      "orgKeySaved": "已保存组织密钥",
+      "noOrgKey": "无组织密钥",
+      "activeDescription": "目前为该租户驱动每个 AI 步骤。",
+      "readyDescription": "已保存并就绪 — 设为活动以通过它路由 AI。",
+      "fallbackDescription": "如已配置，则使用平台环境回退。",
+      "edit": "编辑",
+      "connect": "连接",
+      "remove": "移除",
+      "inUse": "使用中",
+      "setActive": "设为活动",
+      "testing": "测试中…",
+      "test": "测试",
+      "testAlive": "就绪 · {{latencyMs}} 毫秒",
+      "testFailed": "失败 · {{error}}",
+      "testNoResponse": "无响应"
+    },
+    "detail": {
+      "model": "模型",
+      "endpoint": "端点",
+      "key": "密钥",
+      "keyOptional": "可选",
+      "keyNotSaved": "未保存",
+      "updated": "已更新",
+      "updatedNever": "从不"
+    },
+    "dialog": {
+      "updateTitle": "更新 {{label}}",
+      "addTitle": "添加模型提供商",
+      "description": "API 密钥在存储前会加密，且绝不会返回给浏览器。编辑时将密钥留空以保留已保存的密钥。",
+      "providerLabel": "提供商",
+      "apiKeyLabelOptional": "API 密钥（可选）",
+      "apiKeyLabel": "API 密钥",
+      "apiKeyPlaceholderKeep": "留空以保留已保存的密钥",
+      "apiKeyPlaceholderOptional": "对本地运行时为可选",
+      "apiKeyPlaceholder": "粘贴提供商密钥",
+      "modelLabel": "模型",
+      "baseUrlLabel": "基础 URL",
+      "baseUrlHintLocal": "localhost 仅在本地开发中受支持。生产环境需要公网 https。",
+      "baseUrlHint": "必须是公网 https 端点。",
+      "cancel": "取消",
+      "saving": "保存中...",
+      "save": "保存提供商"
+    }
+  },
+  "connectors": {
+    "category": {
+      "company": "公司数据",
+      "market": "市场与开放数据",
+      "procurement": "采购与招标",
+      "logo": "标志与品牌",
+      "people": "人员与联系人",
+      "ai": "AI 与智能体"
+    },
+    "header": {
+      "title": "连接器目录",
+      "caption": "BidStack 可访问的外部数据源。开放数据源无需密钥即可运行；授权数据源需要凭据。",
+      "sourcesBadge": "{{count}} 个数据源"
+    },
+    "error": {
+      "title": "无法加载连接器",
+      "retry": "重试"
+    },
+    "stat": {
+      "totalSources": "数据源总数",
+      "healthy": "正常",
+      "needsKey": "需要密钥",
+      "degradedDown": "降级/中断",
+      "catalogBadge": "目录"
+    },
+    "filter": {
+      "groupLabel": "按类别筛选连接器",
+      "all": "全部"
+    },
+    "empty": {
+      "title": "此类别中没有连接器"
+    },
+    "row": {
+      "checkedAt": "检查于 {{time}}",
+      "docsLink": "文档 ↗",
+      "disconnecting": "正在断开连接...",
+      "disconnect": "断开连接",
+      "connecting": "正在连接...",
+      "connect": "连接",
+      "requiresKey": "需要密钥",
+      "open": "开放"
+    },
+    "status": {
+      "healthy": "正常",
+      "degraded": "降级",
+      "down": "中断",
+      "disabled": "已禁用"
+    }
+  },
+  "erpConnector": {
+    "title": "ERP MCP",
+    "caption": "设置 ERP_MCP_URL + ERP_DB 以启用",
+    "status": {
+      "error": "错误",
+      "checking": "检查中",
+      "notConfigured": "未配置",
+      "live": "在线",
+      "unreachable": "无法访问"
+    },
+    "error": {
+      "title": "无法连接到 ERP 状态端点",
+      "message": "这是连接问题，而非配置缺失。请重试。",
+      "retry": "重试"
+    },
+    "notConfigured": {
+      "set": "设置",
+      "andOptionally": "并可选地设置",
+      "tail": "以连接 ERP MCP sidecar。在此之前，BidStack 使用本地已验证数据和已验证数据连接器。"
+    },
+    "stat": {
+      "endpoint": "端点",
+      "database": "数据库",
+      "mcpTools": "MCP 工具",
+      "status": "状态"
+    },
+    "value": {
+      "na": "无",
+      "reachable": "可访问",
+      "unreachable": "无法访问"
+    },
+    "kit": {
+      "title": "ERP 投标操作工具包",
+      "subtitle": "为 BidStack 售前调整的合作伙伴、商机、报价、活动、文档和交接模式。",
+      "badge": {
+        "sidecar": "sidecar",
+        "fixSidecar": "修复 sidecar",
+        "local": "本地"
+      }
+    },
+    "autocomplete": {
+      "title": "合作伙伴自动补全",
+      "subtitle": "ERP 风格的法律实体查找，带 BidStack 回退。",
+      "ariaLabel": "公司自动补全查询",
+      "placeholder": "名称、域名、增值税号或 DUNS",
+      "check": "检查",
+      "empty": "暂无公司建议。请添加 ERP MCP 凭据或在 BidStack 中验证此账户。"
+    },
+    "item": {
+      "vat": "增值税号 {{value}}",
+      "duns": "DUNS {{value}}",
+      "noRegistryKeys": "尚无注册标识"
+    }
+  },
+  "connectionCommandCenter": {
+    "path": {
+      "dust": {
+        "title": "Dust 智能体桥接",
+        "eyebrow": "智能体操作",
+        "summary": "通过 MCP 加 REST 同步，为 Dust 提供服务端 CRM 工具集。"
+      },
+      "mcp": {
+        "title": "MCP 服务器",
+        "eyebrow": "自定义工具",
+        "summary": "将 BidStack 注册为 Dust、Claude Desktop 或内部智能体的 MCP 服务器。"
+      },
+      "rest": {
+        "title": "REST API",
+        "eyebrow": "双向数据",
+        "summary": "使用类型化 API 密钥处理 ETL 任务、客户门户和企业自动化。"
+      },
+      "webhooks": {
+        "title": "Webhook",
+        "eyebrow": "实时事件",
+        "summary": "让外部系统订阅交易、投标、提案、发票和智能体事件。"
+      }
+    },
+    "readyLabel": "就绪",
+    "needsSetupLabel": "需要设置",
+    "error": {
+      "title": "无法加载设置指南",
+      "message": "集成契约端点没有响应。",
+      "retry": "重试设置指南"
+    },
+    "readiness": {
+      "dustCredentials": {
+        "label": "Dust 凭据",
+        "ready": "就绪",
+        "needsKey": "需要密钥"
+      },
+      "dustAgents": {
+        "label": "Dust 智能体",
+        "found": "找到 {{count}} 个",
+        "disabled": "已禁用"
+      },
+      "mcpEndpoint": {
+        "label": "MCP 端点",
+        "publicUrlSet": "已设置公共 URL",
+        "localFallback": "本地回退"
+      },
+      "dustDataSource": {
+        "label": "Dust 数据源",
+        "ready": "就绪",
+        "missing": "缺失"
+      }
+    },
+    "title": "连接指挥中心",
+    "generatedAt": "生成于 {{time}}",
+    "subtitle": "选择一条路径，创建正确的密钥，复制精确的端点，并以最小权限范围连接外部系统。",
+    "keyVault": "密钥保险库",
+    "webhookHub": "Webhook 中心",
+    "tablistLabel": "集成设置路径"
+  },
+  "dustCredentials": {
+    "sectionTitle": "Dust 凭据",
+    "sectionCaption": "只需连接一次您的 Dust 工作区——团队智能体、RFP 起草、合规和文档智能都会自动使用它。",
+    "removeButton": "移除",
+    "updateKeysButton": "更新密钥",
+    "connectButton": "连接 Dust",
+    "dialogUpdateTitle": "更新 Dust 凭据",
+    "dialogConnectTitle": "连接 Dust",
+    "dialogDescription": "保存前我们会通过 Dust 验证密钥。API 密钥静态加密存储，且不会再次显示。",
+    "fieldApiKeyLabel": "API 密钥",
+    "fieldApiKeyHint": "来自 Dust → 设置 → API 密钥。",
+    "fieldWorkspaceIdLabel": "工作区 ID",
+    "fieldDataSourceIdLabel": "数据源 ID",
+    "fieldDataSourceIdPlaceholder": "可选——启用文档同步",
+    "fieldBaseUrlLabel": "基础 URL",
+    "fieldBaseUrlPlaceholder": "可选——默认为 https://dust.tt/api",
+    "cancelButton": "取消",
+    "validatingButton": "正在验证…",
+    "validateSaveButton": "验证并保存",
+    "errorBothRequired": "API 密钥和工作区 ID 均为必填项。",
+    "errorCouldNotSave": "无法保存凭据。",
+    "toastConnectedTitle": "Dust 已连接",
+    "toastConnectedDescription": "凭据已验证并保存。AI 功能现在使用您的工作区。",
+    "confirmRemoveTitle": "移除 Dust 凭据？",
+    "confirmRemoveDescription": "AI 功能将回退到平台默认设置（如已设置），否则将暂停，直到添加新密钥。",
+    "confirmRemoveLabel": "移除",
+    "toastRemovedTitle": "Dust 凭据已移除",
+    "toastRemoveFailedTitle": "移除失败",
+    "errorServerRejected": "服务器拒绝了该请求。",
+    "loadErrorTitle": "无法加载 Dust 凭据",
+    "loadErrorMessage": "请重试。",
+    "retryButton": "重试",
+    "emptyTitle": "Dust 尚未连接",
+    "emptyMessageAdmin": "添加您的 Dust API 密钥和工作区 ID，以开启 AI 起草、合规和团队智能体。",
+    "emptyMessageNonAdmin": "请管理员连接您的 Dust 工作区以启用 AI 功能。",
+    "badgePlatformDefault": "平台默认",
+    "badgeConnected": "已连接",
+    "platformKeyNote": "正在使用平台共享的 Dust 密钥。在上方添加您自己的密钥以使用您的工作区。",
+    "detailWorkspaceId": "工作区 ID",
+    "detailDataSourceId": "数据源 ID",
+    "detailBaseUrl": "基础 URL",
+    "detailAgentOverrides": "智能体覆盖",
+    "agentOverridesConfigured": "已配置 {{count}} 个",
+    "agentOverridesDefaults": "使用默认值"
+  },
+  "dataQuality": {
+    "title": "数据质量",
+    "caption": {
+      "generated": "报告生成于 {{time}} · {{count}} 个问题",
+      "idle": "检测重复公司、过时数据、缺失负责人和无效域名。"
+    },
+    "error": {
+      "title": "无法加载数据质量报告",
+      "retry": "重试"
+    },
+    "emptyScan": {
+      "title": "无数据质量扫描",
+      "message": "运行数据质量扫描以查看重复域名、过时记录、缺失负责人、无效域名和徽标覆盖情况。"
+    },
+    "stat": {
+      "qualityScore": "质量评分",
+      "highSeverity": "高严重性",
+      "mediumSeverity": "中严重性",
+      "totalIssues": "问题总数",
+      "badge": "数据"
+    },
+    "noIssues": {
+      "title": "无数据质量问题",
+      "message": "本次扫描未检测到重复域名、过时数据、缺失负责人、无效域名或缺失徽标。"
+    },
+    "issue": {
+      "company": "公司：{{name}}"
+    },
+    "kind": {
+      "duplicateCompany": "重复公司",
+      "staleData": "过时数据",
+      "missingOwner": "缺失负责人",
+      "invalidDomain": "无效域名",
+      "missingLogo": "缺失徽标"
+    },
+    "severity": {
+      "high": "高",
+      "medium": "中",
+      "low": "低"
+    }
+  },
+  "connectionTester": {
+    "title": "连接测试器",
+    "caption": "保存前从 API 服务探测端点。绝不会发送密钥和 bearer 令牌。",
+    "status": {
+      "reachable": "可访问",
+      "needsAttention": "需要关注",
+      "ready": "准备测试"
+    },
+    "probeOption": {
+      "mcp": {
+        "label": "MCP",
+        "description": "代理工具端点"
+      },
+      "rest": {
+        "label": "REST API",
+        "description": "数据同步端点"
+      },
+      "webhook": {
+        "label": "Webhook",
+        "description": "事件接收器"
+      }
+    },
+    "endpointUrlLabel": "端点 URL",
+    "placeholder": {
+      "loading": "正在加载设置契约..."
+    },
+    "useDefault": "使用默认值",
+    "testing": "测试中...",
+    "testEndpoint": "测试端点",
+    "hint": {
+      "noSecrets": {
+        "title": "不发送密钥",
+        "body": "API 仅探测可达性。它会去除查询字符串、片段、用户名和密码。"
+      },
+      "ssrf": {
+        "title": "SSRF 防护",
+        "body": "在发出任何请求之前，本地开发环境之外的专用网络和内部主机会被阻止。"
+      },
+      "timeout": {
+        "title": "快速超时",
+        "body": "探测在 5 秒后停止，并记录一个限定范围的审计事件以供管理员追溯。"
+      }
+    },
+    "toast": {
+      "missingUrl": "请先添加端点 URL",
+      "reachedTitle": "已连接到端点",
+      "warningTitle": "探测已完成，但有警告",
+      "probeFailed": "端点探测失败。",
+      "blockedTitle": "探测被阻止"
+    }
+  },
+  "integrationHero": {
+    "eyebrowBadge": "集成结构",
+    "eyebrowChannels": "MCP、REST、Webhook、Dust",
+    "title": "集成",
+    "subtitle": "通过清晰的设置路径、范围受限的凭据和实时健康检查，连接代理、API、ERP 系统和事件流，与平台的其余部分无缝契合。",
+    "posture": {
+      "refreshing": "正在刷新集成状态…"
+    },
+    "actions": {
+      "createApiKey": "创建 API 密钥",
+      "addWebhook": "添加 Webhook"
+    },
+    "metrics": {
+      "readyPaths": {
+        "label": "就绪路径",
+        "helperCurrent": "当前视图",
+        "helperOverview": "概览标签页"
+      },
+      "dustAgents": {
+        "label": "Dust 代理"
+      },
+      "webhookEvents": {
+        "label": "Webhook 事件",
+        "helperNeedReview": "{{count}} 项需要审查",
+        "helperNoErrors": "未加载事件错误"
+      },
+      "activeMcpTools": {
+        "label": "活跃的 MCP 工具",
+        "helper": "面向 Dust 的 crm_* 工具"
+      },
+      "controlPlane": {
+        "label": "控制平面",
+        "helper": "最小权限配置"
+      }
+    }
+  },
+  "integrationAtoms": {
+    "copyEndpoint": "复制端点",
+    "copySnippet": "复制代码片段",
+    "alreadyCopied": "已复制",
+    "copiedToClipboard": "已复制到剪贴板",
+    "copyFailedTitle": "复制失败",
+    "copyFailedDescription": "无法访问剪贴板。",
+    "copied": "已复制",
+    "copy": "复制",
+    "httpStatus": "HTTP {{status}}",
+    "noResponse": "无响应",
+    "latencyMs": "{{latency}}毫秒"
+  },
+  "dustAgents": {
+    "title": "Dust 代理",
+    "caption": "可用于账户数据验证工作流的工作区代理",
+    "statusDegraded": "降级",
+    "statusConfigured": "已配置",
+    "statusDisabled": "已禁用",
+    "notConfigured": "添加 Dust 凭据以列出可用的工作区代理。",
+    "empty": "Dust 已配置，但此工作区未返回任何可访问的代理。",
+    "badgeAgent": "代理"
+  },
+  "connectionRunway": {
+    "sectionLabel": "集成设置工作流",
+    "stepBadge": "第 {{number}} 步",
+    "steps": {
+      "pickSurface": {
+        "title": "选择接入方式",
+        "body": "为代理选择 MCP，为同步选择 REST，为事件选择 webhooks，或为 ERP 选择连接器。"
+      },
+      "scopeAccess": {
+        "title": "限定访问范围",
+        "body": "仅为特定工作流创建读/写密钥，并将密钥保存在服务器端。"
+      },
+      "probeBeforeSave": {
+        "title": "保存前先探测",
+        "body": "运行安全的可达性检查，启用 SSRF 防护且不发送 bearer 令牌。"
+      },
+      "monitorEvidence": {
+        "title": "监控证据",
+        "body": "无需离开集成中心即可查看提供商运行状况和 webhook 事件。"
+      }
+    }
   }
 }
