@@ -3687,5 +3687,62 @@
     "removeConfirmDescription": "Isso remove \"{{name}}\" dos seus atalhos de tarefas.",
     "removeConfirmButton": "Remover",
     "removeButtonTitle": "Remover a visualização salva mais recente"
+  },
+  "collaborativeNotes": {
+    "heading": "Colaboração ao vivo",
+    "realTimeBadge": "· em tempo real",
+    "loadingEditor": "Carregando o editor",
+    "placeholder": "Comece a escrever notas colaborativas…"
+  },
+  "tagChip": {
+    "tagLabel": "{{name}}, etiqueta",
+    "removeTag": "Remover etiqueta {{name}}"
+  },
+  "scoreSummaryStrip": {
+    "overallBidScoreLabel": "Pontuação geral da proposta: {{score}}%",
+    "rateCriteriaToBegin": "Avalie os critérios para começar",
+    "weightedScoreSummary": "Pontuação ponderada em {{count}} fatores de decisão"
+  },
+  "accountNewsSignal": {
+    "title": "Notícias e sinais",
+    "caption": "Notícias recentes da web pública sobre esta conta — um sinal de atividade gratuito, não dados internos do projeto.",
+    "badgeFreeOpenWeb": "Grátis · Web aberta",
+    "errorTitle": "Não foi possível carregar as notícias",
+    "errorMessage": "O feed de notícias da web aberta não respondeu. Este é um sinal gratuito de melhor esforço.",
+    "retry": "Tentar novamente",
+    "emptyTitle": "Sem notícias recentes",
+    "emptyMessage": "Nenhuma manchete da web pública correspondeu ao nome desta conta recentemente.",
+    "badgeExternal": "Externo",
+    "sourceNote": "Fonte: Google News · verifique antes de tratar como um fato da Mantu."
+  },
+  "googleSignInButton": {
+    "label": "Entrar com o Google",
+    "ariaLabel": "Entrar com o Google"
+  },
+  "sidebarCards": {
+    "quickActionsHeading": "Ações rápidas",
+    "action": {
+      "newLead": "Novo lead",
+      "openTasks": "Tarefas abertas",
+      "contacts": "Contatos",
+      "companies": "Empresas"
+    },
+    "quickLinksHeading": "Links rápidos",
+    "link": {
+      "pipeline": "Pipeline",
+      "reports": "Relatórios",
+      "tasks": "Tarefas",
+      "settings": "Configurações"
+    }
+  },
+  "briefing": {
+    "title": "Resumo: {{label}}",
+    "description": "Resumo executivo gerado pelo Dust (simulado localmente sem DUST_API_KEY).",
+    "errorTitle": "Não foi possível gerar o resumo",
+    "errorUnknown": "Erro desconhecido",
+    "contentAriaLabel": "Conteúdo do resumo",
+    "modelMeta": "Modelo {{model}} · {{tokens}} tokens",
+    "copy": "Copiar",
+    "regenerate": "Regenerar"
   }
 }

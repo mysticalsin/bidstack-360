@@ -785,5 +785,23 @@
     "taskDueSoonDesc": "Alerter lorsqu'une tâche est due dans les 24 heures.",
     "dealStageChangeLabel": "Changements d'étape de l'affaire",
     "dealStageChangeDesc": "Notifier lorsqu'une opportunité dont vous êtes responsable passe à une nouvelle étape."
+  },
+  "profile": {
+    "title": "Profil",
+    "caption": "Votre identité dans cet espace de travail.",
+    "guest": "Invité",
+    "notSignedIn": "Non connecté",
+    "providerClerkShort": "Clerk",
+    "providerStubShort": "Stub de dév.",
+    "accountDetailsTitle": "Détails du compte",
+    "fullNameLabel": "Nom complet",
+    "emailLabel": "E-mail",
+    "roleLabel": "Rôle",
+    "authProviderLabel": "Fournisseur d'authentification",
+    "providerClerkLong": "Clerk (production)",
+    "providerStubLong": "Stub (développement)",
+    "statusLabel": "Statut",
+    "signedIn": "Connecté",
+    "signedOut": "Déconnecté"
   }
 }

@@ -1,4 +1,6 @@
 // Score summary strip — overall ProgressRing + per-category rings.
+import { useTranslation } from 'react-i18next';
+
 import { GlassCard } from '@/components/ui/GlassCard';
 import { ProgressRing } from '@/components/ui/ProgressRing';
 import { StatusPulse } from '@/components/ui/StatusPulse';
@@ -17,6 +19,7 @@ export function ScoreSummaryStrip({
   categoryScores: Record<string, number>;
   ratedCount: number;
 }) {
+  const { t } = useTranslation('crm');
   return (
     <Reveal>
       <GlassCard className="mt-4 mb-6">
@@ -27,7 +30,9 @@ export function ScoreSummaryStrip({
               size={80}
               strokeWidth={6}
               colors={[recommendation.color, recommendation.color]}
-              label={`Overall bid score: ${totalScore}%`}
+              label={t('scoreSummaryStrip.overallBidScoreLabel', 'Overall bid score: {{score}}%', {
+                score: totalScore,
+              })}
             >
               <span className="text-xl font-bold" style={{ color: recommendation.color }}>
                 {totalScore}
@@ -41,11 +46,15 @@ export function ScoreSummaryStrip({
                   animate={ratedCount > 0}
                 />
                 <span className="text-sm font-semibold" style={{ color: recommendation.color }}>
-                  {ratedCount > 0 ? recommendation.verdict : 'Rate criteria to begin'}
+                  {ratedCount > 0
+                    ? recommendation.verdict
+                    : t('scoreSummaryStrip.rateCriteriaToBegin', 'Rate criteria to begin')}
                 </span>
               </div>
               <p className="text-tertiary text-xs">
-                Weighted score across {CRITERIA.length} decision factors
+                {t('scoreSummaryStrip.weightedScoreSummary', 'Weighted score across {{count}} decision factors', {
+                  count: CRITERIA.length,
+                })}
               </p>
             </div>
           </div>

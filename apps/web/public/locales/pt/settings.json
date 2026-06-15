@@ -785,5 +785,23 @@
     "taskDueSoonDesc": "Alertar quando uma tarefa vence em 24 horas.",
     "dealStageChangeLabel": "Mudanças de estágio do negócio",
     "dealStageChangeDesc": "Notificar quando uma oportunidade sob sua responsabilidade passa para um novo estágio."
+  },
+  "profile": {
+    "title": "Perfil",
+    "caption": "Sua identidade neste espaço de trabalho.",
+    "guest": "Convidado",
+    "notSignedIn": "Sessão não iniciada",
+    "providerClerkShort": "Clerk",
+    "providerStubShort": "Stub de desenvolvimento",
+    "accountDetailsTitle": "Detalhes da conta",
+    "fullNameLabel": "Nome completo",
+    "emailLabel": "E-mail",
+    "roleLabel": "Função",
+    "authProviderLabel": "Provedor de autenticação",
+    "providerClerkLong": "Clerk (produção)",
+    "providerStubLong": "Stub (desenvolvimento)",
+    "statusLabel": "Status",
+    "signedIn": "Sessão iniciada",
+    "signedOut": "Sessão encerrada"
   }
 }

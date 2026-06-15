@@ -788,5 +788,23 @@
     "taskDueSoonDesc": "Avisar cuando una tarea vence en 24 horas.",
     "dealStageChangeLabel": "Cambios de etapa del trato",
     "dealStageChangeDesc": "Notificar cuando una oportunidad de tu propiedad pasa a una nueva etapa."
+  },
+  "profile": {
+    "title": "Perfil",
+    "caption": "Tu identidad en este espacio de trabajo.",
+    "guest": "Invitado",
+    "notSignedIn": "Sesión no iniciada",
+    "providerClerkShort": "Clerk",
+    "providerStubShort": "Stub de desarrollo",
+    "accountDetailsTitle": "Detalles de la cuenta",
+    "fullNameLabel": "Nombre completo",
+    "emailLabel": "Correo electrónico",
+    "roleLabel": "Rol",
+    "authProviderLabel": "Proveedor de autenticación",
+    "providerClerkLong": "Clerk (producción)",
+    "providerStubLong": "Stub (desarrollo)",
+    "statusLabel": "Estado",
+    "signedIn": "Sesión iniciada",
+    "signedOut": "Sesión cerrada"
   }
 }

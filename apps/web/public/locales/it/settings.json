@@ -785,5 +785,23 @@
     "taskDueSoonDesc": "Avvisa quando un'attività scade entro 24 ore.",
     "dealStageChangeLabel": "Cambi di fase della trattativa",
     "dealStageChangeDesc": "Notifica quando un'opportunità di cui sei titolare passa a una nuova fase."
+  },
+  "profile": {
+    "title": "Profilo",
+    "caption": "La tua identità in questo spazio di lavoro.",
+    "guest": "Ospite",
+    "notSignedIn": "Accesso non effettuato",
+    "providerClerkShort": "Clerk",
+    "providerStubShort": "Stub di sviluppo",
+    "accountDetailsTitle": "Dettagli account",
+    "fullNameLabel": "Nome completo",
+    "emailLabel": "E-mail",
+    "roleLabel": "Ruolo",
+    "authProviderLabel": "Provider di autenticazione",
+    "providerClerkLong": "Clerk (produzione)",
+    "providerStubLong": "Stub (sviluppo)",
+    "statusLabel": "Stato",
+    "signedIn": "Accesso effettuato",
+    "signedOut": "Disconnesso"
   }
 }

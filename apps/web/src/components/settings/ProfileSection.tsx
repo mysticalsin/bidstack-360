@@ -1,12 +1,14 @@
 // Settings → Profile. Shows the user's identity, avatar, role,
 // and Microsoft account linkage status.
 
+import { useTranslation } from 'react-i18next';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { useAuth, useUser, useRole } from '@/lib/auth';
 
 export function ProfileSection() {
+  const { t } = useTranslation('settings');
   const { isSignedIn } = useAuth();
   const { user } = useUser();
   const { role } = useRole();
@@ -17,22 +19,25 @@ export function ProfileSection() {
   return (
     <div className="space-y-6">
       <Card>
-        <SectionHeader title="Profile" caption="Your identity in this workspace." />
+        <SectionHeader
+          title={t('profile.title', 'Profile')}
+          caption={t('profile.caption', 'Your identity in this workspace.')}
+        />
         <div className="flex items-center gap-4 p-5">
           <Avatar seed={seed} size={64} decorative />
           <div className="min-w-0">
             <div className="text-lg font-semibold text-[var(--fg-primary)]">
-              {user?.fullName ?? user?.firstName ?? 'Guest'}
+              {user?.fullName ?? user?.firstName ?? t('profile.guest', 'Guest')}
             </div>
             <div className="text-sm text-[var(--fg-secondary)]">
-              {user?.primaryEmailAddress?.emailAddress ?? 'Not signed in'}
+              {user?.primaryEmailAddress?.emailAddress ?? t('profile.notSignedIn', 'Not signed in')}
             </div>
             <div className="mt-1.5 flex items-center gap-2">
               {role ? (
                 <Badge tone="purple">{role}</Badge>
               ) : null}
               <Badge tone={usingClerk ? 'jade' : 'gray'}>
-                {usingClerk ? 'Clerk' : 'Dev stub'}
+                {usingClerk ? t('profile.providerClerkShort', 'Clerk') : t('profile.providerStubShort', 'Dev stub')}
               </Badge>
             </div>
           </div>
@@ -40,25 +45,27 @@ export function ProfileSection() {
       </Card>
 
       <Card>
-        <SectionHeader title="Account details" />
+        <SectionHeader title={t('profile.accountDetailsTitle', 'Account details')} />
         <dl className="divide-y divide-[var(--border-subtle)] text-sm">
-          <DetailRow label="Full name">
+          <DetailRow label={t('profile.fullNameLabel', 'Full name')}>
             {user?.fullName ?? '—'}
           </DetailRow>
-          <DetailRow label="Email">
+          <DetailRow label={t('profile.emailLabel', 'Email')}>
             {user?.primaryEmailAddress?.emailAddress ?? '—'}
           </DetailRow>
-          <DetailRow label="Role">
+          <DetailRow label={t('profile.roleLabel', 'Role')}>
             <span className="capitalize">{role ?? '—'}</span>
           </DetailRow>
-          <DetailRow label="Auth provider">
+          <DetailRow label={t('profile.authProviderLabel', 'Auth provider')}>
             <span className="text-[var(--fg-secondary)]">
-              {usingClerk ? 'Clerk (production)' : 'Stub (development)'}
+              {usingClerk
+                ? t('profile.providerClerkLong', 'Clerk (production)')
+                : t('profile.providerStubLong', 'Stub (development)')}
             </span>
           </DetailRow>
-          <DetailRow label="Status">
+          <DetailRow label={t('profile.statusLabel', 'Status')}>
             <Badge tone={isSignedIn ? 'jade' : 'gray'}>
-              {isSignedIn ? 'Signed in' : 'Signed out'}
+              {isSignedIn ? t('profile.signedIn', 'Signed in') : t('profile.signedOut', 'Signed out')}
             </Badge>
           </DetailRow>
         </dl>

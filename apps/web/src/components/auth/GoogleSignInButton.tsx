@@ -1,4 +1,5 @@
 import { lazy } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface GoogleSignInButtonProps {
   label?: string;
@@ -8,10 +9,14 @@ interface GoogleSignInButtonProps {
 export const GoogleSignInButton = lazy(() =>
   import('@clerk/clerk-react').then((m) => ({
     default: function GoogleSignInButtonImpl({
-      label = 'Sign in with Google',
+      label,
       variant = 'secondary',
     }: GoogleSignInButtonProps) {
       const { signIn, isLoaded } = m.useSignIn();
+      const { t } = useTranslation('crm');
+
+      const resolvedLabel =
+        label ?? t('googleSignInButton.label', 'Sign in with Google');
 
       const baseClasses =
         'inline-flex w-full items-center justify-center gap-2.5 rounded-full px-5 py-3 text-sm font-medium font-body transition-all hover:brightness-110 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 cursor-pointer';
@@ -29,7 +34,7 @@ export const GoogleSignInButton = lazy(() =>
             className={`${baseClasses} ${variantClasses} opacity-60 cursor-not-allowed`}
           >
             <GoogleLogo />
-            {label}
+            {resolvedLabel}
           </button>
         );
       }
@@ -45,10 +50,10 @@ export const GoogleSignInButton = lazy(() =>
             });
           }}
           className={`${baseClasses} ${variantClasses}`}
-          aria-label="Sign in with Google"
+          aria-label={t('googleSignInButton.ariaLabel', 'Sign in with Google')}
         >
           <GoogleLogo />
-          {label}
+          {resolvedLabel}
         </button>
       );
     },

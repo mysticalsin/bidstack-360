@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/cn';
 import type { Tag } from '@bidstack/shared';
@@ -21,13 +22,14 @@ interface TagChipProps {
 }
 
 export function TagChip({ tag, onRemove, interactive = false, size = 'sm' }: TagChipProps) {
+  const { t } = useTranslation('crm');
   const fg = useMemo(() => contrastingTextColor(tag.color), [tag.color]);
 
   return (
     <span
       role={interactive ? 'button' : undefined}
       tabIndex={interactive ? 0 : undefined}
-      aria-label={`${tag.name}, tag`}
+      aria-label={t('tagChip.tagLabel', '{{name}}, tag', { name: tag.name })}
       className={cn(
         'inline-flex items-center gap-1 rounded-full font-medium leading-none align-middle',
         size === 'sm' ? 'h-6 px-2.5 text-[11px]' : 'h-7 px-3 text-xs',
@@ -44,7 +46,7 @@ export function TagChip({ tag, onRemove, interactive = false, size = 'sm' }: Tag
             e.stopPropagation();
             onRemove();
           }}
-          aria-label={`Remove tag ${tag.name}`}
+          aria-label={t('tagChip.removeTag', 'Remove tag {{name}}', { name: tag.name })}
           className="-mr-1 ml-0.5 grid h-4 w-4 place-items-center rounded-full hover:bg-black/15 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-current"
           style={{ color: fg }}
         >

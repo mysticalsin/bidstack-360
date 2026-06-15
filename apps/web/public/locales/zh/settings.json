@@ -785,5 +785,23 @@
     "taskDueSoonDesc": "任务将在 24 小时内到期时提醒。",
     "dealStageChangeLabel": "交易阶段变更",
     "dealStageChangeDesc": "当您负责的商机进入新阶段时通知您。"
+  },
+  "profile": {
+    "title": "个人资料",
+    "caption": "您在此工作区中的身份。",
+    "guest": "访客",
+    "notSignedIn": "未登录",
+    "providerClerkShort": "Clerk",
+    "providerStubShort": "开发桩",
+    "accountDetailsTitle": "账户详情",
+    "fullNameLabel": "全名",
+    "emailLabel": "电子邮箱",
+    "roleLabel": "角色",
+    "authProviderLabel": "认证提供商",
+    "providerClerkLong": "Clerk（生产环境）",
+    "providerStubLong": "桩（开发环境）",
+    "statusLabel": "状态",
+    "signedIn": "已登录",
+    "signedOut": "已退出"
   }
 }

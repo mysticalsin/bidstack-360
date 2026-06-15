@@ -12,6 +12,7 @@
 //   sidebar remains for structured threaded notes.
 
 import { lazy, Suspense } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useUser } from '@/lib/auth';
 
@@ -37,10 +38,13 @@ export function CollaborativeNotesSection({
   entityType,
   entityId,
   fieldKey = 'notes',
-  label = 'Live collaboration',
+  label,
   readOnly = false,
 }: Props) {
   const { user } = useUser();
+  const { t } = useTranslation('crm');
+
+  const heading = label ?? t('collaborativeNotes.heading', 'Live collaboration');
 
   return (
     <section aria-labelledby={`collab-notes-${entityId ?? 'loading'}`}>
@@ -48,9 +52,9 @@ export function CollaborativeNotesSection({
         id={`collab-notes-${entityId ?? 'loading'}`}
         className="text-sm font-semibold text-[var(--fg-secondary)] uppercase tracking-wider mb-2"
       >
-        {label}
+        {heading}
         <span className="ml-2 text-xs font-normal text-[var(--fg-tertiary)] normal-case">
-          · real-time
+          {t('collaborativeNotes.realTimeBadge', '· real-time')}
         </span>
       </h2>
 
@@ -59,7 +63,7 @@ export function CollaborativeNotesSection({
           <div
             className="min-h-[8rem] animate-pulse rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)]"
             aria-busy="true"
-            aria-label="Loading editor"
+            aria-label={t('collaborativeNotes.loadingEditor', 'Loading editor')}
           />
         }
       >
@@ -72,7 +76,7 @@ export function CollaborativeNotesSection({
           }}
           userName={user?.fullName ?? undefined}
           userId={user?.id ?? undefined}
-          placeholder="Start writing collaborative notes…"
+          placeholder={t('collaborativeNotes.placeholder', 'Start writing collaborative notes…')}
           readOnly={readOnly || !entityId}
           className="min-h-[8rem]"
         />

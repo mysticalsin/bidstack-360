@@ -3687,5 +3687,62 @@
     "removeConfirmDescription": "这将从您的任务快捷方式中移除\"{{name}}\"。",
     "removeConfirmButton": "移除",
     "removeButtonTitle": "移除最近保存的视图"
+  },
+  "collaborativeNotes": {
+    "heading": "实时协作",
+    "realTimeBadge": "· 实时",
+    "loadingEditor": "正在加载编辑器",
+    "placeholder": "开始撰写协作笔记…"
+  },
+  "tagChip": {
+    "tagLabel": "{{name}}，标签",
+    "removeTag": "移除标签 {{name}}"
+  },
+  "scoreSummaryStrip": {
+    "overallBidScoreLabel": "总体投标评分：{{score}}%",
+    "rateCriteriaToBegin": "评分各项标准以开始",
+    "weightedScoreSummary": "基于 {{count}} 项决策因素的加权评分"
+  },
+  "accountNewsSignal": {
+    "title": "新闻与信号",
+    "caption": "关于此客户的近期公开网络新闻——一个免费的活动信号，而非内部项目数据。",
+    "badgeFreeOpenWeb": "免费 · 开放网络",
+    "errorTitle": "无法加载新闻",
+    "errorMessage": "开放网络新闻源未响应。这是一个尽力而为的免费信号。",
+    "retry": "重试",
+    "emptyTitle": "暂无近期新闻",
+    "emptyMessage": "近期没有公开网络头条与此客户名称匹配。",
+    "badgeExternal": "外部",
+    "sourceNote": "来源：Google News · 在视为 Mantu 事实之前请先核实。"
+  },
+  "googleSignInButton": {
+    "label": "使用 Google 登录",
+    "ariaLabel": "使用 Google 登录"
+  },
+  "sidebarCards": {
+    "quickActionsHeading": "快捷操作",
+    "action": {
+      "newLead": "新线索",
+      "openTasks": "待办任务",
+      "contacts": "联系人",
+      "companies": "公司"
+    },
+    "quickLinksHeading": "快捷链接",
+    "link": {
+      "pipeline": "管道",
+      "reports": "报告",
+      "tasks": "任务",
+      "settings": "设置"
+    }
+  },
+  "briefing": {
+    "title": "简报：{{label}}",
+    "description": "由 Dust 生成的执行摘要（无 DUST_API_KEY 时在本地模拟）。",
+    "errorTitle": "无法生成简报",
+    "errorUnknown": "未知错误",
+    "contentAriaLabel": "简报内容",
+    "modelMeta": "模型 {{model}} · {{tokens}} 个 token",
+    "copy": "复制",
+    "regenerate": "重新生成"
   }
 }

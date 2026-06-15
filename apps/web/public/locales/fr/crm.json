@@ -3742,5 +3742,62 @@
     "removeConfirmDescription": "Cela supprime « {{name}} » de vos raccourcis de tâches.",
     "removeConfirmButton": "Supprimer",
     "removeButtonTitle": "Supprimer la vue enregistrée la plus récente"
+  },
+  "collaborativeNotes": {
+    "heading": "Collaboration en direct",
+    "realTimeBadge": "· en temps réel",
+    "loadingEditor": "Chargement de l'éditeur",
+    "placeholder": "Commencez à rédiger des notes collaboratives…"
+  },
+  "tagChip": {
+    "tagLabel": "{{name}}, étiquette",
+    "removeTag": "Supprimer l'étiquette {{name}}"
+  },
+  "scoreSummaryStrip": {
+    "overallBidScoreLabel": "Score global de l'offre : {{score}} %",
+    "rateCriteriaToBegin": "Évaluez les critères pour commencer",
+    "weightedScoreSummary": "Score pondéré sur {{count}} facteurs de décision"
+  },
+  "accountNewsSignal": {
+    "title": "Actualités et signaux",
+    "caption": "Actualités récentes du web public sur ce compte — un signal d'activité gratuit, pas des données internes du projet.",
+    "badgeFreeOpenWeb": "Gratuit · Web ouvert",
+    "errorTitle": "Impossible de charger les actualités",
+    "errorMessage": "Le flux d'actualités du web ouvert n'a pas répondu. Il s'agit d'un signal gratuit au mieux.",
+    "retry": "Réessayer",
+    "emptyTitle": "Aucune actualité récente",
+    "emptyMessage": "Aucun titre du web public ne correspond au nom de ce compte récemment.",
+    "badgeExternal": "Externe",
+    "sourceNote": "Source : Google News · vérifiez avant de le considérer comme un fait Mantu."
+  },
+  "googleSignInButton": {
+    "label": "Se connecter avec Google",
+    "ariaLabel": "Se connecter avec Google"
+  },
+  "sidebarCards": {
+    "quickActionsHeading": "Actions rapides",
+    "action": {
+      "newLead": "Nouveau prospect",
+      "openTasks": "Tâches ouvertes",
+      "contacts": "Contacts",
+      "companies": "Entreprises"
+    },
+    "quickLinksHeading": "Liens rapides",
+    "link": {
+      "pipeline": "Pipeline",
+      "reports": "Rapports",
+      "tasks": "Tâches",
+      "settings": "Paramètres"
+    }
+  },
+  "briefing": {
+    "title": "Synthèse : {{label}}",
+    "description": "Résumé exécutif généré par Dust (simulé en local sans DUST_API_KEY).",
+    "errorTitle": "Impossible de générer la synthèse",
+    "errorUnknown": "Erreur inconnue",
+    "contentAriaLabel": "Contenu de la synthèse",
+    "modelMeta": "Modèle {{model}} · {{tokens}} jetons",
+    "copy": "Copier",
+    "regenerate": "Régénérer"
   }
 }

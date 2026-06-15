@@ -3687,5 +3687,62 @@
     "removeConfirmDescription": "Questo rimuove \"{{name}}\" dalle scorciatoie delle attività.",
     "removeConfirmButton": "Rimuovi",
     "removeButtonTitle": "Rimuovi la vista salvata più recente"
+  },
+  "collaborativeNotes": {
+    "heading": "Collaborazione dal vivo",
+    "realTimeBadge": "· in tempo reale",
+    "loadingEditor": "Caricamento dell'editor",
+    "placeholder": "Inizia a scrivere note collaborative…"
+  },
+  "tagChip": {
+    "tagLabel": "{{name}}, tag",
+    "removeTag": "Rimuovi tag {{name}}"
+  },
+  "scoreSummaryStrip": {
+    "overallBidScoreLabel": "Punteggio complessivo dell'offerta: {{score}}%",
+    "rateCriteriaToBegin": "Valuta i criteri per iniziare",
+    "weightedScoreSummary": "Punteggio ponderato su {{count}} fattori decisionali"
+  },
+  "accountNewsSignal": {
+    "title": "Notizie e segnali",
+    "caption": "Notizie recenti dal web pubblico su questo account: un segnale di attività gratuito, non dati interni del progetto.",
+    "badgeFreeOpenWeb": "Gratuito · Web aperto",
+    "errorTitle": "Impossibile caricare le notizie",
+    "errorMessage": "Il feed di notizie dal web aperto non ha risposto. Questo è un segnale gratuito al meglio delle possibilità.",
+    "retry": "Riprova",
+    "emptyTitle": "Nessuna notizia recente",
+    "emptyMessage": "Nessun titolo dal web pubblico ha corrisposto al nome di questo account di recente.",
+    "badgeExternal": "Esterno",
+    "sourceNote": "Fonte: Google News · verifica prima di trattarlo come un fatto Mantu."
+  },
+  "googleSignInButton": {
+    "label": "Accedi con Google",
+    "ariaLabel": "Accedi con Google"
+  },
+  "sidebarCards": {
+    "quickActionsHeading": "Azioni rapide",
+    "action": {
+      "newLead": "Nuovo lead",
+      "openTasks": "Attività aperte",
+      "contacts": "Contatti",
+      "companies": "Aziende"
+    },
+    "quickLinksHeading": "Link rapidi",
+    "link": {
+      "pipeline": "Pipeline",
+      "reports": "Report",
+      "tasks": "Attività",
+      "settings": "Impostazioni"
+    }
+  },
+  "briefing": {
+    "title": "Sintesi: {{label}}",
+    "description": "Sintesi esecutiva generata da Dust (simulata localmente senza DUST_API_KEY).",
+    "errorTitle": "Impossibile generare la sintesi",
+    "errorUnknown": "Errore sconosciuto",
+    "contentAriaLabel": "Contenuto della sintesi",
+    "modelMeta": "Modello {{model}} · {{tokens}} token",
+    "copy": "Copia",
+    "regenerate": "Rigenera"
   }
 }

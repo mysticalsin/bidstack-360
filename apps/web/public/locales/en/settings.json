@@ -766,5 +766,23 @@
     "taskDueSoonDesc": "Alert when a task is due within 24 hours.",
     "dealStageChangeLabel": "Deal stage changes",
     "dealStageChangeDesc": "Notify when an opportunity you own moves to a new stage."
+  },
+  "profile": {
+    "title": "Profile",
+    "caption": "Your identity in this workspace.",
+    "guest": "Guest",
+    "notSignedIn": "Not signed in",
+    "providerClerkShort": "Clerk",
+    "providerStubShort": "Dev stub",
+    "accountDetailsTitle": "Account details",
+    "fullNameLabel": "Full name",
+    "emailLabel": "Email",
+    "roleLabel": "Role",
+    "authProviderLabel": "Auth provider",
+    "providerClerkLong": "Clerk (production)",
+    "providerStubLong": "Stub (development)",
+    "statusLabel": "Status",
+    "signedIn": "Signed in",
+    "signedOut": "Signed out"
   }
 }
