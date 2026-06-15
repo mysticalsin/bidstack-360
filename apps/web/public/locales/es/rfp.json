@@ -125,5 +125,108 @@
     "emptyTitle": "No competitor findings yet",
     "emptyMessage": "Pick a competitor and run research. We only surface claims we can link to a public source — including real federal award pricing from USASpending.",
     "error": "Couldn't load competitor findings."
+  },
+  "proposalDetail": {
+    "loadingAriaLabel": "Cargando propuesta",
+    "errorTitle": "No se pudo cargar la propuesta",
+    "errorRetry": "Vuelve a intentarlo en un momento.",
+    "backToProposals": "Volver a propuestas",
+    "notFound": "Propuesta no encontrada.",
+    "backToProposalsAriaLabel": "Volver a propuestas",
+    "version": "v{{version}}",
+    "due": "Vence {{date}}",
+    "requiredBadge": "Obligatorio",
+    "aiDraftedBadge": "Redactado por IA",
+    "wordCount": "{{count}} palabras",
+    "draftingSectionAriaLabel": "Redactando {{title}}…",
+    "aiDraftSectionAriaLabel": "Borrador de IA para {{title}}",
+    "drafting": "Redactando…",
+    "aiDraft": "Borrador de IA",
+    "editSectionAriaLabel": "Editar la sección {{title}}",
+    "editContentAriaLabel": "Editar el contenido de {{title}}",
+    "cancel": "Cancelar",
+    "saving": "Guardando…",
+    "save": "Guardar",
+    "emptyContent": "Aún no hay contenido. Usa Borrador de IA para generar una primera versión."
+  },
+  "proposals": {
+    "title": "Propuestas",
+    "subtitle": "Espacio de RFP: redacta, revisa y envía propuestas ganadoras.",
+    "newProposal": "Nueva propuesta",
+    "createProposal": "Crear propuesta",
+    "nameLabel": "Nombre de la propuesta",
+    "namePlaceholder": "Nombre de la propuesta…",
+    "creating": "Creando…",
+    "create": "Crear",
+    "cancel": "Cancelar",
+    "createError": "No se pudo crear la propuesta.",
+    "filterByStatus": "Filtrar por estado",
+    "resultCount": "{{count}} propuestas",
+    "loading": "Cargando propuestas",
+    "loadError": "No se pudieron cargar las propuestas",
+    "loadErrorRetry": "Inténtalo de nuevo en un momento.",
+    "emptyTitle": "Aún no hay propuestas.",
+    "emptyMessage": "Crea tu primera propuesta para comenzar.",
+    "viewProposal": "Ver propuesta: {{name}}",
+    "version": "v{{version}}",
+    "due": "Vence {{date}}"
+  },
+  "rfpCrew": {
+    "statusWaiting": "En espera",
+    "statusWorking": "Trabajando",
+    "statusDone": "Hecho",
+    "statusOverseeing": "Supervisando",
+    "viewRoleDetailsAria": "{{role}} — ver detalles del rol",
+    "moveToStageAria": "Mover {{role}} a otra etapa. Usa las teclas de flecha izquierda y derecha."
+  },
+  "proposalStatusChip": {
+    "label": {
+      "draft": "Borrador",
+      "review": "En revisión",
+      "approved": "Aprobado",
+      "submitted": "Enviado",
+      "won": "Ganado",
+      "lost": "Perdido"
+    }
+  },
+  "sectionEditor": {
+    "ariaLabelEditSection": "Editar sección: {{title}}",
+    "statusReviewed": "✓ Revisado",
+    "statusNotReviewed": "Aún no revisado",
+    "saving": "Guardando…",
+    "saveAndMarkReviewed": "Guardar y marcar como revisado"
+  },
+  "rfpStatusChip": {
+    "stageIdle": "Inactivo",
+    "stageQueued": "En cola",
+    "stageExtracting": "Extrayendo",
+    "stageStoryMatching": "Emparejando historias",
+    "stageSectionDrafting": "Redactando",
+    "stageComplianceFill": "Cumplimiento",
+    "stageLegalScan": "Equipo de revisión",
+    "stageQaReview": "Revisión de calidad",
+    "stageAwaitingApproval": "Pendiente de aprobación",
+    "stageApproved": "Aprobado",
+    "stageCompleted": "Completado",
+    "stageFailed": "Fallido",
+    "stageRejected": "Rechazado",
+    "stageTimeout": "Tiempo agotado",
+    "ariaPipelineStatus": "Estado del flujo: {{status}}"
+  },
+  "requirementRow": {
+    "pageRefAria": "Encontrado en la página {{page}}",
+    "confidenceAria": "Confianza de la IA: {{percent}}%",
+    "confidenceLabel": "{{percent}}% de confianza"
+  },
+  "adminRfp": {
+    "eyebrow": "Administración",
+    "title": "Análisis de RFP",
+    "subtitle": "Cada RFP de la organización, su valor y el desglose por responsable.",
+    "viewAllProposals": "Ver todas las propuestas"
+  },
+  "aiDisclosureBadge": {
+    "ariaLabel": "Este contenido se generó con asistencia de IA",
+    "title": "Borrador asistido por IA: revíselo antes de enviar",
+    "label": "Borrador asistido por IA"
   }
 }
