@@ -113,5 +113,13 @@
     "copyCodeLabel": "Copiar código",
     "replayBefore": "Rejeite os eventos onde",
     "replayAfter": "segundos para evitar ataques de repetição. Use sempre uma comparação de tempo constante."
+  },
+  "templateStep": {
+    "kindFilterLabel": "Tipo de modelo",
+    "allTypesOption": "Todos os tipos",
+    "documentTemplateLabel": "Modelo de documento",
+    "selectTemplatePlaceholder": "Selecione um modelo…",
+    "templateVariablesHeading": "Variáveis do modelo",
+    "nextButton": "Próximo: Destinatários"
   }
 }

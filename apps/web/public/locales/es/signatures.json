@@ -113,5 +113,13 @@
     "copyCodeLabel": "Copiar código",
     "replayBefore": "Rechaza los eventos donde",
     "replayAfter": "segundos para prevenir ataques de repetición. Usa siempre una comparación de tiempo constante."
+  },
+  "templateStep": {
+    "kindFilterLabel": "Tipo de plantilla",
+    "allTypesOption": "Todos los tipos",
+    "documentTemplateLabel": "Plantilla de documento",
+    "selectTemplatePlaceholder": "Selecciona una plantilla…",
+    "templateVariablesHeading": "Variables de la plantilla",
+    "nextButton": "Siguiente: Destinatarios"
   }
 }

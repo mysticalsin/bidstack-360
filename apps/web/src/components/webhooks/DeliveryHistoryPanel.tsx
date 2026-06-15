@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Icon } from '@/components/ui/Icon';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
@@ -13,6 +14,7 @@ export function DeliveryHistoryPanel({
   subscriptionId: string;
   id: string;
 }) {
+  const { t } = useTranslation('crm');
   const deliveries = useWebhookDeliveries(subscriptionId);
 
   return (
@@ -22,35 +24,46 @@ export function DeliveryHistoryPanel({
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-          Delivery history
+          {t('deliveryHistory.heading', 'Delivery history')}
         </h3>
         {deliveries.data?.hasMore ? (
-          <span className="text-xs text-[var(--fg-tertiary)]">Showing 50 most recent</span>
+          <span className="text-xs text-[var(--fg-tertiary)]">
+            {t('deliveryHistory.showingRecent', 'Showing 50 most recent')}
+          </span>
         ) : null}
       </div>
 
       {deliveries.isLoading ? (
         <LoadingSkeleton rows={3} />
       ) : deliveries.isError ? (
-        <ErrorState title="Failed to load" message="Could not load delivery history." />
+        <ErrorState
+          title={t('deliveryHistory.errorTitle', 'Failed to load')}
+          message={t('deliveryHistory.errorMessage', 'Could not load delivery history.')}
+        />
       ) : !deliveries.data || deliveries.data.data.length === 0 ? (
-        <p className="text-sm text-[var(--fg-secondary)]">No deliveries recorded yet.</p>
+        <p className="text-sm text-[var(--fg-secondary)]">
+          {t('deliveryHistory.empty', 'No deliveries recorded yet.')}
+        </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)]">
           <table className="min-w-full text-xs">
             <thead>
               <tr className="border-b border-[var(--border-subtle)] bg-[var(--surface-sunken)]">
-                <th className="px-3 py-2 text-left font-medium text-[var(--fg-tertiary)]">Event</th>
                 <th className="px-3 py-2 text-left font-medium text-[var(--fg-tertiary)]">
-                  Status
+                  {t('deliveryHistory.columnEvent', 'Event')}
                 </th>
                 <th className="px-3 py-2 text-left font-medium text-[var(--fg-tertiary)]">
-                  Duration
+                  {t('deliveryHistory.columnStatus', 'Status')}
                 </th>
                 <th className="px-3 py-2 text-left font-medium text-[var(--fg-tertiary)]">
-                  Attempt
+                  {t('deliveryHistory.columnDuration', 'Duration')}
                 </th>
-                <th className="px-3 py-2 text-left font-medium text-[var(--fg-tertiary)]">Time</th>
+                <th className="px-3 py-2 text-left font-medium text-[var(--fg-tertiary)]">
+                  {t('deliveryHistory.columnAttempt', 'Attempt')}
+                </th>
+                <th className="px-3 py-2 text-left font-medium text-[var(--fg-tertiary)]">
+                  {t('deliveryHistory.columnTime', 'Time')}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border-subtle)]">
@@ -66,6 +79,7 @@ export function DeliveryHistoryPanel({
 }
 
 function DeliveryRow({ delivery }: { delivery: WebhookDeliveryRecord }) {
+  const { t } = useTranslation('crm');
   const [showError, setShowError] = useState(false);
 
   return (
@@ -87,7 +101,7 @@ function DeliveryRow({ delivery }: { delivery: WebhookDeliveryRecord }) {
             )}
           >
             <Icon name={delivery.success ? 'check' : 'x'} size={9} />
-            {delivery.statusCode ?? 'timeout'}
+            {delivery.statusCode ?? t('deliveryHistory.statusTimeout', 'timeout')}
           </span>
         </td>
         <td className="px-3 py-2 tabular-nums text-[var(--fg-secondary)]">
@@ -102,7 +116,11 @@ function DeliveryRow({ delivery }: { delivery: WebhookDeliveryRecord }) {
                 type="button"
                 onClick={() => setShowError((value) => !value)}
                 className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded hover:bg-[var(--surface-sunken)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
-                aria-label={showError ? 'Hide error' : 'Show error'}
+                aria-label={
+                  showError
+                    ? t('deliveryHistory.hideError', 'Hide error')
+                    : t('deliveryHistory.showError', 'Show error')
+                }
                 aria-expanded={showError}
               >
                 <Icon name="info" size={11} className="text-[var(--error-fg)]" />

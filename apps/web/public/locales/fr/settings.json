@@ -666,5 +666,23 @@
       "demote": "Rétrograder en membre",
       "promote": "Promouvoir administrateur"
     }
+  },
+  "opportunityFilters": {
+    "loadErrorTitle": "Impossible de charger les règles de filtre",
+    "loadErrorMessage": "Réessayez dans un instant.",
+    "saveSuccessTitle": "Règles de filtre enregistrées",
+    "saveErrorTitle": "Échec de l'enregistrement",
+    "title": "Filtres d'opportunités",
+    "caption": "Quelles opportunités ABC arrivent dans BidStack. Liste vide = aucun filtre sur cette dimension. Ces règles prennent effet une fois le connecteur ABC connecté — elles sont appliquées par la synchronisation lors de l'ingestion, pas rétroactivement.",
+    "expertiseLabel": "Types d'expertise à inclure",
+    "expertiseHint": "Séparés par des virgules. Seules les opportunités étiquetées avec l'un de ces types d'expertise sont importées.",
+    "solutionLabel": "Types de solution à inclure",
+    "solutionHint": "Séparés par des virgules. Filtre par type de solution indépendamment de l'expertise.",
+    "frameworkLabel": "Types d'accord-cadre / de convention",
+    "frameworkHint": "Noms d'accords-cadres ou de conventions séparés par des virgules.",
+    "excludeNonFrameworkLabel": "N'importer que les opportunités relevant d'un accord-cadre/convention listé",
+    "savingButton": "Enregistrement…",
+    "saveButton": "Enregistrer les règles de filtre",
+    "fieldPlaceholder": "par ex. Cybersécurité, Cloud, Données"
   }
 }

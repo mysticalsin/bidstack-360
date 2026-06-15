@@ -5,6 +5,7 @@
  * prep sector-specific pitch decks.
  */
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
@@ -13,15 +14,19 @@ import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMe
 import { useSectorView, type SectorRow } from '@/hooks/useSectorView';
 
 export default function SectorViewPage() {
+  const { t } = useTranslation('crm');
   const view = useSectorView();
 
   return (
     <div className="space-y-5">
       <div className="page-head">
         <div>
-          <h1 className="page-title">Sector view</h1>
+          <h1 className="page-title">{t('sectorView.title', 'Sector view')}</h1>
           <div className="page-sub">
-            Where Amaris is active by industry — accounts, countries, and FTE volume from ABC.
+            {t(
+              'sectorView.subtitle',
+              'Where Amaris is active by industry — accounts, countries, and FTE volume from ABC.',
+            )}
           </div>
         </div>
       </div>
@@ -30,13 +35,19 @@ export default function SectorViewPage() {
         <LoadingSkeleton rows={6} />
       ) : view.isError ? (
         <ErrorState
-          title="Could not load the sector view"
-          message={view.error?.message ?? 'The sector endpoint did not respond.'}
+          title={t('sectorView.errorTitle', 'Could not load the sector view')}
+          message={
+            view.error?.message ??
+            t('sectorView.errorMessage', 'The sector endpoint did not respond.')
+          }
         />
       ) : !view.data || view.data.sectors.length === 0 ? (
         <EmptyState
-          title="No sector data yet"
-          message="Accounts gain a sector when ABC classification (or external enrichment) fills their industry."
+          title={t('sectorView.emptyTitle', 'No sector data yet')}
+          message={t(
+            'sectorView.emptyMessage',
+            'Accounts gain a sector when ABC classification (or external enrichment) fills their industry.',
+          )}
         />
       ) : (
         <>
@@ -47,10 +58,17 @@ export default function SectorViewPage() {
             >
               <Icon name="info" size={16} aria-hidden />
               <div>
-                <strong className="font-semibold">Sector data quality is low.</strong>{' '}
-                {view.data.classifiedAccounts} of {view.data.totalAccounts} accounts carry an ABC
-                sector classification — treat these splits as directional until ABC coverage
-                improves.
+                <strong className="font-semibold">
+                  {t('sectorView.qualityWarningHeading', 'Sector data quality is low.')}
+                </strong>{' '}
+                {t(
+                  'sectorView.qualityWarningDetail',
+                  '{{classified}} of {{total}} accounts carry an ABC sector classification — treat these splits as directional until ABC coverage improves.',
+                  {
+                    classified: view.data.classifiedAccounts,
+                    total: view.data.totalAccounts,
+                  },
+                )}
               </div>
             </div>
           ) : null}
@@ -66,6 +84,7 @@ export default function SectorViewPage() {
 }
 
 function SectorCard({ sector }: { sector: SectorRow }) {
+  const { t } = useTranslation('crm');
   const [open, setOpen] = useState(false);
   return (
     <Card>
@@ -78,14 +97,30 @@ function SectorCard({ sector }: { sector: SectorRow }) {
         <span className="font-medium text-[var(--fg-primary)]">{sector.sector}</span>
         <span className="flex items-center gap-3 text-xs text-[var(--fg-tertiary)]">
           <span>
-            {sector.accountCount} account{sector.accountCount === 1 ? '' : 's'}
+            {sector.accountCount === 1
+              ? t('sectorView.accountCountOne', '{{count}} account', {
+                  count: sector.accountCount,
+                })
+              : t('sectorView.accountCountOther', '{{count}} accounts', {
+                  count: sector.accountCount,
+                })}
           </span>
           {sector.fteVolume != null ? (
-            <span>{sector.fteVolume.toLocaleString()} FTE</span>
+            <span>
+              {t('sectorView.fteValue', '{{value}} FTE', {
+                value: sector.fteVolume.toLocaleString(),
+              })}
+            </span>
           ) : (
-            <span title="No account in this sector has a known headcount">FTE unknown</span>
+            <span title={t('sectorView.fteUnknownTooltip', 'No account in this sector has a known headcount')}>
+              {t('sectorView.fteUnknown', 'FTE unknown')}
+            </span>
           )}
-          <Badge tone="blue">{sector.countries.length} countries</Badge>
+          <Badge tone="blue">
+            {t('sectorView.countriesBadge', '{{count}} countries', {
+              count: sector.countries.length,
+            })}
+          </Badge>
           <span aria-hidden>{open ? '−' : '+'}</span>
         </span>
       </button>
@@ -94,16 +129,20 @@ function SectorCard({ sector }: { sector: SectorRow }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wider text-[var(--fg-tertiary)]">
-                <th className="py-1.5 font-medium">Country</th>
-                <th className="py-1.5 text-right font-medium">Accounts</th>
-                <th className="py-1.5 text-right font-medium">FTE volume</th>
+                <th className="py-1.5 font-medium">{t('sectorView.tableCountry', 'Country')}</th>
+                <th className="py-1.5 text-right font-medium">
+                  {t('sectorView.tableAccounts', 'Accounts')}
+                </th>
+                <th className="py-1.5 text-right font-medium">
+                  {t('sectorView.tableFteVolume', 'FTE volume')}
+                </th>
               </tr>
             </thead>
             <tbody>
               {sector.countries.map((c) => (
                 <tr key={c.countryCode} className="border-t border-[var(--border)]">
                   <td className="py-1.5 text-[var(--fg-primary)]">
-                    {c.countryCode === '??' ? 'Unknown' : c.countryCode}
+                    {c.countryCode === '??' ? t('sectorView.unknownCountry', 'Unknown') : c.countryCode}
                   </td>
                   <td className="py-1.5 text-right tabular-nums">{c.accountCount}</td>
                   <td className="py-1.5 text-right tabular-nums">

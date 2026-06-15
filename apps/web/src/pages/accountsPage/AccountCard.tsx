@@ -3,6 +3,7 @@
 import { memo } from 'react';
 
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { CompanyLogo } from '@/components/company/CompanyLogo';
@@ -27,6 +28,7 @@ export const AccountCard = memo(function AccountCard({
   row: AccountRow;
   index: number;
 }) {
+  const { t } = useTranslation('crm');
   const { formatMoneyMicros } = useFormatMoney();
   const { company, openDeals, pipelineMicros, totalDeals, health } = row;
   const sources = sourcePillsFor(company);
@@ -46,7 +48,9 @@ export const AccountCard = memo(function AccountCard({
         <Link
           to={`/accounts/${encodeURIComponent(company.id)}`}
           className="account-card"
-          aria-label={`Open ${company.name} customer cockpit`}
+          aria-label={t('account.openCockpitAria', 'Open {{name}} customer cockpit', {
+            name: company.name,
+          })}
         >
           {company.imageUrl ? (
             <img
@@ -67,14 +71,19 @@ export const AccountCard = memo(function AccountCard({
             <div className="account-card-title">
               <div className="account-card-name">{company.name}</div>
               <div className="account-card-meta">
-                {titleCase(company.industry ?? 'Unknown industry')}
+                {titleCase(company.industry ?? t('account.unknownIndustry', 'Unknown industry'))}
                 {company.domain ? ` · ${company.domain}` : ''}
               </div>
             </div>
             <Badge tone={healthTone(health)}>{healthLabel(health)}</Badge>
           </div>
 
-          <div className="account-card-sources" aria-label={`${company.name} data sources`}>
+          <div
+            className="account-card-sources"
+            aria-label={t('account.dataSourcesAria', '{{name}} data sources', {
+              name: company.name,
+            })}
+          >
             {sources.map((source, sourceIndex) => (
               <motion.span
                 key={source}
@@ -89,38 +98,39 @@ export const AccountCard = memo(function AccountCard({
 
           <dl className="account-card-stats">
             <div>
-              <dt>Open deals</dt>
+              <dt>{t('account.openDeals', 'Open deals')}</dt>
               <dd>
                 <AnimatedMetric value={openDeals.toLocaleString()} />
               </dd>
             </div>
             <div>
-              <dt>Pipeline</dt>
+              <dt>{t('account.pipeline', 'Pipeline')}</dt>
               <dd>
                 <AnimatedMetric value={formatMoneyMicros(pipelineMicros, 'EUR')} />
               </dd>
             </div>
             <div>
-              <dt>Total deals</dt>
+              <dt>{t('account.totalDeals', 'Total deals')}</dt>
               <dd>
                 <AnimatedMetric value={totalDeals.toLocaleString()} />
               </dd>
             </div>
             <div>
-              <dt>Employees</dt>
+              <dt>{t('account.employees', 'Employees')}</dt>
               <dd>{company.employeeCount ? company.employeeCount.toLocaleString() : '—'}</dd>
             </div>
           </dl>
 
           <div className="account-card-confidence">
-            <span>Confidence</span>
+            <span>{t('account.confidence', 'Confidence')}</span>
             <strong>
               <AnimatedMetric value={`${Math.round(company.confidence * 100)}%`} />
             </strong>
           </div>
 
           <div className="account-card-foot">
-            Open account cockpit <Icon name="arrow" size={11} />
+            {t('account.openAccountCockpit', 'Open account cockpit')}{' '}
+            <Icon name="arrow" size={11} />
           </div>
         </Link>
       </div>

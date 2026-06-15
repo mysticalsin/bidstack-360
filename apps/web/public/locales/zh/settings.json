@@ -666,5 +666,23 @@
       "demote": "降级为成员",
       "promote": "提升为管理员"
     }
+  },
+  "opportunityFilters": {
+    "loadErrorTitle": "无法加载筛选规则",
+    "loadErrorMessage": "请稍后重试。",
+    "saveSuccessTitle": "筛选规则已保存",
+    "saveErrorTitle": "无法保存",
+    "title": "商机筛选器",
+    "caption": "哪些 ABC 商机会进入 BidStack。空列表 = 该维度不做筛选。这些规则在 ABC 连接器连接后生效——由同步在数据摄取时应用，而非追溯应用。",
+    "expertiseLabel": "要包含的专业类型",
+    "expertiseHint": "以逗号分隔。仅导入标记为这些专业类型之一的商机。",
+    "solutionLabel": "要包含的解决方案类型",
+    "solutionHint": "以逗号分隔。按解决方案类型筛选，与专业类型无关。",
+    "frameworkLabel": "框架/协议类型",
+    "frameworkHint": "以逗号分隔的框架或协议名称。",
+    "excludeNonFrameworkLabel": "仅导入列出的框架/协议下的商机",
+    "savingButton": "保存中…",
+    "saveButton": "保存筛选规则",
+    "fieldPlaceholder": "例如：网络安全、云、数据"
   }
 }

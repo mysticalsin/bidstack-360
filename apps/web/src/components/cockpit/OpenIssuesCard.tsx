@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge } from '@/components/ui/Badge';
@@ -20,6 +21,7 @@ interface Props {
 // snapshot fetch. Avoids re-render when sibling cards refetch.
 export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }: Props) {
   const reducedMotion = useReducedMotion();
+  const { t } = useTranslation('crm');
   const openRisks = risks.filter((r) => r.status === 'open' || r.status === 'in_progress');
   const openCompliance = compliance.filter(
     (c) => c.status === 'blocked' || c.status === 'in_progress' || c.status === 'not_started',
@@ -30,30 +32,45 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
   const buckets = [
     {
       label: 'Critical',
+      labelText: t('openIssues.severityCritical', 'Critical'),
       count: risks.filter((risk) => risk.severity === 'critical').length,
       tone: 'tomato',
     },
     {
       label: 'High',
+      labelText: t('openIssues.severityHigh', 'High'),
       count: risks.filter((risk) => risk.severity === 'high').length,
       tone: 'amber',
     },
     {
       label: 'Medium',
+      labelText: t('openIssues.severityMedium', 'Medium'),
       count: risks.filter((risk) => risk.severity === 'medium').length,
       tone: 'blue',
     },
-    { label: 'Low', count: risks.filter((risk) => risk.severity === 'low').length, tone: 'gray' },
+    {
+      label: 'Low',
+      labelText: t('openIssues.severityLow', 'Low'),
+      count: risks.filter((risk) => risk.severity === 'low').length,
+      tone: 'gray',
+    },
   ] as const;
 
   return (
-    <Card role="region" aria-label="Open issues by severity">
+    <Card role="region" aria-label={t('openIssues.regionLabel', 'Open issues by severity')}>
       <SectionHeader
-        title="Open issues"
-        caption={total === 0 ? 'All clear' : `${total} item${total === 1 ? '' : 's'} to action`}
+        title={t('openIssues.title', 'Open issues')}
+        caption={
+          total === 0
+            ? t('openIssues.captionAllClear', 'All clear')
+            : t('openIssues.captionItemsToAction', '{{count}} item{{plural}} to action', {
+                count: total,
+                plural: total === 1 ? '' : 's',
+              })
+        }
       />
       <div style={{ padding: '8px 18px 14px' }}>
-        <div className="issue-buckets" aria-label="Severity buckets">
+        <div className="issue-buckets" aria-label={t('openIssues.bucketsLabel', 'Severity buckets')}>
           {buckets.map((bucket, index) => (
             <motion.div
               key={bucket.label}
@@ -62,7 +79,7 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
               animate={{ opacity: 1, y: 0 }}
               transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.035 }}
             >
-              <Badge tone={bucket.tone}>{bucket.label}</Badge>
+              <Badge tone={bucket.tone}>{bucket.labelText}</Badge>
               <strong>
                 <AnimatedMetric value={bucket.count.toLocaleString()} />
               </strong>
@@ -70,7 +87,10 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
           ))}
         </div>
         {total === 0 ? (
-          <EmptyState title="No open issues" message="Everything is green here." />
+          <EmptyState
+            title={t('openIssues.emptyTitle', 'No open issues')}
+            message={t('openIssues.emptyMessage', 'Everything is green here.')}
+          />
         ) : (
           <ul className="open-issues">
             {openRisks.slice(0, 4).map((r, index) => (
@@ -88,8 +108,8 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
                     {r.title}
                   </div>
                   <div style={{ fontSize: 11.5, color: 'var(--fg-tertiary)' }}>
-                    {r.owner ?? 'Unassigned'}
-                    {r.dueDate ? ` - due ${r.dueDate}` : ''}
+                    {r.owner ?? t('openIssues.unassigned', 'Unassigned')}
+                    {r.dueDate ? t('openIssues.dueSuffix', ' - due {{dueDate}}', { dueDate: r.dueDate }) : ''}
                   </div>
                 </div>
                 <Badge tone={severityTone(r.severity)}>{r.severity}</Badge>
@@ -113,7 +133,7 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
                     {c.label}
                   </div>
                   <div style={{ fontSize: 11.5, color: 'var(--fg-tertiary)' }}>
-                    {c.owner ?? 'No owner'}
+                    {c.owner ?? t('openIssues.noOwner', 'No owner')}
                   </div>
                 </div>
                 <Badge tone="amber">{c.status.replace('_', ' ')}</Badge>

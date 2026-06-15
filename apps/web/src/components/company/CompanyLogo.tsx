@@ -1,4 +1,5 @@
 import { useState, forwardRef, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { HoverCard } from '@/components/ui/HoverCard';
 import type { CrmLogo } from '@bidstack/shared';
@@ -27,6 +28,7 @@ export const CompanyLogo = forwardRef<HTMLSpanElement, CompanyLogoProps>(functio
   { name, logo, domain, size = 36, className, brief, priority = false },
   ref,
 ) {
+  const { t } = useTranslation('crm');
   const sources: string[] = [];
   const normalizedDomain = normalizeDomain(domain);
   const shouldUseCompactFavicon =
@@ -69,8 +71,8 @@ export const CompanyLogo = forwardRef<HTMLSpanElement, CompanyLogoProps>(functio
         fontSize: Math.max(11, Math.round(size * 0.3)),
         fontWeight: 700,
       }}
-      title={logo?.attribution?.label ?? `${name} logo`}
-      aria-label={`${name} logo`}
+      title={logo?.attribution?.label ?? t('companyLogo.ariaLabel', '{{name}} logo', { name })}
+      aria-label={t('companyLogo.ariaLabel', '{{name}} logo', { name })}
     >
       {url ? (
         <img

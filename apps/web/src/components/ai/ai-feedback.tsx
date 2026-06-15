@@ -4,6 +4,7 @@
 // learning loop.
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/cn';
 import { useAiFeedback } from '@/hooks/useAiAssistant';
@@ -15,6 +16,7 @@ interface AiFeedbackProps {
 }
 
 export function AiFeedback({ sessionId, onSubmit }: AiFeedbackProps) {
+  const { t } = useTranslation('crm');
   const [hoveredStar, setHoveredStar] = useState<number | null>(null);
   const [selectedRating, setSelectedRating] = useState<number | null>(null);
   const [comment, setComment] = useState('');
@@ -42,7 +44,7 @@ export function AiFeedback({ sessionId, onSubmit }: AiFeedbackProps) {
   if (submitted) {
     return (
       <p className="text-xs text-[var(--fg-secondary)] mt-2" role="status">
-        Thanks for your feedback!
+        {t('ai-feedback.thanks', 'Thanks for your feedback!')}
       </p>
     );
   }
@@ -51,19 +53,19 @@ export function AiFeedback({ sessionId, onSubmit }: AiFeedbackProps) {
     <div
       className="mt-3 flex flex-col gap-2"
       // WHY aria-label: the stars look purely decorative without it.
-      aria-label="Rate this AI response"
+      aria-label={t('ai-feedback.aria-rate-response', 'Rate this AI response')}
     >
-      <p className="text-xs text-[var(--fg-tertiary)]">Was this helpful?</p>
+      <p className="text-xs text-[var(--fg-tertiary)]">{t('ai-feedback.was-this-helpful', 'Was this helpful?')}</p>
 
       {/* Stars */}
-      <div className="flex gap-1" role="group" aria-label="Rating">
+      <div className="flex gap-1" role="group" aria-label={t('ai-feedback.aria-rating', 'Rating')}>
         {[1, 2, 3, 4, 5].map((star) => {
           const filled = hoveredStar !== null ? star <= hoveredStar : star <= (selectedRating ?? 0);
           return (
             <button
               key={star}
               type="button"
-              aria-label={`${star} star${star > 1 ? 's' : ''}`}
+              aria-label={t('ai-feedback.aria-star-rating', '{{count}} star', { count: star })}
               aria-pressed={selectedRating === star}
               className={cn(
                 // 44×44 touch target, smaller visual
@@ -100,10 +102,10 @@ export function AiFeedback({ sessionId, onSubmit }: AiFeedbackProps) {
               'resize-none',
             )}
             rows={2}
-            placeholder="Optional comment…"
+            placeholder={t('ai-feedback.comment-placeholder', 'Optional comment…')}
             maxLength={2000}
             value={comment}
-            aria-label="Feedback comment"
+            aria-label={t('ai-feedback.aria-comment', 'Feedback comment')}
             onChange={(e) => setComment(e.target.value)}
           />
           <button
@@ -117,11 +119,13 @@ export function AiFeedback({ sessionId, onSubmit }: AiFeedbackProps) {
               'min-h-[44px]',
             )}
           >
-            {mutation.isPending ? 'Sending…' : 'Submit feedback'}
+            {mutation.isPending
+              ? t('ai-feedback.submitting', 'Sending…')
+              : t('ai-feedback.submit', 'Submit feedback')}
           </button>
           {mutation.isError ? (
             <p className="text-xs text-[var(--danger)]" role="alert">
-              Failed to submit feedback. Please try again.
+              {t('ai-feedback.error', 'Failed to submit feedback. Please try again.')}
             </p>
           ) : null}
         </>

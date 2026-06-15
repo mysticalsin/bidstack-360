@@ -7,6 +7,7 @@
 
 import * as Dialog from '@radix-ui/react-dialog';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { useFocusRestore } from '@/hooks/useFocusRestore';
@@ -26,6 +27,7 @@ interface Props {
 }
 
 export function ContactQuickLook({ contact, onClose }: Props) {
+  const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
   const open = Boolean(contact);
   // Quick Look is always opened programmatically (via Space key) — Radix
@@ -56,7 +58,7 @@ export function ContactQuickLook({ contact, onClose }: Props) {
                 className="fixed left-1/2 top-1/2 z-50 w-[min(420px,92vw)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--surface-card)] shadow-[var(--shadow-lg)] outline-none"
               >
                 <Dialog.Title className="border-b border-[var(--border-subtle)] px-5 py-3 text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-                  Quick Look
+                  {t('contactQuickLook.title', 'Quick Look')}
                 </Dialog.Title>
                 <div className="space-y-3 p-5">
                   <div>
@@ -68,11 +70,15 @@ export function ContactQuickLook({ contact, onClose }: Props) {
                     ) : null}
                   </div>
                   <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
-                    <dt className="text-[var(--fg-tertiary)]">Customer</dt>
+                    <dt className="text-[var(--fg-tertiary)]">
+                      {t('contactQuickLook.fieldCustomer', 'Customer')}
+                    </dt>
                     <dd className="text-[var(--fg-primary)]">{contact.customer}</dd>
                     {contact.email ? (
                       <>
-                        <dt className="text-[var(--fg-tertiary)]">Email</dt>
+                        <dt className="text-[var(--fg-tertiary)]">
+                          {t('contactQuickLook.fieldEmail', 'Email')}
+                        </dt>
                         <dd>
                           <a
                             href={`mailto:${contact.email}`}
@@ -85,19 +91,25 @@ export function ContactQuickLook({ contact, onClose }: Props) {
                     ) : null}
                     {contact.phone ? (
                       <>
-                        <dt className="text-[var(--fg-tertiary)]">Phone</dt>
+                        <dt className="text-[var(--fg-tertiary)]">
+                          {t('contactQuickLook.fieldPhone', 'Phone')}
+                        </dt>
                         <dd className="text-[var(--fg-primary)]">{contact.phone}</dd>
                       </>
                     ) : null}
                     {contact.influence !== null ? (
                       <>
-                        <dt className="text-[var(--fg-tertiary)]">Influence</dt>
+                        <dt className="text-[var(--fg-tertiary)]">
+                          {t('contactQuickLook.fieldInfluence', 'Influence')}
+                        </dt>
                         <dd className="text-[var(--fg-primary)]">{contact.influence}/5</dd>
                       </>
                     ) : null}
                     {contact.sentiment ? (
                       <>
-                        <dt className="text-[var(--fg-tertiary)]">Sentiment</dt>
+                        <dt className="text-[var(--fg-tertiary)]">
+                          {t('contactQuickLook.fieldSentiment', 'Sentiment')}
+                        </dt>
                         <dd>
                           <Badge tone={SENTIMENT_TONE[contact.sentiment]}>
                             {contact.sentiment}
@@ -109,17 +121,17 @@ export function ContactQuickLook({ contact, onClose }: Props) {
                 </div>
                 <footer className="flex justify-between border-t border-[var(--border-subtle)] px-5 py-2 text-[10px] text-[var(--fg-tertiary)]">
                   <span>
-                    Press{' '}
+                    {t('contactQuickLook.footerPress', 'Press')}{' '}
                     <kbd className="rounded border border-[var(--border-default)] bg-[var(--surface-sunken)] px-1 py-0.5 font-mono">
                       Esc
                     </kbd>{' '}
-                    or{' '}
+                    {t('contactQuickLook.footerOr', 'or')}{' '}
                     <kbd className="rounded border border-[var(--border-default)] bg-[var(--surface-sunken)] px-1 py-0.5 font-mono">
                       Space
                     </kbd>{' '}
-                    to close
+                    {t('contactQuickLook.footerToClose', 'to close')}
                   </span>
-                  <span>Read-only</span>
+                  <span>{t('contactQuickLook.readOnly', 'Read-only')}</span>
                 </footer>
               </motion.div>
             </Dialog.Content>

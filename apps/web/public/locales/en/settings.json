@@ -647,5 +647,23 @@
       "demote": "Demote to member",
       "promote": "Promote to admin"
     }
+  },
+  "opportunityFilters": {
+    "loadErrorTitle": "Could not load filter rules",
+    "loadErrorMessage": "Try again shortly.",
+    "saveSuccessTitle": "Filter rules saved",
+    "saveErrorTitle": "Could not save",
+    "title": "Opportunity filters",
+    "caption": "Which ABC opportunities flow into BidStack. Empty list = no filter on that dimension. These rules take effect once the ABC connector is connected — they are applied by the sync at ingestion, not retroactively.",
+    "expertiseLabel": "Expertise types to include",
+    "expertiseHint": "Comma-separated. Only opportunities tagged with one of these expertise types are imported.",
+    "solutionLabel": "Solution types to include",
+    "solutionHint": "Comma-separated. Filters by solution type independently of expertise.",
+    "frameworkLabel": "Framework / agreement types",
+    "frameworkHint": "Comma-separated framework or agreement names.",
+    "excludeNonFrameworkLabel": "Only import opportunities under a listed framework/agreement",
+    "savingButton": "Saving…",
+    "saveButton": "Save filter rules",
+    "fieldPlaceholder": "e.g. Cybersecurity, Cloud, Data"
   }
 }

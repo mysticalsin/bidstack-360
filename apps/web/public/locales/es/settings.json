@@ -669,5 +669,23 @@
       "demote": "Degradar a miembro",
       "promote": "Promover a administrador"
     }
+  },
+  "opportunityFilters": {
+    "loadErrorTitle": "No se pudieron cargar las reglas de filtro",
+    "loadErrorMessage": "Vuelve a intentarlo en breve.",
+    "saveSuccessTitle": "Reglas de filtro guardadas",
+    "saveErrorTitle": "No se pudo guardar",
+    "title": "Filtros de oportunidades",
+    "caption": "Qué oportunidades de ABC entran en BidStack. Lista vacía = sin filtro en esa dimensión. Estas reglas se aplican una vez conectado el conector de ABC: se aplican durante la sincronización en la ingesta, no de forma retroactiva.",
+    "expertiseLabel": "Tipos de especialidad a incluir",
+    "expertiseHint": "Separados por comas. Solo se importan las oportunidades etiquetadas con uno de estos tipos de especialidad.",
+    "solutionLabel": "Tipos de solución a incluir",
+    "solutionHint": "Separados por comas. Filtra por tipo de solución de forma independiente a la especialidad.",
+    "frameworkLabel": "Tipos de acuerdo marco / contrato",
+    "frameworkHint": "Nombres de acuerdos marco o contratos separados por comas.",
+    "excludeNonFrameworkLabel": "Importar solo oportunidades bajo un acuerdo marco/contrato listado",
+    "savingButton": "Guardando…",
+    "saveButton": "Guardar reglas de filtro",
+    "fieldPlaceholder": "p. ej. Ciberseguridad, Nube, Datos"
   }
 }

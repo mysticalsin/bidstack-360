@@ -1,5 +1,6 @@
 // Step 1: pick a document template and fill its variable placeholders.
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useDocumentTemplates, useDocumentTemplate } from '@/hooks/useDocumentTemplates';
 import type { TemplateKind } from '@bidstack/shared';
@@ -21,6 +22,7 @@ export function TemplateStep({
   onChangeVariable,
   onNext,
 }: Props) {
+  const { t } = useTranslation('signatures');
   const [kindFilter, setKindFilter] = useState<TemplateKind | ''>('');
   const { data: page, isLoading } = useDocumentTemplates(
     kindFilter ? { kind: kindFilter as TemplateKind } : {},
@@ -41,7 +43,7 @@ export function TemplateStep({
     <div className="flex flex-col gap-4">
       {/* Kind filter */}
       <div>
-        <FieldLabel htmlFor="kind-filter">Template type</FieldLabel>
+        <FieldLabel htmlFor="kind-filter">{t('templateStep.kindFilterLabel', 'Template type')}</FieldLabel>
         <select
           id="kind-filter"
           value={kindFilter}
@@ -50,7 +52,7 @@ export function TemplateStep({
         >
           {kinds.map((k) => (
             <option key={k} value={k}>
-              {k === '' ? 'All types' : k}
+              {k === '' ? t('templateStep.allTypesOption', 'All types') : k}
             </option>
           ))}
         </select>
@@ -59,7 +61,7 @@ export function TemplateStep({
       {/* Template list */}
       <div>
         <FieldLabel htmlFor="template-select" required>
-          Document template
+          {t('templateStep.documentTemplateLabel', 'Document template')}
         </FieldLabel>
         {isLoading ? (
           <div className="h-10 animate-pulse rounded-lg bg-[var(--surface-sunken)]" />
@@ -71,7 +73,7 @@ export function TemplateStep({
             className={inputClass}
             required
           >
-            <option value="">Select a template…</option>
+            <option value="">{t('templateStep.selectTemplatePlaceholder', 'Select a template…')}</option>
             {page?.items.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name} ({t.kind})
@@ -85,7 +87,7 @@ export function TemplateStep({
       {uniqueVars.length > 0 && (
         <div className="rounded-xl border border-[var(--border-subtle)] p-4">
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-            Template variables
+            {t('templateStep.templateVariablesHeading', 'Template variables')}
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             {uniqueVars.map((v) => (
@@ -117,7 +119,7 @@ export function TemplateStep({
             'disabled:opacity-40 disabled:cursor-not-allowed',
           )}
         >
-          Next: Recipients
+          {t('templateStep.nextButton', 'Next: Recipients')}
         </button>
       </div>
     </div>

@@ -7,6 +7,7 @@
 
 import { motion, useReducedMotion } from 'framer-motion';
 import { memo, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
@@ -50,6 +51,7 @@ export const ActivityTimelineCard = memo(function ActivityTimelineCard({
   limit = 8,
 }: Props) {
   const reduced = useReducedMotion();
+  const { t } = useTranslation('crm');
 
   // Sort newest first; the API isn't always strictly ordered when activities
   // come from multiple sources (tasks + sync events + dust runs).
@@ -63,19 +65,31 @@ export const ActivityTimelineCard = memo(function ActivityTimelineCard({
 
   if (items.length === 0) {
     return (
-      <Card role="region" aria-label="Recent activity">
-        <SectionHeader title="Recent activity" />
+      <Card role="region" aria-label={t('activityTimeline.regionLabel', 'Recent activity')}>
+        <SectionHeader title={t('activityTimeline.title', 'Recent activity')} />
         <EmptyState
-          title="Nothing yet"
-          message="Tasks, emails, and Dust runs for this account will appear here."
+          title={t('activityTimeline.emptyTitle', 'Nothing yet')}
+          message={t(
+            'activityTimeline.emptyMessage',
+            'Tasks, emails, and Dust runs for this account will appear here.',
+          )}
         />
       </Card>
     );
   }
 
   return (
-    <Card role="region" aria-label="Recent activity" data-tour="activity-timeline">
-      <SectionHeader title="Recent activity" caption={`Last ${items.length} items`} />
+    <Card
+      role="region"
+      aria-label={t('activityTimeline.regionLabel', 'Recent activity')}
+      data-tour="activity-timeline"
+    >
+      <SectionHeader
+        title={t('activityTimeline.title', 'Recent activity')}
+        caption={t('activityTimeline.itemCount', 'Last {{count}} items', {
+          count: items.length,
+        })}
+      />
       <div className="relative px-5 pb-5 pt-3">
         {/* The vertical rail that the dots sit on. Drawn once, sits behind
             every row — purely decorative, so aria-hidden. */}

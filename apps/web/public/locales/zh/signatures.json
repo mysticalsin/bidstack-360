@@ -113,5 +113,13 @@
     "copyCodeLabel": "复制代码",
     "replayBefore": "拒绝满足以下条件的事件：",
     "replayAfter": "秒，以防止重放攻击。请始终使用时间安全的比较方式。"
+  },
+  "templateStep": {
+    "kindFilterLabel": "模板类型",
+    "allTypesOption": "所有类型",
+    "documentTemplateLabel": "文档模板",
+    "selectTemplatePlaceholder": "选择一个模板…",
+    "templateVariablesHeading": "模板变量",
+    "nextButton": "下一步：收件人"
   }
 }

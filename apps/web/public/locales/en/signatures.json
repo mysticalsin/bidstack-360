@@ -113,5 +113,13 @@
     "copyCodeLabel": "Copy code",
     "replayBefore": "Reject events where",
     "replayAfter": "seconds to prevent replay attacks. Always use a timing-safe comparison."
+  },
+  "templateStep": {
+    "kindFilterLabel": "Template type",
+    "allTypesOption": "All types",
+    "documentTemplateLabel": "Document template",
+    "selectTemplatePlaceholder": "Select a template…",
+    "templateVariablesHeading": "Template variables",
+    "nextButton": "Next: Recipients"
   }
 }
