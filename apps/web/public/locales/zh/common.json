@@ -44,7 +44,19 @@
     "agents": "Dust 智能体",
     "search": "搜索",
     "references": "参考资料库",
-    "settingsPage": "设置"
+    "settingsPage": "设置",
+    "home": "主页",
+    "bidsRfp": "投标与 RFP",
+    "quickStart": "快速开始",
+    "salesToolkits": "销售工具包",
+    "keyAccounts": "关键客户",
+    "topAccounts": "重点客户",
+    "sectorView": "行业视图",
+    "crossSell": "交叉销售",
+    "agentStudio": "智能体工作室",
+    "calendar": "日历",
+    "customObjects": "自定义对象",
+    "analyticsReports": "分析与报告"
   },
   "crumbs": {
     "portfolio": "投资组合",
@@ -113,7 +125,10 @@
     "deleted": "已删除",
     "copied": "已复制到剪贴板",
     "genericError": "出现了问题。请重试。",
-    "networkError": "网络错误。请检查您的连接。"
+    "networkError": "网络错误。请检查您的连接。",
+    "regionLabel": "通知",
+    "clearAll": "全部清除 ({{count}})",
+    "dismiss": "关闭"
   },
   "validation": {
     "required": "此字段为必填项",
@@ -267,5 +282,105 @@
         "leadRot": "线索过期规则"
       }
     }
+  },
+  "topbar": {
+    "skipToContent": "跳至内容",
+    "switchToLight": "切换到浅色模式",
+    "switchToDark": "切换到深色模式",
+    "help": "帮助与快捷键",
+    "helpAria": "帮助和键盘快捷键",
+    "productTour": "开始产品导览",
+    "signOut": "退出登录",
+    "portfolio": "客户组合",
+    "detail": "详情"
+  },
+  "appRoutes": {
+    "notFoundTitle": "页面未找到",
+    "notFoundMessage": "您查找的页面不存在。",
+    "goToDashboard": "前往仪表板"
+  },
+  "select": {
+    "placeholder": "—",
+    "noOptions": "无选项"
+  },
+  "lookupFieldPicker": {
+    "placeholder": "搜索…",
+    "clearSelection": "清除选择",
+    "searching": "搜索中…",
+    "noResults": "无结果。",
+    "typeToSearch": "输入以搜索…"
+  },
+  "confirm": {
+    "cancel": "取消",
+    "delete": "删除",
+    "confirm": "确认",
+    "save": "保存"
+  },
+  "avatar": {
+    "statusOnline": "在线",
+    "statusOffline": "离线"
+  },
+  "helpDrawer": {
+    "title": "键盘快捷键",
+    "closeAria": "关闭快捷键",
+    "groupGlobal": "全局",
+    "groupNavigation": "导航",
+    "groupRecords": "记录",
+    "openCommandPalette": "打开命令面板",
+    "quickAddMenu": "快速添加菜单",
+    "openThisDrawer": "打开此面板",
+    "closeCurrentDialog": "关闭当前对话框",
+    "goToDashboard": "转到仪表板",
+    "goToOpportunities": "转到商机",
+    "goToPipeline": "转到管道",
+    "goToContacts": "转到联系人",
+    "goToTasks": "转到任务",
+    "goToReports": "转到报告",
+    "goToAccounts": "转到客户",
+    "goToSettings": "转到设置",
+    "goToSearch": "转到搜索",
+    "moveSelectionInLists": "在列表中移动选择",
+    "openRecord": "打开记录",
+    "editSelectedRecord": "编辑所选记录",
+    "deleteWithConfirmation": "删除并确认",
+    "footer": "除文本字段内之外，大多数快捷键在任何地方都有效。随时按 ? 重新打开此面板。"
+  },
+  "breadcrumbs": {
+    "dashboard": "仪表盘",
+    "accounts": "客户",
+    "opportunities": "商机",
+    "pipeline": "管道",
+    "contacts": "联系人",
+    "tasks": "任务",
+    "reports": "报告",
+    "integrations": "集成",
+    "settings": "设置",
+    "auditLog": "审计日志",
+    "login": "登录",
+    "ariaLabel": "面包屑导航"
+  },
+  "progressRing": {
+    "ariaLabelPercentComplete": "完成 {{percent}}%"
+  },
+  "sortableHeader": {
+    "ariaLabel": "按 {{label}} 排序。当前排序：{{current}}。激活以进行 {{next}} 排序。"
+  },
+  "upgradeBanner": {
+    "actionLabel": "升级"
+  },
+  "showMore": {
+    "moreLabel": "显示更多",
+    "lessLabel": "显示更少"
+  },
+  "bulkActionBar": {
+    "regionLabel": "批量操作",
+    "selectedCount": "已选择 {{count}} 项",
+    "exportSelected": "导出所选项",
+    "deleting": "正在删除…",
+    "deleteSelected": "删除所选项",
+    "clear": "清除"
+  },
+  "dialog": {
+    "closeAriaLabel": "关闭"
   }
 }
