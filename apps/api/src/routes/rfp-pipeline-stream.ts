@@ -15,6 +15,7 @@
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { prisma } from '@bidstack/db';
+import { buildAllowedCorsOrigins, isLoopbackOrigin } from '../lib/cors-origins.js';
 import { createLogger } from '../lib/logger.js';
 import {
   StreamParams,
@@ -62,13 +63,22 @@ export const rfpPipelineStreamRoutes: FastifyPluginAsyncZod = async (server) => 
       // Wildcard + credentials (cookies / Authorization header) is rejected by browsers
       // AND exposes the SSE stream to any origin. Fail-closed: if PUBLIC_BASE_URL is
       // not set in production, return 500 rather than silently open the stream to all.
+      const allowedOrigins = buildAllowedCorsOrigins(
+        process.env.PUBLIC_BASE_URL,
+        process.env.NODE_ENV ?? 'development',
+      );
+      const requestOrigin = req.headers.origin;
       const allowedOrigin =
-        process.env.PUBLIC_BASE_URL ??
-        (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : null);
+        typeof requestOrigin === 'string' && allowedOrigins.includes(requestOrigin)
+          ? requestOrigin
+          : allowedOrigins[0];
       if (!allowedOrigin) {
         throw server.httpErrors.internalServerError(
           'SSE stream misconfigured: PUBLIC_BASE_URL env var is required in production',
         );
+      }
+      if ((process.env.NODE_ENV ?? 'development') === 'production' && isLoopbackOrigin(allowedOrigin)) {
+        throw server.httpErrors.forbidden('SSE stream origin rejected');
       }
       reply.raw.writeHead(200, {
         'Content-Type': 'text/event-stream',

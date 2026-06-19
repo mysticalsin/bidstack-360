@@ -114,3 +114,15 @@ export async function enqueueDocumentExtract(job: DocumentExtractJob): Promise<s
     return null;
   }
 }
+
+export async function closeDocumentExtractQueueForTest(): Promise<void> {
+  const queue = queueSingleton;
+  const connection = connectionSingleton;
+  queueSingleton = null;
+  connectionSingleton = null;
+
+  await queue?.close().catch(() => undefined);
+  if (connection) {
+    await connection.quit().catch(() => connection.disconnect());
+  }
+}

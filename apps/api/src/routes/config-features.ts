@@ -17,6 +17,8 @@ export const configFeaturesRoutes: FastifyPluginAsyncZod = async (server) => {
         showRevenueBlock: env.SHOW_REVENUE_BLOCK === 'true',
         infosearchEnabled: env.INFOSEARCH_ENABLED === 'true',
         lms360Enabled: env.LMS_360L_ENABLED === 'true',
+        serumEnabled: env.SERUM_ENABLED === 'true',
+        serumDemoModeEnabled: env.SERUM_DEMO_MODE_ENABLED === 'true',
       };
     },
   );

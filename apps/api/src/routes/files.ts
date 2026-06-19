@@ -12,6 +12,7 @@
 // large bodies through the API process) and keeps the API endpoint compatible
 // once we flip STORAGE_DRIVER=s3.
 
+import { randomUUID } from 'node:crypto';
 import { pipeline } from 'node:stream/promises';
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -29,6 +30,7 @@ import {
 
 import { getStorage, keyBelongsToOrg } from '../storage/index.js';
 import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
+import { canReadAccount } from '../lib/account-access.js';
 
 // accountId is a free-text string (not a UUID FK) — different cases of the
 // same brand should resolve to one account. Lowercase + trim at every write
@@ -55,6 +57,7 @@ function safeContentDisposition(filename: string): string {
 interface DbFileRow {
   id: string;
   accountId: string;
+  companyId: string | null;
   name: string;
   contentType: string;
   bytes: number;
@@ -68,6 +71,7 @@ function serialize(row: DbFileRow): FileAttachment {
   return {
     id: row.id,
     accountId: row.accountId,
+    companyId: row.companyId ?? undefined,
     name: row.name,
     contentType: row.contentType,
     bytes: row.bytes,
@@ -79,6 +83,21 @@ function serialize(row: DbFileRow): FileAttachment {
 }
 
 export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
+  async function ensureAccountVisible(input: {
+    orgId: string;
+    userId: string;
+    accountId: string;
+    companyId?: string | null;
+  }) {
+    const access = await canReadAccount({
+      orgId: input.orgId,
+      userId: input.userId,
+      accountId: input.accountId,
+      companyId: input.companyId,
+      prismaClient: prisma,
+    });
+    if (!access.allowed) throw server.httpErrors.notFound('Account not found');
+  }
 
   // RBAC: gate every route in this plugin by method — writes need 'files:write',
   // reads need 'files:read'. Runs after the global auth onRequest.
@@ -98,6 +117,18 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const storage = await getStorage();
+      if (
+        req.body.companyId &&
+        !(await tenantEntityBelongsToOrg('company', req.body.companyId, req.auth.orgId))
+      ) {
+        throw server.httpErrors.notFound('Company not found');
+      }
+      await ensureAccountVisible({
+        orgId: req.auth.orgId,
+        userId: req.auth.userId,
+        accountId: req.body.accountId,
+        companyId: req.body.companyId,
+      });
       // Storage key is namespaced under req.auth.orgId so a malicious upload
       // request can't target another tenant's accountId namespace. The
       // sibling FileAttachment row also writes orgId at finalize time, but
@@ -171,6 +202,12 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
       ) {
         throw server.httpErrors.notFound('Company not found');
       }
+      await ensureAccountVisible({
+        orgId: req.auth.orgId,
+        userId: req.auth.userId,
+        accountId: req.body.accountId,
+        companyId: req.body.companyId,
+      });
 
       let metadata;
       try {
@@ -195,9 +232,11 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
       const accountId = normalizeAccountId(req.body.accountId);
       // Atomic create + audit so a crash can't leave a file row without a
       // paper trail.
-      const created = await prisma.$transaction(async (tx) => {
-        const row = await tx.fileAttachment.create({
+      const fileId = randomUUID();
+      const [created] = await prisma.$transaction([
+        prisma.fileAttachment.create({
           data: {
+            id: fileId,
             orgId: req.auth.orgId,
             accountId,
             companyId: req.body.companyId ?? null,
@@ -208,14 +247,14 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
             uploadedByUserId: req.auth.userId,
           },
           include: { uploader: { select: { email: true } } },
-        });
-        await tx.auditLog.create({
+        }),
+        prisma.auditLog.create({
           data: {
             orgId: req.auth.orgId,
             userId: req.auth.userId,
             action: 'file.upload',
             targetType: 'file_attachment',
-            targetId: row.id,
+            targetId: fileId,
             diff: {
               name: req.body.name,
               bytes: metadata.bytes,
@@ -224,9 +263,8 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
               scanStatus,
             },
           },
-        });
-        return row;
-      });
+        }),
+      ]);
       return reply.code(201).send({
         ...serialize(created),
         verifiedBytes: metadata.bytes,
@@ -244,17 +282,27 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: {
         querystring: z.object({
           accountId: z.string().min(1).max(255),
+          companyId: z.string().uuid().optional(),
           limit: z.coerce.number().int().min(1).max(200).default(100),
         }),
         response: { 200: FileListResponse },
       },
     },
     async (req) => {
+      await ensureAccountVisible({
+        orgId: req.auth.orgId,
+        userId: req.auth.userId,
+        accountId: req.query.accountId,
+        companyId: req.query.companyId,
+      });
+      const accountId = normalizeAccountId(req.query.accountId);
       const items = await prisma.fileAttachment.findMany({
         where: {
           orgId: req.auth.orgId,
-          accountId: normalizeAccountId(req.query.accountId),
           deletedAt: null,
+          ...(req.query.companyId
+            ? { OR: [{ companyId: req.query.companyId }, { accountId }] }
+            : { accountId }),
         },
         include: { uploader: { select: { email: true } } },
         orderBy: { createdAt: 'desc' },
@@ -273,6 +321,12 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!row) throw server.httpErrors.notFound('File not found');
+      await ensureAccountVisible({
+        orgId: req.auth.orgId,
+        userId: req.auth.userId,
+        accountId: row.accountId,
+        companyId: row.companyId,
+      });
 
       const storage = await getStorage();
       const dl = await storage.getDownload(row.storageKey, {
@@ -305,6 +359,12 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!row) throw server.httpErrors.notFound('File not found');
+      await ensureAccountVisible({
+        orgId: req.auth.orgId,
+        userId: req.auth.userId,
+        accountId: row.accountId,
+        companyId: row.companyId,
+      });
 
       const storage = await getStorage();
       try {

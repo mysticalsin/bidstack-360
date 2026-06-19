@@ -172,6 +172,33 @@ describe('mutationAuditPlugin', () => {
     await server.close();
   });
 
+  it('records denied admin credential-surface mutations for security review', async () => {
+    createMock.mockResolvedValueOnce({} as never);
+    const server = Fastify({ logger: false });
+    withAuth(server);
+    await server.register(mutationAuditPlugin);
+    server.put('/api/v1/integrations/agent-providers/credentials/:provider', async (_req, reply) => {
+      return reply.code(403).send({ message: 'forbidden' });
+    });
+
+    const res = await server.inject({
+      method: 'PUT',
+      url: '/api/v1/integrations/agent-providers/credentials/claude',
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(createMock).toHaveBeenCalledTimes(1);
+    const call = createMock.mock.calls[0]![0] as { data: Record<string, unknown> };
+    expect(call.data.action).toBe('http.mutation.denied');
+    expect(call.data.diff).toMatchObject({
+      method: 'PUT',
+      path: '/api/v1/integrations/agent-providers/credentials/claude',
+      statusCode: 403,
+    });
+
+    await server.close();
+  });
+
   it('does not throw if authenticated context is missing a user id', async () => {
     createMock.mockResolvedValueOnce({} as never);
     const server = Fastify({ logger: false });

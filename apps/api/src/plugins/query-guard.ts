@@ -71,7 +71,7 @@ export const queryGuardPlugin: FastifyPluginAsync = fp(async (server) => {
     }
 
     // 4. Dev response headers
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
       reply.header('X-Prisma-Time', `${store.totalPrismaMs.toFixed(2)}ms`);
       reply.header('X-Query-Count', String(store.queries.length));
       if (warnings.length > 0) {

@@ -7,10 +7,15 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { prisma, type Prisma } from '@bidstack/db';
+import { prisma, Prisma } from '@bidstack/db';
 import { TOP_ACCOUNTS_MAX, TopAccountListUpdate, TopAccountsSource } from '@bidstack/shared';
 
 import { emptyAccountStats, fetchAccountStats } from './accounts.helpers.js';
+import {
+  applyCompanyScope,
+  countryVariantsForScope,
+  getAccessScope,
+} from '../lib/access-scope.js';
 
 const KeyAccountResponse = z.object({
   id: z.string().uuid(),
@@ -59,10 +64,11 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
       },
     },
     handler: async (req, reply) => {
-      const { orgId } = req.auth;
+      const { orgId, userId } = req.auth;
       const { search, industry, ownerId, limit, cursor } = req.query;
+      const scope = await getAccessScope(orgId, userId);
 
-      const where = {
+      const where = applyCompanyScope({
         orgId,
         tier: 'key' as const,
         deletedAt: null,
@@ -76,7 +82,7 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
           : {}),
         ...(industry ? { industry: { equals: industry, mode: 'insensitive' as const } } : {}),
         ...(ownerId ? { keyAccountOwnerId: ownerId } : {}),
-      };
+      }, scope);
 
       // Fetch one extra row to detect whether a next page exists.
       const companies = await prisma.company.findMany({
@@ -134,17 +140,18 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
       },
     },
     handler: async (req, reply) => {
-      const { orgId } = req.auth;
+      const { orgId, userId } = req.auth;
       const { limit, search, industry } = req.query;
+      const scope = await getAccessScope(orgId, userId);
 
       // Curated mode: ANY non-null rank in the org switches the endpoint to the
       // manually ordered list (search/industry still filter within it).
       const curatedCount = await prisma.company.count({
-        where: { orgId, deletedAt: null, topAccountRank: { not: null } },
+        where: applyCompanyScope({ orgId, deletedAt: null, topAccountRank: { not: null } }, scope),
       });
       if (curatedCount > 0) {
         const curated = await prisma.company.findMany({
-          where: {
+          where: applyCompanyScope({
             orgId,
             deletedAt: null,
             topAccountRank: { not: null },
@@ -159,7 +166,7 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
             ...(industry
               ? { industry: { equals: industry, mode: 'insensitive' as const } }
               : {}),
-          },
+          }, scope),
           orderBy: { topAccountRank: 'asc' },
           take: Math.min(limit, TOP_ACCOUNTS_MAX),
         });
@@ -203,6 +210,38 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
       // so Prisma can parameterize all values safely without dynamic SQL.
       const searchPat = search ? `%${search}%` : null;
       const industryVal = industry ?? null;
+      const countryVariants = countryVariantsForScope(scope);
+      const companyCountryScopeSql =
+        !scope.unrestricted && countryVariants.length > 0
+          ? Prisma.sql`c.country_code = ANY(ARRAY[${Prisma.join(countryVariants)}]::text[]) OR`
+          : Prisma.empty;
+      const opportunityCountryScopeSql =
+        !scope.unrestricted && countryVariants.length > 0
+          ? Prisma.sql`
+              so.country = ANY(ARRAY[${Prisma.join(countryVariants)}]::text[])
+              OR st.country_codes && ARRAY[${Prisma.join(countryVariants)}]::text[]
+              OR`
+          : Prisma.empty;
+      const accountScopeSql = scope.unrestricted
+        ? Prisma.empty
+        : Prisma.sql`
+            AND (
+              ${companyCountryScopeSql}
+              c.key_account_owner_id = ${userId}::uuid
+              OR EXISTS (
+                SELECT 1
+                FROM opportunities so
+                LEFT JOIN territories st ON st.id = so.territory_id
+                WHERE so.company_id = c.id
+                  AND so.org_id = ${orgId}::uuid
+                  AND so.deleted_at IS NULL
+                  AND (
+                    ${opportunityCountryScopeSql}
+                    so.owner_id = ${userId}::uuid
+                  )
+              )
+            )
+          `;
 
       type TopRow = {
         id: string;
@@ -252,6 +291,7 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
                OR c.name   ILIKE ${searchPat}
                OR c.domain ILIKE ${searchPat})
           AND (${industryVal}::text IS NULL OR c.industry ILIKE ${industryVal})
+          ${accountScopeSql}
         GROUP BY c.id
         ORDER BY "totalValue" DESC
         LIMIT ${limit}
@@ -300,6 +340,12 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
     handler: async (req, reply) => {
       const { orgId, userId } = req.auth;
       const { companyIds } = req.body;
+      const scope = await getAccessScope(orgId, userId);
+      if (!scope.unrestricted) {
+        throw server.httpErrors.forbidden(
+          'Global top-account curation requires unrestricted account scope',
+        );
+      }
 
       if (companyIds.length > 0) {
         const owned = await prisma.company.findMany({
@@ -369,12 +415,13 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
       },
     },
     handler: async (req, reply) => {
-      const { orgId } = req.auth;
+      const { orgId, userId } = req.auth;
       const { id } = req.params;
       const { tier, keyAccountOwnerId, keyAccountNotes } = req.body;
+      const scope = await getAccessScope(orgId, userId);
 
       const company = await prisma.company.findFirst({
-        where: { id, orgId, deletedAt: null },
+        where: applyCompanyScope({ id, orgId, deletedAt: null }, scope),
       });
       if (!company) {
         throw server.httpErrors.notFound('Company not found');
@@ -439,9 +486,10 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
       response: { 200: z.object({ items: z.array(z.string()) }) },
     },
     handler: async (req, reply) => {
-      const { orgId } = req.auth;
+      const { orgId, userId } = req.auth;
+      const scope = await getAccessScope(orgId, userId);
       const rows = await prisma.company.findMany({
-        where: { orgId, deletedAt: null },
+        where: applyCompanyScope({ orgId, deletedAt: null }, scope),
         select: { industry: true },
         distinct: ['industry'],
         take: 1000,

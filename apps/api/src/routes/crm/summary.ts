@@ -52,6 +52,13 @@ function crmSummaryCacheKey(orgId: string, limit: number): string {
   return `${orgId}:${limit}`;
 }
 
+/** Drop the in-process CRM summary cache for one org (mutation writes call this). */
+export function invalidateCrmSummaryCache(orgId: string): void {
+  for (const key of crmSummaryCache.keys()) {
+    if (key.startsWith(`${orgId}:`)) crmSummaryCache.delete(key);
+  }
+}
+
 async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummaryPayload> {
   // NOTE: 'closed_won' and 'closed_lost' are inlined as SQL text (not interpolated
   // parameters) because Prisma's $queryRaw tagged-template serializer cannot encode

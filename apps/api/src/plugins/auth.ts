@@ -11,10 +11,10 @@ import { createHash } from 'node:crypto';
 import { verifyToken } from '@clerk/backend';
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
-import * as Sentry from '@sentry/node';
 
 import { prisma } from '@bidstack/db';
 
+import { emailDomainForTelemetry } from '../lib/email-privacy.js';
 import { writeAuthAudit } from './auth-audit.js';
 import { ensureAdminRoleGrant, mapClerkRole } from './auth-helpers.js';
 import { isDemoMode, resolveDemoAuth } from './demo-auth.js';
@@ -39,6 +39,143 @@ export interface AuthContext {
 }
 
 const STUB_CLERK_ORG = 'org_seed_mantu';
+const STUB_ROLE_HEADER = 'x-bidstack-e2e-role';
+export const SSO_DOMAIN_REJECTED_MESSAGE =
+  'Sign-in domain is not permitted for this organization.';
+
+const STUB_ROLE_OVERRIDES: Record<
+  string,
+  { systemRole: string; legacyRole: string; email: string; name: string; clerkUser: string }
+> = {
+  admin: {
+    systemRole: 'Admin',
+    legacyRole: 'admin',
+    email: 'e2e-admin@bidstack.local',
+    name: 'E2E Admin',
+    clerkUser: 'e2e_admin',
+  },
+  manager: {
+    systemRole: 'Sales Manager',
+    legacyRole: 'manager',
+    email: 'e2e-manager@bidstack.local',
+    name: 'E2E Sales Manager',
+    clerkUser: 'e2e_sales_manager',
+  },
+  'sales-manager': {
+    systemRole: 'Sales Manager',
+    legacyRole: 'manager',
+    email: 'e2e-manager@bidstack.local',
+    name: 'E2E Sales Manager',
+    clerkUser: 'e2e_sales_manager',
+  },
+  'read-only': {
+    systemRole: 'Read-Only',
+    legacyRole: 'member',
+    email: 'e2e-read-only@bidstack.local',
+    name: 'E2E Read Only',
+    clerkUser: 'e2e_read_only',
+  },
+  viewer: {
+    systemRole: 'Read-Only',
+    legacyRole: 'member',
+    email: 'e2e-viewer@bidstack.local',
+    name: 'E2E Viewer',
+    clerkUser: 'e2e_viewer',
+  },
+};
+
+function readStubRoleOverride(req: FastifyRequest): (typeof STUB_ROLE_OVERRIDES)[string] | null {
+  const raw = req.headers[STUB_ROLE_HEADER];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (!value) return null;
+  if (process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER !== 'true') {
+    throw req.server.httpErrors.forbidden('Stub role override header is disabled');
+  }
+  const normalized = value.trim().toLowerCase();
+  const override = STUB_ROLE_OVERRIDES[normalized];
+  if (!override) {
+    throw req.server.httpErrors.badRequest(`Unsupported stub role override: ${value}`);
+  }
+  return override;
+}
+
+export function parseAllowedSsoDomains(raw: string | undefined): string[] {
+  return (raw ?? '')
+    .split(',')
+    .map((domain) => domain.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function ssoDomainRejectionLogFields(
+  email: string,
+  allowedDomains: string[],
+): { userDomain: string | null; allowedDomainCount: number } {
+  return {
+    userDomain: emailDomainForTelemetry(email),
+    allowedDomainCount: allowedDomains.length,
+  };
+}
+
+function isHttpStatusError(err: unknown): err is { statusCode: number } {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    typeof (err as { statusCode?: unknown }).statusCode === 'number'
+  );
+}
+
+async function resolveStubRoleOverride(
+  req: FastifyRequest,
+  orgId: string,
+  override: (typeof STUB_ROLE_OVERRIDES)[string],
+): Promise<AuthContext> {
+  const role = await prisma.role.findFirst({
+    where: { orgId, name: override.systemRole, deletedAt: null },
+    select: { id: true },
+  });
+  if (!role) {
+    throw req.server.httpErrors.serviceUnavailable(
+      `Stub auth: role ${override.systemRole} missing - run pnpm db:seed`,
+    );
+  }
+
+  const user = await prisma.user.upsert({
+    where: { email: override.email },
+    create: {
+      orgId,
+      clerkUser: override.clerkUser,
+      email: override.email,
+      name: override.name,
+      role: override.legacyRole,
+    },
+    update: {
+      orgId,
+      name: override.name,
+      role: override.legacyRole,
+      deletedAt: null,
+    },
+    select: { id: true, role: true, email: true },
+  });
+
+  await prisma.$transaction([
+    prisma.userRole.deleteMany({
+      where: { userId: user.id, orgId, roleId: { not: role.id } },
+    }),
+    prisma.userRole.upsert({
+      where: { userId_roleId: { userId: user.id, roleId: role.id } },
+      create: { orgId, userId: user.id, roleId: role.id },
+      update: { orgId, deletedAt: null },
+    }),
+  ]);
+
+  return {
+    orgId,
+    userId: user.id,
+    scopes: ['read', 'write'],
+    role: user.role,
+    email: user.email ?? undefined,
+  };
+}
 
 async function resolveStubAuth(req: FastifyRequest): Promise<AuthContext> {
   // P1 #19: restrict stub auth to loopback interfaces only — a mis-configured dev
@@ -60,6 +197,11 @@ async function resolveStubAuth(req: FastifyRequest): Promise<AuthContext> {
       'Stub auth: seed org missing — run `pnpm db:seed`',
     );
   }
+  const roleOverride = readStubRoleOverride(req);
+  if (roleOverride) {
+    return resolveStubRoleOverride(req, org.id, roleOverride);
+  }
+
   const user = await prisma.user.findFirst({
     where: { orgId: org.id },
     orderBy: { createdAt: 'asc' },
@@ -115,17 +257,17 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
     // ID boundaries even when Clerk's dashboard allows broader providers.
     // We do NOT audit-log this rejection because we don't have a verified
     // orgId yet at this point in the flow (Clerk org claim hasn't been
-    // matched to a tenant row). The Pino warn line is the durable record.
-    const allowedDomains = process.env.SSO_ALLOWED_EMAIL_DOMAINS?.split(',')
-      .map((d) => d.trim().toLowerCase())
-      .filter(Boolean);
-    if (allowedDomains && allowedDomains.length > 0) {
-      const userDomain = email.split('@')[1]?.toLowerCase() ?? '';
+    // matched to a tenant row). The Pino warn line is the durable record,
+    // but it must not include the full email or tenant allowlist.
+    const allowedDomains = parseAllowedSsoDomains(process.env.SSO_ALLOWED_EMAIL_DOMAINS);
+    if (allowedDomains.length > 0) {
+      const { userDomain, allowedDomainCount } = ssoDomainRejectionLogFields(
+        email,
+        allowedDomains,
+      );
       if (!userDomain || !allowedDomains.includes(userDomain)) {
-        req.log.warn({ email, userDomain, allowedDomains }, 'SSO domain rejected');
-        throw req.server.httpErrors.forbidden(
-          `Sign-in from @${userDomain} is not permitted. Allowed domains: ${allowedDomains.join(', ')}`,
-        );
+        req.log.warn({ userDomain, allowedDomainCount }, 'SSO domain rejected');
+        throw req.server.httpErrors.forbidden(SSO_DOMAIN_REJECTED_MESSAGE);
       }
     }
 
@@ -278,6 +420,9 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
       email: email || undefined,
     };
   } catch (err) {
+    if (isHttpStatusError(err)) {
+      throw err;
+    }
     // Note: token-signature failures (no `org_id`, expired, wrong issuer)
     // cannot be safely audit-logged because we have no validated orgId to
     // attribute them to. They surface in Pino logs and Sentry. The auth
@@ -373,8 +518,6 @@ const plugin: FastifyPluginAsync = fp(
       const apiAuth = await verifyApiKey(req);
       if (apiAuth) {
         req.auth = apiAuth;
-        Sentry.setTag('orgId', req.auth.orgId);
-        Sentry.setTag('userId', req.auth.userId);
         return;
       }
 
@@ -386,9 +529,6 @@ const plugin: FastifyPluginAsync = fp(
         req.auth = await resolveStubAuth(req);
       }
 
-      Sentry.setTag('orgId', req.auth.orgId);
-      Sentry.setTag('userId', req.auth.userId);
-      Sentry.setUser({ id: req.auth.userId, email: req.auth.email });
     });
   },
   { name: 'auth' },

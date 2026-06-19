@@ -14,6 +14,7 @@
  * direct download link.
  */
 
+import { PassThrough } from 'node:stream';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
@@ -66,7 +67,7 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
           owner: z.string().email().optional(),
           industry: z.string().optional(),
         }),
-        // Bypass Fastify's JSON serializer — reply is sent via reply.raw.
+        // Bypass Fastify's JSON serializer; reply is streamed as CSV.
         response: { 200: z.any() },
       },
     },
@@ -84,72 +85,77 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
         ...(owner ? { owner: { email: owner } } : {}),
       };
 
-      // Stream directly on the underlying Node.js response — avoids buffering
-      // the entire dataset in memory.
-      const raw = reply.raw;
-      raw.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      raw.setHeader(
-        'Content-Disposition',
-        `attachment; filename="bidstack-opportunities-${stamp}.csv"`,
-      );
-      raw.setHeader('Transfer-Encoding', 'chunked');
-      raw.setHeader('Cache-Control', 'no-store');
-      raw.writeHead(200);
+      // Stream through Fastify so global headers (CORS/security) still apply
+      // while keeping memory flat for large exports.
+      const stream = new PassThrough();
+      reply
+        .type('text/csv; charset=utf-8')
+        .header('Content-Disposition', `attachment; filename="bidstack-opportunities-${stamp}.csv"`)
+        .header('Cache-Control', 'no-store');
 
-      // Header row
-      raw.write(csvRow([...CSV_HEADERS]));
+      const writeExport = async () => {
+        // Header row
+        stream.write(csvRow([...CSV_HEADERS]));
 
-      let cursor: string | undefined;
-      let totalWritten = 0;
+        let cursor: string | undefined;
+        let totalWritten = 0;
 
-      // Cursor-paginate so the heap stays flat for large datasets.
-      while (true) {
-        // WHY include not select: Prisma's TS inference for relation fields is
-        // only reliable with `include`. Using `select` with nested relation
-        // objects causes the compiler to fall back to the bare scalar type and
-        // lose pipelineStage/owner/territory. include + narrow sub-selects
-        // matches the pattern used across every other query in this codebase.
-        const batch = await prisma.opportunity.findMany({
-          where,
-          include: {
-            pipelineStage: { select: { name: true } },
-            owner: { select: { name: true, email: true } },
-            territory: { select: { name: true } },
-          },
-          orderBy: { updatedAt: 'desc' },
-          take: BATCH_SIZE,
-          ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-        });
+        // Cursor-paginate so the heap stays flat for large datasets.
+        while (true) {
+          // WHY include not select: Prisma's TS inference for relation fields is
+          // only reliable with `include`. Using `select` with nested relation
+          // objects causes the compiler to fall back to the bare scalar type and
+          // lose pipelineStage/owner/territory. include + narrow sub-selects
+          // matches the pattern used across every other query in this codebase.
+          const batch = await prisma.opportunity.findMany({
+            where,
+            include: {
+              pipelineStage: { select: { name: true } },
+              owner: { select: { name: true, email: true } },
+              territory: { select: { name: true } },
+            },
+            orderBy: { updatedAt: 'desc' },
+            take: BATCH_SIZE,
+            ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+          });
 
-        if (batch.length === 0) break;
+          if (batch.length === 0) break;
 
-        for (const opp of batch) {
-          const stageName = opp.pipelineStage?.name ?? opp.stage ?? '';
-          const ownerLabel = opp.owner?.name ?? opp.owner?.email ?? '';
-          const territory = opp.territory?.name ?? '';
-          raw.write(
-            csvRow([
-              opp.code,
-              opp.name,
-              opp.customer,
-              stageName,
-              formatMicros(opp.valueMicros),
-              `${opp.probability}%`,
-              opp.dueDate?.toISOString().slice(0, 10) ?? '',
-              ownerLabel,
-              territory,
-              opp.updatedAt.toISOString(),
-            ]),
-          );
+          for (const opp of batch) {
+            const stageName = opp.pipelineStage?.name ?? opp.stage ?? '';
+            const ownerLabel = opp.owner?.name ?? opp.owner?.email ?? '';
+            const territory = opp.territory?.name ?? '';
+            stream.write(
+              csvRow([
+                opp.code,
+                opp.name,
+                opp.customer,
+                stageName,
+                formatMicros(opp.valueMicros),
+                `${opp.probability}%`,
+                opp.dueDate?.toISOString().slice(0, 10) ?? '',
+                ownerLabel,
+                territory,
+                opp.updatedAt.toISOString(),
+              ]),
+            );
+          }
+
+          totalWritten += batch.length;
+          cursor = batch[batch.length - 1]!.id;
+          if (batch.length < BATCH_SIZE) break;
         }
 
-        totalWritten += batch.length;
-        cursor = batch[batch.length - 1]!.id;
-        if (batch.length < BATCH_SIZE) break;
-      }
+        req.log.info({ orgId, totalWritten }, 'opportunities/export: streamed CSV');
+        stream.end();
+      };
 
-      req.log.info({ orgId, totalWritten }, 'opportunities/export: streamed CSV');
-      raw.end();
+      void writeExport().catch((err) => {
+        req.log.error({ err }, 'opportunities/export: stream failed');
+        stream.destroy(err instanceof Error ? err : new Error('Export stream failed'));
+      });
+
+      return reply.send(stream);
     },
   );
 };

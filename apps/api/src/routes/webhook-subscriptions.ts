@@ -5,6 +5,10 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 import { WebhookEventKeySchema, assertSafeWebhookUrl } from '@bidstack/shared';
+import {
+  assertSerumConnectorAllowed,
+  recordSerumConnectorTestSuccess,
+} from '../lib/serum-connector-policy.js';
 
 const WebhookSub = z.object({
   id: z.string().uuid(),
@@ -301,6 +305,14 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
         data: { message: 'This is a test ping from BidStack webhooks.' },
       });
 
+      await assertSerumConnectorAllowed({
+        orgId: sub.orgId,
+        connectorId: 'webhook_delivery',
+        operation: 'webhook.testPing',
+        writeRequested: true,
+        connectionTestProbe: true,
+      });
+
       const t = Math.floor(Date.now() / 1000);
       const sig = createHmac('sha256', sub.secret).update(`${t}.${pingBody}`).digest('hex');
       const signature = `t=${t},v1=${sig}`;
@@ -361,6 +373,16 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
         where: { id: sub.id },
         data: result.success ? { lastDeliveryAt: new Date() } : { lastFailureAt: new Date() },
       });
+
+      if (result.success) {
+        await recordSerumConnectorTestSuccess({
+          orgId: sub.orgId,
+          connectorId: 'webhook_delivery',
+          operation: 'webhook.testPing',
+          testedByUserId: req.auth.userId,
+          evidence: { subscriptionId: sub.id, statusCode: result.statusCode },
+        });
+      }
 
       return result;
     },

@@ -25,6 +25,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import {
   sendSms,
+  testTwilioConnection,
   handleStatusCallback,
   handleInboundSms,
   validateTwilioSignature,
@@ -174,6 +175,28 @@ export const twilioWebhookRoutes: FastifyPluginAsync = async (fastify) => {
 
 export const smsRoutes: FastifyPluginAsync = async (fastify) => {
   const app = fastify.withTypeProvider<ZodTypeProvider>();
+
+  app.post(
+    '/integrations/twilio/test',
+    {
+      schema: {
+        description: 'Test the active Twilio connection without sending an SMS',
+        tags: ['sms'],
+        response: {
+          200: z.object({
+            ok: z.literal(true),
+            accountSidSuffix: z.string(),
+            fromNumber: z.string(),
+          }),
+        },
+      },
+    },
+    async (req, reply) => {
+      const auth = (req as unknown as { auth: { orgId: string; userId: string } }).auth;
+      const result = await testTwilioConnection(auth.orgId, auth.userId, req.log);
+      return reply.send(result);
+    },
+  );
 
   /**
    * Send an SMS to a contact or lead.

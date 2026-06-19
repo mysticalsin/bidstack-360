@@ -22,9 +22,15 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { judgeFixture, type JudgeScore } from './llm-judge.js';
+import {
+  enforceSerumEvalGate,
+  preflightSerumEvalGate,
+  resolveSerumEvalGateContext,
+} from './serum-eval-policy.js';
 import type { GoldenFixture } from './types.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 const FIXTURES_DIR = join(__dirname, 'golden-fixtures');
 
 // ─── Load fixtures ───────────────────────────────────────────────────────────
@@ -98,6 +104,19 @@ function formatRow(r: EvalResult): string {
 }
 
 async function main() {
+  const gateContext = resolveSerumEvalGateContext();
+  if (gateContext.required) {
+    console.log(
+      `\nSERUM eval gate preflight - config=${gateContext.configKey} suite=${gateContext.suite} env=${gateContext.environment}`,
+    );
+    const preflight = await preflightSerumEvalGate(gateContext);
+    console.log(`SERUM eval gate preflight: ${preflight.decision?.status ?? 'skipped'}`);
+  } else {
+    console.log(
+      '\nSERUM eval gate: optional for heuristic run; set SERUM_EVAL_POLICY_REQUIRED=true for release enforcement.',
+    );
+  }
+
   const fixtures = loadFixtures();
   console.log(
     `\n🔍 RFP Eval Suite — ${fixtures.length} fixtures — mode: ${process.env.EVAL_MODE ?? 'heuristic'}\n`,
@@ -126,7 +145,22 @@ async function main() {
   console.log(`Average phantom rate (golden): ${(avgPhantomRate * 100).toFixed(2)}%`);
   console.log(`CI gate (phantom < 5%): ${avgPhantomRate < 0.05 ? '✅ PASS' : '❌ FAIL'}`);
 
-  const allPassed = goldenFails.length === 0 && adversarialFails.length === 0;
+  const failedCount = goldenFails.length + adversarialFails.length;
+  const passRate = results.length > 0 ? (results.length - failedCount) / results.length : 0;
+  let gateDenied = false;
+  try {
+    const gateResult = await enforceSerumEvalGate(gateContext, { passRate, failedCount });
+    if (!gateResult.skipped) {
+      console.log(
+        `SERUM eval gate result: ${gateResult.decision?.status ?? 'unknown'} - passRate=${(passRate * 100).toFixed(2)}%`,
+      );
+    }
+  } catch (err) {
+    gateDenied = true;
+    console.error(err instanceof Error ? err.message : String(err));
+  }
+
+  const allPassed = failedCount === 0 && !gateDenied;
   if (!allPassed) {
     console.error('\n❌ Eval suite FAILED — see above for details.\n');
     process.exit(1);
@@ -135,7 +169,13 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error('Eval runner crashed:', err);
-  process.exit(1);
-});
+if (process.argv[1] === __filename) {
+  main().catch((err) => {
+    const message = err instanceof Error ? err.message : String(err);
+    const label = message.startsWith('SERUM eval')
+      ? 'Eval runner blocked:'
+      : 'Eval runner crashed:';
+    console.error(label, err);
+    process.exit(1);
+  });
+}

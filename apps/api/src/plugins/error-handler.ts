@@ -6,8 +6,24 @@ import type { FastifyError, FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 import { ZodError } from 'zod';
 
+import { clientAbortLogFields, isExpectedClientAbortError } from '../lib/http-client-abort.js';
+import { captureSentryServerError } from './sentry.js';
+
 const plugin: FastifyPluginAsync = fp(async (server) => {
   server.setErrorHandler((err: FastifyError, req, reply) => {
+    if (isExpectedClientAbortError(err, req.raw)) {
+      req.log.info(
+        { ...clientAbortLogFields(err), method: req.method, url: req.url },
+        'client aborted request',
+      );
+      if (reply.sent || reply.raw.destroyed || reply.raw.writableEnded) return;
+      return reply.status(499).send({
+        statusCode: 499,
+        error: 'Client Closed Request',
+        message: 'The client closed the request before the response completed.',
+      });
+    }
+
     if (err instanceof ZodError) {
       req.log.warn({ issues: err.issues }, 'validation failed');
       return reply.status(400).send({
@@ -67,6 +83,7 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
     }
 
     req.log.error({ err }, 'unhandled error');
+    captureSentryServerError(err);
     return reply.status(500).send({
       statusCode: 500,
       error: 'Internal Server Error',

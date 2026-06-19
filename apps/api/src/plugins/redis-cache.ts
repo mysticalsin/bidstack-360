@@ -1,6 +1,8 @@
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
 import { cacheGet, cacheSet, cacheKey, bodyHash, cacheDel } from '../lib/redis-cache.js';
+import { invalidateDashboardSnapshotCache } from '../routes/crm/dashboard.js';
+import { invalidateCrmSummaryCache } from '../routes/crm/summary.js';
 
 // WHY FastifyRequest (not FastifyInstance): cache is a per-request helper that
 // reads req.auth.orgId for tenant-scoped keys. Using `this` binding in the
@@ -88,6 +90,12 @@ const redisCachePluginImpl: FastifyPluginAsync<RedisCachePluginOptions> = async 
     if (isMutation && isSuccess) {
       // Invalidate all cache keys for this tenant orgId
       await cacheDel(`bidstack:cache:${orgId}:*`);
+      // Also drop the in-process snapshot Maps for this org. Redis is cleared
+      // above, but these per-process caches have their own 10s TTL and would
+      // otherwise serve stale data until expiry. Both are in-process +
+      // idempotent, safe to run outside any transaction.
+      invalidateDashboardSnapshotCache(orgId);
+      invalidateCrmSummaryCache(orgId);
     }
     return payload;
   });

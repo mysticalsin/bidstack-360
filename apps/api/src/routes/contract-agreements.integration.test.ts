@@ -1,10 +1,14 @@
 // Integration tests for contractual management (MSAs/framework agreements).
 // Pattern: cross-sell.integration.test.ts — buildServer + inject against the
 // seed org; fixtures cleaned up in afterAll.
+import { Queue } from 'bullmq';
+import IORedis from 'ioredis';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { prisma } from '@bidstack/db';
+import { DOCUMENT_EXTRACT } from '@bidstack/shared';
 
+import { closeDocumentExtractQueueForTest } from '../queues/document-extract.js';
 import { buildServer } from '../server.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
@@ -44,6 +48,23 @@ const t = (name: string, fn: () => Promise<void>) =>
     await fn();
   });
 
+async function redisReachable(url: string): Promise<boolean> {
+  const redis = new IORedis(url, {
+    maxRetriesPerRequest: 1,
+    connectTimeout: 1_000,
+    lazyConnect: true,
+  });
+  try {
+    await redis.connect();
+    await redis.ping();
+    return true;
+  } catch {
+    return false;
+  } finally {
+    redis.disconnect();
+  }
+}
+
 describe('contract agreement routes', () => {
   t('create (MSA with countries + rebate) → list → patch status → delete', async () => {
     const create = await server.inject({
@@ -71,6 +92,10 @@ describe('contract agreement routes', () => {
       globalRebateBps: number;
       status: string;
       rateCard: { role: string; rateMicros: number; unit: string }[];
+      fieldSources: Record<
+        string,
+        { source: string; label: string; confidence: number | null; sourceFileId: string | null }
+      >;
     };
     expect(body.kind).toBe('msa');
     // Country codes are normalized to uppercase ISO-2 by the schema.
@@ -83,6 +108,12 @@ describe('contract agreement routes', () => {
       role: 'Senior Consultant',
       rateMicros: 800_000_000,
       unit: 'day',
+    });
+    expect(body.fieldSources.reference).toMatchObject({
+      source: 'manual',
+      label: 'Manual',
+      confidence: 1,
+      sourceFileId: null,
     });
     const id = body.id;
 
@@ -135,9 +166,22 @@ describe('contract agreement routes', () => {
         },
       });
       expect(create.statusCode).toBe(201);
-      const body = create.json() as { sourceFileId: string; sourceFileName: string };
+      const body = create.json() as {
+        sourceFileId: string;
+        sourceFileName: string;
+        fieldSources: Record<
+          string,
+          { source: string; label: string; sourceFileId: string; sourceFileName: string }
+        >;
+      };
       expect(body.sourceFileId).toBe(file.id);
       expect(body.sourceFileName).toBe('MSA-Acme.pdf');
+      expect(body.fieldSources.reference).toMatchObject({
+        source: 'document',
+        label: 'Document',
+        sourceFileId: file.id,
+        sourceFileName: 'MSA-Acme.pdf',
+      });
 
       // A random (non-existent / foreign) file id is rejected.
       const bad = await server.inject({
@@ -151,6 +195,29 @@ describe('contract agreement routes', () => {
         },
       });
       expect(bad.statusCode).toBe(400);
+
+      const otherAccountFile = await prisma.fileAttachment.create({
+        data: {
+          orgId: orgId!,
+          accountId: 'other-contract-account',
+          name: 'MSA-Other.pdf',
+          contentType: 'application/pdf',
+          bytes: 2222,
+          storageKey: `${orgId}/other-contract-account/test-msa.pdf`,
+        },
+      });
+      const wrongAccount = await server.inject({
+        method: 'POST',
+        url: '/api/contract-agreements',
+        payload: {
+          accountKey: ACCOUNT,
+          kind: 'msa',
+          reference: 'MSA-WRONG-ACCOUNT-DOC',
+          sourceFileId: otherAccountFile.id,
+        },
+      });
+      expect(wrongAccount.statusCode).toBe(400);
+      await prisma.fileAttachment.deleteMany({ where: { id: otherAccountFile.id } });
     } finally {
       await prisma.fileAttachment.deleteMany({ where: { id: file.id } });
     }
@@ -198,6 +265,236 @@ describe('contract agreement routes', () => {
       expect(bad.statusCode).toBe(404);
     } finally {
       if (extractionId) await prisma.documentExtraction.deleteMany({ where: { id: extractionId } });
+      await prisma.fileAttachment.deleteMany({ where: { id: file.id } });
+    }
+  });
+
+  t('enqueues a real BullMQ contract extraction job when queue tests are enabled', async () => {
+    const redisUrl = process.env.BIDSTACK_API_E2E_REDIS_URL ?? 'redis://localhost:6380/15';
+    if (!(await redisReachable(redisUrl))) {
+      console.warn(`[skip] contract extraction enqueue proof - Redis unavailable at ${redisUrl}`);
+      return;
+    }
+
+    const previousRedisUrl = process.env.REDIS_URL;
+    const previousQueueFlag = process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS;
+    process.env.REDIS_URL = redisUrl;
+    process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS = 'true';
+
+    const connection = new IORedis(redisUrl, { maxRetriesPerRequest: null });
+    const queue = new Queue(DOCUMENT_EXTRACT.name, {
+      connection,
+      defaultJobOptions: DOCUMENT_EXTRACT.defaultJobOptions,
+    });
+    const file = await prisma.fileAttachment.create({
+      data: {
+        orgId: orgId!,
+        accountId: ACCOUNT,
+        name: 'MSA-queue.txt',
+        contentType: 'text/plain',
+        bytes: 2048,
+        storageKey: `${orgId}/${ACCOUNT}/queue-msa.txt`,
+      },
+    });
+    let extractionId: string | null = null;
+    let jobId: string | null = null;
+
+    try {
+      const start = await server.inject({
+        method: 'POST',
+        url: '/api/contract-agreements/extract',
+        payload: { fileId: file.id },
+      });
+      expect(start.statusCode).toBe(200);
+      const res = start.json() as { id: string; fileId: string; status: string };
+      extractionId = res.id;
+      expect(res.fileId).toBe(file.id);
+      expect(res.status).toBe('pending');
+
+      jobId = [orgId!, file.id, extractionId].join('--');
+      const job = await queue.getJob(jobId);
+      expect(job, 'contract extraction route must enqueue a BullMQ job').not.toBeNull();
+      expect(job?.name).toBe('document.extract');
+      expect(job?.data).toMatchObject({
+        orgId,
+        accountId: ACCOUNT,
+        documentId: file.id,
+        extractionId,
+        storageKey: file.storageKey,
+        contentType: file.contentType,
+        name: file.name,
+        extractionKind: 'contract',
+      });
+    } finally {
+      if (jobId) {
+        const job = await queue.getJob(jobId);
+        await job?.remove().catch(() => undefined);
+      }
+      if (extractionId) await prisma.documentExtraction.deleteMany({ where: { id: extractionId } });
+      await prisma.fileAttachment.deleteMany({ where: { id: file.id } });
+      await queue.close();
+      await connection.quit();
+      await closeDocumentExtractQueueForTest();
+      if (previousRedisUrl === undefined) delete process.env.REDIS_URL;
+      else process.env.REDIS_URL = previousRedisUrl;
+      if (previousQueueFlag === undefined) delete process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS;
+      else process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS = previousQueueFlag;
+    }
+  });
+
+  t('approves a completed extraction into an agreement and exposes review status', async () => {
+    const file = await prisma.fileAttachment.create({
+      data: {
+        orgId: orgId!,
+        accountId: ACCOUNT,
+        name: 'MSA-review.pdf',
+        contentType: 'application/pdf',
+        bytes: 4096,
+        storageKey: `${orgId}/${ACCOUNT}/review-msa.pdf`,
+      },
+    });
+    const extraction = await prisma.documentExtraction.create({
+      data: {
+        orgId: orgId!,
+        documentId: file.id,
+        accountId: ACCOUNT,
+        status: 'done',
+        extractedData: {
+          reference: 'MSA-REVIEW-001',
+          kind: 'msa',
+          countries: ['FR', 'DE'],
+          currency: 'EUR',
+          globalRebateBps: 750,
+          effectiveDate: null,
+          expiryDate: new Date('2028-12-31').toISOString(),
+          rateReviewSchedule: 'annual',
+          rateCard: [{ role: 'Architect', rateMicros: 1_100_000_000, unit: 'day' }],
+          confidenceBps: 8500,
+          warnings: ['AI-assisted extraction - review every field before saving.'],
+        },
+      },
+    });
+    let agreementId: string | null = null;
+    try {
+      const approve = await server.inject({
+        method: 'POST',
+        url: `/api/contract-agreements/extractions/${extraction.id}/approve`,
+        payload: {
+          accountKey: ACCOUNT,
+          kind: 'msa',
+          reference: 'MSA-REVIEWED-001',
+          countries: ['FR', 'DE'],
+          globalRebateBps: 750,
+          currency: 'EUR',
+          expiryDate: new Date('2028-12-31').toISOString(),
+          rateReviewSchedule: 'annual',
+          rateCard: [{ role: 'Architect', rateMicros: 1_100_000_000, unit: 'day' }],
+          status: 'active',
+        },
+      });
+      expect(approve.statusCode).toBe(201);
+      const approved = approve.json() as {
+        id: string;
+        sourceFileId: string;
+        sourceExtractionId: string;
+        reference: string;
+        fieldSources: Record<
+          string,
+          {
+            source: string;
+            label: string;
+            confidence: number | null;
+            sourceFileId: string;
+            sourceFileName: string;
+            sourceExtractionId: string;
+          }
+        >;
+      };
+      agreementId = approved.id;
+      expect(approved.reference).toBe('MSA-REVIEWED-001');
+      expect(approved.sourceFileId).toBe(file.id);
+      expect(approved.sourceExtractionId).toBe(extraction.id);
+      expect(approved.fieldSources.reference).toMatchObject({
+        source: 'derived:llm',
+        label: 'AI reviewed',
+        confidence: 0.85,
+        sourceFileId: file.id,
+        sourceFileName: 'MSA-review.pdf',
+        sourceExtractionId: extraction.id,
+      });
+
+      const poll = await server.inject({
+        method: 'GET',
+        url: `/api/contract-agreements/extractions/${extraction.id}`,
+      });
+      expect(poll.statusCode).toBe(200);
+      const result = poll.json() as {
+        reviewStatus: string;
+        approvedAgreementId: string | null;
+        source: string;
+        confidenceBps: number | null;
+        sourceFileName: string | null;
+      };
+      expect(result.reviewStatus).toBe('approved');
+      expect(result.approvedAgreementId).toBe(agreementId);
+      expect(result.source).toBe('llm');
+      expect(result.confidenceBps).toBe(8500);
+      expect(result.sourceFileName).toBe('MSA-review.pdf');
+
+      const duplicate = await server.inject({
+        method: 'POST',
+        url: `/api/contract-agreements/extractions/${extraction.id}/approve`,
+        payload: {
+          accountKey: ACCOUNT,
+          kind: 'msa',
+          reference: 'MSA-REVIEWED-001',
+          countries: ['FR'],
+          currency: 'EUR',
+          rateReviewSchedule: 'annual',
+        },
+      });
+      expect(duplicate.statusCode).toBe(409);
+    } finally {
+      if (agreementId) await prisma.contractAgreement.deleteMany({ where: { id: agreementId } });
+      await prisma.documentExtraction.deleteMany({ where: { id: extraction.id } });
+      await prisma.fileAttachment.deleteMany({ where: { id: file.id } });
+    }
+  });
+
+  t('rejects pending extraction provenance until a reviewable draft exists', async () => {
+    const file = await prisma.fileAttachment.create({
+      data: {
+        orgId: orgId!,
+        accountId: ACCOUNT,
+        name: 'MSA-pending.pdf',
+        contentType: 'application/pdf',
+        bytes: 2048,
+        storageKey: `${orgId}/${ACCOUNT}/pending-msa.pdf`,
+      },
+    });
+    const extraction = await prisma.documentExtraction.create({
+      data: {
+        orgId: orgId!,
+        documentId: file.id,
+        accountId: ACCOUNT,
+        status: 'pending',
+        extractedData: {},
+      },
+    });
+    try {
+      const create = await server.inject({
+        method: 'POST',
+        url: '/api/contract-agreements',
+        payload: {
+          accountKey: ACCOUNT,
+          kind: 'msa',
+          reference: 'MSA-PENDING-SHOULD-NOT-LINK',
+          sourceExtractionId: extraction.id,
+        },
+      });
+      expect(create.statusCode).toBe(409);
+    } finally {
+      await prisma.documentExtraction.deleteMany({ where: { id: extraction.id } });
       await prisma.fileAttachment.deleteMany({ where: { id: file.id } });
     }
   });

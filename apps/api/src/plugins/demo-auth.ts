@@ -17,7 +17,7 @@ import { createHmac, timingSafeEqual, randomUUID } from 'node:crypto';
 
 import type { FastifyRequest } from 'fastify';
 
-import { prisma, seedOrgData } from '@bidstack/db';
+import { Prisma, prisma, seedOrgData } from '@bidstack/db';
 
 import { enqueueApolloEnrich } from '../queues/company-enrich-apollo.js';
 
@@ -148,28 +148,41 @@ export interface DemoSession {
 }
 
 /**
+ * Re-signin lookup: resolve a visitor already provisioned under a demo org by
+ * email, so they land back in their own workspace rather than spawning a
+ * duplicate (and colliding on the unique User.email index). Returns null when
+ * the email has no demo org yet.
+ */
+async function findExistingDemoSession(normalizedEmail: string): Promise<DemoSession | null> {
+  const existing = await prisma.user.findFirst({
+    where: { email: normalizedEmail, org: { clerkOrg: { startsWith: DEMO_ORG_PREFIX } } },
+    select: { id: true, orgId: true },
+  });
+  if (!existing) return null;
+  return {
+    token: signDemoToken(existing.id, existing.orgId),
+    email: normalizedEmail,
+    orgId: existing.orgId,
+  };
+}
+
+/**
  * Provision (or reuse) a demo org for `email` and return a signed session token.
  * Re-signing in with the same email returns to the same workspace; otherwise a
  * fresh org is created and seeded with the curated dataset.
+ *
+ * Provisioning is atomic + idempotent:
+ *  - org.create + seedOrgData run in one interactive transaction, so a failed
+ *    seed rolls back the org (no orphaned empty workspace).
+ *  - a concurrent sign-in that wins the User.email unique index surfaces P2002;
+ *    we treat that as "already provisioned" and return the existing session.
  */
 export async function provisionDemoSession(email: string, name?: string): Promise<DemoSession> {
   const normalized = email.trim().toLowerCase();
   await reapStaleDemoOrgs();
 
-  // Re-signin: reuse the visitor's existing demo org so they land back in their
-  // own workspace rather than spawning a duplicate (and colliding on the unique
-  // User.email index).
-  const existing = await prisma.user.findFirst({
-    where: { email: normalized, org: { clerkOrg: { startsWith: DEMO_ORG_PREFIX } } },
-    select: { id: true, orgId: true },
-  });
-  if (existing) {
-    return {
-      token: signDemoToken(existing.id, existing.orgId),
-      email: normalized,
-      orgId: existing.orgId,
-    };
-  }
+  const existing = await findExistingDemoSession(normalized);
+  if (existing) return existing;
 
   // Capacity guard — keeps a public demo from being used to mass-create orgs.
   const maxOrgs = Number(process.env.DEMO_MAX_ORGS) || 500;
@@ -177,10 +190,33 @@ export async function provisionDemoSession(email: string, name?: string): Promis
   if (count >= maxOrgs) throw new Error('DEMO_AT_CAPACITY');
 
   const slug = randomUUID().replace(/-/g, '').slice(0, 12);
-  const org = await prisma.org.create({
-    data: { clerkOrg: `${DEMO_ORG_PREFIX}${slug}`, name: 'BidStack Demo Workspace' },
-  });
-  await seedOrgData(prisma, org.id, { ownerEmail: normalized, ownerName: name, namespace: slug });
+
+  let org: { id: string };
+  try {
+    // Atomic: a seed failure rolls back the org so it can never orphan empty.
+    org = await prisma.$transaction(
+      async (tx) => {
+        const created = await tx.org.create({
+          data: { clerkOrg: `${DEMO_ORG_PREFIX}${slug}`, name: 'BidStack Demo Workspace' },
+        });
+        await seedOrgData(tx, created.id, {
+          ownerEmail: normalized,
+          ownerName: name,
+          namespace: slug,
+        });
+        return created;
+      },
+      { timeout: 30000 },
+    );
+  } catch (err) {
+    // A concurrent sign-in already provisioned this visitor and won the
+    // User.email unique index — return that session instead of failing.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      const raced = await findExistingDemoSession(normalized);
+      if (raced) return raced;
+    }
+    throw err;
+  }
 
   const visitor = await prisma.user.findFirst({
     where: { orgId: org.id, email: normalized },

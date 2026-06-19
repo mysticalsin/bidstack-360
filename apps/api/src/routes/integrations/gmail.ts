@@ -24,6 +24,8 @@ import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, IntegrationProvider } from '@bidstack/db';
 import { encryptToken } from '@bidstack/shared/token-crypto';
+import { emailDomainForTelemetry } from '../../lib/email-privacy.js';
+import { recordSerumConnectorTestSuccess } from '../../lib/serum-connector-policy.js';
 
 const GMAIL_AUTH_BASE = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GMAIL_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -174,6 +176,7 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
 
       // Fetch the user's Gmail address for display
       let externalEmail: string | undefined;
+      let gmailProfileEvidence: { emailAddress?: string; messagesTotal?: number; threadsTotal?: number } | null = null;
       try {
         const profileRes = await fetch('https://www.googleapis.com/oauth2/v1/userinfo?alt=json', {
           headers: { Authorization: `Bearer ${tokens.access_token}` },
@@ -184,6 +187,22 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
         }
       } catch (err) {
         server.log.warn({ err }, 'Could not fetch Gmail user profile');
+      }
+
+      try {
+        const gmailProfileRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
+          headers: { Authorization: `Bearer ${tokens.access_token}` },
+        });
+        if (gmailProfileRes.ok) {
+          gmailProfileEvidence = (await gmailProfileRes.json()) as {
+            emailAddress?: string;
+            messagesTotal?: number;
+            threadsTotal?: number;
+          };
+          externalEmail ??= gmailProfileEvidence.emailAddress;
+        }
+      } catch (err) {
+        server.log.warn({ err }, 'Could not fetch Gmail API profile');
       }
 
       const expiresAt = tokens.expires_in
@@ -208,7 +227,24 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
         },
       });
 
-      server.log.info({ orgId, userId, email: externalEmail }, 'Gmail connected');
+      if (gmailProfileEvidence) {
+        await recordSerumConnectorTestSuccess({
+          orgId,
+          connectorId: 'gmail',
+          operation: 'gmail.oauth.callback',
+          testedByUserId: userId,
+          evidence: {
+            emailAddress: gmailProfileEvidence.emailAddress,
+            messagesTotal: gmailProfileEvidence.messagesTotal,
+            threadsTotal: gmailProfileEvidence.threadsTotal,
+          },
+        });
+      }
+
+      server.log.info(
+        { orgId, userId, externalAccountDomain: emailDomainForTelemetry(externalEmail) },
+        'Gmail connected',
+      );
 
       return reply.redirect(
         `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings/integrations?connected=gmail`,

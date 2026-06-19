@@ -1,36 +1,58 @@
 /**
- * opportunities.helpers.ts — Pure utility functions shared by opportunity route handlers.
+ * opportunities.helpers.ts - Pure utility functions shared by opportunity route handlers.
  *
  * WHY separate: mintNextCode and isUniqueViolation have no Fastify dependency
- * and are used from both the create and bulk-import handlers. Extracting them
- * here keeps the route files free of transaction/collision logic and allows
- * independent testing.
- *
- * Import DAG: no local sibling imports — leaf node.
+ * and are used from create, import, and lead conversion handlers.
  */
 import { Prisma } from '@bidstack/db';
 
+type MaxOpportunityCodeRow = {
+  maxCode: number | bigint | null;
+};
+
+function formatOpportunityCode(n: number): string {
+  return `OP-${n.toString().padStart(4, '0')}`;
+}
+
+async function readMaxOpportunityCodeNumber(
+  tx: Prisma.TransactionClient,
+  orgId: string,
+): Promise<number> {
+  // Numeric suffix ordering is required once the sequence reaches OP-10000.
+  // Lexicographic DESC would keep OP-9999 above OP-10000 and repeatedly mint
+  // a duplicate under concurrent create/import traffic.
+  //
+  // Do not filter deleted_at: the unique key is (org_id, code), so a
+  // soft-deleted row still owns its code.
+  const rows = await tx.$queryRaw<MaxOpportunityCodeRow[]>(Prisma.sql`
+    SELECT MAX((substring(code FROM 4))::integer) AS "maxCode"
+    FROM opportunities
+    WHERE org_id = ${orgId}::uuid
+      AND code ~ '^OP-[0-9]+$'
+  `);
+  const rawMax = rows[0]?.maxCode;
+  if (rawMax === null || rawMax === undefined) return 2000;
+  return typeof rawMax === 'bigint' ? Number(rawMax) : rawMax;
+}
+
 /**
- * Reads the highest existing OP-NNNN code inside the current transaction and
- * returns the next value. Unique violation on collision is caught by the
+ * Reads the highest existing numeric OP-* code inside the current transaction
+ * and returns the next value. Unique violation on collision is caught by the
  * bounded retry loop in the caller.
  */
 export async function mintNextCode(tx: Prisma.TransactionClient, orgId: string): Promise<string> {
-  // Reads inside the active transaction so a concurrent create's row is
-  // visible to whichever attempt wins. Unique violation on collision is
-  // caught by the caller's bounded retry loop.
-  // NB: do NOT filter deletedAt here. The unique key is (orgId, code) and ignores
-  // soft-delete, so a soft-deleted row still owns its code. Excluding it would
-  // re-mint that code, collide (P2002), and exhaust the retry loop — permanently
-  // breaking creation after the highest-coded opp is deleted. (Review finding.)
-  const last = await tx.opportunity.findFirst({
-    where: { orgId, code: { startsWith: 'OP-' } },
-    orderBy: { code: 'desc' },
-    select: { code: true },
-  });
-  if (!last) return 'OP-2001';
-  const n = Number(last.code.slice(3));
-  return `OP-${(n + 1).toString().padStart(4, '0')}`;
+  const codes = await mintNextCodes(tx, orgId, 1);
+  return codes[0]!;
+}
+
+export async function mintNextCodes(
+  tx: Prisma.TransactionClient,
+  orgId: string,
+  count: number,
+): Promise<string[]> {
+  if (count <= 0) return [];
+  const start = (await readMaxOpportunityCodeNumber(tx, orgId)) + 1;
+  return Array.from({ length: count }, (_, index) => formatOpportunityCode(start + index));
 }
 
 export function isUniqueViolation(err: unknown): boolean {

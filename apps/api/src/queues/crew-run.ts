@@ -16,6 +16,7 @@ export interface CrewRunJob {
   crewId: string;
   runId: string;
   inputs: Record<string, string>;
+  approvalConfirmed: boolean;
 }
 
 let queueSingleton: Queue | null = null;
