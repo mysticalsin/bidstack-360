@@ -19,7 +19,10 @@ export class ReportBuilderPage {
   constructor(page: Page) {
     this.page = page;
     this.heading = page.getByRole('heading', { name: /reports|analytics/i, level: 1 });
-    this.newReportButton = page.getByRole('button', { name: /new report|create report|add report/i });
+    this.newReportButton = page
+      .getByRole('link', { name: /new report|create report|add report/i })
+      .or(page.getByRole('button', { name: /new report|create report|add report/i }))
+      .first();
     this.runButton = page.getByRole('button', { name: /run|run report|generate/i });
     this.exportCsvButton = page.getByRole('button', { name: /export|download|csv/i });
     this.chartContainer = page.locator('[data-testid="report-chart"], .recharts-wrapper, svg.recharts-surface');
@@ -27,7 +30,7 @@ export class ReportBuilderPage {
   }
 
   async navigate(): Promise<void> {
-    await this.page.goto('/reports', { waitUntil: 'load' });
+    await this.page.goto('/reports/list', { waitUntil: 'load' });
     await expect(this.heading).toBeVisible({ timeout: 15_000 });
   }
 

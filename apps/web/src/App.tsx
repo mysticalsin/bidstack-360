@@ -17,6 +17,7 @@ import { ProductTour } from '@/components/onboarding/ProductTour';
 import { SampleDataBanner } from '@/components/onboarding/SampleDataBanner';
 import { TemplatePicker } from '@/components/onboarding/TemplatePicker';
 import { QuickAddMenu } from '@/components/quickadd/QuickAddMenu';
+import { GlobalInteractionSound } from '@/components/sound/GlobalInteractionSound';
 import { ConfirmHost, PromptHost } from '@/components/ui/ConfirmDialog';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import { Toaster } from '@/components/ui/Toast';
@@ -64,6 +65,7 @@ export function App() {
         </ErrorBoundary>
       ) : (
         <AppShell>
+          <GlobalInteractionSound />
           {/* ErrorBoundary scoped inside AppShell so a render error in any page
               falls back gracefully while the sidebar/topbar survive. */}
           {/* Enter-only page transition keyed on the path: each navigation

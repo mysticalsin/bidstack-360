@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
 
+import type { SourceAttribution } from '@bidstack/shared';
+
 export interface AccountNewsItem {
   title: string;
   url: string;
@@ -12,6 +14,7 @@ export interface AccountNewsItem {
 export interface AccountNewsResponse {
   source: 'google-news';
   fetchedAt: string;
+  sourceAttribution?: SourceAttribution;
   items: AccountNewsItem[];
 }
 

@@ -10,6 +10,8 @@ const ALL_OFF: FeatureFlags = {
   showRevenueBlock: false,
   infosearchEnabled: false,
   lms360Enabled: false,
+  serumEnabled: false,
+  serumDemoModeEnabled: false,
 };
 
 /**

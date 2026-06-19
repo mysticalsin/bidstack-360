@@ -1,6 +1,11 @@
 import type { QueryClient } from '@tanstack/react-query';
 
 const CACHE_KEY = 'bidstack-rq-cache';
+const AUTH_FINGERPRINT_KEY = 'bidstack:auth-fingerprint';
+const SESSION_MARKER_KEY = 'bidstack:session';
+const STUB_ROLE_KEY = 'bidstack:stub-role';
+const DEMO_EMAIL_KEY = 'bidstack:demo-email';
+export const AUTH_FINGERPRINT_EVENT = 'bidstack:auth-fingerprint-change';
 const MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 // Bounds that keep the persisted blob from growing without limit (the old
 // implementation re-wrote the entire cache on EVERY query success and never
@@ -8,6 +13,28 @@ const MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 const MAX_TOTAL_BYTES = 4 * 1024 * 1024; // ~4MB (localStorage ceiling is ~5MB)
 const MAX_ENTRY_BYTES = 256 * 1024; // skip persisting any single huge query
 const FLUSH_DELAY_MS = 1000; // debounce writes — coalesce bursts of successes
+
+const LIVE_OR_SECURITY_QUERY_PREFIXES = new Set([
+  'agent-provider-credentials',
+  'api-keys',
+  'crm-connectors',
+  'crm-data-quality',
+  'crm-provider-health',
+  'dust:credentials',
+  'dust:status',
+  'erp:company-autocomplete',
+  'erp:presales-kit',
+  'erp:status',
+  'integrations:setup-guide',
+  'me',
+  'permissions',
+  'roles',
+  'user-groups',
+  'user-integrations-status',
+  'user-roles',
+  'users',
+  'webhooks',
+]);
 
 interface PersistedEntry {
   state: unknown;
@@ -76,6 +103,16 @@ function isQueryKeySerializable(key: unknown[]): boolean {
 }
 
 function shouldPersistQueryKey(key: unknown[]): boolean {
+  // Live control-plane and health surfaces must always hit the backend after
+  // reload; a persisted "healthy" snapshot is worse than a skeleton there.
+  const prefix = typeof key[0] === 'string' ? key[0] : '';
+  if (
+    key[0] === 'serum' ||
+    key[0] === 'crm-integrations' ||
+    LIVE_OR_SECURITY_QUERY_PREFIXES.has(prefix)
+  ) {
+    return false;
+  }
   // Account cockpit payloads include freshness-sensitive enrichment data
   // such as Apollo sync status. Persisting them makes refreshed pages show
   // stale company intelligence until the global React Query stale window ends.
@@ -141,7 +178,9 @@ export function hydrateCache(queryClient: QueryClient): void {
       if (now - entry.timestamp > MAX_AGE_MS) continue;
       const queryKey = JSON.parse(keyStr) as unknown[];
       if (!shouldPersistQueryKey(queryKey)) continue;
-      queryClient.setQueryData(queryKey, (entry.state as { data?: unknown }).data);
+      queryClient.setQueryData(queryKey, (entry.state as { data?: unknown }).data, {
+        updatedAt: entry.timestamp,
+      });
     }
   } catch {
     // If localStorage is corrupted, clear it and start fresh.
@@ -158,20 +197,34 @@ export function clearPersistedCache(): void {
   localStorage.removeItem(CACHE_KEY);
 }
 
-/** Subscribe to auth state changes and clear the cache on logout. */
+function currentAuthFingerprint(): string {
+  const sessionMarker = localStorage.getItem(SESSION_MARKER_KEY);
+  if (!sessionMarker) return '';
+  if (sessionMarker === 'stub' || sessionMarker.startsWith('stub:')) {
+    return `${sessionMarker}:role:${localStorage.getItem(STUB_ROLE_KEY) ?? 'admin'}`;
+  }
+  const demoEmail = localStorage.getItem(DEMO_EMAIL_KEY);
+  return demoEmail ? `${sessionMarker}:${demoEmail}` : sessionMarker;
+}
+
+/** Subscribe to auth identity changes and clear user-scoped query snapshots. */
 export function watchAuthForCacheClear(queryClient: QueryClient): () => void {
   const handler = () => {
-    const wasSignedIn = sessionStorage.getItem('bidstack:signed-in');
-    const isSignedIn = Boolean(localStorage.getItem('bidstack:session'));
-    if (wasSignedIn && !isSignedIn) {
+    const previousFingerprint = sessionStorage.getItem(AUTH_FINGERPRINT_KEY);
+    const nextFingerprint = currentAuthFingerprint();
+    if (previousFingerprint !== null && previousFingerprint !== nextFingerprint) {
       clearPersistedCache();
       queryClient.clear();
     }
-    sessionStorage.setItem('bidstack:signed-in', String(isSignedIn));
+    sessionStorage.setItem(AUTH_FINGERPRINT_KEY, nextFingerprint);
   };
 
   // Check immediately and on storage changes
   handler();
   window.addEventListener('storage', handler);
-  return () => window.removeEventListener('storage', handler);
+  window.addEventListener(AUTH_FINGERPRINT_EVENT, handler);
+  return () => {
+    window.removeEventListener('storage', handler);
+    window.removeEventListener(AUTH_FINGERPRINT_EVENT, handler);
+  };
 }

@@ -50,7 +50,7 @@ export class LeadsPage {
   async assertLeadDetailVisible(namePattern?: RegExp): Promise<void> {
     await expect(this.page.locator('#main')).toBeVisible({ timeout: 10_000 });
     if (namePattern) {
-      await expect(this.page.getByRole('heading', { level: 1 })).toMatchText(namePattern);
+      await expect(this.page.getByRole('heading', { level: 1 })).toHaveText(namePattern);
     }
   }
 

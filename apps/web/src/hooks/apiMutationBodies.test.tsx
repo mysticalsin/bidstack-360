@@ -3,6 +3,7 @@ import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { api } from '@/lib/api';
+import { useRefreshCompanyTechnicalStack } from './useCompanyTechnicalStack';
 import { useUpdateUserRole } from './useUsers';
 import {
   useCreateWebhookSubscription,
@@ -75,5 +76,20 @@ describe('admin/integration mutation bodies', () => {
         body: { active: false },
       },
     );
+  });
+
+  it('sends technical-stack refresh as an empty JSON object so provider pulls are accepted', async () => {
+    const { result } = renderHook(() => useRefreshCompanyTechnicalStack('CI Financial'), {
+      wrapper,
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync();
+    });
+
+    expect(api).toHaveBeenCalledWith('/api/crm/companies/CI%20Financial/technical-stack/refresh', {
+      method: 'POST',
+      body: {},
+    });
   });
 });

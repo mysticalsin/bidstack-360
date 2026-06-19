@@ -7,37 +7,16 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
-import * as Sentry from '@sentry/react';
-import { browserTracingIntegration } from '@sentry/browser';
 
 import { ApiError } from '@/lib/api';
 import { AuthProvider } from '@/lib/auth';
+import { initSentry, Sentry } from '@/lib/sentry';
 import { logVitalsToConsole, reportWebVitals } from '@/lib/web-vitals';
 import { persistCache, hydrateCache, watchAuthForCacheClear } from '@/lib/queryCache';
 import { App } from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
-const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
-if (sentryDsn) {
-  const initSentry = () => {
-    Sentry.init({
-      dsn: sentryDsn,
-      environment: import.meta.env.VITE_SENTRY_ENVIRONMENT || import.meta.env.MODE,
-      release: import.meta.env.VITE_SENTRY_RELEASE || '@bidstack/web@0.1.0',
-      integrations: [browserTracingIntegration()],
-      tracesSampleRate: 1.0,
-    });
-  };
-  if (typeof window !== 'undefined') {
-    if ('requestIdleCallback' in window) {
-      window.requestIdleCallback(() => initSentry());
-    } else {
-      setTimeout(initSentry, 50);
-    }
-  } else {
-    initSentry();
-  }
-}
+initSentry();
 
 // Boot the Web Vitals observer once at app load. In dev/preview we log each
 // metric to the console; in production this is where you'd send the metric
@@ -56,7 +35,11 @@ const queryClient = new QueryClient({
         }
         return true;
       },
-      refetchOnWindowFocus: false,
+      // Long-lived CRM tabs must heal after laptop sleep/token rotation.
+      // With a 2 minute staleTime this stays quiet on quick tab switches,
+      // but a page left open will refetch instead of forcing a relogin.
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
       staleTime: 120_000, // 2 minutes (up from 30s)
       gcTime: 600_000, // 10 minutes
     },
@@ -99,7 +82,7 @@ if (!clerkKey && authMode === 'clerk') {
   throw new Error('VITE_CLERK_PUBLISHABLE_KEY is missing while VITE_AUTH_MODE=clerk.');
 }
 
-const APP_SHELL_CACHE_NAME = 'bidstack-v1';
+const APP_SHELL_CACHE_NAME = 'bidstack-v4-network-owned-routes';
 type ViteManifestEntry = {
   file?: string;
   css?: string[];

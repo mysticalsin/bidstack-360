@@ -6,29 +6,92 @@
  * admin panel is an information-security violation. RBAC failures can never
  * be detected at runtime — only E2E catches them.
  */
-import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
-test.describe('RBAC — role-based access control', () => {
-  test('read-only role: edit buttons are absent or disabled on opportunity', async ({ page }) => {
-    // Navigate as default user (stub mode = admin). If RolesPage is available,
-    // switch to read-only and verify restrictions.
-    await page.goto('/roles', { waitUntil: 'load' });
-    const rolesHeading = page.getByRole('heading', { name: /roles/i, level: 1 });
-    const rolesAvailable = await rolesHeading.isVisible({ timeout: 5_000 }).catch(() => false);
-    test.skip(!rolesAvailable, '/roles not available in this session — RBAC enforcement not testable');
+import { test, expect, type SupportedRole } from '../fixtures/auth.fixture';
 
-    // Go to an opportunity and check for edit controls.
-    await page.goto('/opportunities', { waitUntil: 'load' });
-    const firstLink = page.locator('a[href^="/opportunities/"]').first();
-    const hasLink = await firstLink.isVisible({ timeout: 10_000 }).catch(() => false);
-    test.skip(!hasLink, 'No opportunities — cannot test RBAC on deal detail');
+interface CapabilityBody {
+  isAdmin: boolean;
+  roles: string[];
+  permissions: string[];
+}
 
-    await firstLink.click();
-    await expect(page.locator('#main')).toBeVisible({ timeout: 10_000 });
+async function fetchCapabilities(page: Page, role: SupportedRole): Promise<CapabilityBody> {
+  const apiUrl = process.env.E2E_API_URL;
+  if (!apiUrl) throw new Error('E2E_API_URL is required for RBAC capability checks');
 
-    // In admin/stub mode, edit should be present.
-    const editBtn = page.getByRole('button', { name: /edit/i });
-    await expect(editBtn.first()).toBeVisible({ timeout: 5_000 });
+  return page.evaluate(
+    async ({ apiUrl: targetApiUrl, role: targetRole }) => {
+      const response = await fetch(`${targetApiUrl}/api/v1/me/capabilities`, {
+        headers: { 'x-bidstack-e2e-role': targetRole },
+        credentials: 'include',
+      });
+      const body = await response.json();
+      return { status: response.status, body };
+    },
+    { apiUrl, role },
+  ).then(({ status, body }) => {
+    expect(status).toBe(200);
+    return body as CapabilityBody;
+  });
+}
+
+test.describe('RBAC - role-based access control', () => {
+  test('read-only role receives a non-admin capability manifest with no write permissions', async ({
+    page,
+    loginAs,
+  }) => {
+    await loginAs('read-only');
+    await page.goto('/dashboard', { waitUntil: 'load' });
+    const body = await fetchCapabilities(page, 'read-only');
+
+    expect(body.isAdmin).toBe(false);
+    expect(body.roles).toContain('Read-Only');
+    expect(body.permissions).toContain('accounts:read');
+    expect(body.permissions).not.toContain('audit-log:read');
+    expect(body.permissions.filter((permission) => permission.endsWith(':write'))).toEqual([]);
+  });
+
+  test('read-only role is redirected away from admin-only audit log', async ({ page, loginAs }) => {
+    await loginAs('read-only');
+    await page.goto('/audit-log', { waitUntil: 'load' });
+    await expect(page).toHaveURL(/\/dashboard/);
+    await expect(page.getByRole('heading', { name: /audit log/i, level: 1 })).toHaveCount(0);
+  });
+
+  test('viewer role is read-only and cannot reach admin-only audit log', async ({
+    page,
+    loginAs,
+  }) => {
+    await loginAs('viewer');
+    await page.goto('/dashboard', { waitUntil: 'load' });
+    const body = await fetchCapabilities(page, 'viewer');
+
+    expect(body.isAdmin).toBe(false);
+    expect(body.roles).toContain('Read-Only');
+    expect(body.permissions).toContain('accounts:read');
+    expect(body.permissions).not.toContain('audit-log:read');
+    expect(body.permissions.filter((permission) => permission.endsWith(':write'))).toEqual([]);
+
+    await page.goto('/audit-log', { waitUntil: 'load' });
+    await expect(page).toHaveURL(/\/dashboard/);
+    await expect(page.getByRole('heading', { name: /audit log/i, level: 1 })).toHaveCount(0);
+  });
+
+  test('sales manager role gets commercial write permissions but not admin settings', async ({
+    page,
+    loginAs,
+  }) => {
+    await loginAs('manager');
+    await page.goto('/dashboard', { waitUntil: 'load' });
+    const body = await fetchCapabilities(page, 'manager');
+
+    expect(body.isAdmin).toBe(false);
+    expect(body.roles).toContain('Sales Manager');
+    expect(body.permissions).toContain('opportunities:write');
+    expect(body.permissions).toContain('territories:write');
+    expect(body.permissions).not.toContain('settings:write');
+    expect(body.permissions).not.toContain('users:write');
   });
 
   test('roles page lists system roles', async ({ page }) => {
@@ -43,13 +106,9 @@ test.describe('RBAC — role-based access control', () => {
     ).toBeVisible({ timeout: 10_000 });
   });
 
-  test('admin-only route (audit-log) is accessible to admin session', async ({ page }) => {
+  test('admin-only route (audit-log) is accessible to admin session', async ({ page, loginAs }) => {
+    await loginAs('admin');
     await page.goto('/audit-log', { waitUntil: 'load' });
-    // In stub mode, default session is admin — must not redirect.
-    const redirected = page.url().includes('/dashboard');
-    if (redirected) {
-      test.skip(true, 'Session is non-admin — cannot verify admin-only access');
-    }
     await expect(
       page.getByRole('heading', { name: /audit log/i, level: 1 }),
     ).toBeVisible({ timeout: 15_000 });

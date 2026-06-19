@@ -7,7 +7,7 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 
-const APP_SHELL_CACHE_NAME = 'bidstack-v1';
+const APP_SHELL_CACHE_NAME = 'bidstack-v4-network-owned-routes';
 
 async function waitForOfflineAppShell(page: Page) {
   await page.evaluate(async () => {

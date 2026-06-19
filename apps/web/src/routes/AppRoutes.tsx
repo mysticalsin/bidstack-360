@@ -47,6 +47,7 @@ import {
   ReportsPage,
   ReportBuilderPage,
   SearchPage,
+  SerumMissionControlPage,
   ServiceCaseDetailPage,
   ServiceDeskPage,
   SsoCallbackPage,
@@ -110,6 +111,14 @@ export function AppRoutes() {
           />
           {/* Agent Studio — open to members (run + view); authoring is admin-gated
               inside the page via useIsAdmin(). */}
+          <Route
+            path="/serum"
+            element={
+              <RequireAuth>
+                <SerumMissionControlPage />
+              </RequireAuth>
+            }
+          />
           <Route
             path="/agent-studio"
             element={

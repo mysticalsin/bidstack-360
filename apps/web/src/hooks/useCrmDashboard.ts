@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 
 import type { CrmDashboardSnapshot, DashboardWidget } from '@bidstack/shared';
 
@@ -12,6 +12,13 @@ export function useCrmDashboard(accountId?: string) {
         ? `/api/crm/dashboard?account=${encodeURIComponent(accountId)}`
         : '/api/crm/dashboard';
       return api<CrmDashboardSnapshot>(path, { signal });
+    },
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    retry: (failureCount, error) => {
+      if (error instanceof ApiError && error.status === 404) return false;
+      return failureCount < 2;
     },
   });
 }

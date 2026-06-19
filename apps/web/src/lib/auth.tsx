@@ -31,6 +31,7 @@ import {
 } from 'react';
 
 import { setApiTokenProvider } from '@/lib/api';
+import { AUTH_FINGERPRINT_EVENT } from '@/lib/queryCache';
 
 interface AuthUser {
   id: string;
@@ -61,6 +62,64 @@ const STUB_USER: AuthUser = {
 
 const STUB_SESSION_KEY = 'bidstack:session';
 const STUB_SIGNED_OUT_KEY = 'bidstack:stub-signed-out';
+export const STUB_ROLE_KEY = 'bidstack:stub-role';
+
+const STUB_USERS: Record<string, AuthUser> = {
+  admin: STUB_USER,
+  manager: {
+    id: 'stub-user-manager',
+    firstName: 'Morgan',
+    lastName: 'Manager',
+    fullName: 'Morgan Manager',
+    primaryEmailAddress: { emailAddress: 'e2e-manager@bidstack.local' },
+  },
+  'read-only': {
+    id: 'stub-user-read-only',
+    firstName: 'Riley',
+    lastName: 'Reader',
+    fullName: 'Riley Reader',
+    primaryEmailAddress: { emailAddress: 'e2e-read-only@bidstack.local' },
+  },
+  viewer: {
+    id: 'stub-user-viewer',
+    firstName: 'Val',
+    lastName: 'Viewer',
+    fullName: 'Val Viewer',
+    primaryEmailAddress: { emailAddress: 'e2e-viewer@bidstack.local' },
+  },
+};
+
+function normalizeStubRole(value: string | null): keyof typeof STUB_USERS {
+  if (value === 'manager' || value === 'read-only' || value === 'viewer') return value;
+  return 'admin';
+}
+
+function notifyAuthFingerprintChanged(): void {
+  window.dispatchEvent(new Event(AUTH_FINGERPRINT_EVENT));
+}
+
+function writeSessionMarker(value: string | null): void {
+  const oldValue = localStorage.getItem(STUB_SESSION_KEY);
+  if (value === null) {
+    localStorage.removeItem(STUB_SESSION_KEY);
+  } else {
+    localStorage.setItem(STUB_SESSION_KEY, value);
+  }
+  if (oldValue === value) {
+    notifyAuthFingerprintChanged();
+    return;
+  }
+
+  window.dispatchEvent(
+    new StorageEvent('storage', {
+      key: STUB_SESSION_KEY,
+      oldValue,
+      newValue: value,
+      storageArea: localStorage,
+    }),
+  );
+  notifyAuthFingerprintChanged();
+}
 
 function StubAuthProvider({ children }: { children: ReactNode }) {
   const [signedIn, setSignedIn] = useState(() => {
@@ -69,19 +128,30 @@ function StubAuthProvider({ children }: { children: ReactNode }) {
       localStorage.getItem(STUB_SIGNED_OUT_KEY) === null
     );
   });
+  const [stubRole, setStubRole] = useState(() => normalizeStubRole(localStorage.getItem(STUB_ROLE_KEY)));
 
   useEffect(() => {
     setApiTokenProvider(null);
     if (signedIn && localStorage.getItem(STUB_SESSION_KEY) === null) {
-      localStorage.setItem(STUB_SESSION_KEY, 'stub');
+      writeSessionMarker('stub');
     }
     return () => setApiTokenProvider(null);
   }, [signedIn]);
 
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === STUB_ROLE_KEY) {
+        setStubRole(normalizeStubRole(event.newValue));
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
   const signIn = useCallback((cb?: () => void) => {
     setSignedIn(true);
     localStorage.removeItem(STUB_SIGNED_OUT_KEY);
-    localStorage.setItem(STUB_SESSION_KEY, 'stub');
+    writeSessionMarker('stub');
     cb?.();
   }, []);
 
@@ -91,24 +161,20 @@ function StubAuthProvider({ children }: { children: ReactNode }) {
     // Remove the key and fire a synthetic storage event — native storage events
     // don't fire on the originating tab, so the same-tab cache-clear handler
     // in watchAuthForCacheClear would never trigger otherwise.
-    localStorage.removeItem(STUB_SESSION_KEY);
-    window.dispatchEvent(
-      new StorageEvent('storage', {
-        key: STUB_SESSION_KEY,
-        newValue: null,
-        storageArea: localStorage,
-      }),
-    );
+    writeSessionMarker(null);
     cb?.();
   }, []);
+
+  const user = STUB_USERS[stubRole] ?? STUB_USER;
+  const role = stubRole === 'admin' ? 'admin' : stubRole;
 
   return (
     <AuthContext.Provider
       value={{
         isLoaded: true,
         isSignedIn: signedIn,
-        user: signedIn ? STUB_USER : null,
-        role: 'admin',
+        user: signedIn ? user : null,
+        role: signedIn ? role : null,
         signIn,
         signOut,
       }}
@@ -134,26 +200,24 @@ function DemoAuthProvider({ children }: { children: ReactNode }) {
     // The token is a plain string in localStorage (the app has no cookie layer;
     // this matches the existing Bearer-token model used for Clerk).
     setApiTokenProvider(() => localStorage.getItem(DEMO_TOKEN_KEY));
+    if (signedIn && localStorage.getItem(DEMO_TOKEN_KEY)) {
+      writeSessionMarker('demo');
+    }
     return () => setApiTokenProvider(null);
-  }, []);
+  }, [signedIn]);
 
   const signIn = useCallback((cb?: () => void) => {
-    setSignedIn(localStorage.getItem(DEMO_TOKEN_KEY) !== null);
+    const hasToken = localStorage.getItem(DEMO_TOKEN_KEY) !== null;
+    setSignedIn(hasToken);
+    if (hasToken) writeSessionMarker('demo');
     cb?.();
   }, []);
 
   const signOut = useCallback((cb?: () => void) => {
     localStorage.removeItem(DEMO_TOKEN_KEY);
     localStorage.removeItem(DEMO_EMAIL_KEY);
-    localStorage.removeItem(STUB_SESSION_KEY);
     setSignedIn(false);
-    window.dispatchEvent(
-      new StorageEvent('storage', {
-        key: STUB_SESSION_KEY,
-        newValue: null,
-        storageArea: localStorage,
-      }),
-    );
+    writeSessionMarker(null);
     cb?.();
   }, []);
 
@@ -211,12 +275,14 @@ const LazyClerkBranch = lazy(async () => {
         auth.getToken(forceRefresh ? { skipCache: true } : undefined),
       );
       // Keep bidstack:session in sync with Clerk auth state so
-      // watchAuthForCacheClear can detect sign-out on any tab.
+      // watchAuthForCacheClear can detect sign-out/org switches on any tab.
       if (auth.isLoaded) {
         if (auth.isSignedIn && auth.userId) {
-          localStorage.setItem(STUB_SESSION_KEY, auth.userId);
+          const orgId = auth.orgId ?? 'personal';
+          const orgRole = auth.orgRole ?? 'member';
+          writeSessionMarker(`${auth.userId}:${orgId}:${orgRole}`);
         } else if (!auth.isSignedIn) {
-          localStorage.removeItem(STUB_SESSION_KEY);
+          writeSessionMarker(null);
         }
       }
       return () => setApiTokenProvider(null);
@@ -244,16 +310,7 @@ const LazyClerkBranch = lazy(async () => {
           },
           signOut: (cb) => {
             void clerk.signOut().then(() => {
-              // Remove session key and fire a synthetic storage event so the
-              // same-tab watchAuthForCacheClear handler fires immediately.
-              localStorage.removeItem(STUB_SESSION_KEY);
-              window.dispatchEvent(
-                new StorageEvent('storage', {
-                  key: STUB_SESSION_KEY,
-                  newValue: null,
-                  storageArea: localStorage,
-                }),
-              );
+              writeSessionMarker(null);
               cb?.();
             });
           },
@@ -372,9 +429,7 @@ function useAuthCtx(): AuthCtx {
 // eslint-disable-next-line react-refresh/only-export-components
 export function useAuth(): { isLoaded: boolean; isSignedIn: boolean } {
   const ctx = useAuthCtx();
-  const hasSession =
-    typeof window !== 'undefined' && localStorage.getItem(STUB_SESSION_KEY) !== null;
-  return { isLoaded: ctx.isLoaded, isSignedIn: ctx.isSignedIn || hasSession };
+  return { isLoaded: ctx.isLoaded, isSignedIn: ctx.isSignedIn };
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

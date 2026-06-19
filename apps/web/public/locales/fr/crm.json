@@ -379,12 +379,15 @@
     "subtitle": "{{count}} personnes dans l'unité de décision.",
     "actions": {
       "importCsv": {
+        "label": "Importer CSV",
         "aria": "Importer des contacts depuis un CSV"
       },
       "exportCsv": {
+        "label": "Exporter CSV",
         "aria": "Exporter tous les contacts visibles au format CSV"
       },
       "newContact": {
+        "label": "Nouveau contact",
         "aria": "Créer un nouveau contact"
       },
       "delete": "Supprimer",

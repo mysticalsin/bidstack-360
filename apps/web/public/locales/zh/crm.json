@@ -294,12 +294,15 @@
     "subtitle": "决策单位中有 {{count}} 人。",
     "actions": {
       "importCsv": {
+        "label": "导入 CSV",
         "aria": "从 CSV 导入联系人"
       },
       "exportCsv": {
+        "label": "导出 CSV",
         "aria": "将所有可见联系人导出为 CSV"
       },
       "newContact": {
+        "label": "新建联系人",
         "aria": "创建新联系人"
       },
       "delete": "删除",

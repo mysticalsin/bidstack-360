@@ -24,6 +24,14 @@
 
 import * as Sentry from '@sentry/react';
 
+export const SENTRY_UNAUTHENTICATED_ORG_TAG = 'unauthenticated';
+
+type BrowserSentryEvent = {
+  request?: { data?: unknown };
+  extra?: Record<string, unknown>;
+  breadcrumbs?: Array<{ data?: Record<string, unknown> }>;
+};
+
 // ─── PII field scrubber ────────────────────────────────────────────────────
 
 const PII_FIELDS = new Set([
@@ -40,6 +48,22 @@ function scrubPii(obj: unknown, depth = 0): unknown {
     result[key] = PII_FIELDS.has(key) ? '[REDACTED]' : scrubPii(value, depth + 1);
   }
   return result;
+}
+
+export function scrubSentryBrowserEvent<T extends BrowserSentryEvent>(event: T): T {
+  if (event.request?.data) {
+    event.request.data = scrubPii(event.request.data);
+  }
+  if (event.extra) {
+    event.extra = scrubPii(event.extra) as Record<string, unknown>;
+  }
+  if (event.breadcrumbs) {
+    event.breadcrumbs = event.breadcrumbs.map((breadcrumb) => ({
+      ...breadcrumb,
+      data: breadcrumb.data ? (scrubPii(breadcrumb.data) as typeof breadcrumb.data) : breadcrumb.data,
+    }));
+  }
+  return event;
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────
@@ -77,21 +101,7 @@ export function initSentry(): void {
     replaysOnErrorSampleRate: import.meta.env.VITE_SENTRY_REPLAY === 'true' ? 1.0 : 0,
 
     beforeSend(event) {
-      // Scrub request body and extra context
-      if (event.request?.data) {
-        event.request.data = scrubPii(event.request.data);
-      }
-      if (event.extra) {
-        event.extra = scrubPii(event.extra) as Record<string, unknown>;
-      }
-      // Strip PII from breadcrumb data
-      if (event.breadcrumbs) {
-        event.breadcrumbs = event.breadcrumbs.map((bc) => ({
-          ...bc,
-          data: bc.data ? (scrubPii(bc.data) as typeof bc.data) : bc.data,
-        }));
-      }
-      return event;
+      return scrubSentryBrowserEvent(event);
     },
 
     // WHY: filter common browser/extension noise from Sentry inbox
@@ -123,5 +133,5 @@ export const withSentryErrorBoundary = Sentry.withErrorBoundary;
 export function setSentryUser(user: { id: string; orgId: string } | null): void {
   if (!import.meta.env.VITE_SENTRY_DSN) return;
   Sentry.setUser(user ? { id: user.id } : null);
-  if (user?.orgId) Sentry.setTag('orgId', user.orgId);
+  Sentry.setTag('orgId', user?.orgId ?? SENTRY_UNAUTHENTICATED_ORG_TAG);
 }

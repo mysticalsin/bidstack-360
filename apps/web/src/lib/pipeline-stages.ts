@@ -60,11 +60,19 @@ export function getOpportunityStageBusinessKey(opp: Opportunity): string {
   return opp.stage ?? 'unknown';
 }
 
-export function getPipelineStages(items: Opportunity[]): PipelineStage[] {
+export function getPipelineStages(
+  items: Opportunity[],
+  configuredStages: PipelineStage[] = [],
+): PipelineStage[] {
   const hasCanonicalStages = items.some((opp) => opp.pipelineStage);
+  const hasConfiguredStages = configuredStages.length > 0;
   const map = new Map<string, PipelineStage>();
 
-  if (!hasCanonicalStages) {
+  for (const stage of configuredStages) {
+    map.set(getPipelineStageBusinessKey(stage), stage);
+  }
+
+  if (!hasConfiguredStages && !hasCanonicalStages) {
     for (const stage of LEGACY_PIPELINE_STAGES) map.set(getPipelineStageBusinessKey(stage), stage);
   }
 
@@ -72,16 +80,24 @@ export function getPipelineStages(items: Opportunity[]): PipelineStage[] {
     const stage = resolvePipelineStage(opp);
     if (stage.id !== 'unknown') {
       const bkey = getPipelineStageBusinessKey(stage);
-      if (!map.has(bkey) || isPipelineStageIdUuid(stage.id)) {
+      if (!map.has(bkey) || (!hasConfiguredStages && isPipelineStageIdUuid(stage.id))) {
         map.set(bkey, stage);
       }
     }
   }
 
+  const configuredOrder = new Map(
+    configuredStages.map((stage, index) => [getPipelineStageBusinessKey(stage), index]),
+  );
   const legacyOrder = new Map(LEGACY_PIPELINE_STAGES.map((stage, index) => [stage.id, index]));
   return [...map.values()].sort((a, b) => {
     const aKey = getPipelineStageBusinessKey(a);
     const bKey = getPipelineStageBusinessKey(b);
+    const aConfigured = configuredOrder.get(aKey);
+    const bConfigured = configuredOrder.get(bKey);
+    if (aConfigured !== undefined && bConfigured !== undefined) return aConfigured - bConfigured;
+    if (aConfigured !== undefined) return -1;
+    if (bConfigured !== undefined) return 1;
     const ao = legacyOrder.get(aKey);
     const bo = legacyOrder.get(bKey);
     if (ao !== undefined && bo !== undefined) return ao - bo;

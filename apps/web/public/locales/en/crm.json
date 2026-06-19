@@ -294,12 +294,15 @@
     "subtitle": "{{count}} people in the decision unit.",
     "actions": {
       "importCsv": {
+        "label": "Import CSV",
         "aria": "Import contacts from CSV"
       },
       "exportCsv": {
+        "label": "Export CSV",
         "aria": "Export all visible contacts as CSV"
       },
       "newContact": {
+        "label": "New contact",
         "aria": "Create a new contact"
       },
       "delete": "Delete",
@@ -2665,7 +2668,9 @@
       "missingFieldsTitle": "Missing fields",
       "missingFieldsBody": "Description and both units are required.",
       "logged": "Cross-sell action logged",
-      "saveError": "Could not save"
+      "saveError": "Could not save",
+      "statusAdvanced": "Status: {{status}}",
+      "statusError": "Could not update status"
     },
     "form": {
       "descriptionPlaceholder": "What needs to happen?",

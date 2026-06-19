@@ -3,6 +3,8 @@ import { useEffect } from 'react';
 import { useCurrencyStore } from '@/stores/currency';
 import { formatMoney, formatMoneyMicros } from '@/lib/format';
 
+const SHOULD_AUTO_FETCH_RATES = import.meta.env.MODE !== 'test';
+
 /**
  * Hook that returns currency formatting functions with automatic conversion
  * based on the user's selected display currency.
@@ -11,6 +13,7 @@ export function useFormatMoney() {
   const { currency, convert, fetchRates } = useCurrencyStore();
 
   useEffect(() => {
+    if (!SHOULD_AUTO_FETCH_RATES) return;
     void fetchRates();
   }, [fetchRates]);
 

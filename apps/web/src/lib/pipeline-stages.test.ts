@@ -40,6 +40,40 @@ const baseOpportunity: Opportunity = {
 };
 
 describe('pipeline stage normalization', () => {
+  it('keeps configured empty stages instead of deriving columns only from current cards', () => {
+    const s1Canonical: PipelineStage = {
+      id: '7124dff3-f67b-46c7-abae-4f938666884a',
+      name: 'S1 Lead',
+      probability: 10,
+      color: '#3b82f6',
+      isWon: false,
+      isLost: false,
+    };
+    const s1OngoingCanonical: PipelineStage = {
+      id: '8124dff3-f67b-46c7-abae-4f938666884a',
+      name: 'S1 Ongoing',
+      probability: 25,
+      color: '#6366f1',
+      isWon: false,
+      isLost: false,
+    };
+    const s2CanonicalOpp: Opportunity = {
+      ...baseOpportunity,
+      id: '44444444-4444-4444-8444-444444444444',
+      code: 'OP-4444',
+      stage: 'S2 Sent',
+      pipelineStageId: s2Canonical.id,
+      pipelineStage: s2Canonical,
+    };
+
+    const stages = getPipelineStages(
+      [s2CanonicalOpp],
+      [s1Canonical, s1OngoingCanonical, s2Canonical],
+    );
+
+    expect(stages.map((stage) => stage.name)).toEqual(['S1 Lead', 'S1 Ongoing', 'S2 Sent']);
+  });
+
   it('deduplicates legacy and canonical versions of the same business stage', () => {
     const legacyS2: Opportunity = {
       ...baseOpportunity,

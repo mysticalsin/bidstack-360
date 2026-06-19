@@ -22,6 +22,9 @@ export const QuickStartPage = lazy(() =>
 export const SearchPage = lazy(() =>
   import('@/pages/SearchPage').then((m) => ({ default: m.SearchPage })),
 );
+export const SerumMissionControlPage = lazy(() =>
+  import('@/pages/SerumMissionControlPage').then((m) => ({ default: m.SerumMissionControlPage })),
+);
 
 // ─── CRM ──────────────────────────────────────────────────────────────────────
 
