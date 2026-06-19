@@ -18,11 +18,13 @@ import { AuditLogSection } from '@/components/settings/AuditLogSection';
 import { RfpAnalyticsSection } from '@/components/settings/RfpAnalyticsSection';
 import { AccessGroupsSection } from '@/components/settings/AccessGroupsSection';
 import { OpportunityFiltersSection } from '@/components/settings/OpportunityFiltersSection';
+import { SerumControlPlaneSection } from '@/components/settings/SerumControlPlaneSection';
 
 // Each entry maps a section code to its [i18n key suffix, English default].
 // The English default is passed to t() so the UI never shows a raw key.
 const SECTION_TITLES: Record<SettingsSection, [string, string]> = {
   overview: ['sectionOverview', 'Overview'],
+  serum: ['sectionSerum', 'SERUM Control Plane'],
   profile: ['sectionProfile', 'Profile'],
   appearance: ['sectionAppearance', 'Appearance & Language'],
   language: ['sectionLanguage', 'Language'],
@@ -52,6 +54,7 @@ export function SettingsPage() {
 
   const sections: Record<SettingsSection, React.ReactNode> = {
     overview: <SettingsOverviewSection onNavigate={setActive} />,
+    serum: <SerumControlPlaneSection />,
     // Profile + Language no longer have their own tabs — they fold into
     // Security and Appearance. The standalone keys stay so deep links still
     // resolve.

@@ -36,7 +36,9 @@ function UpdatedAgo({ iso }: { iso: string }) {
       <span className="mx-1.5 text-[var(--fg-muted)]" aria-hidden>
         ·
       </span>
-      <span title={new Date(iso).toLocaleString()}>{label}</span>
+      <span data-testid="opportunity-updated-at" title={new Date(iso).toLocaleString()}>
+        {label}
+      </span>
     </>
   );
 }

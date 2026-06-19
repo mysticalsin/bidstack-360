@@ -1,20 +1,29 @@
 // Key Accounts — strategically important accounts flagged by admins.
 // Shows full portfolio view with pipeline, contacts, and proactive alerts.
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
 import { KeyAccountBadge } from '@/components/company/AccountTierBadges';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { CursorPager } from '@/components/ui/CursorPager';
 import { useKeyAccounts, useAccountIndustries } from '@/hooks/useKeyAccounts';
+import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
+
+import { StrategicSignalInsight } from './accountsPage/StrategicSignalInsight';
+import { keyAccountSignal } from './accountsPage/strategicSignals';
+
+const KEY_ACCOUNTS_PAGE_SIZE = 50;
+const KEY_ACCOUNTS_SIGNAL_SIZE = 200;
 
 export function KeyAccountsPage() {
   const { t } = useTranslation('crm');
@@ -22,16 +31,58 @@ export function KeyAccountsPage() {
   const [search, setSearch] = useState('');
   const [industry, setIndustry] = useState<string>('');
   const { formatMoney } = useFormatMoney();
+  const pager = useCursorPagination(`${search}\u0000${industry}`);
 
   const industries = useAccountIndustries();
   const accounts = useKeyAccounts({
     search: search || undefined,
     industry: industry || undefined,
+    limit: KEY_ACCOUNTS_PAGE_SIZE,
+    cursor: pager.cursor,
+  });
+  const signalAccounts = useKeyAccounts({
+    search: search || undefined,
+    limit: KEY_ACCOUNTS_SIGNAL_SIZE,
   });
 
-  const items = accounts.data?.items ?? [];
+  const items = useMemo(() => accounts.data?.items ?? [], [accounts.data?.items]);
+  const signalItems = useMemo(
+    () => signalAccounts.data?.items ?? items,
+    [items, signalAccounts.data?.items],
+  );
+  const unclassifiedIndustry = t('keyAccounts.unclassifiedIndustry', 'Unclassified');
   const accountError = accounts.error instanceof Error ? accounts.error.message : undefined;
   const industryError = industries.error instanceof Error ? industries.error.message : undefined;
+  const totalPipeline = useMemo(
+    () => items.reduce((sum, account) => sum + account.totalValue, 0),
+    [items],
+  );
+  const openDeals = useMemo(() => items.reduce((sum, account) => sum + account.openDeals, 0), [items]);
+  const contactCount = useMemo(
+    () => items.reduce((sum, account) => sum + account.contactCount, 0),
+    [items],
+  );
+  const opportunityCount = useMemo(
+    () => items.reduce((sum, account) => sum + account.opportunityCount, 0),
+    [items],
+  );
+  const industryBreakdown = useMemo(() => {
+    const byIndustry = new Map<string, { count: number; pipeline: number }>();
+    for (const account of signalItems) {
+      const key = account.industry || unclassifiedIndustry;
+      const current = byIndustry.get(key) ?? { count: 0, pipeline: 0 };
+      current.count += 1;
+      current.pipeline += account.totalValue;
+      byIndustry.set(key, current);
+    }
+    return [...byIndustry.entries()]
+      .map(([name, stats]) => ({ name, ...stats }))
+      .sort((a, b) => b.pipeline - a.pipeline || b.count - a.count)
+      .slice(0, 6);
+  }, [signalItems, unclassifiedIndustry]);
+  const maxIndustryPipeline = Math.max(1, ...industryBreakdown.map((item) => item.pipeline));
+  const selectedIndustryStats = industryBreakdown.find((item) => item.name === industry);
+  const leadingIndustry = selectedIndustryStats ?? industryBreakdown[0] ?? null;
 
   return (
     <motion.div
@@ -117,7 +168,78 @@ export function KeyAccountsPage() {
             </button>
           </div>
         ) : null}
+        {search || industry ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              setSearch('');
+              setIndustry('');
+            }}
+          >
+            <Icon name="refresh" size={14} ariaHidden />
+            {t('keyAccounts.resetFilters', 'Reset')}
+          </Button>
+        ) : null}
       </motion.div>
+
+      {!accounts.isError && industryBreakdown.length > 0 ? (
+        <motion.section
+          variants={reducedMotion ? undefined : staggerChild}
+          className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4 shadow-[var(--shadow-xs)]"
+          aria-label={t('keyAccounts.industrySignalLabel', 'Key account industry signal')}
+        >
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--fg-tertiary)]">
+                {t('keyAccounts.industrySignalEyebrow', 'Industry signal')}
+              </p>
+              <h2 className="mt-1 truncate text-lg font-semibold text-[var(--fg-primary)]">
+                {leadingIndustry
+                  ? t('keyAccounts.industrySignalTitle', '{{industry}} leads the view', {
+                      industry: leadingIndustry.name,
+                    })
+                  : t('keyAccounts.industrySignalFallback', 'No industry signal')}
+              </h2>
+              <p className="mt-1 text-sm text-[var(--fg-secondary)]">
+                {leadingIndustry
+                  ? t('keyAccounts.industrySignalDetail', '{{count}} accounts / {{pipeline}} pipeline', {
+                      count: leadingIndustry.count,
+                      pipeline: formatMoney(leadingIndustry.pipeline, 'EUR'),
+                    })
+                  : t('keyAccounts.industrySignalEmpty', 'Add industries to companies to unlock the split.')}
+              </p>
+            </div>
+            <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {industryBreakdown.map((item) => (
+                <button
+                  key={item.name}
+                  type="button"
+                  aria-label={t('keyAccounts.filterByIndustry', 'Filter key accounts by {{industry}}', {
+                    industry: item.name,
+                  })}
+                  aria-pressed={industry === item.name}
+                  onClick={() => setIndustry(industry === item.name ? '' : item.name)}
+                  className="group rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3 text-left transition hover:border-[var(--border-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+                >
+                  <div className="flex items-center justify-between gap-3 text-xs">
+                    <span className="truncate font-semibold text-[var(--fg-primary)]">{item.name}</span>
+                    <span className="font-medium text-[var(--fg-tertiary)]">{item.count}</span>
+                  </div>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--border-subtle)]">
+                    <motion.span
+                      className="block h-full rounded-full bg-[var(--brand-primary)]"
+                      initial={reducedMotion ? false : { width: 0 }}
+                      animate={{ width: `${Math.max(8, Math.round((item.pipeline / maxIndustryPipeline) * 100))}%` }}
+                      transition={springSoft}
+                    />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </motion.section>
+      ) : null}
 
       {/* sr-only live region — announces filter result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
@@ -140,18 +262,13 @@ export function KeyAccountsPage() {
           <StatCard
             label={t('keyAccounts.statTotalPipeline', 'Total pipeline')}
             value={formatMoney(
-              items.reduce((s, a) => s + a.totalValue, 0),
+              totalPipeline,
               'EUR',
             )}
           />
-          <StatCard
-            label={t('keyAccounts.statOpenDeals', 'Open deals')}
-            value={items.reduce((s, a) => s + a.openDeals, 0)}
-          />
-          <StatCard
-            label={t('keyAccounts.statContacts', 'Contacts')}
-            value={items.reduce((s, a) => s + a.contactCount, 0)}
-          />
+          <StatCard label={t('keyAccounts.statOpenDeals', 'Open deals')} value={openDeals} />
+          <StatCard label={t('keyAccounts.statContacts', 'Contacts')} value={contactCount} />
+          <StatCard label={t('keyAccounts.statOpportunities', 'Opportunities')} value={opportunityCount} />
         </motion.div>
       ) : null}
 
@@ -184,63 +301,86 @@ export function KeyAccountsPage() {
           )}
         />
       ) : (
-        <div className="grid grid-cols-1 gap-4">
-          {items.map((account, index) => (
-            <motion.div
-              key={account.id}
-              variants={reducedMotion ? undefined : staggerChild}
-              initial={reducedMotion ? false : { opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.04 }}
-            >
-              <Card>
-                <div className="flex items-start gap-4 p-5">
-                  <CompanyLogo domain={account.domain} name={account.name} size={48} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Link
-                        to={`/companies/${account.id}`}
-                        className="text-base font-semibold text-[var(--fg-primary)] hover:text-[var(--brand-primary)] truncate"
-                      >
-                        {account.name}
-                      </Link>
-                      <KeyAccountBadge />
-                      {account.industry ? <Badge tone="gray">{account.industry}</Badge> : null}
-                    </div>
-                    {account.domain ? (
-                      <div className="text-xs text-[var(--fg-tertiary)]">{account.domain}</div>
-                    ) : null}
-                    {account.keyAccountNotes ? (
-                      <div className="mt-1.5 text-sm text-[var(--fg-secondary)] line-clamp-2">
-                        {account.keyAccountNotes}
+        <>
+          <motion.div layout className="grid grid-cols-1 gap-4">
+            {items.map((account, index) => {
+              const signal = keyAccountSignal(account);
+              return (
+                <motion.div
+                  key={account.id}
+                  layout
+                  variants={reducedMotion ? undefined : staggerChild}
+                  initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.04 }}
+                >
+                  <Card>
+                    <div className="flex items-start gap-4 p-5">
+                      <CompanyLogo domain={account.domain} name={account.name} size={48} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Link
+                            to={`/companies/${account.id}`}
+                            className="text-base font-semibold text-[var(--fg-primary)] hover:text-[var(--brand-primary)] truncate"
+                          >
+                            {account.name}
+                          </Link>
+                          <KeyAccountBadge />
+                          {account.industry ? <Badge tone="gray">{account.industry}</Badge> : null}
+                        </div>
+                        {account.domain ? (
+                          <div className="text-xs text-[var(--fg-tertiary)]">{account.domain}</div>
+                        ) : null}
+                        {account.keyAccountNotes ? (
+                          <div className="mt-1.5 text-sm text-[var(--fg-secondary)] line-clamp-2">
+                            {account.keyAccountNotes}
+                          </div>
+                        ) : null}
+                        <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
+                          <span className="text-[var(--fg-secondary)]">
+                            <span className="font-medium text-[var(--fg-primary)]">
+                              {formatMoney(account.totalValue, 'EUR')}
+                            </span>{' '}
+                            {t('keyAccounts.metricPipeline', 'pipeline')}
+                          </span>
+                          <span className="text-[var(--fg-secondary)]">
+                            <span className="font-medium text-[var(--fg-primary)]">
+                              {account.openDeals}
+                            </span>{' '}
+                            {t('keyAccounts.metricOpenDeals', 'open deals')}
+                          </span>
+                          <span className="text-[var(--fg-secondary)]">
+                            <span className="font-medium text-[var(--fg-primary)]">
+                              {account.contactCount}
+                            </span>{' '}
+                            {t('keyAccounts.metricContacts', 'contacts')}
+                          </span>
+                        </div>
+                        <StrategicSignalInsight
+                          signal={signal}
+                          label={`${account.name} strategic account signal`}
+                          className="mt-3"
+                        />
                       </div>
-                    ) : null}
-                    <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
-                      <span className="text-[var(--fg-secondary)]">
-                        <span className="font-medium text-[var(--fg-primary)]">
-                          {formatMoney(account.totalValue, 'EUR')}
-                        </span>{' '}
-                        {t('keyAccounts.metricPipeline', 'pipeline')}
-                      </span>
-                      <span className="text-[var(--fg-secondary)]">
-                        <span className="font-medium text-[var(--fg-primary)]">
-                          {account.openDeals}
-                        </span>{' '}
-                        {t('keyAccounts.metricOpenDeals', 'open deals')}
-                      </span>
-                      <span className="text-[var(--fg-secondary)]">
-                        <span className="font-medium text-[var(--fg-primary)]">
-                          {account.contactCount}
-                        </span>{' '}
-                        {t('keyAccounts.metricContacts', 'contacts')}
-                      </span>
                     </div>
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
+                  </Card>
+                </motion.div>
+              );
+            })}
+          </motion.div>
+          {pager.hasPrevious || accounts.data?.nextCursor ? (
+            <CursorPager
+              currentPage={pager.page}
+              hasNext={Boolean(accounts.data?.nextCursor)}
+              hasPrevious={pager.hasPrevious}
+              isLoading={accounts.isFetching}
+              itemCount={items.length}
+              label={t('keyAccounts.paginationLabel', 'key accounts')}
+              onNext={() => pager.goNext(accounts.data?.nextCursor)}
+              onPrevious={pager.goPrevious}
+            />
+          ) : null}
+        </>
       )}
     </motion.div>
   );

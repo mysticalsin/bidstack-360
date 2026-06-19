@@ -60,6 +60,8 @@ export const PipelineCard = memo(function PipelineCard({
     >
       <Link
         to={`/opportunities/${opp.id}`}
+        data-testid="pipeline-card"
+        data-opportunity-id={opp.id}
         draggable
         onDragStart={(e) => {
           e.dataTransfer.setData('text/plain', opp.id);

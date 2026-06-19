@@ -209,6 +209,10 @@ function SidebarSection({
           className="sb-item sb-parent-trigger"
           aria-label={sectionTitle}
           title={sectionTitle}
+          onClick={() => {
+            const toggleSidebar = useUiStore.getState().toggleSidebar;
+            toggleSidebar();
+          }}
         >
           <Icon name={section.icon} size={16} />
           {totalBadge > 0 && <span className="sb-badge-dot" />}

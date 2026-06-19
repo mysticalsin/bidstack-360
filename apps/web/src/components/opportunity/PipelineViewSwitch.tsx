@@ -34,14 +34,13 @@ export function PipelineViewSwitch({ current }: { current: 'list' | 'board' }) {
 
   return (
     <div
-      role="tablist"
+      role="group"
       aria-label={t('pipelineViewSwitch.ariaLabel', 'Opportunity view')}
       className="inline-flex rounded-lg border border-[var(--border-default)] bg-[var(--surface-sunken)] p-0.5"
     >
       <button
         type="button"
-        role="tab"
-        aria-selected={current === 'list'}
+        aria-pressed={current === 'list'}
         onClick={() => go('list')}
         className={tab('list')}
       >
@@ -49,8 +48,12 @@ export function PipelineViewSwitch({ current }: { current: 'list' | 'board' }) {
       </button>
       <button
         type="button"
-        role="tab"
-        aria-selected={current === 'board'}
+        aria-pressed={current === 'board'}
+        aria-label={
+          current === 'board'
+            ? undefined
+            : t('pipelineViewSwitch.switchToBoard', 'Switch to kanban view')
+        }
         onClick={() => go('board')}
         className={tab('board')}
       >

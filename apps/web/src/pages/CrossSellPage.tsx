@@ -141,7 +141,7 @@ export default function CrossSellPage() {
                           { onError: (err: Error) => toast.error(t('crossSell.updateFailed', 'Update failed'), { description: err.message }) },
                         )
                       }
-                      className="min-h-[28px] rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] disabled:opacity-60"
+                      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md px-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] disabled:opacity-60"
                       aria-label={t('crossSell.advanceStatusAria', 'Advance status of {{description}}', {
                         description: a.description,
                       })}

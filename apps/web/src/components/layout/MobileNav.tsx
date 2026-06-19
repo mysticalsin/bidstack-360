@@ -3,7 +3,6 @@
 // and closes on link selection, backdrop tap, or Escape.
 
 import * as RadixDialog from '@radix-ui/react-dialog';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -22,7 +21,6 @@ import { ADMIN_SETTINGS, MEMBER_SETTINGS, NAV_SECTIONS, type NavItem } from './n
 export function MobileNav() {
   const open = useUiStore((s) => s.mobileNavOpen);
   const setOpen = useUiStore((s) => s.setMobileNavOpen);
-  const reduced = useReducedMotion();
 
   // Lock body scroll while open.
   useEffect(() => {
@@ -30,44 +28,27 @@ export function MobileNav() {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
+      document.body.style.pointerEvents = 'auto';
     }
     return () => {
       document.body.style.overflow = '';
+      document.body.style.pointerEvents = 'auto';
     };
   }, [open]);
 
   return (
     <RadixDialog.Root open={open} onOpenChange={setOpen}>
-      <AnimatePresence>
-        {open && (
-          <RadixDialog.Portal forceMount>
-            <RadixDialog.Overlay asChild forceMount>
-              <motion.div
-                className="mobile-nav-backdrop"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={reduced ? { duration: 0 } : { duration: 0.2 }}
-              />
-            </RadixDialog.Overlay>
-            <RadixDialog.Content asChild forceMount aria-describedby={undefined}>
-              <motion.div
-                id="mobile-nav-drawer"
-                className="mobile-nav-drawer"
-                initial={reduced ? { x: 0 } : { x: '-100%' }}
-                animate={{ x: 0 }}
-                exit={reduced ? { x: 0 } : { x: '-100%' }}
-                transition={
-                  reduced ? { duration: 0 } : { type: 'spring', stiffness: 300, damping: 30 }
-                }
-              >
-                <RadixDialog.Title className="sr-only">Primary navigation</RadixDialog.Title>
-                <MobileNavContent onClose={() => setOpen(false)} />
-              </motion.div>
-            </RadixDialog.Content>
-          </RadixDialog.Portal>
-        )}
-      </AnimatePresence>
+      <RadixDialog.Portal>
+        <RadixDialog.Overlay className="mobile-nav-backdrop" />
+        <RadixDialog.Content
+          aria-describedby={undefined}
+          id="mobile-nav-drawer"
+          className="mobile-nav-drawer"
+        >
+          <RadixDialog.Title className="sr-only">Primary navigation</RadixDialog.Title>
+          <MobileNavContent onClose={() => setOpen(false)} />
+        </RadixDialog.Content>
+      </RadixDialog.Portal>
     </RadixDialog.Root>
   );
 }

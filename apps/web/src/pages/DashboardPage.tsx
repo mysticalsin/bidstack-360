@@ -178,6 +178,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
 
   const cockpit = snapshot.cockpit;
   const isAccountView = Boolean(accountId);
+  const accountRecordKey = accountId.trim() || cockpit.company.name;
   const accountOpps = opps.data?.items.filter(
     (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
   );
@@ -253,25 +254,25 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
 
           {show('crossSell') && (
             <Reveal delay={0.18}>
-              <CrossSellCard accountKey={cockpit.company.id} />
+              <CrossSellCard accountKey={accountRecordKey} />
             </Reveal>
           )}
 
           {show('governance') && (
             <Reveal delay={0.2}>
-              <GovernanceLogCard accountKey={cockpit.company.id} />
+              <GovernanceLogCard accountKey={accountRecordKey} />
             </Reveal>
           )}
 
           {show('spotlightRefs') && (
             <Reveal delay={0.22}>
-              <SpotlightRefsCard accountKey={cockpit.company.id} />
+              <SpotlightRefsCard accountKey={accountRecordKey} />
             </Reveal>
           )}
 
           {show('contracts') && (
             <Reveal delay={0.24}>
-              <ContractAgreementsCard accountKey={cockpit.company.id} />
+              <ContractAgreementsCard accountKey={accountRecordKey} />
             </Reveal>
           )}
 

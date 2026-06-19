@@ -13,7 +13,14 @@ import { springSoft } from '@/lib/motion';
 
 import { AccountCard } from './accountsPage/AccountCard';
 import { IntegrationMotionRail, SourceStat } from './accountsPage/AccountDashboardWidgets';
-import { deriveAccount, sortRows, titleCase, type SortKey } from './accountsPage/accountUtils';
+import {
+  deriveAccount,
+  segmentMatches,
+  sortRows,
+  titleCase,
+  type AccountSegmentKey,
+  type SortKey,
+} from './accountsPage/accountUtils';
 
 export function AccountsPage() {
   const { t } = useTranslation('crm');
@@ -23,26 +30,48 @@ export function AccountsPage() {
   const reducedMotion = useReducedMotion();
   const [search, setSearch] = useState('');
   const [industry, setIndustry] = useState<string | null>(null);
+  const [segment, setSegment] = useState<AccountSegmentKey>('all');
+  const [technology, setTechnology] = useState<string | null>(null);
   const [sort, setSort] = useState<SortKey>('pipeline');
   const syncError = autopopulate.error instanceof Error ? autopopulate.error.message : null;
 
-  const rows = useMemo(() => {
+  const allRows = useMemo(() => {
     if (!dashboard.data) return [];
-    return dashboard.data.companies
-      .map((company) => deriveAccount(company, dashboard.data!.deals))
+    return dashboard.data.companies.map((company) => deriveAccount(company, dashboard.data!.deals));
+  }, [dashboard.data]);
+
+  const rows = useMemo(() => {
+    return allRows
       .filter((row) => {
         if (industry && row.company.industry !== industry) return false;
+        if (!segmentMatches(row, segment)) return false;
+        if (
+          technology &&
+          !(row.company.technicalStack ?? []).some(
+            (category) =>
+              category.label === technology ||
+              category.items.some((item) => item.name === technology),
+          )
+        ) {
+          return false;
+        }
         if (search) {
           const needle = search.toLowerCase();
           return (
             row.company.name.toLowerCase().includes(needle) ||
-            (row.company.domain ?? '').toLowerCase().includes(needle)
+            (row.company.domain ?? '').toLowerCase().includes(needle) ||
+            (row.company.industry ?? '').toLowerCase().includes(needle) ||
+            (row.company.technicalStack ?? []).some(
+              (category) =>
+                category.label.toLowerCase().includes(needle) ||
+                category.items.some((item) => item.name.toLowerCase().includes(needle)),
+            )
           );
         }
         return true;
       })
       .sort((a, b) => sortRows(a, b, sort));
-  }, [dashboard.data, search, industry, sort]);
+  }, [allRows, search, industry, segment, technology, sort]);
 
   // Memoize aggregate stats so they don't recompute on every render
   // (rows is already memoized — this just avoids four extra O(n) passes).
@@ -52,8 +81,24 @@ export function AccountsPage() {
       totalOpen: rows.reduce((acc, r) => acc + r.openDeals, 0),
       logoCoverage: rows.filter((r) => Boolean(r.company.logo?.url)).length,
       enrichedAccounts: rows.filter((r) => r.company.source === 'verified_data').length,
+      techAccounts: rows.filter((r) => (r.company.technicalStack?.length ?? 0) > 0).length,
+      avgCoverage:
+        rows.length > 0
+          ? Math.round(rows.reduce((acc, r) => acc + r.coverage.score, 0) / rows.length)
+          : 0,
     }),
     [rows],
+  );
+
+  const segmentCounts = useMemo(
+    () => ({
+      all: allRows.length,
+      enriched: allRows.filter((row) => segmentMatches(row, 'enriched')).length,
+      with_tech: allRows.filter((row) => segmentMatches(row, 'with_tech')).length,
+      needs_data: allRows.filter((row) => segmentMatches(row, 'needs_data')).length,
+      watch: allRows.filter((row) => segmentMatches(row, 'watch')).length,
+    }),
+    [allRows],
   );
 
   const industries = useMemo(() => {
@@ -64,6 +109,41 @@ export function AccountsPage() {
       ),
     ].sort();
   }, [dashboard.data]);
+
+  const technologyOptions = useMemo(() => {
+    const options = new Set<string>();
+    for (const row of allRows) {
+      for (const category of row.company.technicalStack ?? []) {
+        options.add(category.label);
+        for (const item of category.items) options.add(item.name);
+      }
+    }
+    return [...options].sort();
+  }, [allRows]);
+
+  const healthDistribution = useMemo(
+    () => [
+      { key: 'strong', label: t('accounts.health.strong', 'Strong'), count: rows.filter((row) => row.health === 'strong').length },
+      { key: 'good', label: t('accounts.health.good', 'Good'), count: rows.filter((row) => row.health === 'good').length },
+      {
+        key: 'needs_attention',
+        label: t('accounts.health.watch', 'Watch'),
+        count: rows.filter((row) => row.health === 'needs_attention').length,
+      },
+      { key: 'critical', label: t('accounts.health.risk', 'At risk'), count: rows.filter((row) => row.health === 'critical').length },
+    ],
+    [rows, t],
+  );
+
+  const topMissingFields = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      for (const missing of row.coverage.missing) {
+        counts.set(missing, (counts.get(missing) ?? 0) + 1);
+      }
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  }, [rows]);
 
   if (dashboard.isLoading) {
     return (
@@ -96,7 +176,7 @@ export function AccountsPage() {
     );
   }
 
-  const { totalPipeline, totalOpen, logoCoverage, enrichedAccounts } = summaryStats;
+  const { totalPipeline, totalOpen, logoCoverage, enrichedAccounts, techAccounts, avgCoverage } = summaryStats;
   const healthyProviders = dashboard.data.providerHealth.filter(
     (p) => p.status === 'healthy',
   ).length;
@@ -231,9 +311,12 @@ export function AccountsPage() {
           detail={t('accounts.stats.weightedPipeline.detail', 'bid and presales')}
         />
         <SourceStat
-          label={t('accounts.stats.logoCoverage.label', 'Logo coverage')}
-          value={`${logoCoverage}/${rows.length || 0}`}
-          detail={t('accounts.stats.logoCoverage.detail', 'brand assets')}
+          label={t('accounts.stats.coverage.label', 'Avg coverage')}
+          value={`${avgCoverage}%`}
+          detail={t('accounts.stats.coverage.detail', '{{logos}} logos / {{tech}} tech', {
+            logos: logoCoverage,
+            tech: techAccounts,
+          })}
         />
         <SourceStat
           label={t('accounts.stats.enrichedProfiles.label', 'Enriched profiles')}
@@ -253,6 +336,36 @@ export function AccountsPage() {
         }))}
       />
 
+      <section className="account-experience-panel" aria-label={t('accounts.experience.regionLabel', 'Portfolio cockpit')}>
+        <div className="account-experience-copy">
+          <p>{t('accounts.experience.eyebrow', 'Portfolio cockpit')}</p>
+          <h2>{t('accounts.experience.title', '{{count}} accounts in view', { count: rows.length })}</h2>
+          <span>
+            {topMissingFields.length > 0
+              ? t('accounts.experience.gaps', 'Top gaps: {{gaps}}', {
+                  gaps: topMissingFields.map(([name, count]) => `${name} (${count})`).join(', '),
+                })
+              : t('accounts.experience.complete', 'No coverage gaps in the current view.')}
+          </span>
+        </div>
+        <div className="account-health-bars">
+          {healthDistribution.map((item) => {
+            const width = rows.length > 0 ? `${Math.round((item.count / rows.length) * 100)}%` : '0%';
+            return (
+              <div key={item.key} className={`account-health-bar account-health-${item.key}`}>
+                <div>
+                  <span>{item.label}</span>
+                  <strong>{item.count}</strong>
+                </div>
+                <span aria-hidden>
+                  <i style={{ width }} />
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
       <motion.section
         className="card account-filter-card"
         aria-label={t('accounts.filters.regionLabel', 'Filters')}
@@ -260,7 +373,27 @@ export function AccountsPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ ...springSoft, delay: reducedMotion ? 0 : 0.08 }}
       >
-        <div className="card-body" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <div className="card-body account-filter-body">
+          <div className="account-segment-bar" role="group" aria-label={t('accounts.segments.label', 'Account segments')}>
+            {[
+              { key: 'all', label: t('accounts.segments.all', 'All'), count: segmentCounts.all },
+              { key: 'enriched', label: t('accounts.segments.enriched', 'Enriched'), count: segmentCounts.enriched },
+              { key: 'with_tech', label: t('accounts.segments.withTech', 'Tech stack'), count: segmentCounts.with_tech },
+              { key: 'needs_data', label: t('accounts.segments.needsData', 'Needs data'), count: segmentCounts.needs_data },
+              { key: 'watch', label: t('accounts.segments.watch', 'Watch'), count: segmentCounts.watch },
+            ].map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                aria-pressed={segment === option.key}
+                className={segment === option.key ? 'is-active' : ''}
+                onClick={() => setSegment(option.key as AccountSegmentKey)}
+              >
+                <span>{option.label}</span>
+                <strong>{option.count}</strong>
+              </button>
+            ))}
+          </div>
           <label className="account-filter" aria-label={t('accounts.filters.search.label', 'Search')}>
             <Icon name="search" size={14} />
             <input
@@ -284,6 +417,20 @@ export function AccountsPage() {
               ))}
             </select>
           </label>
+          <label
+            className="account-filter"
+            aria-label={t('accounts.filters.technology.label', 'Technology')}
+          >
+            <Icon name="zap" size={14} />
+            <select value={technology ?? ''} onChange={(e) => setTechnology(e.target.value || null)}>
+              <option value="">{t('accounts.filters.technology.all', 'All technologies')}</option>
+              {technologyOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="account-filter" aria-label={t('accounts.filters.sort.label', 'Sort')}>
             <Icon name="reports" size={14} />
             <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
@@ -295,8 +442,26 @@ export function AccountsPage() {
               <option value="industry">
                 {t('accounts.filters.sort.industry', 'Sort: industry')}
               </option>
+              <option value="coverage">
+                {t('accounts.filters.sort.coverage', 'Sort: coverage')}
+              </option>
             </select>
           </label>
+          {search || industry || technology || segment !== 'all' ? (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setSearch('');
+                setIndustry(null);
+                setTechnology(null);
+                setSegment('all');
+              }}
+            >
+              <Icon name="refresh" size={14} />
+              {t('accounts.filters.reset', 'Reset')}
+            </button>
+          ) : null}
         </div>
       </motion.section>
 

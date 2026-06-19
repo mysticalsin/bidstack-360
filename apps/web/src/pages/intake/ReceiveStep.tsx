@@ -82,7 +82,7 @@ export function ReceiveStep({
           isDragging
             ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)]'
             : 'border-[var(--border-subtle)] bg-[var(--surface-sunken)]'
-        } ${canUpload ? '' : 'opacity-70'}`}
+        }`}
       >
         <Icon name="upload" size={20} className="mx-auto text-[var(--fg-tertiary)]" />
         <p className="mt-1 text-xs text-[var(--fg-secondary)]">

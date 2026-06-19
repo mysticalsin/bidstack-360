@@ -55,7 +55,12 @@ export function WebhookEventsCard({
           </div>
         </div>
       ) : (
-        <div className="overflow-x-auto" role="region" aria-label="Recent webhook events table">
+        <div
+          className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+          role="region"
+          aria-label="Recent webhook events table"
+          tabIndex={0}
+        >
           <table className="w-full min-w-[760px] border-collapse text-left text-sm">
             <caption className="sr-only">Recent webhook events, newest first</caption>
             <thead className="bg-[var(--surface-secondary)] text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">

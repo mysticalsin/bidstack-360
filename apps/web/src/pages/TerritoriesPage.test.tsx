@@ -5,7 +5,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement, ReactNode } from 'react';
 
 import { TerritoriesPage } from './TerritoriesPage';
-import { useTerritories, useLeadRoutingRules, useTerritoryAnalytics } from '@/hooks/useTerritories';
+import {
+  useTerritories,
+  useLeadRoutingRules,
+  useTerritoryAnalytics,
+  useTerritorySegments,
+} from '@/hooks/useTerritories';
 
 type MapChildrenProps = { children?: ReactNode };
 type GeographiesProps = { children: (args: { geographies: unknown[] }) => ReactNode };
@@ -14,6 +19,7 @@ vi.mock('@/hooks/useTerritories', () => ({
   useTerritories: vi.fn(),
   useLeadRoutingRules: vi.fn(),
   useTerritoryAnalytics: vi.fn(),
+  useTerritorySegments: vi.fn(),
   useCreateTerritory: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useUpdateTerritory: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useDeleteTerritory: vi.fn(() => ({ mutate: vi.fn() })),
@@ -42,11 +48,19 @@ function mockTerritoryHooks(
   tValue: Partial<ReturnType<typeof useTerritories>>,
   rValue: Partial<ReturnType<typeof useLeadRoutingRules>>,
   aValue: Partial<ReturnType<typeof useTerritoryAnalytics>>,
+  sValue: Partial<ReturnType<typeof useTerritorySegments>> = {
+    data: undefined,
+    isLoading: false,
+    isError: false,
+  },
 ) {
   vi.mocked(useTerritories).mockReturnValue(tValue as ReturnType<typeof useTerritories>);
   vi.mocked(useLeadRoutingRules).mockReturnValue(rValue as ReturnType<typeof useLeadRoutingRules>);
   vi.mocked(useTerritoryAnalytics).mockReturnValue(
     aValue as ReturnType<typeof useTerritoryAnalytics>,
+  );
+  vi.mocked(useTerritorySegments).mockReturnValue(
+    sValue as ReturnType<typeof useTerritorySegments>,
   );
 }
 

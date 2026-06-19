@@ -72,6 +72,7 @@ export const CompanyLogo = forwardRef<HTMLSpanElement, CompanyLogoProps>(functio
         fontWeight: 700,
       }}
       title={logo?.attribution?.label ?? t('companyLogo.ariaLabel', '{{name}} logo', { name })}
+      role="img"
       aria-label={t('companyLogo.ariaLabel', '{{name}} logo', { name })}
     >
       {url ? (

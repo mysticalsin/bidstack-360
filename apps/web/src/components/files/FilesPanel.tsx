@@ -73,10 +73,10 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
         title={t('files.heading', 'Files')}
         caption={
           list.data
-            ? t('files.attachmentCount', '{{count}} attachment(s)', {
+            ? t('files.attachmentCountScoped', '{{count}} attachment(s) - access follows account groups', {
                 count: list.data.items.length,
               })
-            : undefined
+            : t('files.accessScoped', 'Access follows account groups')
         }
         action={
           <Button
@@ -88,6 +88,16 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
             {upload.isPending ? t('files.uploading', 'Uploading…') : t('files.upload', 'Upload')}
           </Button>
         }
+      />
+
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        accept={FILE_INPUT_ACCEPT}
+        onChange={onChange}
+        className="sr-only"
+        aria-label={t('files.inputLabel', 'Choose files to upload')}
       />
 
       <div
@@ -117,14 +127,6 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
         <p className="mt-0.5 text-[11px] text-[var(--fg-tertiary)]">
           {t('files.acceptedFormats', 'PDF, DOCX, XLSX, images — up to 50 MB')}
         </p>
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          accept={FILE_INPUT_ACCEPT}
-          onChange={onChange}
-          className="sr-only"
-        />
       </div>
 
       {uploadError ? (

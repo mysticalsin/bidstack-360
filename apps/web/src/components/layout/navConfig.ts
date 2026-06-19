@@ -100,6 +100,7 @@ export const NAV_SECTIONS: NavSection[] = [
       // RFP Response Hub (a read-only roll-up) folded into Proposals — the
       // actual work surface. /rfp-response now redirects there.
       { to: '/proposals', label: 'Proposals', labelKey: 'nav.proposals', icon: 'receipt' },
+      { to: '/serum', label: 'SERUM Mission Control', labelKey: 'nav.serumMissionControl', icon: 'sparkle' },
       { to: '/agent-studio', label: 'Agent Studio', labelKey: 'nav.agentStudio', icon: 'sparkle' },
     ],
   },

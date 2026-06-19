@@ -37,7 +37,7 @@ interface StageColumnProps {
 }
 
 export const StageColumn = memo(function StageColumn({
-  stageId: _stageId,
+  stageId,
   stageName,
   stageColor: _stageColor,
   items,
@@ -59,6 +59,9 @@ export const StageColumn = memo(function StageColumn({
   return (
     <section
       aria-label={`${stageName} column with ${items.length} opportunities`}
+      data-testid="pipeline-column"
+      data-stage-id={stageId}
+      data-stage-name={stageName}
       className="min-w-0"
     >
       <div className="flex items-center justify-between mb-2 px-1">
@@ -91,6 +94,7 @@ export const StageColumn = memo(function StageColumn({
       </div>
       <GlassCard
         padding="none"
+        data-testid="pipeline-column-dropzone"
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}

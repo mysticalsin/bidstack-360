@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { memo, useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { AnimatedNumber } from '@/components/motion/AnimatedNumber';
@@ -22,32 +23,34 @@ interface Props {
 // Management), each under an explicit header. A manually edited field moves
 // to Internal and carries the "manually overridden" flag.
 export const KpiRow = memo(function KpiRow({ cockpit }: Props) {
+  const { t } = useTranslation('crm');
   const external = cockpit.kpis.filter((k) => k.block === 'external');
   const internal = cockpit.kpis.filter((k) => k.block !== 'external');
+  const companyOverrideKey = cockpit.company.name;
   const lastSynced = cockpit.externalLastSyncedAt
     ? cockpit.externalLastSyncedAt.slice(0, 10)
     : null;
 
   return (
-    <div className="space-y-3">
+    <section className="space-y-3" aria-label="Account metrics">
       <KpiBlock
-        title="External Intelligence"
+        title={t('kpiRow.externalIntelligence', 'External Intelligence')}
         caption={
           lastSynced
-            ? `External source · Last updated: ${lastSynced} (refreshes ~every 2 weeks)`
-            : 'External source · not synced yet'
+            ? `${t('kpiRow.externalLastUpdated', 'External source · Last updated:')} ${lastSynced} ${t('kpiRow.externalRefreshes', '(refreshes ~every 2 weeks)')}`
+            : t('kpiRow.externalNotSynced', 'External source · not synced yet')
         }
         kpis={external}
-        companyKey={cockpit.company.id}
+        companyKey={companyOverrideKey}
         editable
       />
       <KpiBlock
-        title="Internal Data"
-        caption="ABC / Opportunity Management — projects, deals, outcomes"
+        title={t('kpiRow.internalData', 'Internal Data')}
+        caption={t('kpiRow.internalCaption', 'ABC / Opportunity Management — projects, deals, outcomes')}
         kpis={internal}
-        companyKey={cockpit.company.id}
+        companyKey={companyOverrideKey}
       />
-    </div>
+    </section>
   );
 });
 
@@ -64,6 +67,7 @@ function KpiBlock({
   companyKey: string;
   editable?: boolean;
 }) {
+  const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
   if (kpis.length === 0) return null;
   const cols = Math.min(6, Math.max(3, kpis.length));
@@ -114,11 +118,11 @@ function KpiBlock({
               }}
             >
               <SourceBadge
-                label={kpi.overridden ? 'Manually overridden' : (kpi.sourceLabel ?? 'Internal')}
+                label={kpi.overridden ? t('kpiRow.manuallyOverridden', 'Manually overridden') : (kpi.sourceLabel ?? t('kpiRow.internal', 'Internal'))}
                 state={kpi.sourceState ?? 'crm'}
-                hint={kpi.sourceHint ?? kpi.detail ?? 'BidStack internal data'}
+                hint={kpi.sourceHint ?? kpi.detail ?? t('kpiRow.internalDataHint', 'BidStack internal data')}
               />
-              {editable && kpi.fieldKey ? (
+              {(editable || kpi.overridden) && kpi.fieldKey ? (
                 <FieldOverrideEditor kpi={kpi} companyKey={companyKey} />
               ) : null}
             </div>
@@ -135,6 +139,7 @@ function KpiBlock({
  * flagged as manually overridden — the Apollo snapshot itself is untouched.
  */
 function FieldOverrideEditor({ kpi, companyKey }: { kpi: CockpitKpi; companyKey: string }) {
+  const { t } = useTranslation('crm');
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const queryClient = useQueryClient();
@@ -147,13 +152,13 @@ function FieldOverrideEditor({ kpi, companyKey }: { kpi: CockpitKpi; companyKey:
         body: { fieldKey, value },
       }),
     onSuccess: () => {
-      toast.success('Field overridden', {
+      toast.success(t('kpiRow.toastFieldOverridden', 'Field overridden'), {
         description: `${kpi.label} moved to Internal Data with your value.`,
       });
       setOpen(false);
       void queryClient.invalidateQueries({ queryKey: ['crm-dashboard'] });
     },
-    onError: (err: Error) => toast.error('Override failed', { description: err.message }),
+    onError: (err: Error) => toast.error(t('kpiRow.toastOverrideFailed', 'Override failed'), { description: err.message }),
   });
 
   const revert = useMutation({
@@ -163,12 +168,12 @@ function FieldOverrideEditor({ kpi, companyKey }: { kpi: CockpitKpi; companyKey:
         { method: 'DELETE' },
       ),
     onSuccess: () => {
-      toast.success('Reverted to external value', {
+      toast.success(t('kpiRow.toastReverted', 'Reverted to external value'), {
         description: `${kpi.label} uses the external source value again.`,
       });
       void queryClient.invalidateQueries({ queryKey: ['crm-dashboard'] });
     },
-    onError: (err: Error) => toast.error('Revert failed', { description: err.message }),
+    onError: (err: Error) => toast.error(t('kpiRow.toastRevertFailed', 'Revert failed'), { description: err.message }),
   });
 
   const onSubmit = (event: FormEvent) => {
@@ -181,7 +186,7 @@ function FieldOverrideEditor({ kpi, companyKey }: { kpi: CockpitKpi; companyKey:
     }
     const numeric = Number(trimmed.replace(/[,\s]/g, ''));
     if (!Number.isFinite(numeric) || numeric <= 0) {
-      toast.error('Invalid value', { description: 'Enter a positive number.' });
+      toast.error(t('kpiRow.toastInvalidValue', 'Invalid value'), { description: t('kpiRow.toastEnterPositiveNumber', 'Enter a positive number.') });
       return;
     }
     // Revenue is entered in plain currency units; the wire wants micros.
@@ -223,7 +228,7 @@ function FieldOverrideEditor({ kpi, companyKey }: { kpi: CockpitKpi; companyKey:
           if (event.key === 'Escape') setOpen(false);
         }}
         aria-label={`New value for ${kpi.label}`}
-        placeholder={fieldKey === 'industry' ? 'Industry' : 'Number'}
+        placeholder={fieldKey === 'industry' ? t('kpiRow.placeholderIndustry', 'Industry') : t('kpiRow.placeholderNumber', 'Number')}
         className="min-h-[44px] w-24 rounded border border-[var(--border)] bg-[var(--surface)] px-1.5 text-xs text-[var(--fg-primary)]"
       />
       <button
@@ -231,7 +236,7 @@ function FieldOverrideEditor({ kpi, companyKey }: { kpi: CockpitKpi; companyKey:
         disabled={save.isPending}
         className="inline-flex min-h-[44px] items-center rounded bg-[var(--brand-primary)] px-2.5 text-[11px] font-semibold text-[var(--fg-on-brand,white)] disabled:opacity-50"
       >
-        {save.isPending ? '…' : 'Save'}
+        {save.isPending ? '…' : t('kpiRow.btnSave', 'Save')}
       </button>
     </form>
   );

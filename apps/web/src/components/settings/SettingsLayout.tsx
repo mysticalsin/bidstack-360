@@ -6,6 +6,7 @@ import { useIsAdmin } from '@/lib/auth';
 
 export type SettingsSection =
   | 'overview'
+  | 'serum'
   | 'profile'
   | 'appearance'
   | 'notifications'
@@ -31,7 +32,10 @@ interface Group {
 const GROUPS: Group[] = [
   {
     label: 'Command center',
-    items: [{ id: 'overview', label: 'Overview', icon: 'dashboard' }],
+    items: [
+      { id: 'overview', label: 'Overview', icon: 'dashboard' },
+      { id: 'serum', label: 'SERUM Control Plane', icon: 'sparkle', admin: true },
+    ],
   },
   {
     // Profile folds into Security; Language folds into Appearance — fewer,
@@ -98,6 +102,8 @@ export function SettingsLayout({ active, onChange, children }: Props) {
     switch (id) {
       case 'overview':
         return t('settingsLayout.itemOverview', 'Overview');
+      case 'serum':
+        return t('settingsLayout.itemSerum', 'SERUM Control Plane');
       case 'appearance':
         return t('settingsLayout.itemAppearance', 'Appearance & Language');
       case 'notifications':

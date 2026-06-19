@@ -187,7 +187,7 @@ export function QuickStartPage() {
                   'group flex w-full items-start gap-4 rounded-xl border p-4 text-left transition-all',
                   'min-h-[44px]', // WCAG touch target
                   done
-                    ? 'border-[var(--border-subtle)] bg-[var(--surface-sunken)] opacity-70'
+                    ? 'border-[var(--border-subtle)] bg-[var(--surface-sunken)]'
                     : 'border-[var(--border-default)] bg-[var(--surface-card)] hover:border-[var(--brand)] hover:shadow-sm',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]',
                 )}
@@ -212,7 +212,7 @@ export function QuickStartPage() {
                     className={cn(
                       'text-sm font-medium',
                       done
-                        ? 'text-[var(--fg-tertiary)] line-through'
+                        ? 'text-[var(--fg-secondary)] line-through'
                         : 'text-[var(--fg-primary)]',
                     )}
                   >

@@ -146,7 +146,7 @@ export function MeetingNotesImportDialog({ accountId, companyName, domain, trigg
               >
                 <div className="meeting-import-result-head">
                   <div>
-                    <span>Saved to BidStack</span>
+                    <span>Saved to CRM</span>
                     <strong>{totalSignals} extracted signals</strong>
                   </div>
                   <Badge tone="jade">{totalCreated(result)} records</Badge>

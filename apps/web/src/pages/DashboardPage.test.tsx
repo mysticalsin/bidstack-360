@@ -13,6 +13,13 @@ import { ApiError } from '@/lib/api';
 import { useIsAdmin } from '@/lib/auth';
 import { useAccountHistory } from '@/stores/accountHistory';
 
+const cardProps = vi.hoisted(() => ({
+  crossSellKeys: [] as string[],
+  governanceKeys: [] as string[],
+  spotlightKeys: [] as string[],
+  contractKeys: [] as string[],
+}));
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (_key: string, fallback: string) => fallback,
@@ -45,16 +52,28 @@ vi.mock('@/components/account-intel/InfoSearchLeadsCard', () => ({
   InfoSearchLeadsCard: () => <div data-testid="infosearch-card" />,
 }));
 vi.mock('@/components/account-intel/CrossSellCard', () => ({
-  CrossSellCard: () => <div data-testid="cross-sell-card" />,
+  CrossSellCard: ({ accountKey }: { accountKey: string }) => {
+    cardProps.crossSellKeys.push(accountKey);
+    return <div data-testid="cross-sell-card" />;
+  },
 }));
 vi.mock('@/components/account-intel/GovernanceLogCard', () => ({
-  GovernanceLogCard: () => <div data-testid="governance-card" />,
+  GovernanceLogCard: ({ accountKey }: { accountKey: string }) => {
+    cardProps.governanceKeys.push(accountKey);
+    return <div data-testid="governance-card" />;
+  },
 }));
 vi.mock('@/components/account-intel/SpotlightRefsCard', () => ({
-  SpotlightRefsCard: () => <div data-testid="spotlight-card" />,
+  SpotlightRefsCard: ({ accountKey }: { accountKey: string }) => {
+    cardProps.spotlightKeys.push(accountKey);
+    return <div data-testid="spotlight-card" />;
+  },
 }));
 vi.mock('@/components/account-intel/ContractAgreementsCard', () => ({
-  ContractAgreementsCard: () => <div data-testid="contracts-card" />,
+  ContractAgreementsCard: ({ accountKey }: { accountKey: string }) => {
+    cardProps.contractKeys.push(accountKey);
+    return <div data-testid="contracts-card" />;
+  },
 }));
 vi.mock('@/components/account-intel/AccountNewsSignalCard', () => ({
   AccountNewsSignalCard: () => <div data-testid="news-signal-card" />,
@@ -202,6 +221,10 @@ function renderAccountRoute() {
 describe('DashboardPage account cockpit', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    cardProps.crossSellKeys = [];
+    cardProps.governanceKeys = [];
+    cardProps.spotlightKeys = [];
+    cardProps.contractKeys = [];
     sessionStorage.clear();
     vi.mocked(usePipelineReport).mockReturnValue({} as never);
       vi.mocked(useOpportunities).mockReturnValue({
@@ -296,6 +319,27 @@ describe('DashboardPage account cockpit', () => {
     expect(screen.getByRole('alert')).toBeDefined();
     expect(screen.getByText("Couldn't load the account cockpit")).toBeDefined();
     expect(screen.queryByTestId('page-head')).toBeNull();
+  });
+
+  it('passes the route account key to account-scoped intelligence cards', () => {
+    const snapshot = dashboardSnapshot('fresh');
+    snapshot.cockpit.company.id = '00000000-0000-4000-8000-000000000999';
+
+    vi.mocked(useCrmDashboard).mockReturnValue({
+      data: snapshot,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch,
+    } as never);
+
+    renderAccountRoute();
+
+    expect(cardProps.crossSellKeys).toContain('acme');
+    expect(cardProps.governanceKeys).toContain('acme');
+    expect(cardProps.spotlightKeys).toContain('acme');
+    expect(cardProps.contractKeys).toContain('acme');
+    expect(cardProps.crossSellKeys).not.toContain('00000000-0000-4000-8000-000000000999');
   });
 
   it('queues Apollo refresh once when account strategic intelligence is stale', async () => {

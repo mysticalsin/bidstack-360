@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useReducedMotion } from 'framer-motion';
 import { motion } from 'motion/react';
 
@@ -10,6 +11,7 @@ const VIDEO_URL =
   'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260428_193507_4286c423-2fd9-4efd-92bd-91a939453fc1.mp4';
 
 export function Hero() {
+  const { t } = useTranslation('auth');
   const reducedMotion = useReducedMotion();
 
   const h1Anim = reducedMotion
@@ -46,7 +48,7 @@ export function Hero() {
               {...h1Anim}
               transition={{ duration: 0.8, delay: 0.2 }}
             >
-              Win More Bids
+              {t('hero.winBids', 'Win More Bids')}
             </motion.h1>
 
             <motion.div
@@ -62,10 +64,12 @@ export function Hero() {
               <div className="w-12 h-[2px] bg-[rgba(30,50,90,0.15)] mb-4 rounded-full" />
 
               <a
-                href="https://github.com/tonywalteur"
+                href="https://www.linkedin.com/in/tonywalteur/"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-xs sm:text-sm font-bold tracking-wider text-[rgba(30,50,90,0.9)] hover:text-black uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
               >
-                Built by Tony Walteur
+                {t('hero.builtBy', 'Built by Tony Walteur')}
               </a>
             </motion.div>
           </div>

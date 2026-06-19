@@ -16,6 +16,45 @@ vi.mock('@/hooks/useStageMutation', () => ({
   useStageMutation: vi.fn(() => ({ mutateAsync: vi.fn() })),
 }));
 
+vi.mock('@/hooks/usePipelineStages', () => ({
+  usePipelineStages: vi.fn(() => ({
+    data: { items: [] },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
+}));
+
+vi.mock('@/hooks/useTerritories', () => ({
+  useTerritorySegments: vi.fn(() => ({
+    data: {
+      dimension: 'industry',
+      items: [],
+      totals: {
+        totalSegments: 0,
+        totalValueMicros: 0,
+        totalOpportunities: 0,
+        avgProbability: 0,
+      },
+    },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
+}));
+
+vi.mock('@/hooks/useFormatMoney', () => ({
+  useFormatMoney: () => ({
+    currency: 'EUR',
+    convert: (value: number) => value,
+    formatMoney: (value: number) => `EUR ${value.toLocaleString('en-US')}`,
+    formatMoneyMicros: (micros: string | number | bigint) =>
+      `EUR ${(Number(micros) / 1_000_000).toLocaleString('en-US')}`,
+  }),
+}));
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 });
