@@ -21,7 +21,9 @@ const pub = new Redis(redisUrl, {
   enableOfflineQueue: true,
   maxRetriesPerRequest: null,
   retryStrategy: (times) => Math.min(times * 200, 5_000),
-  lazyConnect: false,
+  // HTTP-only API flows should not emit realtime Redis incidents at startup.
+  // Connect when publish/subscribe is actually used, then fail loudly there.
+  lazyConnect: true,
 });
 
 pub.on('error', (err: Error) => {
@@ -34,7 +36,7 @@ const sub = new Redis(redisUrl, {
   enableOfflineQueue: true,
   maxRetriesPerRequest: null,
   retryStrategy: (times) => Math.min(times * 200, 5_000),
-  lazyConnect: false,
+  lazyConnect: true,
 });
 
 sub.on('error', (err: Error) => {

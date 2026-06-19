@@ -40,6 +40,7 @@ import { reportsRoutes } from './routes/reports.js';
 import { analyticsReportsRoutes } from './routes/analytics-reports.js';
 import { analyticsDashboardsRoutes } from './routes/analytics-dashboards.js';
 import { configFeaturesRoutes } from './routes/config-features.js';
+import { serumRoutes } from './routes/serum.js';
 import { salesToolkitsRoutes } from './routes/sales-toolkits.js';
 import { sectorViewRoutes } from './routes/sector-view.js';
 import { infosearchRoutes } from './routes/infosearch.js';
@@ -117,6 +118,7 @@ import { rfpPipelineRoutes } from './routes/rfp-pipeline.js';
 import { competitorRoutes } from './routes/competitors.js';
 // Wave 10 — Operational monitoring (queue depths, embedding failure rate, alerts)
 import { monitoringRoutes } from './routes/monitoring.js';
+import { opsSentrySmokeRoutes } from './routes/ops-sentry-smoke.js';
 // Data migration: CSV import, cancel/undo destructive operations
 import { migrationRoutes } from './routes/migrations.js';
 // Data migration: HubSpot OAuth + import
@@ -134,6 +136,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(analyticsReportsRoutes, { prefix: '/api/v1' });
   await server.register(analyticsDashboardsRoutes, { prefix: '/api/v1' });
   await server.register(configFeaturesRoutes, { prefix: '/api/v1' });
+  await server.register(serumRoutes, { prefix: '/api/v1' });
   await server.register(salesToolkitsRoutes, { prefix: '/api/v1' });
   await server.register(sectorViewRoutes, { prefix: '/api/v1' });
   await server.register(infosearchRoutes, { prefix: '/api/v1' });
@@ -270,6 +273,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
 
   // Wave 10 — Operational monitoring: live queue depths, embedding failure rate, alert conditions
   await server.register(monitoringRoutes, { prefix: '/api/v1' });
+  await server.register(opsSentrySmokeRoutes, { prefix: '/api/v1' });
 
   // Data migration: CSV import, cancel/undo destructive operations
   await server.register(migrationRoutes, { prefix: '/api/v1' });

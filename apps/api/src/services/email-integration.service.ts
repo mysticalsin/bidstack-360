@@ -29,6 +29,7 @@ import {
 } from './email-integration.helpers.js';
 import { sendViaGmail, pullGmail } from './email-integration.gmail.js';
 import { sendViaMsGraph, pullMsGraphMail } from './email-integration.graph.js';
+import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
 
 // Re-export types so callers don't need to import from helpers directly
 export type {
@@ -59,9 +60,16 @@ export async function sendEmail(
     throw new Error('No active email integration found. Connect Gmail or Outlook first.');
   }
 
-  const accessToken = await getAccessToken(token, log);
   const pixelToken = randomBytes(24).toString('base64url');
   const isGmail = token.provider === 'gmail';
+  await assertSerumConnectorAllowed({
+    orgId: params.orgId,
+    connectorId: isGmail ? 'gmail' : 'microsoft_graph',
+    operation: 'email.send',
+    writeRequested: true,
+  });
+
+  const accessToken = await getAccessToken(token, log);
 
   const { externalMessageId, threadId } = isGmail
     ? await sendViaGmail(accessToken, params, pixelToken, log)
@@ -116,6 +124,13 @@ export async function pullEmails(params: PullEmailsParams, log: ServiceLogger): 
     log.warn({ tokenId: params.integrationTokenId }, 'Skipping pull: token inactive or not found');
     return;
   }
+
+  await assertSerumConnectorAllowed({
+    orgId: params.orgId,
+    connectorId: token.provider === 'gmail' ? 'gmail' : 'microsoft_graph',
+    operation: 'email.pull',
+    writeRequested: false,
+  });
 
   const accessToken = await getAccessToken(token, log);
   const deltaState = (token.deltaState ?? {}) as Record<string, unknown>;

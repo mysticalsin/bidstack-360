@@ -31,11 +31,15 @@ const PRUNE_DAYS = parseInt(process.env.YJS_PRUNE_DAYS ?? '30', 10);
 const ENCRYPTION_ENABLED = process.env.PII_FIELD_ENCRYPTION === 'true';
 const ENC_KEY_HEX = (process.env.APP_SECRET ?? '0'.repeat(64)).slice(0, 64);
 const ENC_KEY = Buffer.from(ENC_KEY_HEX, 'hex');
+const IV_BYTES = 12;
+const AUTH_TAG_BYTES = 16;
 
 function encrypt(plainBuf: Buffer): Buffer {
   if (!ENCRYPTION_ENABLED) return plainBuf;
-  const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', ENC_KEY, iv);
+  const iv = randomBytes(IV_BYTES);
+  const cipher = createCipheriv('aes-256-gcm', ENC_KEY, iv, {
+    authTagLength: AUTH_TAG_BYTES,
+  });
   const encrypted = Buffer.concat([cipher.update(plainBuf), cipher.final()]);
   const authTag = cipher.getAuthTag();
   return Buffer.concat([iv, authTag, encrypted]);
@@ -43,10 +47,12 @@ function encrypt(plainBuf: Buffer): Buffer {
 
 function decrypt(cipherBuf: Buffer): Buffer {
   if (!ENCRYPTION_ENABLED) return cipherBuf;
-  const iv = cipherBuf.subarray(0, 12);
-  const authTag = cipherBuf.subarray(12, 28);
-  const ciphertext = cipherBuf.subarray(28);
-  const decipher = createDecipheriv('aes-256-gcm', ENC_KEY, iv);
+  const iv = cipherBuf.subarray(0, IV_BYTES);
+  const authTag = cipherBuf.subarray(IV_BYTES, IV_BYTES + AUTH_TAG_BYTES);
+  const ciphertext = cipherBuf.subarray(IV_BYTES + AUTH_TAG_BYTES);
+  const decipher = createDecipheriv('aes-256-gcm', ENC_KEY, iv, {
+    authTagLength: AUTH_TAG_BYTES,
+  });
   decipher.setAuthTag(authTag);
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
 }

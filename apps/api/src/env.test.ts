@@ -50,7 +50,70 @@ describe('boot environment validation', () => {
         S3_REGION: 'us-east-1',
         STORAGE_SCAN_REQUIRED: 'true',
       }),
-    ).rejects.toThrow('INTEGRATION_TOKEN_KEY is required in production');
+    ).rejects.toThrow('INTEGRATION_TOKEN_KEY must be a 64-character hex string in production');
+  });
+
+  it('rejects malformed INTEGRATION_TOKEN_KEY in production', async () => {
+    await expect(
+      loadEnvWith({
+        NODE_ENV: 'production',
+        STORAGE_DRIVER: 's3',
+        S3_BUCKET: 'bidstack-prod-files',
+        S3_REGION: 'us-east-1',
+        STORAGE_SCAN_REQUIRED: 'true',
+        INTEGRATION_TOKEN_KEY: 'unit-test-integration-token-key',
+        PUBLIC_BASE_URL: 'https://crm.example.com',
+      }),
+    ).rejects.toThrow('INTEGRATION_TOKEN_KEY must be a 64-character hex string in production');
+  });
+
+  it('requires a non-loopback HTTPS public web origin in production', async () => {
+    const productionBase = {
+      NODE_ENV: 'production',
+      STORAGE_DRIVER: 's3',
+      S3_BUCKET: 'bidstack-prod-files',
+      S3_REGION: 'us-east-1',
+      STORAGE_SCAN_REQUIRED: 'true',
+      INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
+    };
+
+    await expect(
+      loadEnvWith({
+        ...productionBase,
+        PUBLIC_BASE_URL: 'http://crm.example.com',
+      }),
+    ).rejects.toThrow('PUBLIC_BASE_URL must use https in production');
+
+    await expect(
+      loadEnvWith({
+        ...productionBase,
+        PUBLIC_BASE_URL: 'https://127.0.0.1:5173',
+      }),
+    ).rejects.toThrow('PUBLIC_BASE_URL must be set to the public web origin in production');
+  });
+
+  it('requires an explicit acknowledgement before public demo mode can run in production', async () => {
+    const productionDemo = {
+      NODE_ENV: 'production',
+      STORAGE_DRIVER: 'local',
+      STORAGE_SCAN_REQUIRED: 'true',
+      INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
+      PUBLIC_BASE_URL: 'https://demo.example.com',
+      DEMO_MODE: 'true',
+      DEMO_SESSION_SECRET: 'demo-session-secret',
+    };
+
+    await expect(loadEnvWith(productionDemo)).rejects.toThrow(
+      'DEMO_MODE=true in production requires DEMO_PUBLIC_DEPLOYMENT_ACK=true',
+    );
+
+    const env = await loadEnvWith({
+      ...productionDemo,
+      DEMO_PUBLIC_DEPLOYMENT_ACK: 'true',
+    });
+
+    expect(env.DEMO_MODE).toBe('true');
+    expect(env.STORAGE_DRIVER).toBe('local');
   });
 
   it('accepts explicit durable storage settings for production', async () => {
@@ -60,7 +123,7 @@ describe('boot environment validation', () => {
       S3_BUCKET: 'bidstack-prod-files',
       S3_REGION: 'us-east-1',
       STORAGE_SCAN_REQUIRED: 'true',
-      INTEGRATION_TOKEN_KEY: 'unit-test-integration-token-key',
+      INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
       PUBLIC_BASE_URL: 'https://crm.example.com',
     });
 

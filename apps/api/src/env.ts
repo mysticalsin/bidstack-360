@@ -35,6 +35,7 @@ export const envSchema = z.object({
   // Use ONLY for the public demo deployment, never a real tenant.
   DEMO_MODE: z.enum(['true', 'false']).default('false'),
   DEMO_SESSION_SECRET: z.string().min(1).optional().or(z.literal('')),
+  DEMO_PUBLIC_DEPLOYMENT_ACK: z.enum(['true', 'false']).default('false'),
   DEMO_ORG_TTL_HOURS: z.coerce.number().int().positive().default(24),
   DEMO_MAX_ORGS: z.coerce.number().int().positive().default(500),
   // When true (demo mode only), each new visitor org kicks off a LIVE Apollo
@@ -112,15 +113,39 @@ export const envSchema = z.object({
   INFOSEARCH_ENABLED: z.enum(['true', 'false']).default('false'),
   INFOSEARCH_MCP_URL: z.string().url().optional().or(z.literal('')),
   INFOSEARCH_API_KEY: z.string().min(1).optional().or(z.literal('')),
+  // Seamless.AI can run through an MCP gateway for source-pull workflows, with
+  // the REST API retained as fallback when only SEAMLESS_API_KEY is set.
+  SEAMLESS_MCP_URL: z.string().url().optional().or(z.literal('')),
+  SEAMLESS_MCP_BEARER_TOKEN: z.string().min(1).optional().or(z.literal('')),
+  SEAMLESS_MCP_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
+  SEAMLESS_MCP_SEARCH_COMPANIES_TOOL: z.string().min(1).optional().or(z.literal('')),
+  SEAMLESS_API_KEY: z.string().min(1).optional().or(z.literal('')),
+  SEAMLESS_API_BASE_URL: z.string().url().optional().or(z.literal('')),
+  // Optional vendor-neutral technology-intelligence MCP. Use for BuiltWith,
+  // Wappalyzer, or a private tech-source gateway only after that MCP is configured.
+  TECH_STACK_MCP_URL: z.string().url().optional().or(z.literal('')),
+  TECH_STACK_MCP_BEARER_TOKEN: z.string().min(1).optional().or(z.literal('')),
+  TECH_STACK_MCP_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
+  TECH_STACK_MCP_TOOL: z.string().min(1).optional().or(z.literal('')),
+  TECH_STACK_MCP_LABEL: z.string().min(1).optional().or(z.literal('')),
+  TECH_STACK_MCP_SOURCE_IDS: z.string().optional().or(z.literal('')),
   // 360Learning LMS (Sales Toolkits). Env names cannot start with a digit,
   // so the brief's 360L_* arrive as LMS_360L_*.
   LMS_360L_ENABLED: z.enum(['true', 'false']).default('false'),
   LMS_360L_BASE_URL: z.string().url().optional().or(z.literal('')),
   LMS_360L_API_KEY: z.string().min(1).optional().or(z.literal('')),
 
+  // SERUM control plane. Default-off by design: the UI must never imply live
+  // agent loops, memory, or pattern learning before the backend is configured.
+  SERUM_ENABLED: z.enum(['true', 'false']).default('false'),
+  SERUM_DEMO_MODE_ENABLED: z.enum(['true', 'false']).default('false'),
+
   // Observability
   SENTRY_DSN: z.string().optional(),
   SENTRY_ENVIRONMENT: z.string().optional(),
+  SENTRY_RELEASE: z.string().optional(),
+  SENTRY_SMOKE_ENABLED: z.enum(['true', 'false']).default('false'),
+  SENTRY_SMOKE_TOKEN: z.string().optional().or(z.literal('')),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
   OTEL_SERVICE_NAME: z.string().default('bidstack-api'),
   OTEL_SERVICE_VERSION: z.string().default('0.1.0'),
@@ -151,6 +176,15 @@ export type Env = z.infer<typeof envSchema>;
 
 let _env: Env | null = null;
 
+function isIntegrationTokenKey(value: string | undefined): boolean {
+  return Boolean(value && /^[0-9a-fA-F]{64}$/.test(value));
+}
+
+function publicBaseUrlIsLoopback(value: string): boolean {
+  const hostname = new URL(value).hostname.toLowerCase();
+  return hostname === 'localhost' || hostname === '::1' || hostname.startsWith('127.');
+}
+
 export function getEnv(): Env {
   if (_env) return _env;
   const parsed = envSchema.safeParse(process.env);
@@ -169,10 +203,18 @@ export function getEnv(): Env {
   const env = parsed.data;
   const semanticErrors: string[] = [];
 
-  // Production must set a real public origin; the localhost default would make
-  // the CORS allowlist reject every browser request from the deployed frontend.
-  if (env.NODE_ENV === 'production' && env.PUBLIC_BASE_URL.includes('localhost')) {
-    semanticErrors.push('PUBLIC_BASE_URL must be set to the public web origin in production (cannot contain localhost)');
+  if (env.NODE_ENV === 'production') {
+    const publicBaseUrl = new URL(env.PUBLIC_BASE_URL);
+    if (publicBaseUrl.protocol !== 'https:') {
+      semanticErrors.push('PUBLIC_BASE_URL must use https in production');
+    }
+    // Production must set a real public origin; loopback defaults would make
+    // the CORS allowlist reject deployed browsers and mask a bad release config.
+    if (publicBaseUrlIsLoopback(env.PUBLIC_BASE_URL)) {
+      semanticErrors.push(
+        'PUBLIC_BASE_URL must be set to the public web origin in production (cannot be loopback)',
+      );
+    }
   }
 
   // Production normally requires S3 object storage. The public demo runs without
@@ -188,9 +230,9 @@ export function getEnv(): Env {
   // at rest. Optional in dev (those features degrade gracefully) but mandatory
   // in production — booting without it would let admins save secrets the app
   // then can't decrypt, or (worse) store them weakly.
-  if (env.NODE_ENV === 'production' && !env.INTEGRATION_TOKEN_KEY) {
+  if (env.NODE_ENV === 'production' && !isIntegrationTokenKey(env.INTEGRATION_TOKEN_KEY)) {
     semanticErrors.push(
-      'INTEGRATION_TOKEN_KEY is required in production (encrypts per-org Dust + OAuth secrets at rest)',
+      'INTEGRATION_TOKEN_KEY must be a 64-character hex string in production (encrypts per-org Dust + OAuth secrets at rest)',
     );
   }
   // Demo-mode gate: the public passwordless door must never run alongside real
@@ -202,6 +244,9 @@ export function getEnv(): Env {
     if (!env.DEMO_SESSION_SECRET) {
       semanticErrors.push('DEMO_SESSION_SECRET is required when DEMO_MODE=true');
     }
+    if (env.NODE_ENV === 'production' && env.DEMO_PUBLIC_DEPLOYMENT_ACK !== 'true') {
+      semanticErrors.push('DEMO_MODE=true in production requires DEMO_PUBLIC_DEPLOYMENT_ACK=true');
+    }
   }
   // Flag-gated integrations fail closed: an enabled flag without its
   // credentials would render a section that can only error.
@@ -212,6 +257,9 @@ export function getEnv(): Env {
   }
   if (env.LMS_360L_ENABLED === 'true' && (!env.LMS_360L_BASE_URL || !env.LMS_360L_API_KEY)) {
     semanticErrors.push('LMS_360L_ENABLED=true requires LMS_360L_BASE_URL and LMS_360L_API_KEY');
+  }
+  if (env.SERUM_DEMO_MODE_ENABLED === 'true' && env.NODE_ENV === 'production') {
+    semanticErrors.push('SERUM_DEMO_MODE_ENABLED=true is not allowed in production');
   }
   if (semanticErrors.length > 0) {
     throw new Error(`Environment validation failed:\n  Invalid: ${semanticErrors.join(', ')}`);

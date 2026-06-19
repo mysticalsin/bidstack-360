@@ -309,7 +309,11 @@ function claimDate(entity: WikidataEntity, property: string): string | null {
   if (!isRecord(value) || typeof value.time !== 'string') return null;
   const match = value.time.match(/^\+?(\d{4})-(\d{2})-(\d{2})/);
   if (!match) return null;
-  return `${match[1]}-${match[2]}-${match[3]}`;
+  const candidate = `${match[1]}-${match[2]}-${match[3]}`;
+  const date = new Date(`${candidate}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime()) || candidate !== date.toISOString().slice(0, 10)
+    ? null
+    : candidate;
 }
 
 function claimEntityIds(entity: WikidataEntity, property: string): string[] {

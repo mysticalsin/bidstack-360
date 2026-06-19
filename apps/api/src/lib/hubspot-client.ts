@@ -204,6 +204,15 @@ export async function countHubSpotObject(
   }
 }
 
+export async function probeHubSpotConnection(accessToken: string): Promise<{ companyProbeOk: boolean }> {
+  await hubspotFetch<HubSpotCountResponse>(
+    '/crm/v3/objects/companies',
+    accessToken,
+    { limit: '1', properties: 'hs_object_id' },
+  );
+  return { companyProbeOk: true };
+}
+
 // ─── Paginated list (used during migration chunks) ───────────────────────────
 
 export interface HubSpotRecord {

@@ -19,7 +19,9 @@ import { mutationAuditPlugin } from './plugins/mutation-audit.js';
 import { openapiPlugin } from './plugins/openapi.js';
 import { queryGuardPlugin } from './plugins/query-guard.js';
 import { redisCachePlugin } from './plugins/redis-cache.js';
+import { sentryPlugin } from './plugins/sentry.js';
 import { securityHeadersPlugin } from './plugins/security-headers.js';
+import { buildAllowedCorsOrigins, isLoopbackOrigin } from './lib/cors-origins.js';
 // Wave 7 — Real-time collaboration
 import { realtimePlugin } from './plugins/realtime.js';
 // Wave 8 — Y.js CRDT collaborative text editing
@@ -75,6 +77,7 @@ export async function buildServer(): Promise<FastifyInstance> {
         paths: [
           'req.headers.authorization',
           'req.headers.cookie',
+          'req.headers["x-bidstack-sentry-smoke-token"]',
           'req.headers["x-api-key"]',
           'req.headers["x-clerk-session"]',
           'res.headers["set-cookie"]',
@@ -146,13 +149,10 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(cors, {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
-      const allowed = [config.PUBLIC_BASE_URL].filter(Boolean);
-      if (config.NODE_ENV === 'development') {
-        allowed.push('http://localhost:5173', 'http://localhost:4173');
-      }
-      // Production safety: never allow localhost origins.
-      if (config.NODE_ENV === 'production' && origin.includes('localhost')) {
-        return cb(new Error('localhost origin rejected in production'), false);
+      const allowed = buildAllowedCorsOrigins(config.PUBLIC_BASE_URL, config.NODE_ENV);
+      // Production safety: never allow loopback origins.
+      if (config.NODE_ENV === 'production' && isLoopbackOrigin(origin)) {
+        return cb(new Error('loopback origin rejected in production'), false);
       }
       cb(null, allowed.includes(origin));
     },
@@ -186,6 +186,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(apiVersioningPlugin);
   await server.register(errorHandlerPlugin);
   await server.register(authPlugin);
+  await server.register(sentryPlugin);
   await server.register(rbacPlugin);
   await server.register(securityHeadersPlugin);
   await server.register(idempotencyPlugin);
@@ -200,7 +201,10 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(healthRoute);
 
   await server.register(rateLimit, {
-    max: (config.NODE_ENV === 'development' || config.NODE_ENV === 'test') ? 10_000 : config.API_RATE_LIMIT_MAX,
+    max:
+      config.NODE_ENV === 'development' || config.NODE_ENV === 'test'
+        ? 10_000
+        : config.API_RATE_LIMIT_MAX,
     timeWindow: '1 minute',
     redis:
       config.NODE_ENV !== 'test' && (redis.status === 'ready' || redis.status === 'connect')

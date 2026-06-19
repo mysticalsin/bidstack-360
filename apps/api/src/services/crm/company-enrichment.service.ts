@@ -20,6 +20,7 @@ import {
   normalizeName,
   parseAttribution,
   parseTechnicalStack,
+  mergeTechnicalStack,
   record,
   stringArray,
   stringRecord,
@@ -27,6 +28,7 @@ import {
 } from './dashboard.utils.js';
 
 const COMPANY_STRATEGIC_INTEL_STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
+type CompanyTechnicalStack = NonNullable<z.infer<typeof CrmCompany>['technicalStack']>;
 
 // ─── Domain / website lookup ──────────────────────────────────────────────────
 
@@ -121,7 +123,7 @@ export function serializeCompany(enrichment: {
       ? enrichment.incorporationDate.toISOString().slice(0, 10)
       : null,
     logo: logoFor(name, enrichment.logoUrl, enrichment.logoSource),
-    technicalStack: parseTechnicalStack(metadata.meetingTechStack),
+    technicalStack: buildProviderTechnicalStack(metadata),
     strategicIntel: parseStrategicIntel({
       metadata,
       sourceAttribution,
@@ -216,6 +218,108 @@ function freshnessFor(
   if (!lastSyncedAt) return 'never';
   const ageMs = Date.now() - new Date(lastSyncedAt).getTime();
   return ageMs > COMPANY_STRATEGIC_INTEL_STALE_AFTER_MS ? 'stale' : 'fresh';
+}
+
+function buildProviderTechnicalStack(
+  metadata: Record<string, unknown>,
+): CompanyTechnicalStack {
+  return dedupeTechnicalStack(
+    mergeTechnicalStack(
+      mergeTechnicalStack(parseTechnicalStack(metadata.meetingTechStack), seamlessTechnicalStack(metadata)),
+      techStackMcpTechnicalStack(metadata),
+    ),
+  );
+}
+
+function seamlessTechnicalStack(
+  metadata: Record<string, unknown>,
+): CompanyTechnicalStack {
+  const openCompanyProfile = record(metadata.openCompanyProfile);
+  const seamlessProfiles = [record(openCompanyProfile.seamless), record(metadata.seamless)];
+  const technologies = [
+    ...new Set(seamlessProfiles.flatMap((profile) => stringArray(profile.technologies))),
+  ]
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .slice(0, 24);
+
+  if (technologies.length === 0) return [];
+  return [
+    {
+      label: 'Seamless technologies',
+      items: technologies.map((name) => ({
+        name,
+        source: 'enrichment:seamless',
+        confidence: 0.9,
+      })),
+    },
+  ];
+}
+
+function techStackMcpTechnicalStack(
+  metadata: Record<string, unknown>,
+): CompanyTechnicalStack {
+  const providerProfiles = Array.isArray(metadata.techStackMcps)
+    ? metadata.techStackMcps.map(record)
+    : [];
+  const profiles = providerProfiles.length > 0 ? providerProfiles : [record(metadata.techStackMcp)];
+  return profiles.flatMap((rawProfile) => {
+    const technologies = stringArray(rawProfile.technologies)
+      .map((name) => name.trim())
+      .filter(Boolean)
+      .slice(0, 30);
+    if (technologies.length === 0) return [];
+    const provider = stringArray([rawProfile.provider])[0] ?? 'Tech Intel MCP';
+    const source = `enrichment:tech_stack_mcp:${slugProviderSource(provider)}`;
+    return [
+      {
+        label: `${provider} technologies`,
+        items: technologies.map((name) => ({
+          name,
+          source,
+          confidence: 0.86,
+        })),
+      },
+    ];
+  });
+}
+
+function slugProviderSource(value: string): string {
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '') || 'source'
+  );
+}
+
+function dedupeTechnicalStack(
+  stack: CompanyTechnicalStack,
+): CompanyTechnicalStack {
+  const chosen = new Map<
+    string,
+    { label: string; item: CompanyTechnicalStack[number]['items'][number] }
+  >();
+
+  for (const category of stack) {
+    for (const item of category.items) {
+      const key = item.name.trim().toLowerCase();
+      if (!key) continue;
+      const existing = chosen.get(key);
+      if (!existing || existing.item.confidence < item.confidence) {
+        chosen.set(key, { label: category.label, item });
+      }
+    }
+  }
+
+  const byCategory = new Map<string, CompanyTechnicalStack[number]>();
+  for (const { label, item } of chosen.values()) {
+    const category = byCategory.get(label) ?? { label, items: [] };
+    category.items.push(item);
+    byCategory.set(label, category);
+  }
+  return [...byCategory.values()];
 }
 
 // ─── Fallback company ─────────────────────────────────────────────────────────

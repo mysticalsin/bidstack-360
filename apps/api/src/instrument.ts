@@ -1,6 +1,8 @@
 import * as Sentry from '@sentry/node';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
 
+import { scrubSentryEvent } from './lib/sentry-privacy.js';
+
 export function initSentry(): void {
   const dsn = process.env.SENTRY_DSN;
   if (!dsn) return;
@@ -11,10 +13,12 @@ export function initSentry(): void {
   Sentry.init({
     dsn,
     environment,
-    release: process.env.npm_package_version,
+    release: process.env.SENTRY_RELEASE ?? process.env.npm_package_version,
+    sendDefaultPii: false,
     tracesSampleRate: isDev ? 1.0 : 0.1,
     profilesSampleRate: 0.1,
     integrations: [nodeProfilingIntegration()],
+    beforeSend: scrubSentryEvent,
   });
 }
 

@@ -6,10 +6,9 @@
 // exponential backoff before giving up.
 
 import { prisma } from '@bidstack/db';
-import { DustClient } from '@bidstack/dust-client';
 import pino from 'pino';
 
-import { resolveOrgDustCredentials } from './dust-credentials.js';
+import { getOrgDust } from './dust-credentials.js';
 
 const log = pino({ name: 'dust-push', level: process.env.LOG_LEVEL ?? 'info' });
 
@@ -89,20 +88,12 @@ function serializeOpportunityToMarkdown(opp: {
 /** Push an opportunity to Dust. Called after create or update.
  *  orgId is required so the lookup stays org-scoped and respects multi-tenancy. */
 export async function pushOpportunityToDust(oppId: string, orgId: string): Promise<void> {
-  const creds = await resolveOrgDustCredentials(orgId);
-  if (!creds?.dataSourceId) return; // a data source is required to push documents
+  const { client: dust, creds } = await getOrgDust(orgId, log);
+  if (!dust || !creds?.dataSourceId) return; // a data source is required to push documents
 
   try {
     const opp = await prisma.opportunity.findUnique({ where: { id: oppId, orgId } });
     if (!opp) return;
-
-    const dust = new DustClient({
-      apiKey: creds.apiKey,
-      workspaceId: creds.workspaceId,
-      baseUrl: creds.baseUrl,
-      timeoutMs: 10_000,
-      logger: log,
-    });
 
     const documentId = `bidstack-deal-${opp.code}`;
     const text = serializeOpportunityToMarkdown(opp);
@@ -134,20 +125,12 @@ export async function pushOpportunityToDust(oppId: string, orgId: string): Promi
 /** Push a lead to Dust. Called after create or update.
  *  orgId is required so the lookup stays org-scoped and respects multi-tenancy. */
 export async function pushLeadToDust(leadId: string, orgId: string): Promise<void> {
-  const creds = await resolveOrgDustCredentials(orgId);
-  if (!creds?.dataSourceId) return; // a data source is required to push documents
+  const { client: dust, creds } = await getOrgDust(orgId, log);
+  if (!dust || !creds?.dataSourceId) return; // a data source is required to push documents
 
   try {
     const lead = await prisma.lead.findUnique({ where: { id: leadId, orgId } });
     if (!lead) return;
-
-    const dust = new DustClient({
-      apiKey: creds.apiKey,
-      workspaceId: creds.workspaceId,
-      baseUrl: creds.baseUrl,
-      timeoutMs: 10_000,
-      logger: log,
-    });
 
     const documentId = `bidstack-lead-${lead.id}`;
     const text = [

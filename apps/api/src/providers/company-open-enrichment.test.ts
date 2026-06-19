@@ -125,6 +125,61 @@ describe('company open data verification', () => {
     expect(profile).toBeNull();
   });
 
+  it('drops Wikidata inception dates with unknown month or day precision', async () => {
+    const fetchImpl = vi.fn(async (input: string | URL) => {
+      const url = input.toString();
+      if (url.includes('wbsearchentities')) {
+        return jsonResponse({
+          search: [
+            {
+              id: 'Q5011970',
+              label: 'CI Financial',
+              description: 'Canadian investment management company',
+              concepturi: 'https://www.wikidata.org/wiki/Q5011970',
+            },
+          ],
+        });
+      }
+
+      if (url.includes('wbgetentities')) {
+        return jsonResponse({
+          entities: {
+            Q5011970: {
+              id: 'Q5011970',
+              labels: { en: { value: 'CI Financial' } },
+              descriptions: {
+                en: { value: 'Canadian investment management company' },
+              },
+              claims: {
+                P856: [claim('https://www.ci.com/')],
+                P571: [claim({ time: '+1965-00-00T00:00:00Z' })],
+              },
+              sitelinks: { enwiki: { title: 'CI Financial' } },
+            },
+          },
+        });
+      }
+
+      if (url.includes('/page/summary/CI%20Financial')) {
+        return jsonResponse({
+          extract: 'CI Financial is a Canadian investment management company.',
+          content_urls: { desktop: { page: 'https://en.wikipedia.org/wiki/CI_Financial' } },
+        });
+      }
+
+      throw new Error(`Unexpected request ${url}`);
+    });
+
+    const profile = await fetchOpenCompanyProfile({
+      name: 'CI Financial',
+      domain: 'ci.com',
+      now,
+      fetchImpl,
+    });
+
+    expect(profile?.incorporationDate).toBeNull();
+  });
+
   it('builds a direct favicon fallback when open profiles are unavailable', () => {
     const profile = faviconProfile({
       name: 'Mantu',

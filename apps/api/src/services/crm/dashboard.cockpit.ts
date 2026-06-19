@@ -31,6 +31,7 @@ import {
   record,
   titleCase,
 } from './dashboard.utils.js';
+import { TECHNICAL_STACK_FIELD_KEY, parseTechnicalStackOverride } from './technical-stack.service.js';
 
 const COCKPIT_RISK_LIMIT = 6;
 const COCKPIT_COMPLIANCE_LIMIT = 6;
@@ -253,6 +254,17 @@ export function applyFieldOverrides(
     }
   }
   return { company: next, overriddenKeys };
+}
+
+function resolveCockpitTechnicalStack(
+  providerStack: z.infer<typeof AccountCockpitSnapshot>['technicalStack'],
+  overrides: CockpitFieldOverride[],
+): z.infer<typeof AccountCockpitSnapshot>['technicalStack'] {
+  const technicalStackOverride = parseTechnicalStackOverride(
+    overrides.find((override) => override.fieldKey === TECHNICAL_STACK_FIELD_KEY)?.value,
+  );
+  if (technicalStackOverride) return technicalStackOverride.stack;
+  return mergeTechnicalStack(providerStack, defaultTechnicalStack());
 }
 
 // ─── Activity serializer ──────────────────────────────────────────────────────
@@ -697,7 +709,7 @@ export function buildCockpit({
           ]
         : []),
     ],
-    technicalStack: mergeTechnicalStack(company.technicalStack ?? [], defaultTechnicalStack()),
+    technicalStack: resolveCockpitTechnicalStack(company.technicalStack ?? [], fieldOverrides),
     // Score on THIS company's contacts/tasks only. The org-wide dashboard path
     // passes every org row; the single-company path passes pre-filtered rows —
     // scoping here keeps the score identical across both entry points.
