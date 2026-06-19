@@ -30,7 +30,17 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { WEBHOOK_DELIVERY, assertSafeWebhookUrl } from '@bidstack/shared';
 
+import { createResearchFetch } from '../lib/safe-research-fetch.js';
+import { serumConnectorDenialMessage } from '../lib/serum-connector-policy.js';
+
 const QUEUE_NAME = WEBHOOK_DELIVERY.name;
+
+/**
+ * DNS-rebind-safe fetch: resolves the host and rejects internal IPs before each
+ * hop (initial URL + every redirect). Closes the SSRF gap the https-only string
+ * check (`assertSafeWebhookUrl`) cannot catch on its own.
+ */
+const safeFetch = createResearchFetch();
 
 /** Maximum time we wait for the partner endpoint to respond. */
 const DELIVERY_TIMEOUT_MS = 10_000;
@@ -86,7 +96,7 @@ async function deliver(
 
     let res: Response;
     try {
-      res = await fetch(url, {
+      res = await safeFetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -112,7 +122,7 @@ async function deliver(
 
 // ── Worker ────────────────────────────────────────────────────────────────────
 
-async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger): Promise<void> {
+export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger): Promise<void> {
   const parsed = DeliveryJobSchema.safeParse(job.data);
   if (!parsed.success) {
     log.warn(
@@ -126,7 +136,13 @@ async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger): Prom
 
   const sub = await prisma.webhookSubscription.findFirst({
     where: { id: subscriptionId, deletedAt: null, active: true },
-    select: { id: true, orgId: true, url: true, secret: true, failureCount: true },
+    select: {
+      id: true,
+      orgId: true,
+      url: true,
+      secret: true,
+      failureCount: true,
+    },
   });
 
   if (!sub) {
@@ -144,6 +160,29 @@ async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger): Prom
   });
 
   const attempt = (job.attemptsMade ?? 0) + 1;
+  const denial = await serumConnectorDenialMessage({
+    orgId: sub.orgId,
+    connectorId: 'webhook_delivery',
+    operation: `webhook.deliver.${event}`,
+    writeRequested: true,
+  });
+  if (denial) {
+    log.warn({ subscriptionId, event, attempt }, denial);
+    await prisma.webhookDelivery.create({
+      data: {
+        subscriptionId,
+        orgId: sub.orgId,
+        event,
+        statusCode: null,
+        success: false,
+        durationMs: 0,
+        attempt,
+        errorMessage: denial,
+      },
+    });
+    return;
+  }
+
   const result = await deliver(sub.url, sub.secret, body);
 
   log.info(

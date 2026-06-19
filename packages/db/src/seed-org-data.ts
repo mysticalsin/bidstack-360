@@ -22,6 +22,17 @@ import type { Prisma, PrismaClient } from '../generated/client/index.js';
 
 import { seedRolesAndPermissions } from './seed.rbac.js';
 
+/**
+ * A Prisma client capable of running the seed. Accepts either the top-level
+ * `PrismaClient` (CLI path) or an interactive-transaction client
+ * (`Prisma.TransactionClient`, the demo sign-in door) so provisioning can wrap
+ * org-create + seed in one atomic transaction. The union is sound because every
+ * seed helper uses only model methods (.create/.createMany/.upsert/.findFirst/
+ * .deleteMany) — never client-only methods ($transaction/$queryRaw/$connect),
+ * which `TransactionClient` omits.
+ */
+export type SeedClient = Prisma.TransactionClient | PrismaClient;
+
 export interface SeedOrgDataOptions {
   /** The visitor's email — becomes the org's admin user (shown in the UI). */
   ownerEmail: string;
@@ -508,7 +519,7 @@ function normalizeName(value: string): string {
 
 /** Grant a seeded org Role to a user (mirrors auth-helpers.ensureAdminRoleGrant). */
 async function grantRole(
-  prisma: PrismaClient,
+  prisma: SeedClient,
   orgId: string,
   userId: string,
   roleName: string,
@@ -531,7 +542,7 @@ interface SeededUsers {
 }
 
 async function seedUsers(
-  prisma: PrismaClient,
+  prisma: SeedClient,
   orgId: string,
   opts: SeedOrgDataOptions,
 ): Promise<SeededUsers> {
@@ -566,7 +577,7 @@ async function seedUsers(
 }
 
 /** Company rows back the /accounts + /companies pages (employee count, logo…). */
-async function seedCompanies(prisma: PrismaClient, orgId: string): Promise<void> {
+async function seedCompanies(prisma: SeedClient, orgId: string): Promise<void> {
   for (const c of COMPANIES) {
     await prisma.company.create({
       data: {
@@ -589,7 +600,7 @@ async function seedCompanies(prisma: PrismaClient, orgId: string): Promise<void>
 
 /** CompanyEnrichment rows back the CRM cockpit + are the target a live
  *  /crm/companies/:id/enrich refresh overwrites with Apollo/open-data values. */
-async function seedCompanyEnrichments(prisma: PrismaClient, orgId: string): Promise<void> {
+async function seedCompanyEnrichments(prisma: SeedClient, orgId: string): Promise<void> {
   for (const c of COMPANIES) {
     await prisma.companyEnrichment.create({
       data: {
@@ -623,7 +634,7 @@ async function seedCompanyEnrichments(prisma: PrismaClient, orgId: string): Prom
 }
 
 async function seedOpps(
-  prisma: PrismaClient,
+  prisma: SeedClient,
   orgId: string,
   byInitials: Map<string, string>,
 ): Promise<Map<string, string>> {
@@ -650,7 +661,7 @@ async function seedOpps(
 }
 
 async function seedProposals(
-  prisma: PrismaClient,
+  prisma: SeedClient,
   orgId: string,
   byInitials: Map<string, string>,
   oppByCode: Map<string, string>,
@@ -674,7 +685,7 @@ async function seedProposals(
   }
 }
 
-async function seedContacts(prisma: PrismaClient, orgId: string, ns: string): Promise<void> {
+async function seedContacts(prisma: SeedClient, orgId: string, ns: string): Promise<void> {
   for (const c of CONTACTS) {
     await prisma.contact.create({
       data: {
@@ -692,7 +703,7 @@ async function seedContacts(prisma: PrismaClient, orgId: string, ns: string): Pr
 }
 
 async function seedLeads(
-  prisma: PrismaClient,
+  prisma: SeedClient,
   orgId: string,
   byInitials: Map<string, string>,
   ns: string,
@@ -717,7 +728,7 @@ async function seedLeads(
 }
 
 async function seedTasks(
-  prisma: PrismaClient,
+  prisma: SeedClient,
   orgId: string,
   byInitials: Map<string, string>,
   oppByCode: Map<string, string>,
@@ -742,7 +753,7 @@ async function seedTasks(
  * by reusing the existing org when an email signs in again).
  */
 export async function seedOrgData(
-  prisma: PrismaClient,
+  prisma: SeedClient,
   orgId: string,
   opts: SeedOrgDataOptions,
 ): Promise<void> {

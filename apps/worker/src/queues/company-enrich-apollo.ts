@@ -1,7 +1,8 @@
 // Apollo.io company enrichment worker.
 //
 // Job shape: { orgId, companyName, domain? }
-// Prefer Apollo MCP company search/get-company when APOLLO_MCP_URL is configured.
+// Prefer Apollo MCP company search/get-company when APOLLO_MCP_URL and
+// APOLLO_MCP_BEARER_TOKEN are configured.
 // Fall back to the REST organization enrichment endpoint only when APOLLO_API_KEY
 // is configured and a domain is known.
 // Maps the response
@@ -813,6 +814,43 @@ interface ApolloMcpCompanyIntel {
   raw: Record<string, unknown>;
 }
 
+export type ApolloEnrichmentTransport =
+  | { kind: 'mcp'; url: string; bearerToken: string }
+  | { kind: 'api'; apiKey: string }
+  | { kind: 'none'; reason: string };
+
+export function resolveApolloEnrichmentTransport({
+  env = process.env,
+  hasDomain,
+}: {
+  env?: NodeJS.ProcessEnv;
+  hasDomain: boolean;
+}): ApolloEnrichmentTransport {
+  const mcpUrl = env.APOLLO_MCP_URL?.trim();
+  const mcpBearerToken = env.APOLLO_MCP_BEARER_TOKEN?.trim();
+  if (mcpUrl && mcpBearerToken) {
+    return { kind: 'mcp', url: mcpUrl, bearerToken: mcpBearerToken };
+  }
+
+  const apiKey = env.APOLLO_API_KEY?.trim();
+  if (apiKey && hasDomain) return { kind: 'api', apiKey };
+
+  if (mcpUrl || mcpBearerToken) {
+    return {
+      kind: 'none',
+      reason:
+        'Apollo MCP is partially configured; set both APOLLO_MCP_URL and APOLLO_MCP_BEARER_TOKEN, or set APOLLO_API_KEY with a company domain.',
+    };
+  }
+
+  return {
+    kind: 'none',
+    reason: hasDomain
+      ? 'Apollo MCP/API not configured'
+      : 'Apollo REST fallback requires a company domain',
+  };
+}
+
 /**
  * Calls Apollo's /v1/organizations/enrich and returns the parsed organization.
  * Throws on non-2xx, network failure, or schema mismatch.
@@ -1231,8 +1269,9 @@ export async function startCompanyEnrichApollo(
         throw new Error('Invalid Apollo enrichment job signature');
       }
 
-      const apolloMcpUrl = process.env.APOLLO_MCP_URL;
-      const apiKey = process.env.APOLLO_API_KEY;
+      const transport = resolveApolloEnrichmentTransport({
+        hasDomain: Boolean(data.domain),
+      });
       let organization: ApolloOrganization;
       let syncMode: ApolloSyncMode;
       let creditPolicy: ApolloCreditPolicy;
@@ -1242,10 +1281,10 @@ export async function startCompanyEnrichApollo(
       let jobPostings: unknown = null;
       let executives: unknown = null;
 
-      if (apolloMcpUrl) {
+      if (transport.kind === 'mcp') {
         const mcpIntel = await callApolloMcpCompanyIntel({
-          url: apolloMcpUrl,
-          bearerToken: process.env.APOLLO_MCP_BEARER_TOKEN,
+          url: transport.url,
+          bearerToken: transport.bearerToken,
           companyName: data.companyName,
           ...(data.domain ? { domain: data.domain } : {}),
           timeoutMs: Number(process.env.APOLLO_MCP_TIMEOUT_MS ?? APOLLO_TIMEOUT_MS),
@@ -1264,26 +1303,38 @@ export async function startCompanyEnrichApollo(
         rawMcp = mcpIntel.raw;
         jobPostings = mcpIntel.jobPostings;
         executives = mcpIntel.executives;
-      } else if (!apiKey || !data.domain) {
+      } else if (transport.kind === 'none') {
         jobLog.warn(
-          { companyName: data.companyName, hasDomain: Boolean(data.domain) },
-          'Apollo enrichment is a no-op: configure APOLLO_MCP_URL, or APOLLO_API_KEY with a domain',
+          {
+            companyName: data.companyName,
+            hasDomain: Boolean(data.domain),
+            reason: transport.reason,
+          },
+          'Apollo enrichment is a no-op: configure complete Apollo MCP credentials, or APOLLO_API_KEY with a domain',
         );
-        return { skipped: true, reason: 'Apollo MCP/API not configured' };
+        return { skipped: true, reason: transport.reason };
       } else {
+        const domain = data.domain;
+        if (!domain) {
+          jobLog.warn(
+            { companyName: data.companyName },
+            'Apollo REST enrichment skipped because no company domain was provided',
+          );
+          return { skipped: true, reason: 'Apollo REST fallback requires a company domain' };
+        }
         organization = await callApolloEnrich({
-          apiKey,
+          apiKey: transport.apiKey,
           companyName: data.companyName,
-          domain: data.domain,
+          domain,
         });
         syncMode = 'apollo_api_organization_enrich';
         creditPolicy = 'uses_credits';
         if (process.env.APOLLO_API_ENABLE_PEOPLE_SEARCH === 'true') {
           try {
             const peopleSearch = await callApolloPeopleSearch({
-              apiKey,
+              apiKey: transport.apiKey,
               companyName: data.companyName,
-              domain: data.domain,
+              domain,
               perPage: Number(process.env.APOLLO_API_PEOPLE_SEARCH_PER_PAGE ?? 10),
             });
             rawPeopleSearch = peopleSearch;

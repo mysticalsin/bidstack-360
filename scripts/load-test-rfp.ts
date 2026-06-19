@@ -23,21 +23,51 @@
 
 /* eslint-disable no-console -- load test is a CLI tool; console.log IS the output interface */
 
-import { config } from 'dotenv';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Load .env from apps/api so DATABASE_URL + REDIS_URL are available
+// Load root/apps API env files so DATABASE_URL + REDIS_URL are available.
+// Keep this script dependency-free at the repo root: pnpm runs it from the
+// workspace package, where dotenv is not installed.
 const __dir = dirname(fileURLToPath(import.meta.url));
-config({ path: resolve(__dir, '../apps/api/.env'), override: false });
-config({ path: resolve(__dir, '../apps/api/.env.local'), override: false });
+const repoRoot = resolve(__dir, '..');
+
+function loadEnvFile(path: string): void {
+  if (!existsSync(path)) return;
+
+  const content = readFileSync(path, 'utf8');
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+
+    const match = /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(line);
+    if (!match) continue;
+
+    const [, key, rawValue] = match;
+    if (process.env[key] !== undefined) continue;
+
+    const value = rawValue.trim();
+    process.env[key] =
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+        ? value.slice(1, -1)
+        : value;
+  }
+}
+
+loadEnvFile(resolve(repoRoot, '.env'));
+loadEnvFile(resolve(repoRoot, '.env.local'));
+loadEnvFile(resolve(repoRoot, 'apps/api/.env'));
+loadEnvFile(resolve(repoRoot, 'apps/api/.env.local'));
 
 // ─── Imports (after env load) ────────────────────────────────────────────────
 
-import { PrismaClient } from '@prisma/client';
 import IORedis from 'ioredis';
 import { Queue } from 'bullmq';
 import { randomUUID } from 'node:crypto';
+
+const { prisma } = await import('@bidstack/db');
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -55,6 +85,7 @@ interface UploadResult {
   index: number;
   status: number;
   durationMs: number;
+  rfpRequestId: string;
   orchestrationId?: string;
   error?: string;
 }
@@ -86,6 +117,19 @@ function calcPercentiles(durations: number[]): Percentiles {
   };
 }
 
+function unique<T>(values: T[]): T[] {
+  return [...new Set(values)];
+}
+
+function formatHttpError(body: unknown, fallback: string): string {
+  if (body && typeof body === 'object') {
+    const record = body as Record<string, unknown>;
+    const message = record.message ?? record.error;
+    if (typeof message === 'string') return message;
+  }
+  return fallback.slice(0, 500);
+}
+
 function pass(label: string) {
   console.log(`  ✅ ${label}`);
 }
@@ -103,24 +147,22 @@ function section(title: string) {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-const prisma = new PrismaClient({ log: ['error'] });
-
-const redis = new IORedis(REDIS_URL, {
+const redisOptions = {
   maxRetriesPerRequest: null,
   enableOfflineQueue: false,
-  lazyConnect: false,
-});
+  lazyConnect: true,
+} as const;
 
-const queue = new Queue(RFP_ORCHESTRATE_QUEUE, {
-  connection: new IORedis(REDIS_URL, {
-    maxRetriesPerRequest: null,
-    enableOfflineQueue: false,
-  }),
-});
+const redis = new IORedis(REDIS_URL, redisOptions);
+const queueConnection = new IORedis(REDIS_URL, redisOptions);
+
+const queue = new Queue(RFP_ORCHESTRATE_QUEUE, { connection: queueConnection });
 
 // IDs we create during setup so we can clean them up at the end.
 const createdFileAttachmentIds: string[] = [];
 const createdJobIds: string[] = [];
+const createdRfpRequestIds: string[] = [];
+let createdOrgId: string | null = null;
 
 async function main() {
   console.log('\n🚀  BidStack 360° — RFP pipeline load test (W10-P2-1)');
@@ -142,6 +184,9 @@ async function main() {
   pass(`API healthy at ${API_URL}`);
 
   // Verify Redis is up
+  if (redis.status === 'wait') await redis.connect();
+  if (queueConnection.status === 'wait') await queueConnection.connect();
+
   const ping = await redis.ping().catch(() => null);
   if (ping !== 'PONG') {
     fail(`Redis not reachable at ${REDIS_URL}`);
@@ -161,9 +206,11 @@ async function main() {
     return;
   }
 
+  createdOrgId = org.id;
+
   const opportunity = await prisma.opportunity.findFirst({
     where: { orgId: org.id, deletedAt: null },
-    select: { id: true },
+    select: { id: true, customer: true },
   });
   if (!opportunity) {
     fail('No opportunity found for seed org — run: pnpm db:seed');
@@ -175,6 +222,8 @@ async function main() {
 
   // Create FileAttachment rows for both HTTP phases (10 + 50)
   const numAttachments = CONCURRENT_UPLOADS + 10; // extra 10 for rate-limit validation phase
+  const accountId = opportunity.customer || 'rfp-load-test';
+  const storageAccountPath = accountId.replace(/[^a-zA-Z0-9._-]/g, '-').slice(0, 80);
   console.log(`\n  Creating ${numAttachments} test FileAttachment rows...`);
 
   const attachments = await Promise.all(
@@ -182,11 +231,11 @@ async function main() {
       prisma.fileAttachment.create({
         data: {
           orgId: org.id,
+          accountId,
           name: `rfp-load-test-${i + 1}.pdf`,
           contentType: 'application/pdf',
           bytes: 1024, // 1 KiB synthetic
-          storageKey: `load-test/rfp-${randomUUID()}.pdf`,
-          status: 'ready',
+          storageKey: `${org.id}/${storageAccountPath}/load-test/rfp-${randomUUID()}.pdf`,
         },
         select: { id: true },
       }),
@@ -385,26 +434,32 @@ async function fireConcurrentUploads(
   return Promise.all(
     fileAttachmentIds.map(async (fileAttachmentId, i) => {
       const start = Date.now();
+      const rfpRequestId = randomUUID();
+      createdRfpRequestIds.push(rfpRequestId);
       try {
         const res = await fetch(`${API_URL}/api/v1/opportunities/${opportunityId}/rfp/upload`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileAttachmentId }),
+          body: JSON.stringify({ fileAttachmentId, rfpRequestId }),
         });
         const durationMs = Date.now() - start;
         let orchestrationId: string | undefined;
+        let error: string | undefined;
         try {
-          const body = (await res.json()) as { orchestrationId?: string };
+          const text = await res.text();
+          const body = text ? (JSON.parse(text) as { orchestrationId?: string }) : {};
           orchestrationId = body.orchestrationId;
+          if (!res.ok) error = formatHttpError(body, text);
         } catch {
-          // ignore JSON parse failure for non-200 responses
+          if (!res.ok) error = 'Unable to parse error response';
         }
-        return { index: i, status: res.status, durationMs, orchestrationId };
+        return { index: i, status: res.status, durationMs, rfpRequestId, orchestrationId, error };
       } catch (err) {
         return {
           index: i,
           status: 0,
           durationMs: Date.now() - start,
+          rfpRequestId,
           error: err instanceof Error ? err.message : String(err),
         };
       }
@@ -417,20 +472,93 @@ async function fireConcurrentUploads(
 async function teardown() {
   section('CLEANUP');
   try {
-    // Remove test FileAttachment rows
-    if (createdFileAttachmentIds.length > 0) {
+    const fileAttachmentIds = unique(createdFileAttachmentIds);
+    const rfpRequestIds = unique(createdRfpRequestIds);
+    const orgFilter = createdOrgId ? { orgId: createdOrgId } : {};
+
+    const orchestrationRows =
+      rfpRequestIds.length > 0
+        ? await prisma.rfpOrchestration.findMany({
+            where: { ...orgFilter, rfpRequestId: { in: rfpRequestIds } },
+            select: { id: true, documentVersionId: true },
+          })
+        : [];
+    const orchestrationIds = unique(orchestrationRows.map((row) => row.id));
+    const orchestrationDocumentVersionIds = unique(
+      orchestrationRows.map((row) => row.documentVersionId),
+    );
+
+    const documentVersionsByFile =
+      fileAttachmentIds.length > 0
+        ? await prisma.documentVersion.findMany({
+            where: { ...orgFilter, fileAttachmentId: { in: fileAttachmentIds } },
+            select: { id: true, bidDocumentId: true },
+          })
+        : [];
+    const documentVersionsByOrchestration =
+      orchestrationDocumentVersionIds.length > 0
+        ? await prisma.documentVersion.findMany({
+            where: { ...orgFilter, id: { in: orchestrationDocumentVersionIds } },
+            select: { id: true, bidDocumentId: true },
+          })
+        : [];
+    const documentVersionRows = [...documentVersionsByFile, ...documentVersionsByOrchestration];
+    const documentVersionIds = unique([
+      ...orchestrationDocumentVersionIds,
+      ...documentVersionRows.map((row) => row.id),
+    ]);
+    const bidDocumentIds = unique(documentVersionRows.map((row) => row.bidDocumentId));
+
+    if (orchestrationIds.length > 0) {
+      const auditRows = await prisma.auditLog.deleteMany({
+        where: { targetType: 'rfp_orchestration', targetId: { in: orchestrationIds } },
+      });
+      pass(`Deleted ${auditRows.count} RFP orchestration audit rows`);
+
+      const deleted = await prisma.rfpOrchestration.deleteMany({
+        where: { id: { in: orchestrationIds } },
+      });
+      pass(`Deleted ${deleted.count} RFP orchestration rows`);
+    }
+
+    if (documentVersionIds.length > 0) {
+      const deleted = await prisma.documentVersion.deleteMany({
+        where: { id: { in: documentVersionIds } },
+      });
+      pass(`Deleted ${deleted.count} DocumentVersion rows`);
+    }
+
+    if (bidDocumentIds.length > 0) {
+      const deleted = await prisma.bidDocument.deleteMany({
+        where: { id: { in: bidDocumentIds } },
+      });
+      pass(`Deleted ${deleted.count} BidDocument rows`);
+    }
+
+    if (fileAttachmentIds.length > 0) {
       const deleted = await prisma.fileAttachment.deleteMany({
-        where: { id: { in: createdFileAttachmentIds } },
+        where: { id: { in: fileAttachmentIds } },
       });
       pass(`Deleted ${deleted.count} test FileAttachment rows`);
     }
 
     // Delete BullMQ test jobs (best-effort — they also have a 60s auto-remove TTL)
-    if (createdJobIds.length > 0) {
+    const uploadJobIds =
+      createdOrgId === null
+        ? []
+        : rfpRequestIds.map((rfpRequestId) => `rfp-orch-${createdOrgId}-${rfpRequestId}`);
+    const jobIds = unique([...createdJobIds, ...uploadJobIds]);
+
+    if (jobIds.length > 0) {
       const jobs = await Promise.allSettled(
-        createdJobIds.map((id) => queue.getJob(id).then((j) => j?.remove())),
+        jobIds.map(async (id) => {
+          const job = await queue.getJob(id);
+          if (!job) return false;
+          await job.remove();
+          return true;
+        }),
       );
-      const removed = jobs.filter((j) => j.status === 'fulfilled').length;
+      const removed = jobs.filter((j) => j.status === 'fulfilled' && j.value).length;
       pass(`Removed ${removed} BullMQ test jobs`);
     }
   } catch (err) {
@@ -438,6 +566,7 @@ async function teardown() {
   } finally {
     await prisma.$disconnect();
     await queue.close();
+    if (queueConnection.status !== 'end') queueConnection.disconnect();
     redis.disconnect();
   }
 }

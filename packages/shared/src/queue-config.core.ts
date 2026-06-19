@@ -65,6 +65,17 @@ export const DUST_WEBHOOK_PROCESSOR: QueueConfig = {
 };
 
 /** Document intelligence extraction — reads file, calls LLM, writes solutions/products. */
+/** Controlled release smoke queue for proving worker Sentry failure capture. */
+export const SENTRY_SMOKE: QueueConfig = {
+  name: 'sentry.smoke',
+  defaultJobOptions: {
+    attempts: 1,
+    backoff: { type: 'fixed', delay: 1_000 },
+    removeOnComplete: { age: 86_400, count: 50 },
+    removeOnFail: { age: 86_400 * 7, count: 500 },
+  },
+};
+
 export const DOCUMENT_EXTRACT: QueueConfig = {
   name: 'document-extract',
   defaultJobOptions: {

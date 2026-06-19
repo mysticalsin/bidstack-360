@@ -15,6 +15,10 @@ import type pino from 'pino';
 import { Worker as BullWorker, Queue as BullQueue } from 'bullmq';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
+import {
+  SERUM_RUNTIME_CONFIG_KEYS,
+  checkSerumLoopRuntimePolicy,
+} from '@bidstack/db/serum-runtime-policy';
 
 import { RFP_ORCHESTRATE, RFP_REQUIREMENT_EXTRACT } from '@bidstack/shared';
 
@@ -31,6 +35,12 @@ const JobData = z.object({
   startedByUserId: z.string().uuid().optional(),
 });
 type JobData = z.infer<typeof JobData>;
+
+function defaultSerumConfigEnvironment(): 'dev' | 'staging' | 'production' {
+  const env = process.env.SERUM_CONFIG_ENVIRONMENT;
+  if (env === 'staging' || env === 'production') return env;
+  return 'dev';
+}
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -103,6 +113,23 @@ async function markOrchestrationFailed(
 
 // ─── Core processor ────────────────────────────────────────────────────────
 
+export async function serumLoopDenialForRfpOrchestrator(
+  data: JobData,
+  retryCount: number,
+): Promise<string | null> {
+  const decision = await checkSerumLoopRuntimePolicy({
+    orgId: data.orgId,
+    environment: defaultSerumConfigEnvironment(),
+    configKey: SERUM_RUNTIME_CONFIG_KEYS.loops,
+    loopId: data.rfpRequestId,
+    operation: 'rfp.orchestrate',
+    retryCount,
+    hasDurableEvent: true,
+    approvalGateReached: false,
+  });
+  return decision.allowed ? null : `SERUM runtime denied loop "${data.rfpRequestId}": ${decision.reason}`;
+}
+
 async function processJob(
   job: Job<JobData>,
   log: pino.Logger,
@@ -115,6 +142,17 @@ async function processJob(
 
   const { orgId, rfpRequestId, documentVersionId, opportunityId, proposalId, startedByUserId } =
     parsed.data;
+
+  const serumDenial = await serumLoopDenialForRfpOrchestrator(
+    parsed.data,
+    job.attemptsMade ?? 0,
+  );
+  if (serumDenial) {
+    await markOrchestrationFailed(orgId, rfpRequestId, 'orchestrate', serumDenial);
+    const err = new Error(`rfp-orchestrator: ${serumDenial}`);
+    (err as Error & { doNotRetry?: boolean }).doNotRetry = true;
+    throw err;
+  }
 
   const orchestration = await upsertOrchestration(
     { orgId, rfpRequestId, documentVersionId, opportunityId, proposalId, startedByUserId },

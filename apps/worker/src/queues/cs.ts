@@ -25,6 +25,7 @@ import {
   runOrgChurnDetection,
   surfaceExpansionOpportunities,
 } from '../services/cs/index.js';
+import { paginatedFindAll } from '../lib/paginated-find-all.js';
 
 // ─── Queue names ─────────────────────────────────────────────────────────
 
@@ -76,29 +77,31 @@ async function startHealthScoreWorker(
     async (job) => {
       log.info({ jobId: job.id }, 'cs.health: starting nightly health score pass');
 
-      // Load all orgs with active subscriptions.
-      const orgs = await prisma.org.findMany({
-        where: {
-          deletedAt: null,
-          subscriptions: { some: { status: 'ACTIVE', deletedAt: null } },
-        },
-        select: { id: true },
-      });
+      // Load all orgs with active subscriptions (cursor-paginated).
+      const orgIds = await paginatedFindAll(
+        (args) => prisma.org.findMany({
+          ...args,
+          where: {
+            deletedAt: null,
+            subscriptions: { some: { status: 'ACTIVE', deletedAt: null } },
+          },
+        }),
+      );
 
       let total = 0;
-      for (const org of orgs) {
+      for (const orgId of orgIds) {
         const accounts = await prisma.subscription.findMany({
-          where: { orgId: org.id, status: 'ACTIVE', deletedAt: null },
+          where: { orgId, status: 'ACTIVE', deletedAt: null },
           select: { accountId: true },
           distinct: ['accountId'],
         });
 
         for (const { accountId } of accounts) {
           try {
-            await computeAndPersistHealthScore(org.id, accountId, log);
+            await computeAndPersistHealthScore(orgId, accountId, log);
             total++;
           } catch (err) {
-            log.warn({ err, orgId: org.id, accountId }, 'cs.health: score compute failed, continuing');
+            log.warn({ err, orgId, accountId }, 'cs.health: score compute failed, continuing');
           }
         }
       }
@@ -140,17 +143,19 @@ async function startNpsWorker(
     async (job) => {
       log.info({ jobId: job.id }, 'cs.nps: dispatching quarterly surveys');
 
-      const orgs = await prisma.org.findMany({
-        where: { deletedAt: null },
-        select: { id: true },
-      });
+      const orgIds = await paginatedFindAll(
+        (args) => prisma.org.findMany({
+          ...args,
+          where: { deletedAt: null },
+        }),
+      );
 
-      for (const org of orgs) {
+      for (const orgId of orgIds) {
         try {
-          const count = await sendQuarterlyNpsSurveys(org.id, log);
-          log.info({ orgId: org.id, count }, 'cs.nps: surveys dispatched');
+          const count = await sendQuarterlyNpsSurveys(orgId, log);
+          log.info({ orgId, count }, 'cs.nps: surveys dispatched');
         } catch (err) {
-          log.warn({ err, orgId: org.id }, 'cs.nps: dispatch failed, continuing');
+          log.warn({ err, orgId }, 'cs.nps: dispatch failed, continuing');
         }
       }
     },
@@ -186,19 +191,21 @@ async function startChurnDetectionWorker(
     async (job) => {
       log.info({ jobId: job.id }, 'cs.churn: starting nightly detection');
 
-      const orgs = await prisma.org.findMany({
-        where: { deletedAt: null },
-        select: { id: true },
-      });
+      const orgIds = await paginatedFindAll(
+        (args) => prisma.org.findMany({
+          ...args,
+          where: { deletedAt: null },
+        }),
+      );
 
-      for (const org of orgs) {
+      for (const orgId of orgIds) {
         try {
-          const signals = await runOrgChurnDetection(org.id, log);
+          const signals = await runOrgChurnDetection(orgId, log);
           if (signals > 0) {
-            log.warn({ orgId: org.id, signals }, 'cs.churn: new signals detected');
+            log.warn({ orgId, signals }, 'cs.churn: new signals detected');
           }
         } catch (err) {
-          log.warn({ err, orgId: org.id }, 'cs.churn: org detection failed, continuing');
+          log.warn({ err, orgId }, 'cs.churn: org detection failed, continuing');
         }
       }
     },
@@ -234,16 +241,18 @@ async function startExpansionWorker(
     async (job) => {
       log.info({ jobId: job.id }, 'cs.expansion: weekly surface pass');
 
-      const orgs = await prisma.org.findMany({
-        where: { deletedAt: null },
-        select: { id: true },
-      });
+      const orgIds = await paginatedFindAll(
+        (args) => prisma.org.findMany({
+          ...args,
+          where: { deletedAt: null },
+        }),
+      );
 
-      for (const org of orgs) {
+      for (const orgId of orgIds) {
         try {
-          await surfaceExpansionOpportunities(org.id, log);
+          await surfaceExpansionOpportunities(orgId, log);
         } catch (err) {
-          log.warn({ err, orgId: org.id }, 'cs.expansion: org pass failed, continuing');
+          log.warn({ err, orgId }, 'cs.expansion: org pass failed, continuing');
         }
       }
     },
@@ -279,19 +288,21 @@ async function startRenewalWorker(
     async (job) => {
       log.info({ jobId: job.id }, 'cs.renewal: daily renewal opportunity pass');
 
-      const orgs = await prisma.org.findMany({
-        where: { deletedAt: null },
-        select: { id: true },
-      });
+      const orgIds = await paginatedFindAll(
+        (args) => prisma.org.findMany({
+          ...args,
+          where: { deletedAt: null },
+        }),
+      );
 
-      for (const org of orgs) {
+      for (const orgId of orgIds) {
         try {
-          const created = await processRenewalOpportunities(org.id, log);
+          const created = await processRenewalOpportunities(orgId, log);
           if (created > 0) {
-            log.info({ orgId: org.id, created }, 'cs.renewal: opportunities created');
+            log.info({ orgId, created }, 'cs.renewal: opportunities created');
           }
         } catch (err) {
-          log.warn({ err, orgId: org.id }, 'cs.renewal: org pass failed, continuing');
+          log.warn({ err, orgId }, 'cs.renewal: org pass failed, continuing');
         }
       }
     },

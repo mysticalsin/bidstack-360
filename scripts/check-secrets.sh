@@ -17,10 +17,10 @@ if [ "${1:-}" = "--full" ] || [ "${1:-}" = "--tree" ]; then
   MODE="full"
 fi
 
-PATTERNS='sk-[A-Za-z0-9]{20,}|sk_live_[A-Za-z0-9]{20,}|sk_test_[A-Za-z0-9]{20,}|pk_live_[A-Za-z0-9]{20,}|whsec_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|gho_[A-Za-z0-9]{30,}|BEGIN (RSA|OPENSSH|EC|DSA) PRIVATE KEY'
+PATTERNS='sk-[A-Za-z0-9_-]{20,}|sk_live_[A-Za-z0-9]{20,}|sk_test_[A-Za-z0-9]{20,}|pk_live_[A-Za-z0-9]{20,}|whsec_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|gho_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|xox[baprs]-[A-Za-z0-9-]{20,}|AIza[0-9A-Za-z_-]{35}|AccountKey=[A-Za-z0-9+/=]{40,}|BEGIN (RSA|OPENSSH|EC|DSA) PRIVATE KEY'
 
 if [ "$MODE" = "staged" ]; then
-  # Get the staged diff (added/changed lines only — ignores removals).
+  # Get the staged diff (added/changed lines only - ignores removals).
   DIFF=$(git diff --cached --no-color --unified=0 -- ':!*.env.example' ':!*.md' || true)
 
   if [ -z "$DIFF" ]; then
@@ -38,11 +38,11 @@ if [ "$MODE" = "staged" ]; then
   if [ -n "$HIT" ]; then
     echo "Secret-scan blocked the commit."
     echo "   Suspicious lines (preview, masked):"
-    printf "%s\n" "$HIT" | head -10 | sed -E 's/(sk-|sk_live_|sk_test_|pk_live_|whsec_|ghp_|gho_)[A-Za-z0-9]+/\1***REDACTED***/g'
+    printf "%s\n" "$HIT" | head -10 | sed -E 's/(sk-|sk_live_|sk_test_|pk_live_|whsec_|ghp_|gho_|github_pat_|xox[baprs]-|AIza)[A-Za-z0-9_+=\/-]+/\1***REDACTED***/g; s/(AccountKey=)[A-Za-z0-9+\/=]+/\1***REDACTED***/g'
     echo
     echo "   If this is a false positive, revise the snippet to not match the regex"
     echo "   (e.g. mark it as a fixture or move to .env.example)."
-    echo "   This guard is non-bypassable — secrets in git history are forever."
+    echo "   This guard is non-bypassable - secrets in git history are forever."
     exit 1
   fi
 
@@ -60,14 +60,14 @@ fi
 #   apps/api/src/security/penetration.test.ts  uses fixture-shaped strings
 EXCLUDES='\.env\.example$|\.md$|^scripts/check-secrets\.sh$|^\.claude/hooks/scan-secrets\.sh$|^\.gitleaks\.toml$|^pnpm-lock\.yaml$|^apps/api/src/security/penetration\.test\.ts$|^apps/api/src/plugins/auth\.test\.ts$|^apps/api/src/routes/webhooks\.integration\.test\.ts$'
 
-# `git ls-files` is the source of truth — only tracked files count.
+# `git ls-files` is the source of truth - only tracked files count.
 FILES=$(git ls-files | grep -Ev "$EXCLUDES" || true)
 if [ -z "$FILES" ]; then
   exit 0
 fi
 
 # Stream files through grep so we can attach the path to each hit. We export
-# PATTERNS so the inner sh inherits it as an env var — this dodges the quoting
+# PATTERNS so the inner sh inherits it as an env var - this dodges the quoting
 # nightmare of passing a regex that contains pipes through xargs.
 export PATTERNS
 HITS=$(printf "%s\n" "$FILES" | xargs -I{} sh -c 'grep -HEn "$PATTERNS" "$1" 2>/dev/null || true' _ {} || true)
@@ -75,7 +75,7 @@ HITS=$(printf "%s\n" "$FILES" | xargs -I{} sh -c 'grep -HEn "$PATTERNS" "$1" 2>/
 if [ -n "$HITS" ]; then
   echo "Full-tree secret-scan found suspicious strings in committed files."
   echo
-  echo "$HITS" | head -50 | sed -E 's/(sk-|sk_live_|sk_test_|pk_live_|whsec_|ghp_|gho_)[A-Za-z0-9]+/\1***REDACTED***/g'
+  echo "$HITS" | head -50 | sed -E 's/(sk-|sk_live_|sk_test_|pk_live_|whsec_|ghp_|gho_|github_pat_|xox[baprs]-|AIza)[A-Za-z0-9_+=\/-]+/\1***REDACTED***/g; s/(AccountKey=)[A-Za-z0-9+\/=]+/\1***REDACTED***/g'
   echo
   TOTAL=$(printf "%s\n" "$HITS" | wc -l)
   if [ "$TOTAL" -gt 50 ]; then

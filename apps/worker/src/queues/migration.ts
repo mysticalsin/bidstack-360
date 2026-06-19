@@ -9,7 +9,8 @@
  *   SALESFORCE_CSV / CSV — rows pre-parsed client-side, stored in Redis under
  *     payload.redisKey (1h TTL); this worker slices [chunkOffset, +chunkSize).
  *   HUBSPOT_OAUTH       — rows fetched live from the HubSpot CRM v3 API using
- *     the access token forwarded in payload.meta. Pagination: each chunk
+ *     an encrypted IntegrationConfig credential reference. Raw OAuth tokens are
+ *     never stored in BullMQ payloads. Pagination: each chunk
  *     enqueues the next one while HubSpot returns paging.next.after.
  *     KNOWN GAP: no token refresh — imports started with <30min-old OAuth
  *     tokens (the normal flow) complete fine; an expired token fails the job
@@ -28,6 +29,9 @@ import type pino from 'pino';
 
 import { prisma, Prisma } from '@bidstack/db';
 import { MIGRATION, MigrationJobPayload, type MigrationJobError } from '@bidstack/shared';
+import { decryptSecret } from '@bidstack/shared/server-crypto';
+
+import { serumConnectorDenialMessage } from '../lib/serum-connector-policy.js';
 
 // ─── Entity normalization ──────────────────────────────────────────────────
 
@@ -348,13 +352,74 @@ interface HubSpotPage {
   nextAfter: string | null;
 }
 
-async function fetchHubSpotPage(
+const HUBSPOT_INTEGRATION_TYPE = 'hubspot' as const;
+const HUBSPOT_MIGRATION_CONFIG_NAME = 'hubspot-migration';
+
+interface StoredHubSpotTokens {
+  accessToken?: unknown;
+  refreshToken?: unknown;
+  expiresAt?: unknown;
+}
+
+export async function resolveHubSpotAccessToken(
+  payload: MigrationJobPayload,
+): Promise<string> {
+  const meta = payload.meta as Record<string, unknown> | undefined;
+  const configId =
+    typeof meta?.hubspotIntegrationConfigId === 'string'
+      ? meta.hubspotIntegrationConfigId
+      : undefined;
+
+  const config = await prisma.integrationConfig.findFirst({
+    where: {
+      ...(configId ? { id: configId } : {}),
+      orgId: payload.orgId,
+      type: HUBSPOT_INTEGRATION_TYPE,
+      name: HUBSPOT_MIGRATION_CONFIG_NAME,
+      isActive: true,
+    },
+    select: { credentials: true },
+  });
+
+  if (!config) {
+    throw new Error('HubSpot not connected — complete OAuth flow first');
+  }
+
+  const encrypted = (config.credentials as Record<string, unknown>).encrypted;
+  if (typeof encrypted !== 'string' || !encrypted) {
+    throw new Error('HubSpot credential reference is missing encrypted tokens');
+  }
+
+  let tokens: StoredHubSpotTokens;
+  try {
+    tokens = JSON.parse(decryptSecret(encrypted)) as StoredHubSpotTokens;
+  } catch {
+    throw new Error('Failed to decrypt HubSpot tokens');
+  }
+
+  if (typeof tokens.accessToken !== 'string' || !tokens.accessToken) {
+    throw new Error('HubSpot credential reference is missing an access token');
+  }
+
+  return tokens.accessToken;
+}
+
+export async function fetchHubSpotPage(
+  orgId: string,
   entityType: string,
   accessToken: string,
   properties: string[],
   limit: number,
   after?: string,
 ): Promise<HubSpotPage> {
+  const denial = await serumConnectorDenialMessage({
+    orgId,
+    connectorId: 'hubspot',
+    operation: `hubspot.import.${entityType}`,
+    writeRequested: false,
+  });
+  if (denial) throw new Error(denial);
+
   const params = new URLSearchParams({ limit: String(limit) });
   if (after) params.set('after', after);
   if (properties.length > 0) params.set('properties', properties.join(','));
@@ -490,11 +555,9 @@ export async function startMigrationWorker(
       let rows: Record<string, unknown>[];
       let nextAfter: string | null = null;
       if (payload.source === 'HUBSPOT_OAUTH') {
-        const accessToken = (payload.meta as Record<string, unknown> | undefined)?.accessToken;
-        if (typeof accessToken !== 'string' || !accessToken) {
-          throw new Error('HubSpot chunk missing accessToken in payload.meta');
-        }
+        const accessToken = await resolveHubSpotAccessToken(payload);
         const page = await fetchHubSpotPage(
+          payload.orgId,
           payload.entityType,
           accessToken,
           Object.keys(payload.mappings),

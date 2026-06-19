@@ -3,9 +3,39 @@
 import type pino from 'pino';
 
 import { prisma } from '@bidstack/db';
+import {
+  SERUM_RUNTIME_CONFIG_KEYS,
+  checkSerumConnectorRuntimePolicy,
+} from '@bidstack/db/serum-runtime-policy';
+import type { SerumConfigEnvironment } from '@bidstack/shared';
 
 import { CalendarConflictError } from './calendar-sync-types.js';
 import type { PushParams } from './calendar-sync-types.js';
+
+function defaultSerumConfigEnvironment(): SerumConfigEnvironment {
+  const env = process.env.SERUM_CONFIG_ENVIRONMENT;
+  if (env === 'staging' || env === 'production') return env;
+  return 'dev';
+}
+
+async function ensureMicrosoftGraphConnectorAllowed(args: {
+  orgId: string;
+  operation: string;
+  writeRequested: boolean;
+}): Promise<void> {
+  const decision = await checkSerumConnectorRuntimePolicy({
+    orgId: args.orgId,
+    environment: defaultSerumConfigEnvironment(),
+    configKey: SERUM_RUNTIME_CONFIG_KEYS.connectors,
+    connectorId: 'microsoft_graph',
+    operation: args.operation,
+    writeRequested: args.writeRequested,
+    approvalConfirmed: false,
+  });
+  if (!decision.allowed) {
+    throw new Error(`SERUM Connector policy denied Microsoft Graph ${args.operation}: ${decision.reason}`);
+  }
+}
 
 // ─── Microsoft push ────────────────────────────────────────────────────────
 
@@ -15,6 +45,12 @@ export async function handleMicrosoftPush({
   accessToken,
   log,
 }: PushParams): Promise<void> {
+  await ensureMicrosoftGraphConnectorAllowed({
+    orgId: event.orgId,
+    operation: `calendar.${operation}`,
+    writeRequested: true,
+  });
+
   const baseUrl = 'https://graph.microsoft.com/v1.0/me/events';
   const headers = {
     Authorization: `Bearer ${accessToken}`,
@@ -95,6 +131,12 @@ export async function pullMicrosoftIncremental(
   deltaState: Record<string, unknown>,
   log: pino.Logger,
 ): Promise<void> {
+  await ensureMicrosoftGraphConnectorAllowed({
+    orgId,
+    operation: 'calendar.pullIncremental',
+    writeRequested: false,
+  });
+
   const deltaLink = deltaState['calendarDeltaLink'] as string | undefined;
   const url =
     deltaLink ??

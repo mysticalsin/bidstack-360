@@ -13,6 +13,7 @@
 #   5. TypeScript compiles without errors
 #   6. All tests pass
 #   7. Build completes successfully
+#   8. Fresh deploy evidence exists for load, security, secrets, and Sentry
 #
 # Exit code: 0 = all gates passed; 1 = one or more gates failed
 # =============================================================================
@@ -29,6 +30,9 @@ NC='\033[0m'
 FAIL_COUNT=0
 WARN_COUNT=0
 ENV_TARGET="${1:-production}"
+if [[ "${1:-}" == "--env" ]]; then
+  ENV_TARGET="${2:-production}"
+fi
 ENV_FILE=".env.${ENV_TARGET}"
 
 log_gate_pass()  { echo -e "  ${GREEN}✓ PASS${NC}  $1"; }
@@ -59,7 +63,7 @@ else
 fi
 
 # Check for secrets patterns in staged diff
-SECRET_PATTERNS='(sk_live_|sk_test_|whsec_|pk_live_|PRIVATE KEY|BEGIN RSA|AKIA[A-Z0-9]{16})'
+SECRET_PATTERNS='(sk-[A-Za-z0-9_-]{20,}|sk_live_[A-Za-z0-9]{20,}|sk_test_[A-Za-z0-9]{20,}|whsec_[A-Za-z0-9]{20,}|pk_live_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{16}|ghp_[A-Za-z0-9]{30,}|gho_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|xox[baprs]-[A-Za-z0-9-]{20,}|AIza[0-9A-Za-z_-]{35}|AccountKey=[A-Za-z0-9+/=]{40,}|PRIVATE KEY|BEGIN RSA)'
 STAGED_SECRETS=$(git diff --cached -U0 2>/dev/null | grep -E "$SECRET_PATTERNS" | head -5 || true)
 if [[ -n "$STAGED_SECRETS" ]]; then
   log_gate_fail "Potential secrets detected in staged diff (first 5 lines):"
@@ -261,6 +265,24 @@ for path in "${CRITICAL_PATHS[@]}"; do
   fi
 done
 log_gate_pass "Critical path check complete (see warnings above if any)"
+
+# =============================================================================
+# Gate 9: Deploy evidence bundle
+# =============================================================================
+log_section "Gate 9: Deploy evidence bundle"
+
+if command -v node &>/dev/null; then
+  log_info "Running: node scripts/verify-deploy-evidence.mjs --env $ENV_TARGET"
+  if node scripts/verify-deploy-evidence.mjs --env "$ENV_TARGET"; then
+    log_gate_pass "Fresh deploy evidence is complete"
+  elif [[ "$ENV_TARGET" == "production" || "$ENV_TARGET" == "staging" ]]; then
+    log_gate_fail "Fresh deploy evidence is incomplete or stale"
+  else
+    log_gate_warn "Deploy evidence is incomplete for non-strict target $ENV_TARGET"
+  fi
+else
+  log_gate_fail "node not found - cannot verify deploy evidence"
+fi
 
 # =============================================================================
 # Summary

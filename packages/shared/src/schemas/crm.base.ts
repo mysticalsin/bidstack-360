@@ -51,3 +51,37 @@ export const TechnicalStackCategory = z.object({
   items: z.array(TechnicalStackItem),
 });
 export type TechnicalStackCategory = z.infer<typeof TechnicalStackCategory>;
+
+export const TechnicalStackSuggestion = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  item: TechnicalStackItem,
+  providerUpdatedAt: z.string().datetime().nullable(),
+});
+export type TechnicalStackSuggestion = z.infer<typeof TechnicalStackSuggestion>;
+
+export const TechnicalStackState = z.object({
+  companyKey: z.string().min(1),
+  manualStack: z.array(TechnicalStackCategory),
+  providerStack: z.array(TechnicalStackCategory),
+  effectiveStack: z.array(TechnicalStackCategory),
+  suggestions: z.array(TechnicalStackSuggestion),
+  updatedAt: z.string().datetime().nullable(),
+});
+export type TechnicalStackState = z.infer<typeof TechnicalStackState>;
+
+export const TechnicalStackRefreshProvider = z.object({
+  id: z.enum(['apollo', 'seamless', 'tech_intel', 'open_data']),
+  label: z.string().min(1),
+  status: z.enum(['synced', 'queued', 'disabled', 'unavailable']),
+  transport: z.enum(['mcp', 'api', 'open_data', 'queue']).nullable(),
+  message: z.string().min(1),
+  lastCheckedAt: z.string().datetime(),
+});
+export type TechnicalStackRefreshProvider = z.infer<typeof TechnicalStackRefreshProvider>;
+
+export const TechnicalStackRefreshResponse = z.object({
+  state: TechnicalStackState,
+  providers: z.array(TechnicalStackRefreshProvider),
+});
+export type TechnicalStackRefreshResponse = z.infer<typeof TechnicalStackRefreshResponse>;

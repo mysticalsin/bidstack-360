@@ -77,6 +77,7 @@ const JobData = z.object({
   extractionKind: z.enum(['intel', 'contract']).optional(),
 });
 type JobData = z.infer<typeof JobData>;
+export type DocumentExtractJobData = JobData;
 
 // ─── Dust extraction ───────────────────────────────────────────────────────
 
@@ -160,9 +161,29 @@ function mergeContractDrafts(
   };
 }
 
+function accountIntelExtractionMetadata(input: {
+  extractionId: string;
+  documentId: string;
+  dustRunId: string | null;
+}): Prisma.InputJsonValue {
+  return {
+    source: {
+      type: 'document_extraction',
+      extractionId: input.extractionId,
+      documentId: input.documentId,
+      extractor: input.dustRunId ? 'dust' : 'deterministic',
+      dustRunId: input.dustRunId,
+    },
+  };
+}
+
 // ─── Worker processor ──────────────────────────────────────────────────────
 
-async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
+async function processJobData(
+  rawData: unknown,
+  log: pino.Logger,
+  jobId: string | number | undefined,
+): Promise<void> {
   const {
     orgId,
     accountId,
@@ -176,7 +197,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
     documentVersionId,
     prompt,
     extractionKind,
-  } = JobData.parse(job.data);
+  } = JobData.parse(rawData);
 
   // Mark as running
   const runningUpdate = await prisma.documentExtraction.updateMany({
@@ -224,7 +245,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
         draft = mergeContractDrafts(llmDraft, deterministic);
         source = 'llm';
       } else {
-        log.warn({ jobId: job.id, provider: llm.kind }, 'contract LLM pass failed; using deterministic');
+        log.warn({ jobId, provider: llm.kind }, 'contract LLM pass failed; using deterministic');
       }
     }
 
@@ -239,7 +260,7 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
       throw new Error('Contract extraction does not match an active tenant-scoped extraction');
     }
     log.info(
-      { jobId: job.id, documentId, source, provider: llm?.kind ?? null },
+      { jobId, documentId, source, provider: llm?.kind ?? null },
       'contract extraction completed',
     );
     return;
@@ -265,6 +286,11 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
     log.info('No Dust agent configured, using deterministic extraction');
     result = deterministicExtract(text);
   }
+  const extractionMetadata = accountIntelExtractionMetadata({
+    extractionId,
+    documentId,
+    dustRunId,
+  });
 
   // Persist solutions
   for (const s of result.solutions) {
@@ -278,12 +304,14 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
         category: s.category,
         extractedFromDocumentId: documentId,
         confidenceBps: dustRunId ? 8500 : 5200,
+        metadata: extractionMetadata,
       },
       update: {
         description: s.description || null,
         category: s.category,
         extractedFromDocumentId: documentId,
         confidenceBps: dustRunId ? 8500 : 5200,
+        metadata: extractionMetadata,
       },
     });
   }
@@ -300,12 +328,14 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
         category: p.category,
         extractedFromDocumentId: documentId,
         confidenceBps: dustRunId ? 8500 : 5200,
+        metadata: extractionMetadata,
       },
       update: {
         description: p.description || null,
         category: p.category,
         extractedFromDocumentId: documentId,
         confidenceBps: dustRunId ? 8500 : 5200,
+        metadata: extractionMetadata,
       },
     });
   }
@@ -340,6 +370,17 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
       dustRunId,
     });
   }
+}
+
+async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
+  await processJobData(job.data, log, job.id);
+}
+
+export async function processDocumentExtractJobForTest(
+  data: DocumentExtractJobData,
+  log: pino.Logger,
+): Promise<void> {
+  await processJobData(data, log, 'test-direct');
 }
 
 // ─── BullMQ bootstrap ──────────────────────────────────────────────────────

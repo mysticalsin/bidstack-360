@@ -34,6 +34,7 @@ export * from './lead-rot.js';
 export * from './webhooks.js';
 export * from './analytics.js';
 export * from './feature-flags.js';
+export * from './serum.js';
 export * from './top-accounts.js';
 export * from './user-groups.js';
 export * from './cross-sell.js';

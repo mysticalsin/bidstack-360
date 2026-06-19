@@ -10,6 +10,11 @@ import type pino from 'pino';
 import { Worker as BullWorker, Queue as BullQueue } from 'bullmq';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
+import {
+  SERUM_RUNTIME_CONFIG_KEYS,
+  checkSerumAgentRuntimePolicy,
+  checkSerumLoopRuntimePolicy,
+} from '@bidstack/db/serum-runtime-policy';
 
 import { CREW_RUN } from '@bidstack/shared';
 
@@ -24,6 +29,7 @@ const JobData = z.object({
   crewId: z.string().uuid(),
   runId: z.string().uuid(),
   inputs: z.record(z.string()).default({}),
+  approvalConfirmed: z.boolean().default(false),
 });
 type JobData = z.infer<typeof JobData>;
 
@@ -51,6 +57,12 @@ interface RunStatusRow {
 
 function asStringArray(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+}
+
+function defaultSerumConfigEnvironment(): 'dev' | 'staging' | 'production' {
+  const env = process.env.SERUM_CONFIG_ENVIRONMENT;
+  if (env === 'staging' || env === 'production') return env;
+  return 'dev';
 }
 
 /** Load a crew + its agents + tasks into a CrewDef. Returns null if not found. */
@@ -116,6 +128,51 @@ async function markFailed(orgId: string, runId: string, message: string): Promis
   `;
 }
 
+function crewRuntimeAgentIds(crew: CrewDef): string[] {
+  const ids = new Set<string>();
+  for (const task of crew.tasks) ids.add(task.agentId);
+  if (crew.process === 'hierarchical' && crew.managerAgentId) ids.add(crew.managerAgentId);
+  return [...ids].filter(Boolean);
+}
+
+async function serumDenialForCrewRun(args: {
+  orgId: string;
+  crew: CrewDef;
+  runId: string;
+  approvalConfirmed: boolean;
+  retryCount: number;
+}): Promise<string | null> {
+  const loopDecision = await checkSerumLoopRuntimePolicy({
+    orgId: args.orgId,
+    environment: defaultSerumConfigEnvironment(),
+    configKey: SERUM_RUNTIME_CONFIG_KEYS.loops,
+    loopId: args.runId,
+    operation: 'crew.run',
+    retryCount: args.retryCount,
+    hasDurableEvent: true,
+    approvalGateReached: false,
+    approvalConfirmed: args.approvalConfirmed,
+  });
+  if (!loopDecision.allowed) {
+    return `SERUM runtime denied loop "${args.runId}": ${loopDecision.reason}`;
+  }
+
+  for (const agentId of crewRuntimeAgentIds(args.crew)) {
+    const decision = await checkSerumAgentRuntimePolicy({
+      orgId: args.orgId,
+      environment: defaultSerumConfigEnvironment(),
+      configKey: SERUM_RUNTIME_CONFIG_KEYS.agents,
+      agentId,
+      approvalConfirmed: args.approvalConfirmed,
+      excludedRunId: args.runId,
+    });
+    if (!decision.allowed) {
+      return `SERUM runtime denied agent "${agentId}": ${decision.reason}`;
+    }
+  }
+  return null;
+}
+
 function isAbortError(err: unknown): boolean {
   return err instanceof Error && err.name === 'AbortError';
 }
@@ -148,7 +205,7 @@ function startCancellationWatcher(
 async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
   const parsed = JobData.safeParse(job.data);
   if (!parsed.success) throw new Error(`crew-run: invalid job data: ${parsed.error.message}`);
-  const { orgId, crewId, runId, inputs } = parsed.data;
+  const { orgId, crewId, runId, inputs, approvalConfirmed } = parsed.data;
 
   const claimed = await prisma.$executeRaw`
     UPDATE crew_runs SET status = 'running'
@@ -163,6 +220,20 @@ async function processJob(job: Job<JobData>, log: pino.Logger): Promise<void> {
   if (!crew) {
     await markFailed(orgId, runId, 'crew not found');
     const err = new Error(`crew-run: crew ${crewId} not found for org`);
+    (err as Error & { doNotRetry?: boolean }).doNotRetry = true;
+    throw err;
+  }
+
+  const serumDenial = await serumDenialForCrewRun({
+    orgId,
+    crew,
+    runId,
+    approvalConfirmed,
+    retryCount: job.attemptsMade ?? 0,
+  });
+  if (serumDenial) {
+    await markFailed(orgId, runId, serumDenial);
+    const err = new Error(`crew-run: ${serumDenial}`);
     (err as Error & { doNotRetry?: boolean }).doNotRetry = true;
     throw err;
   }

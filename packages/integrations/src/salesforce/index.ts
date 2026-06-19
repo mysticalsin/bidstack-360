@@ -5,6 +5,16 @@ import type {
   SyncResult,
   } from '../types/plugin.js';
 
+/** Default fetch timeout for Salesforce API calls (15 seconds). */
+const FETCH_TIMEOUT_MS = 15_000;
+
+function fetchWithTimeout(url: string, opts: RequestInit & { timeout?: number } = {}): Promise<Response> {
+  const { timeout = FETCH_TIMEOUT_MS, ...rest } = opts;
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  return fetch(url, { ...rest, signal: controller.signal }).finally(() => clearTimeout(id));
+}
+
 /**
  * Salesforce CRM Integration Plugin
  *
@@ -45,7 +55,7 @@ export class SalesforcePlugin implements IntegrationPlugin {
       throw new Error('Salesforce OAuth credentials not configured');
     }
 
-    const tokenRes = await fetch(`${loginUrl}/services/oauth2/token`, {
+    const tokenRes = await fetchWithTimeout(`${loginUrl}/services/oauth2/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -58,8 +68,8 @@ export class SalesforcePlugin implements IntegrationPlugin {
     });
 
     if (!tokenRes.ok) {
-      const text = await tokenRes.text();
-      throw new Error(`Salesforce token exchange failed: ${text}`);
+      // Do NOT propagate response body — it may contain sensitive token data.
+      throw new Error(`Salesforce token exchange failed (HTTP ${tokenRes.status})`);
     }
 
     const tokenData = (await tokenRes.json()) as {
@@ -86,7 +96,7 @@ export class SalesforcePlugin implements IntegrationPlugin {
     if (!accessToken || !instanceUrl) return { valid: false, message: 'Missing credentials' };
 
     try {
-      const res = await fetch(`${instanceUrl}/services/data/v60.0/limits`, {
+      const res = await fetchWithTimeout(`${instanceUrl}/services/data/v60.0/limits`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       return { valid: res.ok, message: res.ok ? undefined : `HTTP ${res.status}` };
@@ -105,7 +115,7 @@ export class SalesforcePlugin implements IntegrationPlugin {
       throw new Error('Cannot refresh: missing refresh token or client credentials');
     }
 
-    const res = await fetch(`${loginUrl}/services/oauth2/token`, {
+    const res = await fetchWithTimeout(`${loginUrl}/services/oauth2/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -116,7 +126,7 @@ export class SalesforcePlugin implements IntegrationPlugin {
       }),
     });
 
-    if (!res.ok) throw new Error('Salesforce refresh failed');
+    if (!res.ok) throw new Error(`Salesforce refresh failed (HTTP ${res.status})`);
     const data = (await res.json()) as { access_token: string };
 
     return {
@@ -129,10 +139,11 @@ export class SalesforcePlugin implements IntegrationPlugin {
     const accessToken = config.credentials?.accessToken as string | undefined;
     const loginUrl = process.env.SALESFORCE_LOGIN_URL ?? 'https://login.salesforce.com';
     if (accessToken) {
-      await fetch(`${loginUrl}/services/oauth2/revoke`, {
+      await fetchWithTimeout(`${loginUrl}/services/oauth2/revoke`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ token: accessToken }),
+        timeout: 5_000,
       }).catch(() => {}); // Best-effort revoke.
     }
   }
@@ -154,7 +165,7 @@ export class SalesforcePlugin implements IntegrationPlugin {
           const accessToken = context.config.credentials?.accessToken as string | undefined;
           const instanceUrl = context.config.credentials?.instanceUrl as string | undefined;
           if (!accessToken || !instanceUrl) throw new Error('Salesforce not connected');
-          const res = await fetch(
+          const res = await fetchWithTimeout(
             `${instanceUrl}/services/data/v60.0/query?q=${encodeURIComponent(args.soql as string)}`,
             { headers: { Authorization: `Bearer ${accessToken}` } },
           );
@@ -173,7 +184,7 @@ export class SalesforcePlugin implements IntegrationPlugin {
           const accessToken = context.config.credentials?.accessToken as string | undefined;
           const instanceUrl = context.config.credentials?.instanceUrl as string | undefined;
           if (!accessToken || !instanceUrl) throw new Error('Salesforce not connected');
-          const res = await fetch(`${instanceUrl}/services/data/v60.0/sobjects/${args.sobject}`, {
+          const res = await fetchWithTimeout(`${instanceUrl}/services/data/v60.0/sobjects/${args.sobject}`, {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${accessToken}`,

@@ -214,7 +214,7 @@ export async function startCalendarSync(
           }
 
           const accessToken = decryptToken(t.accessTokenEncrypted);
-          await renewGoogleWatchChannel(t.id, accessToken, childLog);
+          await renewGoogleWatchChannel(t.orgId, t.id, accessToken, childLog);
         } catch (err) {
           childLog.error({ err, tokenId: t.id }, 'Watch channel renewal failed');
         }

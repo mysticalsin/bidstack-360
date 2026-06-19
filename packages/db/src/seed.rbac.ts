@@ -5,9 +5,17 @@
  * Extracted from seed.ts (BS-R1 file-size refactor).
  * Imported only by seed.ts.
  */
-import type { PrismaClient } from '../generated/client/index.js';
+import type { Prisma, PrismaClient } from '../generated/client/index.js';
 
 import { fixtureUsers } from './seed-data.js';
+
+/**
+ * Either the top-level `PrismaClient` (seed.ts CLI path) or an interactive
+ * transaction client (`Prisma.TransactionClient`, the demo provisioning path).
+ * Sound because this orchestrator uses only model methods, never client-only
+ * ones, which `TransactionClient` omits.
+ */
+type RbacSeedClient = Prisma.TransactionClient | PrismaClient;
 
 // ─── Builder helpers (hoisted in seed.ts; explicit order here) ───────────────
 
@@ -290,7 +298,7 @@ const LEGACY_ROLE_ASSIGNMENTS: Record<string, readonly string[]> = {
  * caller (seed.ts) controls the client lifecycle.
  */
 export async function seedRolesAndPermissions(
-  prisma: PrismaClient,
+  prisma: RbacSeedClient,
   orgId: string,
   usersByInitials: Map<string, string>,
 ): Promise<void> {

@@ -9,6 +9,10 @@ import type { z } from 'zod';
 
 import type { MemOSService } from '@bidstack/memos';
 import { prisma } from '@bidstack/db';
+import {
+  SERUM_RUNTIME_CONFIG_KEYS,
+  checkSerumPromptLibraryRuntimePolicy,
+} from '@bidstack/db/serum-runtime-policy';
 import { RFP_STORY_MATCH, rolePreambleForKey } from '@bidstack/shared';
 import { buildAgentUserMessage } from '../lib/prompt-safety.js';
 import { logAiInvocation } from '../lib/ai-audit-worker.js';
@@ -27,6 +31,12 @@ import {
 } from './rfp-requirement-extract.helpers.js';
 
 const DEFAULT_EXTRACT_AGENT_ID = 'rfp-extractor-agent';
+
+function defaultSerumConfigEnvironment(): 'dev' | 'staging' | 'production' {
+  const env = process.env.SERUM_CONFIG_ENVIRONMENT;
+  if (env === 'staging' || env === 'production') return env;
+  return 'dev';
+}
 
 // ─── Core processor ────────────────────────────────────────────────────────
 
@@ -87,7 +97,34 @@ export async function processJob(
     rfpContent: rawText,
   });
 
-  const envLlm = resolveLlmFromEnv();
+  let promptPolicyAllowed = false;
+  try {
+    const promptDecision = await checkSerumPromptLibraryRuntimePolicy({
+      orgId,
+      environment: defaultSerumConfigEnvironment(),
+      configKey: SERUM_RUNTIME_CONFIG_KEYS.promptLibrary,
+      operation: 'rfp.requirementExtract',
+      promptSet: 'rfp-extractor',
+      versionedPrompt: true,
+      injectionTested: true,
+      productionApproved: true,
+    });
+    promptPolicyAllowed = promptDecision.allowed;
+    if (!promptDecision.allowed) {
+      log.warn(
+        { orgId, orchestrationId, reason: promptDecision.reason },
+        'rfp-requirement-extract: SERUM prompt library denied AI extraction',
+      );
+    }
+  } catch (err) {
+    log.warn(
+      { err, orgId, orchestrationId },
+      'rfp-requirement-extract: SERUM prompt library check failed',
+    );
+  }
+
+  if (promptPolicyAllowed) {
+    const envLlm = resolveLlmFromEnv();
 
   // ─── Tier 1: direct LLM provider — OpenAI (GPT) / Anthropic (Claude) / Moonshot
   // (Kimi). Selected via RFP_LLM_PROVIDER + the provider's API key, so an org can
@@ -194,6 +231,10 @@ export async function processJob(
     }
 
     // ─── Tier 3: nothing configured → deterministic keyword/obligation parse ───
+  } else {
+    requirements = fallbackExtract(rawText);
+  }
+
   } else {
     requirements = fallbackExtract(rawText);
   }

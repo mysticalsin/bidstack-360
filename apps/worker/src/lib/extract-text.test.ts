@@ -1,4 +1,4 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -10,6 +10,11 @@ let previousRoot: string | undefined;
 let previousDriver: string | undefined;
 let previousOmniBase: string | undefined;
 let previousOmniTimeout: string | undefined;
+let previousOcrEnabled: string | undefined;
+let previousOcrLanguages: string | undefined;
+let previousOcrTimeout: string | undefined;
+let previousOcrmypdfBin: string | undefined;
+let previousTesseractBin: string | undefined;
 const tempRoots: string[] = [];
 
 afterEach(async () => {
@@ -21,6 +26,21 @@ afterEach(async () => {
   else process.env.OMNIPARSE_BASE_URL = previousOmniBase;
   if (previousOmniTimeout === undefined) delete process.env.OMNIPARSE_TIMEOUT_MS;
   else process.env.OMNIPARSE_TIMEOUT_MS = previousOmniTimeout;
+  if (previousOcrEnabled === undefined) delete process.env.BIDSTACK_OCR_ENABLED;
+  else process.env.BIDSTACK_OCR_ENABLED = previousOcrEnabled;
+  if (previousOcrLanguages === undefined) delete process.env.BIDSTACK_OCR_LANGUAGES;
+  else process.env.BIDSTACK_OCR_LANGUAGES = previousOcrLanguages;
+  if (previousOcrTimeout === undefined) delete process.env.BIDSTACK_OCR_TIMEOUT_MS;
+  else process.env.BIDSTACK_OCR_TIMEOUT_MS = previousOcrTimeout;
+  if (previousOcrmypdfBin === undefined) delete process.env.BIDSTACK_OCRMYPDF_BIN;
+  else process.env.BIDSTACK_OCRMYPDF_BIN = previousOcrmypdfBin;
+  if (previousTesseractBin === undefined) delete process.env.BIDSTACK_TESSERACT_BIN;
+  else process.env.BIDSTACK_TESSERACT_BIN = previousTesseractBin;
+  previousOcrEnabled = undefined;
+  previousOcrLanguages = undefined;
+  previousOcrTimeout = undefined;
+  previousOcrmypdfBin = undefined;
+  previousTesseractBin = undefined;
   vi.restoreAllMocks();
   await Promise.all(tempRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
@@ -60,6 +80,44 @@ describe('worker document extraction utilities', () => {
       expect.objectContaining({ method: 'POST' }),
     );
   });
+
+  it('extracts an image-only scanned PDF through OCRmyPDF when the OCR runtime gate is enabled', async () => {
+    if (process.env.BIDSTACK_OCR_RUNTIME_TEST !== '1') {
+      console.warn('[skip] scanned PDF OCR runtime gate - set BIDSTACK_OCR_RUNTIME_TEST=1');
+      return;
+    }
+
+    previousOcrEnabled = process.env.BIDSTACK_OCR_ENABLED;
+    previousOcrLanguages = process.env.BIDSTACK_OCR_LANGUAGES;
+    previousOcrTimeout = process.env.BIDSTACK_OCR_TIMEOUT_MS;
+    previousOcrmypdfBin = process.env.BIDSTACK_OCRMYPDF_BIN;
+    previousTesseractBin = process.env.BIDSTACK_TESSERACT_BIN;
+
+    const buffer = await readFile(
+      new URL('./__fixtures__/ocr-smoke-scanned.pdf', import.meta.url),
+    );
+
+    process.env.BIDSTACK_OCR_ENABLED = 'false';
+    const withoutOcr = await extractTextFromBuffer({
+      buffer,
+      contentType: 'application/pdf',
+      name: 'ocr-smoke-scanned.pdf',
+    });
+    expect(withoutOcr.trim()).toBe('');
+
+    process.env.BIDSTACK_OCR_ENABLED = 'true';
+    process.env.BIDSTACK_OCR_LANGUAGES = 'eng';
+    process.env.BIDSTACK_OCR_TIMEOUT_MS = '120000';
+
+    const text = await extractTextFromBuffer({
+      buffer,
+      contentType: 'application/pdf',
+      name: 'ocr-smoke-scanned.pdf',
+    });
+    const normalized = text.replace(/\s+/g, ' ').trim();
+    expect(normalized).toContain('OCR RUNTIME READY');
+    expect(normalized).toContain('MASTER SERVICES AGREEMENT');
+  }, 180_000);
 
   it.each([
     ['image/heic', 'scan.heic', '/parse_media/image'],

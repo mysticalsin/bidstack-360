@@ -8,6 +8,7 @@ import { prisma } from '@bidstack/db';
 
 import { CalendarConflictError } from './calendar-sync-types.js';
 import type { PushParams } from './calendar-sync-types.js';
+import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
 
 // ─── Google push ───────────────────────────────────────────────────────────
 
@@ -17,6 +18,13 @@ export async function handleGooglePush({
   accessToken,
   log,
 }: PushParams): Promise<void> {
+  await assertSerumConnectorAllowed({
+    orgId: event.orgId,
+    connectorId: 'google_workspace',
+    operation: `calendar.${operation}`,
+    writeRequested: true,
+  });
+
   const baseUrl = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
   const headers = {
     Authorization: `Bearer ${accessToken}`,
@@ -129,6 +137,13 @@ export async function pullGoogleIncremental(
   deltaState: Record<string, unknown>,
   log: pino.Logger,
 ): Promise<void> {
+  await assertSerumConnectorAllowed({
+    orgId,
+    connectorId: 'google_workspace',
+    operation: 'calendar.pullIncremental',
+    writeRequested: false,
+  });
+
   const syncToken = deltaState['calendarSyncToken'] as string | undefined;
   let url: string;
 
@@ -250,10 +265,18 @@ async function upsertGoogleEvents(
 // ─── Google watch channel renewal ─────────────────────────────────────────
 
 export async function renewGoogleWatchChannel(
+  orgId: string,
   tokenId: string,
   accessToken: string,
   log: pino.Logger,
 ): Promise<void> {
+  await assertSerumConnectorAllowed({
+    orgId,
+    connectorId: 'google_workspace',
+    operation: 'calendar.watchRenew',
+    writeRequested: true,
+  });
+
   const channelId = randomUUID();
   const webhookUrl = process.env.GOOGLE_CALENDAR_WEBHOOK_URL ?? '';
 

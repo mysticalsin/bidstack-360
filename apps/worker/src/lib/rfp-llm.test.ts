@@ -9,16 +9,27 @@ vi.mock('./llm-provider.js', () => ({ resolveLlmFromEnv: vi.fn(), completeChat: 
 // Per-org provider resolution is exercised in org-llm.test.ts; here it defaults
 // to null so the env-tier path is what these tiering assertions observe.
 vi.mock('./org-llm.js', () => ({ resolveOrgLlm: vi.fn().mockResolvedValue(null) }));
+vi.mock('@bidstack/db/serum-runtime-policy', () => ({
+  SERUM_RUNTIME_CONFIG_KEYS: { modelRouter: 'routing', promptLibrary: 'governance' },
+  checkSerumModelRouterRuntimePolicy: vi.fn(),
+  checkSerumPromptLibraryRuntimePolicy: vi.fn(),
+}));
 
 import { runRfpCompletion } from './rfp-llm.js';
 import { resolveLlmFromEnv, completeChat } from './llm-provider.js';
 import { resolveOrgLlm } from './org-llm.js';
 import { logAiInvocation } from './ai-audit-worker.js';
+import {
+  checkSerumModelRouterRuntimePolicy,
+  checkSerumPromptLibraryRuntimePolicy,
+} from '@bidstack/db/serum-runtime-policy';
 
 const mockResolve = vi.mocked(resolveLlmFromEnv);
 const mockResolveOrg = vi.mocked(resolveOrgLlm);
 const mockComplete = vi.mocked(completeChat);
 const mockLogAiInvocation = vi.mocked(logAiInvocation);
+const mockCheckSerumModelRouter = vi.mocked(checkSerumModelRouterRuntimePolicy);
+const mockCheckSerumPromptLibrary = vi.mocked(checkSerumPromptLibraryRuntimePolicy);
 const log = { warn: vi.fn(), info: vi.fn(), error: vi.fn() } as unknown as pino.Logger;
 
 const base = {
@@ -32,6 +43,26 @@ const base = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockResolveOrg.mockResolvedValue(null);
+  mockCheckSerumPromptLibrary.mockResolvedValue({
+    configType: 'prompt_library',
+    configKey: 'governance',
+    environment: 'dev',
+    subject: 'rfp-test:rfp-test',
+    allowed: true,
+    status: 'allowed',
+    reason: 'Prompt execution is allowed by the active SERUM policy.',
+    activeConfigVersionId: '33333333-3333-4333-8333-333333333333',
+  });
+  mockCheckSerumModelRouter.mockResolvedValue({
+    configType: 'model_router',
+    configKey: 'routing',
+    environment: 'dev',
+    subject: 'openai',
+    allowed: true,
+    status: 'allowed',
+    reason: 'Model route is allowed by the active SERUM policy.',
+    activeConfigVersionId: '22222222-2222-4222-8222-222222222222',
+  });
 });
 
 describe('runRfpCompletion tiering', () => {
@@ -48,6 +79,28 @@ describe('runRfpCompletion tiering', () => {
     const r = await runRfpCompletion({ ...base, dust });
 
     expect(r).toEqual({ text: '{"ok":1}', provider: 'anthropic' });
+    expect(mockCheckSerumPromptLibrary).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orgId: base.orgId,
+        environment: 'dev',
+        configKey: 'governance',
+        operation: 'rfp-test',
+        promptSet: 'rfp-test',
+        versionedPrompt: true,
+        injectionTested: true,
+        productionApproved: true,
+      }),
+    );
+    expect(mockCheckSerumModelRouter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orgId: base.orgId,
+        environment: 'dev',
+        configKey: 'routing',
+        provider: 'claude',
+        requestedMaxTokens: 4096,
+        sourceCitationsRequired: true,
+      }),
+    );
     expect(mockComplete).toHaveBeenCalledOnce();
     expect(
       (dust as unknown as { runAgent: ReturnType<typeof vi.fn> }).runAgent,
@@ -68,6 +121,9 @@ describe('runRfpCompletion tiering', () => {
     const r = await runRfpCompletion({ ...base, dust: null });
 
     expect(r).toEqual({ text: 'org answer', provider: 'moonshot' });
+    expect(mockCheckSerumModelRouter).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: 'kimi', requestedMaxTokens: 4096 }),
+    );
     expect(mockResolve).not.toHaveBeenCalled(); // env never consulted once org resolves
   });
 
@@ -79,6 +135,10 @@ describe('runRfpCompletion tiering', () => {
     const r = await runRfpCompletion({ ...base, dust });
 
     expect(r).toEqual({ text: 'draft', provider: 'dust', runId: 'r1' });
+    expect(mockCheckSerumPromptLibrary).toHaveBeenCalledWith(
+      expect.objectContaining({ operation: 'rfp-test', promptSet: 'rfp-test' }),
+    );
+    expect(mockCheckSerumModelRouter).not.toHaveBeenCalled();
     expect(mockComplete).not.toHaveBeenCalled();
   });
 
@@ -88,7 +148,7 @@ describe('runRfpCompletion tiering', () => {
     expect(r).toBeNull();
   });
 
-  it('falls through to Dust when the direct provider fails', async () => {
+  it('does not fall through to Dust when a SERUM-allowed direct provider fails', async () => {
     mockResolve.mockReturnValue({ kind: 'openai', apiKey: 'k', model: 'm', baseUrl: 'b' });
     mockComplete.mockRejectedValue(new Error('boom'));
     const runAgent = vi.fn().mockResolvedValue({ status: 'succeeded', output: 'dust draft', run_id: 'r2' });
@@ -96,8 +156,103 @@ describe('runRfpCompletion tiering', () => {
 
     const r = await runRfpCompletion({ ...base, dust });
 
-    expect(r).toEqual({ text: 'dust draft', provider: 'dust', runId: 'r2' });
-    expect(runAgent).toHaveBeenCalledOnce();
+    expect(r).toBeNull();
+    expect(runAgent).not.toHaveBeenCalled();
+    expect(mockLogAiInvocation).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'error', errorMsg: 'boom' }),
+      log,
+    );
+  });
+
+  it('blocks a direct provider before execution when SERUM denies the route', async () => {
+    mockResolve.mockReturnValue({ kind: 'nim', apiKey: 'k', model: 'm', baseUrl: 'b' });
+    mockCheckSerumModelRouter.mockResolvedValueOnce({
+      configType: 'model_router',
+      configKey: 'routing',
+      environment: 'dev',
+      subject: 'nvidia_nim',
+      allowed: false,
+      status: 'denied',
+      reason: 'Requested token budget exceeds the active SERUM router cap.',
+      activeConfigVersionId: '22222222-2222-4222-8222-222222222222',
+    });
+    const runAgent = vi.fn().mockResolvedValue({ status: 'succeeded', output: 'dust draft', run_id: 'r2' });
+    const dust = { runAgent } as unknown as DustClient;
+
+    const r = await runRfpCompletion({
+      ...base,
+      dust,
+      maxTokens: 9000,
+      sourceCitationsRequired: false,
+    });
+
+    expect(r).toBeNull();
+    expect(mockCheckSerumModelRouter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'nvidia_nim',
+        requestedMaxTokens: 9000,
+        sourceCitationsRequired: false,
+      }),
+    );
+    expect(mockComplete).not.toHaveBeenCalled();
+    expect(runAgent).not.toHaveBeenCalled();
+    expect(mockLogAiInvocation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'error',
+        errorMsg: expect.stringContaining('Requested token budget exceeds'),
+      }),
+      log,
+    );
+  });
+
+  it('blocks model execution before router or Dust fallback when SERUM denies the prompt set', async () => {
+    mockResolve.mockReturnValue({ kind: 'anthropic', apiKey: 'k', model: 'm', baseUrl: 'b' });
+    mockCheckSerumPromptLibrary.mockResolvedValueOnce({
+      configType: 'prompt_library',
+      configKey: 'governance',
+      environment: 'dev',
+      subject: 'rfp-test:rfp-test',
+      allowed: false,
+      status: 'denied',
+      reason: 'Prompt set is not in the active SERUM allowlist.',
+      activeConfigVersionId: '33333333-3333-4333-8333-333333333333',
+    });
+    const runAgent = vi.fn().mockResolvedValue({ status: 'succeeded', output: 'dust draft', run_id: 'r2' });
+    const dust = { runAgent } as unknown as DustClient;
+
+    const r = await runRfpCompletion({ ...base, dust });
+
+    expect(r).toBeNull();
+    expect(mockComplete).not.toHaveBeenCalled();
+    expect(mockCheckSerumModelRouter).not.toHaveBeenCalled();
+    expect(runAgent).not.toHaveBeenCalled();
+    expect(mockLogAiInvocation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'error',
+        errorMsg: expect.stringContaining('Prompt set is not in the active SERUM allowlist'),
+      }),
+      log,
+    );
+  });
+
+  it('fails closed without model execution when the SERUM router check errors', async () => {
+    mockResolve.mockReturnValue({ kind: 'gemma', apiKey: 'local', model: 'gemma3', baseUrl: 'b' });
+    mockCheckSerumModelRouter.mockRejectedValueOnce(new Error('policy database unavailable'));
+    const runAgent = vi.fn().mockResolvedValue({ status: 'succeeded', output: 'dust draft', run_id: 'r2' });
+    const dust = { runAgent } as unknown as DustClient;
+
+    const r = await runRfpCompletion({ ...base, dust });
+
+    expect(r).toBeNull();
+    expect(mockComplete).not.toHaveBeenCalled();
+    expect(runAgent).not.toHaveBeenCalled();
+    expect(mockLogAiInvocation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'error',
+        errorMsg: expect.stringContaining('policy database unavailable'),
+      }),
+      log,
+    );
   });
 
   it('does not fall through to Dust when cancellation aborts the direct provider', async () => {

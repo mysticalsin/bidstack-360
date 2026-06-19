@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./serum-runtime-policy": {
+      "types": "./dist/serum-runtime-policy.d.ts",
+      "default": "./dist/serum-runtime-policy.js"
     }
   },
   "scripts": {

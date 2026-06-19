@@ -42,7 +42,7 @@ const args = [
   '--passWithNoTests',
   '--pool=forks',
   '--no-file-parallelism',
-  '--isolate=false',
+  '--isolate=true',
   ...process.argv.slice(2),
 ];
 

@@ -8,6 +8,10 @@
 // PostgreSQL and is double-quoted throughout.
 
 import { prisma } from '@bidstack/db';
+import {
+  SERUM_RUNTIME_CONFIG_KEYS,
+  checkSerumRetrievalRuntimePolicy,
+} from '@bidstack/db/serum-runtime-policy';
 
 const COHERE_MODEL = 'embed-multilingual-v3.0';
 const EMBED_DIM = 1024;
@@ -39,10 +43,25 @@ export interface ReferenceSearchOpts {
  * Embed a query with Cohere. Returns null when COHERE_API_KEY is unset (caller
  * falls back to keyword search) or on any transport/shape error.
  */
-export async function embedQuery(text: string): Promise<number[] | null> {
+export async function embedQuery(
+  orgId: string,
+  text: string,
+  requestedChunks: number,
+): Promise<number[] | null> {
   const apiKey = process.env.COHERE_API_KEY;
   if (!apiKey) return null;
   try {
+    const decision = await checkSerumRetrievalRuntimePolicy({
+      orgId,
+      environment: defaultSerumConfigEnvironment(),
+      configKey: SERUM_RUNTIME_CONFIG_KEYS.retrieval,
+      operation: 'retrieval.referenceSearch',
+      requestedChunks,
+      sourceBacked: true,
+      expectedConfidence: 1,
+    });
+    if (!decision.allowed) return null;
+
     const res = await fetch('https://api.cohere.ai/v1/embed', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -59,6 +78,12 @@ export async function embedQuery(text: string): Promise<number[] | null> {
   } catch {
     return null;
   }
+}
+
+function defaultSerumConfigEnvironment(): 'dev' | 'staging' | 'production' {
+  const env = process.env.SERUM_CONFIG_ENVIRONMENT;
+  if (env === 'staging' || env === 'production') return env;
+  return 'dev';
 }
 
 interface RefRow {
@@ -84,7 +109,7 @@ export async function searchReferences(
   opts: ReferenceSearchOpts = {},
 ): Promise<ReferenceSearchResult> {
   const limit = Math.min(Math.max(opts.limit ?? 8, 1), 25);
-  const vector = await embedQuery(query);
+  const vector = await embedQuery(orgId, query, limit);
 
   let rows: RefRow[];
   if (vector) {

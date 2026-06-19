@@ -42,6 +42,9 @@ import { startRfpQaReview } from './queues/rfp-qa-review.js';
 import { startCrewRun, startCrewRunReaper } from './queues/crew-run.js';
 import { startSignatureWorkers } from './queues/signatures.js';
 import { startMigrationWorker } from './queues/migration.js';
+import { startSentrySmokeWorker } from './queues/sentry-smoke.js';
+import { attachSentryToWorker, initWorkerSentry } from './plugins/sentry.js';
+import { assertWorkerProductionEnv } from './lib/production-env.js';
 
 const log = pino({
   level: process.env.LOG_LEVEL ?? 'info',
@@ -53,16 +56,13 @@ const log = pino({
 });
 
 // Fail fast on bad production config instead of booting "healthy" and failing
-// every job. Postgres + Redis are the worker's universal hard dependencies; the
-// API enforces its own env via getEnv(), but the worker can't import that
-// app-specific schema, so it checks its must-haves here. (DATABASE_URL is read
-// by the Prisma client; REDIS_URL by every BullMQ queue below.)
-if (process.env.NODE_ENV === 'production') {
-  const missing = (['DATABASE_URL', 'REDIS_URL'] as const).filter((k) => !process.env[k]?.trim());
-  if (missing.length > 0) {
-    log.fatal({ missing }, 'worker: missing required production env — refusing to boot');
-    process.exit(1);
-  }
+// jobs later when a queue first hits Postgres, Redis, encrypted provider tokens,
+// or durable object storage.
+try {
+  assertWorkerProductionEnv(process.env);
+} catch (err) {
+  log.fatal({ err }, 'worker: invalid production env - refusing to boot');
+  process.exit(1);
 }
 
 const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6380';
@@ -84,6 +84,7 @@ connection.on('connect', () => log.info({ redisEndpoint }, 'redis connected'));
 
 const workers: Worker[] = [];
 const queues: Queue[] = [];
+initWorkerSentry(log);
 
 // WHY separate: startCallWorkers has a different signature — returns Worker[]
 // synchronously (no queue/workers arrays) and does not need to be awaited.
@@ -122,7 +123,12 @@ await Promise.all([
   startCrewRunReaper(connection, log, workers, queues),
   // Migration connector (CSV / Salesforce CSV / HubSpot) import consumer
   startMigrationWorker(connection, log, workers, queues),
+  startSentrySmokeWorker(connection, log, workers, queues),
 ]);
+
+for (const worker of workers) {
+  attachSentryToWorker(worker, worker.name, log);
+}
 
 log.info(
   'BidStack worker ready (dust-poll + webhook-processor + company-enrich-apollo + document-extract + calendar-sync + email-sync + sms + webhook-delivery + yjs-compact + cs + call-processing + predictive-retrain + rfp-orchestrator + rfp-requirement-extract + rfp-story-match + rfp-section-draft + rfp-compliance-fill + rfp-embed-reference + rfp-embed-requirement)',
