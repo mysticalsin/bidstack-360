@@ -4,6 +4,64 @@ Append-only sprint log. Every sprint ends with a commit + a checkpoint here.
 
 ---
 
+## 2026-06-19 - Production-Hardening for Real Mantu Tenants
+
+**Branch:** `feat/prod-hardening-mantu` (off `demo` @ c038c5d9)
+
+**Goal:** `/goal` — finish the CRM toward real production for Mantu bid teams.
+
+**Done — verify-before-fix sweep (the audit was stale):**
+
+- Re-checked all 26 `walteur-kit/enterprise-assessment.json` findings against
+  current source via a 26-agent verification fan-out. **17 of 26 were already
+  remediated in the working tree** (incl. the heavy ones: F2 cockpit win/loss +
+  revenue truncation now uses `fetchAccountPerformance` Postgres aggregates;
+  F3 `@@index([orgId, companyId])` on Opportunity; F4 key-accounts cursor
+  pagination; F25 governance mutations now audited). Security #5–#17 confirmed
+  already closed (only migration `20260613160000` deploy pending).
+- Confirmed auth is production-safe: stub/demo modes refuse to boot in prod and
+  are loopback-only; Clerk path enforces `org_id`, SSO-domain allowlist,
+  cross-org attack prevention, JIT user provisioning + audit.
+
+**Done — fixed the 9 genuinely-open findings (surgical, parallel implementers):**
+
+- **F9** (security) webhook delivery now routes through `createResearchFetch`
+  (DNS-rebind-safe, resolves + rejects internal IPs per hop) instead of raw fetch.
+- **F11** (security) access-scope cache now invalidates cross-replica via Redis
+  pub/sub (was 60s-stale per-process on `replicas:2`).
+- **F6** (correctness) sector-view `totalAccounts` + `dataQualityWarning` now
+  org-exact `count()`s, not a take:1000 newest-companies sample.
+- **F19** (resilience) demo-org provisioning now atomic (`$transaction`, no orphan)
+  + idempotent on P2002 email race; `seedOrgData` widened to `TransactionClient`.
+- **F14/F15/F16** (perf) mutation onSend drops in-process cache tiers; lean
+  1-query release-score path; cockpit field-override folded into the parallel batch.
+- **F21** (a11y) cross-sell status advance now announces via aria-live toast.
+- **F26** (audit) mutation-audit safety-net now covers serum + credential admin
+  prefixes (+ regression test). **F28** scratch_img excluded from Docker context.
+
+**Done — production runbook:** new `DEPLOY.production.md` (real Clerk/Mantu deploy
+vs the demo-only `DEPLOY.md`): prod env, explicit `migrate:deploy` release step,
+per-tenant Clerk-org→Org registration, RBAC seed, verification, known gaps.
+
+**Verified:** `pnpm -r typecheck` PASS · `pnpm -r lint` PASS · `pnpm test` PASS
+(api 703/2-skip, web 374, mcp 48, db 12, memos 8, shared/dust/odoo/worker green).
+
+**Committed:** runbook (ba1e2b3d) + the in-progress demo wave consolidated in 6
+gate-green chunked commits (Windows lint-staged arg-limit forced chunking; each
+chunk lint-verified). The wave is mostly prior-session work, verified green here.
+
+**Surfaced / operator-only (cannot be done from the agent shell):**
+
+- Run `migrate:deploy` (incl. pending `20260613160000`) on the prod DB.
+- Set prod secrets (Clerk, signing, integration key, S3); register each Mantu
+  Clerk org as an `Org` row (JIT provisions users, not orgs).
+- Add Chromium to the `api` image for PDF export; WS proxy for realtime.
+- Did NOT touch the live Railway DB or the orphaned `Quote` tables (Rule 13).
+- Live end-to-end browser smoke against a running prod instance still pending
+  (needs prod DB env handoff).
+
+---
+
 ## 2026-06-07 - Agent Studio Bid Workspace Evidence Handoff
 
 **Done:**
