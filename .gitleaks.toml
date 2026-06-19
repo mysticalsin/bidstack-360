@@ -45,9 +45,9 @@ tags = ["key", "stripe", "webhook"]
 
 [[rules]]
 id = "bidstack-openai-key"
-description = "OpenAI / Anthropic-style API key (sk-…)"
-regex = '''sk-[A-Za-z0-9]{20,}'''
-tags = ["key", "openai"]
+description = "OpenAI / Anthropic-style API key (sk-...)"
+regex = '''sk-[A-Za-z0-9_-]{20,}'''
+tags = ["key", "openai", "anthropic"]
 
 [[rules]]
 id = "bidstack-aws-access-key"
@@ -66,6 +66,30 @@ id = "bidstack-github-oauth"
 description = "GitHub OAuth token"
 regex = '''gho_[A-Za-z0-9]{30,}'''
 tags = ["key", "github"]
+
+[[rules]]
+id = "bidstack-github-fine-grained-pat"
+description = "GitHub fine-grained personal access token"
+regex = '''github_pat_[A-Za-z0-9_]{30,}'''
+tags = ["key", "github"]
+
+[[rules]]
+id = "bidstack-slack-token"
+description = "Slack bot/app/user token"
+regex = '''xox[baprs]-[A-Za-z0-9-]{20,}'''
+tags = ["key", "slack"]
+
+[[rules]]
+id = "bidstack-google-api-key"
+description = "Google API key"
+regex = '''AIza[0-9A-Za-z_-]{35}'''
+tags = ["key", "google"]
+
+[[rules]]
+id = "bidstack-azure-storage-account-key"
+description = "Azure Storage connection string account key"
+regex = '''AccountKey=[A-Za-z0-9+/=]{40,}'''
+tags = ["key", "azure"]
 
 [[rules]]
 id = "bidstack-pem-private-key"

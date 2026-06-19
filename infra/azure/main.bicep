@@ -15,7 +15,7 @@
 //    Container Apps Environment
 //      ├─ Job  : migrate   (one-shot; `prisma migrate deploy`; runs BEFORE apps)
 //      ├─ App  : api        (external ingress :4000)
-//      ├─ App  : web        (external ingress :80)
+//      ├─ App  : web        (external ingress -> container :8080)
 //      ├─ App  : worker     (no ingress)
 //      └─ App  : mcp-server (internal ingress :4001, health :4003)
 //
@@ -49,7 +49,9 @@ param pgAdminLogin string
 param pgAdminPassword string
 
 @secure()
-@description('AES-256-GCM key (base64, 32 bytes) that encrypts per-org Dust + OAuth secrets at rest. REQUIRED in prod.')
+@minLength(64)
+@maxLength(64)
+@description('64-character hex AES-256-GCM key generated with `openssl rand -hex 32`; encrypts per-org Dust + OAuth secrets at rest. REQUIRED in prod.')
 param integrationTokenKey string
 
 @secure()
@@ -375,7 +377,7 @@ resource webApp 'Microsoft.App/containerApps@2024-03-01' = {
     environmentId: env.id
     configuration: {
       activeRevisionsMode: 'Single'
-      ingress: { external: true, targetPort: 80, transport: 'auto' }
+      ingress: { external: true, targetPort: 8080, transport: 'auto' }
       registries: registries
     }
     template: {

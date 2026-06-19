@@ -34,6 +34,8 @@ coverage/
 .nyc_output/
 playwright-report/
 test-results/
+load-test-report/
+deploy-evidence/
 trace_extracted/
 *.err
 
@@ -87,6 +89,7 @@ apps/mobile/*.mobileprovision
 .claude/scheduled_tasks.lock
 
 # Tool/agent scratch outputs (screenshots, page snapshots, debug outputs)
+.forge/
 .playwright-mcp/
 .tmp-screens/
 .swarm_state/
@@ -98,6 +101,10 @@ scratch/
 scratch_skills/
 apps/web/scratch/
 apps/api/debug-out.txt
+
+# Generated i18n sweep scratch files. Keep the canonical coverage script, but
+# do not let temporary batch drivers/results enter release source evidence.
+apps/web/scripts/_i18n_*
 
 # Root-level screenshot dumps (from Playwright QA passes)
 *.png

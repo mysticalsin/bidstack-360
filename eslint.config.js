@@ -89,6 +89,7 @@ export default tseslint.config(
       'integrations/**', // Zapier app and other CJS/vanilla-JS integrations
       'load-tests/**', // k6 load-test scripts — not Node.js, use k6 globals
       'scripts/**', // one-off ops scripts — console is intentional there
+      'apps/web/scripts/**', // one-off i18n/QA harnesses with agent globals
       'scratch/**', // local scratch scripts (gitignored)
       'apps/*/_*.mjs', // local workspace probes (gitignored)
       '.claire/**', // ephemeral agent worktrees

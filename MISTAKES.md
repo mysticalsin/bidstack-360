@@ -23,15 +23,426 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 ---
 
+### 2026-06-19 PROCESS: Blind `git add <file>` on a tree with pre-existing uncommitted WIP
+- **What went wrong:** Intended a 1-line lint fix commit (`userId` → `_userId`) but `git add` of `serum-connector-egress.test.ts` captured all 209 lines of that pre-existing untracked file, misattributing prior-session serum WIP under a "lint fix" message. Caught and reversed with `git reset --mixed HEAD~1`.
+- **Root cause:** The `demo` branch carried a large uncommitted wave (~404 files, incl. untracked new files and the F2/F3/F4/F25 audit remediations). `git add <path>` stages the entire file, not just the hunk you authored, so a file already dirty/untracked at HEAD bundles its pre-existing changes into your commit.
+- **Prevention rule:** On a dirty WIP tree, before `git add <file>` confirm the file was clean at HEAD (`git diff --numstat HEAD -- <file>` should show only your hunk; check it isn't untracked). If it carries changes you didn't author, do NOT bulk-add — isolate hunks (`git add -p` / patch-apply) or leave it for the tree owner to commit. New files you authored (e.g. a fresh doc) are safe to add alone.
+- **Files affected:** apps/worker/src/queues/serum-connector-egress.test.ts (commit reversed; lint fix preserved in working tree).
+
+---
+
 ## Ledger
 
 <!-- New entries appended at the top of this section. -->
+
+### 2026-06-19 TESTING: Technical stack E2E assumed one account shape
+
+- **What went wrong:** The technical-stack browser spec used broad provider-label text and then assumed a newly staged vendor would always be `Vendor 1 in QA`. The improved launchpad reused provider labels, and seeded accounts can already contain a QA category.
+- **Root cause:** The test targeted repeated display text and fixed row order instead of semantic regions, explicit setup, and user-visible values.
+- **Prevention rule:** Cockpit E2E specs must scope repeated labels to named regions and verify outcomes by API response, provider ids, accessible controls, and input values rather than fixed category/item positions.
+- **Files affected:** `apps/web/e2e/technical-stack.spec.ts`.
+
+### 2026-06-19 SECURITY: HubSpot migration queue carried raw OAuth tokens
+
+- **What went wrong:** HubSpot import chunks placed `accessToken`, `refreshToken`, and `expiresAt` in `MigrationJobPayload.meta`, which BullMQ persists in Redis.
+- **Root cause:** The worker needed HubSpot credentials per page, and the original producer forwarded decrypted tokens instead of a non-secret credential reference.
+- **Prevention rule:** Queue payloads are not secret stores. Provider jobs must carry credential references only, with shared schema guards rejecting raw secret-looking metadata and workers resolving encrypted credentials just in time.
+- **Files affected:** `packages/shared/src/schemas/migration.ts`, `packages/shared/src/schemas/migration.test.ts`, `apps/api/src/routes/migrations-hubspot.routes.ts`, `apps/api/src/routes/migrations-hubspot.routes.test.ts`, `apps/worker/src/queues/migration.ts`, `apps/worker/src/queues/migration.hubspot-credentials.test.ts`, `docs/solutions/hubspot-migration-queue-secret-hygiene.md`.
+
+### 2026-06-19 BUG: HubSpot migration credentials used Salesforce integration type
+
+- **What went wrong:** HubSpot OAuth migration credentials were stored in `IntegrationConfig` as `type='salesforce'` with `name='hubspot-migration'`.
+- **Root cause:** The `integration_type` enum did not have a HubSpot value, and the route used Salesforce as a temporary closest-fit provider type.
+- **Prevention rule:** Provider credentials must never be stored under a different provider enum. Add the enum/migration/backfill first, then route new writes through typed helper coordinates with a regression test.
+- **Files affected:** `packages/db/prisma/schema.prisma`, `packages/db/prisma/migrations/20260619140000_hubspot_integration_type/migration.sql`, `packages/db/prisma/migrations/20260619140500_hubspot_integration_config_backfill/migration.sql`, `apps/api/src/routes/migrations-hubspot.routes.ts`, `apps/api/src/routes/migrations-hubspot.routes.test.ts`, `docs/solutions/hubspot-integration-type-migration.md`.
+
+### 2026-06-19 UX: Empty technical stack started manual-first
+
+- **What went wrong:** Accounts with no saved technical stack showed a passive blank state, so source-backed discovery from Apollo, Seamless.AI, configured Tech Intel MCPs, open data, or other attributed sources was not the obvious first action.
+- **Root cause:** The card had a provider refresh contract and a mature add composer, but the zero-state did not route users into that source-backed workflow.
+- **Prevention rule:** Enterprise data-entry zero-states must expose the best evidence-gathering path first, plus a clear manual-truth fallback, before asking users to type from scratch.
+- **Files affected:** `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`, `apps/web/src/styles/cockpit.css`, `docs/solutions/technical-stack-provider-source-pull.md`.
+
+### 2026-06-19 TOOLING: Container scan passed local mutable tags as release proof
+
+- **What went wrong:** Strict production evidence accepted a fresh Trivy scan of local mutable image tags such as `bidcrm-api:root-api-user-probe` as if it proved the images that staging or production would deploy.
+- **Root cause:** The container scanner recorded requested image coverage and findings, but not release environment or immutable registry digest refs. The strict verifier checked coverage by name only.
+- **Prevention rule:** Release container evidence must record strict mode, deploy environment, and immutable image references (`registry/image@sha256:<digest>`). Local tag scans are useful hygiene but must not satisfy staging/production release gates.
+- **Files affected:** `scripts/run-container-vulnerability-scan.mjs`, `scripts/verify-deploy-evidence.mjs`, `scripts/run-deploy-evidence-bundle.mjs`, `package.json`, `docs/solutions/container-vulnerability-scan-gate.md`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-19 TOOLING: Load certification evidence did not prove deploy environment
+
+- **What went wrong:** Strict deploy evidence checked load profile, target, auth, thresholds, and a few optional metrics, but did not require the load artifact to record and match `BIDSTACK_DEPLOY_ENV`. It also allowed release-shaped artifacts without `strictEvidence: true` or the core k6 metrics block.
+- **Root cause:** Browser and provider artifacts were hardened for environment reuse first, while load certification stayed treated as target/profile-only proof.
+- **Prevention rule:** Every release evidence artifact with staging/production scope must record environment, strict-mode provenance, and minimum proof metrics, then assert equality with the verifier target in strict mode.
+- **Files affected:** `scripts/run-k6-load-test.mjs`, `scripts/verify-deploy-evidence.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-19 SECURITY: MCP server could initialize public routes before production env validation
+
+- **What went wrong:** The MCP server imported `server.ts` at module load, which initialized the Redis client before any production env validation could run. Missing, invalid, loopback, or fail-open Redis configuration could therefore reach the public MCP surface before failing through health or rate-limit behavior.
+- **Root cause:** The API and worker had boot contracts, but MCP kept implicit defaults (`redis://localhost:6380`) and trusted runtime health checks instead of validating production dependencies before route exposure.
+- **Prevention rule:** Any public tool/API surface with shared auth, database, or rate-limit dependencies must validate production env before importing modules that open connections or register routes. Production rate limiting must not be explicitly fail-open.
+- **Files affected:** `apps/mcp-server/src/production-env.ts`, `apps/mcp-server/src/production-env.test.ts`, `apps/mcp-server/src/main.ts`, `scripts/verify-compose-production-policy.mjs`, `docs/solutions/mcp-production-env-fail-fast.md`.
+
+### 2026-06-19 SECURITY: Worker boot accepted malformed production secret/storage config
+
+- **What went wrong:** Production workers only failed fast for missing `DATABASE_URL` and `REDIS_URL`, while queues later decrypted OAuth/provider secrets and read/write object storage using `INTEGRATION_TOKEN_KEY` and storage env.
+- **Root cause:** API env validation had the full production contract, but worker boot kept a local minimal check and relied on lazy queue failures for secret/storage misconfiguration.
+- **Prevention rule:** Any worker that processes encrypted tenant/provider credentials or uploaded files must have a pure, unit-tested production env contract and call it before opening Redis or starting queue processors.
+- **Files affected:** `apps/worker/src/lib/production-env.ts`, `apps/worker/src/lib/production-env.test.ts`, `apps/worker/src/main.ts`, `docs/solutions/worker-production-env-fail-fast.md`.
+
+### 2026-06-19 SECURITY: Production compose omitted encryption key for API and worker
+
+- **What went wrong:** `docker-compose.prod.yml` did not pass `INTEGRATION_TOKEN_KEY` to the API or worker even though production API boot rejects a missing key and workers decrypt stored provider/OAuth credentials.
+- **Root cause:** Runtime env validation and Azure secret wiring were hardened, but local production compose was not mechanically checked against the same encryption-key contract.
+- **Prevention rule:** Every production deploy descriptor must have a policy verifier tying runtime-required encryption keys to each service that encrypts or decrypts tenant/provider secrets; required interpolation only, no empty defaults.
+- **Files affected:** `docker-compose.prod.yml`, `scripts/verify-compose-production-policy.mjs`, `package.json`, `docs/RUNBOOK.md`, `docs/solutions/production-compose-secret-wiring.md`.
+
+### 2026-06-19 SECURITY: Web edge cache locations shadowed hardening headers
+
+- **What went wrong:** The production nginx config had only basic security headers, and locations with their own `add_header Cache-Control` directives would shadow parent security headers unless every header was repeated in those blocks.
+- **Root cause:** Cache freshness was hardened separately from browser security posture, but nginx `add_header` inheritance makes those concerns coupled.
+- **Prevention rule:** Any nginx location that declares `add_header` must be tested for the full security header set, not just the new header being added. App-shell cache tests must assert HSTS, CSP, COOP/CORP, Permissions-Policy, and the baseline XFO/XCTO/referrer headers together.
+- **Files affected:** `apps/web/nginx.conf`, `apps/web/src/lib/nginx-cache-policy.test.ts`, `docs/solutions/web-edge-security-headers.md`.
+
+### 2026-06-19 SECURITY: Integration token rotation could strand encrypted provider tokens
+
+- **What went wrong:** The quarterly rotation script could generate and write a new `INTEGRATION_TOKEN_KEY` even though the token re-encryption tool did not exist, while the operator copy implied `pnpm db:migrate` would handle re-encryption.
+- **Root cause:** Format hardening aligned key shape but did not prove the operational rotation workflow had the required old-key-to-new-key migration step before replacement.
+- **Prevention rule:** Any secret rotation for data-at-rest encryption must fail closed before generating a replacement key unless the tested re-encryption tool contract exists and ships a local selftest. Cleanup of previous keys must be conditional on completed row re-encryption, not elapsed time.
+- **Files affected:** `scripts/ops/rotate-secrets.sh`, `scripts/rotate-integration-tokens.ts`, `scripts/verify-secret-rotation-policy.mjs`, `package.json`, `docs/RUNBOOK.md`, `docs/solutions/agent-provider-credentials-org-secret-routing.md`.
+
+### 2026-06-19 SECURITY: Auth and provider control snapshots persisted like dashboard data
+
+- **What went wrong:** React Query persistence could hydrate `me/capabilities`, roles, users, API key summaries, provider credentials, Dust status, and connector health as ordinary cached data. Role changes could also keep the same session marker, making logout/login look like the only way to refresh permissions or integration state.
+- **Root cause:** The cache policy only excluded obvious live SERUM/account-cockpit snapshots and did not classify authorization/admin/provider control-plane queries as fail-closed data. Clerk session fingerprints included user/org but not org role; stub fingerprints ignored the active role.
+- **Prevention rule:** Persist only low-risk dashboard snapshots. Auth, RBAC, credentials, provider health, integration setup, and webhook/admin data must refetch from the backend after reload and must clear on user, org, role, or demo identity changes.
+- **Files affected:** `apps/web/src/lib/queryCache.ts`, `apps/web/src/lib/queryCache.test.ts`, `apps/web/src/lib/auth.tsx`, `apps/web/src/lib/auth.test.tsx`, `apps/web/e2e/flows/idle-auth-recovery.spec.ts`, `docs/solutions/idle-auth-refresh-and-focus-refetch.md`, `docs/audits/2026-06-16-serum-ux-ui-walteur-report.md`.
+
+### 2026-06-19 UX: Provider evidence was separated from the manual add moment
+
+- **What went wrong:** The Technical Stack add composer could show quick manual suggestions while Apollo, Seamless, or Tech Intel provider matches lived only in the separate source review queue. A user typing a provider-detected vendor could create a manual entry and lose accepted-source provenance.
+- **Root cause:** The composer excluded provider suggestions from quick suggestions but did not replace them with an inline source-backed match surface.
+- **Prevention rule:** When a manual composer and provider review queue share the same entity type, the composer must promote matching provider evidence inline and preserve provenance on accept.
+- **Files affected:** `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`, `apps/web/src/styles/cockpit.css`, `docs/solutions/technical-stack-provider-source-pull.md`, `docs/audits/2026-06-16-serum-ux-ui-walteur-report.md`.
+
+### 2026-06-19 UX: Mobile stack header copy visually collided
+
+- **What went wrong:** In 390px browser QA, the Technical Stack editor's "Curated stack" title and "Saved as internal verified data" subtitle rendered as one crowded line.
+- **Root cause:** The stack-header title/subtitle pair did not explicitly render as block text even though the surrounding mobile layout stacked the header.
+- **Prevention rule:** After adding compact mobile workbench UI, capture the exact edited state and inspect title/subtitle pairs, not just overflow and button size metrics.
+- **Files affected:** `apps/web/src/styles/cockpit.css`, `docs/audits/2026-06-16-serum-ux-ui-walteur-report.md`.
+
+### 2026-06-18 UX: Provider suggestions made source lanes look unchecked
+
+- **What went wrong:** Opening Technical Stack edit mode from existing Apollo, Seamless, or Tech Intel suggestions could still show provider readiness rows as "not checked" because the UI only trusted the current refresh response for lane status.
+- **Root cause:** Source readiness state was modeled as a session-local refresh artifact instead of also deriving review-ready state from the actual pending provider suggestions already in the technical-stack state.
+- **Prevention rule:** Any review inbox backed by provider evidence must derive lane readiness from both the latest provider refresh response and the queued evidence itself. Never let reviewable source deltas appear disconnected from their source lane.
+- **Files affected:** `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`, `docs/solutions/technical-stack-provider-source-pull.md`, `docs/audits/2026-06-16-serum-ux-ui-walteur-report.md`.
+
+### 2026-06-18 SECURITY: Production demo mode lacked explicit public-demo acknowledgement
+
+- **What went wrong:** `DEMO_MODE=true` could run in production with `DEMO_SESSION_SECRET` and local storage, creating an intentional public passwordless demo door without a second operator acknowledgement.
+- **Root cause:** Demo mode was treated as a valid production deployment kind but had only the feature flag and secret checks; it did not require a separate environment acknowledgement that this was intentionally public demo infrastructure.
+- **Prevention rule:** Public/passwordless auth doors in production require a second explicit acknowledgement env separate from the feature flag, with tests proving production fails closed by default.
+- **Files affected:** `apps/api/src/env.ts`, `apps/api/src/env.test.ts`, `.env.example`, `docs/solutions/public-demo-mode-production-ack.md`, `docs/audits/2026-06-16-serum-ux-ui-walteur-report.md`.
+
+### 2026-06-18 SECURITY: Sentry request hooks were encapsulated and org tags could stay stale
+
+- **What went wrong:** The Sentry Fastify plugin added request hooks without `fastify-plugin`, so hooks could be scoped to the plugin instead of protecting sibling routes. Sentry also set `orgId` tags only when a user/org was present, leaving a path for stale tenant tags after logout, anonymous requests, or completed responses.
+- **Root cause:** Observability context was treated as a local plugin concern instead of process-wide request middleware, and tag clearing was less explicit than user clearing.
+- **Prevention rule:** Cross-cutting Fastify hooks for auth, telemetry, security, and error handling must be wrapped with `fastify-plugin` unless encapsulation is intentional and tested. Any request-scoped telemetry tag needs an explicit anonymous/sentinel value on missing auth and after response cleanup.
+- **Files affected:** `apps/api/src/plugins/sentry.ts`, `apps/api/src/plugins/sentry-context.test.ts`, `apps/web/src/lib/sentry.ts`, `apps/web/src/lib/sentry.test.ts`, `docs/solutions/sentry-pii-safe-observability.md`, `docs/audits/2026-06-16-serum-ux-ui-walteur-report.md`.
+
+### 2026-06-18 UX: Provider bulk accept only staged visible source rows
+
+- **What went wrong:** The Technical Stack source review queue let users filter by Apollo, Seamless, or Tech Intel, but the bulk accept action only staged the visible eight-card slice when the queue was capped.
+- **Root cause:** The dense visual grid limit was reused as the data acceptance boundary, even though the operator intent was the active provider/source filter.
+- **Prevention rule:** Review inboxes may cap rendered rows for scanability, but bulk actions must bind to the explicit filter/selection model. Test overflowed provider queues so hidden eligible rows are either included or clearly excluded by product copy.
+- **Files affected:** `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`, `apps/web/src/styles/cockpit.css`, `docs/solutions/technical-stack-provider-source-pull.md`, `docs/audits/2026-06-16-serum-ux-ui-walteur-report.md`.
+
+### 2026-06-18 SECURITY: Production public origin accepted insecure HTTP
+
+- **What went wrong:** Production env validation rejected `PUBLIC_BASE_URL` only when it contained the literal string `localhost`, so `http://crm.example.com` and loopback aliases such as `https://127.0.0.1:5173` could pass boot validation.
+- **Root cause:** The production-origin check used substring matching instead of parsing URL protocol and hostname semantics.
+- **Prevention rule:** Production public URLs must be parsed and validated by protocol and host class. Require `https:` and reject loopback aliases before CORS or auth origin allowlists are built.
+- **Files affected:** `apps/api/src/env.ts`, `apps/api/src/env.test.ts`, `docs/solutions/service-worker-api-bypass-and-streaming-cors.md`, `docs/audits/2026-06-16-serum-ux-ui-walteur-report.md`.
+
+### 2026-06-18 SECURITY: Global top-account curation ignored restricted account scope
+
+- **What went wrong:** A group-scoped user with `accounts:write` could call `PUT /api/v1/accounts/top-list` and replace the org-wide top-account curation, including clearing ranks for accounts outside their visible scope.
+- **Root cause:** The route treated `accounts:write` and org membership as sufficient for a global curation mutation, but it did not check whether the caller's account visibility scope was unrestricted before running the global rank-clearing transaction.
+- **Prevention rule:** Any account mutation that changes global/org-wide account state must check both permission and access scope. If the mutation can affect accounts outside the requester's visible set, require unrestricted scope before validation or transaction side effects.
+- **Files affected:** `apps/api/src/routes/accounts.ts`, `apps/api/src/routes/user-groups.integration.test.ts`, `docs/solutions/account-access-scope-and-dev-proxy-verification.md`, `docs/audits/2026-06-16-serum-ux-ui-walteur-report.md`.
+
+### 2026-06-18 UX: Source pull hid the stack workbench behind a second click
+
+- **What went wrong:** The Technical Stack `Pull sources` action checked Apollo/Seamless/Tech Intel/open-data lanes but left the user in read-only mode unless the pull produced visible suggestions. Structured provider exports such as `technology,category,source` could also be parsed as flat vendor text.
+- **Root cause:** The source-refresh path optimized for data refresh before operator review, and the import parser only modeled freeform paste patterns.
+- **Prevention rule:** Source-pull actions must land users in the review context when the pull succeeds, even when sources only update readiness/provider state. Stack import parsers must support provider-export headers and test that headers/source columns are never staged as technologies.
+- **Files affected:** `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`, `apps/web/e2e/technical-stack.spec.ts`, `docs/solutions/technical-stack-provider-source-pull.md`, `docs/audits/2026-06-16-serum-ux-ui-walteur-report.md`.
+
+### 2026-06-18 SECURITY: Auth and mail logs exposed email identifiers
+
+- **What went wrong:** SSO domain rejection logged the full rejected email and returned the configured allowlist to the caller; Gmail and Outlook connection logs wrote the external mailbox address.
+- **Root cause:** Auth-policy and integration-success logs optimized for operator detail before applying the same PII-minimization rule used for Sentry.
+- **Prevention rule:** General app logs must never include full email addresses for auth failures or integration connection success. Log pseudonymous ids plus bounded metadata such as domain/count, and add tests for generic auth-policy responses.
+- **Files affected:** `apps/api/src/lib/email-privacy.ts`, `apps/api/src/lib/email-privacy.test.ts`, `apps/api/src/plugins/auth.ts`, `apps/api/src/plugins/auth.test.ts`, `apps/api/src/routes/integrations/gmail.ts`, `apps/api/src/routes/integrations/microsoft-mail.ts`.
+
+### 2026-06-18 INFRA: Expected browser aborts surfaced as API errors
+
+- **What went wrong:** The Technical Stack E2E flow passed, but an aborted dashboard refetch could surface as `premature close` / `stream closed prematurely` at error severity and flow toward Sentry.
+- **Root cause:** The central Fastify error handler and dashboard route catch block did not classify expected client disconnects separately from real 5xx backend faults.
+- **Prevention rule:** Any browser/E2E-aborted request must be classified before route/error-handler logging and excluded from Sentry capture. Add regression coverage for `premature close`, `ERR_STREAM_PREMATURE_CLOSE`, and closed-request socket resets.
+- **Files affected:** `apps/api/src/lib/http-client-abort.ts`, `apps/api/src/lib/http-client-abort.test.ts`, `apps/api/src/plugins/error-handler.ts`, `apps/api/src/plugins/sentry.ts`, `apps/api/src/plugins/sentry-context.test.ts`, `apps/api/src/routes/crm/dashboard.ts`.
+
+### 2026-06-18 INFRA: Realtime Redis connected during HTTP-only QA startup
+
+- **What went wrong:** The Technical Stack browser flow did not use WebSockets, but API startup still emitted `realtime.service` Redis timeout errors when local Redis was absent.
+- **Root cause:** Realtime pub/sub and presence Redis clients connected eagerly at module load instead of waiting for publish/subscribe/presence usage.
+- **Prevention rule:** Optional realtime infrastructure must lazy-connect for HTTP-only API flows and fail loudly only when the realtime path is invoked.
+- **Files affected:** `apps/api/src/services/realtime.service.ts`, `apps/api/src/services/presence.service.ts`, `apps/api/src/plugins/realtime.validateChannel.test.ts`, `apps/web/e2e/technical-stack.spec.ts`.
+
+### 2026-06-18 TESTING: Source readiness map was only component-tested at first
+
+- **What went wrong:** The first verification pass for the Technical Stack source readiness map proved the map in component tests, but the browser E2E still only asserted the broader source-pull/add/save flow.
+- **Root cause:** The new UI surface was added after the existing E2E had already covered the workflow, and the page-level assertion was not updated in the same patch.
+- **Prevention rule:** Whenever a user-facing surface is added to an existing workflow, update the focused browser E2E to assert that surface by accessible label or role before calling the UX slice verified.
+- **Files affected:** `apps/web/e2e/technical-stack.spec.ts`, `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`, `apps/web/src/styles/cockpit.css`.
+
+### 2026-06-18 UX: Technical stack intake squeezed inside cockpit column
+
+- **What went wrong:** The Technical Stack add path passed page-level overflow checks, but the real account cockpit column squeezed the enabled vendor textarea to about 22px wide. Staged adds also lacked immediate visual proof, and comma-separated quick suggestions went dead after the first token.
+- **Root cause:** QA measured the viewport and page shell instead of the live control geometry inside the nested cockpit card. The quick-suggestion search used the whole parsed input instead of the active comma/newline token.
+- **Prevention rule:** For cockpit/sidebar cards, browser QA must measure enabled control geometry inside the real region on desktop and mobile. Multi-entry typeahead/search must use the active token, and every add workflow needs immediate status feedback before save.
+- **Files affected:** `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`, `apps/web/src/styles/cockpit.css`, `apps/web/e2e/technical-stack.spec.ts`, `docs/solutions/technical-stack-provider-source-pull.md`.
+
+### 2026-06-18 INFRA: Azure token-key contract drifted from runtime
+
+- **What went wrong:** `infra/azure/main.bicep` still described `integrationTokenKey` as a base64 32-byte value even though the runtime, API boot gate, `.env.example`, and rotation script now require a 64-character hex key from `openssl rand -hex 32`.
+- **Root cause:** The secret-format hardening updated app/runtime surfaces first, but the Azure operator-facing IaC contract was not covered by a release policy verifier.
+- **Prevention rule:** Any secret format change must update every deployment surface in the same slice and add a policy check for IaC/operator docs when the platform cannot enforce the full shape itself.
+- **Files affected:** `infra/azure/main.bicep`, `infra/azure/README.md`, `scripts/verify-azure-infra-policy.mjs`, `scripts/write-release-tool-readiness.mjs`, `package.json`, `docs/solutions/agent-provider-credentials-org-secret-routing.md`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-18 DOCKER: Standalone worker runtime parity was unguarded
+
+- **What went wrong:** `apps/worker/Dockerfile` claimed to mirror the root worker target, but its runtime still used an older pnpm version, ran as root, and lacked a container healthcheck.
+- **Root cause:** Previous Docker hardening focused on the root multi-target image and OCR package drift. The standalone/Railway-style Dockerfile had no policy test enforcing the same runtime invariants.
+- **Prevention rule:** Every standalone service Dockerfile must have a policy test for the deploy invariants it claims to mirror: workspace-pinned package manager, non-root runtime user, owned artifact copy, package-manager pruning, healthcheck, and image probe evidence.
+- **Files affected:** `apps/worker/Dockerfile`, `apps/worker/src/lib/worker-dockerfile-policy.test.ts`, `docs/solutions/container-vulnerability-scan-gate.md`.
+
+### 2026-06-18 TOOLING: Source review wave counts double-counted overlaps
+
+- **What went wrong:** The source review plan counted both risk buckets and path groups, so files that matched both could inflate wave totals even though the exact file manifest was unique.
+- **Root cause:** The planner used aggregate bucket/path-group counts for `estimatedTouches`, `trackedDirtyCount`, and `untrackedCount` instead of deriving those fields from the de-duplicated wave file manifest.
+- **Prevention rule:** Release cleanup plans must compute all operator-facing wave counts from the exact file list they ask reviewers to inspect. Aggregate buckets can guide grouping, but not final counts.
+- **Files affected:** `scripts/write-source-review-plan.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-18 TOOLING: Exact source cleanup files were buried in JSON
+
+- **What went wrong:** The cleanup plan had exact files, but reviewers still had to dig through a large JSON artifact to inspect P0/P1 waves.
+- **Root cause:** The source plan optimized for machine verification and did not write human review packets with path lists and checklists.
+- **Prevention rule:** Any large dirty-source release blocker needs both machine JSON and per-wave human packets: path list, exact checklist, counts, and verification commands.
+- **Files affected:** `scripts/write-source-review-plan.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-18 UX: Interactive provider chips kept static chip height
+
+- **What went wrong:** The Technical Stack source-lane chips were converted from static labels into review-filter buttons, but the first CSS pass kept the old compact chip height and failed the 44px mobile touch-target rule.
+- **Root cause:** The visual component became an interactive control without immediately re-auditing the component's responsive geometry across enabled and disabled states.
+- **Prevention rule:** When turning any visual badge/chip into a button, update min-height/min-width for mobile targets in the same patch and include disabled controls in the browser geometry probe.
+- **Files affected:** `apps/web/src/styles/cockpit.css`, `apps/web/src/components/cockpit/TechStackCard.tsx`.
+
+### 2026-06-18 TOOLING: Bundle execution continued after preflight blockers
+
+- **What went wrong:** The release bundle recorded preflight blockers but still entered the evidence command loop by default, so a run with missing live inputs could spend time on tool/source/provider steps before failing.
+- **Root cause:** `runBundle()` collected preflight results only for the final artifact; command execution did not fail fast on `preflight.blockingFailures`.
+- **Prevention rule:** Release bundles must fail fast on preflight blockers unless `--continue-on-error` is explicitly set for diagnostics. The artifact should show skipped steps with `preflight blockers` and block only on the preflight IDs.
+- **Files affected:** `scripts/run-deploy-evidence-bundle.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-18 TOOLING: Release preflight accepted placeholder evidence inputs
+
+- **What went wrong:** Staging preflight could pass with example domains, placeholder tokens, sample security approver emails, and sample approval tickets because the validator only checked presence/non-local shape.
+- **Root cause:** The preflight treated "non-empty" as operator-ready and did not reject template values such as `.example` hosts, `<...>` placeholders, `security-owner@example.com`, or `SEC-123`.
+- **Prevention rule:** Release preflight must validate both presence and evidence realism. Reject template domains, angle-bracket placeholders, sample tickets/emails, and placeholder token strings in selftests and live preflight probes.
+- **Files affected:** `scripts/run-deploy-evidence-bundle.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-18 TOOLING: PowerShell JSON BOM broke disposition preflight
+
+- **What went wrong:** A dummy staging preflight using a PowerShell-created `BIDSTACK_SECRET_DISPOSITION_FILE` failed because the JSON parser rejected the UTF-8 BOM.
+- **Root cause:** The bundle preflight and secret evidence writer parsed disposition files with raw `JSON.parse(readFileSync(..., 'utf8'))`, but Windows/PowerShell often writes UTF-8 files with a BOM.
+- **Prevention rule:** Release evidence JSON readers that accept operator-authored files must strip a leading UTF-8 BOM before parsing and include a Windows/PowerShell fixture in selftests.
+- **Files affected:** `scripts/run-deploy-evidence-bundle.mjs`, `scripts/write-secret-scan-evidence.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-18 PROCESS: Release preflight inputs were scattered
+
+- **What went wrong:** The bundle preflight could report every missing live input, but operators still had to assemble release env variables from multiple evidence docs and script help blocks.
+- **Root cause:** Evidence gates were added by family, so the source of truth for load, provider, secret disposition, Sentry, and browser inputs was fragmented.
+- **Prevention rule:** Any multi-family release bundle must have one placeholder-only input template that maps directly to preflight requirements. Filled values belong in CI secrets or ignored `deploy-evidence/` files, never source control.
+- **Files affected:** `docs/templates/release-evidence.env.example`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-18 TOOLING: Release source evidence counted local scratch artifacts
+
+- **What went wrong:** Dirty source evidence counted `.forge/` local run state and generated `apps/web/scripts/_i18n_*` batch files as untracked release source.
+- **Root cause:** The source gate correctly trusted Git status, but the ignore rules had not kept up with local WALTEUR/Forge QA artifacts and temporary i18n sweep outputs.
+- **Prevention rule:** Any generated agent/run artifact that is not intended source must be ignored before release evidence runs. Keep canonical tools tracked, but ignore their batch outputs and local run logs/screenshots.
+- **Files affected:** `.gitignore`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-17 TESTING: Provider breakdown helper lost literal id types
+
+- **What went wrong:** The Technical Stack provider review breakdown passed
+  focused tests and lint, but web typecheck failed because the helper returned
+  `{ id: string }[]` instead of the narrower provider-id union used by the
+  component props.
+- **Root cause:** TypeScript widened the inline array literal after the counts
+  map, and I had not run `tsc` before calling the implementation patch complete.
+- **Prevention rule:** For UI summary helpers that feed typed child props, give
+  the returned array an explicit domain type before filtering, then run the
+  package typecheck immediately after focused tests.
+- **Files affected:** `apps/web/src/components/cockpit/TechStackCard.tsx`.
+
+### 2026-06-17 TOOLING: Release readiness probe assumed direct pnpm spawn on Windows
+
+- **What went wrong:** The first release-tool readiness writer failed its live
+  probe because `spawnSync('pnpm')` returned `ENOENT` and `spawnSync('pnpm.cmd')`
+  returned `EINVAL` on this machine, even though PowerShell could run `pnpm`.
+  The same new script also had a `??`/`||` precedence syntax error caught by
+  `node --check`.
+- **Root cause:** I assumed Windows exposed a `.cmd` pnpm shim and mixed
+  nullish coalescing with OR without parentheses in one expression.
+- **Prevention rule:** Node-based release tooling that shells out to pnpm on
+  Windows must use a dedicated wrapper (`cmd /d /s /c pnpm ...`) and every new
+  `.mjs` runner must pass `node --check` before any live probe.
+- **Files affected:** `scripts/write-release-tool-readiness.mjs`.
+
+### 2026-06-17 OPS: Secret evidence gate depended on a hidden native Gitleaks install
+
+- **What went wrong:** The deploy secret evidence writer assumed `gitleaks` was
+  installed on the release runner, so the gate could fail before producing
+  current-commit proof even though Dockerized scanners were already part of the
+  release workflow.
+- **Root cause:** The secret scanner path was wired differently from Semgrep and
+  Trivy, which already use pinned container images for repeatable release
+  evidence.
+- **Prevention rule:** Release evidence writers must either declare a required
+  native binary with a clear preflight or provide a pinned, overrideable
+  container fallback. Evidence artifacts must record which runner produced the
+  proof.
+- **Files affected:** `scripts/write-secret-scan-evidence.mjs`,
+  `docs/solutions/deploy-evidence-hard-gate.md`,
+  `docs/solutions/security-scan-local-gates.md`.
+
+### 2026-06-17 WEB: Web Sentry entrypoint bypassed privacy helper
+
+- **What went wrong:** `apps/web/src/main.tsx` initialized Sentry directly,
+  bypassing the browser `beforeSend` PII scrubber, replay opt-in controls, and
+  id-only helper boundary documented in `apps/web/src/lib/sentry.ts`.
+- **Root cause:** The production entrypoint and the canonical Sentry helper
+  drifted apart, and there was no focused test proving that the app boot path
+  uses the helper.
+- **Prevention rule:** Web entrypoints must call `initSentry()` from
+  `apps/web/src/lib/sentry.ts` and import `Sentry` from that helper for capture
+  calls. Keep focused tests for no-DSN behavior, replay opt-in, PII scrubbing,
+  and id-only user context before changing browser telemetry.
+- **Files affected:** `apps/web/src/main.tsx`,
+  `apps/web/src/lib/sentry.ts`, `apps/web/src/lib/sentry.test.ts`.
+
+### 2026-06-17 BUG: Generic tech-stack MCP parser recursed on undefined fields
+
+- **What went wrong:** The first generic Tech Intel MCP parser called its row
+  walker recursively for missing optional keys, so a no-signal MCP response
+  could hit maximum call stack instead of returning `null`.
+- **Root cause:** The walker treated every value as an object candidate and did
+  not stop on `undefined`/primitive values before iterating expected provider
+  keys.
+- **Prevention rule:** Generic external-response walkers must have primitive
+  guards before recursive key traversal, and fixtures must include no-signal
+  objects such as `{ company: { name } }` so company identity is not mistaken
+  for technology evidence.
+- **Files affected:** `apps/api/src/providers/company-tech-stack-mcp.ts`,
+  `apps/api/src/providers/company-tech-stack-mcp.test.ts`.
+
+### 2026-06-17 TESTING: Account-intel component test reused test ids without cleanup
+
+- **What went wrong:** A new IntelTabs provenance test rendered a solution card
+  with the same `data-testid` as a later fallback test, and the later assertion
+  failed because both DOM trees were still mounted.
+- **Root cause:** The test file did not explicitly clean up between renders, and
+  I reused the same fixture id across tests.
+- **Prevention rule:** Component test files that render the same component more
+  than once with stable test ids must call Testing Library `cleanup()` in
+  `afterEach`, or use unique fixture ids per test. Rerun the failed focused
+  test before broadening verification.
+- **Files affected:** `apps/web/src/components/account-intel/IntelTabs.test.tsx`.
+
+### 2026-06-17 BUG: Technical-stack refresh POST missed its JSON command body
+
+- **What went wrong:** The Technical Stack source pull button could look idle in
+  the live app because the refresh POST was sent without a JSON body/content
+  type, while the API did not declare an empty command-body contract.
+- **Root cause:** Component tests mocked the hook and never exercised the real
+  fetch payload shape, so the browser/API path drifted from the intended route
+  contract.
+- **Prevention rule:** Mutation hooks for write endpoints must send object
+  bodies, even `{}` for command POSTs, and must have hook-level regression tests
+  for the exact request body. Live browser/API smoke must validate response
+  status after button clicks, not only visual state.
+- **Files affected:** `apps/web/src/hooks/useCompanyTechnicalStack.ts`,
+  `apps/web/src/hooks/apiMutationBodies.test.tsx`,
+  `apps/api/src/routes/crm/companies.ts`.
+
+### 2026-06-17 BUG: Open-data refresh passed invalid Wikidata dates to Prisma
+
+- **What went wrong:** A live CI Financial source pull failed with Prisma
+  validation because a Wikidata date with unknown month/day precision
+  (`+1965-00-00T...`) became an invalid JavaScript `Date`.
+- **Root cause:** The external date normalizer matched the date string shape but
+  did not reject incomplete calendar precision before persistence.
+- **Prevention rule:** External date normalizers must return a valid ISO date or
+  `null`. Add fixtures for unknown month/day public data before writing parsed
+  provider dates into Prisma `Date` fields.
+- **Files affected:** `apps/api/src/providers/company-open-enrichment.ts`,
+  `apps/api/src/providers/company-open-enrichment.test.ts`.
+
+### 2026-06-17 TESTING: Package-scoped lint used a repo-relative E2E path
+
+- **What went wrong:** A focused ESLint run under `pnpm --filter @bidstack/web exec` passed `apps/web/e2e/technical-stack.spec.ts`, and ESLint failed because it was already running from `apps/web`.
+- **Root cause:** I mixed repo-relative and package-relative paths during a package-scoped command.
+- **Prevention rule:** For package-scoped `exec` commands, pass package-relative paths such as `e2e/technical-stack.spec.ts`, or run the command from the repo root with a root-level script. Rerun the failed gate with the corrected path before calling verification green.
+- **Files affected:** none.
+
+### 2026-06-17 WEB: Frontend provenance field union lagged API fieldSources
+
+- **What went wrong:** The contract summary provenance change used the `status` field from API `fieldSources`, but the frontend-local `ContractFieldKey` union did not include `status`, so web typecheck failed.
+- **Root cause:** The UI duplicated a subset of the API provenance keys instead of deriving or fully mirroring the shared contract field-source surface.
+- **Prevention rule:** When rendering field-level provenance from a shared/API `fieldSources` map, update the frontend field-key union and run `pnpm --filter @bidstack/web exec tsc --noEmit --pretty false` before calling the slice green.
+- **Files affected:** `apps/web/src/components/account-intel/ContractAgreementsCard.tsx`.
+
+### 2026-06-17 OPS: Deploy checklist could pass without release evidence
+
+- **What went wrong:** The pre-deploy checklist verified code health, but it did not require fresh load, SAST, container, secret-history, or Sentry proof for the actual staging/production release candidate.
+- **Root cause:** Deployment readiness was spread across docs and manual notes instead of enforced by a single fail-closed evidence verifier.
+- **Prevention rule:** Strict deploy targets must run `pnpm deploy:evidence:staging` or `pnpm deploy:evidence:production` and block when proof artifacts are missing, stale, local-only, or weaker than certification profile.
+- **Files affected:** `scripts/verify-deploy-evidence.mjs`, `scripts/ops/deploy-checklist.sh`, `package.json`, `.gitignore`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-17 BUG: Enrichment refresh could erase technical-stack provider lanes
+
+- **What went wrong:** Company enrichment refreshes treated provider metadata as
+  one replaceable snapshot, so a later open-data refresh could silently drop
+  older Apollo, Seamless, or meeting-derived technical stack signals.
+- **Root cause:** The upsert path did not preserve provider-owned metadata and
+  source-attribution lanes before writing refreshed company enrichment data.
+- **Prevention rule:** Provider enrichment writes must merge per-provider
+  metadata/source attribution and include multi-provider technical-stack tests
+  before adding or changing any source lane.
+- **Files affected:** `apps/api/src/services/crm/enrichment.service.ts`,
+  `apps/api/src/services/crm/company-enrichment.service.ts`,
+  `docs/solutions/technical-stack-provider-source-pull.md`.
 
 ### 2026-06-07 BACKEND: Assumed a named integration config constraint existed
 
 - **What went wrong:** The first provider credential live smoke returned `500`
   because the route used `ON CONFLICT ON CONSTRAINT
-  integration_configs_org_type_name_key`, but the live local DB does not have
+integration_configs_org_type_name_key`, but the live local DB does not have
   that named constraint. The existing Dust credential route had the same
   fragile assumption.
 - **Root cause:** I trusted schema-intent naming without verifying the live
@@ -104,6 +515,7 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 - **What went wrong:** A direct Prisma/tsx probe failed because `DATABASE_URL` was not loaded in that standalone shell context.
 - **Root cause:** I used an ad hoc eval context instead of the package/API test bootstrap that loads the repo's environment configuration.
 - **Prevention rule:** When probing database-backed app behavior, use the API route, package tests, or explicitly load the same env bootstrap as the app; do not assume standalone `tsx -` has database config.
+
 ### 2026-06-07 BACKEND: Used `$queryRaw` for a void advisory-lock call
 
 - **What went wrong:** The first duplicate-run lock used `tx.$queryRaw` for `SELECT pg_advisory_xact_lock(...)`, and the focused integration test returned a `500` because Prisma could not deserialize the `void` result.
@@ -1561,3 +1973,1116 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 - **Root cause:** I assumed normal browser globals were available inside the Codex browser runtime's read-only evaluation wrapper.
 - **Prevention rule:** In in-app browser `evaluate` checks, prefer plain `tagName` and attribute reads instead of `instanceof` or constructor-based DOM checks.
 - **Files affected:** none.
+
+### 2026-06-13 TESTING: Normalized green Vitest runs with teardown fetch noise
+
+- **What went wrong:** Full web tests passed but still printed happy-dom `DOMException [AbortError]` during teardown because incidental money-format hook renders started unmanaged exchange-rate fetches.
+- **Root cause:** Page/component tests mocked their business data hooks but did not own mount-time `useFormatMoney()` / `useDisplayMoney()` exchange-rate side effects.
+- **Prevention rule:** Do not accept noisy green gates. Component tests that render money formatting must either stub/cache rates or rely on the test-mode hook auto-fetch guard; direct currency-store tests should call `fetchRates()` explicitly with an owned fetch stub.
+- **Files affected:** `apps/web/src/hooks/useFormatMoney.ts`, `apps/web/src/hooks/useDisplayMoney.ts`, `docs/solutions/test-owned-exchange-rate-fetches.md`.
+
+### 2026-06-14 FRONTEND: Trusted React Query freshness while browser HTTP cache stayed stale
+
+- **What went wrong:** The pipeline stale-data regression first looked like a React Query invalidation gap, but a manual browser run proved `GET /api/opportunities?limit=50` could be served from browser HTTP cache after an API-created record.
+- **Root cause:** JSON API fetches did not set `cache: 'no-store'`; React Query was refetching, but the browser was allowed to satisfy that refetch from HTTP cache.
+- **Prevention rule:** Authenticated API clients must set `cache: 'no-store'` at the fetch layer, and stale-data E2E tests should create data through the API after warming a page.
+- **Files affected:** `apps/web/src/lib/api.ts`, `apps/web/src/hooks/useOpportunities.ts`, `apps/web/e2e/flows/pipeline.spec.ts`, `docs/solutions/browser-http-cache-and-api-freshness.md`.
+
+### 2026-06-14 PWA: Let the service worker touch API/auth/export traffic
+
+- **What went wrong:** The app shell service worker could synthesize stale or misleading responses for endpoints that must always hit the network.
+- **Root cause:** The worker cached too broadly and treated API-like failures as offline app-shell concerns.
+- **Prevention rule:** Service workers may cache static shell assets, but must bypass `/api`, auth, export, data, and cross-origin requests.
+- **Files affected:** `apps/web/public/sw.js`, `apps/web/src/main.tsx`, `docs/solutions/service-worker-api-bypass-and-streaming-cors.md`.
+
+### 2026-06-14 BACKEND: Streamed exports outside Fastify's reply path
+
+- **What went wrong:** Opportunity CSV export downloaded, but raw stream handling could bypass Fastify header/CORS/security behavior.
+- **Root cause:** The route wrote directly to `reply.raw` instead of sending a stream through Fastify.
+- **Prevention rule:** Export routes should set headers on `reply` and `reply.send(stream)` so platform hooks remain attached.
+- **Files affected:** `apps/api/src/routes/opportunities.export.ts`, `docs/solutions/service-worker-api-bypass-and-streaming-cors.md`.
+
+### 2026-06-14 BACKEND: Allocated opportunity codes by lexicographic order
+
+- **What went wrong:** Code allocation could choose the wrong next `OP-` code once suffixes crossed digit-width boundaries.
+- **Root cause:** String ordering treats `OP-9999` as greater than `OP-10000`.
+- **Prevention rule:** Code allocators must parse and compare numeric suffixes, with integration coverage around digit-width transitions.
+- **Files affected:** `apps/api/src/routes/opportunities.helpers.ts`, `apps/api/src/routes/opportunities.mutations.ts`, `apps/api/src/routes/opportunities.integration.test.ts`, `docs/solutions/numeric-opportunity-code-allocation.md`.
+
+### 2026-06-16 AUTH: Gated SERUM status with the wrong permission
+
+- **What went wrong:** The first SERUM status route used `agents:read`, which blocked the admin settings/control-plane read during stub-auth QA.
+- **Root cause:** I treated SERUM as an agent surface instead of the settings-owned control-plane status it powers in this slice.
+- **Prevention rule:** For read-only admin settings and control-plane health endpoints, map the permission to the visible owner surface first, then verify with a rendered stub-admin request before wiring the UI.
+- **Files affected:** `apps/api/src/routes/serum.ts`, `docs/solutions/serum-control-plane-safe-foundation.md`.
+
+### 2026-06-16 FRONTEND: Mixed Radix Dialog parts with Framer in a brittle mobile drawer path
+
+- **What went wrong:** A first attempt to remove the mobile nav ref warning left the drawer translated off-canvas, so the close button was visible to the locator but outside the viewport.
+- **Root cause:** The Framer/Radix bridge did not animate the Radix content back to `translateX(0)` in the live mobile smoke test.
+- **Prevention rule:** For Radix dialog shell animation, prefer Radix parts plus CSS `data-state` keyframes unless a rendered mobile smoke proves the Framer bridge is clickable and warning-free.
+- **Files affected:** `apps/web/src/components/layout/MobileNav.tsx`, `apps/web/src/index.css`, `docs/solutions/serum-control-plane-safe-foundation.md`.
+
+### 2026-06-16 SHELL: Reused PowerShell's reserved `$PID` variable in cleanup loop
+
+- **What went wrong:** A QA server cleanup command failed before stopping local dev processes because the loop variable was named `$pid`.
+- **Root cause:** PowerShell variable names are case-insensitive, and `$PID` is a read-only automatic variable.
+- **Prevention rule:** In PowerShell process loops, use names like `$processId` or `$targetProcessId`; never use `$pid` as an assignment target.
+- **Files affected:** none.
+
+### 2026-06-16 FRONTEND: Mode switch used tab semantics for route navigation
+
+- **What went wrong:** Critical controls Playwright could not find the board switch as a button because the opportunities list/board switch used `role=tab` without real tab panels.
+- **Root cause:** A route-level segmented control had been modeled as tabs, blending navigation and tab semantics.
+- **Prevention rule:** Use segmented buttons with `aria-pressed` for route/view switches; reserve `role=tablist` for tab panels that remain on the same screen.
+- **Files affected:** `apps/web/src/components/opportunity/PipelineViewSwitch.tsx`, `docs/solutions/serum-control-plane-safe-foundation.md`.
+
+### 2026-06-16 FRONTEND: Sent account overrides with a display id instead of the backend lookup key
+
+- **What went wrong:** Account field overrides could be saved from the cockpit but fail to reappear for enriched/verified accounts because the UI sent `cockpit.company.id`.
+- **Root cause:** The backend stores and reads field overrides by normalized company name, while the component assumed the display/id field was the durable lookup key.
+- **Prevention rule:** When an API route accepts a free-form `:key`, trace the write path and read path before wiring UI mutations; component tests must assert the exact mutation URL for key identity.
+- **Files affected:** `apps/web/src/components/cockpit/KpiRow.tsx`, `apps/web/src/components/cockpit/KpiRow.test.tsx`.
+
+### 2026-06-16 A11Y: Nested hidden file input inside a custom dropzone
+
+- **What went wrong:** The real account cockpit axe scan reported a critical unlabeled file input and a serious nested-interactive violation in the upload dropzone.
+- **Root cause:** A visually hidden `<input type="file">` lived inside a clickable `role="button"` dropzone and had no accessible name.
+- **Prevention rule:** Hidden file inputs need an explicit label or `aria-label` and should sit beside custom dropzones, not inside another interactive control; run axe against composed routes that include shared widgets.
+- **Files affected:** `apps/web/src/components/files/FilesPanel.tsx`.
+
+### 2026-06-16 TESTING: Used jest-dom matchers in a Vitest file without jest-dom setup
+
+- **What went wrong:** New cockpit component tests failed with `Invalid Chai property: toBeInTheDocument`.
+- **Root cause:** I copied a common Testing Library assertion style into a test package that does not load jest-dom matchers globally.
+- **Prevention rule:** Before using matcher extensions in this repo, inspect nearby tests or use plain truthy/null assertions unless the setup file explicitly loads the matcher library.
+- **Files affected:** `apps/web/src/components/cockpit/BusinessSnapshotCard.test.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`.
+
+### 2026-06-16 TESTING: Partially mocked Framer without AnimatedNumber dependencies
+
+- **What went wrong:** `BusinessSnapshotCard.test.tsx` crashed in `AnimatedNumber` because the `framer-motion` mock omitted `useMotionValue`.
+- **Root cause:** The card indirectly renders `AnimatedMetric`, which depends on `AnimatedNumber`; the first mock only covered `motion.*` and `useReducedMotion`.
+- **Prevention rule:** When a component renders `AnimatedMetric` or `AnimatedNumber`, copy the complete local Framer test mock shape: `motion`, `animate`, `useMotionValue`, and `useReducedMotion`.
+- **Files affected:** `apps/web/src/components/cockpit/BusinessSnapshotCard.test.tsx`.
+
+### 2026-06-16 QA: Tested new routes against stale dev servers
+
+- **What went wrong:** Browser QA initially reported `PUT /technical-stack` as missing even though the route was implemented.
+- **Root cause:** The already-running `4000/5173` local servers had not picked up the new API route, so the browser was testing stale runtime code.
+- **Prevention rule:** Before live QA for new routes, restart or start a fresh API/web pair and verify the browser target is pointed at that pair.
+- **Files affected:** none.
+
+### 2026-06-16 QA: Repeated stale-server false negative on SERUM status
+
+- **What went wrong:** Browser QA reproduced `SERUM status is unavailable` on the existing `5173/4000` target after the stale-server prevention rule was already logged.
+- **Root cause:** I trusted an already-running local process before probing whether the exact backend target had the current route table; the `4000` API process had started on 2026-06-15 and returned 404 for `/api/v1/serum/status`.
+- **Prevention rule:** Before claiming a browser failure is product behavior, run a direct HTTP probe against the exact browser proxy target and the backing API, record process start time, and switch to a fresh server pair if the process predates the current slice.
+- **Files affected:** none.
+
+### 2026-06-16 FRONTEND: Empty async API state erased visible fallback data
+
+- **What went wrong:** The first technical-stack hook integration could render an empty stack after the async technical-stack API returned an unsaved empty state, hiding the provider/default stack already visible in the cockpit snapshot.
+- **Root cause:** The UI treated "API loaded but no override exists" the same as "user saved an empty curated stack."
+- **Prevention rule:** Distinguish unsaved empty server state from explicit saved empty overrides with a durable marker such as `updatedAt`; component tests must cover the async fallback path.
+- **Files affected:** `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`.
+
+### 2026-06-16 QA: Forced browser API requests cross-origin during local verification
+
+- **What went wrong:** The first SERUM/account browser smoke used `VITE_API_URL=http://127.0.0.1:4001`, so the browser fetched the API directly and hit expected dev CORS blocks instead of testing the normal same-origin Vite proxy path.
+- **Root cause:** I used the production-style client API base to reach a fresh local API, instead of giving the dev server proxy its own server-only override.
+- **Prevention rule:** For local browser QA on shifted ports, keep `VITE_API_URL` empty and set `BIDSTACK_DEV_API_URL` for the Vite proxy; verify served `api.ts` before trusting browser results.
+- **Files affected:** `apps/web/vite.config.ts`, `docs/solutions/account-access-scope-and-dev-proxy-verification.md`.
+
+### 2026-06-16 E2E: Asserted component fallbacks instead of localized UI copy
+
+- **What went wrong:** The new Top Accounts E2E expected the fallback heading `Account Ranking`, but the loaded English locale renders `Top accounts`.
+- **Root cause:** I read the component fallback string and did not verify the actual runtime locale before writing the Playwright assertion.
+- **Prevention rule:** For UI E2E assertions, prefer the rendered accessibility snapshot or locale JSON over component fallback text; fallback strings are not the product copy when translations are loaded.
+- **Files affected:** `apps/web/e2e/serum-account-experience.spec.ts`.
+
+### 2026-06-16 E2E: Used an ambiguous heading locator on SERUM settings
+
+- **What went wrong:** The new SERUM settings E2E failed because `SERUM Control Plane` appeared as two legitimate headings on the page.
+- **Root cause:** I used a strict `getByRole('heading', { name })` without scoping or selecting the first matching landmark.
+- **Prevention rule:** When a page intentionally repeats section labels, scope Playwright locators to a region or use `.first()` only after verifying both matches are valid visible UI, not duplicates caused by a render bug.
+- **Files affected:** `apps/web/e2e/serum-account-experience.spec.ts`.
+
+### 2026-06-16 TESTING: Bundle budget mislabeled lazy route payload as initial payload
+
+- **What went wrong:** The bundle budget spec claimed to measure initial JavaScript but summed every JavaScript file in `dist/assets`, including lazy route chunks.
+- **Root cause:** The test ignored the Vite manifest entry/import graph and treated build output storage location as load order.
+- **Prevention rule:** Initial payload budgets must derive from the Vite manifest entrypoint and static imports; keep lazy-route growth covered by a separate per-chunk or route-level budget.
+- **Files affected:** `apps/web/e2e/performance/bundle-size-budget.spec.ts`, `docs/solutions/e2e-type-and-performance-budget-gates.md`.
+
+### 2026-06-16 PERF: Animated dense shell layout properties hurt INP
+
+- **What went wrong:** Sidebar collapse motion animated grid/layout properties in the primary CRM shell, adding avoidable reflow during interaction timing probes.
+- **Root cause:** Decorative motion was allowed on structural layout properties inside a dense, always-mounted application shell.
+- **Prevention rule:** For app-shell navigation in data-heavy CRM screens, avoid animating grid tracks, widths, padding, or other layout-driving properties; reserve motion for opacity/transform and verify with the Core Web Vitals suite.
+- **Files affected:** `apps/web/src/index.css`, `apps/web/e2e/performance/core-web-vitals.spec.ts`, `docs/solutions/e2e-type-and-performance-budget-gates.md`.
+
+### 2026-06-16 QA: API route tests skipped the worker lane for contract extraction
+
+- **What went wrong:** Contract approval coverage proved API guards but the extraction-start test intentionally skipped the worker in test mode, leaving the real stored-document-to-draft path unproven.
+- **Root cause:** The production contract processor was only reachable through BullMQ, so tests had to choose between queue timing and no worker execution.
+- **Prevention rule:** Queue processors that own launch-critical transformations need a direct processor seam plus an integration test that runs the same code path against real persisted input; route tests alone do not prove worker behavior when queues are skipped.
+- **Files affected:** `apps/worker/src/queues/document-extract.ts`, `apps/worker/src/queues/document-extract.contract.test.ts`, `docs/solutions/contract-extraction-review-gates.md`.
+
+### 2026-06-16 E2E: Spawned a worker from a Playwright spec with raw Windows env
+
+- **What went wrong:** The first browser/API/worker contract proof failed with `spawn EINVAL` when the Playwright spec tried to launch the document worker directly.
+- **Root cause:** The test mixed Windows child-process environment semantics with product assertions and put service lifecycle inside the spec instead of the Playwright service layer.
+- **Prevention rule:** For local service dependencies in Playwright, prefer `webServer` with a health URL and explicit env. If a Windows spawn is unavoidable, sanitize hidden `=X:` env keys and keep process lifecycle outside assertions.
+- **Files affected:** `apps/web/e2e/serum-account-experience.spec.ts`, `apps/web/playwright.config.ts`.
+
+### 2026-06-16 E2E: Focused worker harness missed dotenv bootstrap
+
+- **What went wrong:** The Playwright-managed document worker started but failed DB health because `DATABASE_URL` was not loaded.
+- **Root cause:** The standalone E2E worker harness did not mirror `apps/worker/src/main.ts` env bootstrap before importing Prisma-backed code.
+- **Prevention rule:** Any standalone worker harness that imports Prisma or queue processors must bootstrap env from the repo root before DB health checks or job execution.
+- **Files affected:** `apps/worker/src/e2e/document-extract-worker.ts`.
+
+### 2026-06-16 QA: Used Bash heredoc syntax in PowerShell
+
+- **What went wrong:** A PDF fixture assertion failed before running because I used `python - <<'PY'` in a PowerShell shell.
+- **Root cause:** I carried over Bash heredoc muscle memory even though this workspace runs commands through PowerShell.
+- **Prevention rule:** In PowerShell sessions, pipe a single-quoted here-string into the interpreter: `@' ... '@ | python -`.
+- **Files affected:** none.
+
+### 2026-06-16 E2E: Tried to prove current source by mounting it into a stale worker image
+
+- **What went wrong:** A Dockerized OCR worker proof failed on package export/dependency resolution after mounting current `dist` into an older `bidcrm-worker:latest` image.
+- **Root cause:** The image's package metadata and pnpm symlink topology predated the current source, so the runtime was no longer a coherent build artifact.
+- **Prevention rule:** For OCR-capable browser E2E, rebuild the worker image from the current worktree or run the local source worker with native OCR installed; do not mix current `dist` with stale workspace metadata.
+- **Files affected:** `apps/web/playwright.config.ts`, `docs/solutions/contract-extraction-review-gates.md`.
+
+### 2026-06-16 DOCKER: Standalone worker image drifted from workspace manifests
+
+- **What went wrong:** The standalone worker Dockerfile claimed to mirror the root worker target but did not copy every active workspace package manifest and used a non-frozen install.
+- **Root cause:** The monorepo workspace grew (`apps/marketing`, `packages/integrations`) while the standalone Dockerfile was not updated with the root Dockerfile.
+- **Prevention rule:** Any service-specific Dockerfile in a pnpm workspace must copy the same active workspace package manifests as the root install stage and use the lockfile with a pnpm cache mount.
+- **Files affected:** `apps/worker/Dockerfile`.
+
+### 2026-06-16 OCR: Alpine worker missed Tesseract OSD data
+
+- **What went wrong:** OCRmyPDF failed scanned-PDF extraction with `Error opening data file /usr/share/tessdata/osd.traineddata` in the freshly built standalone worker image.
+- **Root cause:** The Alpine worker installed English trained data but not Tesseract orientation/script detection data, which OCRmyPDF can require even when `BIDSTACK_OCR_LANGUAGES=eng`.
+- **Prevention rule:** Alpine OCR worker images must install `tesseract-ocr-data-eng` and `tesseract-ocr-data-osd`; smoke tests must run actual `extractTextFromBuffer` against an image-only PDF, not only version checks.
+- **Files affected:** `apps/worker/Dockerfile`, `docs/solutions/contract-extraction-review-gates.md`.
+
+### 2026-06-16 E2E: Dockerized health endpoint bound container loopback
+
+- **What went wrong:** The focused document worker health server bound `127.0.0.1`, which is fine for a local Playwright-managed process but not for a Dockerized external worker exposed with port publishing.
+- **Root cause:** The E2E harness hard-coded the listen host instead of making the bind address configurable per runtime.
+- **Prevention rule:** Any harness that can run both as a local process and in Docker needs a host env override; keep local loopback as the default and use `0.0.0.0` only for container health exposure.
+- **Files affected:** `apps/worker/src/e2e/document-extract-worker.ts`, `docs/solutions/contract-extraction-review-gates.md`.
+
+### 2026-06-16 API: File finalize used brittle interactive transaction
+
+- **What went wrong:** Browser drag/drop upload intermittently failed at `/api/v1/files/finalize` with Prisma `P2028` because the interactive transaction exceeded the default 5s timeout under local DB IO pressure.
+- **Root cause:** The endpoint used an interactive transaction for two deterministic writes even though a pre-generated file UUID allows a batch transaction.
+- **Prevention rule:** For simple atomic multi-write API endpoints, prefer batch transactions with pre-generated IDs over interactive Prisma transactions; browser E2E must cover upload-url, local upload, finalize, cleanup, and slow local DB conditions.
+- **Files affected:** `apps/api/src/routes/files.ts`, `apps/web/e2e/serum-account-experience.spec.ts`.
+
+### 2026-06-16 DOCKER: Timed-out Docker commands left orphaned CLI clients
+
+- **What went wrong:** Long `docker build` / `docker run` calls timed out from the shell but left `docker` and `docker-buildx` client processes running, after which new `docker run` calls hung even for small images.
+- **Root cause:** The command wrapper killed its wait, not every spawned Docker client process, and the heavy image workflow stressed Docker Desktop.
+- **Prevention rule:** After Docker command timeouts on Windows, inspect `Get-Process docker,docker-buildx` and stop only orphaned CLI clients before retrying; do not restart Docker Desktop without explicit coordination because unrelated containers may be running.
+- **Files affected:** none.
+
+### 2026-06-16 DOCKER: Treated an existing image tag as a fresh OCR artifact
+
+- **What went wrong:** A tagged worker image existed after a timed-out build, but probing the runtime showed only `eng` Tesseract data and not `osd`.
+- **Root cause:** I checked for tag existence before proving the artifact contents, and the timed-out build left ambiguity about whether the current Dockerfile reached the runtime layer.
+- **Prevention rule:** For native/OCR packaging gates, verify the image contents directly (`tesseract --list-langs`, required binaries, and scanned-fixture extraction) before calling the Docker artifact green.
+- **Files affected:** `apps/worker/Dockerfile`, `docs/solutions/contract-extraction-review-gates.md`.
+
+### 2026-06-16 MEMORY: PowerShell double-quoted here-string corrupted baton Markdown
+
+- **What went wrong:** A shared-memory baton update containing Markdown backticks was appended through a double-quoted PowerShell here-string, turning sequences such as `` `t ``, `` `0 ``, and `` `r `` into tab, NUL, and carriage-return control characters.
+- **Root cause:** PowerShell treats backticks as escape characters in double-quoted strings and here-strings.
+- **Prevention rule:** When appending Markdown from PowerShell, use single-quoted here-strings (`@' ... '@`) or `apply_patch`; never write Markdown with backticks through a double-quoted here-string.
+- **Files affected:** `E:\Full Knowledge\Home Server\_relay\BATON.md`.
+
+### 2026-06-16 DOCKER: Generated Prisma engines bloated build context to 8.78 GB
+
+- **What went wrong:** The standalone worker Docker build looked hung because `COPY . .` was sending an 8.78 GB context into Docker.
+- **Root cause:** `.dockerignore` allowed `packages/db/generated`, which had accumulated stale Windows Prisma query-engine `.old` files; Docker runs `pnpm db:generate` anyway, so these generated files were unnecessary source context.
+- **Prevention rule:** Exclude generated DB clients, stale engine backups, local tool caches, coverage, screenshots, and QA artifacts from Docker context. Verify context size in Docker output when a build feels slow.
+- **Files affected:** `.dockerignore`, `packages/db/generated`.
+
+### 2026-06-16 DOCKER: Root worker target depended on full-product builder
+
+- **What went wrong:** The root `Dockerfile --target worker` path could not be certified locally because it dragged the full web/API/MCP builder path into a worker-only image build before hitting the heavier Debian runtime layers.
+- **Root cause:** The root Dockerfile had one monolithic `builder` stage shared by every deploy target, so a worker deploy inherited unrelated build work.
+- **Prevention rule:** Multi-target Dockerfiles need target-specific builder stages for expensive deployables; worker-only images should build only worker dependencies/artifacts, then probe the exact final image.
+- **Files affected:** `Dockerfile`.
+
+### 2026-06-17 DOCKER: Recursive runtime chown made deploy images look hung
+
+- **What went wrong:** Root Docker image targets timed out or took many extra minutes while exporting runtime layers that ran `chown -R /app` over pnpm workspace installs, generated Prisma engines, and built artifacts.
+- **Root cause:** Ownership was rewritten after copying large dependency trees, creating a huge extra layer instead of assigning ownership during copy.
+- **Prevention rule:** In Docker runtime stages, create the non-root user before artifact copies and use `COPY --chown` for built outputs; avoid recursive ownership rewrites over `/app` unless the copied tree is known small.
+- **Files affected:** `Dockerfile`, `docs/solutions/contract-extraction-review-gates.md`.
+
+### 2026-06-17 DOCKER: Repeated stage patterns made a patch hit the wrong target
+
+- **What went wrong:** A narrow deletion meant for the worker target briefly removed the API target's user-creation step because the same `RUN addgroup ... && chown -R` pattern appeared in multiple Dockerfile stages.
+- **Root cause:** I patched an instruction by repeated text instead of anchoring the edit to the stage and then checked the diff after the fact.
+- **Prevention rule:** For multi-stage Dockerfiles, inspect all repeated instructions with `Select-String` before and after line-level patches; verify each touched target builds and runs with `id` when changing non-root user setup.
+- **Files affected:** `Dockerfile`.
+
+### 2026-06-17 TEST: Page unit test passed while background queries hit the API
+
+- **What went wrong:** `OpportunitiesPage.test.tsx` mocked `useOpportunities` but still mounted real `usePipelineStages` and `useTerritorySegments` queries, so Vitest passed while printing six `ECONNRESET` socket errors after the assertions.
+- **Root cause:** The test mocked the page's primary data hook but not the supporting query hooks introduced by the premium industry/pipeline experience.
+- **Prevention rule:** When unit-testing a React Query page, mock every mounted query hook or provide a deliberate test API layer; rerun the full suite and treat clean stderr as part of the pass condition.
+- **Files affected:** `apps/web/src/pages/OpportunitiesPage.test.tsx`.
+
+### 2026-06-17 TEST: Auth E2E used URL shape instead of app-shell semantics
+
+- **What went wrong:** The new WebKit cross-browser gate failed the stub-auth smoke test even though the authenticated app shell was visible, because the page object only treated `/dashboard` or `/pipeline` URLs as proof of stub mode.
+- **Root cause:** The test encoded an incidental redirect path rather than the user-visible contract of "authenticated app shell, no login form."
+- **Prevention rule:** Auth and shell E2E helpers must assert semantic landmarks and controls (`main`, primary navigation, login-form absence) instead of depending on browser-specific redirect URL shape.
+- **Files affected:** `apps/web/e2e/pages/LoginPage.ts`, `apps/web/playwright.config.ts`, `docs/solutions/cross-browser-e2e-core-gate.md`.
+
+### 2026-06-17 TEST: Browser RBAC test waited on incidental page data
+
+- **What went wrong:** The first real browser RBAC spec waited for `/me/capabilities` after navigating to Settings, but that screen did not make the request in the tested path, so Chromium burned the full 60s timeout despite the role override working.
+- **Root cause:** The test relied on an incidental page composition detail instead of directly exercising the authorization contract it needed to prove.
+- **Prevention rule:** Browser RBAC specs should explicitly fetch the capability manifest from browser origin with the tested role header, then separately assert visible route/control behavior.
+- **Files affected:** `apps/web/e2e/flows/rbac.spec.ts`, `docs/solutions/cross-browser-e2e-core-gate.md`.
+
+### 2026-06-17 TEST: RFP load gate drifted from schema and queue contract
+
+- **What went wrong:** `pnpm load-test:rfp` could not certify the RFP upload path: the root script depended on undeclared packages, initialized Prisma before env loading, created stale `FileAttachment` data, reused one `rfpRequestId` across concurrent uploads, and only cleaned file rows.
+- **Root cause:** The load harness lived at the repo root but imported package-local runtime dependencies and encoded old schema/queue assumptions. The upload route also created document rows before the unique orchestration guard, so duplicate submissions could leave partial records.
+- **Prevention rule:** Root certification scripts must declare direct root dependencies, load env before importing DB clients, generate unique business IDs for concurrent load, and clean every artifact they create. Backend writes that depend on a uniqueness guard must be in one DB transaction.
+- **Files affected:** `scripts/load-test-rfp.ts`, `apps/api/src/routes/rfp-pipeline.ts`, `apps/api/src/routes/rfp-pipeline.upload.integration.test.ts`, `docs/solutions/rfp-upload-load-gate-harness.md`.
+
+### 2026-06-17 TEST: Root k6 gate depended on local tools and skipped CRM auth paths
+
+- **What went wrong:** `pnpm load-test` required a locally installed `k6` binary, skipped authenticated CRM routes when no token was provided, and treated intentional search `429` back pressure as a failed infrastructure response.
+- **Root cause:** The gate did not model the local dev-stub auth mode or the per-user search rate limit, and it relied on developer workstation state instead of owning its runner.
+- **Prevention rule:** Root load gates must own their runtime path with a pinned Docker fallback, exercise authenticated routes under local stubs by default, threshold endpoint checks explicitly, and encode expected rate-limit behavior per endpoint.
+- **Files affected:** `package.json`, `scripts/run-k6-load-test.mjs`, `scripts/load-test.js`, `docs/solutions/k6-load-gate-docker-fallback.md`.
+
+### 2026-06-17 OPS: PowerShell cleanup used reserved variable and optimistic success output
+
+- **What went wrong:** Temporary API cleanup used `$pid` as a loop variable, which conflicts with PowerShell's read-only `$PID`, then a log cleanup loop printed `removed ...` even though `Remove-Item` failed because the parent `tsx watch` process still held the handles.
+- **Root cause:** The cleanup command did not use a safe variable name or `-ErrorAction Stop` before printing success.
+- **Prevention rule:** In PowerShell process cleanup, avoid reserved automatic variables (`$PID`, `$Host`, `$Error`, etc.) and emit success only after a command succeeds with `-ErrorAction Stop`.
+- **Files affected:** none.
+
+### 2026-06-17 SECURITY: Observability override broke the API test runtime
+
+- **What went wrong:** The first dependency remediation attempted to force `@opentelemetry/core` onto a patched line without upgrading the Sentry/OpenTelemetry packages that consume it, and API tests failed during tracing bootstrap.
+- **Root cause:** The dependency graph was treated as individual vulnerable packages instead of a compatibility family.
+- **Prevention rule:** For observability/security SDKs, upgrade the compatible package set together and run package-level tests before calling the audit fix complete.
+- **Files affected:** `apps/api/package.json`, `apps/worker/package.json`, `package.json`, `docs/solutions/dependency-audit-zero-advisory-remediation.md`.
+
+### 2026-06-17 TEST: Worker Vitest isolation was disabled and leaked mocks
+
+- **What went wrong:** The worker test runner used `--isolate=false`, so a mocked Prisma test polluted a later org-LLM test and made it hit the real Prisma path with fixture IDs.
+- **Root cause:** The runner optimized for process reuse before proving every worker test file was global-state safe.
+- **Prevention rule:** Keep Vitest isolation enabled for worker suites unless each file has an explicit mock cleanup contract and the full suite is proven both ways.
+- **Files affected:** `scripts/run-worker-tests.mjs`.
+
+### 2026-06-17 OPS: Secret scanner shell script had CRLF line endings
+
+- **What went wrong:** `bash scripts/check-secrets.sh --full` failed on Windows with `set: -\r invalid option`.
+- **Root cause:** The shell script had CRLF line endings, so Bash parsed carriage returns as option text.
+- **Prevention rule:** Shell scripts must remain LF-only. After editing a `.sh` file on Windows, run it with Bash before treating any security gate as green.
+- **Files affected:** `scripts/check-secrets.sh`.
+
+### 2026-06-17 OPS: Broad Dockerized SAST scans timed out and left scanner processes
+
+- **What went wrong:** Broad Dockerized Semgrep and `gitleaks --no-git` scans over the local checkout timed out and left scanner containers or Docker client processes running.
+- **Root cause:** The scans were not bounded tightly enough for a large dirty workspace with generated/local artifacts.
+- **Prevention rule:** Scope local SAST to shipped source/config or use CI-tuned scanner config. After any timeout, inspect and stop scanner containers/client processes before starting the next gate.
+- **Files affected:** `docs/solutions/security-scan-local-gates.md`.
+
+### 2026-06-17 SECURITY: Printed a tracked settings secret while classifying gitleaks
+
+- **What went wrong:** While classifying a gitleaks finding, I printed `.claude/settings.json` raw before sanitizing the MCP `API_KEY` value.
+- **Root cause:** I inspected the config file directly instead of using a redacting projection first.
+- **Prevention rule:** Secret-hit triage must never print raw config files. Use redacted field projections, then patch the file to a placeholder and require rotation for any exposed credential.
+- **Files affected:** `.claude/settings.json`, `docs/solutions/security-scan-local-gates.md`.
+
+### 2026-06-17 OPS: PowerShell expanded POSIX command substitution in a Docker probe
+
+- **What went wrong:** A Docker Alpine probe used `$(id -u bidstack)` inside a PowerShell double-quoted command, so PowerShell evaluated the subexpression before the shell inside the container saw it.
+- **Root cause:** I mixed POSIX shell syntax into a PowerShell string without single-quote isolation.
+- **Prevention rule:** When passing POSIX shell fragments through PowerShell, wrap the container command in single quotes or escape `$`; verify the command reaches the intended shell before interpreting its failure.
+- **Files affected:** none.
+
+### 2026-06-17 SECURITY: Broad Semgrep scans needed a temporary source mirror
+
+- **What went wrong:** Directly mounting the repo into Dockerized Semgrep kept timing out even after path excludes, because local worktrees/generated state still made the scan too broad.
+- **Root cause:** The scanner target was the developer checkout rather than a controlled set of shipped source/config files.
+- **Prevention rule:** SAST gates in a dirty monorepo should build an explicit temporary mirror from `git ls-files --cached --others --exclude-standard`, then scan that mirror with pinned tool versions and documented severity policy.
+- **Files affected:** `scripts/run-semgrep-sast.mjs`, `package.json`, `docs/solutions/security-scan-local-gates.md`.
+
+### 2026-06-17 SECURITY: AES-GCM decryptors omitted explicit auth tag length
+
+- **What went wrong:** Several AES-256-GCM decryptors stored and validated 16-byte tags by layout but did not pass `authTagLength` to Node's crypto API.
+- **Root cause:** The envelope format encoded the tag size implicitly, and tests proved tamper rejection but did not assert the runtime API contract that SAST expects.
+- **Prevention rule:** Every GCM `createCipheriv` and `createDecipheriv` call must pass the expected `authTagLength`, and tests that replicate the envelope should do the same.
+- **Files affected:** `apps/api/src/services/yjs-persistence.service.ts`, `apps/api/src/services/yjs-merge.service.ts`, `apps/api/src/services/yjs-persistence.service.test.ts`, `apps/worker/src/queues/yjs-compaction.ts`, `packages/shared/src/crypto/pii-field-cipher.ts`, `packages/shared/src/crypto/token-cipher.ts`, `packages/shared/src/utils/crypto.ts`.
+
+### 2026-06-17 DOCKER: Migrate image depended on full product builder
+
+- **What went wrong:** The root Docker `migrate` target timed out locally because it copied Prisma assets from the full `builder` stage, forcing web/API/worker builds before producing a schema-only migration image.
+- **Root cause:** The migration target reused app artifact patterns instead of reasoning from `prisma migrate deploy` requirements.
+- **Prevention rule:** One-shot migration images should copy only schema/migrations and run Prisma directly. Do not depend on compiled app artifacts unless the migration command imports them.
+- **Files affected:** `Dockerfile`, `docs/solutions/docker-migrate-image-fast-nonroot.md`.
+
+### 2026-06-17 DOCKER: Runtime pnpm command triggered Corepack in migrate image
+
+- **What went wrong:** After the migrate image became non-root, running `pnpm --filter @bidstack/db migrate:deploy` inside the container printed a Corepack download notice at runtime.
+- **Root cause:** The container `CMD` used the package manager as a launcher even though the Prisma CLI binary was already installed under the package workspace.
+- **Prevention rule:** Production one-shot images should execute the runtime binary directly, e.g. `packages/db/node_modules/.bin/prisma`, and avoid package-manager/network bootstrap in `CMD`.
+- **Files affected:** `Dockerfile`, `docs/solutions/docker-migrate-image-fast-nonroot.md`.
+
+### 2026-06-17 DOCKER: Assumed Prisma binary lived at root node_modules
+
+- **What went wrong:** The first direct Prisma `CMD` used `/app/node_modules/.bin/prisma`, but pnpm exposed the package-local binary at `/app/packages/db/node_modules/.bin/prisma`.
+- **Root cause:** I assumed npm-style root binary layout in a pnpm workspace.
+- **Prevention rule:** Probe actual `node_modules/.bin` paths inside the built image before hardcoding runtime command paths.
+- **Files affected:** `Dockerfile`.
+
+### 2026-06-17 SECURITY: Clean workspace audit missed container runtime CVEs
+
+- **What went wrong:** `pnpm audit` and SAST were clean, but Trivy found HIGH vulnerabilities in built deploy images.
+- **Root cause:** The audit covered workspace dependencies, not base-image OS packages or global Node package-manager trees shipped inside containers.
+- **Prevention rule:** Run `pnpm container:scan` against every deploy image before calling a release security gate green. Include web/static-serving images, not only app services.
+- **Files affected:** `scripts/run-container-vulnerability-scan.mjs`, `Dockerfile`, `package.json`, `docs/solutions/container-vulnerability-scan-gate.md`.
+
+### 2026-06-17 DOCKER: Runtime images shipped unused npm/Corepack package trees
+
+- **What went wrong:** Node runtime images carried vulnerable packages from `/usr/local/lib/node_modules/npm` even though runtime commands did not need npm or Corepack.
+- **Root cause:** The final images inherited package managers from `node:alpine` and left install-time tooling in runtime layers.
+- **Prevention rule:** After production installs, remove global npm/Corepack/pnpm trees and shims from final Node images unless runtime explicitly needs a package manager.
+- **Files affected:** `Dockerfile`.
+
+### 2026-06-17 DOCKER: Web image package freshness was not part of the gate
+
+- **What went wrong:** The nginx web image had HIGH Alpine package findings in OpenSSL/libxml2 while Node service images were clean.
+- **Root cause:** The deploy-image default scan initially omitted web, and the web stage relied on the base image package snapshot without upgrading fixed packages during build.
+- **Prevention rule:** Treat static web containers as production deploy images. Scan them by default and refresh OS packages or pin a fixed base digest before release.
+- **Files affected:** `Dockerfile`, `scripts/run-container-vulnerability-scan.mjs`.
+
+### 2026-06-17 DOCKER: Static nginx image failed when API DNS was absent
+
+- **What went wrong:** After switching the web target to unprivileged nginx, the container could fail before serving static assets because nginx resolved the literal `api:4000` upstream during startup.
+- **Root cause:** A static web image still had eager proxy upstream DNS resolution baked into nginx config.
+- **Prevention rule:** For optional backend proxy paths in static nginx containers, use a variable upstream with an explicit resolver and bounded proxy timeouts, then prove the image serves `/health` and `/` without the backend DNS name present.
+- **Files affected:** `apps/web/nginx.conf`.
+
+### 2026-06-17 DOCKER: Container healthcheck used ambiguous localhost
+
+- **What went wrong:** The unprivileged nginx image served `127.0.0.1:8080/health`, but BusyBox `wget` against `localhost:8080` could hit a refused path during container-local probes.
+- **Root cause:** `localhost` resolution inside minimal images is not always the same path as the listener used by nginx.
+- **Prevention rule:** Container healthchecks should target the exact loopback address and port that was runtime-probed, for example `http://127.0.0.1:8080/health`.
+- **Files affected:** `Dockerfile`.
+
+### 2026-06-17 TESTING: Shared schema build raced downstream typechecks
+
+- **What went wrong:** I launched `@bidstack/shared build`, API typecheck, and web typecheck in parallel after adding a shared response field. API/web typechecks briefly saw stale `@bidstack/shared/dist` declarations and reported false missing-export/missing-field errors.
+- **Root cause:** API/web TypeScript and Fastify response validation resolve `@bidstack/shared` through package `dist`; a concurrent build is not an atomic dependency for downstream checks.
+- **Prevention rule:** After changing shared schemas, run `pnpm --filter @bidstack/shared build` to completion before API/web typechecks, API tests, or live browser QA.
+- **Files affected:** `packages/shared/src/schemas/contract-agreement.ts`, `apps/api/src/routes/contract-agreements.ts`, `apps/web/src/components/account-intel/ContractAgreementsCard.tsx`.
+
+### 2026-06-17 UX: Cursor-paginated account API was flattened in the hook
+
+- **What went wrong:** The Key Accounts API returned `{ items, nextCursor }` and supported server-side industry filtering, but the web hook exposed only `items`; the page filtered industry locally on the first page.
+- **Root cause:** The UI treated a paginated operational list like a complete snapshot and dropped the backend pagination contract.
+- **Prevention rule:** Hooks for cursor-paginated endpoints must preserve `nextCursor`, send `limit`/`cursor`, and use shared pager controls. Push supported filters to the server instead of filtering only the current client slice.
+- **Files affected:** `apps/web/src/hooks/useKeyAccounts.ts`, `apps/web/src/pages/KeyAccountsPage.tsx`, `apps/web/src/hooks/useKeyAccounts.pagination.test.tsx`.
+
+### 2026-06-17 UX: Extracted account-intel cards hid exact confidence
+
+- **What went wrong:** Account Intelligence solution/product cards showed a plain `From:` line only when a document was linked, and a binary high-confidence badge only above 70%.
+- **Root cause:** The display treated provenance as secondary copy instead of a first-class decision signal.
+- **Prevention rule:** Extracted account-intel surfaces must show source and exact confidence for every row, including manual/no-document fallbacks, using the shared cockpit source badge pattern.
+- **Files affected:** `apps/web/src/components/account-intel/IntelTabs.tsx`, `apps/web/src/components/account-intel/IntelTabs.test.tsx`.
+
+### 2026-06-17 TESTING: E2E personas shared a derived Clerk identity
+
+- **What went wrong:** The new `viewer` RBAC test failed with a unique `clerk_user` conflict because `viewer` and `read-only` both mapped to `Read-Only` and the stub auth derived `clerkUser` from the shared system role name.
+- **Root cause:** QA persona identity was coupled to authorization role name.
+- **Prevention rule:** E2E persona fixtures must define explicit stable identity keys when multiple personas can share the same product role.
+- **Files affected:** `apps/api/src/plugins/auth.ts`, `apps/api/src/routes/users.roles.integration.test.ts`, `apps/web/e2e/flows/rbac.spec.ts`.
+
+### 2026-06-17 UX: Account coverage was a percentage without action
+
+- **What went wrong:** Account cards showed signal coverage as a percentage/bar, but did not tell the user why the score was weak or what to fix first.
+- **Root cause:** The UI treated coverage as a passive status metric instead of an operational coaching surface.
+- **Prevention rule:** Any CRM score shown in account/industry workflows must expose a reason and next action in the same visual context as the score.
+- **Files affected:** `apps/web/src/pages/accountsPage/accountUtils.ts`, `apps/web/src/pages/accountsPage/AccountCard.tsx`, `apps/web/src/pages/accountsPage/AccountCard.test.tsx`, `apps/web/src/index.css`.
+
+### 2026-06-17 UX: Strategic account views explained sectors but not account action
+
+- **What went wrong:** Key Accounts, Top Accounts, and Sector View showed strategic counts, ranks, and coverage percentages without consistently explaining the first recovery action.
+- **Root cause:** The strategic views reused dashboard-style metrics after the account card had already moved to action-oriented signal coaching.
+- **Prevention rule:** Account and industry views must share deterministic signal explainability; a score/rank/coverage bar is incomplete unless the same row or card names the reason and next action.
+- **Files affected:** `apps/web/src/pages/accountsPage/strategicSignals.ts`, `apps/web/src/pages/accountsPage/StrategicSignalInsight.tsx`, `apps/web/src/pages/KeyAccountsPage.tsx`, `apps/web/src/pages/TopAccountsPage.tsx`, `apps/web/src/pages/SectorViewPage.tsx`, `apps/web/src/index.css`.
+
+### 2026-06-17 TESTING: Core Web Vitals passed without durable measured evidence
+
+- **What went wrong:** The Core Web Vitals suite passed locally, but successful runs did not leave route-level metric values for launch review.
+- **Root cause:** The spec only annotated budget misses or missing lab signals, so a green run was not independently auditable.
+- **Prevention rule:** Performance gates must persist successful metric evidence as ignored report artifacts, including value, unit, budget, route, status, and timestamp.
+- **Files affected:** `apps/web/e2e/performance/core-web-vitals.spec.ts`, `docs/solutions/e2e-type-and-performance-budget-gates.md`, `docs/solutions/sidebar-collapse-inp-headroom.md`.
+
+### 2026-06-17 UX: Sidebar collapse used non-urgent rendering for an urgent click
+
+- **What went wrong:** The dashboard synthetic INP click measured 144ms on the sidebar collapse control: green against the 200ms launch budget, but above the 100ms premium headroom target.
+- **Root cause:** Sidebar collapse state was routed through `startTransition`, the app shell subscribed to that state just to update grid width, and the collapse path still animated layout-affecting properties.
+- **Prevention rule:** Urgent shell controls should update visual state immediately, drive global layout from CSS/data flags when possible, and avoid animating padding, gap, width, max-width, max-height, or grid tracks on dense CRM pages.
+- **Files affected:** `apps/web/src/stores/ui.ts`, `apps/web/src/stores/ui.test.ts`, `apps/web/src/components/layout/AppShell.tsx`, `apps/web/src/index.css`.
+
+### 2026-06-17 TESTING: Auth-mode E2E gate was silently forced to stub
+
+- **What went wrong:** The first idle-auth browser proof was launched with `E2E_AUTH_MODE=demo`, but the built app still rendered the stub user because the web package `build` script hardcoded `VITE_AUTH_MODE=stub`.
+- **Root cause:** Playwright exposed an auth-mode switch while the managed web server reused a package script with a different hardcoded auth mode.
+- **Prevention rule:** Auth-variant E2E gates must build the app with the selected auth environment and include evidence from the rendered session or request headers that the intended provider path was actually used. After changing the E2E web server command, rerun a default stub-auth smoke.
+- **Files affected:** `apps/web/playwright.config.ts`, `apps/web/e2e/flows/idle-auth-recovery.spec.ts`.
+
+### 2026-06-17 TESTING: k6 summary thresholds were parsed as pass/fail booleans
+
+- **What went wrong:** The first compact load-test artifact marked a passing k6 run as failed because the wrapper treated raw `thresholds` boolean fields in `--summary-export` as direct pass/fail results.
+- **Root cause:** k6's JSON export stores rate metrics under `value` and threshold entries are not a stable enough pass/fail contract for our artifact parser.
+- **Prevention rule:** Certification artifacts must compute threshold verdicts from exported metric values (`value`, `p(95)`, etc.) and compare them to the expression, then verify the artifact verdict against the terminal run before documenting it.
+- **Files affected:** `scripts/run-k6-load-test.mjs`.
+
+### 2026-06-17 DB: Prisma migrate dev hung during SERUM config migration
+
+- **What went wrong:** `prisma migrate dev` and `--create-only` hung while creating the SERUM config migration in the local Windows workspace.
+- **Root cause:** The local migration command path was not reliable enough under the active workspace/database state, and the generated diff also surfaced unrelated local drift on `notification_prefs.updated_at`.
+- **Prevention rule:** When `migrate dev` hangs, generate SQL with `prisma migrate diff`, inspect for unrelated drift, keep only the intended DDL in the migration, then apply with package-local `prisma migrate deploy`.
+- **Files affected:** `packages/db/prisma/schema.prisma`, `packages/db/prisma/migrations/20260617123000_serum_config_versions/migration.sql`.
+
+### 2026-06-17 API: Zod JSON records were passed directly to Prisma JSON writes
+
+- **What went wrong:** The SERUM draft/rollback route passed `Record<string, unknown>` to a Prisma `Json` column and failed API typecheck.
+- **Root cause:** Prisma write inputs require `Prisma.InputJsonObject`; Zod's JSON object shape is runtime-valid but not assignable to Prisma's stricter input type.
+- **Prevention rule:** Convert or cast validated JSON objects at the API boundary with a small helper before Prisma writes, and keep runtime validation before the conversion.
+- **Files affected:** `apps/api/src/routes/serum.ts`.
+
+### 2026-06-17 UX: SERUM settings editor reset text from an effect
+
+- **What went wrong:** The first SERUM config editor draft synchronized backend versions into textarea state with `setState` in `useEffect`, which the React lint gate rejected.
+- **Root cause:** The editor state lived in the parent and tried to copy query data into local mutable text after render.
+- **Prevention rule:** For settings editors, let the editor component own unsaved text state and key it by backend version id. Remount on version change instead of resetting user-editable state from an effect.
+- **Files affected:** `apps/web/src/components/settings/SerumControlPlaneSection.tsx`.
+
+### 2026-06-17 TESTING: SERUM E2E asserted stale section heading copy
+
+- **What went wrong:** After the SERUM settings UI changed from a single General editor to a 24-section workbench, the focused Playwright spec still asserted the old `General deployment policy` heading and failed even though the product behavior was healthy.
+- **Root cause:** The test overfit to presentation copy instead of the stable section selection behavior and config snapshot contract.
+- **Prevention rule:** When changing settings information architecture, update E2E to assert endpoint responses, selected section labels, and functional controls rather than stale heading prose.
+- **Files affected:** `apps/web/e2e/serum-account-experience.spec.ts`, `apps/web/src/components/settings/SerumControlPlaneSection.tsx`.
+
+### 2026-06-17 TESTING: SERUM E2E used broad text for repeated readiness labels
+
+- **What went wrong:** The first browser proof for the SERUM config Test result used `getByText('Human approval')`; Playwright strict mode found the phrase in the section summary, the checklist label, and the checklist detail.
+- **Root cause:** The assertion did not scope to the result checklist or use exact matching after adding repeated operator language to the page.
+- **Prevention rule:** For dense settings pages, assert backend responses first, then scope visible assertions to the specific panel or use exact text for repeated checklist labels.
+- **Files affected:** `apps/web/e2e/serum-account-experience.spec.ts`.
+
+### 2026-06-17 TESTING: SERUM typed controls repeated checklist labels again
+
+- **What went wrong:** After adding typed high-risk controls, the focused SERUM E2E again asserted `Human approval` globally; the new switch label and the test-result checklist label both matched.
+- **Root cause:** The previous prevention rule was applied with exact text but not with a stable panel boundary once the UI gained operator controls.
+- **Prevention rule:** Dense settings result panels need accessible region labels, and E2E must scope repeated readiness labels to those regions before asserting row text.
+- **Files affected:** `apps/web/src/components/settings/SerumControlPlaneSection.tsx`, `apps/web/e2e/serum-account-experience.spec.ts`.
+
+### 2026-06-17 API: SERUM publish reused a type guard boolean as typed evidence
+
+- **What went wrong:** The first high-risk approval publish implementation failed API typecheck because `draft.configType` was still a Prisma `string` when passed into `testSerumConfig`.
+- **Root cause:** The code stored `configRequiresApproval(draft.configType)` as a boolean, which lost the type predicate narrowing before the deterministic test call.
+- **Prevention rule:** When a persisted string must feed a shared enum-typed function, parse it once with the shared Zod enum and carry the parsed value forward. Do not rely on a detached boolean as type evidence.
+- **Files affected:** `apps/api/src/routes/serum.ts`.
+
+### 2026-06-17 API: SERUM approval state was validated before the lock
+
+- **What went wrong:** The first dual-control pass validated request, approve, and publish state from a row read before acquiring the advisory lock.
+- **Root cause:** The lock protected the write, but the decision used stale pre-lock state. Under concurrent approval requests, a second transaction could wait on the lock and then overwrite the original requester evidence.
+- **Prevention rule:** For stateful approval/change-control routes, acquire the row's logical advisory lock, re-read under that lock, and only then validate and mutate. Add a fail-closed regression for inconsistent stored approval evidence.
+- **Files affected:** `apps/api/src/routes/serum.ts`, `apps/api/src/routes/serum.integration.test.ts`.
+
+### 2026-06-17 API: Runtime tool scope map was typed as a closed literal
+
+- **What went wrong:** The first SERUM runtime-policy helper failed API typecheck because a dynamic request `toolName` indexed a literal object without a string index signature.
+- **Root cause:** The map was declared with `satisfies Record<string, ToolScope>`, which validates values but keeps the inferred key union closed.
+- **Prevention rule:** Runtime registries indexed by request input need an explicit `Record<string, Scope>` type, and unknown entries should fail closed.
+- **Files affected:** `apps/api/src/lib/serum-runtime-policy.ts`.
+
+### 2026-06-17 API: SERUM retry approval body broke no-body clients
+
+- **What went wrong:** Adding `approvalConfirmed` to crew-run retry made the existing no-payload retry integration return 400 instead of 202.
+- **Root cause:** The Fastify/Zod route body schema rejected requests before handler defaults could apply.
+- **Prevention rule:** When adding optional governance fields to existing endpoints, preserve no-body clients by validating `req.body ?? {}` inside the handler or proving the framework accepts an absent body.
+- **Files affected:** `apps/api/src/routes/crews.ts`, `apps/api/src/routes/crews.integration.test.ts`.
+
+### 2026-06-17 TESTING: SERUM denial assertion used raw serialized JSON
+
+- **What went wrong:** A correct 409 denial response failed the test because the assertion searched the raw JSON string and did not account for escaped quotes.
+- **Root cause:** The test asserted transport serialization instead of the parsed error message contract.
+- **Prevention rule:** API error assertions should parse JSON and assert semantic fields such as `message` unless the serialization format itself is the behavior under test.
+- **Files affected:** `apps/api/src/routes/crews.integration.test.ts`.
+
+### 2026-06-17 WORKER: Direct LLM fallback could bypass SERUM model routing
+
+- **What went wrong:** The shared RFP LLM wrapper could select a direct provider, fail that provider, and then fall through to Dust without a runtime Model Router decision for the fallback path.
+- **Root cause:** The old resilience contract treated provider fallback as harmless availability behavior, but SERUM turns model route selection into a governance boundary.
+- **Prevention rule:** Once a direct model route is selected, check SERUM immediately before execution and do not fall through to another model system unless that system has its own explicit runtime policy allowance.
+- **Files affected:** `apps/worker/src/lib/rfp-llm.ts`, `apps/worker/src/lib/rfp-llm.test.ts`.
+
+### 2026-06-17 API/WORKER: Dust clients bypassed SERUM gateway runtime policy
+
+- **What went wrong:** Dust execution was spread across worker RFP jobs, document extraction, Dust polling, API assistant services, integration status, and CRM-to-Dust push helpers. Some paths used `getOrgDust`, while others constructed `new DustClient(...)` directly, so a future Dust/MCP Gateway policy would not have covered all network calls.
+- **Root cause:** Dust was treated as an integration utility instead of an external model/tool gateway with runtime governance requirements. Caller-level checks would have been easy to miss.
+- **Prevention rule:** Guard the API/worker Dust client factories and grep for direct `new DustClient(...)` construction on every SERUM gateway change. Only admin credential-validation probes may construct Dust directly before credentials/policy exist.
+- **Files affected:** `packages/shared/src/schemas/serum.ts`, `packages/db/src/serum-runtime-policy.ts`, `apps/api/src/lib/dust-credentials.ts`, `apps/api/src/lib/dust-push.ts`, `apps/api/src/routes/dust-integration.ts`, `apps/api/src/routes/dust-integration.helpers.ts`, `apps/worker/src/lib/dust-credentials.ts`, `apps/worker/src/lib/dust-credentials.test.ts`, `apps/worker/src/crew/dust-executor.ts`.
+
+### 2026-06-17 WEB: API base prefixes can make live SERUM endpoints look down
+
+- **What went wrong:** A deployed frontend configured with an API base ending in `/api` or `/api/v1` could join paths into duplicated URLs such as `/api/api/v1/serum/status`, making the live SERUM control plane appear unavailable even when the backend route was healthy.
+- **Root cause:** Path normalization lived in call sites instead of the shared API boundary, and the SERUM unavailable copy collapsed routing, auth, permission, backend, and network failures into one generic message.
+- **Prevention rule:** Normalize configured API bases once in `apps/web/src/lib/api.ts`; keep hook paths canonical; add regression coverage for `/api` and `/api/v1` bases; bump app-shell cache names after API-boundary fixes; show status-specific recovery copy.
+- **Files affected:** `apps/web/src/lib/api.ts`, `apps/web/src/lib/api.test.ts`, `apps/web/src/hooks/useSerumStatus.ts`, `apps/web/src/components/serum/SerumGlass.tsx`, `apps/web/src/main.tsx`, `apps/web/public/sw.js`.
+
+### 2026-06-17 MCP/WORKER: SERUM Retrieval config had no execution guard
+
+- **What went wrong:** The SERUM workbench exposed Retrieval as a governable section, but MCP semantic search and worker embedding queues could still call Cohere without checking a published Retrieval runtime policy.
+- **Root cause:** Retrieval was treated as background infrastructure while SERUM UI/config work focused first on high-risk model, agent, tool, and Dust gateway paths.
+- **Prevention rule:** Every SERUM section promoted to UI/config must have a matching `checkSerum*RuntimePolicy` helper and at least one execution-call-site regression proving the external provider call is skipped when policy denies.
+- **Files affected:** `packages/shared/src/schemas/serum.ts`, `packages/db/src/serum-runtime-policy.ts`, `apps/api/src/routes/serum.ts`, `apps/mcp-server/src/lib/reference-search.ts`, `apps/mcp-server/src/lib/reference-search.test.ts`, `apps/worker/src/queues/rfp-embed-requirement.ts`, `apps/worker/src/queues/rfp-embed-reference.ts`.
+
+### 2026-06-17 API/WORKER: SERUM Prompt Library config had no runtime prompt gate
+
+- **What went wrong:** Prompt Library existed as a SERUM settings/config section, but RFP model prompts could still reach direct providers or Dust through the shared worker wrapper, requirement extraction, and legacy API Dust helpers without proving the active Prompt Library policy allowed that prompt set.
+- **Root cause:** Prompt governance was treated as config validation instead of a runtime boundary immediately before model execution.
+- **Prevention rule:** Any model/prompt execution path must call `checkSerumPromptLibraryRuntimePolicy` with a named prompt set before the provider call, and tests must prove SERUM denial skips direct providers and does not fall through to Dust.
+- **Files affected:** `packages/shared/src/schemas/serum.ts`, `packages/db/src/serum-runtime-policy.ts`, `apps/api/src/routes/serum.ts`, `apps/api/src/routes/serum.integration.test.ts`, `apps/api/src/services/ai/dust-agent.service.ts`, `apps/worker/src/lib/rfp-llm.ts`, `apps/worker/src/lib/rfp-llm.test.ts`, `apps/worker/src/queues/rfp-requirement-extract.processor.ts`.
+
+### 2026-06-17 API: SERUM eval config was not release-runtime evidence
+
+- **What went wrong:** Evals Quality Gates existed as a SERUM settings/config section, but the RFP eval runner could produce release evidence without asking runtime policy whether the suite and result were allowed.
+- **Root cause:** Eval governance was treated as draft preflight instead of a release-time boundary around the runner and its final pass/fail result.
+- **Prevention rule:** Every release eval runner must call `checkSerumEvalsQualityGateRuntimePolicy` with suite, pass rate, and failure count; model-backed/full evals must preflight org-scoped policy before provider-backed judging starts.
+- **Files affected:** `packages/shared/src/schemas/serum.ts`, `packages/db/src/serum-runtime-policy.ts`, `apps/api/src/routes/serum.ts`, `apps/api/src/routes/serum.integration.test.ts`, `apps/api/src/evals/run-evals.ts`, `apps/api/src/evals/serum-eval-policy.ts`, `apps/api/src/evals/serum-eval-policy.test.ts`.
+
+### 2026-06-17 API/WORKER: SERUM Connector config did not guard egress
+
+- **What went wrong:** Connector existed as a SERUM settings/config section, but ERP/Odoo MCP routes and Microsoft Graph calendar sync could still call external systems without a runtime connector decision.
+- **Root cause:** Connector governance was treated as publish-time configuration hygiene instead of a network-egress boundary immediately before external SaaS/ERP calls.
+- **Prevention rule:** Every external connector egress path must call `checkSerumConnectorRuntimePolicy` before the fetch/client call, and regression tests must prove SERUM denial prevents network egress.
+- **Files affected:** `packages/shared/src/schemas/serum.ts`, `packages/db/src/serum-runtime-policy.ts`, `apps/api/src/routes/serum.ts`, `apps/api/src/routes/serum.integration.test.ts`, `apps/api/src/routes/erp-integration.ts`, `apps/api/src/routes/erp-integration.test.ts`, `apps/worker/src/queues/calendar-sync-microsoft.ts`, `apps/worker/src/queues/calendar-sync-microsoft.test.ts`.
+
+### 2026-06-17 API/WORKER: SERUM Loops config had no runtime guard
+
+- **What went wrong:** Loops existed as a SERUM settings/config section, but Crew and RFP loop launch paths could still start without a first-class Loop runtime decision.
+- **Root cause:** Durable-event, replay, approval, and retry checks lived in config validation instead of the producer/worker execution boundary.
+- **Prevention rule:** Every SERUM section that names runtime loop behavior must ship a matching `checkSerumLoopRuntimePolicy` call at queue producers and worker backstops, plus regressions proving denied loops do not enqueue or continue side effects.
+- **Files affected:** `packages/shared/src/schemas/serum.ts`, `packages/db/src/serum-runtime-policy.ts`, `apps/api/src/routes/serum.ts`, `apps/api/src/routes/serum.integration.test.ts`, `apps/api/src/queues/rfp-orchestrator.ts`, `apps/api/src/queues/rfp-orchestrator.test.ts`, `apps/api/src/routes/rfp-pipeline.ts`, `apps/api/src/routes/crews.ts`, `apps/api/src/routes/crews.integration.test.ts`, `apps/worker/src/queues/rfp-orchestrator.ts`, `apps/worker/src/queues/__tests__/rfp-orchestrator.test.ts`, `apps/worker/src/queues/crew-run.ts`.
+
+### 2026-06-17 API/WORKER: Connector policy coverage stopped after first families
+
+- **What went wrong:** The first Connector runtime pass guarded ERP/Odoo and Microsoft calendar sync, but Slack, Twilio, Gmail, Google Workspace, HubSpot migration, Microsoft mail, and webhook delivery still had external egress paths.
+- **Root cause:** The audit followed the initial visible failures instead of enumerating every active connector-family fetch/client call across API and worker packages.
+- **Prevention rule:** For connector governance work, grep all active API/worker egress paths by provider name and by generic `fetch(`, then add denial-path tests that assert provider calls and credential lookups are skipped before calling the slice complete.
+- **Files affected:** `apps/api/src/lib/serum-connector-policy.ts`, `apps/api/src/services/slack.service.ts`, `apps/api/src/services/twilio-sms.service.ts`, `apps/api/src/services/email-integration.service.ts`, `apps/api/src/services/microsoft-graph.service.ts`, `apps/api/src/routes/migrations-hubspot.routes.ts`, `apps/api/src/routes/webhook-subscriptions.ts`, `apps/api/src/services/serum-connector-egress.test.ts`, `apps/worker/src/lib/serum-connector-policy.ts`, `apps/worker/src/queues/calendar-sync-google.ts`, `apps/worker/src/queues/calendar-sync.ts`, `apps/worker/src/queues/migration.ts`, `apps/worker/src/queues/webhook-delivery.ts`, `apps/worker/src/queues/serum-connector-egress.test.ts`.
+
+### 2026-06-17 DB/API: Runtime-policy tests imported stale package dist
+
+- **What went wrong:** After adding the connector connection-test evidence ledger, focused API integration tests still denied a valid policy because the API test process imported the previously built `@bidstack/db` dist output.
+- **Root cause:** The migration/source changes were applied, but the shared workspace package had not been rebuilt before dependent API tests ran.
+- **Prevention rule:** After changing `packages/db` runtime-policy source or Prisma schema, run `pnpm --filter @bidstack/db build` before dependent API/worker integration tests. If behavior looks impossible, inspect whether the dependent package is importing stale dist.
+- **Files affected:** `packages/db/src/serum-runtime-policy.ts`, `apps/api/src/routes/serum.integration.test.ts`.
+
+### 2026-06-17 WEB: Premium compact controls missed touch-target size
+
+- **What went wrong:** The Technical Stack Overview source/add UX looked polished, but compact icon actions and category preset buttons were below the 44px target expected for enterprise touch and accessibility.
+- **Root cause:** Visual density was checked before touch-target geometry, so the control felt premium on desktop while being less reliable on touch devices.
+- **Prevention rule:** Any compact/icon-first cockpit control must get a CSS geometry check for min 44px width/height, focus ring, disabled state, and mobile wrapping before the UX slice is called complete.
+- **Files affected:** `apps/web/src/styles/cockpit.css`, `apps/web/src/components/cockpit/TechStackCard.tsx`.
+
+### 2026-06-17 API/WEB: Provider lanes must match real transport paths
+
+- **What went wrong:** Technical Stack Overview source pulls risked presenting provider trust too optimistically if Seamless was shown beside Apollo without an actual MCP execution path.
+- **Root cause:** The UX source-rail concept moved faster than the backend transport audit; Apollo had an MCP-first queue path, while Seamless still needed an explicit MCP-first provider implementation and API fallback semantics.
+- **Prevention rule:** Before adding a provider lane to enterprise source-pull UI, prove the transport path in code and tests, expose disabled/unavailable states when credentials are missing, and only label `mcp` when the runtime can actually call an MCP endpoint.
+- **Files affected:** `apps/api/src/providers/company-seamless-enrichment.ts`, `apps/api/src/routes/crm/companies.ts`, `apps/web/src/components/cockpit/TechStackCard.tsx`.
+
+### 2026-06-17 WEB: Browser QA text entry can be tool-limited
+
+- **What went wrong:** In-app browser QA could click and inspect the Technical Stack editor, but `fill`/`type` failed because the virtual clipboard bridge was not installed in the browser automation environment.
+- **Root cause:** Browser-plugin input automation depends on host-side virtual clipboard support; that failure does not prove the app input is broken.
+- **Prevention rule:** When browser text entry fails for tooling reasons, verify persistence with Playwright E2E and use browser QA for live visual geometry, labels, overflow, and click-state inspection.
+- **Files affected:** `apps/web/e2e/technical-stack.spec.ts`, `apps/web/src/components/cockpit/TechStackCard.tsx`.
+
+### 2026-06-17 WEB: Source-review batch action followed the visible slice
+
+- **What went wrong:** The Technical Stack source review queue rendered a bounded set of provider suggestions, and the `Accept all` action used that same visible slice instead of the full eligible suggestion set. Category-prefixed paste also lost user intent by flattening structured lines into the selected composer category.
+- **Root cause:** The UI optimized display density before separating intake semantics from rendered-card limits.
+- **Prevention rule:** Review queues need separate `eligible` and `visible` collections; batch actions operate on eligible data, while rendering can stay capped. Paste intake should preserve structured user hints when they match known categories, and tests must cover multi-category paste plus provider confidence visibility.
+- **Files affected:** `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`, `apps/web/src/styles/cockpit.css`.
+
+### 2026-06-18 API/WEB: Partial MCP config overclaimed provider readiness
+
+- **What went wrong:** Apollo Technical Stack refresh could present MCP as the active transport when only part of the MCP configuration existed, and the review queue capped visible provider cards without telling users that bulk acceptance still applied to the larger eligible set.
+- **Root cause:** Provider status logic treated URL-or-token presence as enough to describe MCP posture, while the UI separated eligible and visible source suggestions without an explicit overflow cue.
+- **Prevention rule:** Provider transport labels must require the complete credential set for that transport. If a review queue renders fewer cards than the eligible batch action set, show an explicit status message and test the hidden-count path.
+- **Files affected:** `apps/api/src/routes/crm/companies.ts`, `apps/api/src/routes/crm/companies.test.ts`, `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`, `apps/web/src/styles/cockpit.css`.
+
+### 2026-06-18 TOOLING: Release preflight was trapped inside bundle execution
+
+- **What went wrong:** Operators could dry-run the release bundle or execute the full evidence sequence, but there was no first-class command that only checked live-input readiness without being marked as deploy approval.
+- **Root cause:** Preflight collection lived inside `scripts/run-deploy-evidence-bundle.mjs` as an internal step, so the cheapest way to learn missing staging inputs was a dry-run artifact or a failed bundle execution.
+- **Prevention rule:** Long release evidence flows need a standalone preflight artifact that checks credentials, targets, owner approvals, provider company keys, Sentry projects, and Clerk browser settings without running evidence commands. Passing preflight must never imply deploy approval.
+- **Files affected:** `scripts/run-deploy-evidence-bundle.mjs`, `package.json`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-18 TOOLING: Dirty source evidence lacked review breakdown
+
+- **What went wrong:** Source-control evidence correctly failed a dirty release tree, but the artifact only exposed aggregate counts and a first-page status sample. Large untracked directories could also be collapsed by plain `git status`, hiding the real review area.
+- **Root cause:** The source gate optimized for pass/fail release validation before modeling the human review task needed to turn a large dirty tree into a clean reviewed release revision.
+- **Prevention rule:** Fail-closed release gates should also produce actionable cleanup metadata. Dirty source artifacts need full untracked path expansion, path-area counts, risk buckets, truncation metadata, and small file samples, while still requiring a clean worktree for release.
+- **Files affected:** `scripts/write-source-control-evidence.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-18 TOOLING: Source cleanup still lacked an ordered review plan
+
+- **What went wrong:** The dirty-source artifact became reviewable, but release operators still had to decide the cleanup order manually from buckets and samples.
+- **Root cause:** Evidence metadata described the problem shape, but there was no non-destructive artifact translating it into release cleanup waves with priorities and verification commands.
+- **Prevention rule:** Large source cleanup blockers need a generated review plan that orders release-critical config/secrets, security/access, runtime code, frontend UX, docs, and uncategorized files. The plan must stay advisory and must not weaken the clean-source release gate.
+- **Files affected:** `scripts/write-source-review-plan.mjs`, `scripts/write-release-tool-readiness.mjs`, `package.json`, `docs/solutions/deploy-evidence-hard-gate.md`, `docs/solutions/release-tool-readiness-gate.md`.
+
+### 2026-06-18 TOOLING: Source cleanup waves lacked exact files
+
+- **What went wrong:** The cleanup plan ordered review waves but still exposed only aggregate counts and samples, which left reviewers without the exact path list for each wave.
+- **Root cause:** The source-control artifact intentionally capped `statusEntries` for readability, but no separate path-only manifest existed for downstream review tooling.
+- **Prevention rule:** Keep human-readable samples capped, but write a full path-only status manifest for review automation. Cleanup plans should attach exact files to each wave while preserving the hard clean-source gate.
+- **Files affected:** `scripts/write-source-control-evidence.mjs`, `scripts/write-source-review-plan.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-18 TOOLING: Provider quality was documented but not deploy-gated
+
+- **What went wrong:** Apollo, Seamless, and Tech Intel live source-quality risk was documented as a residual release risk, but the strict deploy verifier did not require a fresh provider-quality artifact.
+- **Root cause:** The provider UX/API work shipped honest lanes first, then release evidence work hardened load/secrets/Sentry/browser without carrying the provider-source risk into the same hard gate.
+- **Prevention rule:** Any residual risk that depends on live external provider evidence must become a release artifact or an explicit launch exception. Strict deploy gates should reject missing, local, fixture-only, or weak source-quality proof.
+- **Files affected:** `scripts/write-provider-quality-evidence.mjs`, `scripts/verify-deploy-evidence.mjs`, `scripts/run-deploy-evidence-bundle.mjs`, `scripts/write-release-tool-readiness.mjs`, `package.json`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-18 TOOLING: Release evidence lacked one sequenced operator path
+
+- **What went wrong:** The release gate had strong individual evidence commands, but no single auditable runner that executed them in order and recorded the final strict verifier result.
+- **Root cause:** Evidence work improved each proof family independently, leaving the operator journey as a manual checklist rather than a fail-closed release command.
+- **Prevention rule:** Every production evidence family must be reachable from one bundle runner that writes a redacted artifact, records skipped/failed steps, and ends with the strict verifier. Dry-run artifacts must stay blocked so planning output cannot be used as approval.
+- **Files affected:** `scripts/run-deploy-evidence-bundle.mjs`, `scripts/write-release-tool-readiness.mjs`, `package.json`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-18 TOOLING: Secret history owner approval was only a boolean
+
+- **What went wrong:** Secret-history evidence required owner approval but did not require a separate named owner approver, making the approval too easy to represent as a checkbox.
+- **Root cause:** The artifact schema modeled reviewer and owner approval, but not the accountable security owner identity for historical credential disposition.
+- **Prevention rule:** Any manual security disposition must record both the reviewer/operator and the accountable owner approver. Strict release verifiers should reject historical secret evidence when owner approval is true but no owner approver is named.
+- **Files affected:** `scripts/write-secret-scan-evidence.mjs`, `scripts/verify-deploy-evidence.mjs`, `scripts/run-deploy-evidence-bundle.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-18 TOOLING: Secret owner approval still lacked audit shape
+
+- **What went wrong:** Adding a named owner approver improved accountability, but the release evidence still allowed a historical secret disposition without an approval ticket/reference or timestamps for approval and rotation verification.
+- **Root cause:** The gate focused on boolean truth values before modeling the evidence shape a security owner can actually sign and an auditor can trace.
+- **Prevention rule:** Manual launch approvals must have identity, ticket/reference, timestamp, and a single machine-readable disposition file. Bundle preflight should ingest that file so release operators do not hand-compose security signoff from scattered environment flags.
+- **Files affected:** `scripts/write-secret-scan-evidence.mjs`, `scripts/verify-deploy-evidence.mjs`, `scripts/run-deploy-evidence-bundle.mjs`, `docs/templates/secret-history-disposition.example.json`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-18 TOOLING: Release evidence did not prove source provenance
+
+- **What went wrong:** Strict deploy verification could accept operational evidence artifacts without proving they were generated from a clean, attributable Git revision.
+- **Root cause:** The release gate tracked tools, load, scanners, secrets, providers, Sentry, and browser proof, but treated source-control cleanliness as an implicit human step.
+- **Prevention rule:** Enterprise release gates must include source-control evidence: full commit SHA, clean worktree, no staged changes, no tracked modifications, and no untracked files. The bundle should run this before expensive live evidence and stop early when the source snapshot is dirty.
+- **Files affected:** `scripts/write-source-control-evidence.mjs`, `scripts/verify-deploy-evidence.mjs`, `scripts/run-deploy-evidence-bundle.mjs`, `scripts/write-release-tool-readiness.mjs`, `package.json`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-18 TOOLING: Source provenance lacked upstream reviewability
+
+- **What went wrong:** Source-control evidence could prove a clean local commit without proving the commit belonged to an upstream tracking branch or had zero ahead/behind drift.
+- **Root cause:** The first provenance pass modeled local cleanliness before remote reviewability.
+- **Prevention rule:** Release source evidence must record upstream branch and ahead/behind counts. Strict release gates should fail missing upstream, unpushed commits, and branches behind upstream.
+- **Files affected:** `scripts/write-source-control-evidence.mjs`, `scripts/verify-deploy-evidence.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-17 API: Sentry privacy docs drifted from production init
+
+- **What went wrong:** The documented Sentry PII scrubber lived in the Fastify plugin file, but the actual API entrypoint initialized Sentry through `apps/api/src/instrument.ts` without the scrubber. Auth also set Sentry user context with email.
+- **Root cause:** Observability was split between an init module, a request plugin, and auth-side convenience calls. The tests covered copied scrubber logic, not the production init/request-context path.
+- **Prevention rule:** Privacy scrubbers must live in a shared helper used by the real init path; tests must import that helper directly and assert request context never includes email/name/phone. Capture handled 5xx errors at the central error-handler sink, not by assuming framework hooks cover normalized errors.
+- **Files affected:** `apps/api/src/lib/sentry-privacy.ts`, `apps/api/src/instrument.ts`, `apps/api/src/plugins/sentry.ts`, `apps/api/src/plugins/auth.ts`, `apps/api/src/plugins/error-handler.ts`.
+
+### 2026-06-18 TOOLING: Browser evidence selftest missed Windows spawn/runtime parser gaps
+
+- **What went wrong:** The browser evidence selftest validated fixture parsing and command construction, but the first real runner attempt failed on Windows `pnpm` spawning, then parsed real Playwright JSON as unknown tests.
+- **Root cause:** The selftest did not execute the spawned command boundary, and the parser fixture used simplified `passed` statuses/file paths instead of Playwright's real `status: "expected"` and testDir-relative paths.
+- **Prevention rule:** Release evidence runners need at least one real local execution to a non-latest artifact on the current OS, plus parser fixtures that mirror real tool output status/path shapes.
+- **Files affected:** `scripts/write-browser-regression-evidence.mjs`, `package.json`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-18 TOOLING: Sentry evidence depended on a manual smoke trigger pre-step
+
+- **What went wrong:** The Sentry evidence writer queried for API/worker smoke issues, but the normal release command did not trigger those controlled failures first.
+- **Root cause:** Triggering and observing were documented as separate human steps instead of one auditable release evidence flow.
+- **Prevention rule:** Release evidence commands should either create the signal they verify or record that they are query-only. Manual pre-steps must have a trigger-capable script path before the gate is called release-ready.
+- **Files affected:** `scripts/write-sentry-smoke-evidence.mjs`, `package.json`, `docs/solutions/deploy-evidence-hard-gate.md`, `docs/observability/sentry.md`.
+
+### 2026-06-18 TOOLING: Load certification command could create rejectable release proof
+
+- **What went wrong:** The load certification command could be run with default localhost settings, producing a local artifact that the strict deploy verifier correctly rejected.
+- **Root cause:** The k6 wrapper guarded non-local auth, but it did not have a named strict release-evidence mode that refused local/invalid targets before k6 started.
+- **Prevention rule:** Evidence commands used for release approval need a strict mode separate from local regression commands. Strict load evidence must fail before execution unless it is certification profile, non-local, authenticated, and not health-only.
+- **Files affected:** `scripts/run-k6-load-test.mjs`, `package.json`, `docs/solutions/deploy-evidence-hard-gate.md`, `docs/solutions/k6-load-gate-docker-fallback.md`.
+
+### 2026-06-18 WEB: Technical stack source review was too all-or-nothing
+
+- **What went wrong:** The Technical Stack source review queue could collect Apollo, Seamless, Tech Intel MCP, and other suggestions together, but users had no provider filter and source cards did not show the reported transport. That made large provider pulls harder to trust and made bulk acceptance feel too broad.
+- **Root cause:** The first premium review queue optimized for one visible source shelf before modeling the enterprise review task as a provider-scoped inbox.
+- **Prevention rule:** Any multi-provider review queue must expose source/provider filters, counts, transport/provenance cues, and batch actions scoped to the user’s current review filter. Keep an All filter for full-queue actions, and test both paths.
+- **Files affected:** `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`, `apps/web/src/styles/cockpit.css`.
+
+### 2026-06-18 TOOLING: Failed bundles made source cleanup a second manual step
+
+- **What went wrong:** The production bundle stopped at dirty source evidence, but operators still had to know and run a separate source review planner command to get exact cleanup waves.
+- **Root cause:** The planner was strict by default and exited non-zero on active waves, so it was not safe to include in the bundle without a write-only diagnostic mode.
+- **Prevention rule:** Any expected-fail evidence gate that can produce a useful remediation artifact should have a bundle-safe write mode. The remediation step must not count as deploy approval or weaken the strict final verifier.
+- **Files affected:** `scripts/run-deploy-evidence-bundle.mjs`, `scripts/write-source-review-plan.mjs`, `package.json`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-18 WEB: Technical stack review count counted staged suggestions
+
+- **What went wrong:** The Technical Stack edit-mode provider panel could keep showing the original provider suggestion count after a user accepted a suggestion into the draft, so the source inbox felt stale before save.
+- **Root cause:** The metric used the server suggestion list instead of the draft-filtered list that excludes technologies already staged by the user.
+- **Prevention rule:** Workflow counters must derive from the same visible/actionable collection as the UI list. For review queues, test the count before and after staging an item, not only after persistence.
+- **Files affected:** `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`.
+
+### 2026-06-18 WEB: Technical stack batch accept could include hidden provider rows
+
+- **What went wrong:** The Technical Stack source inbox capped the visible provider cards at eight, but the batch action could still stage every filtered suggestion, including hidden rows the user had not inspected.
+- **Root cause:** The batch action used the filtered source array instead of the visible source array, while the overflow copy implied the hidden scope was intentional.
+- **Prevention rule:** Review-queue batch actions must operate on the same visible/actionable collection named by the button. If hidden rows can be affected, the UI must expose an explicit separate action and tests must prove the hidden-row behavior.
+- **Files affected:** `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`, `apps/web/src/styles/cockpit.css`.
+
+### 2026-06-18 API: Generic Tech Intel MCP was only a single source
+
+- **What went wrong:** The Technical Stack source-pull UX could honestly say Tech Intel MCP, but the backend only supported one generic MCP endpoint. BuiltWith, Wappalyzer, and private enrichers needed a custom aggregator before they could all contribute stack evidence.
+- **Root cause:** The provider metadata modeled a single `techStackMcp` profile before the product workflow was treated as a multi-source intelligence inbox.
+- **Prevention rule:** Vendor-neutral MCP lanes must support multiple named source configs, preserve provider labels downstream, and keep legacy single-source envs compatible. Tests should cover multiple configured MCPs and duplicate technology de-dupe.
+- **Files affected:** `apps/api/src/providers/company-tech-stack-mcp.ts`, `apps/api/src/services/crm/enrichment.service.ts`, `apps/api/src/services/crm/company-enrichment.service.ts`, `apps/api/src/routes/crm/companies.ts`, `.env.example`.
+
+### 2026-06-18 TOOLING: Provider evidence proved the lane but not named Tech Intel sources
+
+- **What went wrong:** Release evidence could prove the generic `tech_intel` lane while failing to prove that each promised MCP source, such as BuiltWith MCP and Wappalyzer MCP, actually returned attributed stack evidence.
+- **Root cause:** The first provider-quality gate treated source lanes as the release contract. After multi-MCP support, the contract needed a second dimension: expected source labels inside the Tech Intel lane.
+- **Prevention rule:** Any aggregate provider lane that accepts multiple named sources must expose both expected and observed source labels in its release artifact. Strict deploy verification must reject missing named sources when operators declare them required.
+- **Files affected:** `scripts/write-provider-quality-evidence.mjs`, `scripts/verify-deploy-evidence.mjs`, `scripts/run-deploy-evidence-bundle.mjs`, `docs/templates/release-evidence.env.example`.
+
+### 2026-06-18 TOOLING: Operational readiness was documented but not deploy-gated
+
+- **What went wrong:** Deploy evidence proved app/source/provider/browser families, but Azure plan, migration path, backup/restore, rollback, monitoring, on-call, and ops approval were still mostly docs-only or draft evidence.
+- **Root cause:** The strict verifier hardened product and security signals first, while platform/ops readiness stayed outside the machine-readable release artifact set.
+- **Prevention rule:** 100k-user release gates must require platform/ops evidence: infra plan/build, migration deployment path, backup configuration and retention, restore RTO/RPO drill, rollback runbook/drill, monitoring alerts, on-call escalation, named approver, ticket/reference, and approval timestamp.
+- **Files affected:** `scripts/write-operational-readiness-evidence.mjs`, `scripts/verify-deploy-evidence.mjs`, `scripts/run-deploy-evidence-bundle.mjs`, `scripts/write-release-tool-readiness.mjs`, `package.json`, `docs/templates/operational-readiness.example.json`, `docs/templates/release-evidence.env.example`, `docs/solutions/deploy-evidence-hard-gate.md`, `docs/solutions/release-tool-readiness-gate.md`.
+
+### 2026-06-18 WEB: Auth cache fingerprint ignored tenant switches
+
+- **What went wrong:** Long-lived tabs could keep user-scoped React Query snapshots when the effective workspace changed but the local session marker did not, especially demo email/workspace changes under `bidstack:session=demo` and Clerk organization switches under the same user id.
+- **Root cause:** Cache invalidation listened to `bidstack:session` storage changes, but the fingerprint omitted Clerk `orgId` and had no same-tab event for identity details that change while the session marker string remains stable.
+- **Prevention rule:** User-scoped browser caches must key invalidation by the effective tenant identity, not only the login session. Emit a same-tab auth-fingerprint event for auth writes, include organization/workspace identity in the marker, and test same-marker identity changes.
+- **Files affected:** `apps/web/src/lib/queryCache.ts`, `apps/web/src/lib/queryCache.test.ts`, `apps/web/src/lib/auth.tsx`, `apps/web/src/lib/auth.test.tsx`, `docs/solutions/idle-auth-refresh-and-focus-refetch.md`.
+
+### 2026-06-18 WEB: Pipeline drag/drop lacked pointer-path browser proof
+
+- **What went wrong:** Keyboard stage movement and optimistic mutation behavior had coverage, but native pointer drag-and-drop could regress without a focused browser proof.
+- **Root cause:** Critical-controls work emphasized command and keyboard paths, while the pipeline suite lacked an API-backed native drop test that asserted both board placement and persisted stage data.
+- **Prevention rule:** Critical workflows need both accessible keyboard and pointer-path E2E proof, plus rollback unit tests for optimistic cache mutations. Green tests should be free of warning noise.
+- **Files affected:** `apps/web/e2e/flows/pipeline.spec.ts`, `apps/web/src/hooks/useStageMutation.test.tsx`, `docs/solutions/pipeline-drag-drop-qa-gate.md`.
+
+### 2026-06-18 WEB: Outcome button QA depended on seeded terminal state
+
+- **What went wrong:** Mark Won browser proof could skip when seeded first deal was terminal, and detail UI had no explicit Mark Won/Lost buttons despite the page object expecting them.
+- **Root cause:** Critical-controls coverage relied on seed data and a generic stage selector instead of fixture-backed terminal action controls.
+- **Prevention rule:** Revenue terminal actions need explicit UI controls wired through the domain transition route and deterministic API-backed E2E for each terminal outcome. Tests must assert pipeline semantics (`isWon`/`isLost` plus linked pipeline stage), not display labels.
+- **Files affected:** `apps/web/src/pages/OpportunityDetailPage.tsx`, `apps/web/e2e/pages/DealDetailPage.ts`, `apps/web/e2e/flows/pipeline.spec.ts`, `docs/solutions/pipeline-outcome-buttons-qa-gate.md`.
+
+### 2026-06-18 TOOLING: Source review plan could outlive the source artifact
+
+- **What went wrong:** The source cleanup plan could be generated from an older source-control artifact and still look actionable after later worktree changes.
+- **Root cause:** `write-source-review-plan` trusted `deploy-evidence/source-control-latest.json` without comparing its commit/status manifest to the current Git worktree.
+- **Prevention rule:** Remediation plans for dirty source must prove currency before allowing active cleanup waves. Compare commit, branch, upstream, and the full status manifest; stale evidence must fail even in write/diagnostic mode.
+- **Files affected:** `scripts/write-source-review-plan.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-18 WEB: Provider workbench copy crowded the narrow cockpit panel
+
+- **What went wrong:** The Technical Stack workbench correctly named Apollo MCP/API, Seamless MCP/API, Tech Intel MCP, and open data, but the provider title and metric chips could crowd a narrow card column after the copy was made more explicit.
+- **Root cause:** The provider panel used a single-row grid for title plus metrics while provider-source copy grew from short lane names into the honest runtime contract.
+- **Prevention rule:** When copy becomes more explicit in dense enterprise panels, run a live browser layout check in the real shell, not only unit/E2E clicks. Let metrics wrap under headings and keep file/import/action controls at 44px targets.
+- **Files affected:** `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/styles/cockpit.css`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`, `apps/web/e2e/technical-stack.spec.ts`.
+
+### 2026-06-18 TOOLING: Secret disposition artifacts accepted template-looking approval fields
+
+- **What went wrong:** Preflight rejected placeholder secret-disposition environment values, but the evidence writer/verifier path could still accept an existing artifact with non-empty sample owner/reviewer/ticket strings.
+- **Root cause:** Secret disposition validation checked presence for approver, reviewer, and ticket, while placeholder detection lived mainly in bundle preflight string checks.
+- **Prevention rule:** Any release approval field must reject template-looking values at every ingestion layer: preflight, writer, and verifier. Selftests need poisoned twins for copied template files and stale artifacts, not only missing fields.
+- **Files affected:** `scripts/write-secret-scan-evidence.mjs`, `scripts/verify-deploy-evidence.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-18 TOOLING: Ops approval tickets only had generic placeholder checks
+
+- **What went wrong:** Operational readiness rejected obvious placeholders like angle-bracket values and example emails, but copied sample tickets such as `OPS-1234` could still satisfy the ticket field if other template values were replaced.
+- **Root cause:** The placeholder detector relied on generic words and angle brackets, while approval-ticket samples use realistic-looking project prefixes.
+- **Prevention rule:** Release approval ticket fields need exact poisoned sample tokens in every ingestion layer, plus a selftest where only the ticket remains fake. Template files should make sample tickets visibly non-release evidence.
+- **Files affected:** `scripts/write-operational-readiness-evidence.mjs`, `scripts/verify-deploy-evidence.mjs`, `scripts/run-deploy-evidence-bundle.mjs`, `docs/templates/operational-readiness.example.json`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-18 TOOLING: Provider proof could still look live with fixture-shaped inputs
+
+- **What went wrong:** Provider-quality evidence selftests could use release-shaped fixture values, and strict verification did not reject all provider target/company/token placeholder shapes at every layer.
+- **Root cause:** The first strict provider gate focused on required lanes and named Tech Intel source coverage, but it did not fully separate non-strict fixtures from live release proof.
+- **Prevention rule:** Provider release evidence must reject fixture response files, local or placeholder targets, placeholder company keys, placeholder or short tokens, and placeholder expected source lists in writer, verifier, and bundle preflight paths. Selftests need poisoned twins for each field.
+- **Files affected:** `scripts/write-provider-quality-evidence.mjs`, `scripts/verify-deploy-evidence.mjs`, `scripts/run-deploy-evidence-bundle.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-18 SECURITY: Integration token key format drifted across code, env, and rotation docs
+
+- **What went wrong:** Production env validation only required `INTEGRATION_TOKEN_KEY` to be present, while the token cipher needed a 64-character hex key. The rotation script generated base64 and `.env.example` documented base64, so operators could create a key that passed boot and failed later during OAuth token encryption.
+- **Root cause:** The key contract lived in comments and runtime crypto, but was not enforced at API boot or kept synchronized with the rotation runbook.
+- **Prevention rule:** Secret/key format contracts must be enforced at every ingestion point: env validation, crypto boundary, examples, and rotation scripts. Add poisoned tests for correct length but wrong alphabet.
+- **Files affected:** `packages/shared/src/crypto/token-cipher.ts`, `packages/shared/src/crypto/token-cipher.test.ts`, `apps/api/src/env.ts`, `apps/api/src/env.test.ts`, `.env.example`, `scripts/ops/rotate-secrets.sh`.
+
+### 2026-06-18 WEB: Service worker owned routes that should stay network-only
+
+- **What went wrong:** The PWA worker documented API/auth/export/download bypass behavior, but the actual policy only bypassed `/api/` and `/trpc/`. Production nginx also lacked explicit no-store headers for `sw.js` and `index.html`, and asset cache headers risked shadowing inherited security headers.
+- **Root cause:** The cache policy lived in the worker implementation and nginx config without focused tests for network-owned route classes or nginx `add_header` inheritance behavior.
+- **Prevention rule:** Service workers must define and test network-owned route prefixes/segments separately from shell assets. When adding cache headers in nginx locations, either avoid `add_header` or redeclare the security headers in that same location.
+- **Files affected:** `apps/web/public/sw.js`, `apps/web/src/main.tsx`, `apps/web/e2e/flows/pwa-offline.spec.ts`, `apps/web/nginx.conf`, `apps/web/src/lib/service-worker-policy.test.ts`, `apps/web/src/lib/nginx-cache-policy.test.ts`.
+
+### 2026-06-19 WEB/API: Technical stack source pulls overwrote draft trust
+
+- **What went wrong:** Running Technical Stack `Pull sources` while already editing could replace the user's unsaved draft with the refreshed effective stack. Separately, a single named Tech Intel MCP provider serialized item provenance as generic `enrichment:tech_stack_mcp`.
+- **Root cause:** The source-pull handler reused the same draft reset for both pre-edit and in-edit flows, and the single-MCP serializer did not apply the provider slug path used by multi-MCP metadata.
+- **Prevention rule:** Refresh actions inside an editor must preserve in-progress draft state unless the user explicitly resets or accepts incoming changes. Provider provenance tests must cover zero, one, and many configured sources, because the one-source path is where aggregate labels often collapse.
+- **Files affected:** `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`, `apps/api/src/services/crm/company-enrichment.service.ts`, `apps/api/src/services/crm/company-enrichment.service.test.ts`.
+
+### 2026-06-19 SECURITY: Local secret regex missed modern token families
+
+- **What went wrong:** The local secret scan stack still focused on older Stripe/AWS/GitHub/OpenAI shapes and missed modern `sk-proj-*`, `sk-ant-*`, `github_pat_*`, Slack, Google API, and Azure Storage `AccountKey=` patterns.
+- **Root cause:** Gitleaks defaults were trusted as broad coverage, while the local pre-commit/full-tree/deploy-checklist regexes stayed narrow and did not have poisoned fixture selftests for the token families this product can realistically use.
+- **Prevention rule:** Every secret scanner surface must share the same provider-token families and include selftest fixtures for modern key shapes. When adding a provider, add its token shape to staged-diff, full-tree, untracked-source, hook, deploy-checklist, and gitleaks coverage together.
+- **Files affected:** `.gitleaks.toml`, `.claude/hooks/scan-secrets.sh`, `scripts/check-secrets.sh`, `scripts/write-secret-scan-evidence.mjs`, `scripts/ops/deploy-checklist.sh`, `docs/solutions/security-scan-local-gates.md`.
+
+### 2026-06-19 WEB: Source-assisted add path downgraded provider matches to manual
+
+- **What went wrong:** Technical Stack had source-backed match chips, but typing an exact pending Apollo/Seamless/Tech Intel MCP technology and pressing the normal Stage command still saved it as manual-only data.
+- **Root cause:** Provider provenance was wired only to the explicit source-suggestion buttons. The primary composer path did not resolve exact typed vendors against pending provider suggestions before staging.
+- **Prevention rule:** Any assisted manual-entry path must make the primary commit command source-aware when exact provider matches exist. Tests need to cover the obvious keyboard/button path, not only the special recommendation chip.
+- **Files affected:** `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`, `docs/solutions/technical-stack-provider-source-pull.md`.
+
+### 2026-06-19 SECURITY: Server crypto kept accepting legacy key formats
+
+- **What went wrong:** After aligning token-cipher, env validation, rotation, and Azure policy on 64-character hex `INTEGRATION_TOKEN_KEY`, the exported `@bidstack/shared/server-crypto` helper still accepted base64 key material.
+- **Root cause:** Two AES-GCM helpers owned the same operator-facing secret contract, but only the newer token-cipher path had poisoned tests for legacy base64 and correct-length wrong-alphabet keys.
+- **Prevention rule:** Any shared secret/key contract must have one poisoned regression suite per exported helper and one operator-contract note listing every runtime importer. Do not call the contract aligned until all exported crypto boundaries reject the same bad fixtures.
+- **Files affected:** `packages/shared/src/utils/crypto.ts`, `packages/shared/src/utils/crypto.test.ts`, `docs/solutions/agent-provider-credentials-org-secret-routing.md`.
+
+### 2026-06-19 API: SERUM status ignored its own config audit events
+
+- **What went wrong:** The SERUM status summary's `latestConfigChangeAt` watched agent-provider, Dust, org settings, and RBAC audit actions, but ignored the `serum_config.*` audit rows written by SERUM draft/publish/rollback workflows.
+- **Root cause:** The status freshness query was introduced before the versioned SERUM config audit trail was fully wired, and the config lifecycle test verified the snapshot audit trail but not the top-level status summary.
+- **Prevention rule:** Any control-plane workflow that writes audit events must have a status-summary freshness assertion proving its own status page reflects those events. Do not rely only on detail-page audit trails.
+- **Files affected:** `apps/api/src/routes/serum.ts`, `apps/api/src/routes/serum.integration.test.ts`, `docs/solutions/serum-versioned-config-control-plane.md`.
+
+### 2026-06-19 UX: Technical stack MCP pull was still outside the add moment
+
+- **What went wrong:** The Technical Stack composer still led with manual add, while provider pull/coverage lived in the surrounding panel and queue. The intake summary also squeezed five metrics into four columns, and mobile source lane/drop-cue copy could truncate around 390px.
+- **Root cause:** Provider-pull UX had been layered onto the editor incrementally. Tests covered function and provenance, but not whether the composer itself made Apollo, Seamless.AI, Tech Intel MCP, open data, source-backed accept, and mobile wrapping feel first-class.
+- **Prevention rule:** Source-backed entity composers must expose provider pull, provider coverage, best-match accept, and provenance in the same add surface. Browser QA must include mobile overflow after adding new status chips or source-copy rows.
+- **Files affected:** `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`, `apps/web/src/styles/cockpit.css`, `docs/solutions/technical-stack-provider-source-pull.md`.
+
+### 2026-06-19 SECURITY: Secret scanner selftests used raw token-shaped fixtures
+
+- **What went wrong:** `scripts/write-secret-scan-evidence.mjs` widened modern token coverage but stored raw poisoned fixture strings in the scanner source. Because the file was still untracked, the untracked release scan flagged the scanner itself; once tracked, the full-tree scanner would have hit the same source literals.
+- **Root cause:** Selftests proved detection of assembled values but did not also prove that scanner/test source stayed scan-clean. The scanner surfaces were aligned, yet the fixture storage format violated the scanner's own release rule.
+- **Prevention rule:** Secret scanner fixtures must be assembled from non-matching fragments at runtime, and every scanner selftest must assert its own source text does not match the production secret regex. Never allow raw token-shaped literals in scanner source, tests, or docs outside explicitly excluded example files.
+- **Files affected:** `scripts/write-secret-scan-evidence.mjs`, `docs/solutions/security-scan-local-gates.md`.
+
+### 2026-06-19 TOOLING: Operational restore proof coerced missing values to green 0m
+
+- **What went wrong:** The strict production verifier could display missing operational `restoreRtoMinutes` and `restoreRpoMinutes` values as passing `0m` subchecks because `Number(null)` returns `0`.
+- **Root cause:** The operational evidence writer correctly used `null` for absent numeric proof, but the verifier compared coerced numbers without first checking that numeric evidence was present.
+- **Prevention rule:** Release evidence verifiers must parse numeric evidence with an explicit missing-value guard before threshold comparisons. Add poisoned selftests for `null`, empty string, and out-of-threshold values whenever a gate compares numeric proof.
+- **Files affected:** `scripts/verify-deploy-evidence.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-19 UX: Accepted stack source proof was hidden in the draft
+
+- **What went wrong:** The Technical Stack add assistant could accept source-backed Apollo, Seamless, Tech Intel MCP, or open-data suggestions, but the composer did not summarize accepted provider/source evidence before save.
+- **Root cause:** The source-aware add path preserved provenance in item metadata, while the visible composer state still optimized for queued suggestions and typed entries.
+- **Prevention rule:** Source-assisted entity composers must show pre-save proof for accepted source-backed draft rows, including provider/source counts and mobile wrapping checks.
+- **Files affected:** `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`, `apps/web/src/styles/cockpit.css`, `docs/solutions/technical-stack-provider-source-pull.md`.
+
+### 2026-06-19 TOOLING: Sentry smoke preflight missed CLI auth
+
+- **What went wrong:** The release bundle preflight required Sentry smoke target, release, org, projects, smoke token, and DSN proof, but not the Sentry CLI auth token needed for `sentry issue list`.
+- **Root cause:** The preflight modeled the smoke trigger inputs but not the observation/query credential used by the evidence writer.
+- **Prevention rule:** Evidence preflight must cover every external credential used by both the trigger path and the observation path. If a writer shells out to a SaaS CLI, its auth token must be preflight-checked with poisoned placeholder coverage.
+- **Files affected:** `scripts/run-deploy-evidence-bundle.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-19 UX: Technical stack add path lacked source-verification guidance
+
+- **What went wrong:** The Technical Stack composer had source pull, provider review, and accepted-source proof, but typed manual entries still did not get a clear contextual source-check prompt before Stage.
+- **Root cause:** Tests covered provider pulls and accepted provenance after action, but not the pre-stage decision state where a user decides whether to verify a typed vendor against Apollo, Seamless.AI, Tech Intel MCPs, and open data.
+- **Prevention rule:** Source-assisted add flows must test unchecked-provider guidance, exact source-match guidance, mobile no-overflow, and 44px touch targets around the primary add command.
+- **Files affected:** `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`, `apps/web/src/styles/cockpit.css`, `apps/web/e2e/technical-stack.spec.ts`, `docs/solutions/technical-stack-provider-source-pull.md`.
+
+### 2026-06-19 TOOLING: Browser release evidence did not check deploy environment
+
+- **What went wrong:** Strict deploy evidence checked browser regression profile, target, Clerk auth, production build, roles, projects, specs, and test counts, but did not require the browser artifact's environment to match the deploy target.
+- **Root cause:** The browser artifact recorded environment as metadata, while the verifier treated it as informational. Evidence environment normalization also reused the deploy-target normalizer, which defaulted missing values to `production`.
+- **Prevention rule:** Every release evidence artifact that records an environment must have a strict environment-match assertion and a poisoned mismatch selftest. Use optional-evidence normalization for artifact values so missing evidence stays missing.
+- **Files affected:** `scripts/verify-deploy-evidence.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-19 TOOLING: Provider release evidence did not check deploy environment
+
+- **What went wrong:** Strict deploy evidence checked provider live-refresh status, target, company key, source lanes, response lanes, and Tech Intel MCP sources, but did not require the provider artifact's environment to match the deploy target.
+- **Root cause:** Provider quality recorded `environment`, but the verifier treated it as informational metadata rather than release-scope evidence.
+- **Prevention rule:** Any release evidence artifact with provider, browser, observability, ops, load, or security proof must assert environment equality in strict mode and include a poisoned mismatch selftest.
+- **Files affected:** `scripts/verify-deploy-evidence.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-19 TOOLING: Container scan writer could pass an empty image set
+
+- **What went wrong:** A malformed `BIDSTACK_CONTAINER_SCAN_IMAGES` override such as `,,` could reduce the scanner image list to zero and still let the writer emit `passed: true`.
+- **Root cause:** The runner parsed image/severity lists at module load and did not enforce a non-empty requested image set or require reports for every requested image in the evidence builder.
+- **Prevention rule:** Evidence writers must fail closed on empty required target sets, record requested target coverage, and selftest separator-only overrides plus zero-report artifacts.
+- **Files affected:** `scripts/run-container-vulnerability-scan.mjs`, `docs/solutions/container-vulnerability-scan-gate.md`.
+
+### 2026-06-19 UX: Duplicate stack sources could downgrade typed provenance
+
+- **What went wrong:** When Apollo, Seamless, or a Tech Intel MCP reported the same typed technology, the composer sorted suggestions by confidence/provider trust and then rebuilt them into a `Map` that let later, weaker duplicate rows overwrite the best source.
+- **Root cause:** The exact-match lookup used `new Map(sortedPairs)` without an explicit first-wins rule, so sorted order was not preserved for duplicate vendor names.
+- **Prevention rule:** Any source-backed add flow that dedupes sorted provider evidence must use a named first-wins helper and a regression with duplicate provider rows. Canonical provider names should win over rough typed casing when a source match exists.
+- **Files affected:** `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`, `docs/solutions/technical-stack-provider-source-pull.md`.
+
+### 2026-06-19 TOOLING: Docker daemon readiness stood in for image execution proof
+
+- **What went wrong:** Strict deploy verification accepted a passing tool-readiness artifact even when Gitleaks, k6, Semgrep, and Trivy Docker image probes were marked `skipped`.
+- **Root cause:** The writer kept image probes optional for local inventory, and the strict verifier only inspected required failed checks instead of requiring executed image proof when a release tool depended on Docker fallback.
+- **Prevention rule:** Release evidence may treat direct local inventory as informational, but strict staging/production gates must require executed pinned-image probes for every Docker-dependent fallback. A green Docker daemon check is not image execution proof.
+- **Files affected:** `package.json`, `scripts/verify-deploy-evidence.mjs`, `scripts/run-deploy-evidence-bundle.mjs`, `docs/solutions/release-tool-readiness-gate.md`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-19 TOOLING: Strict deploy verifier left stale JSON reports
+
+- **What went wrong:** `pnpm deploy:evidence:production` printed fresh strict results but did not update `deploy-evidence/strict-production-latest.json` unless `BIDSTACK_DEPLOY_EVIDENCE_REPORT` was set.
+- **Root cause:** The verifier defaulted to console-only output for strict runs instead of deriving a target-specific release report path.
+- **Prevention rule:** Release verifiers must always write the same fresh pass/fail state to the canonical artifact path used by reviewers. Selftests must assert default report paths for every deploy target.
+- **Files affected:** `scripts/verify-deploy-evidence.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-19 TOOLING: Sentry smoke proof omitted the trigger target
+
+- **What went wrong:** Sentry smoke evidence could prove matching API and worker issues existed in Sentry without proving which release API target produced those events.
+- **Root cause:** Bundle preflight checked `API_BASE_URL`, but the compact Sentry artifact and strict verifier treated target provenance as outside the artifact contract.
+- **Prevention rule:** Observability release evidence must record the event-producing target, and strict gates must reject missing, local, or placeholder targets with poisoned selftests.
+- **Files affected:** `scripts/write-sentry-smoke-evidence.mjs`, `scripts/verify-deploy-evidence.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`, `docs/observability/sentry.md`.
+
+### 2026-06-19 TOOLING: Strict source evidence trusted stale clean JSON
+
+- **What went wrong:** The source-review planner compared source evidence to current Git, but the strict deploy verifier only checked source artifact freshness and the artifact's recorded clean/dirty fields.
+- **Root cause:** Currentness enforcement lived in the cleanup-planning helper, not in the deploy-blocking verifier.
+- **Prevention rule:** Release source evidence must be compared with live Git state inside the strict deploy gate. Selftests must prove a stale clean artifact fails after a new worktree change.
+- **Files affected:** `scripts/verify-deploy-evidence.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-19 UX: Other attributed stack sources lost clear provenance
+
+- **What went wrong:** The Technical Stack add assistant could receive attributed stack suggestions from valid sources outside Apollo, Seamless.AI, configured Tech Intel MCP, open-data, meeting, or Omniscient families, but the review UI did not give those sources a visible lane or readable accepted-source label.
+- **Root cause:** Source mapping logic covered known provider families and preserved raw metadata, while unknown attributed sources fell back to generic accepted proof.
+- **Prevention rule:** Source-assisted composers must preserve every attributed source in visible pre-save proof, including an explicit fallback lane and readable fallback label for unknown but valid source IDs.
+- **Files affected:** `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`, `docs/solutions/technical-stack-provider-source-pull.md`.
+
+### 2026-06-19 TOOLING: Browser release evidence could be summary-only
+
+- **What went wrong:** Strict browser release verification could accept a hand-authored summary artifact with `passed: true`, required roles/projects/specs, and a non-local target without proving the raw Playwright JSON report or command trail existed. It also did not reject `tests.unknown > 0` when the artifact claimed `passed: true`.
+- **Root cause:** The browser writer emitted source-report proof, but the strict verifier only checked the compact summary fields.
+- **Prevention rule:** Release evidence verifiers must require the raw source artifact and command trail for derived summaries, plus poisoned tests for summary-only artifacts and unknown outcome counts.
+- **Files affected:** `scripts/verify-deploy-evidence.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-19 TOOLING: Load certification could rely on derived summary only
+
+- **What went wrong:** Strict load verification checked `production-load-latest.json` thresholds and metrics but did not require the raw k6 summary export to exist, even though the compact artifact is derived from that raw run.
+- **Root cause:** The load writer recorded `rawSummaryPath` and `rawSummaryFound`, while the strict verifier only consumed the derived fields.
+- **Prevention rule:** Release verifiers must require raw source artifacts for every derived evidence summary, and include a poisoned missing-source fixture.
+- **Files affected:** `scripts/verify-deploy-evidence.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`, `docs/solutions/k6-load-gate-docker-fallback.md`.
+
+### 2026-06-19 TOOLING: Playwright project name was assumed
+
+- **What went wrong:** The Technical Stack E2E verification was first run with `--project=chromium`, but this repo names the desktop Chromium project `chromium-desktop`.
+- **Root cause:** I assumed the common Playwright project name instead of checking `apps/web/playwright.config.ts` before invoking the targeted E2E command.
+- **Prevention rule:** Before a targeted Playwright run, read the repo config or run `pnpm --filter @bidstack/web exec playwright test --list` and use the exact project name. If a managed server port is already healthy, use the repo's `E2E_REUSE_SERVER=1` path rather than killing local processes.
+- **Files affected:** Verification command only.
+
+### 2026-06-19 TOOLING: Container release evidence could be compact-only
+
+- **What went wrong:** Strict container verification could rely on `container-scan-latest.json` without requiring the raw Trivy JSON reports that produced the zero-finding summary.
+- **Root cause:** The scanner wrote a derived compact artifact, and the verifier checked image coverage, immutability, environment, and findings but did not require source-report proof.
+- **Prevention rule:** Every derived release evidence summary must point to repo-local raw source artifacts, and strict verifiers must include poisoned compact-only fixtures.
+- **Files affected:** `scripts/run-container-vulnerability-scan.mjs`, `scripts/verify-deploy-evidence.mjs`, `docs/solutions/container-vulnerability-scan-gate.md`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-19 TOOLING: Raw load and browser reports only needed to exist
+
+- **What went wrong:** Strict load and browser verification required raw source report paths, but a zero-byte or non-JSON file at that path could still satisfy the release gate.
+- **Root cause:** The verifier checked `existsSync` for raw k6 and Playwright reports while only the container raw Trivy gate parsed JSON.
+- **Prevention rule:** Source artifacts for derived release summaries must be opened and parsed in strict mode, with invalid-source poison fixtures for each artifact family.
+- **Files affected:** `scripts/verify-deploy-evidence.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`, `docs/solutions/k6-load-gate-docker-fallback.md`, `docs/solutions/cross-browser-e2e-core-gate.md`.
+
+### 2026-06-19 TOOLING: Semgrep release proof allowed compact summaries
+
+- **What went wrong:** Strict Semgrep verification could accept a compact `passed: true` / `blockingFindings: 0` summary without proving the scanner, configs, severities, coverage, command exit, raw arrays, or Dockerfile syntax check.
+- **Root cause:** Semgrep was treated differently from newer evidence lanes that require source-run provenance. The verifier trusted outcome fields without validating run metadata.
+- **Prevention rule:** A green release evidence lane must prove the tool actually ran with reviewable metadata, especially when the artifact is generated from an external scanner.
+- **Files affected:** `scripts/verify-deploy-evidence.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-19 TOOLING: Secret scan evidence could be summary-only
+
+- **What went wrong:** Strict secret release verification trusted current-commit and full-history booleans without requiring the raw Gitleaks JSON reports that produced them.
+- **Root cause:** The secret evidence writer parsed temp Gitleaks reports and deleted them, while the deploy verifier only inspected the derived disposition fields.
+- **Prevention rule:** Secret release evidence must persist repo-local raw Gitleaks JSON reports, and strict verifiers must parse them before accepting any derived secret-scan summary.
+- **Files affected:** `scripts/write-secret-scan-evidence.mjs`, `scripts/verify-deploy-evidence.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-19 TOOLING: Ops readiness could pass on boolean claims
+
+- **What went wrong:** Operational readiness evidence could be made release-shaped with boolean flags, names, and timestamps but without references to the approval, Azure validation, backup/restore, rollback, monitoring, or on-call proof behind those claims.
+- **Root cause:** The ops writer and strict verifier treated claim fields as the evidence instead of requiring reviewable evidence references for each operational assertion.
+- **Prevention rule:** Every operational release claim must carry a non-placeholder evidence reference, and bundle preflight must preserve those refs when bridging an ops readiness file into environment variables.
+- **Files affected:** `scripts/write-operational-readiness-evidence.mjs`, `scripts/verify-deploy-evidence.mjs`, `scripts/run-deploy-evidence-bundle.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-19 TOOLING: Failed strict container preflight left stale evidence
+
+- **What went wrong:** Strict container evidence could exit on invalid deploy inputs before writing a fresh artifact, leaving an older non-strict container scan for the production verifier to read. The verifier also passed `container.findings` when strict evidence had zero image reports.
+- **Root cause:** Scanner option validation happened before artifact writing, and the findings check treated an empty report list as zero vulnerabilities instead of no scan evidence.
+- **Prevention rule:** Release evidence commands must write a fresh red artifact on preflight failure, and strict verifiers must not turn missing scan reports into zero-finding passes.
+- **Files affected:** `scripts/run-container-vulnerability-scan.mjs`, `scripts/verify-deploy-evidence.mjs`, `docs/solutions/container-vulnerability-scan-gate.md`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-19 TOOLING: Browser evidence bundle skipped red artifact under preflight blockers
+
+- **What went wrong:** `deploy:evidence:bundle:production` skipped the browser evidence writer whenever operator preflight was blocked, leaving `deploy-evidence/browser-regression-latest.json` missing and forcing the strict verifier to report only missing proof.
+- **Root cause:** The bundle runner treated every step as all-or-nothing under preflight blockers, while browser evidence already had a cheap write-only path that can produce a fresh red artifact without launching Playwright.
+- **Prevention rule:** Release bundles should run safe diagnostic writers under preflight blockers when they can produce reviewable red artifacts without live side effects.
+- **Files affected:** `scripts/run-deploy-evidence-bundle.mjs`, `docs/solutions/cross-browser-e2e-core-gate.md`.
+
+### 2026-06-19 TOOLING: Provider bundle left stale staging evidence under preflight blockers
+
+- **What went wrong:** `deploy:evidence:bundle:production` skipped provider quality evidence when release preflight lacked live provider inputs, so strict production verification kept reading an older staging-scoped provider artifact.
+- **Root cause:** The provider writer already knew how to fail closed and write a fresh red artifact before network calls, but the bundle did not mark it as a preflight diagnostic step.
+- **Prevention rule:** Safe release evidence writers that fail before external side effects should run under preflight blockers so reviewers see fresh target-scoped failures instead of stale proof.
+- **Files affected:** `scripts/run-deploy-evidence-bundle.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-19 WEB/API: Apollo MCP partial config looked queued
+
+- **What went wrong:** Technical Stack refresh could present Apollo source-pull posture while the worker tried to use Apollo MCP with only a URL, and the API producer could enqueue Apollo jobs when neither complete MCP credentials nor REST fallback existed.
+- **Root cause:** API provider status required URL plus token to claim MCP readiness, but the worker branch keyed only on URL and queueing did not share the same readiness invariant.
+- **Prevention rule:** Provider status, producer queueing, and worker transport selection must use one tested readiness rule. Apollo MCP requires `APOLLO_MCP_URL` plus `APOLLO_MCP_BEARER_TOKEN`; REST fallback requires `APOLLO_API_KEY` plus a domain. Partial MCP config must be unavailable/skipped, never queued as runnable.
+- **Files affected:** `apps/api/src/services/crm/enrichment.service.ts`, `apps/api/src/services/crm/company-enrichment.service.test.ts`, `apps/worker/src/queues/company-enrich-apollo.ts`, `apps/worker/src/queues/company-enrich-apollo.test.ts`, `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`.
+
+### 2026-06-19 DEVOPS: MCP Dockerfile exposed stale traffic port
+
+- **What went wrong:** The root Dockerfile `mcp-server` target exposed `3001`, while `apps/mcp-server/src/main.ts` listens on `PORT_MCP` default `4001`. Platforms that infer service ports from image metadata could route MCP traffic to the wrong port.
+- **Root cause:** Health hardening added a separate `4003` health port, but the traffic `EXPOSE` metadata was not checked against the runtime default.
+- **Prevention rule:** Any Dockerfile runtime target with a source-defined default port must have a package-level policy test that checks `EXPOSE`, healthcheck, and non-root process order against the source contract.
+- **Files affected:** `Dockerfile`, `apps/mcp-server/src/dockerfile-policy.test.ts`, `docs/solutions/mcp-production-env-fail-fast.md`.

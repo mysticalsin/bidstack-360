@@ -13,10 +13,16 @@ dist
 **/dist
 build
 **/build
+*.tsbuildinfo
+**/*.tsbuildinfo
 .turbo
 **/.turbo
 .vite
 **/.vite
+
+# Generated artifacts rebuilt inside container images
+packages/db/generated
+packages/db/generated/**
 
 # Env & secrets
 .env
@@ -48,6 +54,14 @@ coverage
 **/coverage
 playwright-report
 **/playwright-report
+artifacts
+artifacts/**
+archives
+archives/**
+qa-screenshots
+qa-screenshots/**
+runtime-logs
+runtime-logs/**
 
 # Docs (not needed in containers)
 docs
@@ -67,14 +81,35 @@ CRM*.zip
 .clone/**
 .codex
 .codex/**
+.codex-*.png
+.codex-tmp
+.codex-tmp/**
 .conductor
 .conductor/**
+.corepack
+.corepack/**
+.forge
+.forge/**
+.local
+.local/**
+.planning
+.planning/**
 .swarm_state
 .swarm_state/**
+.tmp-e2e
+.tmp-e2e/**
+.tmp-run
+.tmp-run/**
+.vercel
+.vercel/**
 BIDCRM-design
 BIDCRM-design/**
+scratch
+scratch/**
 scratch_skills
 scratch_skills/**
+tmp
+tmp/**
 integrations
 integrations/**
 handoff
@@ -87,5 +122,7 @@ packages/twenty-bidstack
 packages/twenty-bidstack/**
 
 # scratch scaffold — never ship to the image
+scratch_img
 scratch_img/
+scratch_img/**
 scratch_skills/

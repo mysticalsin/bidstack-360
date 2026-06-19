@@ -29,7 +29,7 @@ For the production Azure baseline and service decisions, read
 | Container App `…-api`          | Fastify API, external ingress :4000, `/readyz` + `/livez` probes                                                           |
 | Container App `…-worker`       | BullMQ workers (OCR + python sidecar → 2Gi), no ingress                                                                     |
 | Container App `…-mcp`          | MCP server, internal ingress :4001, health server :4003                                                                      |
-| Container App `…-web`          | static nginx, external ingress :80                                                                                          |
+| Container App `…-web`          | static unprivileged nginx, external ingress to container :8080                                                               |
 
 The **zero-touch contract**: the deploy pipeline starts the migrate Job and
 blocks until it `Succeeded`; only then does it roll the app revisions. A failed
@@ -47,6 +47,9 @@ as the compose `depends_on: service_completed_successfully`.
    repo vars `ACR_LOGIN_SERVER`, `AZURE_RG`, `NAME_PREFIX`.
 
 ## First deploy
+
+Generate `integrationTokenKey` with `openssl rand -hex 32`; the runtime accepts
+only a 64-character hex AES-256-GCM key.
 
 ```bash
 az deployment group what-if -g <rg> -f infra/azure/main.bicep \
@@ -70,6 +73,7 @@ Then move `deploy.workflow.yml.draft` → `.github/workflows/deploy.yml` (mainta
 - [ ] Networking: replace the `0.0.0.0` "allow all Azure" Postgres firewall rule with VNet integration + private endpoint for production.
 - [ ] Confirm `DATABASE_URL` `sslmode=require` works with the Flexible Server cert chain from inside Container Apps.
 - [ ] Health probe paths: API exposes `/readyz` + `/livez`; worker exposes `/health` on 4002; MCP serves traffic on 4001 and `/health` on 4003.
+- [ ] Secret shape: `integrationTokenKey` is generated with `openssl rand -hex 32`; `pnpm deploy:evidence:azure:policy` passes before `what-if`.
 - [ ] Object storage: current code requires S3-compatible storage variables (`S3_*`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) or a new Azure Blob adapter.
 - [ ] Job→apps ordering is enforced by the **pipeline** (migrate job gates roll-apps), not by bicep `dependsOn` (which only orders creation). Confirm the pipeline poll loop's terminal states match `az containerapp job execution` output.
 - [ ] Cost/scale: SKUs (`Standard_D2ds_v5`, Redis C1) and min/max replicas are placeholders — right-size them.
