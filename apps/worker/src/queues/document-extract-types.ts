@@ -39,8 +39,10 @@ export const WIN_LOSS_REASON_KEYWORDS: Record<string, string[]> = {
   support: ['support', 'service level', 'sla', 'responsiveness'],
 };
 
+// Phrases are matched on WORD BOUNDARIES (see document-extract-analysis.ts). Bare
+// 'we won' is intentionally excluded — \b still matches it inside "we won't", so
+// only unambiguous, multi-word win phrases are listed.
 export const WIN_PHRASES = [
-  'we won',
   'awarded to us',
   'selected us',
   'chose us',

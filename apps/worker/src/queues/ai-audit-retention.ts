@@ -12,8 +12,11 @@
  * Coexistence with audit immutability: AuditLog mutations are blocked by the
  * Prisma $use middleware (packages/db audit-immutability). This purge targets
  * the ai_invocations TABLE via $executeRaw, which bypasses $use middleware — the
- * single, explicit allowed delete path for retention. (ai_invocations is not a
- * generated Prisma model yet — Windows DLL lock — so raw SQL is required anyway.)
+ * single, explicit allowed delete path for retention. (Raw SQL, not the
+ * generated AiInvocation model, because the $use-exempt delete path must be
+ * explicit.) Operational prerequisite: the ai_invocations table is created by
+ * migration 20260527000000_rfp_vector_indexes — deploy that migration before/
+ * with this worker; the purge guards with to_regclass and no-ops if it is absent.
  */
 
 import { Worker, Queue, type Job } from 'bullmq';
@@ -23,11 +26,20 @@ import type pino from 'pino';
 import { prisma } from '@bidstack/db';
 import { AI_AUDIT_RETENTION } from '@bidstack/shared';
 
-// Retention window in days. Default 90 — the documented AI-audit retention.
-const RETENTION_DAYS = Math.max(1, parseInt(process.env.AI_AUDIT_RETENTION_DAYS ?? '90', 10) || 90);
+// Retention window in days. Default 90. Pure + exported so the env coercion is
+// unit-tested (0 / negative / garbage all fall back to 90).
+export function resolveRetentionDays(raw: string | undefined): number {
+  const n = parseInt(raw ?? '', 10);
+  return Number.isFinite(n) && n > 0 ? n : 90;
+}
+const RETENTION_DAYS = resolveRetentionDays(process.env.AI_AUDIT_RETENTION_DAYS);
 
 // Daily at 03:30 UTC by default — off-peak, after the 03:00 calendar sweeps.
-const RETENTION_CRON = process.env.AI_AUDIT_RETENTION_CRON ?? '30 3 * * *';
+// Validate to a 5-field cron so a malformed env var can't crash worker boot;
+// fall back to the default (a mismatch is surfaced in startAiAuditRetention).
+const FIVE_FIELD_CRON = /^\S+(\s+\S+){4}$/;
+const RAW_RETENTION_CRON = (process.env.AI_AUDIT_RETENTION_CRON ?? '').trim();
+const RETENTION_CRON = FIVE_FIELD_CRON.test(RAW_RETENTION_CRON) ? RAW_RETENTION_CRON : '30 3 * * *';
 
 // Per-batch delete cap. Each batch is its own short transaction so row locks are
 // released before the next slice, keeping the purge from contending with live
@@ -61,6 +73,16 @@ export async function runAiAuditRetentionPass(
   let rowsPurged = 0;
   let batches = 0;
   let truncated = false;
+
+  // Guard: if the migration that creates ai_invocations hasn't run in this
+  // environment, no-op with a warning instead of throwing every night.
+  const reg = await prisma.$queryRaw<Array<{ reg: string | null }>>`
+    SELECT to_regclass('ai_invocations') AS reg
+  `;
+  if (!reg[0]?.reg) {
+    log.warn('ai_invocations table not present — skipping retention purge (run migrations)');
+    return { retentionDays: RETENTION_DAYS, cutoff: cutoff.toISOString(), rowsPurged, batches, truncated };
+  }
 
   for (;;) {
     const deleted = await prisma.$executeRaw`
@@ -128,6 +150,21 @@ export async function startAiAuditRetention(
   });
 
   workers.push(worker);
+
+  if (RAW_RETENTION_CRON && RAW_RETENTION_CRON !== RETENTION_CRON) {
+    log.warn(
+      { provided: RAW_RETENTION_CRON, using: RETENTION_CRON },
+      'AI_AUDIT_RETENTION_CRON is not a valid 5-field cron — using default',
+    );
+  }
+
+  // Drop any stale repeatable on a different pattern so changing the cron doesn't
+  // leave the old schedule running duplicate daily purges.
+  for (const r of await queue.getRepeatableJobs()) {
+    if (r.name === 'ai-audit.retention' && r.pattern !== RETENTION_CRON) {
+      await queue.removeRepeatableByKey(r.key);
+    }
+  }
 
   // Stable jobId prevents duplicate scheduled jobs accumulating across restarts.
   await queue.add(

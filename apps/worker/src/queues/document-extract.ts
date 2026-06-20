@@ -31,35 +31,9 @@ import { resolveOrgLlm } from '../lib/org-llm.js';
 import { getOrgDust, resolveAgentId } from '../lib/dust-credentials.js';
 import type { ContractExtractionDraft } from '@bidstack/shared';
 
-import { deterministicExtract } from './document-extract-analysis.js';
+import { deterministicExtract, normalizeWinLoss } from './document-extract-analysis.js';
 import { writeBidWorkspaceArtifacts } from './document-extract-db.js';
-import {
-  WIN_LOSS_REASON_KEYWORDS,
-  type ExtractionResult,
-  type WinLossSignal,
-} from './document-extract-types.js';
-
-// Coerce an LLM-provided winLoss object into the strict WinLossSignal shape.
-// Defensive: the model may omit fields, return wrong types, or hallucinate an
-// outcome — we clamp to known values and drop unknown reason tags so the stored
-// signal stays trustworthy for aggregation.
-function normalizeWinLoss(raw: unknown): WinLossSignal | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const r = raw as { outcome?: unknown; reasons?: unknown; competitors?: unknown; summary?: unknown };
-  const outcome: WinLossSignal['outcome'] =
-    r.outcome === 'won' || r.outcome === 'lost' ? r.outcome : 'unknown';
-  const knownReasons = new Set(Object.keys(WIN_LOSS_REASON_KEYWORDS).concat('competitor'));
-  const reasons = Array.isArray(r.reasons)
-    ? [...new Set(r.reasons.map((x) => String(x).toLowerCase().trim()).filter((x) => knownReasons.has(x)))]
-    : [];
-  const competitors = Array.isArray(r.competitors)
-    ? [...new Set(r.competitors.map((x) => String(x).slice(0, 80).trim()).filter(Boolean))].slice(0, 10)
-    : [];
-  const summary =
-    typeof r.summary === 'string' && r.summary.trim() ? r.summary.slice(0, 300) : null;
-  if (outcome === 'unknown' && reasons.length === 0 && competitors.length === 0) return null;
-  return { outcome, reasons, competitors, summary };
-}
+import type { ExtractionResult, WinLossSignal } from './document-extract-types.js';
 
 const QUEUE_NAME = DOCUMENT_EXTRACT.name;
 

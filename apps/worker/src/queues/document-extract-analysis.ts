@@ -22,23 +22,76 @@ import {
 // be unit-tested and runs even with no LLM configured. Returns null when the
 // document shows no win/loss signal (the common case for MSAs / rate cards), so
 // callers only attach a signal when something was genuinely detected.
+// Word-boundary match so a short keyword never fires inside an unrelated word:
+// 'fit' must not match 'benefit', 'sla' not 'translate'/'legislation', 'cost' not
+// 'costume'. Substring matching here silently corrupted the learned reason tags.
+function containsWord(haystackLower: string, term: string): boolean {
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`\\b${escaped}\\b`, 'i').test(haystackLower);
+}
+
 export function detectWinLossSignal(text: string): WinLossSignal | null {
   const lower = text.toLowerCase();
 
-  const won = WIN_PHRASES.some((p) => lower.includes(p));
-  const lost = LOSS_PHRASES.some((p) => lower.includes(p));
-  // If both appear (e.g. a debrief comparing deals), prefer the explicit loss
-  // signal — losses are what we most need to learn from.
+  const lost = LOSS_PHRASES.some((p) => containsWord(lower, p));
+  const won = WIN_PHRASES.some((p) => containsWord(lower, p));
+  // Loss precedence: a debrief comparing deals teaches us most from the loss.
   const outcome: WinLossSignal['outcome'] = lost ? 'lost' : won ? 'won' : 'unknown';
+
+  // No explicit outcome phrase => not a win/loss document. Emit nothing so a
+  // routine MSA/SOW that merely mentions "pricing" or "deadline" never surfaces a
+  // misleading win/loss chip (reasons alone are not a signal).
+  if (outcome === 'unknown') return null;
 
   const reasons: string[] = [];
   for (const [tag, keywords] of Object.entries(WIN_LOSS_REASON_KEYWORDS)) {
-    if (keywords.some((k) => lower.includes(k))) reasons.push(tag);
+    if (keywords.some((k) => containsWord(lower, k))) reasons.push(tag);
   }
 
-  if (outcome === 'unknown' && reasons.length === 0) return null;
-
   return { outcome, reasons, competitors: [], summary: null };
+}
+
+// Reason tags the LLM may return: the deterministic keyword tags plus
+// 'competitor' (only the LLM can name a competitor, so the regex path never
+// emits it). Single source so the detector, prompt, and normalizer can't drift.
+const ALLOWED_LLM_REASON_TAGS = new Set([
+  ...Object.keys(WIN_LOSS_REASON_KEYWORDS),
+  'competitor',
+]);
+
+// Coerce an LLM-provided winLoss object into the strict WinLossSignal shape.
+// Defensive: the model may omit fields, return wrong types, or hallucinate an
+// outcome — clamp to known values and drop unknown reason tags so the stored
+// signal stays trustworthy for aggregation. Pure (no I/O) → unit-tested.
+export function normalizeWinLoss(raw: unknown): WinLossSignal | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as {
+    outcome?: unknown;
+    reasons?: unknown;
+    competitors?: unknown;
+    summary?: unknown;
+  };
+  const outcome: WinLossSignal['outcome'] =
+    r.outcome === 'won' || r.outcome === 'lost' ? r.outcome : 'unknown';
+  const reasons = Array.isArray(r.reasons)
+    ? [
+        ...new Set(
+          r.reasons
+            .map((x) => String(x).toLowerCase().trim())
+            .filter((x) => ALLOWED_LLM_REASON_TAGS.has(x)),
+        ),
+      ]
+    : [];
+  const competitors = Array.isArray(r.competitors)
+    ? [...new Set(r.competitors.map((x) => String(x).slice(0, 80).trim()).filter(Boolean))].slice(
+        0,
+        10,
+      )
+    : [];
+  const summary =
+    typeof r.summary === 'string' && r.summary.trim() ? r.summary.slice(0, 300) : null;
+  if (outcome === 'unknown' && reasons.length === 0 && competitors.length === 0) return null;
+  return { outcome, reasons, competitors, summary };
 }
 
 export function detectCategory(text: string): string {
