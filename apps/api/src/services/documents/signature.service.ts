@@ -582,22 +582,44 @@ function timingSafeEqual(a: Buffer, b: Buffer): boolean {
   return diff === 0;
 }
 
+// Escape user-controlled text before interpolating into the signed-doc HTML that
+// htmlToPdf() renders — typedName/documentName are attacker-controllable, so raw
+// interpolation was an HTML/script injection into the rendered PDF.
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// The signature image must be a base64 data:image URL — reject anything else
+// (javascript:, external URLs, onerror-bearing payloads) before it reaches src.
+function safeSignatureSrc(value: string): string {
+  return /^data:image\/(png|jpeg|gif|webp);base64,[a-z0-9+/=]+$/i.test(value) ? value : '';
+}
+
 function buildSignedDocumentHtml(params: {
   typedName: string;
   signatureDataUrl: string;
   signedAt: string;
   documentName: string;
 }): string {
+  const documentName = escapeHtml(params.documentName);
+  const typedName = escapeHtml(params.typedName);
+  const signedAt = escapeHtml(params.signedAt);
+  const signatureSrc = safeSignatureSrc(params.signatureDataUrl);
   return `<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="utf-8"><title>Signed: ${params.documentName}</title></head>
+<head><meta charset="utf-8"><title>Signed: ${documentName}</title></head>
 <body style="font-family:sans-serif;margin:40px;color:#111">
-<h1 style="font-size:1.5rem">${params.documentName}</h1>
+<h1 style="font-size:1.5rem">${documentName}</h1>
 <hr style="margin:24px 0">
-<p>Signed by: <strong>${params.typedName}</strong></p>
-<p>Signed at: ${params.signedAt}</p>
+<p>Signed by: <strong>${typedName}</strong></p>
+<p>Signed at: ${signedAt}</p>
 <div style="margin-top:16px;border:1px solid #ccc;padding:16px;display:inline-block">
-  <img src="${params.signatureDataUrl}" alt="Signature" style="max-height:80px">
+  <img src="${signatureSrc}" alt="Signature" style="max-height:80px">
 </div>
 <p style="margin-top:24px;font-size:0.75rem;color:#666">
   This document was signed via BidStack 360° INTERNAL provider. This is an

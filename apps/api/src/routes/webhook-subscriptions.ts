@@ -338,6 +338,11 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
             },
             body: pingBody,
             signal: controller.signal,
+            // SSRF: refuse to follow redirects — a 30x to an internal host would
+            // bypass the static assertSafeWebhookUrl check on the original URL.
+            // (Full DNS-rebind parity with the worker's safe-research-fetch is
+            // follow-up once that helper moves to a shared package.)
+            redirect: 'error',
           });
         } finally {
           clearTimeout(timeoutId);
