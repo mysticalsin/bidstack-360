@@ -420,6 +420,9 @@ export function ExtractionsTab({
                     )}
                   </div>
                 ) : null}
+                {extraction?.status === 'done' ? (
+                  <WinLossInsight data={extraction.extractedData} />
+                ) : null}
                 {extraction?.error ? (
                   <p className="mt-2 text-xs text-[var(--danger)]">{extraction.error}</p>
                 ) : null}
@@ -428,6 +431,69 @@ export function ExtractionsTab({
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function humanizeReason(tag: string): string {
+  return tag.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// "Why we won / lost" — the learned win/loss pattern extracted from a document,
+// read defensively from the extraction's JSON (no DTO coupling). Renders nothing
+// unless the document actually carried a win/loss signal.
+function WinLossInsight({ data }: { data: Record<string, unknown> | undefined }) {
+  const { t } = useTranslation('crm');
+  const wl = data?.winLoss as
+    | { outcome?: string; reasons?: unknown; competitors?: unknown; summary?: unknown }
+    | null
+    | undefined;
+  if (!wl) return null;
+  const reasons = Array.isArray(wl.reasons) ? wl.reasons.map(String) : [];
+  const competitors = Array.isArray(wl.competitors) ? wl.competitors.map(String) : [];
+  if (wl.outcome !== 'won' && wl.outcome !== 'lost' && reasons.length === 0) return null;
+
+  const headline =
+    wl.outcome === 'won'
+      ? t('intelTabs.winLossWon', 'Why we won')
+      : wl.outcome === 'lost'
+        ? t('intelTabs.winLossLost', 'Why we lost')
+        : t('intelTabs.winLossSignal', 'Win/loss signal');
+  const tone =
+    wl.outcome === 'won'
+      ? 'border-[var(--success)] text-[var(--success)]'
+      : wl.outcome === 'lost'
+        ? 'border-[var(--danger)] text-[var(--danger)]'
+        : 'border-[var(--border-default)] text-[var(--fg-secondary)]';
+
+  return (
+    <div className="mt-2 rounded-md border border-[var(--border-default)] bg-[var(--surface-sunken)] p-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span
+          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${tone}`}
+        >
+          <Icon name="sparkle" size={12} ariaHidden />
+          {headline}
+        </span>
+        {reasons.map((r) => (
+          <span
+            key={r}
+            className="rounded-full border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-0.5 text-xs text-[var(--fg-secondary)]"
+          >
+            {t(`intelTabs.winLossReason.${r}`, humanizeReason(r))}
+          </span>
+        ))}
+      </div>
+      {competitors.length > 0 ? (
+        <p className="mt-1.5 text-xs text-[var(--fg-tertiary)]">
+          {t('intelTabs.winLossCompetitors', 'Competitors: {{names}}', {
+            names: competitors.join(', '),
+          })}
+        </p>
+      ) : null}
+      {typeof wl.summary === 'string' && wl.summary ? (
+        <p className="mt-1.5 text-xs leading-5 text-[var(--fg-secondary)]">{wl.summary}</p>
+      ) : null}
     </div>
   );
 }

@@ -9,10 +9,60 @@ export interface ExtractedItem {
   priceRange?: string;
 }
 
+export type WinLossOutcomeSignal = 'won' | 'lost' | 'unknown';
+
+// A win/loss pattern learned from a document (debrief, email, RFP outcome note).
+// Reasons are canonical tags so they aggregate across deals; competitors are only
+// populated by the LLM path (deterministic regex can't safely name them).
+export interface WinLossSignal {
+  outcome: WinLossOutcomeSignal;
+  reasons: string[];
+  competitors: string[];
+  summary: string | null;
+}
+
 export interface ExtractionResult {
   solutions: ExtractedItem[];
   products: ExtractedItem[];
+  // Null when the document carries no win/loss signal (most MSAs, rate cards).
+  winLoss?: WinLossSignal | null;
 }
+
+// Canonical win/loss reason tags — kept in sync conceptually with the
+// WinLossReasonCode enum in packages/shared so doc-derived reasons can later
+// roll up into WinLossRecord.
+export const WIN_LOSS_REASON_KEYWORDS: Record<string, string[]> = {
+  price: ['price', 'pricing', 'cost', 'budget', 'expensive', 'too high', 'discount', 'cheaper'],
+  product_fit: ['feature', 'functionality', 'requirement', 'capability', 'fit', 'roadmap', 'missing'],
+  relationship: ['relationship', 'incumbent', 'existing supplier', 'trust', 'rapport'],
+  timing: ['timing', 'timeline', 'deadline', 'too slow', 'delivery date'],
+  support: ['support', 'service level', 'sla', 'responsiveness'],
+};
+
+export const WIN_PHRASES = [
+  'we won',
+  'awarded to us',
+  'selected us',
+  'chose us',
+  'preferred vendor',
+  'closed won',
+  'won the bid',
+  'won the deal',
+  'contract awarded to us',
+];
+
+export const LOSS_PHRASES = [
+  'we lost',
+  'not selected',
+  'unsuccessful bid',
+  'chose a competitor',
+  'went with another',
+  'closed lost',
+  'lost the bid',
+  'lost the deal',
+  'awarded to a competitor',
+  'declined our proposal',
+];
 
 export interface SourceChunkCandidate {
   chunkIndex: number;

@@ -8,11 +8,38 @@ import {
   SOLUTION_KEYWORDS,
   PRODUCT_KEYWORDS,
   CATEGORY_MAP,
+  WIN_PHRASES,
+  LOSS_PHRASES,
+  WIN_LOSS_REASON_KEYWORDS,
   type ExtractedItem,
   type ExtractionResult,
   type SourceChunkCandidate,
   type RequirementCandidate,
+  type WinLossSignal,
 } from './document-extract-types.js';
+
+// Learn a win/loss pattern from raw document text. Pure + deterministic so it can
+// be unit-tested and runs even with no LLM configured. Returns null when the
+// document shows no win/loss signal (the common case for MSAs / rate cards), so
+// callers only attach a signal when something was genuinely detected.
+export function detectWinLossSignal(text: string): WinLossSignal | null {
+  const lower = text.toLowerCase();
+
+  const won = WIN_PHRASES.some((p) => lower.includes(p));
+  const lost = LOSS_PHRASES.some((p) => lower.includes(p));
+  // If both appear (e.g. a debrief comparing deals), prefer the explicit loss
+  // signal — losses are what we most need to learn from.
+  const outcome: WinLossSignal['outcome'] = lost ? 'lost' : won ? 'won' : 'unknown';
+
+  const reasons: string[] = [];
+  for (const [tag, keywords] of Object.entries(WIN_LOSS_REASON_KEYWORDS)) {
+    if (keywords.some((k) => lower.includes(k))) reasons.push(tag);
+  }
+
+  if (outcome === 'unknown' && reasons.length === 0) return null;
+
+  return { outcome, reasons, competitors: [], summary: null };
+}
 
 export function detectCategory(text: string): string {
   const lower = text.toLowerCase();
@@ -77,7 +104,7 @@ export function deterministicExtract(text: string): ExtractionResult {
     }
   }
 
-  return { solutions, products };
+  return { solutions, products, winLoss: detectWinLossSignal(text) };
 }
 
 function classifyAndPush(
