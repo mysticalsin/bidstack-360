@@ -58,11 +58,40 @@ function expandCompoundUniqueWhere(model: string, where: unknown): unknown {
   return expanded;
 }
 
+// Inject `deletedAt: null` into args.where unless the caller already filtered on
+// deletedAt (the explicit-bypass escape, e.g. a deliberate soft-delete assertion
+// or a restore that scopes with `deletedAt: { not: null }`).
+function scopeWhereToLiveRows(params: Prisma.MiddlewareParams): void {
+  if (params.args?.where?.deletedAt !== undefined) return;
+  if (!params.args) {
+    params.args = { where: { deletedAt: null } };
+  } else if (!params.args.where) {
+    params.args.where = { deletedAt: null };
+  } else {
+    params.args.where.deletedAt = null;
+  }
+}
+
 export function makeSoftDeleteMiddleware(): Prisma.Middleware {
   return async (params, next) => {
     const models = getSoftDeleteModels();
-    
+
     if (params.model && models.has(params.model)) {
+        // Mutations: an already-soft-deleted row must not be editable or
+        // resurrectable. Scope update/updateMany to live rows so a record that
+        // was soft-deleted cannot be silently mutated through the back door.
+        // (Prisma 5 extendedWhereUnique lets `update` carry a non-unique filter
+        // alongside its unique selector, so this is valid for single update too.)
+        //
+        // delete/deleteMany are intentionally NOT scoped here: hard delete stays
+        // the teardown/admin path, and scoping it would strand soft-deleted rows
+        // that later collide on (orgId, name)-style unique constraints. Converting
+        // hard delete into soft delete is a separate product decision, not a
+        // silent middleware change.
+        if (params.action === 'update' || params.action === 'updateMany') {
+          scopeWhereToLiveRows(params);
+        }
+
         if (params.action === 'findUnique' || params.action === 'findUniqueOrThrow') {
           params.args = {
             ...params.args,
