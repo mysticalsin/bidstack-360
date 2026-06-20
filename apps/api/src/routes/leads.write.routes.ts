@@ -331,9 +331,13 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
           },
         });
 
-        // 3. Mark lead as converted
+        // 3. Mark lead as converted. The status guard makes this flip the
+        // concurrency gate: two simultaneous converts both pass the outside-tx
+        // check, but only one updateMany matches `status != converted`. The
+        // loser's count===0 throws a 409, aborting its $transaction so the
+        // duplicate contact + opportunity it created above are rolled back.
         const updateResult = await tx.lead.updateMany({
-          where: { id: lead.id, orgId: req.auth.orgId },
+          where: { id: lead.id, orgId: req.auth.orgId, status: { not: 'converted' } },
           data: {
             status: 'converted',
             convertedToOpportunityId: opp.id,
@@ -341,7 +345,7 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
           },
         });
         if (updateResult.count === 0) {
-          throw server.httpErrors.notFound('Lead not found');
+          throw server.httpErrors.conflict('Lead already converted');
         }
 
         // 4. Audit log

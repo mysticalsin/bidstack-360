@@ -665,7 +665,10 @@ model ApiKey {
   id         String    @id @default(uuid()) @db.Uuid
   orgId      String    @map("org_id") @db.Uuid
   name       String
-  hashedKey  String    @map("hashed_key")
+  // SHA-256 hex digest of the raw key. Globally unique by construction, so
+  // @unique both prevents hash collisions AND backs the verifyApiKey hot path
+  // (findFirst on hashedKey ran a full table scan without an index — P0 #?).
+  hashedKey  String    @unique @map("hashed_key")
   prefix     String // first 8 chars, displayed
   scopes     String[]  @default(["read"])
   lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(6)
@@ -3211,6 +3214,9 @@ model EmailMessage {
   entityId           String?       @map("entity_id") @db.Uuid
   createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  /// Soft-delete tombstone. Heavy PII (bodies, recipients) — required so GDPR
+  /// erasure can null/tombstone rows instead of leaving them undeletable.
+  deletedAt          DateTime?     @map("deleted_at") @db.Timestamptz(6)
 
   org            Org                  @relation(fields: [orgId], references: [id], onDelete: Cascade)
   user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -3221,6 +3227,7 @@ model EmailMessage {
   @@index([orgId, threadId])
   @@index([orgId, entityType, entityId])
   @@index([orgId, userId])
+  @@index([orgId, deletedAt])
   @@map("email_messages")
 }
 
@@ -3602,6 +3609,9 @@ model SmsMessage {
   entityId           String?        @map("entity_id") @db.Uuid
   createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  /// Soft-delete tombstone. Heavy PII (message body, phone numbers) — required
+  /// so GDPR erasure can tombstone rows instead of leaving them undeletable.
+  deletedAt          DateTime?      @map("deleted_at") @db.Timestamptz(6)
 
   org              Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
   integrationToken IntegrationToken @relation(fields: [integrationTokenId], references: [id], onDelete: Cascade)
@@ -3609,6 +3619,7 @@ model SmsMessage {
   @@index([orgId, toNumber])
   @@index([orgId, entityType, entityId])
   @@index([orgId, status])
+  @@index([orgId, deletedAt])
   @@map("sms_messages")
 }
 
@@ -3782,6 +3793,10 @@ model CallSession {
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  /// Soft-delete tombstone. Heavy PII (transcripts, recordings, participant
+  /// emails) — required so GDPR erasure can tombstone rows instead of leaving
+  /// them undeletable.
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   org           Org           @relation(fields: [orgId], references: [id], onDelete: Cascade)
   user          User          @relation(fields: [userId], references: [id])
@@ -3790,6 +3805,7 @@ model CallSession {
   @@index([orgId, entityType, entityId, scheduledAt(sort: Desc)], map: "call_sessions_org_entity_scheduled_idx")
   @@index([orgId, status])
   @@index([orgId, provider])
+  @@index([orgId, deletedAt])
   @@map("call_sessions")
 }
 

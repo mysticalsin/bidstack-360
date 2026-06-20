@@ -87,6 +87,16 @@ export const envSchema = z.object({
 
   API_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(120),
 
+  // ─── HTTP server timeouts (bound per-Node-worker resource pinning) ─────
+  // Without these Fastify defaults to 0 (unbounded): a slow query or hung
+  // downstream pins a Node worker + its DB connection forever, so at 100k
+  // scale a handful of stuck requests can exhaust the process. REQUEST_TIMEOUT_MS
+  // caps total request processing; KEEPALIVE_TIMEOUT_MS should sit just above a
+  // typical load-balancer idle timeout (~60s) so the LB, not Node, closes idle
+  // keep-alive sockets and we avoid races that surface as 502s.
+  REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+  KEEPALIVE_TIMEOUT_MS: z.coerce.number().int().positive().default(65_000),
+
   // OCR
   BIDSTACK_OCR_ENABLED: z.enum(['true', 'false']).default('false'),
   BIDSTACK_OCRMYPDF_BIN: z.string().default('ocrmypdf'),

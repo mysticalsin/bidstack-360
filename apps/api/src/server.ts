@@ -54,6 +54,11 @@ const FRAME_SRC = ["'self'", 'https://*.clerk.accounts.dev', 'https://challenges
 export async function buildServer(): Promise<FastifyInstance> {
   const server = Fastify({
     bodyLimit: 10485760, // 10 MiB to allow large Dust AI webhooks
+    // Bound per-request and idle-socket lifetimes so a slow query or hung
+    // downstream cannot pin a Node worker (+ its DB connection) indefinitely.
+    // Defaults are 0 (unbounded) — dangerous at 100k scale. See env.ts.
+    requestTimeout: config.REQUEST_TIMEOUT_MS,
+    keepAliveTimeout: config.KEEPALIVE_TIMEOUT_MS,
     rewriteUrl: (req) => {
       const url = req.url ?? '';
       if (url.startsWith('/api/') && !url.startsWith('/api/v')) {

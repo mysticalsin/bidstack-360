@@ -400,8 +400,31 @@ export async function handleInternalSign(params: {
   });
 
   if (!request) notFound('Signing link not found or expired');
-  if (request.status === 'SIGNED') badRequest('Document has already been signed');
   if (request.status === 'VOIDED') badRequest('This signing request has been voided');
+  if (request.status === 'SIGNED') badRequest('Document has already been signed');
+
+  // The signed-PDF key is deterministic (orgId + requestId), so winning the
+  // transition lets us record it up front and the loser never overwrites it.
+  const s3Key = `signed-docs/${request.orgId}/${request.id}/signed.pdf`;
+
+  // TOCTOU GATE: claim the SIGNED transition atomically BEFORE the expensive
+  // PDF render + S3 PUT. `notIn: ['SIGNED','VOIDED']` means only one of two
+  // concurrent submits matches; the loser's count===0 aborts here — so we never
+  // render twice, never overwrite the signed PDF, and never record duplicate
+  // SIGNED events on the non-repudiable audit trail.
+  const claim = await prisma.signatureRequest.updateMany({
+    where: { id: request.id, status: { notIn: ['SIGNED', 'VOIDED'] } },
+    data: {
+      status: 'SIGNED',
+      completedAt: new Date(),
+      completedDocumentS3Key: s3Key,
+      recipients: updateRecipientSignedAt(request.recipients as object[], typedName),
+    },
+  });
+  if (claim.count === 0) {
+    // Another request won the race (or it was voided between read and claim).
+    badRequest('Document has already been signed');
+  }
 
   // Build a minimal signed document HTML
   const signedHtml = buildSignedDocumentHtml({
@@ -416,12 +439,13 @@ export async function handleInternalSign(params: {
   // Upload to storage
   const { getStorage } = await import('../../storage/index.js');
   const store = await getStorage();
-  const s3Key = `signed-docs/${request.orgId}/${request.id}/signed.pdf`;
   // Persist the signed PDF. Local: direct disk write. S3: PUT the bytes via a
-  // presigned URL (driver-agnostic — no direct SDK dependency here). FAIL CLOSED:
-  // never mark the request SIGNED with a key that points at bytes we did not
-  // actually write. The previous S3 branch was a no-op TODO that silently
-  // discarded every signed PDF in production while reporting success. (Review.)
+  // presigned URL (driver-agnostic — no direct SDK dependency here). The status
+  // is already SIGNED (claimed above for TOCTOU dedup); if this PUT throws, the
+  // request stays SIGNED with no SIGNED event recorded (the event write below is
+  // skipped) — the gap is detectable and the deterministic key is re-PUTtable on
+  // retry. The previous S3 branch was a no-op TODO that silently discarded every
+  // signed PDF in production while reporting success. (Review.)
   if (store.writeLocal) {
     await store.writeLocal(s3Key, pdfBuf);
   } else {
@@ -441,27 +465,19 @@ export async function handleInternalSign(params: {
     }
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.signatureRequest.update({
-      where: { id: request.id },
-      data: {
-        status: 'SIGNED',
-        completedAt: new Date(),
-        completedDocumentS3Key: s3Key,
-        recipients: updateRecipientSignedAt(request.recipients as object[], typedName),
-      },
-    });
-    await tx.signatureEvent.create({
-      data: {
-        signatureRequestId: request.id,
-        type: 'SIGNED',
-        recipientEmail: extractFirstEmail(request.recipients as object[]),
-        occurredAt: new Date(),
-        ipAddress,
-        userAgent,
-        payload: { typedName, s3Key } as object,
-      },
-    });
+  // The SIGNED status, completedAt, s3Key, and recipient signedAt were committed
+  // by the winning claim above. Only the immutable audit event remains — record
+  // it exactly once (one SIGNED event per winning submit, as before).
+  await prisma.signatureEvent.create({
+    data: {
+      signatureRequestId: request.id,
+      type: 'SIGNED',
+      recipientEmail: extractFirstEmail(request.recipients as object[]),
+      occurredAt: new Date(),
+      ipAddress,
+      userAgent,
+      payload: { typedName, s3Key } as object,
+    },
   });
 
   return { requestId: request.id };

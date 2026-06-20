@@ -102,6 +102,49 @@ async function pollOrgDust(orgId: string, log: pino.Logger): Promise<void> {
   });
 }
 
+const FANOUT_JOB = 'dust.poll.fanout';
+const ORG_BATCH_SIZE = 200;
+
+/**
+ * Fan out the scheduled tick: cursor-paginate every org and enqueue ONE
+ * per-org poll job each, then return immediately. The cron job stays
+ * lightweight (a few paginated DB reads + enqueues) so a tick always finishes
+ * well inside its 5-min window even at 100k+ orgs — the heavy Dust I/O runs in
+ * bounded per-org jobs drained by the worker's concurrency + limiter, instead
+ * of being serialised into one ever-growing job that overlaps the next tick.
+ */
+async function fanoutOrgPolls(queue: Queue, log: pino.Logger): Promise<void> {
+  // Window bucket dedups per-org jobs across overlapping fanout runs (e.g. a
+  // delayed tick + the next on-time tick), mirroring email-sync's fanout.
+  const windowBucket = Math.floor(Date.now() / REPEAT_EVERY_MS);
+  let cursor: string | undefined;
+  let dispatched = 0;
+
+  while (true) {
+    const batch = await prisma.org.findMany({
+      select: { id: true },
+      take: ORG_BATCH_SIZE,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      orderBy: { id: 'asc' },
+    });
+    if (batch.length === 0) break;
+
+    for (const o of batch) {
+      await queue.add(
+        'dust.poll',
+        { source: 'scheduled', orgId: o.id },
+        { jobId: `dust-poll:${o.id}:${windowBucket}` },
+      );
+      dispatched++;
+    }
+
+    cursor = batch[batch.length - 1]!.id;
+    if (batch.length < ORG_BATCH_SIZE) break;
+  }
+
+  log.info({ dispatched, windowBucket }, 'dust.poll fanout dispatched');
+}
+
 export async function startDustPoller(
   connection: IORedis,
   log: pino.Logger,
@@ -114,10 +157,13 @@ export async function startDustPoller(
   });
   queues.push(queue);
 
+  // Lightweight cron: only fans out. jobId makes the repeatable registration
+  // idempotent across restarts.
   await queue.add(
-    'dust.poll',
+    FANOUT_JOB,
     { source: 'scheduled' },
     {
+      jobId: 'dust-poll-fanout-cron',
       repeat: { every: REPEAT_EVERY_MS },
       removeOnComplete: { age: 3600, count: 100 },
       removeOnFail: { age: 86400 },
@@ -127,41 +173,32 @@ export async function startDustPoller(
   const worker = new Worker(
     QUEUE_NAME,
     async (job) => {
-      const data = JobData.parse(job.data);
-      log.info({ jobId: job.id, name: job.name, source: data.source }, 'dust.poll tick');
-
-      // Circuit breaker check
-      if (Date.now() < circuitOpenUntil) {
-        log.warn('circuit open, skipping dust poll');
+      // Fanout tick: enqueue per-org jobs and return. No Dust I/O here.
+      if (job.name === FANOUT_JOB) {
+        log.info({ jobId: job.id, name: job.name }, 'dust.poll fanout tick');
+        await fanoutOrgPolls(queue, log);
         return;
       }
 
-      // Target orgs: explicit orgId from a manual resync, else every org for the
-      // scheduled poll. Each org is polled against its OWN Dust workspace.
-      // Cursor-based pagination prevents OOM at scale (10K+ orgs).
-      const ORG_BATCH_SIZE = 200;
-      const targetOrgIds: string[] = data.orgId ? [data.orgId] : [];
+      const data = JobData.parse(job.data);
+      log.info({ jobId: job.id, name: job.name, source: data.source }, 'dust.poll tick');
 
+      // Per-org job. Covers both fanout-dispatched orgs and manual "Resync now"
+      // (the API producer enqueues { orgId } directly). A poll job without an
+      // orgId is a no-op — every real poll targets exactly one org's workspace.
       if (!data.orgId) {
-        let cursor: string | undefined;
-        while (true) {
-          const batch = await prisma.org.findMany({
-            select: { id: true },
-            take: ORG_BATCH_SIZE,
-            ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
-            orderBy: { id: 'asc' },
-          });
-          if (batch.length === 0) break;
-          for (const o of batch) targetOrgIds.push(o.id);
-          cursor = batch[batch.length - 1]!.id;
-          if (batch.length < ORG_BATCH_SIZE) break;
-        }
+        log.warn({ jobId: job.id }, 'dust.poll job missing orgId — skipping');
+        return;
+      }
+
+      // Circuit breaker check
+      if (Date.now() < circuitOpenUntil) {
+        log.warn({ orgId: data.orgId }, 'circuit open, skipping dust poll');
+        return;
       }
 
       try {
-        for (const orgId of targetOrgIds) {
-          await pollOrgDust(orgId, log);
-        }
+        await pollOrgDust(data.orgId, log);
         consecutiveFailures = 0;
       } catch (err) {
         consecutiveFailures++;
@@ -172,7 +209,7 @@ export async function startDustPoller(
         throw err;
       }
     },
-    { connection },
+    { connection, concurrency: 5, limiter: { max: 10, duration: 1_000 } },
   );
   workers.push(worker);
 }

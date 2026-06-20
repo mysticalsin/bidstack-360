@@ -167,7 +167,9 @@ export function CrossSellCard({ accountKey }: { accountKey: string }) {
 
 function CreateAction({ accountKey }: { accountKey: string }) {
   const [open, setOpen] = useState(false);
-  const users = useUsers();
+  // Assignee picker: no server-side user search exists, so request the route
+  // maximum (200) instead of the default 100 to avoid dropping assignees.
+  const users = useUsers({ limit: 200 });
   const create = useCreateCrossSellAction();
   const { t } = useTranslation('crm');
   const [form, setForm] = useState({

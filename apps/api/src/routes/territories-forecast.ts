@@ -10,7 +10,7 @@
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { prisma } from '@bidstack/db';
+import { prisma, Prisma } from '@bidstack/db';
 import { Forecast } from '@bidstack/shared';
 import { A2_TO_A3 } from '../lib/geo/iso-country-codes.js';
 
@@ -187,93 +187,77 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
       },
     },
     async (req) => {
-      // Aggregate opportunities by country code.
-      const rows = await prisma.opportunity.findMany({
-        where: { orgId: req.auth.orgId },
-        select: {
-          id: true,
-          valueMicros: true,
-          probability: true,
-          country: true,
-          territoryId: true,
-          owner: { select: { name: true } },
-          territory: { select: { name: true, countryCodes: true } },
-        },
-        take: 1000,
-      });
-
-      const byCountry = new Map<
-        string,
-        {
+      // Aggregate opportunities by country code over the FULL, non-deleted set.
+      // WHY raw GROUP BY (not prisma.groupBy): the grouping key is a COALESCE
+      // expression spanning a relation array (o.country → territory.country_codes[0]
+      // → 'Unknown'), and we need DISTINCT relation-name arrays (territory/owner)
+      // per group — neither is expressible via prisma.opportunity.groupBy.
+      // Replaces a take:1000 findMany that returned a non-deterministic,
+      // soft-delete-polluted sample as the authoritative total at scale.
+      // value_micros sum is cast ::text so the driver returns a deterministic
+      // string we convert to BigInt for precision-safe sorting (a bare
+      // SUM(bigint) returns numeric, which node-postgres serializes as a string —
+      // sorting those lexicographically would mis-order). probability sum is
+      // ::float8 (cap 100/row × millions of rows overflows int4). count is ::int.
+      const rows = await prisma.$queryRaw<
+        Array<{
           countryCode: string;
-          countryCodeA3: string;
           opportunityCount: number;
-          totalValueMicros: bigint;
-          avgProbability: number;
-          probabilities: number[];
-          territories: Set<string>;
-          ownerNames: Set<string>;
-        }
-      >();
-
-      for (const row of rows) {
-        // Derive country: opportunity.country → territory.countryCodes[0] → 'Unknown'
-        const a2 = row.country ?? row.territory?.countryCodes[0] ?? 'Unknown';
-        const a3 = A2_TO_A3[a2] ?? a2;
-        const val = row.valueMicros ?? BigInt(0);
-        const existing = byCountry.get(a2);
-        if (existing) {
-          existing.opportunityCount += 1;
-          existing.totalValueMicros += val;
-          existing.probabilities.push(row.probability ?? 0);
-          if (row.territory?.name) existing.territories.add(row.territory.name);
-          if (row.owner?.name) existing.ownerNames.add(row.owner.name);
-        } else {
-          byCountry.set(a2, {
-            countryCode: a2,
-            countryCodeA3: a3,
-            opportunityCount: 1,
-            totalValueMicros: val,
-            avgProbability: row.probability ?? 0,
-            probabilities: [row.probability ?? 0],
-            territories: new Set(row.territory?.name ? [row.territory.name] : []),
-            ownerNames: new Set(row.owner?.name ? [row.owner.name] : []),
-          });
-        }
-      }
+          totalValueMicros: string;
+          sumProbability: number;
+          territories: string[];
+          ownerNames: string[];
+        }>
+      >(Prisma.sql`
+        SELECT
+          COALESCE(o.country, t.country_codes[1], 'Unknown') AS "countryCode",
+          COUNT(*)::int AS "opportunityCount",
+          COALESCE(SUM(o.value_micros), 0)::text AS "totalValueMicros",
+          COALESCE(SUM(o.probability), 0)::float8 AS "sumProbability",
+          COALESCE(
+            array_agg(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL),
+            ARRAY[]::text[]
+          ) AS "territories",
+          COALESCE(
+            array_agg(DISTINCT u.name) FILTER (WHERE u.name IS NOT NULL),
+            ARRAY[]::text[]
+          ) AS "ownerNames"
+        FROM opportunities o
+        LEFT JOIN territories t ON t.id = o.territory_id
+        LEFT JOIN users u ON u.id = o.owner_id
+        WHERE o.org_id = ${req.auth.orgId}::uuid
+          AND o.deleted_at IS NULL
+        GROUP BY COALESCE(o.country, t.country_codes[1], 'Unknown')
+      `);
 
       // WHY: sort on BigInt before converting to Number so aggregate values
       // above ~$9B (9_000_000_000_000_000 micros) aren't silently reordered
-      // by IEEE-754 precision loss. Safe to do before the map because
-      // byCountry.values() is a plain JS iterator over our own Map.
-      const sorted = [...byCountry.values()].sort((a, b) =>
-        a.totalValueMicros > b.totalValueMicros
-          ? -1
-          : a.totalValueMicros < b.totalValueMicros
-            ? 1
-            : 0,
-      );
+      // by IEEE-754 precision loss.
+      const sorted = [...rows].sort((a, b) => {
+        const av = BigInt(a.totalValueMicros);
+        const bv = BigInt(b.totalValueMicros);
+        return av > bv ? -1 : av < bv ? 1 : 0;
+      });
 
       const items = sorted.map((c) => ({
         countryCode: c.countryCode,
-        countryCodeA3: c.countryCodeA3,
+        countryCodeA3: A2_TO_A3[c.countryCode] ?? c.countryCode,
         opportunityCount: c.opportunityCount,
         totalValueMicros: Number(c.totalValueMicros),
         avgProbability:
-          c.probabilities.length > 0
-            ? Math.round(
-                (c.probabilities.reduce((a, b) => a + b, 0) / c.probabilities.length) * 10,
-              ) / 10
+          c.opportunityCount > 0
+            ? Math.round((c.sumProbability / c.opportunityCount) * 10) / 10
             : 0,
-        territories: [...c.territories],
-        ownerNames: [...c.ownerNames],
+        territories: c.territories,
+        ownerNames: c.ownerNames,
       }));
 
       const totalOpportunities = items.reduce((s, i) => s + i.opportunityCount, 0);
       const totalValueMicros = items.reduce((s, i) => s + i.totalValueMicros, 0);
+      const totalProbability = rows.reduce((s, r) => s + r.sumProbability, 0);
       const avgProbability =
         totalOpportunities > 0
-          ? Math.round((rows.reduce((s, r) => s + (r.probability ?? 0), 0) / rows.length) * 10) / 10
+          ? Math.round((totalProbability / totalOpportunities) * 10) / 10
           : 0;
 
       return {
@@ -325,72 +309,71 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
     },
     async (req) => {
       const dimension = req.query.dimension;
-      const rows = await prisma.opportunity.findMany({
-        where: { orgId: req.auth.orgId },
-        select: {
-          valueMicros: true,
-          probability: true,
-          industry: true,
-          country: true,
-          customer: true,
-          owner: { select: { name: true } },
-          company: { select: { name: true, industry: true } },
-        },
-        take: 1000,
-      });
 
-      // Resolve the grouping key for a row by the chosen dimension. Industry
+      // Resolve the grouping-key expression for the chosen dimension. Industry
       // falls back from the opp to its company; account prefers the linked
-      // company name over the free-text customer label.
-      const keyFor = (row: (typeof rows)[number]): string => {
-        if (dimension === 'industry') return row.industry ?? row.company?.industry ?? 'Unspecified';
-        if (dimension === 'account') return row.company?.name ?? row.customer ?? 'Unknown';
-        return row.country ?? 'Unknown';
-      };
+      // company name over the free-text customer label; country falls back to
+      // 'Unknown'. Same precedence as the prior in-JS keyFor().
+      const keyExpr =
+        dimension === 'industry'
+          ? Prisma.sql`COALESCE(o.industry, c.industry, 'Unspecified')`
+          : dimension === 'account'
+            ? Prisma.sql`COALESCE(c.name, o.customer, 'Unknown')`
+            : Prisma.sql`COALESCE(o.country, 'Unknown')`;
 
-      const groups = new Map<
-        string,
-        { totalValueMicros: bigint; count: number; probabilities: number[]; owners: Set<string> }
-      >();
-      for (const row of rows) {
-        const key = keyFor(row);
-        const g = groups.get(key) ?? {
-          totalValueMicros: BigInt(0),
-          count: 0,
-          probabilities: [],
-          owners: new Set<string>(),
-        };
-        g.totalValueMicros += row.valueMicros ?? BigInt(0);
-        g.count += 1;
-        g.probabilities.push(row.probability ?? 0);
-        if (row.owner?.name) g.owners.add(row.owner.name);
-        groups.set(key, g);
-      }
+      // Aggregate over the FULL, non-deleted set in Postgres. WHY raw GROUP BY
+      // (not prisma.groupBy): the key is a COALESCE spanning a relation and we
+      // need DISTINCT owner-name arrays per group. Replaces a take:1000 findMany
+      // that returned a non-deterministic, soft-delete-polluted authoritative sample.
+      // See /analytics above for the ::text / ::float8 / ::int cast rationale
+      // (driver returns numeric SUMs as strings; BigInt-safe sort needs them).
+      const rows = await prisma.$queryRaw<
+        Array<{
+          key: string;
+          opportunityCount: number;
+          totalValueMicros: string;
+          sumProbability: number;
+          ownerNames: string[];
+        }>
+      >(Prisma.sql`
+        SELECT
+          ${keyExpr} AS "key",
+          COUNT(*)::int AS "opportunityCount",
+          COALESCE(SUM(o.value_micros), 0)::text AS "totalValueMicros",
+          COALESCE(SUM(o.probability), 0)::float8 AS "sumProbability",
+          COALESCE(
+            array_agg(DISTINCT u.name) FILTER (WHERE u.name IS NOT NULL),
+            ARRAY[]::text[]
+          ) AS "ownerNames"
+        FROM opportunities o
+        LEFT JOIN companies c ON c.id = o.company_id
+        LEFT JOIN users u ON u.id = o.owner_id
+        WHERE o.org_id = ${req.auth.orgId}::uuid
+          AND o.deleted_at IS NULL
+        GROUP BY ${keyExpr}
+      `);
 
       // Sort on BigInt before Number conversion (precision-safe above ~$9B).
-      const items = [...groups.entries()]
-        .sort((a, b) =>
-          a[1].totalValueMicros > b[1].totalValueMicros
-            ? -1
-            : a[1].totalValueMicros < b[1].totalValueMicros
-              ? 1
-              : 0,
-        )
-        .map(([key, g]) => ({
-          key,
-          label: key,
-          opportunityCount: g.count,
+      const items = [...rows]
+        .sort((a, b) => {
+          const av = BigInt(a.totalValueMicros);
+          const bv = BigInt(b.totalValueMicros);
+          return av > bv ? -1 : av < bv ? 1 : 0;
+        })
+        .map((g) => ({
+          key: g.key,
+          label: g.key,
+          opportunityCount: g.opportunityCount,
           totalValueMicros: Number(g.totalValueMicros),
           avgProbability:
-            g.probabilities.length > 0
-              ? Math.round(
-                  (g.probabilities.reduce((s, p) => s + p, 0) / g.probabilities.length) * 10,
-                ) / 10
+            g.opportunityCount > 0
+              ? Math.round((g.sumProbability / g.opportunityCount) * 10) / 10
               : 0,
-          ownerNames: [...g.owners],
+          ownerNames: g.ownerNames,
         }));
 
       const totalOpportunities = items.reduce((s, i) => s + i.opportunityCount, 0);
+      const totalProbability = rows.reduce((s, r) => s + r.sumProbability, 0);
       return {
         dimension,
         items,
@@ -399,9 +382,8 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
           totalValueMicros: items.reduce((s, i) => s + i.totalValueMicros, 0),
           totalOpportunities,
           avgProbability:
-            rows.length > 0
-              ? Math.round((rows.reduce((s, r) => s + (r.probability ?? 0), 0) / rows.length) * 10) /
-                10
+            totalOpportunities > 0
+              ? Math.round((totalProbability / totalOpportunities) * 10) / 10
               : 0,
         },
       };

@@ -44,6 +44,69 @@ function deleteInMemory(pattern: string): void {
   }
 }
 
+// Per-org cache key index. Every cache entry an org writes is registered in a
+// Redis SET so invalidation is O(keys-for-this-org) — a targeted SMEMBERS+DEL —
+// instead of a full-keyspace SCAN on every mutation (which kept the cache cold
+// and pinned Redis at thousands of mutations/sec across a 100k-tenant fleet).
+function orgIndexKey(orgId: string): string {
+  return `bidstack:cacheidx:${orgId}`;
+}
+
+/**
+ * Register a freshly-written cache key under its org's index set so a later
+ * mutation can invalidate it without scanning the keyspace. The index set is
+ * given a TTL slightly longer than the entry's so it self-cleans if no mutation
+ * ever arrives. Best-effort: indexing failures must not fail the read path.
+ */
+export async function registerOrgCacheKey(
+  orgId: string,
+  key: string,
+  ttlSeconds: number,
+): Promise<void> {
+  try {
+    if (await ensureRedisReady()) {
+      const idx = orgIndexKey(orgId);
+      await redis.sadd(idx, key);
+      // Keep the index alive at least as long as the longest entry it tracks.
+      // EXPIRE is reset on each add, so the set lives ttl seconds past the last
+      // write — long enough to cover every entry it indexes.
+      await redis.expire(idx, ttlSeconds + 60);
+    }
+  } catch {
+    // Index is an optimization for invalidation; the in-memory prefix sweep and
+    // entry TTLs still bound staleness if the index is missing.
+  }
+}
+
+/**
+ * Invalidate every cache entry for one org. Uses the per-org index set
+ * (SMEMBERS → DEL keys → DEL set) so cost scales with the org's own cache size,
+ * not the global keyspace. Falls back to nothing on Redis errors; the in-memory
+ * tier is always swept. Correctness matches the old `{orgId}:*` wildcard: all of
+ * the org's entries are dropped.
+ */
+export async function invalidateOrgCache(orgId: string): Promise<void> {
+  try {
+    if (await ensureRedisReady()) {
+      const idx = orgIndexKey(orgId);
+      const keys = await redis.smembers(idx);
+      if (keys.length) {
+        // Chunk DELs so one mutation never ships a single multi-thousand-arg
+        // command (mirrors the 500-key batching the old SCAN path used).
+        const batchSize = 500;
+        for (let i = 0; i < keys.length; i += batchSize) {
+          await redis.del(...keys.slice(i, i + batchSize));
+        }
+      }
+      await redis.del(idx);
+    }
+  } catch {
+    // Redis may be mid-connect or unavailable; always clear the fallback below.
+  }
+
+  deleteInMemory(`bidstack:cache:${orgId}:`);
+}
+
 async function deleteRedisPattern(pattern: string): Promise<void> {
   const batchSize = 500;
   const maxKeys = 10_000;

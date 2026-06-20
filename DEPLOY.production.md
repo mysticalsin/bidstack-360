@@ -50,11 +50,52 @@ for multi-replica safety; never auto-migrate from N replicas at once.
 | `RFP_LLM_PROVIDER` + provider key | optional | e.g. `openai` + `OPENAI_API_KEY` for the live RFP AI pipeline; omit for deterministic fallbacks. |
 | `APOLLO_API_KEY` | optional | Live company enrichment. |
 | `DEMO_MODE` | **must be unset / false** | The API refuses to boot if this is `true` while `CLERK_SECRET_KEY` is set. |
+| `REQUEST_TIMEOUT_MS` | optional | Max time a single HTTP request may process before Fastify aborts it. Default `30000`. Bounds per-worker resource pinning from slow queries / hung downstreams. |
+| `KEEPALIVE_TIMEOUT_MS` | optional | Idle keep-alive socket timeout. Default `65000` — keep it **above** your load balancer's idle timeout (~60s) so the LB, not Node, closes idle sockets (avoids 502 races). |
 
 **[operator action]** Generate every secret yourself; never commit them. Keep
 `BIDSTACK_JOB_SIGNING_SECRET` and `INTEGRATION_TOKEN_KEY` identical across
 api+worker and stable across deploys (rotating `INTEGRATION_TOKEN_KEY` makes
 previously-encrypted integration secrets unreadable).
+
+## 2a. Connection pool sizing (required at scale)
+
+`DATABASE_URL` is also Prisma's **connection-pool knob** — the pool is configured
+on the connection string, not in code. Append
+`?connection_limit=<N>&pool_timeout=<seconds>` to each service's `DATABASE_URL`.
+
+Why this matters: with no `connection_limit`, Prisma opens
+**num_cpus × 2 + 1 connections per process**. Every `api` replica and the
+`worker` each get their own pool, so the totals multiply silently and can blow
+past Postgres `max_connections`. The governing constraint is:
+
+```
+sum(api_replicas × api_connection_limit) + worker_connection_limit  <  Postgres max_connections
+```
+
+- **`api`** — moderate per-request DB use. Start around
+  `connection_limit=10`, `pool_timeout=10` per replica, then size from the
+  formula above and your `max_connections`.
+- **`worker`** — the **busiest** client: it runs many jobs concurrently
+  (~150 in-flight), while Prisma's default pool is only ~17 connections, which
+  surfaces as `P2024` pool-timeout errors under load. Its `connection_limit`
+  **must match the worker's job concurrency** (e.g. `connection_limit=150`,
+  `pool_timeout=20`).
+
+**[operator action]** At 100k scale, front Postgres with **PgBouncer in
+transaction mode** and point each service's `DATABASE_URL` at the pooler. App
+pools then multiplex onto far fewer real server connections, so per-service
+`connection_limit` bounds the app side while PgBouncer bounds the server side.
+(Prisma + PgBouncer transaction mode: add `pgbouncer=true` to the string so
+Prisma disables prepared-statement caching.) The same constraint applies to
+`DATABASE_URL_REPLICA` if a read replica / read pooler is configured.
+
+> Note: the in-code comment in `packages/db/src/index.ts` documents this same
+> rule, and `.env.example`'s `DATABASE_URL` line should carry a commented
+> example of the `connection_limit`/`pool_timeout` params (see "Manual
+> follow-up" below if that comment is not yet present).
+
+---
 
 ## 3. Frontend env vars (build-time, inlined)
 
@@ -131,3 +172,19 @@ the role Clerk reports.
   groups as a data-access control.
 - Multi-replica deployments rely on Redis for cache coherency; run at least the
   documented `replicas` with a shared Redis.
+
+### Manual follow-up — `.env.example` pool comment
+
+The connection-pool guidance in §2a should also be mirrored as a commented
+example on the `DATABASE_URL` line of `.env.example` (the harness blocked an
+automated edit of that file). Add, directly under `DATABASE_URL=...`:
+
+```
+# Connection-pool sizing (production / 100k scale): the connection string is
+# Prisma's pool knob. Without connection_limit Prisma opens num_cpus*2+1
+# connections PER PROCESS, so N replicas + worker can exceed Postgres
+# max_connections. Front Postgres with PgBouncer (transaction mode) and set:
+#   api    (per replica):  ...?connection_limit=10&pool_timeout=10&pgbouncer=true
+#   worker (match concurrency ~150): ...?connection_limit=150&pool_timeout=20&pgbouncer=true
+# Rule: sum(replicas * connection_limit) + worker < max_connections.
+```

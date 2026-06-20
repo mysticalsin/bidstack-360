@@ -25,7 +25,9 @@ function TerritoryDialogForm({
   onClose: () => void;
 }) {
   const { t } = useTranslation('crm');
-  const users = useUsers();
+  // Owner picker: no server-side user search exists, so request the route
+  // maximum (200) instead of the default 100 to avoid silently dropping owners.
+  const users = useUsers({ limit: 200 });
   const [name, setName] = useState(territory?.name ?? '');
   const [region, setRegion] = useState(territory?.region ?? '');
   const [countryCodes, setCountryCodes] = useState(territory?.countryCodes.join(', ') ?? '');

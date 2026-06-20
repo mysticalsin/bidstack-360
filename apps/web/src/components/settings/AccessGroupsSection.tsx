@@ -221,7 +221,9 @@ function GroupEditor({ group }: { group: UserGroup }) {
   const update = useUpdateUserGroup();
   const addMember = useAddGroupMember();
   const removeMember = useRemoveGroupMember();
-  const { data: users } = useUsers();
+  // Member picker: no server-side user search exists, so request the route
+  // maximum (200) instead of the default 100 to avoid dropping candidates.
+  const { data: users } = useUsers({ limit: 200 });
   const [pickedUserId, setPickedUserId] = useState('');
 
   const members = detail.data?.members ?? [];

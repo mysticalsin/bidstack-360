@@ -35,7 +35,9 @@ export function ForecastsPage() {
   const { formatMoneyMicros } = useFormatMoney();
   const reducedMotion = useReducedMotion();
   const forecasts = useForecasts();
-  const users = useUsers();
+  // Owner picker (NewForecastDialog): no server-side user search exists, so
+  // request the route maximum (200) instead of the default 100.
+  const users = useUsers({ limit: 200 });
   const createForecast = useCreateForecast();
   const deleteForecast = useDeleteForecast();
 

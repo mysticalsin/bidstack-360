@@ -1,6 +1,13 @@
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
-import { cacheGet, cacheSet, cacheKey, bodyHash, cacheDel } from '../lib/redis-cache.js';
+import {
+  cacheGet,
+  cacheSet,
+  cacheKey,
+  bodyHash,
+  registerOrgCacheKey,
+  invalidateOrgCache,
+} from '../lib/redis-cache.js';
 import { invalidateDashboardSnapshotCache } from '../routes/crm/dashboard.js';
 import { invalidateCrmSummaryCache } from '../routes/crm/summary.js';
 
@@ -65,6 +72,12 @@ const redisCachePluginImpl: FastifyPluginAsync<RedisCachePluginOptions> = async 
     const promise = (async () => {
       const data = await handler();
       await cacheSet(key, { data }, options.ttlSeconds);
+      // Register the key under this org's index so a later mutation can drop it
+      // without scanning the keyspace. 'anon' has no mutations to invalidate it,
+      // so skip indexing unauthenticated reads.
+      if (orgId !== 'anon') {
+        await registerOrgCacheKey(orgId, key, options.ttlSeconds);
+      }
       return data;
     })();
     inFlightReads.set(key, promise);
@@ -88,8 +101,9 @@ const redisCachePluginImpl: FastifyPluginAsync<RedisCachePluginOptions> = async 
     const isSuccess = reply.statusCode >= 200 && reply.statusCode < 300;
 
     if (isMutation && isSuccess) {
-      // Invalidate all cache keys for this tenant orgId
-      await cacheDel(`bidstack:cache:${orgId}:*`);
+      // Invalidate all cache keys for this tenant orgId via the per-org index
+      // set (targeted SMEMBERS+DEL), not a full-keyspace SCAN.
+      await invalidateOrgCache(orgId);
       // Also drop the in-process snapshot Maps for this org. Redis is cleared
       // above, but these per-process caches have their own 10s TTL and would
       // otherwise serve stale data until expiry. Both are in-process +

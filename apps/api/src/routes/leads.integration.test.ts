@@ -204,6 +204,54 @@ describe('leads routes', () => {
     expect(leadRes.json().convertedToOpportunityId).toBe(body.opportunityId);
   });
 
+  // Regression for the double-conversion race: the in-transaction status guard
+  // (status != converted) must make a second convert a 409 conflict and must NOT
+  // create a second opportunity/contact — otherwise pipeline value duplicates and
+  // forecast/win-rate corrupt. WHY this matters: the bug let two concurrent
+  // converts each mint an opportunity off the same lead.
+  skipIfNoDb('POST /api/leads/:id/convert is idempotent — second convert is 409, no dup opp', async () => {
+    const dupCompany = `${CONVERT_COMPANY_PREFIX}-dup-${randomUUID().slice(0, 8)}`;
+    const createRes = await server.inject({
+      method: 'POST',
+      url: '/api/leads',
+      payload: {
+        firstName: 'Double',
+        lastName: 'Convert',
+        companyName: dupCompany,
+        source: 'event',
+        priority: 'high',
+        score: 70,
+      },
+    });
+    const id = createRes.json().id;
+    createdLeadIds.push(id);
+
+    const first = await server.inject({
+      method: 'POST',
+      url: `/api/leads/${id}/convert`,
+      payload: { opportunityName: `Dup Opp ${dupCompany}`, opportunityValueMicros: 500_000_000 },
+    });
+    expect(first.statusCode).toBe(200);
+    const firstBody = first.json();
+    createdOpportunityIds.push(firstBody.opportunityId);
+    createdContactIds.push(firstBody.contactId);
+
+    // Second convert of an already-converted lead must be rejected.
+    const second = await server.inject({
+      method: 'POST',
+      url: `/api/leads/${id}/convert`,
+      payload: { opportunityName: `Dup Opp 2 ${dupCompany}`, opportunityValueMicros: 999_000_000 },
+    });
+    expect(second.statusCode).toBe(409);
+
+    // The lead must still point at the original opportunity (no overwrite), and
+    // exactly one opportunity must exist for this lead's company.
+    const leadRes = await server.inject({ method: 'GET', url: `/api/leads/${id}` });
+    expect(leadRes.json().convertedToOpportunityId).toBe(firstBody.opportunityId);
+    const opps = await prisma.opportunity.findMany({ where: { customer: dupCompany } });
+    expect(opps).toHaveLength(1);
+  });
+
   skipIfNoDb('DELETE /api/leads/:id soft-deletes and returns 404 on get', async () => {
     const createRes = await server.inject({
       method: 'POST',

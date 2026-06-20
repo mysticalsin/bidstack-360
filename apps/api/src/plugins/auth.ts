@@ -43,6 +43,66 @@ const STUB_ROLE_HEADER = 'x-bidstack-e2e-role';
 export const SSO_DOMAIN_REJECTED_MESSAGE =
   'Sign-in domain is not permitted for this organization.';
 
+// --- Verified-session cache (scale fix) -------------------------------------
+//
+// The onRequest hook runs verifyClerkAuth on EVERY authenticated request. Its
+// DB-side resolution (org lookup + 2 user lookups + a user.upsert + role-sync +
+// an auth.login audit-log write) hammered the Postgres PRIMARY once per request.
+// At 100k-scale every read request became 3 reads + 1-3 writes — enough to melt
+// the primary.
+//
+// Fix mirrors lib/access-scope.ts: a short-TTL, bounded in-process cache of the
+// resolved AuthContext keyed by the VERIFIED token identity. On a hit we skip
+// ALL DB lookups/writes (and the JIT upsert / role-sync / auth.login audit). The
+// JWT signature is still verified every request (CPU, not DB) and the SSO domain
+// check still runs every request — only the DB resolution is cached.
+//
+// The cache key folds in sub + sid + org + role, so a Clerk Dashboard role
+// change (different org_role claim) produces a different key and re-runs the
+// miss path immediately; even without that, the 60s TTL bounds staleness exactly
+// like access-scope. A different org/user/token can never collide because all of
+// those identity components are part of the key. We hash so raw token claims
+// never sit in a Map key.
+const AUTH_CACHE_TTL_MS = 60_000;
+// Drop the whole cache past this size instead of LRU bookkeeping — same rationale
+// as access-scope.ts: a rare full rebuild is cheaper than per-entry eviction.
+const MAX_AUTH_CACHE_ENTRIES = 50_000;
+
+const authCache = new Map<string, { auth: AuthContext; expiresAt: number }>();
+
+interface VerifiedClaims {
+  clerkOrgId: string;
+  clerkUserId: string;
+  sessionId: string | undefined;
+  orgRole: string | undefined;
+  email: string;
+  firstName: string;
+  lastName: string;
+}
+
+/**
+ * Stable cache key for a verified session. Folds every identity component that
+ * could change the resolved AuthContext (user, session, org, role) so distinct
+ * principals never collide and a role change re-keys instead of serving stale.
+ */
+function authCacheKey(claims: VerifiedClaims): string {
+  return createHash('sha256')
+    .update(
+      [
+        claims.clerkUserId,
+        claims.sessionId ?? '',
+        claims.clerkOrgId,
+        claims.orgRole ?? '',
+      ].join('|'),
+    )
+    .digest('hex');
+}
+
+/** Test-only seam: clears the verified-session cache between cases. */
+export function __clearAuthCacheForTests(): void {
+  authCache.clear();
+}
+
 const STUB_ROLE_OVERRIDES: Record<
   string,
   { systemRole: string; legacyRole: string; email: string; name: string; clerkUser: string }
@@ -220,6 +280,171 @@ async function resolveStubAuth(req: FastifyRequest): Promise<AuthContext> {
 
 // mapClerkRole and ensureAdminRoleGrant extracted to ./auth-helpers.ts (BS-R1)
 
+/**
+ * Slow path: resolve verified Clerk claims to an AuthContext via the database.
+ * Runs ONLY on a cache miss (at most once per token identity per TTL window).
+ *
+ * Every security check that must bind a real tenant row lives here: org-not-
+ * registered 404, unknown-role rejection, cross-org clerkUser/email rejection,
+ * plus the JIT user.upsert, role-sync, admin-grant and auth.login audit. These
+ * intentionally do NOT run on a cache hit — repeating the user.upsert and
+ * auth.login write on every request is exactly what melted the primary.
+ */
+async function resolveClerkAuthFromDb(
+  req: FastifyRequest,
+  claims: VerifiedClaims,
+): Promise<AuthContext> {
+  const { clerkOrgId, clerkUserId, email } = claims;
+
+  const org = await prisma.org.findUnique({
+    where: { clerkOrg: clerkOrgId },
+  });
+  if (!org) {
+    throw req.server.httpErrors.notFound('Organization not registered');
+  }
+
+  // JIT provisioning: auto-create the user on first sign-in and sync the
+  // Clerk org role on every login so Dashboard changes are immediate.
+  let clerkRole: string;
+  try {
+    clerkRole = mapClerkRole(claims.orgRole);
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message.startsWith('UNRECOGNIZED_CLERK_ROLE:')) {
+      const roleName = err.message.split(':')[1];
+      req.log.warn({ role: roleName }, 'Unknown Clerk role mapping encountered');
+      await writeAuthAudit(req, {
+        action: 'auth.login_failed',
+        orgId: org.id,
+        actorUserId: null,
+        diff: { reason: 'unknown_clerk_role', attemptedRole: roleName ?? null },
+      });
+      throw req.server.httpErrors.forbidden(`Unrecognized organization role: ${roleName}`);
+    }
+    throw err;
+  }
+  const name = `${claims.firstName} ${claims.lastName}`.trim() || null;
+
+  const existingUser = await prisma.user.findUnique({
+    where: { clerkUser: clerkUserId },
+    select: { id: true, orgId: true, role: true },
+  });
+  if (existingUser && existingUser.orgId !== org.id) {
+    req.log.warn(
+      { clerkOrgId, clerkUserId, existingOrgId: existingUser.orgId, tokenOrgId: org.id },
+      'clerk user attempted cross-organization auth before org-scoped identity migration',
+    );
+    await writeAuthAudit(req, {
+      action: 'auth.login_failed',
+      orgId: org.id,
+      actorUserId: existingUser.id,
+      targetType: 'user',
+      targetId: existingUser.id,
+      diff: {
+        reason: 'cross_org_attempt',
+        attemptedOrgId: org.id,
+        existingOrgId: existingUser.orgId,
+      },
+    });
+    throw req.server.httpErrors.forbidden('User is already registered in another organization');
+  }
+
+  if (email) {
+    const existingEmail = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, orgId: true },
+    });
+    if (existingEmail && existingEmail.orgId !== org.id) {
+      req.log.warn(
+        { clerkOrgId, clerkUserId, existingOrgId: existingEmail.orgId, tokenOrgId: org.id },
+        'email attempted cross-organization auth before org-scoped identity migration',
+      );
+      await writeAuthAudit(req, {
+        action: 'auth.login_failed',
+        orgId: org.id,
+        actorUserId: null,
+        targetType: 'email',
+        targetId: email,
+        diff: {
+          reason: 'cross_org_email',
+          attemptedOrgId: org.id,
+          existingOrgId: existingEmail.orgId,
+        },
+      });
+      throw req.server.httpErrors.forbidden(
+        'Email is already registered in another organization',
+      );
+    }
+  }
+
+  const user = await prisma.user.upsert({
+    where: { clerkUser: clerkUserId },
+    create: {
+      orgId: org.id,
+      clerkUser: clerkUserId,
+      email: email || `${clerkUserId}@placeholder.com`,
+      name,
+      role: clerkRole,
+    },
+    update: { name, role: clerkRole },
+  });
+
+  // Detect a role change against the previous-known value so we can emit
+  // auth.role_change separately from auth.login. The new user case
+  // (`existingUser === null`) is not a role *change* — that's covered by
+  // the first auth.login entry below.
+  const roleChanged = existingUser !== null && existingUser.role !== clerkRole;
+  if (roleChanged) {
+    await writeAuthAudit(req, {
+      action: 'auth.role_change',
+      orgId: org.id,
+      actorUserId: user.id,
+      targetType: 'user',
+      targetId: user.id,
+      diff: {
+        source: 'clerk_jit',
+        previousRole: existingUser?.role ?? null,
+        newRole: clerkRole,
+      },
+    });
+  }
+
+  // Ensure Clerk org-admins have an explicit `Admin` UserRole grant. The
+  // rbac plugin no longer falls back to the legacy `req.auth.role === 'admin'`
+  // claim, so without this row a freshly-provisioned admin would be 403'd on
+  // every permission gate. We only touch the row when the user is currently
+  // an admin — non-admins keep whatever assignments the operator made via the
+  // /api/roles endpoints.
+  if (clerkRole === 'admin') {
+    await ensureAdminRoleGrant(user.id, org.id, req);
+  }
+
+  // Successful sign-in. Fire-and-forget so the audit write can't slow the
+  // critical path or fail the request. The diff intentionally omits PII
+  // beyond email (which is already in the user row) — token claims and
+  // session ids stay out of the table. Only written on the miss path, so at
+  // most once per token identity per TTL window — not once per request.
+  await writeAuthAudit(req, {
+    action: 'auth.login',
+    orgId: org.id,
+    actorUserId: user.id,
+    targetType: 'user',
+    targetId: user.id,
+    diff: {
+      clerkUserId,
+      role: clerkRole,
+      newUser: existingUser === null,
+    },
+  });
+
+  return {
+    orgId: org.id,
+    userId: user.id,
+    scopes: ['read', 'write'],
+    role: user.role,
+    email: email || undefined,
+  };
+}
+
 async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
   const secretKey = process.env.CLERK_SECRET_KEY;
   if (!secretKey) {
@@ -238,19 +463,29 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
   }
   const authorizedParties = publicBaseUrl ? [publicBaseUrl] : [];
 
+  let claims: VerifiedClaims;
   try {
+    // Always verify the JWT signature (CPU, not DB) — we never trust raw token
+    // bytes, including as a cache key. The DB-side resolution is what we cache.
     const payload = await verifyToken(token, {
       secretKey,
       authorizedParties,
     });
 
     const clerkOrgId = payload.org_id as string | undefined;
-    const clerkUserId = payload.sub as string;
-    const email = (payload.email as string | undefined) ?? '';
-
     if (!clerkOrgId) {
       throw req.server.httpErrors.forbidden('No organization context in token');
     }
+
+    claims = {
+      clerkOrgId,
+      clerkUserId: payload.sub as string,
+      sessionId: payload.sid as string | undefined,
+      orgRole: payload.org_role as string | undefined,
+      email: (payload.email as string | undefined) ?? '',
+      firstName: (payload.first_name as string | undefined) ?? '',
+      lastName: (payload.last_name as string | undefined) ?? '',
+    };
 
     // SSO domain restriction: if SSO_ALLOWED_EMAIL_DOMAINS is set, reject
     // sign-ins from unlisted domains. This enforces corporate Microsoft Entra
@@ -259,10 +494,12 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
     // orgId yet at this point in the flow (Clerk org claim hasn't been
     // matched to a tenant row). The Pino warn line is the durable record,
     // but it must not include the full email or tenant allowlist.
+    // Runs on EVERY request (CPU-only, depends on the token's email) — it must
+    // never be skipped by the cache, so it sits before the cache lookup.
     const allowedDomains = parseAllowedSsoDomains(process.env.SSO_ALLOWED_EMAIL_DOMAINS);
     if (allowedDomains.length > 0) {
       const { userDomain, allowedDomainCount } = ssoDomainRejectionLogFields(
-        email,
+        claims.email,
         allowedDomains,
       );
       if (!userDomain || !allowedDomains.includes(userDomain)) {
@@ -270,167 +507,31 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
         throw req.server.httpErrors.forbidden(SSO_DOMAIN_REJECTED_MESSAGE);
       }
     }
-
-    const org = await prisma.org.findUnique({
-      where: { clerkOrg: clerkOrgId },
-    });
-    if (!org) {
-      throw req.server.httpErrors.notFound('Organization not registered');
-    }
-
-    // JIT provisioning: auto-create the user on first sign-in and sync the
-    // Clerk org role on every login so Dashboard changes are immediate.
-    let clerkRole: string;
-    try {
-      clerkRole = mapClerkRole(payload.org_role as string | undefined);
-    } catch (err: unknown) {
-      if (err instanceof Error && err.message.startsWith('UNRECOGNIZED_CLERK_ROLE:')) {
-        const roleName = err.message.split(':')[1];
-        req.log.warn({ role: roleName }, 'Unknown Clerk role mapping encountered');
-        await writeAuthAudit(req, {
-          action: 'auth.login_failed',
-          orgId: org.id,
-          actorUserId: null,
-          diff: { reason: 'unknown_clerk_role', attemptedRole: roleName ?? null },
-        });
-        throw req.server.httpErrors.forbidden(`Unrecognized organization role: ${roleName}`);
-      }
-      throw err;
-    }
-    const firstName = (payload.first_name as string | undefined) ?? '';
-    const lastName = (payload.last_name as string | undefined) ?? '';
-    const name = `${firstName} ${lastName}`.trim() || null;
-
-    const existingUser = await prisma.user.findUnique({
-      where: { clerkUser: clerkUserId },
-      select: { id: true, orgId: true, role: true },
-    });
-    if (existingUser && existingUser.orgId !== org.id) {
-      req.log.warn(
-        { clerkOrgId, clerkUserId, existingOrgId: existingUser.orgId, tokenOrgId: org.id },
-        'clerk user attempted cross-organization auth before org-scoped identity migration',
-      );
-      await writeAuthAudit(req, {
-        action: 'auth.login_failed',
-        orgId: org.id,
-        actorUserId: existingUser.id,
-        targetType: 'user',
-        targetId: existingUser.id,
-        diff: {
-          reason: 'cross_org_attempt',
-          attemptedOrgId: org.id,
-          existingOrgId: existingUser.orgId,
-        },
-      });
-      throw req.server.httpErrors.forbidden('User is already registered in another organization');
-    }
-
-    if (email) {
-      const existingEmail = await prisma.user.findUnique({
-        where: { email },
-        select: { id: true, orgId: true },
-      });
-      if (existingEmail && existingEmail.orgId !== org.id) {
-        req.log.warn(
-          { clerkOrgId, clerkUserId, existingOrgId: existingEmail.orgId, tokenOrgId: org.id },
-          'email attempted cross-organization auth before org-scoped identity migration',
-        );
-        await writeAuthAudit(req, {
-          action: 'auth.login_failed',
-          orgId: org.id,
-          actorUserId: null,
-          targetType: 'email',
-          targetId: email,
-          diff: {
-            reason: 'cross_org_email',
-            attemptedOrgId: org.id,
-            existingOrgId: existingEmail.orgId,
-          },
-        });
-        throw req.server.httpErrors.forbidden(
-          'Email is already registered in another organization',
-        );
-      }
-    }
-
-    const user = await prisma.user.upsert({
-      where: { clerkUser: clerkUserId },
-      create: {
-        orgId: org.id,
-        clerkUser: clerkUserId,
-        email: email || `${clerkUserId}@placeholder.com`,
-        name,
-        role: clerkRole,
-      },
-      update: { name, role: clerkRole },
-    });
-
-    // Detect a role change against the previous-known value so we can emit
-    // auth.role_change separately from auth.login. The new user case
-    // (`existingUser === null`) is not a role *change* — that's covered by
-    // the first auth.login entry below.
-    const roleChanged = existingUser !== null && existingUser.role !== clerkRole;
-    if (roleChanged) {
-      await writeAuthAudit(req, {
-        action: 'auth.role_change',
-        orgId: org.id,
-        actorUserId: user.id,
-        targetType: 'user',
-        targetId: user.id,
-        diff: {
-          source: 'clerk_jit',
-          previousRole: existingUser?.role ?? null,
-          newRole: clerkRole,
-        },
-      });
-    }
-
-    // Ensure Clerk org-admins have an explicit `Admin` UserRole grant. The
-    // rbac plugin no longer falls back to the legacy `req.auth.role === 'admin'`
-    // claim, so without this row a freshly-provisioned admin would be 403'd on
-    // every permission gate. We only touch the row when the user is currently
-    // an admin — non-admins keep whatever assignments the operator made via the
-    // /api/roles endpoints.
-    if (clerkRole === 'admin') {
-      await ensureAdminRoleGrant(user.id, org.id, req);
-    }
-
-    // Successful sign-in. Fire-and-forget so the audit write can't slow the
-    // critical path or fail the request. The diff intentionally omits PII
-    // beyond email (which is already in the user row) — token claims and
-    // session ids stay out of the table.
-    await writeAuthAudit(req, {
-      action: 'auth.login',
-      orgId: org.id,
-      actorUserId: user.id,
-      targetType: 'user',
-      targetId: user.id,
-      diff: {
-        clerkUserId,
-        role: clerkRole,
-        newUser: existingUser === null,
-      },
-    });
-
-    return {
-      orgId: org.id,
-      userId: user.id,
-      scopes: ['read', 'write'],
-      role: user.role,
-      email: email || undefined,
-    };
   } catch (err) {
     if (isHttpStatusError(err)) {
       throw err;
     }
     // Note: token-signature failures (no `org_id`, expired, wrong issuer)
     // cannot be safely audit-logged because we have no validated orgId to
-    // attribute them to. They surface in Pino logs and Sentry. The auth
-    // events we DO log above all happen *after* signature verification
-    // succeeded but before/while a session was being established.
+    // attribute them to. They surface in Pino logs and Sentry.
     req.log.warn({ err }, 'clerk verification failed');
     throw req.server.httpErrors.unauthorized('Invalid or expired token');
   }
+
+  // Cache lookup keyed on the VERIFIED identity. A hit skips every DB read/write
+  // below (org/user lookups, user.upsert, role-sync, auth.login audit). The key
+  // folds org + role so a role change re-keys; the TTL bounds staleness to 60s.
+  const cacheKey = authCacheKey(claims);
+  const hit = authCache.get(cacheKey);
+  if (hit && hit.expiresAt > Date.now()) {
+    return hit.auth;
+  }
+
+  const auth = await resolveClerkAuthFromDb(req, claims);
+
+  if (authCache.size >= MAX_AUTH_CACHE_ENTRIES) authCache.clear();
+  authCache.set(cacheKey, { auth, expiresAt: Date.now() + AUTH_CACHE_TTL_MS });
+  return auth;
 }
 
 async function verifyApiKey(req: FastifyRequest): Promise<AuthContext | null> {

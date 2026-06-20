@@ -39,7 +39,9 @@ function RoutingRuleDialogForm({
   onClose: () => void;
 }) {
   const { t } = useTranslation('crm');
-  const users = useUsers();
+  // User/round-robin pickers: no server-side user search exists, so request the
+  // route maximum (200) instead of the default 100 to avoid dropping members.
+  const users = useUsers({ limit: 200 });
   const territories = useTerritories();
   const [name, setName] = useState(rule?.name ?? '');
   const [priority, setPriority] = useState(rule?.priority ?? 0);

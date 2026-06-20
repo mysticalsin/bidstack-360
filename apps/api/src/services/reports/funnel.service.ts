@@ -1,5 +1,5 @@
-import { prisma } from '@bidstack/db';
-import { daysBetween, quarterStart } from '@bidstack/shared';
+import { Prisma, prisma } from '@bidstack/db';
+import { quarterStart } from '@bidstack/shared';
 
 export interface PipelineKpis {
   byStage: Array<{ stage: string; count: number; valueSum: number }>;
@@ -25,32 +25,30 @@ export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
 
   const open = byStage.filter((s) => s.stage !== 'closed_won' && s.stage !== 'closed_lost');
 
-  const opens = await prisma.opportunity.findMany({
-    where: { orgId, deletedAt: null, stage: { notIn: ['closed_won', 'closed_lost'] } },
-    select: { valueMicros: true, probability: true },
-    take: 1000,
-  });
-  const weighted = opens.reduce(
-    (acc, o) => acc + (Number(o.valueMicros) / 1_000_000) * (o.probability / 100),
-    0,
-  );
-
   const closedThisQuarter = await prisma.opportunity.count({
     where: { orgId, deletedAt: null, stage: 'closed_won', updatedAt: { gte: quarterStart() } },
   });
 
-  const allOpen = await prisma.opportunity.findMany({
-    where: { orgId, deletedAt: null, stage: { notIn: ['closed_won', 'closed_lost'] } },
-    select: { createdAt: true },
-    take: 1000,
-  });
-  const avgDaysOpen =
-    allOpen.length > 0
-      ? Math.round(
-          allOpen.reduce((sum, o) => sum + daysBetween(new Date(), o.createdAt), 0) /
-            allOpen.length,
-        )
-      : 0;
+  // Weighted pipeline + avg-open-age over the FULL open set, not a take:1000
+  // sample. WHY raw SQL: weighted = SUM(value/1e6 * prob/100) is a row-wise
+  // product reduced to a scalar, and avg-open-age floors fractional days PER ROW
+  // (matching the prior daysBetween → Math.floor) before averaging — neither is
+  // expressible via prisma.aggregate. floor(epoch/86400) mirrors Math.floor on
+  // (now - created_at) in whole days.
+  const [agg] = await prisma.$queryRaw<
+    Array<{ weighted: number | null; avgDaysOpen: number | null; openCount: number }>
+  >(Prisma.sql`
+    SELECT
+      SUM((o.value_micros::float8 / 1000000.0) * (o.probability::float8 / 100.0)) AS "weighted",
+      AVG(floor(EXTRACT(EPOCH FROM (now() - o.created_at)) / 86400.0)) AS "avgDaysOpen",
+      COUNT(*)::int AS "openCount"
+    FROM opportunities o
+    WHERE o.org_id = ${orgId}::uuid
+      AND o.deleted_at IS NULL
+      AND o.stage NOT IN ('closed_won', 'closed_lost')
+  `);
+  const weighted = agg?.weighted ?? 0;
+  const avgDaysOpen = agg && agg.openCount > 0 ? Math.round(agg.avgDaysOpen ?? 0) : 0;
 
   return {
     byStage,

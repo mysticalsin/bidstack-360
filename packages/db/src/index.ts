@@ -16,6 +16,18 @@ import { makeSoftDeleteMiddleware } from './middleware/soft-delete.js';
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 function buildPrismaClient(): PrismaClient {
+  // Connection-pool sizing is NOT configured here on purpose. Prisma's canonical
+  // knob is the connection string itself (`?connection_limit=N&pool_timeout=S`),
+  // so the pool is owned by per-service env (DATABASE_URL) + the infra pooler,
+  // not hardcoded in shared code. This matters at 100k scale: Prisma's DEFAULT
+  // pool is num_cpus*2+1 PER PROCESS, so without an explicit connection_limit,
+  // N api replicas + the worker silently multiply and blow past Postgres
+  // max_connections. The worker is the busiest client (~150 in-flight jobs vs a
+  // default ~17 connections → P2024 pool-timeout errors), so its connection_limit
+  // must match its job concurrency. Front Postgres with PgBouncer (transaction
+  // mode) and set per-service connection_limit such that
+  //   sum(replicas * connection_limit) + worker < Postgres max_connections.
+  // See DEPLOY.production.md §"Connection pool sizing" and .env.example.
   const client = new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
   });
