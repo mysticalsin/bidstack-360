@@ -3135,3 +3135,9 @@ integration_configs_org_type_name_key`, but the live local DB does not have
 - **Root cause:** `.gitignore` excluded future agent worktrees, but existing tracked gitlink entries remained in the index and the source evidence gate did not check clean tracked local-artifact paths.
 - **Prevention rule:** Release source evidence must inspect the Git index for tracked local coordination artifacts, not only dirty status output. `.claude/worktrees/*` must remain local-only and never be tracked in release source.
 - **Files affected:** `.claude/worktrees/agent-a10be174ac9f8abbc`, `.claude/worktrees/agent-af86570a156df70f1`, `scripts/write-source-control-evidence.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.
+
+### 2026-06-20 BUG: soft-delete update-scoping broke GDPR re-erasure (idempotency + PII-on-tombstone)
+- **What went wrong:** The soft-delete middleware update/updateMany scoping (commit eb67c010) injected `deletedAt: null` into every update where-clause. GDPR erasure (Art.17) updates a subject by id; on an already soft-deleted contact/lead the scoped update matched 0 rows → P2025 → 404, breaking idempotent re-erasure and leaving PII on tombstoned rows. Caught by the multi-agent QA swarm.
+- **Root cause:** Added a global update-scoping guard without enumerating privileged admin ops that MUST mutate soft-deleted rows. The prior review flagged "restore" as the risk class; erasure is the same class and was missed.
+- **Prevention rule:** When adding a global Prisma $use guard that excludes soft-deleted rows from mutation, list every privileged op that legitimately mutates tombstoned rows (GDPR erasure, restore, admin merge) and route each through the documented bypass (`where.deletedAt` present = match-all) or $executeRaw, with a regression test per op.
+- **Files affected:** packages/db/src/middleware/soft-delete.ts, apps/api/src/routes/erasure.ts

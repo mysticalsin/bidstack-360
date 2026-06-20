@@ -16,6 +16,18 @@ export type CallProvider = 'ZOOM' | 'TEAMS' | 'GOOGLE_MEET' | 'TWILIO_VOICE';
 export type CallEntityType = 'DEAL' | 'CONTACT' | 'OPPORTUNITY' | 'LEAD';
 export type CallStatus = 'SCHEDULED' | 'LIVE' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 
+export interface CallActionItem {
+  owner?: string | null;
+  description: string;
+  dueDate?: string | null;
+}
+
+/** Display text for an action item, tolerating legacy string rows. */
+export function callActionItemText(item: CallActionItem | string): string {
+  if (typeof item === 'string') return item;
+  return item?.description ?? '';
+}
+
 export interface CallSession {
   id: string;
   orgId: string;
@@ -33,7 +45,9 @@ export interface CallSession {
   /** '[available]' in list view; null if no recording */
   recordingUrl: string | null;
   summary: string | null;
-  actionItems: string[] | null;
+  // The analysis worker stores structured items ({owner, description, dueDate}).
+  // Union with string for legacy rows / model variance so render never crashes.
+  actionItems: Array<CallActionItem | string> | null;
   sentimentScore: number | null;
   talkRatio: Record<string, number> | null;
   status: CallStatus;

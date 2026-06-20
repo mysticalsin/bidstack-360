@@ -108,7 +108,10 @@ async function eraseContact(
   // another statement).
   const relatedScrubbed = await prisma.$transaction(async (tx) => {
     await tx.contact.update({
-      where: { id: contact.id },
+      // deletedAt:{not:undefined} = match-all bypass so the soft-delete $use
+      // middleware does NOT scope this to live rows — GDPR erasure must scrub PII
+      // from an already soft-deleted subject too, and must stay idempotent.
+      where: { id: contact.id, deletedAt: { not: undefined } },
       data: {
         name: TOMBSTONE.name,
         // Citext column: keep a deterministic, non-routable, unique-per-subject
@@ -191,7 +194,9 @@ async function eraseLead(
   const now = new Date();
   await prisma.$transaction([
     prisma.lead.update({
-      where: { id: lead.id },
+      // Match-all bypass (see eraseContact): scrub PII even on a soft-deleted
+      // lead and keep re-erasure idempotent under the soft-delete middleware.
+      where: { id: lead.id, deletedAt: { not: undefined } },
       data: {
         firstName: TOMBSTONE.name,
         // lastName is NOT NULL — use an empty string as its tombstone.
