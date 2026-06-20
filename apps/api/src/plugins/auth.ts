@@ -40,6 +40,13 @@ export interface AuthContext {
 
 const STUB_CLERK_ORG = 'org_seed_mantu';
 const STUB_ROLE_HEADER = 'x-bidstack-e2e-role';
+// Test-only seam: lets an integration test point a stub session at a throwaway
+// org (clerkOrg value) instead of the shared seed org, so suites can isolate on
+// per-file orgs. Same safety envelope as the role header: loopback-only (enforced
+// in resolveStubAuth) AND gated behind BIDSTACK_ALLOW_STUB_ORG_HEADER. Never
+// reachable in prod (stub auth itself only runs when CLERK_SECRET_KEY is absent
+// and NODE_ENV is development/test).
+const STUB_ORG_HEADER = 'x-bidstack-e2e-org';
 export const SSO_DOMAIN_REJECTED_MESSAGE =
   'Sign-in domain is not permitted for this organization.';
 
@@ -159,6 +166,18 @@ function readStubRoleOverride(req: FastifyRequest): (typeof STUB_ROLE_OVERRIDES)
   return override;
 }
 
+function readStubOrgOverride(req: FastifyRequest): string | null {
+  const raw = req.headers[STUB_ORG_HEADER];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (!value) return null;
+  if (process.env.BIDSTACK_ALLOW_STUB_ORG_HEADER !== 'true') {
+    throw req.server.httpErrors.forbidden('Stub org override header is disabled');
+  }
+  const normalized = value.trim();
+  if (!normalized) return null;
+  return normalized;
+}
+
 export function parseAllowedSsoDomains(raw: string | undefined): string[] {
   return (raw ?? '')
     .split(',')
@@ -251,10 +270,17 @@ async function resolveStubAuth(req: FastifyRequest): Promise<AuthContext> {
     );
   }
 
-  const org = await prisma.org.findUnique({ where: { clerkOrg: STUB_CLERK_ORG } });
+  // Precedence: per-request header (cross-tenant cases) > per-file env default
+  // (BIDSTACK_STUB_ORG_CLERK, set by an isolated suite in beforeAll) > seed org.
+  // All three only reachable in stub mode, which is dev/test + loopback only.
+  const clerkOrg =
+    readStubOrgOverride(req) ?? process.env.BIDSTACK_STUB_ORG_CLERK ?? STUB_CLERK_ORG;
+  const org = await prisma.org.findUnique({ where: { clerkOrg } });
   if (!org) {
     throw req.server.httpErrors.serviceUnavailable(
-      'Stub auth: seed org missing — run `pnpm db:seed`',
+      clerkOrg === STUB_CLERK_ORG
+        ? 'Stub auth: seed org missing — run `pnpm db:seed`'
+        : `Stub auth: override org ${clerkOrg} not found`,
     );
   }
   const roleOverride = readStubRoleOverride(req);
