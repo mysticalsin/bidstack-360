@@ -26,7 +26,17 @@ interface Props {
 type IntelTabKey = 'solutions' | 'products' | 'extractions';
 
 export function AccountIntelPanel({ accountId }: Props) {
-  const intel = useAccountIntel(accountId);
+  // Live status: poll only while a document extraction is still pending/running,
+  // so an auto-extracted upload progresses to "done" without a manual refresh
+  // (and we stop polling the moment nothing is in flight).
+  const intel = useAccountIntel(accountId, {
+    refetchInterval: (query) => {
+      const pending = (query.state.data?.extractions ?? []).some(
+        (e) => e.status === 'pending' || e.status === 'running',
+      );
+      return pending ? 4000 : false;
+    },
+  });
   const files = useFiles(accountId);
   const extract = useExtractDocument(accountId);
   const deleteSolution = useDeleteSolution(accountId);

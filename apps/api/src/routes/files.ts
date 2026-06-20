@@ -31,6 +31,22 @@ import {
 import { getStorage, keyBelongsToOrg } from '../storage/index.js';
 import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 import { canReadAccount } from '../lib/account-access.js';
+import { enqueueDocumentExtract } from '../queues/document-extract.js';
+
+// Document types the intelligence worker can read text from today (PDF, Word,
+// plain text / markdown). Spreadsheets (rate cards) and images need dedicated
+// parsers — a later phase — so they are not auto-extracted yet.
+const INTEL_EXTRACTABLE_TYPES = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain',
+  'text/markdown',
+]);
+
+function isExtractableForIntel(contentType: string): boolean {
+  return INTEL_EXTRACTABLE_TYPES.has(contentType);
+}
 
 // accountId is a free-text string (not a UUID FK) — different cases of the
 // same brand should resolve to one account. Lowercase + trim at every write
@@ -265,6 +281,43 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
           },
         }),
       ]);
+
+      // Auto-extract: an account-scoped document becomes intelligence the moment
+      // it lands, so the user never has to hunt for a separate "Extract" action
+      // (the old hidden two-step that made uploads feel like nothing happened).
+      // Best-effort + fail-open — a queue/Redis hiccup must never fail the upload.
+      // Skipped under NODE_ENV=test so the integration suite keeps asserting
+      // explicit extraction control; dev/prod opt in by default.
+      if (
+        accountId &&
+        process.env.NODE_ENV !== 'test' &&
+        isExtractableForIntel(req.body.contentType)
+      ) {
+        try {
+          const extraction = await prisma.documentExtraction.create({
+            data: {
+              orgId: req.auth.orgId,
+              documentId: fileId,
+              accountId,
+              companyId: req.body.companyId ?? null,
+              status: 'pending',
+              extractedData: {},
+            },
+          });
+          await enqueueDocumentExtract({
+            orgId: req.auth.orgId,
+            accountId,
+            documentId: fileId,
+            extractionId: extraction.id,
+            storageKey: req.body.storageKey,
+            contentType: req.body.contentType,
+            name: req.body.name,
+          });
+        } catch (err) {
+          req.log.warn({ err, fileId }, 'auto-extract enqueue failed (upload still succeeded)');
+        }
+      }
+
       return reply.code(201).send({
         ...serialize(created),
         verifiedBytes: metadata.bytes,

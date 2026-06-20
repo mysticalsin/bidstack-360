@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
 
@@ -10,7 +10,9 @@ import type {
 
 export function useAccountIntel(
   accountId: string | undefined,
-  opts?: { refetchInterval?: number | false },
+  // Accept React Query's native refetchInterval (number | false | fn(query)) so a
+  // caller can poll only while an extraction is in flight — see AccountIntelPanel.
+  opts?: { refetchInterval?: UseQueryOptions<AccountIntelSnapshot>['refetchInterval'] },
 ) {
   return useQuery({
     enabled: !!accountId,
