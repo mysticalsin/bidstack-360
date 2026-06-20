@@ -125,6 +125,8 @@ import { migrationRoutes } from './routes/migrations.js';
 import { hubspotMigrationRoutes } from './routes/migrations-hubspot.routes.js';
 // Public demo door (only self-registers when DEMO_MODE is armed)
 import { demoRoutes } from './routes/demo.js';
+// GDPR Art. 20 — tenant data-portability export
+import { tenantExportRoutes } from './routes/tenant-export.js';
 
 export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(opportunityRoutes, { prefix: '/api/v1' });
@@ -279,6 +281,9 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(migrationRoutes, { prefix: '/api/v1' });
   // Data migration: HubSpot OAuth + import
   await server.register(hubspotMigrationRoutes, { prefix: '/api/v1' });
+
+  // GDPR Art. 20 — tenant data-portability export (admin-gated, org-scoped)
+  await server.register(tenantExportRoutes, { prefix: '/api/v1' });
 
   // Public demo door — POST /api/v1/demo/session + GET /api/v1/demo/status.
   // Self-gates on DEMO_MODE; registering it unconditionally is safe.

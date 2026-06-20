@@ -45,3 +45,4 @@ export * from './notification.js';
 export * from './rbac.js';
 export * from './contract-agreement.js';
 export * from './win-loss.js';
+export * from './tenant-export.js';

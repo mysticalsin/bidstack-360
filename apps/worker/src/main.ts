@@ -43,6 +43,8 @@ import { startCrewRun, startCrewRunReaper } from './queues/crew-run.js';
 import { startSignatureWorkers } from './queues/signatures.js';
 import { startMigrationWorker } from './queues/migration.js';
 import { startSentrySmokeWorker } from './queues/sentry-smoke.js';
+// GDPR Art. 20 — tenant data-portability export
+import { startTenantExport } from './queues/tenant-export.js';
 import { attachSentryToWorker, initWorkerSentry } from './plugins/sentry.js';
 import { assertWorkerProductionEnv } from './lib/production-env.js';
 
@@ -124,6 +126,8 @@ await Promise.all([
   // Migration connector (CSV / Salesforce CSV / HubSpot) import consumer
   startMigrationWorker(connection, log, workers, queues),
   startSentrySmokeWorker(connection, log, workers, queues),
+  // GDPR Art. 20 — tenant data-portability export
+  startTenantExport(connection, log, workers, queues),
 ]);
 
 for (const worker of workers) {

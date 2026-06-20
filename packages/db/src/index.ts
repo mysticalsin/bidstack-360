@@ -101,6 +101,7 @@ export type {
   QueueHealth,
   ReleaseScore,
   Lead,
+  TenantExport,
 } from '../generated/client/index.js';
 
 // `Prisma` is exported as a value because we need its runtime classes

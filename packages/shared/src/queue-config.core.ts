@@ -158,3 +158,21 @@ export const CREW_RUN: QueueConfig = {
     removeOnFail: { age: 604_800, count: 5000 },
   },
 };
+
+/**
+ * Tenant export (GDPR Art. 20 data portability) — streams every org-scoped
+ * business/personal-data entity into a single gzipped NDJSON archive and
+ * uploads it to durable storage. Few attempts: the job is idempotent (it
+ * re-checks TenantExport.status before doing work), but a retry that re-runs a
+ * full-tenant scan is expensive, so we back off long and cap attempts low. Jobs
+ * are kept 7 days on success / 30 days on failure for compliance audit.
+ */
+export const TENANT_EXPORT: QueueConfig = {
+  name: 'tenant-export',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 30_000 },
+    removeOnComplete: { age: 86_400 * 7, count: 200 },
+    removeOnFail: { age: 86_400 * 30, count: 5000 },
+  },
+};
