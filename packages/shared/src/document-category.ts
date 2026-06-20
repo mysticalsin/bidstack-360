@@ -49,6 +49,22 @@ export function classifyDocument(name: string, _contentType?: string): DocumentC
   return 'other';
 }
 
+// Document MIME types the intelligence worker can read text from today (PDF,
+// Word, plain text / markdown). Spreadsheets (rate cards) and images need
+// dedicated parsers — a later phase — so they are not auto-extracted yet.
+// Shared so the API auto-extract gate and any client hint agree on one list.
+export const INTEL_EXTRACTABLE_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain',
+  'text/markdown',
+] as const;
+
+export function isExtractableForIntel(contentType: string): boolean {
+  return (INTEL_EXTRACTABLE_TYPES as readonly string[]).includes(contentType);
+}
+
 // Default English labels — UI should prefer i18n keys (documentCategory.<key>)
 // and fall back to these.
 export const DOCUMENT_CATEGORY_LABELS: Record<DocumentCategory, string> = {

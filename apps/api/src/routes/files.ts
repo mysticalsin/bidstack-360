@@ -26,27 +26,13 @@ import {
   FileListResponse,
   FileUploadUrlRequest,
   FileUploadUrlResponse,
+  isExtractableForIntel,
 } from '@bidstack/shared';
 
 import { getStorage, keyBelongsToOrg } from '../storage/index.js';
 import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 import { canReadAccount } from '../lib/account-access.js';
 import { enqueueDocumentExtract } from '../queues/document-extract.js';
-
-// Document types the intelligence worker can read text from today (PDF, Word,
-// plain text / markdown). Spreadsheets (rate cards) and images need dedicated
-// parsers — a later phase — so they are not auto-extracted yet.
-const INTEL_EXTRACTABLE_TYPES = new Set([
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'text/plain',
-  'text/markdown',
-]);
-
-function isExtractableForIntel(contentType: string): boolean {
-  return INTEL_EXTRACTABLE_TYPES.has(contentType);
-}
 
 // accountId is a free-text string (not a UUID FK) — different cases of the
 // same brand should resolve to one account. Lowercase + trim at every write
@@ -304,7 +290,7 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
               extractedData: {},
             },
           });
-          await enqueueDocumentExtract({
+          const jobId = await enqueueDocumentExtract({
             orgId: req.auth.orgId,
             accountId,
             documentId: fileId,
@@ -313,6 +299,15 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
             contentType: req.body.contentType,
             name: req.body.name,
           });
+          if (!jobId) {
+            // Queue disabled or Redis down — no worker will ever pick this up.
+            // Mark it errored (not stuck 'pending' forever) so the UI shows a
+            // retryable state; the user can re-run from the Extractions tab.
+            await prisma.documentExtraction.updateMany({
+              where: { id: extraction.id, orgId: req.auth.orgId, documentId: fileId },
+              data: { status: 'error', error: 'Extraction queue unavailable — retry' },
+            });
+          }
         } catch (err) {
           req.log.warn({ err, fileId }, 'auto-extract enqueue failed (upload still succeeded)');
         }

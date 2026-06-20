@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { classifyDocument } from './document-category.js';
+import { classifyDocument, isExtractableForIntel } from './document-category.js';
 
 describe('classifyDocument', () => {
   it('tags master service agreements as msa (before the generic proposal rule)', () => {
@@ -39,5 +39,23 @@ describe('classifyDocument', () => {
   it('falls back to other for unrelated files', () => {
     expect(classifyDocument('team-photo.png')).toBe('other');
     expect(classifyDocument('notes.txt')).toBe('other');
+  });
+});
+
+describe('isExtractableForIntel', () => {
+  it('accepts the text-extractable document types', () => {
+    expect(isExtractableForIntel('application/pdf')).toBe(true);
+    expect(
+      isExtractableForIntel(
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      ),
+    ).toBe(true);
+    expect(isExtractableForIntel('text/plain')).toBe(true);
+  });
+
+  it('rejects spreadsheets and images (no parser yet) so they are not auto-extracted', () => {
+    expect(isExtractableForIntel('application/vnd.ms-excel')).toBe(false);
+    expect(isExtractableForIntel('image/png')).toBe(false);
+    expect(isExtractableForIntel('application/json')).toBe(false);
   });
 });
