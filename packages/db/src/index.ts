@@ -10,6 +10,7 @@
 // Runbook: docs/security/pii-field-encryption.md
 
 import { PrismaClient } from '../generated/client/index.js';
+import { makeAuditImmutabilityMiddleware } from './middleware/audit-immutability.js';
 import { isPiiEncryptionEnabled, makePiiMiddleware } from './middleware/pii-encryption.js';
 import { makeSoftDeleteMiddleware } from './middleware/soft-delete.js';
 
@@ -47,6 +48,24 @@ function buildPrismaClient(): PrismaClient {
   // Soft delete middleware automatically filters out records where deletedAt is not null.
   // We apply this globally so developers don't have to constantly append `deletedAt: null`.
   client.$use(makeSoftDeleteMiddleware());
+
+  // Audit immutability: AuditLog is insert-only. Blocks update/delete/upsert via
+  // the Prisma client so audit history cannot be silently altered. The retention
+  // purge deletes expired rows through $executeRaw, which bypasses $use middleware
+  // and is therefore the single allowed delete path. See audit-immutability.ts.
+  //
+  // WHY the test-env skip: integration tests seed AuditLog fixtures and must purge
+  // them in teardown via the ordinary client. The guard's behaviour is proven by
+  // audit-immutability.test.ts (it calls the factory directly), and real
+  // tamper-resistance is enforced in prod/dev here AND, as the recommended
+  // backstop, by a DB-level trigger + REVOKE (see audit-immutability.ts). Leaving
+  // the app-layer guard unconditional in test would force every suite onto a raw
+  // SQL purge path for no added safety, so we skip registration only under Vitest.
+  const isTestRuntime =
+    process.env.VITEST === 'true' || process.env.NODE_ENV === 'test';
+  if (!isTestRuntime) {
+    client.$use(makeAuditImmutabilityMiddleware());
+  }
 
   return client;
 }

@@ -29,7 +29,7 @@ import { yjsCollabPlugin } from './plugins/yjs-collab.js';
 import { config } from './env.js';
 import { rbacPlugin } from './plugins/rbac.js';
 import { redis } from './redis.js';
-import { healthRoute } from './routes/health.js';
+import { healthRoute, httpRequestsTotal, httpRequestDuration } from './routes/health.js';
 import { registerRoutes } from './server.routes.js';
 
 const CONNECT_SRC = [
@@ -109,6 +109,22 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   server.setValidatorCompiler(validatorCompiler);
   server.setSerializerCompiler(serializerCompiler);
+
+  // Record Prometheus HTTP metrics on every completed response. Use the route
+  // TEMPLATE (req.routeOptions.url, e.g. /api/v1/accounts/:id) as the label —
+  // never the raw path — so path params like ids don't blow up label
+  // cardinality. Unmatched requests (404s with no route) fall back to 'unknown'.
+  // reply.elapsedTime is the wall-clock request duration in ms; convert to s.
+  server.addHook('onResponse', async (req, reply) => {
+    const route = req.routeOptions?.url ?? 'unknown';
+    const labels = {
+      method: req.method,
+      route,
+      status_code: String(reply.statusCode),
+    };
+    httpRequestsTotal.inc(labels);
+    httpRequestDuration.observe({ method: req.method, route }, reply.elapsedTime / 1000);
+  });
 
   server.addHook('onSend', async (_req, reply) => {
     reply.header('X-Request-Id', _req.id);

@@ -45,8 +45,16 @@ import { startMigrationWorker } from './queues/migration.js';
 import { startSentrySmokeWorker } from './queues/sentry-smoke.js';
 // GDPR Art. 20 — tenant data-portability export
 import { startTenantExport } from './queues/tenant-export.js';
+// EU AI Act Art. 50 / GDPR Art. 22 — AI audit log retention purge (daily)
+import { startAiAuditRetention } from './queues/ai-audit-retention.js';
 import { attachSentryToWorker, initWorkerSentry } from './plugins/sentry.js';
 import { assertWorkerProductionEnv } from './lib/production-env.js';
+import {
+  attachMetricsToWorker,
+  metricsAccessAllowed,
+  renderMetrics,
+  startQueueDepthCollector,
+} from './lib/metrics.js';
 
 const log = pino({
   level: process.env.LOG_LEVEL ?? 'info',
@@ -128,11 +136,17 @@ await Promise.all([
   startSentrySmokeWorker(connection, log, workers, queues),
   // GDPR Art. 20 — tenant data-portability export
   startTenantExport(connection, log, workers, queues),
+  // EU AI Act Art. 50 / GDPR Art. 22 — AI audit log retention purge (daily)
+  startAiAuditRetention(connection, log, workers, queues),
 ]);
 
 for (const worker of workers) {
   attachSentryToWorker(worker, worker.name, log);
+  attachMetricsToWorker(worker, worker.name);
 }
+
+// Periodic queue-depth gauges (waiting/active per queue) for backpressure alerts.
+const queueDepthCollector = startQueueDepthCollector(queues, log);
 
 log.info(
   'BidStack worker ready (dust-poll + webhook-processor + company-enrich-apollo + document-extract + calendar-sync + email-sync + sms + webhook-delivery + yjs-compact + cs + call-processing + predictive-retrain + rfp-orchestrator + rfp-requirement-extract + rfp-story-match + rfp-section-draft + rfp-compliance-fill + rfp-embed-reference + rfp-embed-requirement)',
@@ -140,7 +154,32 @@ log.info(
 
 const healthPort = Number(process.env.WORKER_HEALTH_PORT || 4002);
 
-const healthServer = http.createServer((_req, res) => {
+const healthServer = http.createServer((req, res) => {
+  // Prometheus scrape endpoint. Outside health auth, but production requires an
+  // explicit bearer token (mirrors the API's /metrics guard).
+  const pathname = (req.url ?? '/').split('?')[0];
+  if (pathname === '/metrics') {
+    void (async () => {
+      if (!metricsAccessAllowed(req.headers.authorization)) {
+        res.writeHead(process.env.METRICS_BEARER_TOKEN ? 401 : 404, {
+          'Content-Type': 'text/plain',
+        });
+        res.end('Not found');
+        return;
+      }
+      try {
+        const body = await renderMetrics();
+        res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' });
+        res.end(body);
+      } catch (err) {
+        log.error({ err }, 'failed to render metrics');
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('metrics error');
+      }
+    })();
+    return;
+  }
+
   // Probe BOTH dependencies: nearly every queue handler hits Postgres, so a
   // worker with a dead DB must not report healthy (it would keep receiving jobs
   // it can only fail).
@@ -201,6 +240,7 @@ const shutdown = async (signal: string) => {
     // Release the health port FIRST so a hot-reload's replacement can bind it
     // without a long EADDRINUSE retry window — BullMQ worker.close() below can
     // take seconds while it drains the active job.
+    queueDepthCollector.stop();
     healthServer.close();
     await Promise.all(workers.map((w) => w.close()));
     await Promise.all(queues.map((q) => q.close()));

@@ -176,3 +176,21 @@ export const TENANT_EXPORT: QueueConfig = {
     removeOnFail: { age: 86_400 * 30, count: 5000 },
   },
 };
+
+/**
+ * AI audit retention purge — deletes ai_invocations rows past the retention
+ * window (EU AI Act Art. 50 / GDPR Art. 22 audit log; default 90 days). Runs
+ * daily as a repeatable cron registered by the worker. Few attempts: the purge
+ * is idempotent (it only deletes rows older than a cutoff, which never grows),
+ * so a missed run is harmless — the next day's run covers it. Job records are
+ * kept 7d on success / 30d on failure for compliance audit.
+ */
+export const AI_AUDIT_RETENTION: QueueConfig = {
+  name: 'ai-audit-retention',
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'fixed', delay: 60_000 },
+    removeOnComplete: { age: 86_400 * 7, count: 30 },
+    removeOnFail: { age: 86_400 * 30, count: 100 },
+  },
+};

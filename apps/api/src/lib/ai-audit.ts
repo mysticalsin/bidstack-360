@@ -3,7 +3,8 @@
  *
  * WHY: EU AI Act Art. 50 requires transparency logging for AI-assisted decisions.
  * GDPR Art. 22 requires human oversight of automated decision-making.
- * 90-day retention enforced by scheduled cleanup job (rfp.audit-cleanup).
+ * Retention (default 90 days) enforced by the daily 'ai-audit-retention' worker
+ * (apps/worker/src/queues/ai-audit-retention.ts), window = AI_AUDIT_RETENTION_DAYS.
  *
  * Security: prompts are hashed (SHA-256), not stored in full.
  * Only first 200 chars of prompt/response snippets are kept, stripped of PII.

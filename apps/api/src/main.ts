@@ -10,19 +10,24 @@ dotenvFlow.config({ path: path.resolve(__dirname, '../../..'), silent: true });
 const { initSentry, shutdownSentry } = await import('./instrument.js');
 initSentry();
 
+// Start OpenTelemetry BEFORE importing @bidstack/db, ./server, ./redis — auto
+// instrumentation patches modules (http, pg/Prisma, ioredis) at sdk.start() and
+// only sees modules loaded AFTER it starts. Loading it last (as before) meant
+// every instrumentable module was already required and went untraced. No-op when
+// OTEL_EXPORTER_OTLP_ENDPOINT is unset (see otel.ts).
+const { initTelemetry, shutdownTelemetry } = await import('./otel.js');
+initTelemetry();
+
 const { prisma } = await import('@bidstack/db');
 const { buildServer } = await import('./server.js');
 const { getEnv } = await import('./env.js');
 const { redis } = await import('./redis.js');
-const { initTelemetry, shutdownTelemetry } = await import('./otel.js');
 
 // Fail fast on missing/invalid environment variables.
 const env = getEnv();
 
 const port = env.PORT_API;
 const host = env.HOST;
-
-initTelemetry();
 
 const server = await buildServer();
 
