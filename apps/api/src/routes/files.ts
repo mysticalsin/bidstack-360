@@ -298,6 +298,8 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
             storageKey: req.body.storageKey,
             contentType: req.body.contentType,
             name: req.body.name,
+            // Low priority: a bulk import must not starve user-initiated extracts.
+            priority: 10,
           });
           if (!jobId) {
             // Queue disabled or Redis down — no worker will ever pick this up.

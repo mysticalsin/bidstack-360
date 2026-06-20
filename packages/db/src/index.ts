@@ -50,9 +50,11 @@ function buildPrismaClient(): PrismaClient {
   client.$use(makeSoftDeleteMiddleware());
 
   // Audit immutability: AuditLog is insert-only. Blocks update/delete/upsert via
-  // the Prisma client so audit history cannot be silently altered. The retention
-  // purge deletes expired rows through $executeRaw, which bypasses $use middleware
-  // and is therefore the single allowed delete path. See audit-immutability.ts.
+  // the Prisma client so audit history cannot be silently altered. If/when an
+  // AuditLog retention purge is added it must go through $executeRaw, which
+  // bypasses $use middleware — the single allowed delete path. (NOTE: today only
+  // ai_invocations has a retention purge; AuditLog itself is not yet pruned —
+  // tracked as follow-up. See audit-immutability.ts.)
   //
   // WHY the test-env skip: integration tests seed AuditLog fixtures and must purge
   // them in teardown via the ordinary client. The guard's behaviour is proven by

@@ -408,13 +408,21 @@ export async function startDocumentExtract(
   workers: Worker[],
   _queues: Queue[],
 ): Promise<void> {
+  // Env-tunable so prod can scale extraction throughput without a code change
+  // (defaults preserve prior behaviour). NB: this is a global cap — true per-org
+  // fairness (a bulk import by one tenant must not starve others) needs a
+  // groupKey/per-org lane and is tracked as follow-up; auto-extract jobs are
+  // enqueued at lower priority (see api enqueueDocumentExtract) so user-initiated
+  // extracts still jump the queue.
+  const concurrency = Math.max(1, parseInt(process.env.DOCUMENT_EXTRACT_CONCURRENCY ?? '2', 10) || 2);
+  const limiterMax = Math.max(1, parseInt(process.env.DOCUMENT_EXTRACT_RATE_MAX ?? '10', 10) || 10);
   const queue = new BullWorker<JobData>(
     QUEUE_NAME,
     async (job) => processJob(job, log.child({ jobId: job.id })),
     {
       connection,
-      concurrency: 2,
-      limiter: { max: 10, duration: 60_000 },
+      concurrency,
+      limiter: { max: limiterMax, duration: 60_000 },
     },
   );
 
