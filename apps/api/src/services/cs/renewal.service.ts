@@ -43,25 +43,35 @@ export async function processRenewalOpportunities(
       if (daysOut > threshold) continue; // not yet within window
       if (daysOut < threshold - 5) continue; // already past by >5 days — next threshold
 
-      // Idempotency: check if we already created this trigger row.
-      const existing = await prisma.renewalOpportunity.findFirst({
-        where: {
-          subscriptionId: sub.id,
-          daysOutTrigger: threshold,
-          deletedAt: null,
-        },
-      });
-      if (existing) continue;
+      // Idempotency under concurrency: the find-then-create is a TOCTOU race
+      // (no unique on subscriptionId+daysOutTrigger), so two overlapping runs
+      // could both insert. Serialize per (subscription, threshold) with a pg
+      // advisory xact lock, then re-check inside the same tx before creating
+      // ($executeRaw per MISTAKES.md 2026-06-07 — the lock result is unused).
+      const didCreate = await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`renewal:${sub.id}:${threshold}`}))`;
+        const existing = await tx.renewalOpportunity.findFirst({
+          where: {
+            subscriptionId: sub.id,
+            daysOutTrigger: threshold,
+            deletedAt: null,
+          },
+          select: { id: true },
+        });
+        if (existing) return false;
 
-      await prisma.renewalOpportunity.create({
-        data: {
-          orgId,
-          subscriptionId: sub.id,
-          status: 'UPCOMING',
-          daysOutTrigger: threshold,
-          ownerId: sub.ownerId,
-        },
+        await tx.renewalOpportunity.create({
+          data: {
+            orgId,
+            subscriptionId: sub.id,
+            status: 'UPCOMING',
+            daysOutTrigger: threshold,
+            ownerId: sub.ownerId,
+          },
+        });
+        return true;
       });
+      if (!didCreate) continue;
       created++;
       log.info({ orgId, subscriptionId: sub.id, threshold }, 'cs: renewal opportunity created');
     }

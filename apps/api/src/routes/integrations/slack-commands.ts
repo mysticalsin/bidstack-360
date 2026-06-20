@@ -42,6 +42,31 @@ const slashCommandBody = z.object({
 const slackCommandsPlugin: FastifyPluginAsync = async (fastify) => {
   const app = fastify.withTypeProvider<ZodTypeProvider>();
 
+  // Slack sends slash commands as application/x-www-form-urlencoded. Slack's
+  // HMAC is computed over the EXACT raw request bytes, so re-serializing the
+  // parsed body (JSON.stringify) never byte-matches what Slack signed —
+  // verification was effectively broken. Capture the untouched raw body here
+  // and verify the HMAC against it. Content-type parsers are ENCAPSULATED to
+  // the registering plugin, so this is scoped to the Slack command route and
+  // does not affect the rest of the API. Mirrors the raw-body parsers in
+  // routes/webhooks.ts (Dust) and routes/signatures.ts (DocuSign), combined
+  // with the urlencoded parse from routes/public-nps.ts.
+  app.addContentTypeParser(
+    'application/x-www-form-urlencoded',
+    { parseAs: 'string' },
+    (req, body, done) => {
+      try {
+        (req as unknown as { rawBody: string }).rawBody = body as string;
+        const params = new URLSearchParams(body as string);
+        const obj: Record<string, string> = {};
+        for (const [k, v] of params.entries()) obj[k] = v;
+        done(null, obj);
+      } catch (err) {
+        done(err as Error, undefined);
+      }
+    },
+  );
+
   app.post(
     '/integrations/slack/commands',
     {
@@ -63,7 +88,8 @@ const slackCommandsPlugin: FastifyPluginAsync = async (fastify) => {
         return reply.status(403).send({ error: 'Request timestamp too old' });
       }
 
-      const rawBody = JSON.stringify(request.body);
+      // Verify over the untouched raw bytes Slack signed, not a re-serialized body.
+      const rawBody = (request as unknown as { rawBody?: string }).rawBody ?? '';
       if (!verifySlackSignature(signature, timestamp, rawBody)) {
         return reply.status(403).send({ error: 'Invalid Slack signature' });
       }

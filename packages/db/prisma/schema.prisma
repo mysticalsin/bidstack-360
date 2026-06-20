@@ -339,6 +339,16 @@ model Company {
   // P1 #25: list route orders by createdAt DESC — without this index PG does a
   // full org-scoped scan on every Companies page load.
   @@index([orgId, createdAt(sort: Desc)], map: "companies_org_created_idx")
+  // Scale: key-accounts list (routes/accounts.ts) filters tier='key' + org and
+  // sorts by name ASC. See migration scale_hot_path_indexes.
+  @@index([orgId, tier, name], map: "companies_org_tier_name_idx")
+  // Scale: curated top-accounts (routes/accounts.ts) — PARTIAL index
+  //   ON (org_id, top_account_rank) WHERE top_account_rank IS NOT NULL
+  // backs the rank-ordered "curated mode" list. Prisma's @@index cannot express
+  // the WHERE predicate, so it lives only in raw SQL — see migration
+  // scale_hot_path_indexes (companies_org_top_rank_idx). Do NOT add a plain
+  // @@index([orgId, topAccountRank]) here: that would diff as a NON-partial
+  // index and drift from the SQL.
   @@index([deletedAt])
   @@map("companies")
 }
@@ -752,6 +762,9 @@ model AuditLog {
 
   @@index([orgId, at(sort: Desc)])
   @@index([orgId, targetType, targetId, at(sort: Desc)])
+  // Scale: backs the id-keyset cursor list (routes/audit-logs.ts) — org +
+  // soft-delete filter sorted by id DESC. See migration scale_hot_path_indexes.
+  @@index([orgId, deletedAt, id(sort: Desc)], map: "audit_log_org_deleted_id_idx")
   @@index([deletedAt])
   @@map("audit_log")
 }
@@ -3226,6 +3239,10 @@ model EmailMessage {
   @@unique([orgId, externalMessageId], map: "email_messages_org_external_key")
   @@index([orgId, threadId])
   @@index([orgId, entityType, entityId])
+  // Scale: per-entity timeline (routes/integrations/email.ts) filters by
+  // org/entity and sorts by sent_at DESC — sentAt extends the equality index so
+  // filter + sort come from one index. See migration scale_hot_path_indexes.
+  @@index([orgId, entityType, entityId, sentAt(sort: Desc)], map: "email_messages_org_entity_sent_idx")
   @@index([orgId, userId])
   @@index([orgId, deletedAt])
   @@map("email_messages")

@@ -2,7 +2,7 @@ import fp from 'fastify-plugin';
 import type { FastifyPluginAsync } from 'fastify';
 import { createHash } from 'node:crypto';
 
-import { redis } from '../redis.js';
+import { ensureRedisReady, redis } from '../redis.js';
 
 interface RequestFingerprint {
   fingerprint: string;
@@ -33,8 +33,29 @@ const MUTATING_METHODS = new Set(['POST', 'PATCH', 'DELETE', 'PUT']);
 const MIN_KEY_LENGTH = 8;
 const MAX_KEY_LENGTH = 255;
 
+// Idempotency only protects against duplicate processing if every replica reads
+// the same store. The per-process in-memory Maps below are safe ONLY for a
+// single process (local dev, tests). Under multi-replica production they let
+// replica B miss replica A's key/lock and process a duplicate, defeating the
+// guarantee. So in production we require Redis and fail loud when it is down,
+// rather than silently degrading to a per-process store.
+const REQUIRE_REDIS = process.env.NODE_ENV === 'production';
+
 const memoryStore = new Map<string, { payload: string; expiresAt: number }>();
 const memoryLocks = new Map<string, { fingerprint: string; expiresAt: number }>();
+
+class IdempotencyStoreUnavailableError extends Error {
+  constructor() {
+    super('Idempotency store (Redis) is unavailable');
+    this.name = 'IdempotencyStoreUnavailableError';
+  }
+}
+
+// In production, surface a 503 when the shared store is unreachable so the
+// caller can retry, instead of risking duplicate processing across replicas.
+function failClosedIfRequired(): never | void {
+  if (REQUIRE_REDIS) throw new IdempotencyStoreUnavailableError();
+}
 
 setInterval(() => {
   const now = Date.now();
@@ -52,10 +73,16 @@ setInterval(() => {
 
 async function getCache(key: string): Promise<CachedResponse | null> {
   try {
-    const raw = await redis.get(key);
-    if (raw) return JSON.parse(raw) as CachedResponse;
-  } catch {
-    // Redis unavailable; fall through to memory for local/test.
+    if (await ensureRedisReady()) {
+      const raw = await redis.get(key);
+      return raw ? (JSON.parse(raw) as CachedResponse) : null;
+    }
+    // Redis reachable check failed.
+    failClosedIfRequired();
+  } catch (err) {
+    if (err instanceof IdempotencyStoreUnavailableError) throw err;
+    // Redis errored mid-command; fail closed in prod, else fall through.
+    failClosedIfRequired();
   }
 
   const entry = memoryStore.get(key);
@@ -72,10 +99,14 @@ async function getCache(key: string): Promise<CachedResponse | null> {
 async function setCache(key: string, value: CachedResponse, ttlSeconds: number): Promise<void> {
   const payload = JSON.stringify(value);
   try {
-    await redis.setex(key, ttlSeconds, payload);
-    return;
-  } catch {
-    // Redis unavailable; use process-local memory for local/test.
+    if (await ensureRedisReady()) {
+      await redis.setex(key, ttlSeconds, payload);
+      return;
+    }
+    failClosedIfRequired();
+  } catch (err) {
+    if (err instanceof IdempotencyStoreUnavailableError) throw err;
+    failClosedIfRequired();
   }
 
   if (memoryStore.has(key)) {
@@ -96,19 +127,23 @@ async function acquireLock(
 ): Promise<LockResult> {
   const payload = JSON.stringify(fingerprint);
   try {
-    const result = await redis.set(key, payload, 'EX', ttlSeconds, 'NX');
-    if (result === 'OK') return 'acquired';
+    if (await ensureRedisReady()) {
+      const result = await redis.set(key, payload, 'EX', ttlSeconds, 'NX');
+      if (result === 'OK') return 'acquired';
 
-    const existing = await redis.get(key);
-    if (existing) {
-      const existingFingerprint = JSON.parse(existing) as RequestFingerprint;
-      return existingFingerprint.fingerprint === fingerprint.fingerprint
-        ? 'in-flight-same'
-        : 'in-flight-different';
+      const existing = await redis.get(key);
+      if (existing) {
+        const existingFingerprint = JSON.parse(existing) as RequestFingerprint;
+        return existingFingerprint.fingerprint === fingerprint.fingerprint
+          ? 'in-flight-same'
+          : 'in-flight-different';
+      }
+      return 'in-flight-same';
     }
-    return 'in-flight-same';
-  } catch {
-    // Redis unavailable; use process-local protection for local/test.
+    failClosedIfRequired();
+  } catch (err) {
+    if (err instanceof IdempotencyStoreUnavailableError) throw err;
+    failClosedIfRequired();
   }
 
   const now = Date.now();
@@ -126,8 +161,12 @@ async function acquireLock(
 }
 
 async function releaseLock(key: string): Promise<void> {
+  // Best-effort even in production: a missed release is bounded by the 30s lock
+  // TTL, and throwing here (after the work has run) would corrupt the response.
   try {
-    await redis.del(key);
+    if (await ensureRedisReady()) {
+      await redis.del(key);
+    }
   } catch {
     // Redis unavailable; remove the local/test lock below.
   }
@@ -190,7 +229,25 @@ export const idempotencyPlugin: FastifyPluginAsync = fp(async (server) => {
     const cacheKey = `idempotency:${scope}:${key}`;
     const lockKey = `${cacheKey}:lock`;
     const fingerprint = fingerprintRequest(req.method, req.url, req.body);
-    const cached = await getCache(cacheKey);
+
+    let cached: CachedResponse | null;
+    let lockResult: LockResult;
+    try {
+      cached = await getCache(cacheKey);
+      if (!cached) {
+        lockResult = await acquireLock(lockKey, fingerprint, 30);
+      } else {
+        lockResult = 'acquired';
+      }
+    } catch (err) {
+      if (err instanceof IdempotencyStoreUnavailableError) {
+        throw req.server.httpErrors.serviceUnavailable(
+          'Idempotency store is unavailable; retry the request',
+        );
+      }
+      throw err;
+    }
+
     if (cached) {
       if (cached.fingerprint !== fingerprint.fingerprint) {
         throw req.server.httpErrors.conflict(
@@ -205,7 +262,6 @@ export const idempotencyPlugin: FastifyPluginAsync = fp(async (server) => {
       return;
     }
 
-    const lockResult = await acquireLock(lockKey, fingerprint, 30);
     if (lockResult === 'in-flight-different') {
       throw req.server.httpErrors.conflict(
         'Idempotency-Key was already used for a different request',
@@ -241,7 +297,22 @@ export const idempotencyPlugin: FastifyPluginAsync = fp(async (server) => {
     }
 
     if (!req.auth?.userId) return payload;
-    await setCache(req.idempotencyCacheKey, cacheEntry, IDEMPOTENCY_TTL_SECONDS);
+    try {
+      await setCache(req.idempotencyCacheKey, cacheEntry, IDEMPOTENCY_TTL_SECONDS);
+    } catch (err) {
+      // Lock is held; release it (best-effort) so the client's retry is not
+      // blocked, then fail closed — a missed cache write means a later replica
+      // could re-run this mutation, so we must not report success.
+      if (req.idempotencyLockKey) {
+        await releaseLock(req.idempotencyLockKey);
+      }
+      if (err instanceof IdempotencyStoreUnavailableError) {
+        throw req.server.httpErrors.serviceUnavailable(
+          'Idempotency store is unavailable; retry the request',
+        );
+      }
+      throw err;
+    }
     if (req.idempotencyLockKey) {
       await releaseLock(req.idempotencyLockKey);
     }

@@ -205,23 +205,73 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(yjsCollabPlugin);
   await server.register(healthRoute);
 
+  // ── Rate-limit store selection (Redis vs in-memory) ──────────────────────
+  // The store is chosen ONCE here. In production the limit must hold across
+  // replicas, so we require the shared Redis store; otherwise each Node process
+  // keeps its own counter and the effective global limit is multiplied by the
+  // replica count. Fail loud at boot rather than silently degrading.
+  const redisReady = redis.status === 'ready' || redis.status === 'connect';
+  const rateLimitRedis = config.NODE_ENV !== 'test' && redisReady ? redis : undefined;
+  if (
+    config.NODE_ENV === 'production' &&
+    config.RATE_LIMIT_REDIS_REQUIRED === 'true' &&
+    !rateLimitRedis
+  ) {
+    throw new Error(
+      'Rate-limit Redis store is required in production (RATE_LIMIT_REDIS_REQUIRED=true) ' +
+        `but Redis is not connected (status=${redis.status}). Set RATE_LIMIT_REDIS_REQUIRED=false ` +
+        'only for single-process deploys.',
+    );
+  }
+
+  const isLowEnv = config.NODE_ENV === 'development' || config.NODE_ENV === 'test';
+
   await server.register(rateLimit, {
-    max:
-      config.NODE_ENV === 'development' || config.NODE_ENV === 'test'
-        ? 10_000
-        : config.API_RATE_LIMIT_MAX,
+    max: isLowEnv ? 10_000 : config.API_RATE_LIMIT_MAX,
     timeWindow: '1 minute',
-    redis:
-      config.NODE_ENV !== 'test' && (redis.status === 'ready' || redis.status === 'connect')
-        ? redis
-        : undefined,
+    redis: rateLimitRedis,
     keyGenerator: (req) => {
       // Registered after auth so authenticated routes get per-user buckets.
-      // Public routes (health, webhooks) intentionally fall back to IP.
-      const auth = (req as unknown as { auth?: { userId?: string } }).auth;
-      return auth?.userId ?? req.ip;
+      // Fold in orgId so the per-user bucket is partitioned per tenant and keys
+      // can never collide across tenants. Public routes (health, webhooks) have
+      // no auth context and intentionally fall back to IP.
+      const auth = (req as unknown as { auth?: { userId?: string; orgId?: string } }).auth;
+      if (auth?.userId) return `u:${auth.orgId ?? 'no-org'}:${auth.userId}`;
+      return `ip:${req.ip}`;
     },
   });
+
+  // Per-tenant (org) aggregate cap — OPT-IN (0 = disabled, the default). Enforced
+  // alongside the per-user/IP limit so, in a MULTI-TENANT deployment, one tenant's
+  // users cannot exhaust shared capacity and starve other tenants. Intentionally
+  // OFF by default: a single large (100k-employee) tenant's legitimate aggregate
+  // traffic would trip a low org cap. Operators running shared SaaS set
+  // API_RATE_LIMIT_PER_ORG_MAX > 0. Uses the same store (Redis in prod).
+  if (config.API_RATE_LIMIT_PER_ORG_MAX > 0) {
+    const orgRateLimit = server.createRateLimit({
+      max: config.API_RATE_LIMIT_PER_ORG_MAX,
+      timeWindow: '1 minute',
+      keyGenerator: (req) => {
+        const auth = (req as unknown as { auth?: { orgId?: string } }).auth;
+        return auth?.orgId ? `org:${auth.orgId}` : `ip:${req.ip}`;
+      },
+    });
+    server.addHook('onRequest', async (req, reply) => {
+      // Only authenticated requests carry an org; unauthenticated/public routes
+      // are already covered by the per-IP bucket above.
+      const auth = (req as unknown as { auth?: { orgId?: string } }).auth;
+      if (!auth?.orgId) return;
+      const result = await orgRateLimit(req);
+      if (!result.isAllowed) {
+        reply.header('retry-after', String(result.ttlInSeconds));
+        return reply.code(429).send({
+          statusCode: 429,
+          error: 'Too Many Requests',
+          message: 'Tenant rate limit exceeded. Please retry later.',
+        });
+      }
+    });
+  }
 
   await registerRoutes(server);
 

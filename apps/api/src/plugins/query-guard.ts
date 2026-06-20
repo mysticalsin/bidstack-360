@@ -2,7 +2,9 @@
  * Fastify plugin that wraps every request in a query-tracking context.
  *
  * - Logs slow queries (>500ms) with Pino
- * - Rejects unbounded `findMany` without `take` limit in dev/test (warns in prod)
+ * - Rejects unbounded `findMany` without `take` limit (the scale/DoS guard) in
+ *   every environment by default, including production. Set QUERY_GUARD_REJECT=false
+ *   to downgrade to warn-only.
  * - Adds `X-Prisma-Time` and `X-Query-Warnings` response headers in dev
  * - Surfaces N+1 alerts when >10 identical model+action queries fire per request
  */
@@ -16,11 +18,16 @@ import {
   SLOW_QUERY_MS,
   N_PLUS_ONE_THRESHOLD,
 } from '../lib/prisma-middleware.js';
+import { config } from '../env.js';
 
 // Install the Prisma $use middleware once at module load.
 installPrismaMiddleware();
 
-const REJECT_UNBOUNDED = process.env.NODE_ENV !== 'production';
+// Reject unbounded findMany by default in EVERY environment (the scale/DoS guard
+// must be on where it matters — production). QUERY_GUARD_REJECT=false downgrades
+// to warn-only. Already-bounded queries (a `take` <= 1000) never trip this; only
+// genuinely unbounded reads do (see isUnboundedFindMany in prisma-middleware).
+const REJECT_UNBOUNDED = config.QUERY_GUARD_REJECT === 'true';
 
 export const queryGuardPlugin: FastifyPluginAsync = fp(async (server) => {
   server.addHook('onRequest', (_req, _reply, done) => {
@@ -62,7 +69,7 @@ export const queryGuardPlugin: FastifyPluginAsync = fp(async (server) => {
         reply.code(400);
         return JSON.stringify({
           error: 'Bad Request',
-          message: `Unbounded queries are not allowed in development. Models affected: ${unbounded.join(', ')}`,
+          message: `Unbounded queries are not allowed. Models affected: ${unbounded.join(', ')}`,
         });
       } else {
         req.log.warn({ unbounded, url: req.raw.url }, msg);

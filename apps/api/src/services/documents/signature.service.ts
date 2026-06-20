@@ -294,15 +294,39 @@ export async function handleDocuSignWebhook(
 
   const newStatus = docuSignStatusToModel(eventType);
 
+  // IDEMPOTENCY GATE: DocuSign Connect delivers at-least-once — a "completed"
+  // event is redelivered on every retry until we return 200. Without a guard,
+  // each redelivery re-runs the status write AND appends a duplicate
+  // SignatureEvent, polluting the non-repudiable audit trail. We mirror the
+  // internal-sign TOCTOU pattern: claim the transition atomically with an
+  // updateMany whose WHERE excludes the target status and all terminal states.
+  // count===0 means this event was already processed (or the request is already
+  // terminal) — we return WITHOUT recording a duplicate event. The route still
+  // sends 200 (we don't throw), so DocuSign stops retrying.
+  //
+  // `status: { not: newStatus }` dedupes same-status redeliveries (e.g. a second
+  // "completed"). `notIn TERMINAL_STATUSES` ensures a terminal request (already
+  // SIGNED/VOIDED/DECLINED/EXPIRED) is never reopened by a late or out-of-order
+  // event. Both conditions live on the WHERE, so the gate is decided in the DB,
+  // not in app code that two concurrent deliveries could both pass.
   await prisma.$transaction(async (tx) => {
-    await tx.signatureRequest.update({
-      where: { id: request.id },
+    const claim = await tx.signatureRequest.updateMany({
+      where: {
+        id: request.id,
+        status: { not: newStatus, notIn: DOCUSIGN_TERMINAL_STATUSES },
+      },
       data: {
         status: newStatus,
         ...(newStatus === 'SIGNED' ? { completedAt: new Date() } : {}),
         ...(newStatus === 'VOIDED' ? { voidedAt: new Date() } : {}),
       },
     });
+    if (claim.count === 0) {
+      // Already processed / already terminal — duplicate or stale delivery.
+      // No event written; the transaction commits as a no-op and the caller
+      // returns 200 so DocuSign stops retrying.
+      return;
+    }
 
     await tx.signatureEvent.create({
       data: {
@@ -317,6 +341,15 @@ export async function handleDocuSignWebhook(
     });
   });
 }
+
+// Terminal signature states. Once a request reaches any of these, a redelivered
+// or out-of-order DocuSign webhook must NOT mutate it or append another event.
+const DOCUSIGN_TERMINAL_STATUSES: SignatureStatus[] = [
+  'SIGNED',
+  'VOIDED',
+  'DECLINED',
+  'EXPIRED',
+];
 
 // ─── voidSignatureRequest ─────────────────────────────────────────────────────
 

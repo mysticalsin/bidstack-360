@@ -16,6 +16,7 @@ import { confirm } from '@/components/ui/ConfirmDialog';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useOpportunities, usePatchOpportunity } from '@/hooks/useOpportunities';
+import { useOrgSummary } from '@/hooks/useOrgSummary';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { CursorPager } from '@/components/ui/CursorPager';
@@ -69,6 +70,9 @@ export function OpportunitiesPage() {
           : {}
       : {}),
   });
+  // Tenant-wide aggregate for the KPI strip — the cursor page only ever holds 50
+  // rows, so headline totals must come from the server, not data.items.
+  const orgSummary = useOrgSummary();
   const configuredStages = usePipelineStages();
   const configuredStageOptions = useMemo<PipelineStage[]>(
     () =>
@@ -307,7 +311,7 @@ export function OpportunitiesPage() {
           ))}
         </div>
       ) : data && data.items.length > 0 ? (
-        <OppKpiBar opps={data.items} />
+        <OppKpiBar opps={data.items} summary={orgSummary.data} />
       ) : null}
 
       {/* sr-only live region — announces filter/search result count to AT */}

@@ -455,7 +455,8 @@
     },
     "grid": {
       "regionLabel": "Account cards"
-    }
+    },
+    "paginationLabel": "accounts"
   },
   "publicSign": {
     "announceWelcome": "Step 1: Review document",
@@ -2041,6 +2042,12 @@
     "kpiRevenue": "Revenue",
     "kpiWeightedRevenue": "WR",
     "kpiOpen": "Open",
+    "kpiOpenCount": "Open",
+    "kpiOpenPipeline": "Open pipeline",
+    "kpiWeightedRevenuePage": "WR (page)",
+    "kpiOpportunitiesPage": "Opportunities (page)",
+    "kpiRevenuePage": "Revenue (page)",
+    "kpiOpenPage": "Open (page)",
     "kpiRegionLabel": "Opportunities KPI summary",
     "title": "Opportunities",
     "resultsFor": "results for",

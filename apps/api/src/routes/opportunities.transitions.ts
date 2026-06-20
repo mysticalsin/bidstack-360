@@ -88,24 +88,27 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
       const nextStage = (toStage?.key ?? requestedStage) as PrismaStage | undefined;
       if (!nextStage) throw server.httpErrors.badRequest('Invalid pipeline stage');
 
-      const [updated] = await prisma.$transaction([
-        prisma.opportunity.update({
-          where: { id: opp.id },
-          data: { pipelineStageId: toStage?.id ?? null, stage: nextStage },
-          include: {
-            pipelineStage: {
-              select: {
-                id: true,
-                name: true,
-                probability: true,
-                color: true,
-                isWon: true,
-                isLost: true,
-              },
-            },
+      // Re-assert the precondition in the WRITE: the opp was read with findFirst
+      // above (no lock), so a concurrent move could change its stage between
+      // read and write. updateMany guards on the stage/pipelineStageId we saw;
+      // count === 0 means someone else moved it first → 409 (lost update).
+      const updated = await prisma.$transaction(async (tx) => {
+        const { count } = await tx.opportunity.updateMany({
+          where: {
+            id: opp.id,
+            orgId: req.auth.orgId,
+            deletedAt: null,
+            stage: opp.stage,
+            pipelineStageId: opp.pipelineStageId,
           },
-        }),
-        prisma.auditLog.create({
+          data: { pipelineStageId: toStage?.id ?? null, stage: nextStage },
+        });
+        if (count === 0) {
+          throw server.httpErrors.conflict(
+            'Opportunity stage changed concurrently; reload and retry.',
+          );
+        }
+        await tx.auditLog.create({
           data: {
             orgId: req.auth.orgId,
             userId: req.auth.userId,
@@ -119,8 +122,23 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
               toStage: nextStage,
             },
           },
-        }),
-      ]);
+        });
+        return tx.opportunity.findFirstOrThrow({
+          where: { id: opp.id, orgId: req.auth.orgId },
+          include: {
+            pipelineStage: {
+              select: {
+                id: true,
+                name: true,
+                probability: true,
+                color: true,
+                isWon: true,
+                isLost: true,
+              },
+            },
+          },
+        });
+      });
 
       void pushOpportunityToDust(updated.id, req.auth.orgId);
       void fanOutWebhookEvent(req.auth.orgId, 'opportunity.stage_changed', {

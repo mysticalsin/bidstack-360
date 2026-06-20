@@ -14,6 +14,7 @@ import {
 } from '@bidstack/shared';
 import { MemOSService } from '@bidstack/memos';
 import { defendBidScore } from '../services/ai/dust-agent.service.js';
+import { isUniqueViolation } from './opportunities.helpers.js';
 
 function serializeBidScore(row: {
   id: string;
@@ -156,55 +157,71 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
         5,
       );
 
-      const latest = await prisma.bidScore.findFirst({
-        where: { orgId: req.auth.orgId, opportunityId },
-        orderBy: { version: 'desc' },
-        select: { version: true },
-      });
-      const nextVersion = (latest?.version ?? 0) + 1;
+      // Version is minted INSIDE the tx (read-then-insert atomically) and the
+      // unique (orgId, opportunityId, version) guards concurrent scorers: a
+      // colliding insert throws P2002 and the bounded loop re-reads + retries.
+      let nextVersion = 0;
+      let row: Awaited<ReturnType<typeof prisma.bidScore.create>> | undefined;
+      for (let attempt = 0; ; attempt++) {
+        try {
+          row = await prisma.$transaction(async (tx) => {
+            const latest = await tx.bidScore.findFirst({
+              where: { orgId: req.auth.orgId, opportunityId },
+              orderBy: { version: 'desc' },
+              select: { version: true },
+            });
+            nextVersion = (latest?.version ?? 0) + 1;
 
-      const row = await prisma.$transaction(async (tx) => {
-        const created = await tx.bidScore.create({
-          data: {
-            orgId: req.auth.orgId,
-            opportunityId,
-            scoredBy: req.auth.userId,
-            version: nextVersion,
-            criteria: criteria as Record<string, number>,
-            totalScore,
-            categoryScores: categoryScores as Record<string, number>,
-            weightedSum,
-            totalWeight,
-            aiSuggested: false,
-            memosPolicies: policies.map((p) => p.id),
-            recommendation,
-            notes: notes ?? null,
-            overrideJustification: isOverride ? (override?.justification ?? null) : null,
-            overriddenBy: isOverride ? req.auth.userId : null,
-          },
-        });
-        if (isOverride && override) {
-          // Director/VP visibility surface: explicit audit row (the generic
-          // mutation-audit safety net only logs an opaque http.mutation entry).
-          await tx.auditLog.create({
-            data: {
-              orgId: req.auth.orgId,
-              userId: req.auth.userId,
-              action: 'bid_score.override',
-              targetType: 'bid_score',
-              targetId: created.id,
-              diff: {
+            const created = await tx.bidScore.create({
+              data: {
+                orgId: req.auth.orgId,
                 opportunityId,
+                scoredBy: req.auth.userId,
                 version: nextVersion,
+                criteria: criteria as Record<string, number>,
                 totalScore,
+                categoryScores: categoryScores as Record<string, number>,
+                weightedSum,
+                totalWeight,
+                aiSuggested: false,
+                memosPolicies: policies.map((p) => p.id),
                 recommendation,
-                justification: override.justification,
+                notes: notes ?? null,
+                overrideJustification: isOverride ? (override?.justification ?? null) : null,
+                overriddenBy: isOverride ? req.auth.userId : null,
               },
-            },
+            });
+            if (isOverride && override) {
+              // Director/VP visibility surface: explicit audit row (the generic
+              // mutation-audit safety net only logs an opaque http.mutation entry).
+              await tx.auditLog.create({
+                data: {
+                  orgId: req.auth.orgId,
+                  userId: req.auth.userId,
+                  action: 'bid_score.override',
+                  targetType: 'bid_score',
+                  targetId: created.id,
+                  diff: {
+                    opportunityId,
+                    version: nextVersion,
+                    totalScore,
+                    recommendation,
+                    justification: override.justification,
+                  },
+                },
+              });
+            }
+            return created;
           });
+          break;
+        } catch (err) {
+          if (isUniqueViolation(err) && attempt < 4) continue;
+          throw err;
         }
-        return created;
-      });
+      }
+      if (!row) {
+        throw server.httpErrors.conflict('Could not allocate a unique bid-score version; retry.');
+      }
 
       // Director/VP push: a below-threshold override is escalated as an in-app
       // notification to managers, not just buried in the audit log. Best-effort.

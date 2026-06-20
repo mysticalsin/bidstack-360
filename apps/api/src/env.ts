@@ -86,6 +86,22 @@ export const envSchema = z.object({
   JOB_SIGNING_SECRET: z.string().min(1).optional().or(z.literal('')),
 
   API_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(120),
+  // Per-org (tenant) aggregate request cap (requests/min/org). 0 = DISABLED
+  // (default). Opt-in noisy-neighbor protection for MULTI-TENANT SaaS so one
+  // tenant can't exhaust shared capacity. For a SINGLE large (e.g. 100k-employee)
+  // tenant leave it 0 — aggregate legitimate traffic would trip a low cap. The
+  // per-user/IP limit (API_RATE_LIMIT_MAX) always applies regardless.
+  API_RATE_LIMIT_PER_ORG_MAX: z.coerce.number().int().nonnegative().default(0),
+  // When true (default), the rate limiter MUST use the shared Redis store so
+  // limits hold across replicas. In production we fail loud at boot rather than
+  // silently falling back to per-process memory (which lets the global limit be
+  // multiplied by the replica count). Set false only for single-process deploys.
+  RATE_LIMIT_REDIS_REQUIRED: z.enum(['true', 'false']).default('true'),
+
+  // Query guard: reject (vs. only warn on) unbounded Prisma findMany calls.
+  // Defaults true so production — where scale/DoS risk is highest — is protected.
+  // Set false to downgrade to warn-only (e.g. while migrating a noisy caller).
+  QUERY_GUARD_REJECT: z.enum(['true', 'false']).default('true'),
 
   // ─── HTTP server timeouts (bound per-Node-worker resource pinning) ─────
   // Without these Fastify defaults to 0 (unbounded): a slow query or hung
