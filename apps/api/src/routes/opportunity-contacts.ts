@@ -51,6 +51,11 @@ function serialize(oc: {
 }
 
 export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) => {
+  // RBAC: link/unlink/update contacts on an opportunity require opportunities:write.
+  server.addHook('preHandler', async (req) => {
+    if (req.method !== 'GET') await server.requirePermission('opportunities:write')(req);
+  });
+
   server.get(
     '/opportunities/:id/contacts',
     {

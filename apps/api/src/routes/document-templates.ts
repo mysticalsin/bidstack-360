@@ -62,6 +62,12 @@ function serializeTemplate(row: {
 // ─── Route plugin ─────────────────────────────────────────────────────────────
 
 export const documentTemplatesRoutes: FastifyPluginAsyncZod = async (server) => {
+  // RBAC: gate every mutation in this plugin (create/update/delete templates).
+  // Reads pass through; writes require documents:write.
+  server.addHook('preHandler', async (req) => {
+    if (req.method !== 'GET') await server.requirePermission('documents:write')(req);
+  });
+
   // ── GET /document-templates ───────────────────────────────────────────────
   server.get(
     '/document-templates',

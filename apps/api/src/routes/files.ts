@@ -388,11 +388,21 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
         return reply.redirect(dl.url, 302);
       }
       if (dl.kind === 'stream' && dl.stream) {
-        reply.header('Content-Type', dl.contentType ?? row.contentType);
-        reply.header('Content-Disposition', safeContentDisposition(row.name));
-        if (dl.bytes != null) reply.header('Content-Length', String(dl.bytes));
-        // Why pipeline(): handles backpressure + closes both ends on client
-        // disconnect. Plain reply.send(stream) leaks file handles on aborts.
+        // SECURITY: writing to reply.raw bypasses Fastify serialization AND the
+        // onSend hooks where helmet/security-headers set CSP + nosniff — so we
+        // MUST emit them here. Without nosniff + attachment, an uploaded text/html
+        // file (an allowed type) would be sniffed and rendered INLINE on the API
+        // origin = stored XSS. Force attachment + nosniff + a locked-down CSP for
+        // all user-uploaded content (local-storage / demo path).
+        reply.hijack();
+        reply.raw.writeHead(200, {
+          'Content-Type': dl.contentType ?? row.contentType,
+          'Content-Disposition': safeContentDisposition(row.name),
+          'X-Content-Type-Options': 'nosniff',
+          'Content-Security-Policy': "default-src 'none'; sandbox",
+          ...(dl.bytes != null ? { 'Content-Length': String(dl.bytes) } : {}),
+        });
+        // pipeline(): backpressure + closes both ends on client disconnect.
         await pipeline(dl.stream, reply.raw);
         return reply;
       }

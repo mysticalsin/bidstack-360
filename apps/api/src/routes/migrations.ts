@@ -32,6 +32,12 @@ import {
 import { serializeJob, serializeMapping } from './migrations.helpers.js';
 
 export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
+  // RBAC: CSV import / mapping / cancel / undo mutate tenant data in bulk —
+  // require settings:write (admin-grade), matching tenant-export/erasure.
+  server.addHook('preHandler', async (req) => {
+    if (req.method !== 'GET') await server.requirePermission('settings:write')(req);
+  });
+
   // BullMQ queue handle (producer side only — worker consumes).
   // Lazily initialised so the test environment doesn't need Redis configured.
   let migrationQueue: Queue | null = null;

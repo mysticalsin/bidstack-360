@@ -91,6 +91,12 @@ type PipelineStageRecord = {
 };
 
 export const pipelineStageRoutes: FastifyPluginAsyncZod = async (server) => {
+  // RBAC: pipeline-stage config is org-wide settings — gate edits with
+  // settings:write so any authenticated user can't reshape the funnel.
+  server.addHook('preHandler', async (req) => {
+    if (req.method !== 'GET') await server.requirePermission('settings:write')(req);
+  });
+
   server.get(
     '/pipeline-stages',
     {

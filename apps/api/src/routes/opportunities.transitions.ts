@@ -14,6 +14,12 @@ import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import { buildOpportunityBrief, estimateBriefTokens } from './opportunities.brief.js';
 
 export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server) => {
+  // RBAC: stage transitions and brief generation mutate opportunity state —
+  // require opportunities:write (every route here is a POST).
+  server.addHook('preHandler', async (req) => {
+    if (req.method !== 'GET') await server.requirePermission('opportunities:write')(req);
+  });
+
   // POST /api/opportunities/:id/stage  (kanban move)
   server.post(
     '/opportunities/:id/stage',
