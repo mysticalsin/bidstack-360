@@ -26,6 +26,7 @@ import { defaultReleaseScore } from './dashboard.defaults.js';
 import { asProviderStatus, mapDealStage, normalizeName, record } from './dashboard.utils.js';
 import {
   applyOpportunityScope,
+  countryVariantsForScope,
   type AccessScope,
 } from '../../lib/access-scope.js';
 import { canReadAccount } from '../../lib/account-access.js';
@@ -506,31 +507,38 @@ async function fetchRevenueRows(
   scope?: AccessScope,
 ): Promise<Array<{ period: string; revenue: bigint | number | null }>> {
   if (!scope?.unrestricted && scope) {
-    const rows = await prismaClient.opportunity.findMany({
-      where: applyOpportunityScope(
-        {
-          orgId,
-          customer,
-          deletedAt: null,
-          stage: OpportunityStage.closed_won,
-          dueDate: { not: null },
-        },
-        scope,
-      ),
-      select: { dueDate: true, valueMicros: true },
-      orderBy: { dueDate: 'desc' },
-      take: 5_000,
-    });
-    const byPeriod = new Map<string, bigint>();
-    for (const row of rows) {
-      if (!row.dueDate) continue;
-      const period = row.dueDate.toISOString().slice(0, 7);
-      byPeriod.set(period, (byPeriod.get(period) ?? BigInt(0)) + BigInt(row.valueMicros));
-    }
-    return [...byPeriod.entries()]
-      .sort(([a], [b]) => (a < b ? 1 : -1))
-      .slice(0, 12)
-      .map(([period, revenue]) => ({ period, revenue }));
+    // Aggregate in Postgres for the scoped path too — a JS findMany summed in
+    // app code was take-capped (5k rows), so an account with >5k closed_won opps
+    // silently under-reported. Mirror the unrestricted SQL below, AND-ed with the
+    // same OR-predicate applyOpportunityScope builds (country / territory overlap
+    // / own deals). Predicate construction (variants + empty-variants → own-deals
+    // only) matches the proven raw-SQL scope in lib/account-access.ts.
+    const variants = countryVariantsForScope(scope);
+    const countryScopeSql =
+      variants.length > 0
+        ? Prisma.sql`
+            o.country = ANY(ARRAY[${Prisma.join(variants)}]::text[])
+            OR t.country_codes && ARRAY[${Prisma.join(variants)}]::text[]
+            OR`
+        : Prisma.empty;
+    return prismaClient.$queryRaw<Array<{ period: string; revenue: bigint | null }>>(Prisma.sql`
+      SELECT to_char(date_trunc('month', o.due_date), 'YYYY-MM') AS period,
+             SUM(o.value_micros) AS revenue
+      FROM opportunities o
+      LEFT JOIN territories t ON t.id = o.territory_id
+      WHERE o.org_id = ${orgId}::uuid
+        AND o.customer = ${customer}
+        AND o.stage = 'closed_won'
+        AND o.deleted_at IS NULL
+        AND o.due_date IS NOT NULL
+        AND (
+          ${countryScopeSql}
+          o.owner_id = ${scope.userId}::uuid
+        )
+      GROUP BY 1
+      ORDER BY 1 DESC
+      LIMIT 12
+    `);
   }
 
   return prismaClient.$queryRaw<Array<{ period: string; revenue: bigint | null }>>(Prisma.sql`

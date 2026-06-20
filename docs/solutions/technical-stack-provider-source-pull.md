@@ -1357,3 +1357,45 @@ sources` CTA, and an expanded add composer with manual/source provenance in
   or private Tech Intel MCP extraction without real staging credentials and
   endpoints. This slice proves guided add UX, source provenance handling, and
   Apollo queue readiness honesty.
+
+## 2026-06-19 Source Assistant Status Chips
+
+- The Technical Stack source-first add assistant now shows each provider lane's
+  transport, current pull state, and next action directly in the add workflow.
+  Users no longer have to cross-reference the readiness map to understand
+  whether Apollo is queued through MCP/API, Seamless synced through MCP/API,
+  Tech Intel MCP is unavailable/disabled, or open data is settled.
+- The provider chips use an auto-fit grid with a readable minimum width. Browser
+  QA caught the first pass squeezing four multi-line chips to roughly 67px in a
+  dense account card; the final grid measured 139px desktop and 256px mobile
+  with no horizontal overflow.
+- The backend source contract remains unchanged and honest: Apollo pulls via
+  MCP/API queue readiness, Seamless prefers MCP with API fallback, configured
+  named Tech Intel MCPs carry BuiltWith/Wappalyzer/private source evidence, and
+  other sources are only shown when already attributed.
+
+### Verification Delta
+
+- `pnpm --filter @bidstack/web exec vitest run src/components/cockpit/TechStackCard.test.tsx --reporter=dot`:
+  35/35 pass.
+- `pnpm --filter @bidstack/web exec eslint --no-ignore --no-warn-ignored src/components/cockpit/TechStackCard.tsx src/components/cockpit/TechStackCard.test.tsx src/styles/cockpit.css --max-warnings=0`:
+  pass.
+- `pnpm --filter @bidstack/web exec tsc --noEmit --pretty false`: pass.
+- `pnpm --filter @bidstack/api exec vitest run src/providers/company-tech-stack-mcp.test.ts src/providers/company-seamless-enrichment.test.ts src/routes/crm/companies.test.ts --reporter=dot`:
+  26/26 pass.
+- `pnpm --filter @bidstack/worker exec vitest run src/queues/company-enrich-apollo.test.ts --reporter=dot`:
+  24/24 pass.
+- `pnpm --filter @bidstack/web build`: pass.
+- In-app browser preview on `http://127.0.0.1:4173/accounts/5ae5942c-c97a-4177-b053-dd986008a2d3`
+  with API proxied to `http://127.0.0.1:4101`: source assistant rendered,
+  source pull returned local disabled/unconfigured Apollo/Seamless/Tech Intel
+  and synced open-data states, desktop chip min width 139px, mobile 390px chip
+  min width 256px, no Technical Stack horizontal overflow, and no scoped
+  buttons below 40px.
+
+### Residual Risk
+
+- Local QA still cannot prove live Apollo, Seamless.AI, BuiltWith, Wappalyzer,
+  or private Tech Intel MCP extraction without real staging credentials and
+  endpoints. This slice proves the add-workbench status UX and responsive
+  layout after a real local provider refresh.

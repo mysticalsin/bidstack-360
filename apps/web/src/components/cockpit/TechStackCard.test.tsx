@@ -1809,6 +1809,13 @@ describe('TechStackCard provenance', () => {
     expect(within(sourceMap).getByText('Valid open data')).toBeTruthy();
     expect(within(sourceMap).getByText('Polling')).toBeTruthy();
     expect(within(sourceMap).getByText('Connect')).toBeTruthy();
+
+    const assistant = screen.getByLabelText('Source-backed add assistant');
+    expect(within(assistant).getByText('Queued via MCP')).toBeTruthy();
+    expect(within(assistant).getByText('Synced via API')).toBeTruthy();
+    expect(within(assistant).getByText('not configured')).toBeTruthy();
+    expect(within(assistant).getByText('Valid open data')).toBeTruthy();
+    expect(within(assistant).getAllByText('No new deltas').length).toBeGreaterThanOrEqual(2);
   });
 
   it('keeps refetching while an Apollo MCP/API source pull is queued', async () => {

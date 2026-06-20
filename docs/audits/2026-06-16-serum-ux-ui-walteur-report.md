@@ -8536,6 +8536,49 @@ the MCP server process defaults to `PORT_MCP=4001`, but the root Dockerfile
   load/provider/Sentry/browser evidence, ops approval, secret-history
   disposition, immutable container digest refs, and platform/security approval.
 
+## 2026-06-19 Follow-Up 166: Production Compose Web Ingress Guard
+
+### Trigger
+
+The P0 release-critical compose audit found that the marketing container mapped
+host `8081` to container `8080`, but the primary `web` CRM service had no
+published host port.
+
+### Issues Fixed
+
+- Published the main production web service as
+  `${WEB_HTTP_PORT:-8080}:8080`.
+- Added `WEB_HTTP_PORT=8080` to `.env.example`.
+- Extended the production compose policy to require the web service, the
+  `target: web` build target, `depends_on: api`, and a published port mapping
+  to container `8080`.
+- Updated the runbook so operators validate compose wiring and know the local
+  production web port.
+
+### Implementation Map
+
+- `docker-compose.prod.yml`
+- `.env.example`
+- `scripts/verify-compose-production-policy.mjs`
+- `docs/RUNBOOK.md`
+- `docs/solutions/production-compose-secret-wiring.md`
+- `MISTAKES.md`
+
+### Verification
+
+- Compose policy selftest: pass.
+- Compose policy live check: pass.
+- Compose policy syntax check: pass.
+- Targeted ESLint for the compose policy script: pass.
+- `docker compose -f docker-compose.prod.yml config --quiet` with
+  production-shaped dummy env and `WEB_HTTP_PORT=18080`: pass.
+
+### Remaining Launch Risks
+
+- Current production release evidence is still blocked by dirty source, live
+  load/provider/Sentry/browser evidence, ops approval, secret-history
+  disposition, immutable container digest refs, and platform/security approval.
+
 ## 2026-06-19 Follow-Up 164: Guided Technical Stack Add + Apollo MCP Honesty
 
 ### Trigger
@@ -9346,3 +9389,270 @@ smoke events.
 - Current production release evidence is still blocked by dirty source, live
   load/provider/Sentry/browser evidence, ops approval, secret-history
   disposition, immutable container digest refs, and platform/security approval.
+
+## 2026-06-19 Follow-Up 167: Technical Stack Source Assistant Status Chips
+
+### Trigger
+
+Tony wanted the Technical Stack Overview add experience to feel better and to
+make Apollo, Seamless.AI, and other valid MCP-backed sources visibly pull
+technical stack evidence.
+
+### Issues Fixed
+
+- Source-first add now shows provider transport, pull state, and next action on
+  each provider lane inside the add assistant.
+- Apollo, Seamless.AI, Tech Intel MCP, and open data states are visible in the
+  exact add workflow after a source pull, not only in the separate readiness
+  map.
+- The provider-chip grid now auto-fits to readable widths. Browser QA caught
+  the first pass squeezing chips to about 67px; the fixed layout measured 139px
+  desktop and 256px at 390px mobile with no horizontal overflow.
+
+### Implementation Map
+
+- `apps/web/src/components/cockpit/TechStackCard.tsx`
+- `apps/web/src/components/cockpit/TechStackCard.test.tsx`
+- `apps/web/src/styles/cockpit.css`
+- `docs/solutions/technical-stack-provider-source-pull.md`
+- `MISTAKES.md`
+
+### Verification
+
+- `pnpm --filter @bidstack/web exec vitest run src/components/cockpit/TechStackCard.test.tsx --reporter=dot`:
+  35/35 pass.
+- Targeted web ESLint for touched files: pass.
+- `pnpm --filter @bidstack/web exec tsc --noEmit --pretty false`: pass.
+- API provider/route regression for Tech Intel MCP, Seamless, and company
+  refresh: 26/26 pass.
+- Apollo worker MCP/API transport regression: 24/24 pass.
+- `pnpm --filter @bidstack/web build`: pass.
+- In-app browser preview on local production bundle: Technical Stack source
+  assistant rendered after source pull, local provider states were honest
+  (Apollo/Seamless/Tech Intel not configured, open data synced), desktop/mobile
+  no-overflow metrics passed.
+
+### Remaining Launch Risks
+
+- Full launch still requires live credentialed Apollo, Seamless.AI, and named
+  Tech Intel MCP staging/production evidence, plus clean source review and the
+  broader release evidence gates.
+
+## 2026-06-19 Follow-Up 168: Production Web Health-Gated Startup
+
+### Trigger
+
+The production compose path had been hardened to publish the primary CRM web
+service, but the web service still used short-form `depends_on: - api`, which
+only orders container creation.
+
+### Issues Fixed
+
+- The web service now waits for the API service healthcheck with
+  `condition: service_healthy`.
+- The compose policy still verifies the API dependency exists and now also
+  rejects the weaker short-form dependency.
+- The policy selftest includes a poisoned fixture for the old form.
+
+### Implementation Map
+
+- `docker-compose.prod.yml`
+- `scripts/verify-compose-production-policy.mjs`
+- `docs/solutions/production-compose-secret-wiring.md`
+- `MISTAKES.md`
+
+### Verification
+
+- `node --check scripts/verify-compose-production-policy.mjs`: pass.
+- `pnpm deploy:evidence:compose:policy:selftest`: pass.
+- `pnpm deploy:evidence:compose:policy`: pass.
+- `pnpm exec eslint --no-ignore --no-warn-ignored scripts/verify-compose-production-policy.mjs --max-warnings=0`:
+  pass.
+- `docker compose -f docker-compose.prod.yml config --quiet` with dummy
+  production-shaped env and `WEB_HTTP_PORT=18080`: pass.
+
+### Remaining Launch Risks
+
+- This hardens local production compose startup ordering only. Full launch
+  still requires clean reviewed source, upstream/release branch proof, live
+  provider/browser/load/Sentry evidence, ops/security approval, secret-history
+  disposition, and immutable container digest refs.
+
+## 2026-06-19 Follow-Up 169: Default-Off SERUM Dust Guard
+
+### Trigger
+
+A generated review packet flagged that the new Dust/MCP Gateway runtime guard
+could deny existing Dust workflows even when SERUM was globally disabled.
+
+### Issues Fixed
+
+- API and worker Dust clients now skip the SERUM gateway runtime check unless
+  `SERUM_ENABLED=true`.
+- Existing Dust operations continue through the normal Dust client when SERUM
+  is unset or `false`.
+- When SERUM is enabled, denied gateway decisions still block before any Dust
+  network request.
+- `.planning/review-out.txt` is ignored as generated review scratch while
+  preserving the tracked `.planning` docs.
+
+### Implementation Map
+
+- `.gitignore`
+- `apps/api/src/lib/dust-credentials.ts`
+- `apps/api/src/lib/dust-credentials.test.ts`
+- `apps/worker/src/lib/dust-credentials.ts`
+- `apps/worker/src/lib/dust-credentials.test.ts`
+- `docs/solutions/serum-control-plane-safe-foundation.md`
+- `MISTAKES.md`
+
+### Verification
+
+- API Dust credential test: 2/2 pass.
+- Worker Dust credential test: 3/3 pass.
+- API TypeScript: pass.
+- Worker TypeScript: pass.
+- Targeted API/worker ESLint for touched Dust files: pass.
+
+### Remaining Launch Risks
+
+- This fixes the default-off runtime regression only. Full launch still needs
+  clean source review, live provider/browser/load/Sentry evidence, ops/security
+  approval, secret-history disposition, immutable image digest refs, and real
+  SERUM policy/approval evidence before enabling SERUM in production.
+
+## 2026-06-19 Follow-Up 170: SERUM Runtime Guard Query Budget
+
+### Trigger
+
+Generated source-review analysis flagged that SERUM runtime checks resolved the
+entire control-plane policy snapshot even when a hot operation only needed one
+policy slice, such as an MCP tool call or Dust gateway read.
+
+### Issues Fixed
+
+- Agent, loop, tool, connector, model-router, Dust/MCP gateway, retrieval,
+  prompt-library, and eval gate runtime checks now read only the policy slice
+  they evaluate.
+- Agent checks retain the active crew-run count because concurrency enforcement
+  depends on it.
+- Connector checks still read connection-test evidence when the active
+  connector policy requires it, but no longer trigger unrelated SERUM policy
+  reads.
+- Regression tests assert that MCP tool checks and Dust gateway reads perform
+  exactly one active-config lookup and no unrelated query side paths.
+
+### Implementation Map
+
+- `packages/db/src/serum-runtime-policy.ts`
+- `packages/db/src/serum-runtime-policy.test.ts`
+- `docs/solutions/serum-control-plane-safe-foundation.md`
+- `MISTAKES.md`
+
+### Verification
+
+- SERUM runtime-policy regression test: 6/6 pass.
+- Targeted DB ESLint: pass.
+- DB package build: pass.
+- API, worker, and MCP server TypeScript checks: pass.
+- API Dust credential test: 2/2 pass.
+- Worker Dust credential test: 3/3 pass.
+- `pnpm deploy:evidence:source`: expected block on dirty/untracked source and
+  missing upstream tracking.
+- `pnpm deploy:evidence:source:plan:write`: pass, 6 review waves.
+- `pnpm deploy:evidence:production`: expected block, 44 pass / 77 fail.
+
+### Remaining Launch Risks
+
+- This fixes a runtime scalability hazard only. Full launch still requires
+  clean reviewed source, upstream/release branch proof, live credentialed
+  Apollo/Seamless/Tech Intel provider evidence, browser/load/Sentry evidence,
+  ops/security approval, secret-history disposition, immutable image digest
+  refs, and final SERUM policy/approval evidence.
+
+## 2026-06-19 Follow-Up 171: SERUM Model Router Runtime Side-Query Trim
+
+### Trigger
+
+The runtime-query-budget fix moved Model Router checks onto a slice-specific
+resolver, but that resolver still reused the admin snapshot builder. Admin
+snapshots need org active-provider readiness for display; per-request runtime
+checks only need to validate the provider being executed.
+
+### Issues Fixed
+
+- Model Router runtime checks now build a runtime-only policy from the active
+  `model_router` config row.
+- Explicit provider checks no longer query the org active provider before
+  validating the provider against the policy default/fallback list.
+- Explicit `gemma` route checks now avoid credential SQL entirely because
+  Gemma is locally runnable by policy.
+- Runtime credential checks remain fail-closed for non-Gemma direct providers.
+
+### Implementation Map
+
+- `packages/db/src/serum-runtime-policy.ts`
+- `packages/db/src/serum-runtime-policy.test.ts`
+- `docs/solutions/serum-control-plane-safe-foundation.md`
+- `MISTAKES.md`
+
+### Verification
+
+- SERUM runtime-policy regression test: 7/7 pass.
+- Targeted DB ESLint: pass.
+- DB package build: pass.
+- API, worker, and MCP server TypeScript checks: pass.
+
+### Remaining Launch Risks
+
+- This trims one hot runtime guard only. Full launch still requires clean
+  reviewed source, upstream/release branch proof, live credentialed
+  Apollo/Seamless/Tech Intel provider evidence, browser/load/Sentry evidence,
+  ops/security approval, secret-history disposition, immutable image digest
+  refs, raw Trivy reports, and final SERUM policy/approval evidence.
+
+## 2026-06-19 Follow-Up 172: Source Evidence Rejects Tracked Agent Worktrees
+
+### Trigger
+
+The release source-control gate showed two dirty `.claude/worktrees/*` entries.
+Inspection found they were tracked gitlinks (`160000`) with no `.gitmodules`
+mapping, pointing at local agent workspaces. A clean branch could have shipped
+those malformed local artifacts if the source evidence only inspected dirty
+status output.
+
+### Issues Fixed
+
+- Removed the two tracked `.claude/worktrees/*` gitlinks from the Git index
+  while leaving the local directories on disk.
+- Source-control evidence now checks the tracked index for
+  `.claude/worktrees/` entries even when the worktree is otherwise clean.
+- The source-control selftest now includes a clean-but-bad tracked gitlink
+  fixture and rejects it.
+
+### Implementation Map
+
+- `.claude/worktrees/agent-a10be174ac9f8abbc` staged for removal from source
+  control
+- `.claude/worktrees/agent-af86570a156df70f1` staged for removal from source
+  control
+- `scripts/write-source-control-evidence.mjs`
+- `docs/solutions/deploy-evidence-hard-gate.md`
+- `MISTAKES.md`
+
+### Verification
+
+- `node --check scripts/write-source-control-evidence.mjs`: pass.
+- `pnpm deploy:evidence:source:selftest`: pass.
+- Targeted ESLint for `scripts/write-source-control-evidence.mjs`: pass.
+- The local directories still exist after index-only removal.
+- `pnpm deploy:evidence:source`: expected block, now status=22 because the
+  two gitlink removals are staged plus the broader worktree is still dirty.
+
+### Remaining Launch Risks
+
+- Full launch still requires clean reviewed source, upstream/release branch
+  proof, live credentialed Apollo/Seamless/Tech Intel provider evidence,
+  browser/load/Sentry evidence, ops/security approval, secret-history
+  disposition, immutable image digest refs, raw Trivy reports, and final SERUM
+  policy/approval evidence.

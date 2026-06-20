@@ -9,6 +9,7 @@ import path from 'node:path';
 const DEFAULT_OUTPUT_PATH = 'deploy-evidence/source-control-latest.json';
 const STATUS_SAMPLE_LIMIT = 50;
 const REVIEW_SAMPLE_LIMIT = 8;
+const TRACKED_LOCAL_ARTIFACT_PREFIXES = ['.claude/worktrees/'];
 const PATH_GROUPS = [
   { id: 'api', label: 'API', prefixes: ['apps/api/'] },
   { id: 'web', label: 'Web', prefixes: ['apps/web/'] },
@@ -291,6 +292,15 @@ function summarizeCommand(result) {
   };
 }
 
+function parseTrackedLocalArtifacts(stdout) {
+  return String(stdout || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => normalizeFilePath(line.split(/\s+/).at(-1)))
+    .filter(Boolean);
+}
+
 function collectGitState(root) {
   const inside = runGit(root, ['rev-parse', '--is-inside-work-tree']);
   if (!inside.passed || firstLine(inside.stdout) !== 'true') {
@@ -308,6 +318,12 @@ function collectGitState(root) {
   const status = runGit(root, ['status', '--porcelain=v1', '-uall']);
   const upstream = runGit(root, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}']);
   const aheadBehind = upstream.passed ? runGit(root, ['rev-list', '--left-right', '--count', '@{u}...HEAD']) : null;
+  const trackedLocalArtifacts = runGit(root, [
+    'ls-files',
+    '-s',
+    '--',
+    ...TRACKED_LOCAL_ARTIFACT_PREFIXES,
+  ]);
 
   const statusEntries = status.stdout
     .split(/\r?\n/)
@@ -346,7 +362,10 @@ function collectGitState(root) {
     statusEntries: statusEntries.slice(0, STATUS_SAMPLE_LIMIT),
     statusManifest: buildStatusManifest(statusEntries),
     sourceReview: buildSourceReview(statusEntries),
-    commands: [inside, topLevel, commit, branch, commitTimestamp, status, upstream, aheadBehind]
+    trackedLocalArtifacts: trackedLocalArtifacts.passed
+      ? parseTrackedLocalArtifacts(trackedLocalArtifacts.stdout)
+      : [],
+    commands: [inside, topLevel, commit, branch, commitTimestamp, status, upstream, aheadBehind, trackedLocalArtifacts]
       .filter(Boolean)
       .map(summarizeCommand),
   };
@@ -372,6 +391,13 @@ function validateArtifact(artifact) {
   }
   if (Number(artifact.trackedDirtyCount || 0) > 0) {
     failures.push('git worktree has tracked modifications');
+  }
+  if (Array.isArray(artifact.trackedLocalArtifacts) && artifact.trackedLocalArtifacts.length > 0) {
+    failures.push(
+      `source control must not track local agent worktrees: ${artifact.trackedLocalArtifacts
+        .slice(0, 5)
+        .join(', ')}`,
+    );
   }
   return failures;
 }
@@ -408,6 +434,9 @@ function runWriter(options) {
   process.stdout.write(`Branch: ${artifact.branch || 'missing'}\n`);
   process.stdout.write(`Clean: ${artifact.clean ? 'yes' : 'no'}\n`);
   process.stdout.write(`Status entries: ${artifact.statusEntryCount ?? 'unknown'}\n`);
+  if (artifact.trackedLocalArtifacts?.length > 0) {
+    process.stdout.write(`Tracked local artifacts: ${artifact.trackedLocalArtifacts.length}\n`);
+  }
   const reviewBuckets = artifact.sourceReview?.reviewBuckets || [];
   if (reviewBuckets.length > 0) {
     const topBuckets = reviewBuckets
@@ -464,6 +493,35 @@ function runSelftest() {
     assert.equal(clean.clean, true);
     assert.equal(clean.upstreamSynced, true);
     assert.match(clean.commit, /^[0-9a-f]{40}$/i);
+
+    run(root, 'git', [
+      'update-index',
+      '--add',
+      '--cacheinfo',
+      '160000',
+      clean.commit,
+      '.claude/worktrees/agent-test',
+    ]);
+    run(root, 'git', ['commit', '-m', 'tracked local artifact']);
+    run(root, 'git', ['push']);
+    const trackedLocalArtifact = buildArtifact({ root, outputPath: DEFAULT_OUTPUT_PATH });
+    assert.equal(
+      trackedLocalArtifact.passed,
+      false,
+      'expected tracked local worktree artifact to fail release evidence',
+    );
+    assert.deepEqual(trackedLocalArtifact.trackedLocalArtifacts, ['.claude/worktrees/agent-test']);
+    assert.equal(
+      trackedLocalArtifact.validationFailures.some((failure) =>
+        failure.includes('source control must not track local agent worktrees'),
+      ),
+      true,
+      'expected tracked local artifact failure',
+    );
+
+    run(root, 'git', ['rm', '--cached', '--', '.claude/worktrees/agent-test']);
+    run(root, 'git', ['commit', '-m', 'remove tracked local artifact']);
+    run(root, 'git', ['push']);
 
     mkdirSync(path.join(root, 'apps', 'api', 'src'), { recursive: true });
     mkdirSync(path.join(root, 'docs'), { recursive: true });

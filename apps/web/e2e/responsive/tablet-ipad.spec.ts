@@ -88,7 +88,12 @@ for (const route of KEY_ROUTES) {
   });
 
   test(`${route.name}: screenshot baseline (iPad Mini)`, async ({ page, request }) => {
-    await cleanupVisualRegressionArtifacts(request);
+    // WHY: Scope cleanup to the contacts route only. cleanupVisualRegressionArtifacts
+    // deletes opportunities matching the broad 'E2E Pipeline QA' prefix, which would
+    // race flows/pipeline.spec.ts live fixtures if run on every route.
+    if (route.name === 'contacts') {
+      await cleanupVisualRegressionArtifacts(request);
+    }
     await page.goto(route.path, { waitUntil: 'load' });
     await page.getByRole('main').waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
     await stabilizeDynamicScreenshotText(page);

@@ -62,6 +62,10 @@ function normalizeLines(source) {
   return String(source).replace(/\r\n/g, '\n').split('\n');
 }
 
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function extractServiceBlock(source, serviceName) {
   const lines = normalizeLines(source);
   const startIndex = lines.findIndex((line) => line.match(new RegExp(`^  ${serviceName}:\\s*(?:#.*)?$`)));
@@ -80,6 +84,31 @@ function extractServiceBlock(source, serviceName) {
   }
 
   return block.join('\n');
+}
+
+function extractSectionLines(serviceBlock, sectionName) {
+  if (!serviceBlock) {
+    return [];
+  }
+
+  const lines = normalizeLines(serviceBlock);
+  const sectionIndex = lines.findIndex((line) =>
+    new RegExp(`^ {4}${escapeRegExp(sectionName)}:\\s*(?:#.*)?$`).test(line),
+  );
+  if (sectionIndex < 0) {
+    return [];
+  }
+
+  const sectionLines = [];
+  for (let index = sectionIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index] ?? '';
+    if (/^ {4}[A-Za-z0-9_-]+:\s*/.test(line) && !/^ {6}/.test(line)) {
+      break;
+    }
+    sectionLines.push(line);
+  }
+
+  return sectionLines;
 }
 
 function extractEnvironment(serviceBlock) {
@@ -187,9 +216,96 @@ function validateRuntimeService(source, serviceName, label, requiredKeys) {
   ];
 }
 
+function extractListValues(serviceBlock, sectionName) {
+  const values = [];
+  for (const line of extractSectionLines(serviceBlock, sectionName)) {
+    if (line.trim() === '' || line.trim().startsWith('#')) {
+      continue;
+    }
+
+    const listEntry = line.match(/^ {6}-\s*(.*)$/);
+    if (listEntry) {
+      values.push(listEntry[1].trim().replace(/^['"]|['"]$/g, ''));
+    }
+  }
+
+  return values;
+}
+
+function listContainsDependency(serviceBlock, dependency) {
+  if (extractListValues(serviceBlock, 'depends_on').includes(dependency)) {
+    return true;
+  }
+
+  const dependencyPattern = new RegExp(`^ {6}${escapeRegExp(dependency)}:\\s*(?:#.*)?$`);
+  return extractSectionLines(serviceBlock, 'depends_on').some((line) => dependencyPattern.test(line));
+}
+
+function dependencyRequiresCondition(serviceBlock, dependency, condition) {
+  const sectionLines = extractSectionLines(serviceBlock, 'depends_on');
+  const dependencyPattern = new RegExp(`^ {6}${escapeRegExp(dependency)}:\\s*(?:#.*)?$`);
+  const dependencyIndex = sectionLines.findIndex((line) => dependencyPattern.test(line));
+  if (dependencyIndex < 0) {
+    return false;
+  }
+
+  const conditionPattern = new RegExp(`^ {8}condition:\\s*${escapeRegExp(condition)}\\s*(?:#.*)?$`);
+  for (let index = dependencyIndex + 1; index < sectionLines.length; index += 1) {
+    const line = sectionLines[index] ?? '';
+    if (/^ {6}[A-Za-z0-9_-]+:\s*/.test(line)) {
+      break;
+    }
+    if (conditionPattern.test(line)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function listPublishesContainerPort(serviceBlock, containerPort) {
+  const expectedPort = String(containerPort);
+  return extractListValues(serviceBlock, 'ports').some((entry) => {
+    const portMapping = entry.split('/')[0] ?? entry;
+    const segments = portMapping.split(':').map((segment) => segment.trim());
+    return segments.length >= 2 && segments[segments.length - 1] === expectedPort;
+  });
+}
+
+function validateWebService(source) {
+  const block = extractServiceBlock(source, 'web');
+
+  return [
+    check('web-service-exists', 'Web service exists in production compose', block !== null),
+    check(
+      'web-build-target',
+      'Web service builds the production web Docker target',
+      /target:\s*web\b/.test(block ?? ''),
+    ),
+    check(
+      'web-depends-on-api',
+      'Web service waits for the API service',
+      listContainsDependency(block, 'api'),
+    ),
+    check(
+      'web-depends-on-api-healthy',
+      'Web service waits for the API healthcheck before starting',
+      dependencyRequiresCondition(block, 'api', 'service_healthy'),
+      `depends_on=${extractSectionLines(block, 'depends_on').map((line) => line.trim()).join(' ') || '<missing>'}`,
+    ),
+    check(
+      'web-publishes-8080',
+      'Web service publishes unprivileged nginx container port 8080',
+      listPublishesContainerPort(block, 8080),
+      `ports=${extractListValues(block, 'ports').join(', ') || '<missing>'}`,
+    ),
+  ];
+}
+
 export function validateComposeProductionPolicy(source) {
   const checks = [
     ...validateService(source, 'api'),
+    ...validateWebService(source),
     ...validateService(source, 'worker'),
     ...validateRuntimeService(source, 'mcp-server', 'MCP server', ['DATABASE_URL', 'REDIS_URL']),
     check(
@@ -244,6 +360,15 @@ ${apiKeyLine}
       NODE_ENV: production
       DATABASE_URL: \${DATABASE_URL:?DATABASE_URL is required}
 ${workerKeyLine}
+  web:
+    build:
+      context: .
+      target: web
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - '\${WEB_HTTP_PORT:-8080}:8080'
   mcp-server:
     environment:
       NODE_ENV: production
@@ -287,6 +412,20 @@ function runSelftest() {
   assert.deepEqual(
     failedIds(validateComposeProductionPolicy(composeFixture().replace('      REDIS_URL: ${REDIS_URL:?REDIS_URL is required}', ''))),
     ['mcp-server-redis_url-present', 'mcp-server-redis_url-required'],
+  );
+
+  assert.deepEqual(
+    failedIds(validateComposeProductionPolicy(composeFixture().replace("      - '${WEB_HTTP_PORT:-8080}:8080'", ''))),
+    ['web-publishes-8080'],
+  );
+
+  assert.deepEqual(
+    failedIds(
+      validateComposeProductionPolicy(
+        composeFixture().replace('      api:\n        condition: service_healthy', '      - api'),
+      ),
+    ),
+    ['web-depends-on-api-healthy'],
   );
 
   process.stdout.write('production compose policy selftest passed\n');

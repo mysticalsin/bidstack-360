@@ -1016,6 +1016,7 @@ function TechStackEditor({
           </div>
           <TechStackSourceFirstAssist
             providerRows={sourceFirstProviderRows}
+            reviewBreakdown={reviewBreakdown}
             pendingSuggestions={sourceSuggestions.length}
             sourceMatchedEntryCount={sourceMatchedEntryCount}
             acceptedSourceCount={acceptedSourceCount}
@@ -1577,6 +1578,7 @@ function TechStackEditor({
 
 function TechStackSourceFirstAssist({
   providerRows,
+  reviewBreakdown,
   pendingSuggestions,
   sourceMatchedEntryCount,
   acceptedSourceCount,
@@ -1587,6 +1589,7 @@ function TechStackSourceFirstAssist({
   onAcceptBestMatch,
 }: {
   providerRows: TechStackProviderRow[];
+  reviewBreakdown: ProviderReviewBreakdownItem[];
   pendingSuggestions: number;
   sourceMatchedEntryCount: number;
   acceptedSourceCount: number;
@@ -1601,6 +1604,7 @@ function TechStackSourceFirstAssist({
     (provider) => provider.lastCheckedAt !== NEVER_CHECKED_AT,
   ).length;
   const queuedProviderCount = providerRows.filter((provider) => provider.status === 'queued').length;
+  const reviewCountById = new Map(reviewBreakdown.map((item) => [item.id, item.count]));
   const sourceMatchLabel = bestSourceMatch ? sourceLabelForTechItem(bestSourceMatch.item) : null;
   const sourceMatchConfidence = bestSourceMatch
     ? Math.round(bestSourceMatch.item.confidence * 100)
@@ -1690,16 +1694,11 @@ function TechStackSourceFirstAssist({
         aria-label={t('techStack.sourceFirstCoverageAria', 'MCP provider coverage')}
       >
         {providerRows.map((provider) => (
-          <span
-            className="tech-editor-source-first-chip"
-            data-tone={providerTone(provider.status)}
+          <SourceFirstProviderChip
             key={provider.id}
-            title={provider.message}
-          >
-            <span className="tech-source-dot" aria-hidden />
-            <strong>{provider.label}</strong>
-            <small>{providerTransportPlanText(provider)}</small>
-          </span>
+            provider={provider}
+            reviewCount={reviewCountById.get(provider.id as ProviderReviewBreakdownItem['id']) ?? 0}
+          />
         ))}
       </div>
       <div className="tech-editor-source-first-meta" aria-live="polite">
@@ -1737,6 +1736,32 @@ function TechStackSourceFirstAssist({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function SourceFirstProviderChip({
+  provider,
+  reviewCount,
+}: {
+  provider: TechStackProviderRow;
+  reviewCount: number;
+}) {
+  const statusText = providerStatusText(provider);
+  const nextAction = providerNextActionText(provider, reviewCount);
+
+  return (
+    <span
+      className="tech-editor-source-first-chip"
+      data-tone={providerTone(provider.status)}
+      key={provider.id}
+      title={provider.message}
+    >
+      <span className="tech-source-dot" aria-hidden />
+      <strong>{provider.label}</strong>
+      <small>{providerTransportPlanText(provider)}</small>
+      <em>{statusText}</em>
+      <span className="tech-editor-source-first-next">{nextAction}</span>
+    </span>
   );
 }
 

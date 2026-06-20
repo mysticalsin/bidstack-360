@@ -25,12 +25,15 @@ This runbook covers day-to-day operational procedures. For architecture details 
 ### Standard deploy (Docker / container)
 
 `docker-compose.prod.yml` requires `INTEGRATION_TOKEN_KEY` for both API and
-worker because both services decrypt tenant/provider secrets. Run the compose
-policy before building so env drift fails before an image is shipped.
+worker because both services decrypt tenant/provider secrets. It also publishes
+the web UI on `WEB_HTTP_PORT` (default `8080`) to the web container's
+unprivileged nginx port `8080`. Run the compose policy before building so env
+or ingress drift fails before an image is shipped.
 
 ```bash
 # 0. Validate production compose / env wiring
 pnpm deploy:evidence:compose:policy
+docker compose -f docker-compose.prod.yml config --quiet
 
 # 1. Build and tag the API image
 docker build -t bidstack-api:$GIT_SHA -f Dockerfile .

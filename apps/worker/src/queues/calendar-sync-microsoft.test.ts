@@ -93,7 +93,7 @@ describe('Microsoft Graph calendar connector SERUM gate', () => {
 
     await expect(
       handleMicrosoftPush({ event, operation: 'push', accessToken: 'token', log }),
-    ).rejects.toThrow(/SERUM Connector policy denied Microsoft Graph/);
+    ).rejects.toThrow(/SERUM connector policy denied microsoft_graph/);
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(calendarUpdate).not.toHaveBeenCalled();
@@ -112,6 +112,7 @@ describe('Microsoft Graph calendar connector SERUM gate', () => {
       connectorId: 'microsoft_graph',
       operation: 'calendar.push',
       writeRequested: true,
+      connectionTestProbe: false,
       approvalConfirmed: false,
     });
     expect(fetchMock).toHaveBeenCalledOnce();

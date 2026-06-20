@@ -101,6 +101,7 @@ scratch/
 scratch_skills/
 apps/web/scratch/
 apps/api/debug-out.txt
+.planning/review-out.txt
 
 # Generated i18n sweep scratch files. Keep the canonical coverage script, but
 # do not let temporary batch drivers/results enter release source evidence.

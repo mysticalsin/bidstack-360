@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import type { SerumModuleStatus, SerumStatusCard } from '@bidstack/shared';
@@ -41,6 +42,7 @@ const MODULE_ICONS: Record<string, IconName> = {
 };
 
 export function SerumMissionControlPage() {
+  const { t } = useTranslation('crm');
   const status = useSerumStatus();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -69,18 +71,23 @@ export function SerumMissionControlPage() {
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-[var(--serum-border)] bg-[var(--serum-surface-soft)] px-3 py-1 text-xs font-semibold text-[var(--serum-blue)]">
               <Icon name="sparkle" size={14} ariaHidden />
-              Self-Evolving Revenue Understanding Mesh
+              {t('serum.eyebrow', 'Self-Evolving Revenue Understanding Mesh')}
             </div>
             <h1 className="mt-5 text-3xl font-semibold tracking-tight text-[var(--fg-primary)] lg:text-5xl">
-              SERUM Mission Control
+              {t('serum.title', 'SERUM Mission Control')}
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-[var(--fg-secondary)] lg:text-base">
-              A source-backed control plane for agents, documents, model routing, approvals, and observability.
+              {t(
+                'serum.subtitle',
+                'A source-backed control plane for agents, documents, model routing, approvals, and observability.',
+              )}
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-2">
               <SerumStatusPill status={snapshot.enabled ? 'ready' : 'disabled'} />
               <span className="text-xs text-[var(--fg-tertiary)]">
-                Updated {new Date(snapshot.generatedAt).toLocaleString()}
+                {t('serum.updatedAt', 'Updated {{time}}', {
+                  time: new Date(snapshot.generatedAt).toLocaleString(),
+                })}
               </span>
             </div>
           </div>
@@ -99,10 +106,10 @@ export function SerumMissionControlPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--fg-tertiary)]">
-                Live module map
+                {t('serum.moduleMapEyebrow', 'Live module map')}
               </p>
               <h2 className="mt-2 text-lg font-semibold tracking-tight text-[var(--fg-primary)]">
-                Control-plane readiness
+                {t('serum.moduleMapTitle', 'Control-plane readiness')}
               </h2>
             </div>
             <Link
@@ -110,7 +117,7 @@ export function SerumMissionControlPage() {
               className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-3 text-xs font-medium text-[var(--fg-primary)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
             >
               <Icon name="sparkle" size={14} ariaHidden />
-              Agent Studio
+              {t('serum.agentStudioLink', 'Agent Studio')}
             </Link>
           </div>
 
@@ -157,25 +164,28 @@ export function SerumMissionControlPage() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--fg-tertiary)]">
-                Event feed
+                {t('serum.eventFeedEyebrow', 'Event feed')}
               </p>
               <h2 className="mt-2 text-lg font-semibold tracking-tight text-[var(--fg-primary)]">
-                Durable SERUM events
+                {t('serum.eventFeedTitle', 'Durable SERUM events')}
               </h2>
             </div>
             <SerumStatusPill status="not_configured" />
           </div>
           <div className="mt-5">
             <SerumEmptyState
-              title="No SERUM event ledger yet"
-              detail="The current build reads existing Crew, RFP, document, provider, queue, and audit signals. A future append-only SERUM event table should power live replay before autonomous loops are exposed."
+              title={t('serum.eventFeedEmptyTitle', 'No SERUM event ledger yet')}
+              detail={t(
+                'serum.eventFeedEmptyDetail',
+                'The current build reads existing Crew, RFP, document, provider, queue, and audit signals. A future append-only SERUM event table should power live replay before autonomous loops are exposed.',
+              )}
             />
           </div>
         </SerumPanel>
 
         <SerumPanel className="p-5">
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--fg-tertiary)]">
-            Guardrails
+            {t('serum.guardrailsTitle', 'Guardrails')}
           </p>
           <div className="mt-4 space-y-3">
             {snapshot.guardrails.map((guardrail) => (
@@ -191,25 +201,45 @@ export function SerumMissionControlPage() {
       <div className="grid gap-4 lg:grid-cols-3">
         <SerumSourceCard
           icon="pipeline"
-          label="Loop sources"
-          detail={`${snapshot.summary.activeLoops} active loops from Crew runs and RFP orchestrations.`}
+          label={t('serum.loopSourcesLabel', 'Loop sources')}
+          detail={t(
+            'serum.loopSourcesDetail',
+            '{{count}} active loops from Crew runs and RFP orchestrations.',
+            { count: snapshot.summary.activeLoops },
+          )}
         />
         <SerumSourceCard
           icon="file"
-          label="Document sources"
-          detail={`${snapshot.summary.documentsProcessedToday} successful extractions today; ${snapshot.summary.failedJobs} failed job signals across queues, documents, and RFP loops.`}
+          label={t('serum.documentSourcesLabel', 'Document sources')}
+          detail={t(
+            'serum.documentSourcesDetail',
+            '{{processed}} successful extractions today; {{failed}} failed job signals across queues, documents, and RFP loops.',
+            {
+              processed: snapshot.summary.documentsProcessedToday,
+              failed: snapshot.summary.failedJobs,
+            },
+          )}
         />
         <SerumSourceCard
           icon="zap"
-          label="Model sources"
-          detail={`${snapshot.summary.modelCallsToday} AI invocation audit rows today with ${snapshot.summary.modelTokensToday.toLocaleString('en-US')} tokens.`}
+          label={t('serum.modelSourcesLabel', 'Model sources')}
+          detail={t(
+            'serum.modelSourcesDetail',
+            '{{calls}} AI invocation audit rows today with {{tokens}} tokens.',
+            {
+              calls: snapshot.summary.modelCallsToday,
+              tokens: snapshot.summary.modelTokensToday.toLocaleString('en-US'),
+            },
+          )}
         />
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
         <SerumPanel className="p-5">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold text-[var(--fg-primary)]">Provider health</h2>
+            <h2 className="text-base font-semibold text-[var(--fg-primary)]">
+              {t('serum.providerHealthTitle', 'Provider health')}
+            </h2>
             <SerumStatusPill status={snapshot.summary.providerConfigured || snapshot.summary.dustConfigured ? 'ready' : 'not_configured'} />
           </div>
           <div className="mt-4 space-y-3">
@@ -222,7 +252,9 @@ export function SerumMissionControlPage() {
                   <div>
                     <p className="text-sm font-medium text-[var(--fg-primary)]">{provider.provider}</p>
                     <p className="text-xs text-[var(--fg-tertiary)]">
-                      {provider.latencyMs === null ? 'No latency recorded' : `${provider.latencyMs} ms`}
+                      {provider.latencyMs === null
+                        ? t('serum.noLatencyRecorded', 'No latency recorded')
+                        : t('serum.latencyMs', '{{ms}} ms', { ms: provider.latencyMs })}
                     </p>
                   </div>
                   <SerumStatusPill status={provider.status} />
@@ -230,8 +262,11 @@ export function SerumMissionControlPage() {
               ))
             ) : (
               <SerumEmptyState
-                title="No provider heartbeat rows"
-                detail="Provider credentials may still exist, but no health checks have been written for this org."
+                title={t('serum.providerEmptyTitle', 'No provider heartbeat rows')}
+                detail={t(
+                  'serum.providerEmptyDetail',
+                  'Provider credentials may still exist, but no health checks have been written for this org.',
+                )}
               />
             )}
           </div>
@@ -239,7 +274,9 @@ export function SerumMissionControlPage() {
 
         <SerumPanel className="p-5">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold text-[var(--fg-primary)]">Queue health</h2>
+            <h2 className="text-base font-semibold text-[var(--fg-primary)]">
+              {t('serum.queueHealthTitle', 'Queue health')}
+            </h2>
             <SerumStatusPill status={snapshot.queueHealth.some((queue) => queue.failed > 0) ? 'attention' : 'ready'} />
           </div>
           <div className="mt-4 space-y-3">
@@ -254,14 +291,26 @@ export function SerumMissionControlPage() {
                     <SerumStatusPill status={queue.status} />
                   </div>
                   <p className="mt-2 text-xs text-[var(--fg-tertiary)]">
-                    {queue.waiting} waiting / {queue.active} active / {queue.failed} failed / {queue.completed} completed
+                    {t(
+                      'serum.queueCounts',
+                      '{{waiting}} waiting / {{active}} active / {{failed}} failed / {{completed}} completed',
+                      {
+                        waiting: queue.waiting,
+                        active: queue.active,
+                        failed: queue.failed,
+                        completed: queue.completed,
+                      },
+                    )}
                   </p>
                 </div>
               ))
             ) : (
               <SerumEmptyState
-                title="No queue snapshots"
-                detail="Queue monitor rows have not been recorded yet for this org."
+                title={t('serum.queueEmptyTitle', 'No queue snapshots')}
+                detail={t(
+                  'serum.queueEmptyDetail',
+                  'Queue monitor rows have not been recorded yet for this org.',
+                )}
               />
             )}
           </div>
@@ -272,10 +321,10 @@ export function SerumMissionControlPage() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--fg-tertiary)]">
-              Backend signals
+              {t('serum.backendSignalsEyebrow', 'Backend signals')}
             </p>
             <h2 className="mt-2 text-base font-semibold text-[var(--fg-primary)]">
-              Signal availability
+              {t('serum.backendSignalsTitle', 'Signal availability')}
             </h2>
           </div>
           <SerumStatusPill

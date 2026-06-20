@@ -182,7 +182,17 @@ function isIntegrationTokenKey(value: string | undefined): boolean {
 
 function publicBaseUrlIsLoopback(value: string): boolean {
   const hostname = new URL(value).hostname.toLowerCase();
-  return hostname === 'localhost' || hostname === '::1' || hostname.startsWith('127.');
+  // Node's URL parser keeps IPv6 hosts bracketed, so '::1' arrives as '[::1]'.
+  // Also treat the IPv4 unspecified range (0.0.0.0/8) as non-public — binding
+  // there is not a deployable web origin.
+  return (
+    hostname === 'localhost' ||
+    hostname === '::1' ||
+    hostname === '[::1]' ||
+    hostname.startsWith('127.') ||
+    hostname === '0.0.0.0' ||
+    hostname.startsWith('0.')
+  );
 }
 
 export function getEnv(): Env {

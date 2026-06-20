@@ -3086,3 +3086,52 @@ integration_configs_org_type_name_key`, but the live local DB does not have
 - **Root cause:** Health hardening added a separate `4003` health port, but the traffic `EXPOSE` metadata was not checked against the runtime default.
 - **Prevention rule:** Any Dockerfile runtime target with a source-defined default port must have a package-level policy test that checks `EXPOSE`, healthcheck, and non-root process order against the source contract.
 - **Files affected:** `Dockerfile`, `apps/mcp-server/src/dockerfile-policy.test.ts`, `docs/solutions/mcp-production-env-fail-fast.md`.
+
+### 2026-06-19 DEVOPS: Production compose web app was not published
+
+- **What went wrong:** `docker-compose.prod.yml` published the marketing site but did not publish the primary `web` CRM service, so a local production compose deployment could boot without exposing the actual app UI.
+- **Root cause:** The web image moved to unprivileged nginx on container port `8080`, but the compose policy only checked API/worker/MCP secret and dependency wiring.
+- **Prevention rule:** Production compose policy must verify every public runtime surface has either an explicit ingress service or a published host port. The main web service must publish container `8080` and the port must be documented in `.env.example`.
+- **Files affected:** `docker-compose.prod.yml`, `.env.example`, `scripts/verify-compose-production-policy.mjs`, `docs/RUNBOOK.md`, `docs/solutions/production-compose-secret-wiring.md`.
+
+### 2026-06-19 UI: Technical Stack provider status chips were too cramped
+
+- **What went wrong:** The first source-assistant status-chip pass added useful provider state text but kept a four-column `minmax(0, 1fr)` grid. In the real account card, chips measured about 67px wide, making Apollo/Seamless/Tech Intel status copy feel cramped instead of premium.
+- **Root cause:** Component tests verified the text contract, but only the in-app browser preview measured the rendered card inside the dense account layout.
+- **Prevention rule:** Any dense cockpit chip/card that adds multi-line status text must get a browser layout check for desktop and 390px mobile widths, including minimum chip width, no horizontal overflow, and touch target measurements.
+- **Files affected:** `apps/web/src/components/cockpit/TechStackCard.tsx`, `apps/web/src/components/cockpit/TechStackCard.test.tsx`, `apps/web/src/styles/cockpit.css`, `docs/solutions/technical-stack-provider-source-pull.md`.
+
+### 2026-06-19 DEVOPS: Production web startup only depended on API container creation
+
+- **What went wrong:** The production compose `web` service depended on the API with short-form `depends_on: - api`, which only ordered container creation and did not wait for the API healthcheck.
+- **Root cause:** The compose policy checked that the dependency existed, but not that it used a health-gated condition.
+- **Prevention rule:** Public web/runtime surfaces that proxy to an internal API must wait on `service_healthy`, and compose policy selftests must include a poisoned short-form dependency fixture.
+- **Files affected:** `docker-compose.prod.yml`, `scripts/verify-compose-production-policy.mjs`, `docs/solutions/production-compose-secret-wiring.md`.
+
+### 2026-06-19 API/WORKER: Default-off SERUM blocked existing Dust workflows
+
+- **What went wrong:** The API and worker Dust clients always called the SERUM Dust/MCP Gateway runtime guard, so orgs without a published gateway policy could be denied even when `SERUM_ENABLED` was unset or `false`.
+- **Root cause:** The new gateway guard was wired directly into every Dust client method but was not gated by the global SERUM feature flag.
+- **Prevention rule:** Default-off enterprise control-plane features must not break existing integrations. Runtime fail-closed checks should activate only when their feature flag is enabled, and tests must cover both disabled-pass-through and enabled-denied paths.
+- **Files affected:** `apps/api/src/lib/dust-credentials.ts`, `apps/api/src/lib/dust-credentials.test.ts`, `apps/worker/src/lib/dust-credentials.ts`, `apps/worker/src/lib/dust-credentials.test.ts`, `docs/solutions/serum-control-plane-safe-foundation.md`.
+
+### 2026-06-19 DB: SERUM runtime guards resolved the full control-plane snapshot
+
+- **What went wrong:** Hot runtime guards for SERUM tools, connectors, Dust/MCP gateway, and adjacent policy slices called the full `resolveSerumRuntimePolicy` aggregator even though each decision needed only one active policy row.
+- **Root cause:** The admin/status snapshot resolver was reused for runtime enforcement, hiding about ten DB reads behind single-operation checks.
+- **Prevention rule:** Runtime guards must have query-budget tests. Admin snapshots may aggregate many policy slices, but per-request enforcement should read only the policy slice and evidence rows required for that decision.
+- **Files affected:** `packages/db/src/serum-runtime-policy.ts`, `packages/db/src/serum-runtime-policy.test.ts`, `docs/solutions/serum-control-plane-safe-foundation.md`.
+
+### 2026-06-19 DB: Model Router runtime checks reused admin readiness probes
+
+- **What went wrong:** The Model Router runtime fast path still reused the admin snapshot builder, so explicit model execution checks could query the org active provider and provider credential readiness before checking the single provider being executed.
+- **Root cause:** Admin display policy and per-request enforcement shared one DTO builder even though they have different query budgets.
+- **Prevention rule:** Runtime guards should use enforcement-specific policy builders when admin snapshots include display-only readiness probes. Query-count tests must cover zero-credential providers such as `gemma` so display-only SQL fan-out is caught.
+- **Files affected:** `packages/db/src/serum-runtime-policy.ts`, `packages/db/src/serum-runtime-policy.test.ts`, `docs/solutions/serum-control-plane-safe-foundation.md`.
+
+### 2026-06-19 TOOLING: Local agent worktrees were tracked as gitlinks
+
+- **What went wrong:** Two `.claude/worktrees/*` paths were tracked as gitlinks without a `.gitmodules` mapping. Dirty nested agent worktrees blocked source evidence, and a clean branch could still have shipped malformed local workspace references.
+- **Root cause:** `.gitignore` excluded future agent worktrees, but existing tracked gitlink entries remained in the index and the source evidence gate did not check clean tracked local-artifact paths.
+- **Prevention rule:** Release source evidence must inspect the Git index for tracked local coordination artifacts, not only dirty status output. `.claude/worktrees/*` must remain local-only and never be tracked in release source.
+- **Files affected:** `.claude/worktrees/agent-a10be174ac9f8abbc`, `.claude/worktrees/agent-af86570a156df70f1`, `scripts/write-source-control-evidence.mjs`, `docs/solutions/deploy-evidence-hard-gate.md`.

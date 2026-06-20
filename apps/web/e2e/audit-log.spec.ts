@@ -25,7 +25,7 @@ test.describe('Audit log page', () => {
       timeout: 30_000,
     });
     await expect(page.getByPlaceholder('Search current page by action, actor, target or diff...')).toBeVisible();
-    await expect(page.getByRole('button', { name: /Export visible|Visible CSV|Export CSV/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Export visible' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Copy view link' })).toBeVisible();
     await expect(page.getByRole('button', { name: /Refresh|Refreshing/ })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Evidence quality' })).toBeVisible();

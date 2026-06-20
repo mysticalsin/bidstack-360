@@ -40,7 +40,21 @@ const creds = {
   source: 'org',
 };
 
-describe('getOrgDust SERUM gateway guard', () => {
+function mockDustRunResponse() {
+  globalThis.fetch = vi.fn().mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        run_id: 'run-1',
+        status: 'queued',
+        output: null,
+        conversation_id: null,
+      }),
+      { status: 200 },
+    ),
+  );
+}
+
+describe('API getOrgDust SERUM gateway guard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.SERUM_ENABLED;
@@ -59,17 +73,7 @@ describe('getOrgDust SERUM gateway guard', () => {
   });
 
   it('does not require a SERUM gateway policy while SERUM is globally disabled', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          run_id: 'run-1',
-          status: 'queued',
-          output: null,
-          conversation_id: null,
-        }),
-        { status: 200 },
-      ),
-    );
+    mockDustRunResponse();
 
     const { client } = await getOrgDust(orgId, log);
 
@@ -84,7 +88,7 @@ describe('getOrgDust SERUM gateway guard', () => {
     );
   });
 
-  it('denies Dust agent runs before any network request when SERUM gateway rejects them', async () => {
+  it('denies Dust agent runs before any network request when SERUM is enabled and the gateway rejects them', async () => {
     process.env.SERUM_ENABLED = 'true';
     mocks.checkGateway.mockResolvedValue({
       configType: 'dust_mcp_gateway',
@@ -116,31 +120,30 @@ describe('getOrgDust SERUM gateway guard', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it('marks Dust document upserts as approval-gated writes', async () => {
+  it('proceeds with the Dust agent run when SERUM is enabled and the gateway allows it', async () => {
     process.env.SERUM_ENABLED = 'true';
     mocks.checkGateway.mockResolvedValue({
       configType: 'dust_mcp_gateway',
       configKey: 'gateway',
       environment: 'dev',
-      subject: 'dust.upsertDocument',
-      allowed: false,
-      status: 'denied',
-      reason: 'Gateway write operations require explicit approval confirmation.',
+      subject: 'dust.runAgent',
+      allowed: true,
+      status: 'allowed',
+      reason: 'Dust/MCP Gateway operation is allowed by the active SERUM policy.',
       activeConfigVersionId: '22222222-2222-4222-8222-222222222222',
     });
+    mockDustRunResponse();
 
     const { client } = await getOrgDust(orgId, log);
 
-    await expect(client?.upsertDocument('ds', 'doc-1', 'body')).rejects.toThrow(
-      'SERUM Dust/MCP Gateway denied dust.upsertDocument',
+    await expect(client?.runAgent('agent-1', 'hello')).resolves.toMatchObject({
+      run_id: 'run-1',
+      status: 'queued',
+    });
+    expect(mocks.checkGateway).toHaveBeenCalledTimes(1);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'https://dust.example/api/v1/w/workspace-1/assistant/agent_configurations/agent-1/runs',
+      expect.objectContaining({ method: 'POST' }),
     );
-    expect(mocks.checkGateway).toHaveBeenCalledWith(
-      expect.objectContaining({
-        operation: 'dust.upsertDocument',
-        writeRequested: true,
-        approvalConfirmed: false,
-      }),
-    );
-    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 });

@@ -377,6 +377,7 @@ export async function resolveHubSpotAccessToken(
       type: HUBSPOT_INTEGRATION_TYPE,
       name: HUBSPOT_MIGRATION_CONFIG_NAME,
       isActive: true,
+      deletedAt: null,
     },
     select: { credentials: true },
   });

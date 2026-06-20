@@ -30,6 +30,10 @@ function defaultSerumConfigEnvironment(): SerumConfigEnvironment {
   return 'dev';
 }
 
+function serumGatewayGuardEnabled(): boolean {
+  return process.env.SERUM_ENABLED === 'true';
+}
+
 class SerumGuardedDustClient extends DustClient {
   private readonly orgId: string;
   private readonly environment: SerumConfigEnvironment;
@@ -55,6 +59,10 @@ class SerumGuardedDustClient extends DustClient {
   }
 
   private async guard(operation: string, writeRequested: boolean): Promise<void> {
+    if (!serumGatewayGuardEnabled()) {
+      return;
+    }
+
     const decision = await checkSerumDustMcpGatewayRuntimePolicy({
       orgId: this.orgId,
       environment: this.environment,

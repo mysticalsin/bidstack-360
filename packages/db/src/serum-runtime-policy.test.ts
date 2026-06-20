@@ -22,6 +22,9 @@ vi.mock('./index.js', () => ({
 
 import {
   checkSerumConnectorRuntimePolicy,
+  checkSerumDustMcpGatewayRuntimePolicy,
+  checkSerumModelRouterRuntimePolicy,
+  checkSerumToolRuntimePolicy,
   recordSerumConnectorConnectionTest,
 } from './serum-runtime-policy.js';
 
@@ -39,6 +42,57 @@ function connectorConfig(configJson: Record<string, unknown> = {}) {
       connectorMode: 'read_only',
       requireConnectionTest: true,
       secretRefs: ['connector:odoo-prod'],
+      ...configJson,
+    },
+  };
+}
+
+function toolConfig(configJson: Record<string, unknown> = {}) {
+  return {
+    id: activeConfigVersionId,
+    configType: 'tools',
+    configKey: 'registry',
+    version: 1,
+    configJson: {
+      enabled: true,
+      registryMode: 'explicit_allowlist',
+      allowedTools: ['opportunities.list'],
+      allowWriteTools: false,
+      requireDryRunForWriteTools: true,
+      ...configJson,
+    },
+  };
+}
+
+function dustMcpGatewayConfig(configJson: Record<string, unknown> = {}) {
+  return {
+    id: activeConfigVersionId,
+    configType: 'dust_mcp_gateway',
+    configKey: 'gateway',
+    version: 1,
+    configJson: {
+      dustEnabled: true,
+      mcpEnabled: false,
+      writeMode: 'disabled',
+      secretRefs: ['dust:production'],
+      requireToolAudit: true,
+      ...configJson,
+    },
+  };
+}
+
+function modelRouterConfig(configJson: Record<string, unknown> = {}) {
+  return {
+    id: activeConfigVersionId,
+    configType: 'model_router',
+    configKey: 'routing',
+    version: 1,
+    configJson: {
+      defaultProvider: 'gemma',
+      fallbackProvider: null,
+      maxTokensPerRequest: 2000,
+      requireSourceCitations: true,
+      uncertaintyMode: 'answer_with_limits',
       ...configJson,
     },
   };
@@ -85,6 +139,8 @@ describe('SERUM connector connection-test evidence', () => {
         }),
       }),
     );
+    expect(mocks.configFindFirst).toHaveBeenCalledTimes(1);
+    expect(mocks.queryRaw).not.toHaveBeenCalled();
   });
 
   it('allows read execution when fresh connector evidence exists', async () => {
@@ -103,6 +159,18 @@ describe('SERUM connector connection-test evidence', () => {
       subject: 'erp.search:odoo',
       activeConfigVersionId,
     });
+    expect(mocks.configFindFirst).toHaveBeenCalledTimes(1);
+    expect(mocks.configFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          orgId,
+          environment: 'dev',
+          configType: 'connectors',
+          configKey: 'registry',
+        }),
+      }),
+    );
+    expect(mocks.queryRaw).not.toHaveBeenCalled();
   });
 
   it('allows explicit connection probes to create evidence before prior evidence exists', async () => {
@@ -120,6 +188,8 @@ describe('SERUM connector connection-test evidence', () => {
 
     expect(decision).toMatchObject({ allowed: true, status: 'allowed' });
     expect(mocks.connectionTestFindFirst).not.toHaveBeenCalled();
+    expect(mocks.configFindFirst).toHaveBeenCalledTimes(1);
+    expect(mocks.queryRaw).not.toHaveBeenCalled();
   });
 
   it('records connection-test success with a 30-day expiration by default', async () => {
@@ -147,5 +217,111 @@ describe('SERUM connector connection-test evidence', () => {
       expiresAt: Date;
     };
     expect(data.expiresAt.getTime() - data.testedAt.getTime()).toBe(30 * 24 * 60 * 60 * 1000);
+  });
+});
+
+describe('SERUM hot-path runtime guards', () => {
+  it('checks MCP tool calls with only the active tools policy', async () => {
+    mocks.configFindFirst.mockImplementation(({ where }: { where: { configType: string } }) =>
+      where.configType === 'tools' ? toolConfig() : null,
+    );
+
+    const decision = await checkSerumToolRuntimePolicy({
+      orgId,
+      environment: 'dev',
+      configKey: 'registry',
+      toolName: 'opportunities.list',
+      dryRun: false,
+    });
+
+    expect(decision).toMatchObject({
+      allowed: true,
+      status: 'allowed',
+      subject: 'opportunities.list',
+      activeConfigVersionId,
+    });
+    expect(mocks.configFindFirst).toHaveBeenCalledTimes(1);
+    expect(mocks.configFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          orgId,
+          environment: 'dev',
+          configType: 'tools',
+          configKey: 'registry',
+        }),
+      }),
+    );
+    expect(mocks.queryRaw).not.toHaveBeenCalled();
+    expect(mocks.connectionTestFindFirst).not.toHaveBeenCalled();
+  });
+
+  it('checks Dust gateway reads with only the active gateway policy', async () => {
+    mocks.configFindFirst.mockImplementation(({ where }: { where: { configType: string } }) =>
+      where.configType === 'dust_mcp_gateway' ? dustMcpGatewayConfig() : null,
+    );
+
+    const decision = await checkSerumDustMcpGatewayRuntimePolicy({
+      orgId,
+      environment: 'production',
+      configKey: 'gateway',
+      operation: 'dust.workspace.list',
+      writeRequested: false,
+      toolAuditPresent: true,
+    });
+
+    expect(decision).toMatchObject({
+      allowed: true,
+      status: 'allowed',
+      subject: 'dust.workspace.list',
+      activeConfigVersionId,
+    });
+    expect(mocks.configFindFirst).toHaveBeenCalledTimes(1);
+    expect(mocks.configFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          orgId,
+          environment: 'production',
+          configType: 'dust_mcp_gateway',
+          configKey: 'gateway',
+        }),
+      }),
+    );
+    expect(mocks.queryRaw).not.toHaveBeenCalled();
+    expect(mocks.connectionTestFindFirst).not.toHaveBeenCalled();
+  });
+
+  it('checks explicit Gemma model routes without org-provider or credential side queries', async () => {
+    mocks.configFindFirst.mockImplementation(({ where }: { where: { configType: string } }) =>
+      where.configType === 'model_router' ? modelRouterConfig() : null,
+    );
+
+    const decision = await checkSerumModelRouterRuntimePolicy({
+      orgId,
+      environment: 'dev',
+      configKey: 'routing',
+      provider: 'gemma',
+      requestedMaxTokens: 1000,
+      sourceCitationsRequired: true,
+    });
+
+    expect(decision).toMatchObject({
+      allowed: true,
+      status: 'allowed',
+      subject: 'gemma',
+      activeConfigVersionId,
+    });
+    expect(mocks.configFindFirst).toHaveBeenCalledTimes(1);
+    expect(mocks.configFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          orgId,
+          environment: 'dev',
+          configType: 'model_router',
+          configKey: 'routing',
+        }),
+      }),
+    );
+    expect(mocks.queryRaw).not.toHaveBeenCalled();
+    expect(mocks.connectionTestFindFirst).not.toHaveBeenCalled();
   });
 });

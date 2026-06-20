@@ -56,8 +56,11 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
       adminOnly: false,
     },
     {
-      title: 'SERUM Control Plane',
-      detail: 'Agent, model, document, approval, and policy readiness',
+      title: t('settingsOverview.tileSerumTitle', 'SERUM Control Plane'),
+      detail: t(
+        'settingsOverview.tileSerumDetail',
+        'Agent, model, document, approval, and policy readiness',
+      ),
       tone: 'blue',
       icon: 'sparkle' as const,
       section: 'serum' as const,

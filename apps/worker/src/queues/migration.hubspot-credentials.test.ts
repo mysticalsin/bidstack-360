@@ -63,6 +63,7 @@ describe('HubSpot migration credential resolution', () => {
         type: 'hubspot',
         name: 'hubspot-migration',
         isActive: true,
+        deletedAt: null,
       },
       select: { credentials: true },
     });

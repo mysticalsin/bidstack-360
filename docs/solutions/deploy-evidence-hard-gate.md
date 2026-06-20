@@ -184,6 +184,12 @@ Strict requirements:
 - no tracked modifications
 - no staged-but-uncommitted files
 - no untracked files
+- no tracked local agent worktrees under `.claude/worktrees/`
+
+The writer also checks the Git index directly for `.claude/worktrees/` entries.
+This catches the clean-but-bad case where a local agent workspace was committed
+as a gitlink without a `.gitmodules` mapping. Those directories may exist on a
+developer machine, but release source must not track them.
 
 ### Operational readiness
 

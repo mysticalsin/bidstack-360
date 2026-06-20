@@ -63,6 +63,8 @@ type ActiveConfigRow = {
 type ToolScope = 'read' | 'write';
 type DirectAgentProvider = DirectAgentProviderId;
 
+type ModelRouterRuntimePolicy = Omit<SerumRuntimeModelRouterPolicyDto, 'providerConfigured'>;
+
 type AgentProviderCredentialRow = {
   name: string;
   config: unknown;
@@ -483,6 +485,31 @@ async function buildModelRouterPolicy(
   };
 }
 
+function buildModelRouterRuntimePolicy(row: ActiveConfigRow | null): ModelRouterRuntimePolicy {
+  const config = asJsonObject(row?.configJson);
+  const defaultProvider = nullableStringConfig(config, 'defaultProvider');
+  const fallbackProvider = nullableStringConfig(config, 'fallbackProvider');
+  const defaultPolicyProvider =
+    defaultProvider && defaultProvider !== 'not_configured' && isDirectAgentProvider(defaultProvider)
+      ? defaultProvider
+      : null;
+  const fallbackPolicyProvider =
+    fallbackProvider && fallbackProvider !== 'not_configured' && isDirectAgentProvider(fallbackProvider)
+      ? fallbackProvider
+      : null;
+
+  return {
+    activeConfigVersionId: row?.id ?? null,
+    activeConfigVersion: row?.version ?? null,
+    defaultProvider: defaultProvider === 'not_configured' ? null : defaultProvider,
+    fallbackProvider: fallbackProvider === 'not_configured' ? null : fallbackProvider,
+    effectiveProvider: defaultPolicyProvider ?? fallbackPolicyProvider,
+    maxTokensPerRequest: Math.max(1, numberConfig(config, 'maxTokensPerRequest', 4000)),
+    requireSourceCitations: boolConfig(config, 'requireSourceCitations', true),
+    uncertaintyMode: stringConfig(config, 'uncertaintyMode', 'answer_with_limits'),
+  };
+}
+
 export async function resolveSerumRuntimePolicy(args: {
   orgId: string;
   environment: SerumConfigEnvironmentValue;
@@ -575,6 +602,136 @@ export async function resolveSerumRuntimePolicy(args: {
   });
 }
 
+async function resolveAgentRuntimePolicy(args: {
+  orgId: string;
+  environment: SerumConfigEnvironmentValue;
+  configKey: string;
+  excludedRunId?: string;
+}): Promise<SerumRuntimeAgentPolicyDto> {
+  const [row, currentActiveRuns] = await Promise.all([
+    readActiveConfig({
+      orgId: args.orgId,
+      configType: 'agents',
+      configKey: args.configKey,
+      environment: args.environment,
+    }),
+    countActiveCrewRuns(args.orgId, args.excludedRunId),
+  ]);
+  return buildAgentPolicy(row, currentActiveRuns);
+}
+
+async function resolveLoopRuntimePolicy(args: {
+  orgId: string;
+  environment: SerumConfigEnvironmentValue;
+  configKey: string;
+}): Promise<SerumRuntimeLoopPolicyDto> {
+  const row = await readActiveConfig({
+    orgId: args.orgId,
+    configType: 'loops',
+    configKey: args.configKey,
+    environment: args.environment,
+  });
+  return buildLoopPolicy(row);
+}
+
+async function resolveToolRuntimePolicy(args: {
+  orgId: string;
+  environment: SerumConfigEnvironmentValue;
+  configKey: string;
+}): Promise<SerumRuntimeToolPolicyDto> {
+  const row = await readActiveConfig({
+    orgId: args.orgId,
+    configType: 'tools',
+    configKey: args.configKey,
+    environment: args.environment,
+  });
+  return buildToolPolicy(row);
+}
+
+async function resolveConnectorRuntimePolicy(args: {
+  orgId: string;
+  environment: SerumConfigEnvironmentValue;
+  configKey: string;
+}): Promise<SerumRuntimeConnectorPolicyDto> {
+  const row = await readActiveConfig({
+    orgId: args.orgId,
+    configType: 'connectors',
+    configKey: args.configKey,
+    environment: args.environment,
+  });
+  return buildConnectorPolicy(row);
+}
+
+async function resolveModelRouterRuntimePolicy(args: {
+  orgId: string;
+  environment: SerumConfigEnvironmentValue;
+  configKey: string;
+}): Promise<ModelRouterRuntimePolicy> {
+  const row = await readActiveConfig({
+    orgId: args.orgId,
+    configType: 'model_router',
+    configKey: args.configKey,
+    environment: args.environment,
+  });
+  return buildModelRouterRuntimePolicy(row);
+}
+
+async function resolveDustMcpGatewayRuntimePolicy(args: {
+  orgId: string;
+  environment: SerumConfigEnvironmentValue;
+  configKey: string;
+}): Promise<SerumRuntimeDustMcpGatewayPolicyDto> {
+  const row = await readActiveConfig({
+    orgId: args.orgId,
+    configType: 'dust_mcp_gateway',
+    configKey: args.configKey,
+    environment: args.environment,
+  });
+  return buildDustMcpGatewayPolicy(row);
+}
+
+async function resolveRetrievalRuntimePolicy(args: {
+  orgId: string;
+  environment: SerumConfigEnvironmentValue;
+  configKey: string;
+}): Promise<SerumRuntimeRetrievalPolicyDto> {
+  const row = await readActiveConfig({
+    orgId: args.orgId,
+    configType: 'retrieval',
+    configKey: args.configKey,
+    environment: args.environment,
+  });
+  return buildRetrievalPolicy(row);
+}
+
+async function resolvePromptLibraryRuntimePolicy(args: {
+  orgId: string;
+  environment: SerumConfigEnvironmentValue;
+  configKey: string;
+}): Promise<SerumRuntimePromptLibraryPolicyDto> {
+  const row = await readActiveConfig({
+    orgId: args.orgId,
+    configType: 'prompt_library',
+    configKey: args.configKey,
+    environment: args.environment,
+  });
+  return buildPromptLibraryPolicy(row);
+}
+
+async function resolveEvalsQualityGateRuntimePolicy(args: {
+  orgId: string;
+  environment: SerumConfigEnvironmentValue;
+  configKey: string;
+}): Promise<SerumRuntimeEvalsQualityGatePolicyDto> {
+  const row = await readActiveConfig({
+    orgId: args.orgId,
+    configType: 'evals_quality_gates',
+    configKey: args.configKey,
+    environment: args.environment,
+  });
+  return buildEvalsQualityGatePolicy(row);
+}
+
 export async function checkSerumAgentRuntimePolicy(args: {
   orgId: string;
   environment: SerumConfigEnvironmentValue;
@@ -583,13 +740,12 @@ export async function checkSerumAgentRuntimePolicy(args: {
   approvalConfirmed: boolean;
   excludedRunId?: string;
 }): Promise<SerumRuntimeDecisionDto> {
-  const policy = await resolveSerumRuntimePolicy({
+  const agent = await resolveAgentRuntimePolicy({
     orgId: args.orgId,
     environment: args.environment,
-    configKeys: { agents: args.configKey },
+    configKey: args.configKey,
     excludedRunId: args.excludedRunId,
   });
-  const agent = policy.agents;
   const base = {
     configType: 'agents' as const,
     configKey: args.configKey,
@@ -666,12 +822,11 @@ export async function checkSerumLoopRuntimePolicy(args: {
   replayRequested?: boolean;
   approvalConfirmed?: boolean;
 }): Promise<SerumRuntimeDecisionDto> {
-  const policy = await resolveSerumRuntimePolicy({
+  const loops = await resolveLoopRuntimePolicy({
     orgId: args.orgId,
     environment: args.environment,
-    configKeys: { loops: args.configKey },
+    configKey: args.configKey,
   });
-  const loops = policy.loops;
   const loopId = args.loopId.trim();
   const operation = args.operation.trim();
   const subject = `${operation}:${loopId}`;
@@ -773,12 +928,11 @@ export async function checkSerumToolRuntimePolicy(args: {
   toolName: string;
   dryRun: boolean;
 }): Promise<SerumRuntimeDecisionDto> {
-  const policy = await resolveSerumRuntimePolicy({
+  const tools = await resolveToolRuntimePolicy({
     orgId: args.orgId,
     environment: args.environment,
-    configKeys: { tools: args.configKey },
+    configKey: args.configKey,
   });
-  const tools = policy.tools;
   const base = {
     configType: 'tools' as const,
     configKey: args.configKey,
@@ -854,12 +1008,11 @@ export async function checkSerumConnectorRuntimePolicy(args: {
   connectionTestProbe?: boolean;
   approvalConfirmed?: boolean;
 }): Promise<SerumRuntimeDecisionDto> {
-  const policy = await resolveSerumRuntimePolicy({
+  const connectors = await resolveConnectorRuntimePolicy({
     orgId: args.orgId,
     environment: args.environment,
-    configKeys: { connectors: args.configKey },
+    configKey: args.configKey,
   });
-  const connectors = policy.connectors;
   const connectorId = normalizeConnectorId(args.connectorId);
   const subject = `${args.operation.trim()}:${connectorId}`;
   const base = {
@@ -964,12 +1117,11 @@ export async function checkSerumModelRouterRuntimePolicy(args: {
   requestedMaxTokens: number;
   sourceCitationsRequired: boolean;
 }): Promise<SerumRuntimeDecisionDto> {
-  const policy = await resolveSerumRuntimePolicy({
+  const router = await resolveModelRouterRuntimePolicy({
     orgId: args.orgId,
     environment: args.environment,
-    configKeys: { modelRouter: args.configKey },
+    configKey: args.configKey,
   });
-  const router = policy.modelRouter;
   const requestedProvider = args.provider ?? router.effectiveProvider;
   const allowedProviders = [router.defaultProvider, router.fallbackProvider].filter(Boolean);
   const base = {
@@ -1061,12 +1213,11 @@ export async function checkSerumDustMcpGatewayRuntimePolicy(args: {
   approvalConfirmed?: boolean;
   toolAuditPresent?: boolean;
 }): Promise<SerumRuntimeDecisionDto> {
-  const policy = await resolveSerumRuntimePolicy({
+  const gateway = await resolveDustMcpGatewayRuntimePolicy({
     orgId: args.orgId,
     environment: args.environment,
-    configKeys: { dustMcpGateway: args.configKey },
+    configKey: args.configKey,
   });
-  const gateway = policy.dustMcpGateway;
   const normalizedOperation = args.operation.trim();
   const operationKind = normalizedOperation.startsWith('mcp.') ? 'mcp' : 'dust';
   const inferredWriteRequested =
@@ -1171,12 +1322,11 @@ export async function checkSerumRetrievalRuntimePolicy(args: {
   sourceBacked: boolean;
   expectedConfidence: number;
 }): Promise<SerumRuntimeDecisionDto> {
-  const policy = await resolveSerumRuntimePolicy({
+  const retrieval = await resolveRetrievalRuntimePolicy({
     orgId: args.orgId,
     environment: args.environment,
-    configKeys: { retrieval: args.configKey },
+    configKey: args.configKey,
   });
-  const retrieval = policy.retrieval;
   const subject = args.operation.trim();
   const base = {
     configType: 'retrieval' as const,
@@ -1253,12 +1403,11 @@ export async function checkSerumPromptLibraryRuntimePolicy(args: {
   injectionTested: boolean;
   productionApproved: boolean;
 }): Promise<SerumRuntimeDecisionDto> {
-  const policy = await resolveSerumRuntimePolicy({
+  const promptLibrary = await resolvePromptLibraryRuntimePolicy({
     orgId: args.orgId,
     environment: args.environment,
-    configKeys: { promptLibrary: args.configKey },
+    configKey: args.configKey,
   });
-  const promptLibrary = policy.promptLibrary;
   const promptSet = args.promptSet.trim();
   const subject = `${args.operation.trim()}:${promptSet}`;
   const base = {
@@ -1339,12 +1488,11 @@ export async function checkSerumEvalsQualityGateRuntimePolicy(args: {
   passRate: number;
   failedCount: number;
 }): Promise<SerumRuntimeDecisionDto> {
-  const policy = await resolveSerumRuntimePolicy({
+  const evals = await resolveEvalsQualityGateRuntimePolicy({
     orgId: args.orgId,
     environment: args.environment,
-    configKeys: { evalsQualityGates: args.configKey },
+    configKey: args.configKey,
   });
-  const evals = policy.evalsQualityGates;
   const suite = args.suite.trim();
   const subject = `${args.operation.trim()}:${suite}`;
   const base = {

@@ -46,7 +46,7 @@ function stackHasEntries(stack: TechnicalStackCategory[] | undefined): boolean {
 }
 
 async function fetchDashboardSnapshot(request: APIRequestContext): Promise<DashboardSnapshot> {
-  const response = await request.get(`${API_URL}/api/crm/dashboard`);
+  const response = await request.get(`${API_URL}/api/v1/crm/dashboard`);
   expect(response.ok(), 'dashboard endpoint must respond').toBeTruthy();
   return (await response.json()) as DashboardSnapshot;
 }
@@ -61,7 +61,7 @@ async function fetchAccountSnapshot(request: APIRequestContext): Promise<{
     baseline.companies[0] ??
     baseline.cockpit.company;
   const response = await request.get(
-    `${API_URL}/api/crm/dashboard?account=${encodeURIComponent(target.id)}`,
+    `${API_URL}/api/v1/crm/dashboard?account=${encodeURIComponent(target.id)}`,
   );
   expect(response.ok(), 'target account dashboard endpoint must respond').toBeTruthy();
   const snapshot = (await response.json()) as DashboardSnapshot;
@@ -94,7 +94,7 @@ test('technical stack source pull and manual add flow stay usable', async ({
   gotoAndWait,
 }) => {
   const { accountId, companyName } = await fetchAccountSnapshot(page.request);
-  const stackPath = `${API_URL}/api/crm/companies/${encodeURIComponent(companyName)}/technical-stack`;
+  const stackPath = `${API_URL}/api/v1/crm/companies/${encodeURIComponent(companyName)}/technical-stack`;
   const initialResponse = await page.request.get(stackPath);
   expect(initialResponse.ok(), 'initial technical stack state must load').toBeTruthy();
   const initialState = (await initialResponse.json()) as TechnicalStackState;

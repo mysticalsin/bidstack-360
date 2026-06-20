@@ -39,7 +39,7 @@ function stagePayload(stageId: string): { pipelineStageId: string } | { stage: s
 }
 
 async function getPipelineStage(page: Page, name: string) {
-  const res = await page.request.get('/api/pipeline-stages', { timeout: 10_000 });
+  const res = await page.request.get('/api/v1/pipeline-stages', { timeout: 10_000 });
   expect(res.ok()).toBe(true);
   const body = (await res.json()) as PipelineStageListResponse;
   const stage = body.items.find((item) => item.name === name);
@@ -50,7 +50,7 @@ async function getPipelineStage(page: Page, name: string) {
 async function createPipelineFixture(page: Page, stageName = 'S1 Ongoing') {
   const stage = await getPipelineStage(page, stageName);
   const marker = `${PIPELINE_QA_PREFIX} ${Date.now()}`;
-  const res = await page.request.post('/api/opportunities', {
+  const res = await page.request.post('/api/v1/opportunities', {
     data: {
       customer: PIPELINE_QA_PREFIX,
       name: marker,
@@ -74,7 +74,7 @@ async function createPipelineFixture(page: Page, stageName = 'S1 Ongoing') {
 
 async function deleteOpportunity(page: Page, id: string | null) {
   if (!id) return;
-  const res = await page.request.delete(`/api/opportunities/${id}`, { timeout: 10_000 });
+  const res = await page.request.delete(`/api/v1/opportunities/${id}`, { timeout: 10_000 });
   expect(res.ok() || res.status() === 404).toBe(true);
 }
 
@@ -119,7 +119,7 @@ async function expectOpportunityOutcome(
   await expect
     .poll(
       async () => {
-        const detail = await page.request.get(`/api/opportunities/${opportunityId}`, {
+        const detail = await page.request.get(`/api/v1/opportunities/${opportunityId}`, {
           timeout: 5_000,
         });
         if (!detail.ok()) return `http:${detail.status()}`;
@@ -217,7 +217,7 @@ test.describe('Pipeline kanban board', () => {
       await expect
         .poll(
           async () => {
-            const detail = await page.request.get(`/api/opportunities/${fixture.id}`, {
+            const detail = await page.request.get(`/api/v1/opportunities/${fixture.id}`, {
               timeout: 5_000,
             });
             if (!detail.ok()) return `http:${detail.status()}`;
@@ -325,7 +325,7 @@ test.describe('Pipeline kanban board', () => {
       await expect
         .poll(
           async () => {
-            const detail = await page.request.get(`/api/opportunities/${id}`, { timeout: 5_000 });
+            const detail = await page.request.get(`/api/v1/opportunities/${id}`, { timeout: 5_000 });
             if (!detail.ok()) return `http:${detail.status()}`;
             const body = (await detail.json()) as { pipelineStageId: string | null; stage: string };
             return body.pipelineStageId ?? body.stage;
@@ -335,7 +335,7 @@ test.describe('Pipeline kanban board', () => {
         .toBe(targetStageId);
     } finally {
       if (chosen) {
-        await page.request.post(`/api/opportunities/${chosen.id}/stage`, {
+        await page.request.post(`/api/v1/opportunities/${chosen.id}/stage`, {
           data: stagePayload(chosen.sourceStageId),
           timeout: 10_000,
         });

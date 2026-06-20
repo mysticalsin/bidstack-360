@@ -85,7 +85,10 @@ export const opsSentrySmokeRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/ops/sentry-smoke/api',
     {
-      config: { public: true },
+      // Public (token-gated, flag-off by default) op endpoint — rate-limit it so a
+      // leaked token can't be used to hammer Sentry. rateLimit lives inside config
+      // — that's where @fastify/rate-limit reads it.
+      config: { public: true, rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {
         summary: 'Trigger a controlled API Sentry smoke event',
         tags: ['ops'],
@@ -104,7 +107,11 @@ export const opsSentrySmokeRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/ops/sentry-smoke/worker',
     {
-      config: { public: true },
+      // Public (token-gated, flag-off by default) op endpoint that enqueues a
+      // BullMQ job per call — rate-limit it so a leaked token can't flood the
+      // queue. rateLimit lives inside config — that's where @fastify/rate-limit
+      // reads it.
+      config: { public: true, rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {
         summary: 'Queue a controlled worker Sentry smoke failure',
         tags: ['ops'],

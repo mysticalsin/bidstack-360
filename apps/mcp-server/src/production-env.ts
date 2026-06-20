@@ -6,10 +6,16 @@ function trimmed(env: Env, key: string): string {
 
 function isLoopbackHost(hostname: string): boolean {
   const normalized = hostname.toLowerCase();
+  // 0.0.0.0 / [::] are the IPv4/IPv6 unspecified ("bind-all") addresses — a
+  // common prod misconfig where the broker host is left as the listen address.
+  // A host-less REDIS_URL (e.g. "redis://:6379") throws in new URL() and is
+  // already caught upstream as 'invalid', so no empty-hostname case reaches here.
   return (
     normalized === 'localhost' ||
     normalized === '::1' ||
     normalized === '[::1]' ||
+    normalized === '0.0.0.0' ||
+    normalized === '[::]' ||
     normalized.startsWith('127.')
   );
 }

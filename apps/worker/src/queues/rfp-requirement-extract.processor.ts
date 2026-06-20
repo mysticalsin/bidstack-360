@@ -126,115 +126,114 @@ export async function processJob(
   if (promptPolicyAllowed) {
     const envLlm = resolveLlmFromEnv();
 
-  // ─── Tier 1: direct LLM provider — OpenAI (GPT) / Anthropic (Claude) / Moonshot
-  // (Kimi). Selected via RFP_LLM_PROVIDER + the provider's API key, so an org can
-  // run extraction on GPT/Claude/Kimi without a Dust workspace. ────────────────
-  if (envLlm) {
-    const t0 = Date.now();
-    try {
-      const responseText = await completeChat(envLlm, {
-        system:
-          'You are an RFP requirements-extraction engine. Respond with ONLY a valid ' +
-          'JSON object — no prose, no markdown fences.',
-        user: userMessage,
-        responseFormat: 'json_object',
-      });
-      await logAiInvocation(
-        {
-          orgId,
-          agentType: 'rfp-extractor',
-          model: `${envLlm.kind}:${envLlm.model}`,
-          prompt: userMessage,
-          response: responseText,
-          tokenCount: 0,
-          durationMs: Date.now() - t0,
-          status: 'success',
-          traceId: job.id ?? undefined,
-        },
-        log,
-      );
-      const parsed = DustExtractionResponse.safeParse(JSON.parse(coerceJsonObject(responseText)));
-      requirements = parsed.success ? parsed.data.requirements : fallbackExtract(rawText);
-    } catch (llmErr) {
-      log.warn(
-        { err: llmErr, provider: envLlm.kind },
-        'rfp-requirement-extract: LLM provider call failed, falling back',
-      );
-      requirements = fallbackExtract(rawText);
-      await logAiInvocation(
-        {
-          orgId,
-          agentType: 'rfp-extractor',
-          model: `${envLlm.kind}:${envLlm.model}`,
-          prompt: userMessage,
-          response: '',
-          tokenCount: 0,
-          durationMs: Date.now() - t0,
-          status: 'error',
-          errorMsg: (llmErr as Error).message?.slice(0, 500),
-          traceId: job.id ?? undefined,
-        },
-        log,
-      );
-    }
-
-    // ─── Tier 2: Dust agent (per-org or global workspace) ──────────────────────
-  } else if (dust) {
-    const t0 = Date.now();
-    try {
-      const run = await dust.runAgent(extractAgentId, userMessage);
-      dustRunId = run.run_id;
-      const durationMs = Date.now() - t0;
-      const responseText = run.output ?? '{}';
-
-      await logAiInvocation(
-        {
-          orgId,
-          agentType: 'rfp-extractor',
-          model: 'dust',
-          prompt: userMessage,
-          response: responseText,
-          tokenCount: 0,
-          durationMs,
-          status: 'success',
-          traceId: job.id ?? undefined,
-        },
-        log,
-      );
-
-      // Parse in its own try (+ coerceJsonObject) so a non-JSON Dust reply falls
-      // back WITHOUT being mislabeled as a Dust API failure or double-audited.
+    // ─── Tier 1: direct LLM provider — OpenAI (GPT) / Anthropic (Claude) / Moonshot
+    // (Kimi). Selected via RFP_LLM_PROVIDER + the provider's API key, so an org can
+    // run extraction on GPT/Claude/Kimi without a Dust workspace. ────────────────
+    if (envLlm) {
+      const t0 = Date.now();
       try {
-        const p2 = DustExtractionResponse.safeParse(JSON.parse(coerceJsonObject(responseText)));
-        requirements = p2.success ? p2.data.requirements : fallbackExtract(rawText);
-      } catch {
+        const responseText = await completeChat(envLlm, {
+          system:
+            'You are an RFP requirements-extraction engine. Respond with ONLY a valid ' +
+            'JSON object — no prose, no markdown fences.',
+          user: userMessage,
+          responseFormat: 'json_object',
+        });
+        await logAiInvocation(
+          {
+            orgId,
+            agentType: 'rfp-extractor',
+            model: `${envLlm.kind}:${envLlm.model}`,
+            prompt: userMessage,
+            response: responseText,
+            tokenCount: 0,
+            durationMs: Date.now() - t0,
+            status: 'success',
+            traceId: job.id ?? undefined,
+          },
+          log,
+        );
+        const parsed = DustExtractionResponse.safeParse(JSON.parse(coerceJsonObject(responseText)));
+        requirements = parsed.success ? parsed.data.requirements : fallbackExtract(rawText);
+      } catch (llmErr) {
+        log.warn(
+          { err: llmErr, provider: envLlm.kind },
+          'rfp-requirement-extract: LLM provider call failed, falling back',
+        );
         requirements = fallbackExtract(rawText);
+        await logAiInvocation(
+          {
+            orgId,
+            agentType: 'rfp-extractor',
+            model: `${envLlm.kind}:${envLlm.model}`,
+            prompt: userMessage,
+            response: '',
+            tokenCount: 0,
+            durationMs: Date.now() - t0,
+            status: 'error',
+            errorMsg: (llmErr as Error).message?.slice(0, 500),
+            traceId: job.id ?? undefined,
+          },
+          log,
+        );
       }
-    } catch (dustErr) {
-      log.warn({ err: dustErr }, 'rfp-requirement-extract: Dust call failed, falling back');
+
+      // ─── Tier 2: Dust agent (per-org or global workspace) ──────────────────────
+    } else if (dust) {
+      const t0 = Date.now();
+      try {
+        const run = await dust.runAgent(extractAgentId, userMessage);
+        dustRunId = run.run_id;
+        const durationMs = Date.now() - t0;
+        const responseText = run.output ?? '{}';
+
+        await logAiInvocation(
+          {
+            orgId,
+            agentType: 'rfp-extractor',
+            model: 'dust',
+            prompt: userMessage,
+            response: responseText,
+            tokenCount: 0,
+            durationMs,
+            status: 'success',
+            traceId: job.id ?? undefined,
+          },
+          log,
+        );
+
+        // Parse in its own try (+ coerceJsonObject) so a non-JSON Dust reply falls
+        // back WITHOUT being mislabeled as a Dust API failure or double-audited.
+        try {
+          const p2 = DustExtractionResponse.safeParse(JSON.parse(coerceJsonObject(responseText)));
+          requirements = p2.success ? p2.data.requirements : fallbackExtract(rawText);
+        } catch {
+          requirements = fallbackExtract(rawText);
+        }
+      } catch (dustErr) {
+        log.warn({ err: dustErr }, 'rfp-requirement-extract: Dust call failed, falling back');
+        requirements = fallbackExtract(rawText);
+        await logAiInvocation(
+          {
+            orgId,
+            agentType: 'rfp-extractor',
+            model: 'dust',
+            prompt: userMessage,
+            response: '',
+            tokenCount: 0,
+            durationMs: Date.now() - t0,
+            status: 'error',
+            errorMsg: (dustErr as Error).message?.slice(0, 500),
+            traceId: job.id ?? undefined,
+          },
+          log,
+        );
+      }
+
+      // ─── Tier 3: nothing configured → deterministic keyword/obligation parse ───
+    } else {
       requirements = fallbackExtract(rawText);
-      await logAiInvocation(
-        {
-          orgId,
-          agentType: 'rfp-extractor',
-          model: 'dust',
-          prompt: userMessage,
-          response: '',
-          tokenCount: 0,
-          durationMs: Date.now() - t0,
-          status: 'error',
-          errorMsg: (dustErr as Error).message?.slice(0, 500),
-          traceId: job.id ?? undefined,
-        },
-        log,
-      );
     }
-
-    // ─── Tier 3: nothing configured → deterministic keyword/obligation parse ───
-  } else {
-    requirements = fallbackExtract(rawText);
-  }
-
   } else {
     requirements = fallbackExtract(rawText);
   }

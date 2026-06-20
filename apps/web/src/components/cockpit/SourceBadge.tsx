@@ -22,7 +22,7 @@ export function SourceBadge({ label, state, hint, className, ...rest }: SourceBa
   return (
     <span
       className={cn(
-        'inline-flex max-w-full items-center rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider',
+        'inline-flex max-w-full items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
         STATE_CLASS[state],
         className,
       )}

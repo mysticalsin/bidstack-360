@@ -16,6 +16,7 @@ import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMe
 import { CursorPager } from '@/components/ui/CursorPager';
 import { useKeyAccounts, useAccountIndustries } from '@/hooks/useKeyAccounts';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
 
@@ -31,17 +32,21 @@ export function KeyAccountsPage() {
   const [search, setSearch] = useState('');
   const [industry, setIndustry] = useState<string>('');
   const { formatMoney } = useFormatMoney();
-  const pager = useCursorPagination(`${search}\u0000${industry}`);
+  // Debounce the value that feeds the query keys so a server fetch fires once the
+  // user pauses typing — not on every keystroke. `search` still drives the input
+  // display for responsive typing.
+  const debouncedSearch = useDebouncedValue(search, 250);
+  const pager = useCursorPagination(`${debouncedSearch}\u0000${industry}`);
 
   const industries = useAccountIndustries();
   const accounts = useKeyAccounts({
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     industry: industry || undefined,
     limit: KEY_ACCOUNTS_PAGE_SIZE,
     cursor: pager.cursor,
   });
   const signalAccounts = useKeyAccounts({
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     limit: KEY_ACCOUNTS_SIGNAL_SIZE,
   });
 

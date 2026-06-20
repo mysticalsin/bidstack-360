@@ -107,7 +107,10 @@ services:
         # Pass ASSET_CDN_URL to bake CDN base paths into the Vite build
         ASSET_CDN_URL: ${ASSET_CDN_URL:-}
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    ports:
+      - '${WEB_HTTP_PORT:-8080}:8080'
     restart: unless-stopped
     deploy:
       replicas: 2
