@@ -127,6 +127,8 @@ import { hubspotMigrationRoutes } from './routes/migrations-hubspot.routes.js';
 import { demoRoutes } from './routes/demo.js';
 // GDPR Art. 20 — tenant data-portability export
 import { tenantExportRoutes } from './routes/tenant-export.js';
+// GDPR Art. 17 — per-data-subject erasure (anonymization)
+import { erasureRoutes } from './routes/erasure.js';
 
 export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(opportunityRoutes, { prefix: '/api/v1' });
@@ -284,6 +286,9 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
 
   // GDPR Art. 20 — tenant data-portability export (admin-gated, org-scoped)
   await server.register(tenantExportRoutes, { prefix: '/api/v1' });
+
+  // GDPR Art. 17 — per-data-subject erasure / anonymization (admin-gated, org-scoped)
+  await server.register(erasureRoutes, { prefix: '/api/v1' });
 
   // Public demo door — POST /api/v1/demo/session + GET /api/v1/demo/status.
   // Self-gates on DEMO_MODE; registering it unconditionally is safe.
