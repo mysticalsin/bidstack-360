@@ -97,6 +97,11 @@ export function useDeleteContact() {
     onError: (_err, _vars, ctx) => {
       ctx?.snapshots.forEach(([key, value]) => qc.setQueryData(key, value));
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ['contacts'] }),
+    onSettled: (_data, _err, id) => {
+      void qc.invalidateQueries({ queryKey: ['contacts'] });
+      // Drop the deleted contact's detail cache so an open ContactDetailPage
+      // refetches (and 404s) instead of showing a stale record.
+      qc.removeQueries({ queryKey: ['contact', id] });
+    },
   });
 }

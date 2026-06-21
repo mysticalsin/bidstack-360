@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { toast } from '@/components/ui/Toast';
+
 import { api } from '@/lib/api';
 import type { Company, CompanyCreate, CompanyDetail, CompanyPatch, CompanyHierarchy } from '@bidstack/shared';
 
@@ -40,6 +42,8 @@ export function useCreateCompany() {
     mutationFn: (input: CompanyCreate) =>
       api<Company>('/api/companies', { method: 'POST', body: input }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['companies'] }),
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not create company'),
   });
 }
 
@@ -52,6 +56,8 @@ export function useUpdateCompany() {
       void qc.invalidateQueries({ queryKey: ['companies'] });
       void qc.invalidateQueries({ queryKey: ['company', variables.id] });
     },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not update company'),
   });
 }
 
@@ -60,6 +66,8 @@ export function useDeleteCompany() {
   return useMutation({
     mutationFn: (id: string) => api<null>(`/api/companies/${id}`, { method: 'DELETE' }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['companies'] }),
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Could not delete company'),
   });
 }
 
