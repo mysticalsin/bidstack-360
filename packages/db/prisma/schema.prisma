@@ -547,6 +547,9 @@ model Contact {
   name      String
   role      String?
   email     String?    @db.Citext
+  // Searchable HMAC-SHA256 hash of email, populated by the PII field-encryption
+  // middleware (PII_FIELD_ENCRYPTION=true) so encrypted emails stay lookup-able.
+  emailHash String?    @map("email_hash") @db.VarChar(64)
   phone     String?
   influence Int?
   sentiment Sentiment?
@@ -569,6 +572,7 @@ model Contact {
   // order by createdAt DESC — full table scan without this index.
   @@index([orgId, createdAt(sort: Desc)], map: "contacts_org_created_idx")
   @@index([deletedAt])
+  @@index([orgId, emailHash], map: "contacts_org_email_hash_idx")
   @@map("contacts")
 }
 
@@ -2248,6 +2252,8 @@ model Lead {
   firstName                String       @map("first_name")
   lastName                 String       @map("last_name")
   email                    String?
+  // Searchable HMAC-SHA256 hash of email (PII field-encryption middleware).
+  emailHash                String?      @map("email_hash") @db.VarChar(64)
   phone                    String?
   companyName              String       @map("company_name")
   companyId                String?      @map("company_id") @db.Uuid
@@ -2294,6 +2300,7 @@ model Lead {
   @@index([convertedToOpportunityId])
   @@index([orgId, status, statusChangedAt])
   @@index([deletedAt])
+  @@index([orgId, emailHash], map: "leads_org_email_hash_idx")
   @@map("leads")
 }
 
