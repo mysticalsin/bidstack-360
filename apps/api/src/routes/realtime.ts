@@ -80,7 +80,7 @@ export const realtimeRoutes: FastifyPluginAsync = async (server) => {
 
       // Upsert the lock — idempotent for the same user (extends TTL).
       const lock = await prisma.entityEditLock.upsert({
-        where: { entityType_entityId: { entityType, entityId } },
+        where: { orgId_entityType_entityId: { orgId, entityType, entityId } },
         create: { orgId, entityType, entityId, userId, sessionId, expiresAt },
         update: { userId, sessionId, expiresAt, acquiredAt: new Date() },
       });
@@ -131,7 +131,7 @@ export const realtimeRoutes: FastifyPluginAsync = async (server) => {
       }
 
       await prisma.entityEditLock.delete({
-        where: { entityType_entityId: { entityType, entityId } },
+        where: { orgId_entityType_entityId: { orgId, entityType, entityId } },
       });
 
       // Broadcast lock release.

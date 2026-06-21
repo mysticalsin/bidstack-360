@@ -2173,7 +2173,10 @@ model EntityEditLock {
 
   org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
-  @@unique([entityType, entityId])
+  // Tenant-scoped unique: include orgId so a lock row can never be overwritten /
+  // taken over across orgs via upsert (defense-in-depth, even though entityId is
+  // a UUID).
+  @@unique([orgId, entityType, entityId])
   @@index([orgId])
   @@index([expiresAt])
   @@map("entity_edit_locks")
