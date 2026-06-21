@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
-import { useIsAdmin } from '@/lib/auth';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useCrossSellActions, usePatchCrossSellAction } from '@/hooks/useCrossSell';
 import type { GovernanceStatus } from '@bidstack/shared';
 
@@ -43,7 +43,9 @@ export default function CrossSellPage() {
   const [status, setStatus] = useState<GovernanceStatus | 'all'>('all');
   const actions = useCrossSellActions(status === 'all' ? {} : { status });
   const patch = usePatchCrossSellAction();
-  const canWrite = useIsAdmin();
+  // Mirror the backend gate (PATCH /api/cross-sell requires 'accounts:write')
+  // so sales / pre-sales — not just admins — can advance an action's status.
+  const canWrite = useHasPermission('accounts:write');
 
   return (
     <div className="space-y-5">
