@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   _resetIntegrationTokenKey,
   decryptSecret,
+  decryptSecretOrPlaintext,
   encryptSecret,
   getIntegrationTokenKey,
 } from './crypto.js';
@@ -51,5 +52,21 @@ describe('server secret crypto', () => {
     setIntegrationTokenKey(undefined);
 
     expect(() => getIntegrationTokenKey()).toThrow('INTEGRATION_TOKEN_KEY env var is required');
+  });
+
+  describe('decryptSecretOrPlaintext (in-place at-rest migration)', () => {
+    it('decrypts a real encrypted blob', () => {
+      setIntegrationTokenKey(randomBytes(32).toString('hex'));
+      const blob = encryptSecret('signing-secret-fixture');
+      expect(decryptSecretOrPlaintext(blob)).toBe('signing-secret-fixture');
+    });
+
+    it('returns legacy plaintext unchanged (not a valid blob)', () => {
+      setIntegrationTokenKey(randomBytes(32).toString('hex'));
+      // A pre-encryption plaintext secret must pass through, not throw.
+      expect(decryptSecretOrPlaintext('legacy-plaintext-fixture')).toBe(
+        'legacy-plaintext-fixture',
+      );
+    });
   });
 });

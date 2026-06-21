@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 import { WebhookEventKeySchema, assertSafeWebhookUrl } from '@bidstack/shared';
+import { decryptSecretOrPlaintext, encryptSecret } from '@bidstack/shared/server-crypto';
 import {
   assertSerumConnectorAllowed,
   recordSerumConnectorTestSuccess,
@@ -111,7 +112,9 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
         data: {
           orgId: req.auth.orgId,
           url: req.body.url,
-          secret,
+          // Store the HMAC signing secret encrypted at rest; the plaintext is
+          // returned to the caller once below (signingSecret) and never again.
+          secret: encryptSecret(secret),
           events: req.body.events,
           active: req.body.active,
         },
@@ -314,7 +317,9 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
       });
 
       const t = Math.floor(Date.now() / 1000);
-      const sig = createHmac('sha256', sub.secret).update(`${t}.${pingBody}`).digest('hex');
+      const sig = createHmac('sha256', decryptSecretOrPlaintext(sub.secret))
+        .update(`${t}.${pingBody}`)
+        .digest('hex');
       const signature = `t=${t},v1=${sig}`;
       const start = Date.now();
 

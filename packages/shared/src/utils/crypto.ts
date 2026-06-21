@@ -102,6 +102,21 @@ export function decryptSecret(blob: string, key?: Buffer): string {
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
 }
 
+/**
+ * Decrypt a blob, but fall back to returning the input unchanged if it is not a
+ * valid encrypted blob. Used for in-place at-rest migration of columns that may
+ * still hold legacy PLAINTEXT secrets (written before encryption was added) —
+ * new writes are encrypted, old plaintext is read as-is until backfilled. Only
+ * use where the column is transitioning; never as a general "decrypt maybe".
+ */
+export function decryptSecretOrPlaintext(value: string, key?: Buffer): string {
+  try {
+    return decryptSecret(value, key);
+  } catch {
+    return value;
+  }
+}
+
 /** Constant-time compare for string secrets (CSRF state, signing keys, etc.). */
 export function safeCompare(a: string, b: string): boolean {
   const aBuf = Buffer.from(a, 'utf8');
