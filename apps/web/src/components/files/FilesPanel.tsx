@@ -8,7 +8,8 @@ import { Card, SectionHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
-import { downloadFileUrl, useDeleteFile, useFiles, useUploadFile } from '@/hooks/useFiles';
+import { useDeleteFile, useFiles, useUploadFile } from '@/hooks/useFiles';
+import { downloadFromApi } from '@/lib/api';
 import { relativeTime } from '@/lib/format';
 import {
   classifyDocument,
@@ -229,9 +230,15 @@ function FileRow({ file, onDelete }: { file: FileAttachment; onDelete: () => voi
   return (
     <li className="flex items-center gap-3 px-5 py-3 hover:bg-[var(--surface-sunken)] transition-colors">
       <FileGlyph contentType={file.contentType} />
-      <a
-        href={downloadFileUrl(file.id)}
-        className="min-w-0 flex-1 group"
+      <button
+        type="button"
+        // Authed blob download: a native <a href> can't send the Bearer token, so
+        // it 401'd under production (Clerk) auth. downloadFromApi fetches with the
+        // token then saves the blob.
+        onClick={() => {
+          void downloadFromApi(`/api/files/${file.id}/download`, file.name);
+        }}
+        className="min-w-0 flex-1 group text-left"
         title={t('files.downloadTitle', 'Download {{name}}', { name: file.name })}
       >
         <div className="truncate text-sm font-medium text-[var(--fg-primary)] group-hover:underline">
@@ -241,7 +248,7 @@ function FileRow({ file, onDelete }: { file: FileAttachment; onDelete: () => voi
           {humanizeBytes(file.bytes)} · {file.uploadedByEmail ?? t('files.unknownUploader', 'unknown')} ·{' '}
           {relativeTime(file.createdAt)}
         </div>
-      </a>
+      </button>
       <button
         type="button"
         aria-label={t('files.deleteAria', 'Delete {{name}}', { name: file.name })}
