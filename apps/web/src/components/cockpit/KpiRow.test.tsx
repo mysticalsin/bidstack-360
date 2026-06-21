@@ -9,7 +9,10 @@ import type { AccountCockpitSnapshot, CockpitKpi, CrmCompany } from '@bidstack/s
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (_key: string, fallback: string) => fallback,
+    // Resolve the inline English fallback AND interpolate {{vars}} so tests that
+    // query interpolated aria-labels (e.g. "Override Revenue") still match.
+    t: (_key: string, fallback: string, vars?: Record<string, unknown>) =>
+      vars ? fallback.replace(/\{\{(\w+)\}\}/g, (_m, k: string) => String(vars[k] ?? '')) : fallback,
   }),
 }));
 
