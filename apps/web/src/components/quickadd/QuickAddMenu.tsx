@@ -117,6 +117,7 @@ export function QuickAddMenu() {
                   exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.98, y: -4 }}
                   transition={springModal}
                   className="fixed left-1/2 top-[20vh] z-50 w-[min(440px,92vw)] -translate-x-1/2 overflow-hidden rounded-xl outline-none glass-menu"
+                  aria-activedescendant={`quick-add-option-${OPTIONS[activeIdx]?.key}`}
                   onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
                     if (e.key === 'ArrowDown') {
                       e.preventDefault();
@@ -141,12 +142,17 @@ export function QuickAddMenu() {
                   <RadixDialog.Title className="border-b border-[var(--border-subtle)] px-4 py-3 text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
                     {t('quickAddMenu.title', 'Create')}
                   </RadixDialog.Title>
-                  <ul role="listbox" className="p-1">
+                  <ul
+                    role="listbox"
+                    aria-label={t('quickAddMenu.title', 'Create')}
+                    className="p-1"
+                  >
                     {OPTIONS.map((opt, i) => {
                       const active = i === activeIdx;
                       return (
                         <li
                           key={opt.key}
+                          id={`quick-add-option-${opt.key}`}
                           role="option"
                           aria-selected={active}
                           onMouseEnter={() => setActiveIdx(i)}

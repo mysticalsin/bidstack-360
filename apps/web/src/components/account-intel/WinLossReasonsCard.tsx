@@ -15,17 +15,32 @@ import { useIsAdmin } from '@/lib/auth';
 import { useUpsertWinLoss, useWinLossPatterns } from '@/hooks/useWinLoss';
 import type { WinLossOutcome, WinLossReasonCode } from '@bidstack/shared';
 
-const REASON_LABEL: Record<WinLossReasonCode, string> = {
-  price: 'Price',
-  product_fit: 'Product fit',
-  timing: 'Timing',
-  competitor: 'Competitor',
-  relationship: 'Relationship',
-  scope: 'Scope',
-  no_decision: 'No decision',
-  other: 'Other',
-};
-const REASONS = Object.keys(REASON_LABEL) as WinLossReasonCode[];
+const REASONS: WinLossReasonCode[] = [
+  'price',
+  'product_fit',
+  'timing',
+  'competitor',
+  'relationship',
+  'scope',
+  'no_decision',
+  'other',
+];
+
+// Reason labels live in the t() layer so the sweep can register/translate them;
+// resolved per-render via the active crm namespace.
+function useReasonLabels(): Record<WinLossReasonCode, string> {
+  const { t } = useTranslation('crm');
+  return {
+    price: t('winLossReasons.reasonPrice', 'Price'),
+    product_fit: t('winLossReasons.reasonProductFit', 'Product fit'),
+    timing: t('winLossReasons.reasonTiming', 'Timing'),
+    competitor: t('winLossReasons.reasonCompetitor', 'Competitor'),
+    relationship: t('winLossReasons.reasonRelationship', 'Relationship'),
+    scope: t('winLossReasons.reasonScope', 'Scope'),
+    no_decision: t('winLossReasons.reasonNoDecision', 'No decision'),
+    other: t('winLossReasons.reasonOther', 'Other'),
+  };
+}
 
 const inputCls = 'rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm';
 
@@ -37,6 +52,7 @@ export interface ClosedOpp {
 
 export function WinLossReasonsCard({ closedOpps }: { closedOpps: ClosedOpp[] }) {
   const { t } = useTranslation('crm');
+  const reasonLabel = useReasonLabels();
   const patterns = useWinLossPatterns();
   const canWrite = useIsAdmin();
 
@@ -66,7 +82,7 @@ export function WinLossReasonsCard({ closedOpps }: { closedOpps: ClosedOpp[] }) 
               <p className="mt-2 flex items-center gap-2 text-sm text-[var(--fg-primary)]">
                 <Badge tone="tomato">{t('winLossReasons.patternBadge', 'Pattern')}</Badge>
                 {t('winLossReasons.mostLossesCitePrefix', 'Most losses cite ')}
-                <strong>{REASON_LABEL[patterns.data!.topLossReason]}</strong>.
+                <strong>{reasonLabel[patterns.data!.topLossReason]}</strong>.
               </p>
             ) : (
               <p className="mt-2 text-sm text-[var(--fg-tertiary)]">
@@ -84,7 +100,7 @@ export function WinLossReasonsCard({ closedOpps }: { closedOpps: ClosedOpp[] }) 
                   .map((r) => (
                     <li key={r.reason}>
                       <Badge tone="gray">
-                        {REASON_LABEL[r.reason]} · {r.count}
+                        {reasonLabel[r.reason]} · {r.count}
                       </Badge>
                     </li>
                   ))}
@@ -101,6 +117,7 @@ export function WinLossReasonsCard({ closedOpps }: { closedOpps: ClosedOpp[] }) 
 
 function CaptureForm({ closedOpps }: { closedOpps: ClosedOpp[] }) {
   const { t } = useTranslation('crm');
+  const reasonLabel = useReasonLabels();
   const upsert = useUpsertWinLoss();
   const [oppId, setOppId] = useState('');
   const [reason, setReason] = useState<WinLossReasonCode>('price');
@@ -168,7 +185,7 @@ function CaptureForm({ closedOpps }: { closedOpps: ClosedOpp[] }) {
         >
           {REASONS.map((r) => (
             <option key={r} value={r}>
-              {REASON_LABEL[r]}
+              {reasonLabel[r]}
             </option>
           ))}
         </select>

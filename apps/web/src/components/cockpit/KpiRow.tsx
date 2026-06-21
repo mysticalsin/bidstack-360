@@ -153,7 +153,7 @@ function FieldOverrideEditor({ kpi, companyKey }: { kpi: CockpitKpi; companyKey:
       }),
     onSuccess: () => {
       toast.success(t('kpiRow.toastFieldOverridden', 'Field overridden'), {
-        description: `${kpi.label} moved to Internal Data with your value.`,
+        description: t('kpiRow.toastFieldOverriddenDesc', '{{label}} moved to Internal Data with your value.', { label: kpi.label }),
       });
       setOpen(false);
       void queryClient.invalidateQueries({ queryKey: ['crm-dashboard'] });
@@ -169,7 +169,7 @@ function FieldOverrideEditor({ kpi, companyKey }: { kpi: CockpitKpi; companyKey:
       ),
     onSuccess: () => {
       toast.success(t('kpiRow.toastReverted', 'Reverted to external value'), {
-        description: `${kpi.label} uses the external source value again.`,
+        description: t('kpiRow.toastRevertedDesc', '{{label}} uses the external source value again.', { label: kpi.label }),
       });
       void queryClient.invalidateQueries({ queryKey: ['crm-dashboard'] });
     },
@@ -199,20 +199,20 @@ function FieldOverrideEditor({ kpi, companyKey }: { kpi: CockpitKpi; companyKey:
         <button
           type="button"
           className="inline-flex min-h-[44px] items-center rounded px-2 text-[11px] font-medium text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)]"
-          aria-label={`Override ${kpi.label}`}
+          aria-label={t('kpiRow.overrideAria', 'Override {{label}}', { label: kpi.label })}
           onClick={() => setOpen(true)}
         >
-          Edit
+          {t('kpiRow.btnEdit', 'Edit')}
         </button>
         {kpi.overridden ? (
           <button
             type="button"
             disabled={revert.isPending}
             className="inline-flex min-h-[44px] items-center rounded px-2 text-[11px] font-medium text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] disabled:opacity-50"
-            aria-label={`Revert ${kpi.label} to the external source value`}
+            aria-label={t('kpiRow.revertAria', 'Revert {{label}} to the external source value', { label: kpi.label })}
             onClick={() => revert.mutate()}
           >
-            {revert.isPending ? '…' : 'Revert'}
+            {revert.isPending ? '…' : t('kpiRow.btnRevert', 'Revert')}
           </button>
         ) : null}
       </div>
@@ -227,7 +227,7 @@ function FieldOverrideEditor({ kpi, companyKey }: { kpi: CockpitKpi; companyKey:
         onKeyDown={(event) => {
           if (event.key === 'Escape') setOpen(false);
         }}
-        aria-label={`New value for ${kpi.label}`}
+        aria-label={t('kpiRow.newValueAria', 'New value for {{label}}', { label: kpi.label })}
         placeholder={fieldKey === 'industry' ? t('kpiRow.placeholderIndustry', 'Industry') : t('kpiRow.placeholderNumber', 'Number')}
         className="min-h-[44px] w-24 rounded border border-[var(--border)] bg-[var(--surface)] px-1.5 text-xs text-[var(--fg-primary)]"
       />

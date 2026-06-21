@@ -10,6 +10,17 @@ import { cn } from '@/lib/cn';
 
 const ALL_EVENTS = WEBHOOK_EVENT_GROUPS.flatMap((group) => group.events.map((event) => event.key));
 
+// Build a stable i18n key slug from a group label so the sweep can register it
+// without us editing the shared WEBHOOK_EVENT_GROUPS source data.
+const groupSlug = (group: string) =>
+  group
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+// Event keys are dotted slugs (e.g. "lead.created"); flatten for i18n key paths.
+const eventSlug = (key: string) => key.replace(/\./g, '_');
+
 export function CreateWebhookDialog({
   initialUrl = '',
   initialEvents = [],
@@ -141,10 +152,13 @@ export function CreateWebhookDialog({
                     className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)]/45 p-3"
                   >
                     <legend className="px-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-                      {group.group}
+                      {t(`createWebhook.group.${groupSlug(group.group)}.label`, group.group)}
                     </legend>
                     <p className="mb-3 text-xs leading-5 text-[var(--fg-secondary)]">
-                      {group.description}
+                      {t(
+                        `createWebhook.group.${groupSlug(group.group)}.description`,
+                        group.description,
+                      )}
                     </p>
                     <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
                       {group.events.map((event) => {
@@ -167,13 +181,16 @@ export function CreateWebhookDialog({
                             />
                             <span>
                               <span className="block font-medium text-[var(--fg-primary)]">
-                                {event.label}
+                                {t(`createWebhook.event.${eventSlug(event.key)}.label`, event.label)}
                               </span>
                               <code className="mt-1 block font-mono text-[11px] text-[var(--brand-primary)]">
                                 {event.key}
                               </code>
                               <span className="mt-1 block text-xs leading-5 text-[var(--fg-tertiary)]">
-                                {event.description}
+                                {t(
+                                  `createWebhook.event.${eventSlug(event.key)}.description`,
+                                  event.description,
+                                )}
                               </span>
                             </span>
                           </label>

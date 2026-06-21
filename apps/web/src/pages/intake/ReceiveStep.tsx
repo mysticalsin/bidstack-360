@@ -3,6 +3,7 @@
  * Step 1: user selects (and optionally uploads) documents for extraction.
  */
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -27,6 +28,7 @@ export function ReceiveStep({
   onToggle,
   onNext,
 }: ReceiveStepProps) {
+  const { t } = useTranslation('crm');
   const upload = useUploadFile(accountId);
   const [isDragging, setIsDragging] = useState(false);
   const canUpload = Boolean(accountId) && !upload.isPending;
@@ -35,29 +37,35 @@ export function ReceiveStep({
     e.preventDefault();
     setIsDragging(false);
     if (!accountId) {
-      toast.info('Select an account before uploading documents');
+      toast.info(t('crm.receiveStep.selectAccountFirst', 'Select an account before uploading documents'));
       return;
     }
     for (const file of Array.from(e.dataTransfer.files)) {
       upload.mutate(file, {
-        onSuccess: () => toast.success(`Uploaded ${file.name}`),
+        onSuccess: () =>
+          toast.success(t('crm.receiveStep.uploadedFile', 'Uploaded {{name}}', { name: file.name })),
         onError: (err) =>
-          toast.error('Upload failed', { description: err instanceof Error ? err.message : '' }),
+          toast.error(t('crm.receiveStep.uploadFailed', 'Upload failed'), {
+            description: err instanceof Error ? err.message : '',
+          }),
       });
     }
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!accountId) {
-      toast.info('Select an account before uploading documents');
+      toast.info(t('crm.receiveStep.selectAccountFirst', 'Select an account before uploading documents'));
       e.target.value = '';
       return;
     }
     for (const file of Array.from(e.target.files ?? [])) {
       upload.mutate(file, {
-        onSuccess: () => toast.success(`Uploaded ${file.name}`),
+        onSuccess: () =>
+          toast.success(t('crm.receiveStep.uploadedFile', 'Uploaded {{name}}', { name: file.name })),
         onError: (err) =>
-          toast.error('Upload failed', { description: err instanceof Error ? err.message : '' }),
+          toast.error(t('crm.receiveStep.uploadFailed', 'Upload failed'), {
+            description: err instanceof Error ? err.message : '',
+          }),
       });
     }
     e.target.value = '';
@@ -66,8 +74,12 @@ export function ReceiveStep({
   return (
     <Card className="p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-[var(--fg-primary)]">Select documents</h2>
-        <span className="text-xs text-[var(--fg-tertiary)]">{selectedDocs.size} selected</span>
+        <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
+          {t('crm.receiveStep.title', 'Select documents')}
+        </h2>
+        <span className="text-xs text-[var(--fg-tertiary)]">
+          {t('crm.receiveStep.selectedCount', '{{count}} selected', { count: selectedDocs.size })}
+        </span>
       </div>
 
       {/* Upload dropzone */}
@@ -86,13 +98,13 @@ export function ReceiveStep({
       >
         <Icon name="upload" size={20} className="mx-auto text-[var(--fg-tertiary)]" />
         <p className="mt-1 text-xs text-[var(--fg-secondary)]">
-          Drag & drop files here or{' '}
+          {t('crm.receiveStep.dragDropPrefix', 'Drag & drop files here or')}{' '}
           <label
             className={`text-[var(--brand-primary)] ${
               canUpload ? 'cursor-pointer hover:underline' : 'cursor-not-allowed opacity-60'
             }`}
           >
-            browse
+            {t('crm.receiveStep.browse', 'browse')}
             <input
               type="file"
               multiple
@@ -104,32 +116,46 @@ export function ReceiveStep({
           </label>
         </p>
         <p className="text-[10px] text-[var(--fg-secondary)]">
-          PDF, Word, PowerPoint, Excel, text/data, images, audio, and video - up to 50 MB
+          {t(
+            'crm.receiveStep.supportedFormats',
+            'PDF, Word, PowerPoint, Excel, text/data, images, audio, and video - up to 50 MB',
+          )}
         </p>
         <p className="text-[10px] text-[var(--fg-secondary)]">
-          Omniparse upgrades scans, HEIC images, audio, and video when the worker sidecar is
-          enabled.
+          {t(
+            'crm.receiveStep.omniparseNote',
+            'Omniparse upgrades scans, HEIC images, audio, and video when the worker sidecar is enabled.',
+          )}
         </p>
         {upload.isPending && (
           <div className="mt-2 flex items-center justify-center gap-2 text-xs text-[var(--fg-secondary)]">
             <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-r-transparent" />
-            Uploading...
+            {t('crm.receiveStep.uploading', 'Uploading...')}
           </div>
         )}
       </div>
 
       {!accountId ? (
-        <EmptyState title="No account selected" message="Add ?account=ACCOUNT_ID to the URL." />
+        <EmptyState
+          title={t('crm.receiveStep.noAccountTitle', 'No account selected')}
+          message={t('crm.receiveStep.noAccountMessage', 'Add ?account=ACCOUNT_ID to the URL.')}
+        />
       ) : files.isError ? (
-        <ErrorState title="Failed to load files" message={files.error?.message} />
+        <ErrorState
+          title={t('crm.receiveStep.loadFailedTitle', 'Failed to load files')}
+          message={files.error?.message}
+        />
       ) : files.isLoading ? (
         <div className="h-32 flex items-center justify-center text-xs text-[var(--fg-tertiary)]">
-          Loading...
+          {t('crm.receiveStep.loading', 'Loading...')}
         </div>
       ) : files.data?.items.length === 0 ? (
         <EmptyState
-          title="No documents yet"
-          message="Upload documents above or use the account file manager."
+          title={t('crm.receiveStep.noDocsTitle', 'No documents yet')}
+          message={t(
+            'crm.receiveStep.noDocsMessage',
+            'Upload documents above or use the account file manager.',
+          )}
         />
       ) : (
         <div className="space-y-2">
@@ -154,7 +180,10 @@ export function ReceiveStep({
                   {f.name}
                 </div>
                 <div className="text-[10px] text-[var(--fg-tertiary)]">
-                  {f.contentType} - {(f.bytes / 1024).toFixed(0)} KB
+                  {t('crm.receiveStep.fileMeta', '{{type}} - {{size}} KB', {
+                    type: f.contentType,
+                    size: (f.bytes / 1024).toFixed(0),
+                  })}
                 </div>
               </div>
             </label>
@@ -166,9 +195,9 @@ export function ReceiveStep({
         <Button
           onClick={onNext}
           disabled={selectedDocs.size === 0}
-          aria-label="Continue to extract step"
+          aria-label={t('crm.receiveStep.nextAriaLabel', 'Continue to extract step')}
         >
-          Next: Extract -&gt;
+          {t('crm.receiveStep.nextButton', 'Next: Extract ->')}
         </Button>
       </div>
     </Card>

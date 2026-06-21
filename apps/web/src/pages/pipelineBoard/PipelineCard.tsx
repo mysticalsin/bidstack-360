@@ -3,6 +3,7 @@
 import { memo, type KeyboardEvent } from 'react';
 
 import { motion, useReducedMotion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/Badge';
@@ -36,6 +37,7 @@ export const PipelineCard = memo(function PipelineCard({
   onBlur,
   onKey,
 }: PipelineCardProps) {
+  const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
   const { formatMoney } = useFormatMoney();
   const stageName = getStageName(opp);
@@ -73,7 +75,16 @@ export const PipelineCard = memo(function PipelineCard({
         onBlur={() => onBlur(opp.id)}
         onKeyDown={(e) => onKey(e, opp)}
         aria-roledescription="draggable opportunity"
-        aria-label={`${opp.code}: ${opp.name}, ${stageName}, ${formatMoney(opp.value, 'EUR')}. Use left or right arrows to move stage.`}
+        aria-label={t(
+          'crm.pipelineCardAriaLabel',
+          '{{code}}: {{name}}, {{stage}}, {{value}}. Use left or right arrows to move stage.',
+          {
+            code: opp.code,
+            name: opp.name,
+            stage: stageName,
+            value: formatMoney(opp.value, 'EUR'),
+          },
+        )}
         className={cn(
           'block cursor-grab active:cursor-grabbing rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-3 shadow-[var(--shadow-xs)] transition-shadow hover:shadow-[var(--shadow-sm)]',
           isFocused &&
@@ -107,15 +118,24 @@ export const PipelineCard = memo(function PipelineCard({
 
         {/* Activity row */}
         <div className="mt-2 flex items-center gap-3 text-[var(--fg-tertiary)]">
-          <span className="inline-flex items-center gap-0.5 text-[10px]" title="Views">
+          <span
+            className="inline-flex items-center gap-0.5 text-[10px]"
+            title={t('crm.pipelineCardViews', 'Views')}
+          >
             <Icon name="eye" size={12} strokeWidth={2} />
             <span className="tabular-nums">{opp.viewCount ?? 0}</span>
           </span>
-          <span className="inline-flex items-center gap-0.5 text-[10px]" title="Comments">
+          <span
+            className="inline-flex items-center gap-0.5 text-[10px]"
+            title={t('crm.pipelineCardComments', 'Comments')}
+          >
             <Icon name="messageCircle" size={12} strokeWidth={2} />
             <span className="tabular-nums">{opp.commentCount ?? 0}</span>
           </span>
-          <span className="inline-flex items-center gap-0.5 text-[10px]" title="Tasks">
+          <span
+            className="inline-flex items-center gap-0.5 text-[10px]"
+            title={t('crm.pipelineCardTasks', 'Tasks')}
+          >
             <Icon name="checkCircle" size={12} strokeWidth={2} />
             <span className="tabular-nums">{opp.taskCount ?? 0}</span>
           </span>
@@ -125,7 +145,7 @@ export const PipelineCard = memo(function PipelineCard({
         <div className="mt-2 flex items-center justify-between text-[10px] text-[var(--fg-tertiary)]">
           <span className="inline-flex items-center gap-1">
             <Icon name="clock" size={10} strokeWidth={2} />
-            {opp.dueDate ? formatDate(opp.dueDate) : 'No date'}
+            {opp.dueDate ? formatDate(opp.dueDate) : t('crm.pipelineCardNoDate', 'No date')}
           </span>
           <span className="font-mono">{opp.code}</span>
         </div>

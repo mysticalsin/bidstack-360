@@ -1,5 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useState, type FormEvent, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -24,6 +25,7 @@ Risk: High concern around endpoint migration timing. Owner: Sarah
 Action: Send Jamf deployment plan by 2026-06-15`;
 
 export function MeetingNotesImportDialog({ accountId, companyName, domain, trigger }: Props) {
+  const { t } = useTranslation('crm');
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [bodyMd, setBodyMd] = useState('');
@@ -44,7 +46,7 @@ export function MeetingNotesImportDialog({ accountId, companyName, domain, trigg
     event.preventDefault();
     setError(null);
     if (!companyName) {
-      setError('Company name is missing from the cockpit.');
+      setError(t('crm.meetingImport.companyMissing', 'Company name is missing from the cockpit.'));
       return;
     }
     try {
@@ -55,11 +57,13 @@ export function MeetingNotesImportDialog({ accountId, companyName, domain, trigg
         bodyMd: bodyMd.trim(),
       });
       setResult(next);
-      toast.success('Meeting notes imported', {
-        description: `${totalCreated(next)} records were created or refreshed.`,
+      toast.success(t('crm.meetingImport.toastTitle', 'Meeting notes imported'), {
+        description: t('crm.meetingImport.toastDescription', '{{count}} records were created or refreshed.', {
+          count: totalCreated(next),
+        }),
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Import failed');
+      setError(err instanceof Error ? err.message : t('crm.meetingImport.importFailed', 'Import failed'));
     }
   };
 
@@ -82,18 +86,25 @@ export function MeetingNotesImportDialog({ accountId, companyName, domain, trigg
         {trigger ?? (
           <Button size="sm" variant="secondary">
             <Icon name="sparkle" size={14} />
-            Import meeting
+            {t('crm.meetingImport.triggerLabel', 'Import meeting')}
           </Button>
         )}
       </DialogTrigger>
       <DialogContent
-        title="Import meeting notes"
-        description="Paste raw notes once. BidStack turns them into structured records with source receipts."
+        title={t('crm.meetingImport.dialogTitle', 'Import meeting notes')}
+        description={t(
+          'crm.meetingImport.dialogDescription',
+          'Paste raw notes once. BidStack turns them into structured records with source receipts.',
+        )}
         className="meeting-import-dialog"
       >
         <form onSubmit={submit} className="meeting-import-shell">
-          <div className="meeting-import-steps" aria-label="Import steps">
-            {['Paste notes', 'Extract signals', 'Save to BidStack'].map((step, index) => (
+          <div className="meeting-import-steps" aria-label={t('crm.meetingImport.stepsLabel', 'Import steps')}>
+            {[
+              t('crm.meetingImport.stepPaste', 'Paste notes'),
+              t('crm.meetingImport.stepExtract', 'Extract signals'),
+              t('crm.meetingImport.stepSave', 'Save to BidStack'),
+            ].map((step, index) => (
               <motion.div
                 key={step}
                 initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
@@ -107,17 +118,19 @@ export function MeetingNotesImportDialog({ accountId, companyName, domain, trigg
           </div>
 
           <label className="meeting-import-field">
-            <span>Note title</span>
+            <span>{t('crm.meetingImport.noteTitleLabel', 'Note title')}</span>
             <input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder={`Discovery meeting - ${companyName ?? 'account'}`}
+              placeholder={t('crm.meetingImport.noteTitlePlaceholder', 'Discovery meeting - {{company}}', {
+                company: companyName ?? t('crm.meetingImport.accountFallback', 'account'),
+              })}
               maxLength={200}
             />
           </label>
 
           <label className="meeting-import-field">
-            <span>Meeting notes</span>
+            <span>{t('crm.meetingImport.meetingNotesLabel', 'Meeting notes')}</span>
             <textarea
               value={bodyMd}
               onChange={(event) => setBodyMd(event.target.value)}
@@ -146,32 +159,42 @@ export function MeetingNotesImportDialog({ accountId, companyName, domain, trigg
               >
                 <div className="meeting-import-result-head">
                   <div>
-                    <span>Saved to CRM</span>
-                    <strong>{totalSignals} extracted signals</strong>
+                    <span>{t('crm.meetingImport.savedToCrm', 'Saved to CRM')}</span>
+                    <strong>
+                      {t('crm.meetingImport.extractedSignals', '{{count}} extracted signals', {
+                        count: totalSignals,
+                      })}
+                    </strong>
                   </div>
-                  <Badge tone="jade">{totalCreated(result)} records</Badge>
+                  <Badge tone="jade">
+                    {t('crm.meetingImport.recordsBadge', '{{count}} records', {
+                      count: totalCreated(result),
+                    })}
+                  </Badge>
                 </div>
 
                 <SignalSection
-                  title="Tech stack"
-                  empty="No stack detected"
+                  title={t('crm.meetingImport.techStackTitle', 'Tech stack')}
+                  empty={t('crm.meetingImport.techStackEmpty', 'No stack detected')}
                   items={result.extracted.techStack.flatMap((category) =>
                     category.items.map((item) => `${category.label}: ${item.name}`),
                   )}
                 />
                 <SignalSection
-                  title="People"
-                  empty="No contacts detected"
+                  title={t('crm.meetingImport.peopleTitle', 'People')}
+                  empty={t('crm.meetingImport.peopleEmpty', 'No contacts detected')}
                   items={result.extracted.contacts.map((contact) =>
                     contact.email ? `${contact.name} - ${contact.email}` : contact.name,
                   )}
                 />
                 <SignalSection
-                  title="Risks and actions"
-                  empty="No risks or actions detected"
+                  title={t('crm.meetingImport.risksTitle', 'Risks and actions')}
+                  empty={t('crm.meetingImport.risksEmpty', 'No risks or actions detected')}
                   items={[
                     ...result.extracted.risks.map((risk) => `${risk.severity}: ${risk.title}`),
-                    ...result.extracted.tasks.map((task) => `Action: ${task.title}`),
+                    ...result.extracted.tasks.map(
+                      (task) => `${t('crm.meetingImport.actionPrefix', 'Action')}: ${task.title}`,
+                    ),
                   ]}
                 />
               </motion.div>
@@ -185,16 +208,18 @@ export function MeetingNotesImportDialog({ accountId, companyName, domain, trigg
               onClick={() => setBodyMd(SAMPLE_NOTE)}
               disabled={importNotes.isPending}
             >
-              Use example
+              {t('crm.meetingImport.useExample', 'Use example')}
             </Button>
             <div>
               <DialogClose asChild>
                 <Button type="button" variant="ghost" disabled={importNotes.isPending}>
-                  Close
+                  {t('crm.meetingImport.close', 'Close')}
                 </Button>
               </DialogClose>
               <Button type="submit" disabled={!canSubmit || importNotes.isPending}>
-                {importNotes.isPending ? 'Processing...' : 'Process and save'}
+                {importNotes.isPending
+                  ? t('crm.meetingImport.processing', 'Processing...')
+                  : t('crm.meetingImport.processAndSave', 'Process and save')}
               </Button>
             </div>
           </div>

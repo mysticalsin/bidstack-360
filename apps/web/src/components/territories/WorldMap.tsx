@@ -427,6 +427,15 @@ export const WorldMap = memo(function WorldMap({
                   hoveredLegendIndex !== null && (!hasData || bracket !== hoveredLegendIndex);
                 const opacity = isFilteredOut ? 0.15 : 1.0;
 
+                // Keyboard a11y: countries with data are focusable buttons that
+                // surface their name + value to assistive tech and on focus.
+                const countryLabel = item
+                  ? t('worldMap.country.ariaLabel', '{{country}}: {{value}}', {
+                      country: item.countryCode,
+                      value: formatMoneyMicros(item.totalValueMicros, 'EUR'),
+                    })
+                  : undefined;
+
                 return (
                   <Geography
                     key={geo.rsmKey}
@@ -434,6 +443,9 @@ export const WorldMap = memo(function WorldMap({
                     fill={fill}
                     stroke={stroke}
                     strokeWidth={strokeWidth}
+                    tabIndex={item ? 0 : -1}
+                    role={item ? 'button' : undefined}
+                    aria-label={countryLabel}
                     style={{
                       default: {
                         outline: 'none',
@@ -478,6 +490,21 @@ export const WorldMap = memo(function WorldMap({
                       }
                     }}
                     onMouseLeave={() => setHovered(null)}
+                    onFocus={(e) => {
+                      if (item) {
+                        // Focus events carry no pointer coords; derive the
+                        // tooltip anchor from the focused country's bounds.
+                        const rect = (
+                          e.currentTarget as unknown as SVGGraphicsElement
+                        ).getBoundingClientRect();
+                        setHovered({
+                          item,
+                          x: rect.left + rect.width / 2,
+                          y: rect.top + rect.height / 2,
+                        });
+                      }
+                    }}
+                    onBlur={() => setHovered(null)}
                     onClick={() => {
                       if (item && onCountryClick) onCountryClick(item);
                     }}
