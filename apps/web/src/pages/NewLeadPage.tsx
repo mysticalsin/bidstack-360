@@ -39,7 +39,23 @@ export function NewLeadPage() {
       return;
     }
     setErrors({});
-    create.mutate(form, {
+    // Omit empty optional strings — the server schema rejects "" for fields like
+    // email (.email()), so blank optionals must be undefined, not "".
+    const opt = (v: string | undefined): string | undefined => {
+      const trimmed = v?.trim();
+      return trimmed ? trimmed : undefined;
+    };
+    const payload: LeadCreate = {
+      ...form,
+      firstName: form.firstName.trim(),
+      lastName: form.lastName.trim(),
+      email: opt(form.email),
+      phone: opt(form.phone),
+      // companyName is required (schema min(1)) — keep it a string, just trimmed.
+      companyName: form.companyName.trim(),
+      title: opt(form.title),
+    };
+    create.mutate(payload, {
       onError: () => toast.error(t('newLead.toastCreateFailed', 'Failed to create lead')),
     });
   };

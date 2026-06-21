@@ -442,6 +442,12 @@ function RunPanel({ crewId, agents }: { crewId: string; agents: CrewAgent[] }) {
     refetchInterval: (q) => (RUNNING.has(q.state.data?.status ?? '') ? 1500 : false),
   });
 
+  const cancel = useMutation({
+    mutationFn: () => api(`/api/v1/crew-runs/${runId}/cancel`, { method: 'POST' }),
+    onSuccess: () => void run.refetch(),
+    onError: () => toast.error(t('agentStudio.toastCancelError', 'Could not cancel the run')),
+  });
+
   const roleByKey = new Map(agents.map((a) => [a.agentKey, a.role]));
 
   return (
@@ -504,6 +510,18 @@ function RunPanel({ crewId, agents }: { crewId: string; agents: CrewAgent[] }) {
               {t('agentStudio.statusLabel', 'Status:')}{' '}
               <span className="font-medium">{run.data?.status ?? 'queued'}</span>
             </div>
+            {run.data && RUNNING.has(run.data.status) && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => cancel.mutate()}
+                disabled={cancel.isPending}
+              >
+                {cancel.isPending
+                  ? t('agentStudio.cancelling', 'Cancelling…')
+                  : t('agentStudio.cancelRun', 'Cancel run')}
+              </Button>
+            )}
             {(run.isError || (run.data && !RUNNING.has(run.data.status))) && (
               <Button
                 variant="secondary"
