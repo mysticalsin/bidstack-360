@@ -24,11 +24,21 @@ function toString(value: unknown): string {
   return JSON.stringify(value);
 }
 
+/**
+ * Neutralize CSV formula-injection. A cell whose first character is one of
+ * `= + - @ TAB CR` is interpreted as a formula by Excel/Sheets/LibreOffice;
+ * prefixing a single quote forces the cell to be read as literal text.
+ *
+ * WHY exported (not just used by `quote`): the analytics-report and dashboard-
+ * widget exporters build their CSV strings by hand and must share this exact
+ * sanitization rather than re-deriving (and drifting from) it.
+ */
+export function csvCell(value: string): string {
+  return value.replace(/^(=|\+|-|@|\t|\r)/, "'$1");
+}
+
 function quote(value: string): string {
-  // S-M12: Sanitize formula trigger characters to prevent CSV injection
-  // when exported files are opened in Excel. Prefix with a single quote
-  // so the cell is treated as plain text rather than a formula.
-  const sanitized = value.replace(/^(=|\+|-|@|\t|\r)/, "'$1");
+  const sanitized = csvCell(value);
   if (!/[,"\r\n]/.test(sanitized)) return sanitized;
   return `"${sanitized.replace(/"/g, '""')}"`;
 }
