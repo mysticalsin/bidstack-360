@@ -27,6 +27,7 @@ import { RecentActivityCard } from './widgets/RecentActivityCard';
 import { TopAccountsCard } from './widgets/TopAccountsCard';
 import { SalesFunnelCard } from './widgets/SalesFunnelCard';
 import { WinRateCard } from './widgets/WinRateCard';
+import { GettingStarted } from './widgets/GettingStarted';
 
 // ─── OrgDashboard ─────────────────────────────────────────────────────────────
 // Layout-only orchestrator. Every widget component lives in ./widgets/.
@@ -157,6 +158,16 @@ export const OrgDashboard = memo(function OrgDashboard() {
     return t('orgDashboard.greetingEvening', 'Good evening');
   }, [t]);
 
+  // A brand-new org has no records at all. Sum the core entity counts: when
+  // every one is zero, the command center would just read "0 · 0 · 0", so we
+  // show a getting-started branch that points at the first real moves instead.
+  const isEmptyOrg =
+    (s?.companies ?? 0) === 0 &&
+    (s?.contacts ?? 0) === 0 &&
+    (s?.leads ?? 0) === 0 &&
+    (s?.opportunities ?? 0) === 0 &&
+    (s?.tasks ?? 0) === 0;
+
   if (summary.isLoading) return <DashboardSkeleton />;
   if (summary.isError) {
     return (
@@ -175,6 +186,7 @@ export const OrgDashboard = memo(function OrgDashboard() {
       />
     );
   }
+  if (isEmptyOrg) return <GettingStarted />;
 
   return (
     <div className="space-y-5">

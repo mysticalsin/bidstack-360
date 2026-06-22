@@ -26,6 +26,7 @@ import { useCommandPalette } from '@/hooks/useCommandPalette';
 import { useGlobalShortcuts } from '@/hooks/useGlobalShortcuts';
 import { usePreferences } from '@/stores/preferences';
 import { useCockpitLayout } from '@/stores/cockpitLayout';
+import { useOnboardingStore } from '@/stores/onboarding';
 import { useGlobalUndoHotkey } from '@/stores/undoStack';
 import { AppRoutes } from '@/routes/AppRoutes';
 
@@ -41,12 +42,17 @@ export function App() {
   const { user } = useUser();
   const scopePreferences = usePreferences((s) => s.scopeToUser);
   const scopeCockpitLayout = useCockpitLayout((s) => s.scopeToUser);
+  const hydrateOnboarding = useOnboardingStore((s) => s.hydrate);
 
   useEffect(() => {
     const userId = user?.id ?? null;
     scopePreferences(userId);
     scopeCockpitLayout(userId);
-  }, [user?.id, scopePreferences, scopeCockpitLayout]);
+    // Onboarding state is keyed by user and may auto-start the product tour,
+    // so it must only hydrate once a user is authenticated — never on the
+    // login screen with a null user.
+    if (userId) hydrateOnboarding(userId);
+  }, [user?.id, scopePreferences, scopeCockpitLayout, hydrateOnboarding]);
 
   // Map our 3-way motion pref onto framer-motion's MotionConfig contract.
   // `system` → framer's `user` (read prefers-reduced-motion).
