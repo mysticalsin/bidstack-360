@@ -28,11 +28,25 @@ export async function processRenewalOpportunities(
   log: PinoLogger,
 ): Promise<number> {
   // Find subscriptions renewing within 91 days that are still ACTIVE.
+  // Cursor-paginate: an enterprise org can have >1000 subscriptions in the
+  // window; a single bounded findMany would silently drop the overflow (and a
+  // takeless findMany trips the unbounded-query guard).
   const horizon = new Date(Date.now() + 91 * 24 * 60 * 60 * 1000);
-  const subs = await prisma.subscription.findMany({
-    where: { orgId, status: 'ACTIVE', renewalDate: { lte: horizon } },
-    select: { id: true, renewalDate: true, ownerId: true },
-  });
+  const subs: Array<{ id: string; renewalDate: Date; ownerId: string | null }> = [];
+  const PAGE_SIZE = 500;
+  let cursor: string | undefined;
+  for (;;) {
+    const page = await prisma.subscription.findMany({
+      where: { orgId, status: 'ACTIVE', renewalDate: { lte: horizon } },
+      select: { id: true, renewalDate: true, ownerId: true },
+      orderBy: { id: 'asc' },
+      take: PAGE_SIZE,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+    });
+    subs.push(...page);
+    if (page.length < PAGE_SIZE) break;
+    cursor = page[page.length - 1]!.id;
+  }
 
   let created = 0;
 
@@ -88,6 +102,8 @@ export async function listRenewalOpportunities(
   const subs = await prisma.subscription.findMany({
     where: { orgId, accountId, deletedAt: null },
     select: { id: true },
+    orderBy: { id: 'asc' },
+    take: 1000,
   });
   const subIds = subs.map((s) => s.id);
 
@@ -95,5 +111,6 @@ export async function listRenewalOpportunities(
     where: { orgId, subscriptionId: { in: subIds }, deletedAt: null },
     include: { subscription: { select: { planTier: true, arrAmountMicros: true, renewalDate: true } } },
     orderBy: { createdAt: 'desc' },
+    take: 500,
   });
 }
