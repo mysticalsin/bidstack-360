@@ -7,9 +7,14 @@
  */
 
 import type { FastifyError } from 'fastify';
+import pino from 'pino';
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 
 import { prisma } from '@bidstack/db';
+
+import { pdfRenderFallbackTotal } from '../../routes/health.js';
+
+const log = pino({ name: 'service:document', level: process.env.LOG_LEVEL ?? 'info' });
 
 export interface RenderInput {
   templateId: string;
@@ -122,7 +127,13 @@ export async function htmlToPdf(html: string): Promise<Buffer> {
     } finally {
       await browser.close();
     }
-  } catch {
+  } catch (err) {
+    // Chromium unavailable or Puppeteer launch/render failed. The pdf-lib
+    // fallback keeps signing usable, but the degraded output must not be
+    // invisible: surface it so operators can spot a misconfigured image.
+    // (Provisioning Chromium is operator scope — we observe, not fix it here.)
+    log.warn({ err }, 'puppeteer PDF render failed — falling back to pdf-lib basic renderer');
+    pdfRenderFallbackTotal.inc();
     const pdf = await htmlToBasicPdf(html);
     putPdfCache(key, pdf);
     return pdf;

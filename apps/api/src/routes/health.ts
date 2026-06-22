@@ -156,6 +156,12 @@ export const jobFailedTotal = new Counter(
   ['queue'],
 );
 
+export const pdfRenderFallbackTotal = new Counter(
+  'pdf_render_fallback_total',
+  'PDF renders that fell back from Puppeteer to the pdf-lib basic renderer (Chromium unavailable or launch failed)',
+  [],
+);
+
 // ── Collectors array (add new metrics here) ─────────────────────────────────
 
 const ALL_METRICS = [
@@ -164,6 +170,7 @@ const ALL_METRICS = [
   dbQueryDuration,
   jobProcessedTotal,
   jobFailedTotal,
+  pdfRenderFallbackTotal,
 ];
 
 function exposeAllMetrics(): string {

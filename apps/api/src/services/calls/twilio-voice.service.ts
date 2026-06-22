@@ -196,19 +196,78 @@ export function generateDialTwiml(toNumber: string): string {
   ].join('\n');
 }
 
+/** Abort a hung Twilio download rather than stalling the worker indefinitely. */
+const RECORDING_DOWNLOAD_TIMEOUT_MS = 45_000;
+/** Reject pathologically large recordings (a corrupt/hostile URL) before they exhaust memory. */
+const RECORDING_MAX_BYTES = 50 * 1024 * 1024; // 50 MB
+
+/**
+ * Reads a fetch Response body into a Buffer, aborting as soon as the
+ * accumulated size exceeds `maxBytes`. Mirrors the streaming size-cap used by
+ * the worker (lib/storage-read.ts) so a huge download can never balloon memory.
+ */
+async function readBodyWithCap(resp: Response, maxBytes: number): Promise<Buffer> {
+  const reader = resp.body?.getReader();
+  if (!reader) {
+    // No stream (e.g. empty body) — fall back to arrayBuffer with a post-hoc cap.
+    const buf = Buffer.from(await resp.arrayBuffer());
+    if (buf.length > maxBytes) {
+      throw new Error(`Twilio recording too large: ${buf.length} bytes (max ${maxBytes})`);
+    }
+    return buf;
+  }
+
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = Buffer.from(value);
+    total += chunk.length;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new Error(`Twilio recording too large: ${total}+ bytes (max ${maxBytes})`);
+    }
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
 /**
  * Downloads a Twilio recording to a Buffer.
  * The download URL requires Twilio HTTP Basic auth.
+ *
+ * Hardened against a hung or oversized download stalling/OOMing the worker:
+ *  - AbortController timeout caps total wall-clock time.
+ *  - Content-Length is rejected up-front when it already exceeds the cap.
+ *  - The body is streamed and aborted the moment it crosses the byte cap.
  */
 export async function downloadTwilioRecording(recordingUrl: string): Promise<Buffer> {
-  const resp = await fetch(`${recordingUrl}.mp3`, {
-    headers: { Authorization: twilioAuthHeader() },
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), RECORDING_DOWNLOAD_TIMEOUT_MS);
 
-  if (!resp.ok) {
-    throw new Error(`Twilio downloadRecording failed (${resp.status}): ${recordingUrl}`);
+  try {
+    const resp = await fetch(`${recordingUrl}.mp3`, {
+      headers: { Authorization: twilioAuthHeader() },
+      signal: controller.signal,
+    });
+
+    if (!resp.ok) {
+      throw new Error(`Twilio downloadRecording failed (${resp.status}): ${recordingUrl}`);
+    }
+
+    // Cheap early-out: trust a declared Content-Length to reject obvious giants
+    // before streaming a single byte. A lying/absent header is still caught by
+    // the streaming cap below.
+    const declaredLength = Number(resp.headers.get('content-length'));
+    if (Number.isFinite(declaredLength) && declaredLength > RECORDING_MAX_BYTES) {
+      throw new Error(
+        `Twilio recording too large: ${declaredLength} bytes (max ${RECORDING_MAX_BYTES})`,
+      );
+    }
+
+    return await readBodyWithCap(resp, RECORDING_MAX_BYTES);
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const arrayBuffer = await resp.arrayBuffer();
-  return Buffer.from(arrayBuffer);
 }

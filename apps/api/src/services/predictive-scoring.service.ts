@@ -62,6 +62,44 @@ export interface OppScoreResult {
   scoredAt: string;
 }
 
+// ─── Canonical score scale ──────────────────────────────────────────────────
+//
+// WHY basis points: the persisted PredictiveScore.score column is the single
+// source of truth shared by BOTH this ML path AND the heuristic path
+// (routes/predictive.ts). The heuristic writer and the shared
+// PredictiveScore schema (packages/shared) both use integer basis points
+// (0–10000). This service used to persist a 0–100 value, so a heuristic row
+// (e.g. 8500) and an ML row (e.g. 85) for the same target were silently
+// incomparable — the 7-day degradation comparison below mixed the two scales
+// and the >= drop guard could never fire reliably. We standardise on basis
+// points for everything that touches the DB, and derive the public 0–100
+// API value at the edge.
+const BASIS_POINTS_SCALE = 10_000;
+const PERCENT_SCALE = 100;
+const BP_PER_PERCENT = BASIS_POINTS_SCALE / PERCENT_SCALE; // 100
+
+/** A 7-day drop of this many basis points (20 percentage points) is "degraded". */
+const DEGRADATION_THRESHOLD_BP = 20 * BP_PER_PERCENT; // 2000
+
+/** Convert a model probability in [0,1] to an integer basis-point score in [0,10000]. */
+export function probabilityToBasisPoints(prob: number): number {
+  const clamped = Math.min(1, Math.max(0, prob));
+  return Math.round(clamped * BASIS_POINTS_SCALE);
+}
+
+/** Convert a basis-point score (0–10000) to the public 0–100 percentage scale. */
+export function basisPointsToPercent(bp: number): number {
+  return Math.round(bp / BP_PER_PERCENT);
+}
+
+/**
+ * 7-day score degradation in percentage points, given previous and current
+ * scores expressed in the SAME basis-point scale. Positive = score fell.
+ */
+export function degradationPercentPoints(previousBp: number, currentBp: number): number {
+  return (previousBp - currentBp) / BP_PER_PERCENT;
+}
+
 // ─── Cache key helpers ────────────────────────────────────────────────────
 
 const MODEL_CACHE_TTL_S = 3_600; // 1h
@@ -174,7 +212,9 @@ export async function scoreLead(
   const featureVector = await extractLeadFeatures(leadId, orgId);
 
   const scoredAt = new Date().toISOString();
-  let score = 50;
+  // scoreBp is the canonical persisted value (basis points, 0–10000).
+  // Fallback when no model: 0.5 probability → 5000 bp.
+  let scoreBp = probabilityToBasisPoints(0.5);
   let factors: ScoreFactor[] = [];
   let modelVersion = 'fallback-v0';
 
@@ -184,7 +224,7 @@ export async function scoreLead(
       ? inferXgboostScore(model.xgboost.modelJson, featureVector.values)
       : null;
     const prob = xgbProb ?? inferScore(model, featureVector.values);
-    score = Math.round(prob * 100);
+    scoreBp = probabilityToBasisPoints(prob);
     factors = (
       xgbProb !== null
         ? xgboostShapProxy(model, featureVector.values)
@@ -193,7 +233,7 @@ export async function scoreLead(
     modelVersion = xgbProb !== null ? `${model.version}+xgb` : model.version;
   }
 
-  // Persist to DB (upsert on orgId+entityType+entityId)
+  // Persist to DB (upsert on orgId+entityType+entityId), in canonical basis points
   await prisma.predictiveScore.upsert({
     where: {
       // Prisma requires a unique constraint — use compound index semantics
@@ -207,7 +247,7 @@ export async function scoreLead(
         )?.id ?? '00000000-0000-0000-0000-000000000000',
     },
     update: {
-      score,
+      score: scoreBp,
       features: factors as object[],
       modelVersion,
       expiresAt: new Date(Date.now() + SCORE_CACHE_TTL_S * 1000),
@@ -217,14 +257,20 @@ export async function scoreLead(
       targetType: 'lead',
       targetId: leadId,
       kind: 'lead_score',
-      score,
+      score: scoreBp,
       features: factors as object[],
       modelVersion,
       expiresAt: new Date(Date.now() + SCORE_CACHE_TTL_S * 1000),
     },
   });
 
-  const result: LeadScoreResult = { score, factors, modelVersion, scoredAt };
+  // Public API contract is 0–100 (see LeadScoreResponse in routes/predictive-scoring.ts).
+  const result: LeadScoreResult = {
+    score: basisPointsToPercent(scoreBp),
+    factors,
+    modelVersion,
+    scoredAt,
+  };
   await redis.setex(cacheKey, SCORE_CACHE_TTL_S, JSON.stringify(result));
   return result;
 }
@@ -250,7 +296,8 @@ export async function scoreOpportunity(
   const featureVector = await extractOpportunityFeatures(opportunityId, orgId);
 
   const scoredAt = new Date().toISOString();
-  let winProbability = 50;
+  // winProbabilityBp is the canonical persisted value (basis points, 0–10000).
+  let winProbabilityBp = probabilityToBasisPoints(0.5);
   let factors: ScoreFactor[] = [];
   let modelVersion = 'fallback-v0';
 
@@ -260,7 +307,7 @@ export async function scoreOpportunity(
       ? inferXgboostScore(model.xgboost.modelJson, featureVector.values)
       : null;
     const prob = xgbProb ?? inferScore(model, featureVector.values);
-    winProbability = Math.round(prob * 100);
+    winProbabilityBp = probabilityToBasisPoints(prob);
     factors = (
       xgbProb !== null
         ? xgboostShapProxy(model, featureVector.values)
@@ -268,6 +315,9 @@ export async function scoreOpportunity(
     ).slice(0, 5);
     modelVersion = xgbProb !== null ? `${model.version}+xgb` : model.version;
   }
+
+  // Public 0–100 win probability (see OppScoreResponse in routes/predictive-scoring.ts).
+  const winProbability = basisPointsToPercent(winProbabilityBp);
 
   // Check for score degradation vs 7d ago for notification trigger
   const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
@@ -283,10 +333,12 @@ export async function scoreOpportunity(
     select: { score: true },
   });
 
-  // Both operands are 0–100 point values (scoreOpportunity writes score: winProbability),
-  // so subtract directly. The previous `/100` mixed 0–1 with 0–100 and the >=20 drop
-  // guard could never fire, silently killing the degradation notification. (Review.)
-  const recentDropPercent = previousScore ? previousScore.score - winProbability : 0;
+  // Both operands are now canonical basis points: previousScore.score is read
+  // from the same column this path writes (winProbabilityBp). recentDropPercent
+  // is expressed in percentage points for human-facing copy + the >=20 guard.
+  const recentDropPercent = previousScore
+    ? degradationPercentPoints(previousScore.score, winProbabilityBp)
+    : 0;
 
   // Predict close date using current velocity (linear extrapolation)
   const opp = await prisma.opportunity.findFirst({
@@ -308,7 +360,7 @@ export async function scoreOpportunity(
       id: existingScore?.id ?? '00000000-0000-0000-0000-000000000000',
     },
     update: {
-      score: winProbability,
+      score: winProbabilityBp,
       features: factors as object[],
       modelVersion,
       recommendedAction: recommendation,
@@ -319,7 +371,7 @@ export async function scoreOpportunity(
       targetType: 'opportunity',
       targetId: opportunityId,
       kind: 'win_probability',
-      score: winProbability,
+      score: winProbabilityBp,
       features: factors as object[],
       modelVersion,
       recommendedAction: recommendation,
@@ -327,8 +379,8 @@ export async function scoreOpportunity(
     },
   });
 
-  // Trigger degradation notification if score dropped > 20 pts in 7 days
-  if (recentDropPercent >= 20) {
+  // Trigger degradation notification if score dropped >= the threshold (20 pts) in 7 days
+  if (recentDropPercent >= DEGRADATION_THRESHOLD_BP / BP_PER_PERCENT) {
     log.info(
       { orgId, opportunityId, recentDropPercent },
       'opportunity score degraded — firing notification',
