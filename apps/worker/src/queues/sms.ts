@@ -35,6 +35,8 @@ import { decryptToken } from '@bidstack/shared/token-crypto';
 export const SMS_SEND_QUEUE = 'sms.send';
 export const SMS_BULK_SEND_QUEUE = 'sms.bulk-send';
 
+const SMS_CLAIM_TTL_SEC = 86_400; // 24h — well beyond the BullMQ retry/backoff window
+
 // ─── Job data schemas ──────────────────────────────────────────────────────
 
 const SmsSendJobData = z.object({
@@ -106,8 +108,36 @@ async function twilioSend(
 
 // ─── Single-send processor ─────────────────────────────────────────────────
 
-async function processSingleSend(
+/**
+ * Pure builder for an SmsMessage row. Extracted so the send path and the
+ * crash-recovery reconcile path produce identical rows without duplication.
+ */
+export function buildSmsRow(
+  data: z.infer<typeof SmsSendJobData>,
+  fromNumber: string,
+  sid: string,
+  numSegments: number,
+) {
+  return {
+    orgId: data.orgId,
+    userId: data.userId,
+    integrationTokenId: data.integrationTokenId,
+    fromNumber,
+    toNumber: data.toNumber,
+    body: data.body,
+    status: 'QUEUED' as const,
+    twilioSid: sid,
+    segments: numSegments,
+    sentAt: new Date(),
+    entityType: data.entityType ?? null,
+    entityId: data.entityId ?? null,
+  };
+}
+
+export async function processSingleSend(
   rawData: unknown,
+  jobId: string,
+  connection: IORedis,
   log: pino.Logger,
 ): Promise<void> {
   const data = SmsSendJobData.parse(rawData);
@@ -122,6 +152,8 @@ async function processSingleSend(
     return;
   }
 
+  // Token fetch/decrypt must precede the claim: the reconcile branch needs
+  // fromNumber to rebuild a lost DB row.
   const token = await prisma.integrationToken.findUnique({
     where: { id: data.integrationTokenId },
     select: { accessTokenEncrypted: true, externalAccountId: true },
@@ -132,32 +164,39 @@ async function processSingleSend(
   const creds = JSON.parse(decrypted) as { accountSid: string; authToken: string };
   const fromNumber = token.externalAccountId ?? '';
 
-  const { sid, numSegments } = await twilioSend(
-    creds.accountSid,
-    creds.authToken,
-    fromNumber,
-    data.toNumber,
-    data.body,
-    log,
-  );
+  const claimKey = `sms:claim:${jobId}`;
+  // Idempotency: BullMQ retries would re-invoke Twilio after a crash between send
+  // and DB commit → duplicate texts. Claim a per-job key BEFORE sending; a prior
+  // attempt that already sent will have set it, so we skip the resend.
+  const claimed = await connection.set(claimKey, 'pending', 'EX', SMS_CLAIM_TTL_SEC, 'NX');
+  if (claimed !== 'OK') {
+    const prior = await connection.get(claimKey);
+    const priorSid = prior && prior.startsWith('sent:') ? prior.slice('sent:'.length) : null;
+    if (priorSid) {
+      // Reconcile a lost DB row (twilioSid is @unique → safe to retry).
+      await prisma.smsMessage.upsert({
+        where: { twilioSid: priorSid },
+        update: {},
+        create: buildSmsRow(data, fromNumber, priorSid, 1),
+      });
+    }
+    log.warn({ jobId, priorSid }, 'SMS send skipped — idempotency claim already present (retry after prior send)');
+    return;
+  }
 
-  await prisma.smsMessage.create({
-    data: {
-      orgId: data.orgId,
-      userId: data.userId,
-      integrationTokenId: data.integrationTokenId,
-      fromNumber,
-      toNumber: data.toNumber,
-      body: data.body,
-      status: 'QUEUED',
-      twilioSid: sid,
-      segments: numSegments,
-      sentAt: new Date(),
-      entityType: data.entityType ?? null,
-      entityId: data.entityId ?? null,
-    },
-  });
+  let sid: string;
+  let numSegments: number;
+  try {
+    ({ sid, numSegments } = await twilioSend(creds.accountSid, creds.authToken, fromNumber, data.toNumber, data.body, log));
+  } catch (err) {
+    // Twilio never accepted — release the claim so a legitimate retry can resend.
+    await connection.del(claimKey);
+    throw err;
+  }
+  // Record the sid in the claim BEFORE the DB write so a crash here still blocks a resend.
+  await connection.set(claimKey, `sent:${sid}`, 'EX', SMS_CLAIM_TTL_SEC);
 
+  await prisma.smsMessage.create({ data: buildSmsRow(data, fromNumber, sid, numSegments) });
   log.info({ sid, toNumber: data.toNumber }, 'SMS sent (worker)');
 }
 
@@ -219,7 +258,7 @@ export async function startSmsWorker(
 
   const smsSendWorker = new Worker(
     SMS_SEND_QUEUE,
-    async (job) => processSingleSend(job.data, log.child({ jobId: job.id })),
+    async (job) => processSingleSend(job.data, String(job.id), connection, log.child({ jobId: job.id })),
     { connection, concurrency: 1, limiter: { max: 1, duration: 1_000 } },
   );
 
