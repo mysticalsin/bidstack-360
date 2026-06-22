@@ -1,10 +1,10 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, type Prisma } from '@bidstack/db';
-import { Workflow, WorkflowRun, WorkflowCreate } from '@bidstack/shared';
+import { Workflow, WorkflowRun, WorkflowCreate, runWorkflowActions } from '@bidstack/shared';
 import type { WorkflowActionKind, WorkflowTriggerKind } from '@bidstack/shared';
 
-import { isPublicHostname } from '../lib/ssrf-guard.js';
+import { apiWorkflowEffects } from '../services/workflows/workflow-engine.service.js';
 
 export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
 
@@ -237,57 +237,54 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
         },
       });
 
-      // Simple sequential execution. Collect per-step results into a keyed
-      // object — the WorkflowRun.output schema is `z.record()` (an object), so
-      // returning a bare array here trips the response serializer and 500s
-      // every run. Keying by step keeps the contract AND preserves order.
-      const outputs: Record<string, unknown> = {};
-      let error: string | null = null;
-      let step = 0;
-      for (const action of wf.actions) {
-        try {
-          const out = await executeAction(
-            action.kind as z.infer<typeof WorkflowActionKind>,
-            action.config as Record<string, unknown>,
-            req.auth.orgId,
-          );
-          outputs[`step_${step + 1}_${action.kind}`] = out;
-        } catch (err) {
-          error = err instanceof Error ? err.message : String(err);
-          break;
-        }
-        step += 1;
-      }
+      // Manual run shares the SAME engine the worker uses for trigger/schedule
+      // dispatch (one code path). Per-step results are keyed by step — the
+      // WorkflowRun.output schema is `z.record()` (an object), so a bare array
+      // would trip the response serializer. A throwing step stops the run.
+      const { outputs, error } = await runWorkflowActions(
+        wf.actions.map((a) => ({
+          kind: a.kind as z.infer<typeof WorkflowActionKind>,
+          config: (a.config ?? {}) as Record<string, unknown>,
+        })),
+        { orgId: req.auth.orgId, input: req.body.input as Record<string, unknown> },
+        apiWorkflowEffects,
+      );
 
-      const finished = await prisma.$transaction(async (tx) => {
-        const updated = await tx.workflowRun.update({
-          where: { id: run.id },
+      const finalStatus: z.infer<typeof WorkflowRun>['status'] = error ? 'failed' : 'succeeded';
+      const finishedAt = new Date();
+      await prisma.$transaction(async (tx) => {
+        // Org-scope the run finalization (updateMany + count) like every other
+        // tenant write — a bare update({ where: { id } }) skips the org filter.
+        const { count } = await tx.workflowRun.updateMany({
+          where: { id: run.id, orgId: req.auth.orgId },
           data: {
-            status: error ? 'failed' : 'succeeded',
+            status: finalStatus,
             output: outputs as Prisma.InputJsonValue,
             error,
-            finishedAt: new Date(),
+            finishedAt,
           },
         });
+        if (count !== 1) throw server.httpErrors.notFound('Workflow run not found');
         await tx.workflow.updateMany({
           where: { id: wf.id, orgId: req.auth.orgId },
           data: { runCount: { increment: 1 }, lastRunAt: new Date() },
         });
-        return updated;
       });
 
+      // updateMany returns no row; build the response from the created run plus
+      // the finalization values we just persisted (all org-scoped, in scope).
       return {
-        id: finished.id,
-        orgId: finished.orgId,
-        workflowId: finished.workflowId,
-        status: finished.status as z.infer<typeof WorkflowRun>['status'],
-        triggerRecordType: finished.triggerRecordType,
-        triggerRecordId: finished.triggerRecordId,
-        input: finished.input as Record<string, unknown>,
-        output: finished.output as Record<string, unknown>,
-        error: finished.error,
-        startedAt: finished.startedAt.toISOString(),
-        finishedAt: finished.finishedAt?.toISOString() ?? null,
+        id: run.id,
+        orgId: run.orgId,
+        workflowId: run.workflowId,
+        status: finalStatus,
+        triggerRecordType: run.triggerRecordType,
+        triggerRecordId: run.triggerRecordId,
+        input: run.input as Record<string, unknown>,
+        output: outputs as Record<string, unknown>,
+        error,
+        startedAt: run.startedAt.toISOString(),
+        finishedAt: finishedAt.toISOString(),
       };
     },
   );
@@ -373,47 +370,3 @@ function serializeWorkflow(row: {
   };
 }
 
-async function executeAction(
-  kind: z.infer<typeof WorkflowActionKind>,
-  config: Record<string, unknown>,
-  orgId: string,
-): Promise<Record<string, unknown>> {
-  switch (kind) {
-    case 'create_task': {
-      const title = String(config.title ?? 'Workflow task');
-      const task = await prisma.task.create({
-        data: {
-          orgId,
-          title,
-          status: 'open',
-          ...(config.oppId ? { oppId: String(config.oppId) } : {}),
-          ...(config.assigneeId ? { assigneeId: String(config.assigneeId) } : {}),
-        },
-      });
-      return { taskId: task.id, title };
-    }
-    case 'create_notification':
-      return { notified: true, message: config.message };
-    case 'call_webhook': {
-      // S-M10: SSRF defense — validate webhook URL before storing/returning.
-      const rawUrl = String(config.url ?? '');
-      if (!rawUrl) return { url: null, fired: false, error: 'Missing URL' };
-      let url: URL;
-      try {
-        url = new URL(rawUrl);
-      } catch {
-        return { url: null, fired: false, error: 'Invalid URL' };
-      }
-      if (url.protocol !== 'https:') {
-        return { url: null, fired: false, error: 'URL must use HTTPS' };
-      }
-      if (!isPublicHostname(url.hostname)) {
-        return { url: null, fired: false, error: 'Private/internal URLs are not allowed' };
-      }
-      // Fire-and-forget webhook (actual HTTP call deferred to worker)
-      return { url: rawUrl, fired: true };
-    }
-    default:
-      return { kind, executed: true };
-  }
-}

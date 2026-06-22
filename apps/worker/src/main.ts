@@ -28,6 +28,9 @@ import { startCallWorkers } from './queues/calls.js';
 // Wave 8 — Predictive ML scoring retrain worker
 import { startPredictiveRetrainWorker } from './queues/predictive-retrain.js';
 import { startCompetitorResearch } from './queues/competitor-research.js';
+// Workflow automation — trigger dispatch (record_created / stage_changed) + schedule cron
+import { startWorkflowDispatchWorker } from './queues/workflow-dispatch.js';
+import { startWorkflowScheduleWorker } from './queues/workflow-schedule.js';
 // Wave 9 — RFP Automation Engine workers
 import { startRfpOrchestrator, startRfpOrchestrationReaper } from './queues/rfp-orchestrator.js';
 import { startRfpRequirementExtract } from './queues/rfp-requirement-extract.js';
@@ -100,6 +103,11 @@ initWorkerSentry(log);
 // synchronously (no queue/workers arrays) and does not need to be awaited.
 workers.push(...startCallWorkers(connection, log, queues));
 
+// Start the webhook-delivery worker FIRST and capture its producer queue: the
+// workflow engine's `call_webhook` effect reuses this single queue instead of
+// opening (and leaking) a new one per dispatch job / schedule scan.
+const webhookDeliveryQueue = await startWebhookDeliveryWorker(connection, log, workers, queues);
+
 await Promise.all([
   startDustPoller(connection, log, workers, queues),
   startWebhookProcessor(connection, log, workers, queues),
@@ -108,11 +116,13 @@ await Promise.all([
   startCalendarSync(connection, log, workers, queues),
   startEmailSync(connection, log, workers, queues),
   startSmsWorker(connection, log, workers as never, queues),
-  startWebhookDeliveryWorker(connection, log, workers, queues),
   startYjsCompaction(connection, log, workers, queues),
   startCsWorkers(connection, log, workers, queues),
   startPredictiveRetrainWorker(connection, log, workers, queues),
   startCompetitorResearch(connection, log, workers, queues),
+  // Workflow automation engine — reuses the webhook-delivery producer queue.
+  startWorkflowDispatchWorker(connection, log, workers, queues, webhookDeliveryQueue),
+  startWorkflowScheduleWorker(connection, log, workers, queues, webhookDeliveryQueue),
   // Wave 9 — RFP Automation Engine
   startRfpOrchestrator(connection, log, workers, queues),
   startRfpOrchestrationReaper(connection, log, workers, queues),

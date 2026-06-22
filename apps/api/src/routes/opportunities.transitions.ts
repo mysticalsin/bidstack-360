@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 import { pushOpportunityToDust } from '../lib/dust-push.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
+import { dispatchWorkflowEvent } from '../queues/workflow-dispatch.js';
 import { buildOpportunityBrief, estimateBriefTokens } from './opportunities.brief.js';
 
 export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -152,6 +153,16 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
         pipelineStageId: updated.pipelineStageId,
         stage: nextStage,
         stageName: toStage?.name ?? nextStage,
+      });
+      // Dispatch stage_changed workflows for this opportunity (fail-open). The
+      // `stage` key drives the optional target-stage condition match; `ownerId`
+      // lets "notify the owner" actions resolve the recipient (engine falls back
+      // to input.ownerId when create_notification has no explicit userId).
+      void dispatchWorkflowEvent(req.auth.orgId, 'stage_changed', 'opportunity', updated.id, {
+        stage: nextStage,
+        pipelineStageId: updated.pipelineStageId,
+        stageName: toStage?.name ?? nextStage,
+        ownerId: updated.ownerId,
       });
 
       return {

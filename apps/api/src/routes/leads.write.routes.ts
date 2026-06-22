@@ -11,6 +11,7 @@ import { prisma, type Prisma, type LeadPriority, type LeadStatus } from '@bidsta
 import { pushLeadToDust } from '../lib/dust-push.js';
 import { isUniqueViolation, mintNextCode } from './opportunities.helpers.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
+import { dispatchWorkflowEvent } from '../queues/workflow-dispatch.js';
 import {
   LeadConvertBody,
   LeadConvertResult,
@@ -88,6 +89,14 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
         companyName: created.companyName,
         source: created.source,
         priority: created.priority,
+      });
+      // Dispatch record_created workflows for this lead (fail-open). `ownerId`
+      // lets "notify the owner" actions resolve the recipient (the engine falls
+      // back to input.ownerId when create_notification has no explicit userId).
+      void dispatchWorkflowEvent(req.auth.orgId, 'record_created', 'lead', created.id, {
+        source: created.source,
+        priority: created.priority,
+        ownerId: created.ownerId,
       });
 
       return reply.code(201).send({

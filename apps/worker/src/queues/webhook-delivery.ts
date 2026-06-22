@@ -62,6 +62,10 @@ const DeliveryJobSchema = z.object({
 
 type DeliveryJob = z.infer<typeof DeliveryJobSchema>;
 
+/** The webhook-delivery producer queue, shared by fan-out callers (e.g. the
+ * workflow engine's `call_webhook` effect) so they don't open their own. */
+export type WebhookDeliveryQueue = Queue<DeliveryJob>;
+
 // ── HMAC signature ────────────────────────────────────────────────────────────
 
 function buildSignatureHeader(secret: string, body: string): string {

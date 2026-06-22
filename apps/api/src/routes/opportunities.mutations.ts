@@ -20,6 +20,7 @@ import {
   OpportunityImportResult,
 } from '@bidstack/shared';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
+import { dispatchWorkflowEvent } from '../queues/workflow-dispatch.js';
 import { serializeOpportunity } from '../serializers/opportunity.js';
 import { isUniqueViolation, mintNextCode, mintNextCodes } from './opportunities.helpers.js';
 
@@ -184,6 +185,13 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
         valueMicros: created.valueMicros,
         pipelineStageId: created.pipelineStage?.id ?? null,
         stageName: created.pipelineStage?.name ?? null,
+      });
+      // Dispatch record_created workflows for this opportunity (fail-open).
+      // `ownerId` lets "notify the owner" actions resolve the recipient (the
+      // engine falls back to input.ownerId when no explicit userId is set).
+      void dispatchWorkflowEvent(req.auth.orgId, 'record_created', 'opportunity', created.id, {
+        stage: created.stage,
+        ownerId: created.ownerId,
       });
       return reply.code(201).send(serializeOpportunity(created));
     },
