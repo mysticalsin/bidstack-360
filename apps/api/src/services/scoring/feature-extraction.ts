@@ -169,21 +169,39 @@ export async function extractOpportunityFeatures(
 
   if (!opp) return null;
 
-  const allActivities = await db.activity.findMany({
-    where: { orgId, entityType: 'opportunity', entityId: opportunityId },
-    select: { type: true, occurredAt: true },
-    orderBy: { occurredAt: 'desc' },
-  });
+  // Replaces an unbounded findMany over the full activity history (an active
+  // opportunity can accumulate thousands of rows) with bounded aggregates that
+  // return identical values:
+  //   - groupBy(type) for the meeting/email counts (rows = distinct types, tiny)
+  //   - one take:1 desc query for the most-recent activity timestamp
+  //   - one take:1 desc query for the most-recent stage_change timestamp
+  const activityWhere = { orgId, entityType: 'opportunity', entityId: opportunityId } as const;
+  const [typeCounts, lastActivity, lastStageChange] = await Promise.all([
+    db.activity.groupBy({
+      by: ['type'],
+      where: activityWhere,
+      _count: { _all: true },
+    }),
+    db.activity.findFirst({
+      where: activityWhere,
+      select: { occurredAt: true },
+      orderBy: { occurredAt: 'desc' },
+    }),
+    db.activity.findFirst({
+      where: { ...activityWhere, type: 'stage_change' },
+      select: { occurredAt: true },
+      orderBy: { occurredAt: 'desc' },
+    }),
+  ]);
 
-  const meetings = allActivities.filter((a) => a.type === 'meeting');
-  const emails = allActivities.filter(
-    (a) => a.type === 'email' || a.type === 'email_opened' || a.type === 'email_clicked',
-  );
-  const lastActivity = allActivities[0] ?? null;
-  const stageChanges = allActivities
-    .filter((a) => a.type === 'stage_change')
-    .sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime());
-  const lastStageChangeDate = stageChanges[0]?.occurredAt ?? opp.createdAt;
+  const countFor = (types: readonly string[]): number =>
+    typeCounts
+      .filter((row) => types.includes(row.type))
+      .reduce((sum, row) => sum + row._count._all, 0);
+
+  const meetingsCount = countFor(['meeting']);
+  const emailsCount = countFor(['email', 'email_opened', 'email_clicked']);
+  const lastStageChangeDate = lastStageChange?.occurredAt ?? opp.createdAt;
 
   let ownerCloseRate = 0.5;
   if (opp.ownerId) {
@@ -220,8 +238,8 @@ export async function extractOpportunityFeatures(
   push('total_age_days', daysBetween(opp.createdAt, now));
   push('days_to_expected_close', opp.dueDate ? daysBetween(opp.dueDate, now) : 365);
   push('num_contacts_on_account', opp._count.contactLinks);
-  push('num_meetings_held', meetings.length);
-  push('num_emails_sent_received', emails.length);
+  push('num_meetings_held', meetingsCount);
+  push('num_emails_sent_received', emailsCount);
   push('last_activity_days_ago', daysSince(lastActivity?.occurredAt ?? null, now));
   push('owner_close_rate_last_90d', ownerCloseRate);
   push('qualification_score_norm', qualScore / 100);

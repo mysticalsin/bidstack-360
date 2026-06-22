@@ -1,7 +1,30 @@
 import { createHash } from 'crypto';
 import { ensureRedisReady, redis } from '../redis.js';
+import { createLogger } from './logger.js';
+import { publish, subscribe } from '../services/realtime.service.js';
+
+const log = createLogger({ name: 'redis-cache' });
 
 const IN_MEMORY = new Map<string, { value: string; expiresAt: number }>();
+
+// Cross-replica invalidation for the per-process IN_MEMORY fallback tier.
+//
+// The shared Redis tier is already cross-replica. But IN_MEMORY is per-process:
+// an entry written on replica A while Redis was briefly unavailable can be
+// served (on a later Redis miss) after a mutation on replica B has already
+// cleared the shared copy. invalidateOrgCache sweeps only the LOCAL map, so
+// sibling replicas would keep that stale fallback entry until its TTL lapses.
+//
+// Mirror the access-scope pub/sub pattern: invalidate locally first
+// (synchronous, guaranteed), then fire-and-forget a broadcast so every other
+// replica sweeps its own IN_MEMORY tier. Fail-open — a Redis hiccup must never
+// break the mutation path; at worst a sibling keeps a stale fallback entry
+// until its existing TTL expires, which is the pre-broadcast behaviour.
+const INVALIDATION_CHANNEL = 'redis-cache:invalidate';
+
+interface CacheInvalidationMessage {
+  orgId: string;
+}
 
 export async function cacheGet<T>(key: string): Promise<{ hit: boolean; data: T | null }> {
   try {
@@ -104,7 +127,36 @@ export async function invalidateOrgCache(orgId: string): Promise<void> {
     // Redis may be mid-connect or unavailable; always clear the fallback below.
   }
 
+  // Sweep THIS replica's in-memory fallback, then broadcast so siblings sweep
+  // theirs too (their per-process maps are invisible to the SMEMBERS+DEL above).
   deleteInMemory(`bidstack:cache:${orgId}:`);
+  broadcastInvalidation(orgId);
+}
+
+/**
+ * Fire-and-forget a cross-replica in-memory invalidation. Local sweep has
+ * already run by the time this is called. Fail-open: a publish error must not
+ * fail the mutation path that triggered the invalidation.
+ */
+function broadcastInvalidation(orgId: string): void {
+  const message: CacheInvalidationMessage = { orgId };
+  void publish(INVALIDATION_CHANNEL, 'redis-cache.invalidate', message).catch((err) => {
+    log.warn({ err, orgId }, 'failed to broadcast redis-cache invalidation');
+  });
+}
+
+// Subscribe each replica to remote invalidations so a mutation on one replica
+// sweeps the in-memory fallback on all of them. The handler sweeps the local
+// map only (never re-broadcasts) to avoid an invalidation loop. Gated out of
+// the test env — unit tests import this module without a Redis subscriber,
+// matching the NODE_ENV==='test' gate used by access-scope and the queue
+// bootstraps.
+if (process.env.NODE_ENV !== 'test') {
+  subscribe(INVALIDATION_CHANNEL, (payload) => {
+    const data = payload.data as CacheInvalidationMessage | undefined;
+    if (!data || typeof data.orgId !== 'string') return;
+    deleteInMemory(`bidstack:cache:${data.orgId}:`);
+  });
 }
 
 async function deleteRedisPattern(pattern: string): Promise<void> {
