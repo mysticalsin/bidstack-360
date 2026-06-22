@@ -470,6 +470,37 @@ async function recordChunkOutcome(
   }
 }
 
+/**
+ * Returns how many rows of this chunk a prior (retried) run already committed, so
+ * the import loop resumes PAST them instead of restarting. WHY audit-log based:
+ * the chunk audit row is the only durable per-chunk record, and it is written in
+ * the same worker pass — its `rowsConsumed` is an exact cursor (processed +
+ * errored). Returns 0 when this chunk has never run (the common, first-attempt
+ * path). Org-scoped; never reads another tenant's chunk progress.
+ */
+async function resolveChunkResumeCursor(
+  orgId: string,
+  migrationJobId: string,
+  chunkOffset: number,
+): Promise<number> {
+  const prior = await prisma.auditLog.findFirst({
+    where: {
+      orgId,
+      action: 'migration.chunk.imported',
+      targetType: 'MigrationJob',
+      targetId: migrationJobId,
+      // JSONB path filter — only the audit row for THIS chunk.
+      diff: { path: ['chunkOffset'], equals: chunkOffset },
+    },
+    orderBy: { at: 'desc' },
+    select: { diff: true },
+  });
+  if (!prior) return 0;
+  const diff = prior.diff as { rowsConsumed?: unknown } | null;
+  const consumed = typeof diff?.rowsConsumed === 'number' ? diff.rowsConsumed : 0;
+  return consumed >= 0 ? consumed : 0;
+}
+
 async function maybeComplete(migrationJobId: string, forceTotal?: number): Promise<void> {
   const job = await prisma.migrationJob.findUnique({ where: { id: migrationJobId } });
   if (!job || job.status !== 'RUNNING') return;
@@ -585,11 +616,24 @@ export async function startMigrationWorker(
         sourceTag: `migration:${payload.migrationJobId}`,
         dedupStrategy: payload.dedupStrategy,
       };
+
+      // Retry idempotency: a BullMQ retry re-runs the WHOLE chunk from the start.
+      // For the 'skip'/'update' strategies the per-row dedup check makes that safe,
+      // but 'duplicate' re-inserts every row unconditionally — so a retry after a
+      // partial commit would double-insert. We persist a resume cursor (rows
+      // consumed = processed + errored) in the prior chunk audit row and skip PAST
+      // already-committed rows so a retry resumes instead of restarting.
+      const resumeFrom = await resolveChunkResumeCursor(
+        payload.orgId,
+        payload.migrationJobId,
+        payload.chunkOffset,
+      );
+
       const createdIds: string[] = [];
       const errors: MigrationJobError[] = [];
       let processed = 0;
 
-      for (let i = 0; i < rows.length; i++) {
+      for (let i = resumeFrom; i < rows.length; i++) {
         const absoluteRow = payload.chunkOffset + i;
         try {
           const mapped = applyMappings(rows[i]!, payload.mappings);
@@ -606,8 +650,10 @@ export async function startMigrationWorker(
       }
 
       // ── Undo trail: contacts/opportunities have no `source` column, so the
-      // undo route reads these audit rows to find what this job created. ──
-      if (createdIds.length > 0) {
+      // undo route reads these audit rows to find what this job created. The
+      // `rowsConsumed` field doubles as the resume cursor for retry idempotency. ──
+      if (createdIds.length > 0 || processed > 0 || errors.length > 0) {
+        const rowsConsumed = resumeFrom + processed + errors.length;
         await prisma.auditLog.create({
           data: {
             orgId: payload.orgId,
@@ -615,7 +661,7 @@ export async function startMigrationWorker(
             action: 'migration.chunk.imported',
             targetType: 'MigrationJob',
             targetId: payload.migrationJobId,
-            diff: { entity, createdIds, chunkOffset: payload.chunkOffset },
+            diff: { entity, createdIds, chunkOffset: payload.chunkOffset, rowsConsumed },
           },
         });
       }

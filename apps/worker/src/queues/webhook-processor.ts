@@ -24,6 +24,19 @@ const TICK_MS = 10_000;
 
 const WebhookPayload = z.record(z.unknown());
 
+/**
+ * Thrown inside the agent.run.completed transaction when a concurrent/retried
+ * drain has already flipped the event to 'processed'. It rolls the transaction
+ * back (un-doing the duplicate insight) and is swallowed as a benign no-op — the
+ * event is already in a terminal state, so it must NOT be flipped to 'error'.
+ */
+class AlreadyProcessedError extends Error {
+  constructor() {
+    super('sync event already processed by a concurrent drain');
+    this.name = 'AlreadyProcessedError';
+  }
+}
+
 export async function startWebhookProcessor(
   connection: IORedis,
   log: pino.Logger,
@@ -89,42 +102,76 @@ export async function startWebhookProcessor(
             const output = String(data.output ?? '');
             const runId = String(data.run_id ?? '');
 
-            const insight = await prisma.aiInsight.create({
-              data: {
-                orgId: evt.orgId,
-                kind: 'dust.agent_run',
-                title: 'Dust Agent Insight',
-                summary: output.slice(0, 5000),
-                companyName: typeof data.company_name === 'string' ? data.company_name : null,
-                opportunityId: typeof data.opportunity_id === 'string' ? data.opportunity_id : null,
-                sourceAttribution: [
-                  { source: 'dust.webhook', eventType, runId, eventId: Number(evt.id) },
-                ] as Prisma.InputJsonValue,
-              },
-            });
+            // Idempotency: the aiInsight + audit + status flip are ONE atomic unit.
+            // WHY: without this, a retry after a partial write (insight created,
+            // status not yet flipped) re-selects the still-'received' event and
+            // double-inserts the insight. The flip is GUARDED on status:'received'
+            // (via updateMany count) so the transaction commits exactly once; a
+            // second concurrent/retried drain sees count===0 and rolls back, which
+            // un-does the duplicate insight. Mark the event handled so the shared
+            // post-branch flip below does not run twice.
+            await prisma.$transaction(async (tx) => {
+              const flipped = await tx.syncEvent.updateMany({
+                where: { id: evt.id, orgId: evt.orgId, status: 'received' },
+                data: { status: 'processed', processedAt: new Date() },
+              });
+              if (flipped.count === 0) {
+                // Another drain already processed this event — abort so we don't
+                // insert a duplicate insight. Throwing rolls back this tx cleanly.
+                throw new AlreadyProcessedError();
+              }
 
-            await prisma.auditLog.create({
-              data: {
-                orgId: evt.orgId,
-                action: 'ai.insight.created',
-                targetType: 'ai_insight',
-                targetId: insight.id,
-                diff: { source: 'dust.webhook', eventType, runId } as Prisma.InputJsonValue,
-              },
+              const insight = await tx.aiInsight.create({
+                data: {
+                  orgId: evt.orgId,
+                  kind: 'dust.agent_run',
+                  title: 'Dust Agent Insight',
+                  summary: output.slice(0, 5000),
+                  companyName: typeof data.company_name === 'string' ? data.company_name : null,
+                  opportunityId:
+                    typeof data.opportunity_id === 'string' ? data.opportunity_id : null,
+                  sourceAttribution: [
+                    { source: 'dust.webhook', eventType, runId, eventId: Number(evt.id) },
+                  ] as Prisma.InputJsonValue,
+                },
+              });
+
+              await tx.auditLog.create({
+                data: {
+                  orgId: evt.orgId,
+                  action: 'ai.insight.created',
+                  targetType: 'ai_insight',
+                  targetId: insight.id,
+                  diff: { source: 'dust.webhook', eventType, runId } as Prisma.InputJsonValue,
+                },
+              });
             });
+            // Status was flipped inside the transaction — skip the shared flip.
+            continue;
           } else {
             log.info({ eventType, eventId: evt.id }, 'unhandled dust webhook event type');
           }
 
+          // Document branches + unhandled types: flip status here, GUARDED on the
+          // current 'received' status so a retried drain that already flipped is a
+          // no-op (count===0) rather than a redundant write.
           await prisma.syncEvent.updateMany({
-            where: { id: evt.id, orgId: evt.orgId },
+            where: { id: evt.id, orgId: evt.orgId, status: 'received' },
             data: { status: 'processed', processedAt: new Date() },
           });
         } catch (err) {
+          if (err instanceof AlreadyProcessedError) {
+            // Benign race — the event already reached a terminal state. Do not
+            // overwrite it with 'error'; just move on to the next event.
+            log.debug({ eventId: evt.id }, 'sync event already processed — skipping');
+            continue;
+          }
           const error = err instanceof Error ? err.message : String(err);
           log.warn({ eventId: evt.id, error }, 'webhook event processing failed');
+          // Guard on 'received' so we never clobber an event another drain already
+          // moved to a terminal state.
           await prisma.syncEvent.updateMany({
-            where: { id: evt.id, orgId: evt.orgId },
+            where: { id: evt.id, orgId: evt.orgId, status: 'received' },
             data: {
               status: 'error',
               error,

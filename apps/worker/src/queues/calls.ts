@@ -309,7 +309,7 @@ async function processAnalyze(job: Job, updateDealQueue: Queue, log: pino.Logger
 
 // ─── Worker 4: update-deal ────────────────────────────────────────────────
 
-async function processUpdateDeal(job: Job, log: pino.Logger): Promise<void> {
+async function processUpdateDeal(job: Job, redis: IORedis, log: pino.Logger): Promise<void> {
   const data = UpdateDealJobData.parse(job.data);
   const { callSessionId, entityType, entityId, suggestions, orgId } = data;
 
@@ -318,28 +318,45 @@ async function processUpdateDeal(job: Job, log: pino.Logger): Promise<void> {
     'call.update-deal: creating in-app notifications',
   );
 
-  // HUMAN-IN-THE-LOOP: never auto-apply deal changes.
-  // Create an AiInsight notification for each suggestion.
-  // The rep sees these as "AI suggested: move deal to Proposal stage" and can accept/dismiss.
-  for (const suggestion of suggestions) {
-    await prisma.aiInsight.create({
-      data: {
-        orgId,
-        kind: `CALL_DEAL_SUGGESTION_${suggestion.field.toUpperCase()}`,
-        title: `Call suggestion: ${suggestion.field}`,
-        summary: `AI suggestion (${Math.round(suggestion.confidence * 100)}% confidence): ${suggestion.rationale}`,
-        opportunityId: entityType.toLowerCase() === 'opportunity' ? entityId : null,
-        confidenceBps: Math.round(suggestion.confidence * 10_000),
-        sourceAttribution: [
-          {
-            sourceType: 'CALL_SESSION',
-            sourceId: callSessionId,
-            suggestedValue: suggestion.suggestedValue,
+  // Idempotency: a BullMQ retry would re-insert every suggestion (AiInsight has no
+  // natural unique key), double-notifying the rep. Claim per call session before
+  // writing; a retry after a prior success short-circuits instead of duplicating.
+  const claimKey = `calls:dealupdate:${callSessionId}`;
+  const claimed = await redis.set(claimKey, '1', 'EX', 86_400, 'NX');
+  if (claimed !== 'OK') {
+    log.warn({ callSessionId }, 'call.update-deal: skipped — already processed (idempotency claim present)');
+    return;
+  }
+
+  try {
+    // HUMAN-IN-THE-LOOP: never auto-apply deal changes. One AiInsight per suggestion,
+    // all-or-nothing so a mid-batch failure leaves no partial set for the rep.
+    await prisma.$transaction(
+      suggestions.map((suggestion) =>
+        prisma.aiInsight.create({
+          data: {
+            orgId,
+            kind: `CALL_DEAL_SUGGESTION_${suggestion.field.toUpperCase()}`,
+            title: `Call suggestion: ${suggestion.field}`,
+            summary: `AI suggestion (${Math.round(suggestion.confidence * 100)}% confidence): ${suggestion.rationale}`,
+            opportunityId: entityType.toLowerCase() === 'opportunity' ? entityId : null,
+            confidenceBps: Math.round(suggestion.confidence * 10_000),
+            sourceAttribution: [
+              {
+                sourceType: 'CALL_SESSION',
+                sourceId: callSessionId,
+                suggestedValue: suggestion.suggestedValue,
+              },
+            ],
+            status: 'PENDING',
           },
-        ],
-        status: 'PENDING',
-      },
-    });
+        }),
+      ),
+    );
+  } catch (err) {
+    // Insert failed — release the claim so a legitimate retry can re-attempt.
+    await redis.del(claimKey);
+    throw err;
   }
 
   log.info({ callSessionId, count: suggestions.length }, 'call.update-deal: notifications created');
@@ -379,7 +396,7 @@ export function startCallWorkers(redis: IORedis, log: pino.Logger, queues?: Queu
     { connection: redis, concurrency: 1 },
   );
 
-  const updateDealWorker = new Worker(CALL_UPDATE_DEAL.name, (job) => processUpdateDeal(job, log), {
+  const updateDealWorker = new Worker(CALL_UPDATE_DEAL.name, (job) => processUpdateDeal(job, redis, log), {
     connection: redis,
     concurrency: 10,
   });

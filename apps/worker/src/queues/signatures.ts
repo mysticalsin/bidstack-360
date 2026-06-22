@@ -38,6 +38,44 @@ const ReminderJobData = z.object({
   signingUrl: z.string().optional(),
 });
 
+// ─── Status-transition guard ──────────────────────────────────────────────────
+
+/** DocuSign envelope status → canonical SignatureStatus. */
+const DOCUSIGN_STATUS_MAP: Record<string, SignatureStatus> = {
+  completed: 'SIGNED',
+  declined: 'DECLINED',
+  voided: 'VOIDED',
+  sent: 'SENT',
+  delivered: 'SENT',
+};
+
+/** Statuses we treat as terminal — the only ones a poll may transition INTO. */
+const TERMINAL_STATUSES: ReadonlySet<SignatureStatus> = new Set([
+  'SIGNED',
+  'DECLINED',
+  'VOIDED',
+]);
+
+/**
+ * Decides whether a polled DocuSign status is a VALID transition for a request
+ * currently in `currentStatus`. Returns the target status to apply, or `null`
+ * when the transition must be REJECTED. WHY a single guard: DocuSign Connect
+ * webhooks can replay or arrive out of order, so a poll must never (a) act on an
+ * unmapped status, (b) re-apply the status the request already holds — which
+ * would write a duplicate signatureEvent — or (c) flip a request into a
+ * non-terminal status via the poll path. All three are rejected here.
+ */
+export function resolveSignatureTransition(
+  currentStatus: SignatureStatus,
+  docusignStatus: string,
+): SignatureStatus | null {
+  const target = DOCUSIGN_STATUS_MAP[docusignStatus];
+  if (!target) return null; // unknown / unmapped DocuSign status
+  if (target === currentStatus) return null; // no-op: already in this status
+  if (!TERMINAL_STATUSES.has(target)) return null; // poll only commits terminal states
+  return target;
+}
+
 // ─── DocuSign status poll (internal helper) ───────────────────────────────────
 
 async function pollDocuSignStatus(
@@ -104,24 +142,18 @@ async function pollDocuSignStatus(
   }
 
   const envelope = (await res.json()) as { status: string };
-  const statusMap: Record<string, SignatureStatus> = {
-    completed: 'SIGNED',
-    declined: 'DECLINED',
-    voided: 'VOIDED',
-    sent: 'SENT',
-    delivered: 'SENT',
-  };
-  const newStatus = statusMap[envelope.status];
-  if (!newStatus) return;
 
   const current = await prisma.signatureRequest.findUnique({
     where: { id: requestId },
     select: { status: true },
   });
-  if (!current || current.status === newStatus) return;
+  if (!current) return;
 
-  // Terminal statuses — update and record event
-  if (['SIGNED', 'DECLINED', 'VOIDED'].includes(newStatus)) {
+  // Single guard: rejects unmapped, no-op, and non-terminal transitions.
+  const newStatus = resolveSignatureTransition(current.status, envelope.status);
+  if (!newStatus) return;
+
+  {
     await prisma.$transaction(async (tx) => {
       await tx.signatureRequest.update({
         where: { id: requestId },

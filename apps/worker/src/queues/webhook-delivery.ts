@@ -21,7 +21,7 @@
  * Subscriptions with failureCount >= 10 are auto-disabled.
  */
 
-import { createHmac } from 'node:crypto';
+import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { Queue, Worker, type Job } from 'bullmq';
 import type IORedis from 'ioredis';
 import type pino from 'pino';
@@ -58,6 +58,15 @@ const DeliveryJobSchema = z.object({
   event: z.string(),
   /** Full JSON payload to deliver. */
   payload: z.record(z.unknown()),
+  /**
+   * Stable event identity, stamped ONCE at enqueue (see fanOutWebhookEvent).
+   * WHY optional: jobs enqueued before this field existed (or by the API-side
+   * producer that hasn't been updated) fall back to job-derived stable values,
+   * so dedup still holds across the 5 retries. Never regenerate per attempt.
+   */
+  eventId: z.string().uuid().optional(),
+  /** ISO-8601 timestamp of the originating event, stamped once at enqueue. */
+  eventTimestamp: z.string().datetime().optional(),
 });
 
 type DeliveryJob = z.infer<typeof DeliveryJobSchema>;
@@ -68,10 +77,35 @@ export type WebhookDeliveryQueue = Queue<DeliveryJob>;
 
 // ── HMAC signature ────────────────────────────────────────────────────────────
 
-function buildSignatureHeader(secret: string, body: string): string {
-  const t = Math.floor(Date.now() / 1000);
-  const sig = createHmac('sha256', secret).update(`${t}.${body}`).digest('hex');
-  return `t=${t},v1=${sig}`;
+/**
+ * Builds the `t=<unix-seconds>,v1=<hmac>` header. The HMAC covers the documented
+ * `${t}.${body}` string. `tSeconds` is passed in (not read from the clock here)
+ * so all retries of a job sign with the SAME timestamp — partner-side replay /
+ * dedup windows key on `t`, so a per-attempt `t` would defeat them.
+ */
+function buildSignatureHeader(secret: string, body: string, tSeconds: number): string {
+  const sig = createHmac('sha256', secret).update(`${tSeconds}.${body}`).digest('hex');
+  return `t=${tSeconds},v1=${sig}`;
+}
+
+/**
+ * Deterministically derives a stable event UUID from the BullMQ job id. WHY:
+ * `job.id` is constant across all retries of a job, so the same delivery always
+ * carries the same event id — the property partner dedup relies on. Formatted as
+ * an RFC-4122 v5-style UUID (deterministic, namespaced by the SHA-256 of job.id)
+ * so it satisfies the `id: uuid` contract documented in /docs/api/webhooks.md.
+ */
+function deriveStableEventId(job: Job<DeliveryJob>): string {
+  const seed = job.id ?? `${job.name}:${job.timestamp}`;
+  const h = createHash('sha256').update(`webhook.delivery:${seed}`).digest('hex');
+  // Splice RFC-4122 version (5) and variant (8/9/a/b) bits into the digest.
+  return [
+    h.slice(0, 8),
+    h.slice(8, 12),
+    `5${h.slice(13, 16)}`,
+    `${((parseInt(h[16]!, 16) & 0x3) | 0x8).toString(16)}${h.slice(17, 20)}`,
+    h.slice(20, 32),
+  ].join('-');
 }
 
 // ── Delivery ──────────────────────────────────────────────────────────────────
@@ -80,6 +114,7 @@ async function deliver(
   url: string,
   secret: string,
   body: string,
+  tSeconds: number,
 ): Promise<{ statusCode: number | null; durationMs: number; success: boolean; error?: string }> {
   try {
     assertSafeWebhookUrl(url);
@@ -92,7 +127,7 @@ async function deliver(
     };
   }
 
-  const signature = buildSignatureHeader(secret, body);
+  const signature = buildSignatureHeader(secret, body, tSeconds);
   const start = Date.now();
 
   try {
@@ -137,7 +172,16 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
     return; // don't retry malformed jobs
   }
 
-  const { subscriptionId, event, payload } = parsed.data;
+  const { subscriptionId, event, payload, eventId, eventTimestamp } = parsed.data;
+
+  // Stable event identity — computed ONCE per job, reused across all 5 retries so
+  // partner-side dedup works. Prefer the values stamped at enqueue; fall back to
+  // job-derived values (job.id and job.timestamp are both stable across retries).
+  const stableEventId = eventId ?? deriveStableEventId(job);
+  const stableTimestamp = eventTimestamp ?? new Date(job.timestamp).toISOString();
+  // The signature `t` (unix seconds) is derived from the SAME stable timestamp,
+  // not the wall clock, so every retry signs identically.
+  const stableTSeconds = Math.floor(new Date(stableTimestamp).getTime() / 1000);
 
   const sub = await prisma.webhookSubscription.findFirst({
     where: { id: subscriptionId, deletedAt: null, active: true },
@@ -157,10 +201,10 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
   }
 
   const body = JSON.stringify({
-    id: crypto.randomUUID(),
+    id: stableEventId,
     event,
     orgId: sub.orgId,
-    timestamp: new Date().toISOString(),
+    timestamp: stableTimestamp,
     data: payload,
   });
 
@@ -188,7 +232,12 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
     return;
   }
 
-  const result = await deliver(sub.url, decryptSecretOrPlaintext(sub.secret), body);
+  const result = await deliver(
+    sub.url,
+    decryptSecretOrPlaintext(sub.secret),
+    body,
+    stableTSeconds,
+  );
 
   log.info(
     {
@@ -278,9 +327,20 @@ export async function fanOutWebhookEvent(
 
   if (subs.length === 0) return;
 
+  // Stamp the stable event identity ONCE here, at enqueue. Every retry of the
+  // resulting job reuses these exact values, so partner-side dedup holds across
+  // the full 5-attempt retry schedule (each subscription gets its own event id).
+  const eventTimestamp = new Date().toISOString();
+
   const jobs = subs.map((sub) => ({
     name: `${event}:${sub.id}`,
-    data: { subscriptionId: sub.id, event, payload } satisfies DeliveryJob,
+    data: {
+      subscriptionId: sub.id,
+      event,
+      payload,
+      eventId: randomUUID(),
+      eventTimestamp,
+    } satisfies DeliveryJob,
     opts: {
       jobId: `${event}:${sub.id}:${Date.now()}`,
       ...WEBHOOK_DELIVERY.defaultJobOptions,
