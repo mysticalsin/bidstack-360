@@ -4,6 +4,34 @@ Append-only sprint log. Every sprint ends with a commit + a checkpoint here.
 
 ---
 
+## 2026-06-22 — Production-Hardening Waves 1–2 (audit-driven, multi-agent)
+
+**Branch:** `feat/prod-hardening-mantu` · **Mode:** `/goal /audit /plan /loop` autopilot, enterprise-grade for 100k users.
+
+**Audit:** 14-lens verification-first audit (29 agents, adversarial verify) → 92 findings, 42 confirmed high-severity after re-read. Honest score **88/100** (Functional 21 / Code 22 / Design 23 / Infra 22). Prior waves (BS-1..43, walteur R/M/A) confirmed genuinely closed.
+
+**Wave 1 — confirmed blockers (each ships with a regression test):**
+- **PII bulk-encrypt fail-open** — `createMany` array defeated single-object orgId extraction → plaintext on the highest-volume ingest path. Array-aware encrypt + fail-loud throw. (`d818474d`)
+- **SMS double-send on retry** — Twilio called before the DB commit, attempts:3, no idempotency. Per-job Redis claim. (`4d762c31`)
+- **Renewals endpoint DOA** — takeless findMany tripped the query-guard → HTTP 400. Bounded `take` + cursor-paginated worker scan. (`34a89cb7`)
+- **Workflow automation engine never fired** — triggers toggled Active but nothing dispatched; 2 actions were no-ops. Wired a pure engine (`@bidstack/shared`) + per-app injected effects; record_created/stage_changed dispatch + 15-min schedule cron + all 5 actions. Dual cross-model review (Codex + Claude) caught a cross-tenant IDOR (`create_task` oppId) + 8 more, all fixed before commit. (`71f74e04`)
+
+**Wave 2 — confirmed majors (4 commits):**
+- RBAC gates on EmailTemplate + lead-rot (Read-Only could mutate); global search extended (proposals/requirements/references); tautological rbac-matrix test rewritten to fail on a permission regression. (`54fa762a`)
+- Worker idempotency/retry-safety: stable webhook event id across all 5 retries; webhook-processor `$transaction`; migration resume-past-committed; call-deal suggestion idempotency. New webhook + signatures tests. (`352478e9`)
+- API correctness: predictive-score scale unified to basis points; Twilio recording fetch timeout + size cap; PDF render fallback observability. (`6ab20736`)
+- Fail-loud config: API + worker refuse prod boot when the job signing secret is missing. (`d34cdd0c`)
+
+**Verified:** full `pnpm -r typecheck` exit 0 at each wave; ~50 new tests; lint-staged eslint clean on every commit; rbac (40) + search (live-DB, 7) integration tests green.
+
+**In flight:** Wave 3 — WCAG a11y (4 fixes), CSV formula-injection, intake/bulk-void UX, onboarding activation, api perf (4-agent fan-out).
+
+**Surfaced / NOT agent-reachable (the gate to a verified 99/100):**
+- **Operator:** prod `migrate:deploy` for the new `@@unique` constraints (Activity / PredictiveScore / ContractAgreement — schema groundwork pending, blocked on the Windows prisma-generate DLL lock); EXPLAIN-verify + `CONCURRENTLY` trigram + leads composite indexes; Chromium in the worker image for PDF; set `BIDSTACK_JOB_SIGNING_SECRET` in prod; CI branch-protection; live end-to-end smoke.
+- **Product decisions (need Tony):** User identity model (single vs org-scoped email); in-app team invites vs Clerk-owned; multi-stage approval chains; collaborative bid/no-bid voting; e2e seed strategy; marketing copy (Dust co-pilots vs de-scoped RFP-Agent).
+
+---
+
 ## 2026-06-19 - Production-Hardening for Real Mantu Tenants
 
 **Branch:** `feat/prod-hardening-mantu` (off `demo` @ c038c5d9)

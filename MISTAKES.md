@@ -35,6 +35,18 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 <!-- New entries appended at the top of this section. -->
 
+### 2026-06-22 SECURITY: PII field-encryption silently skipped on bulk `createMany` (fail-open)
+- **What went wrong:** The Prisma PII-encryption middleware only handled `args.data` as a single object. `createMany` passes `data` as an array, so `extractOrgId` returned null and the middleware silently skipped encryption — email/phone would persist as plaintext (emailHash null) the moment `PII_FIELD_ENCRYPTION` flipped on. Live call sites: notes.service (AI-extracted meeting contacts) + onboarding.service.
+- **Root cause:** A security control that FAILS OPEN when its input-shape assumption is violated. The orgId-extraction helper assumed the single-row write shape; the array shape (`createMany`, `updateMany`-with-array) was never handled or guarded.
+- **Prevention rule:** Encryption/redaction middleware must FAIL LOUD, never fail open. When a PII-model write carries plaintext PII but no resolvable key, THROW — never pass through. Handle every Prisma write shape (create object, createMany array, upsert create/update, updateMany). Ship a regression test for the bulk path + a fail-loud test.
+- **Files affected:** packages/db/src/middleware/pii-encryption.ts (+ .test.ts). Fixed `d818474d`.
+
+### 2026-06-22 PROCESS: Cross-model review caught a cross-tenant IDOR that author tests missed
+- **What went wrong:** The newly-wired workflow engine's `create_task` action used `config.oppId` without an org-scoped Opportunity lookup — org A could link a task to org B's opportunity. The implementing agent's own 22 unit tests passed; the IDOR only surfaced under independent adversarial review (Codex = BLOCKER, Claude code-reviewer = MAJOR). The original manual-run path had the same gap; the new trigger path widened it.
+- **Root cause:** Author-written tests encode the author's mental model and don't probe the cross-tenant references the author never thought to validate (assignee/owner were validated; oppId was not). Single-perspective verification has blind spots.
+- **Prevention rule:** For security/multi-tenant-sensitive changes, run an independent adversarial review (ideally cross-model) before commit, explicitly prompting "validate EVERY record id read from config/JSON against the caller's org" — not just the obvious refs.
+- **Files affected:** packages/shared/src/workflow-engine.ts + api/worker effects. Fixed `71f74e04`.
+
 ### 2026-06-19 TESTING: Technical stack E2E assumed one account shape
 
 - **What went wrong:** The technical-stack browser spec used broad provider-label text and then assumed a newly staged vendor would always be `Vendor 1 in QA`. The improved launchpad reused provider labels, and seeded accounts can already contain a QA category.
