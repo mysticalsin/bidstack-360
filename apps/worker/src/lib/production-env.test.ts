@@ -10,6 +10,7 @@ const validProductionEnv = {
   STORAGE_DRIVER: 's3',
   S3_BUCKET: 'bidstack-prod-files',
   S3_REGION: 'us-east-1',
+  BIDSTACK_JOB_SIGNING_SECRET: 'b'.repeat(64),
 };
 
 describe('worker production env contract', () => {
@@ -22,6 +23,7 @@ describe('worker production env contract', () => {
       'DATABASE_URL is required in production',
       'REDIS_URL is required in production',
       'INTEGRATION_TOKEN_KEY must be a 64-character hex string in production',
+      'BIDSTACK_JOB_SIGNING_SECRET is required in production',
       'STORAGE_DRIVER=s3 is required in production',
     ]);
   });
@@ -73,6 +75,27 @@ describe('worker production env contract', () => {
         S3_BUCKET: '',
         S3_REGION: '',
       }),
+    ).toEqual([]);
+  });
+
+  it('requires a job signing secret so enrichment jobs are not silently rejected', () => {
+    // Without it the worker rejects every Apollo enrich job in production
+    // (verifyApolloEnrichJobSignature returns false), killing enrichment with
+    // no error — so boot must fail loud instead.
+    const { BIDSTACK_JOB_SIGNING_SECRET: _omit, ...withoutSecret } = validProductionEnv;
+    void _omit;
+    expect(validateWorkerProductionEnv(withoutSecret)).toContain(
+      'BIDSTACK_JOB_SIGNING_SECRET is required in production',
+    );
+  });
+
+  it('accepts the legacy JOB_SIGNING_SECRET fallback the queue resolves', () => {
+    // The queue reads BIDSTACK_JOB_SIGNING_SECRET ?? JOB_SIGNING_SECRET, so the
+    // fallback must satisfy the boot check (else valid deploys break).
+    const { BIDSTACK_JOB_SIGNING_SECRET: _omit, ...withFallback } = validProductionEnv;
+    void _omit;
+    expect(
+      validateWorkerProductionEnv({ ...withFallback, JOB_SIGNING_SECRET: 'b'.repeat(64) }),
     ).toEqual([]);
   });
 

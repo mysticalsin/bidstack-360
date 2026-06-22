@@ -101,6 +101,7 @@ describe('boot environment validation', () => {
       PUBLIC_BASE_URL: 'https://demo.example.com',
       DEMO_MODE: 'true',
       DEMO_SESSION_SECRET: 'demo-session-secret',
+      BIDSTACK_JOB_SIGNING_SECRET: 'b'.repeat(64),
     };
 
     await expect(loadEnvWith(productionDemo)).rejects.toThrow(
@@ -116,6 +117,39 @@ describe('boot environment validation', () => {
     expect(env.STORAGE_DRIVER).toBe('local');
   });
 
+  it('requires a job signing secret in production', async () => {
+    // Without it enqueueApolloEnrich skips silently and the worker rejects every
+    // job — enrichment dies with no error. Production must fail fast at boot.
+    await expect(
+      loadEnvWith({
+        NODE_ENV: 'production',
+        STORAGE_DRIVER: 's3',
+        S3_BUCKET: 'bidstack-prod-files',
+        S3_REGION: 'us-east-1',
+        STORAGE_SCAN_REQUIRED: 'true',
+        INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
+        PUBLIC_BASE_URL: 'https://crm.example.com',
+      }),
+    ).rejects.toThrow('BIDSTACK_JOB_SIGNING_SECRET is required in production');
+  });
+
+  it('accepts the legacy JOB_SIGNING_SECRET fallback in production', async () => {
+    // The queue resolves BIDSTACK_JOB_SIGNING_SECRET ?? JOB_SIGNING_SECRET, so
+    // the fallback alone must satisfy boot (else valid deploys break).
+    const env = await loadEnvWith({
+      NODE_ENV: 'production',
+      STORAGE_DRIVER: 's3',
+      S3_BUCKET: 'bidstack-prod-files',
+      S3_REGION: 'us-east-1',
+      STORAGE_SCAN_REQUIRED: 'true',
+      INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
+      PUBLIC_BASE_URL: 'https://crm.example.com',
+      JOB_SIGNING_SECRET: 'b'.repeat(64),
+    });
+
+    expect(env.JOB_SIGNING_SECRET).toBe('b'.repeat(64));
+  });
+
   it('accepts explicit durable storage settings for production', async () => {
     const env = await loadEnvWith({
       NODE_ENV: 'production',
@@ -125,6 +159,7 @@ describe('boot environment validation', () => {
       STORAGE_SCAN_REQUIRED: 'true',
       INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
       PUBLIC_BASE_URL: 'https://crm.example.com',
+      BIDSTACK_JOB_SIGNING_SECRET: 'b'.repeat(64),
     });
 
     expect(env.STORAGE_DRIVER).toBe('s3');

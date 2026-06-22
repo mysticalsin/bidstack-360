@@ -23,6 +23,15 @@ export function validateWorkerProductionEnv(env: Env = process.env): string[] {
     errors.push('INTEGRATION_TOKEN_KEY must be a 64-character hex string in production');
   }
 
+  // HMAC secret for Apollo enrichment jobs. Without it the worker's
+  // verifyApolloEnrichJobSignature rejects EVERY job in production (returns
+  // false when no secret + NODE_ENV=production), so enrichment silently dies.
+  // Fail loud at boot instead. JOB_SIGNING_SECRET is the accepted fallback the
+  // queue resolves (BIDSTACK_JOB_SIGNING_SECRET ?? JOB_SIGNING_SECRET).
+  if (!trimmed(env, 'BIDSTACK_JOB_SIGNING_SECRET') && !trimmed(env, 'JOB_SIGNING_SECRET')) {
+    errors.push('BIDSTACK_JOB_SIGNING_SECRET is required in production');
+  }
+
   const storageDriver = trimmed(env, 'STORAGE_DRIVER').toLowerCase();
   if (trimmed(env, 'DEMO_MODE') !== 'true' && storageDriver !== 's3') {
     errors.push('STORAGE_DRIVER=s3 is required in production');

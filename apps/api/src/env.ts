@@ -271,6 +271,16 @@ export function getEnv(): Env {
       'INTEGRATION_TOKEN_KEY must be a 64-character hex string in production (encrypts per-org Dust + OAuth secrets at rest)',
     );
   }
+  // HMAC secret for Apollo enrichment jobs, shared by api (signs/enqueues) and
+  // worker (verifies). Missing in production, enqueueApolloEnrich skips silently
+  // and the worker rejects every job — enrichment dies with no error. Fail loud
+  // at boot. JOB_SIGNING_SECRET is the accepted fallback the queue resolves
+  // (BIDSTACK_JOB_SIGNING_SECRET ?? JOB_SIGNING_SECRET).
+  if (env.NODE_ENV === 'production' && !env.BIDSTACK_JOB_SIGNING_SECRET && !env.JOB_SIGNING_SECRET) {
+    semanticErrors.push(
+      'BIDSTACK_JOB_SIGNING_SECRET is required in production (HMAC-signs Apollo enrichment jobs; must match the worker)',
+    );
+  }
   // Demo-mode gate: the public passwordless door must never run alongside real
   // Clerk auth, and needs its own HMAC secret to sign session tokens.
   if (env.DEMO_MODE === 'true') {
