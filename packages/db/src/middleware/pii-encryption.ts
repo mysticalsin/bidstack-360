@@ -121,6 +121,45 @@ function encryptPayload(
   return result;
 }
 
+/**
+ * Returns true when `data` carries at least one non-empty, not-yet-encrypted PII
+ * value for `model`. Used to decide whether an unresolved orgId is fatal
+ * (would persist plaintext) or harmless (a non-PII write).
+ */
+function hasPlaintextPii(model: string, data: Record<string, unknown>): boolean {
+  const config = PII_MAP[model.toLowerCase()];
+  if (!config) return false;
+  return config.fields.some(({ name }) => {
+    const val = data[name];
+    return typeof val === 'string' && val.length > 0 && !isEncrypted(val);
+  });
+}
+
+/**
+ * Encrypt one write payload, failing LOUD when orgId cannot be resolved AND the
+ * payload actually contains plaintext PII.
+ *
+ * WHY: the prior code silently skipped encryption whenever orgId was absent — so
+ * a bulk `createMany` (whose `data` is an array, defeating the single-object
+ * orgId extraction) wrote email/phone in cleartext with no error. Skipping a PII
+ * write must never be silent; throw so the offending call site is fixed instead.
+ */
+function encryptWritePayload(
+  model: string,
+  data: Record<string, unknown>,
+  orgId: string | null,
+  ctx: string,
+): Record<string, unknown> {
+  if (orgId) return encryptPayload(model, data, orgId);
+  if (hasPlaintextPii(model, data)) {
+    throw new Error(
+      `[pii-encryption] Refusing to write ${model} (${ctx}) with plaintext PII but no resolvable orgId — ` +
+        'this would persist cleartext. Include orgId in the data/where clause.',
+    );
+  }
+  return data;
+}
+
 // ----- Read-side helpers ----------------------------------------------------
 
 function decryptRecord(
@@ -191,20 +230,42 @@ export function makePiiMiddleware(): Prisma.Middleware {
     const writeMutations = ['create', 'update', 'upsert', 'createMany', 'updateMany'];
     if (writeMutations.includes(params.action)) {
       if (params.action === 'upsert') {
-        const orgId = extractOrgId(params.args);
-        if (orgId) {
-          if (params.args.create) {
-            params.args.create = encryptPayload(model, params.args.create as Record<string, unknown>, orgId);
-          }
-          if (params.args.update) {
-            params.args.update = encryptPayload(model, params.args.update as Record<string, unknown>, orgId);
-          }
+        const whereOrg = extractOrgId(params.args);
+        const create = params.args?.create as Record<string, unknown> | undefined;
+        const update = params.args?.update as Record<string, unknown> | undefined;
+        if (create) {
+          const orgId = typeof create.orgId === 'string' ? create.orgId : whereOrg;
+          params.args.create = encryptWritePayload(model, create, orgId, 'upsert.create');
+        }
+        if (update) {
+          params.args.update = encryptWritePayload(model, update, whereOrg, 'upsert.update');
+        }
+      } else if (params.action === 'createMany') {
+        // createMany passes `data` as an ARRAY (or, rarely, a single object).
+        // Each row carries its own orgId — the WHERE-clause fallback used by
+        // single-row writes does not exist here. Reading `data` as one object
+        // (the prior bug) made extractOrgId return null and silently SKIPPED
+        // encryption, persisting PII in plaintext on the highest-volume path.
+        const rows = params.args?.data;
+        if (Array.isArray(rows)) {
+          params.args.data = rows.map((row, i) => {
+            const record = row as Record<string, unknown>;
+            const orgId = typeof record.orgId === 'string' ? record.orgId : null;
+            return encryptWritePayload(model, record, orgId, `createMany[${i}]`);
+          });
+        } else if (rows && typeof rows === 'object') {
+          const record = rows as Record<string, unknown>;
+          const orgId = typeof record.orgId === 'string' ? record.orgId : extractOrgId(params.args);
+          params.args.data = encryptWritePayload(model, record, orgId, 'createMany');
         }
       } else if (params.args?.data) {
         const orgId = extractOrgId(params.args);
-        if (orgId) {
-          params.args.data = encryptPayload(model, params.args.data as Record<string, unknown>, orgId);
-        }
+        params.args.data = encryptWritePayload(
+          model,
+          params.args.data as Record<string, unknown>,
+          orgId,
+          params.action,
+        );
       }
     }
 
