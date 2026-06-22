@@ -49,8 +49,21 @@ export function SearchBar() {
     runSearch(query);
   };
 
+  // Whether the recent-searches listbox is actually rendered. Drives
+  // aria-expanded and aria-controls so the combobox only advertises a popup
+  // when one exists (WCAG 4.1.2).
+  const listboxOpen = open && !query && recents.length > 0;
+  const activeOptionId =
+    listboxOpen && highlightedIndex >= 0 ? `tb-search-recent-${highlightedIndex}` : undefined;
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!open || query || recents.length === 0) return;
+    // Escape must always close the popup, even while a query is typed.
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setOpen(false);
+      return;
+    }
+    if (!listboxOpen) return;
 
     switch (e.key) {
       case 'ArrowDown':
@@ -70,10 +83,6 @@ export function SearchBar() {
           }
         }
         break;
-      case 'Escape':
-        e.preventDefault();
-        setOpen(false);
-        break;
       default:
         break;
     }
@@ -88,6 +97,11 @@ export function SearchBar() {
       <input
         id="tb-search-input"
         type="search"
+        role="combobox"
+        aria-expanded={listboxOpen}
+        aria-controls="tb-search-recent-listbox"
+        aria-activedescendant={activeOptionId}
+        aria-autocomplete="list"
         placeholder={t('topbarSearch.placeholder', 'Search or jump to…')}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
@@ -101,8 +115,9 @@ export function SearchBar() {
       />
       <kbd aria-hidden>Ctrl+/</kbd>
       <AnimatePresence>
-        {open && !query && recents.length > 0 && (
+        {listboxOpen && (
           <motion.div
+            id="tb-search-recent-listbox"
             role="listbox"
             aria-label={t('topbarSearch.recentSearchesAriaLabel', 'Recent searches')}
             initial={reduced ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.98 }}
@@ -126,13 +141,14 @@ export function SearchBar() {
                 {t('topbarSearch.clear', 'Clear')}
               </button>
             </div>
-            <ul className="flex flex-col gap-0.5">
+            <ul role="presentation" className="flex flex-col gap-0.5">
               {recents.map((r, index) => {
                 const isHighlighted = index === highlightedIndex;
                 return (
-                  <li key={r}>
+                  <li key={r} role="presentation">
                     <button
                       type="button"
+                      id={`tb-search-recent-${index}`}
                       role="option"
                       aria-selected={isHighlighted}
                       onMouseDown={(e) => {

@@ -75,16 +75,20 @@ export const PipelineCard = memo(function PipelineCard({
         onBlur={() => onBlur(opp.id)}
         onKeyDown={(e) => onKey(e, opp)}
         aria-roledescription="draggable opportunity"
-        aria-label={t(
-          'crm.pipelineCardAriaLabel',
-          '{{code}}: {{name}}, {{stage}}, {{value}}. Use left or right arrows to move stage.',
-          {
-            code: opp.code,
-            name: opp.name,
-            stage: stageName,
-            value: formatMoney(opp.value, 'EUR'),
-          },
-        )}
+        aria-label={
+          // Base label + an ", overdue" suffix so the past-due state reaches
+          // screen-reader users — color alone fails WCAG 1.4.1 (Use of Color).
+          t(
+            'crm.pipelineCardAriaLabel',
+            '{{code}}: {{name}}, {{stage}}, {{value}}. Use left or right arrows to move stage.',
+            {
+              code: opp.code,
+              name: opp.name,
+              stage: stageName,
+              value: formatMoney(opp.value, 'EUR'),
+            },
+          ) + (isStalled ? t('crm.pipelineCardOverdueSuffix', ', overdue') : '')
+        }
         className={cn(
           'block cursor-grab active:cursor-grabbing rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-3 shadow-[var(--shadow-xs)] transition-shadow hover:shadow-[var(--shadow-sm)]',
           isFocused &&
@@ -106,6 +110,20 @@ export const PipelineCard = memo(function PipelineCard({
         <div className="mt-1 text-xs font-medium text-[var(--fg-secondary)] line-clamp-2">
           {opp.name}
         </div>
+
+        {/* Overdue badge — visible icon+text so the past-due state isn't
+            conveyed by the red card tint alone (WCAG 1.4.1). aria-hidden
+            because the card's aria-label already appends ", overdue", so the
+            badge would otherwise be announced twice. tomato tone = AA-paired
+            light/dark tokens. */}
+        {isStalled && (
+          <div className="mt-1.5">
+            <Badge tone="tomato" aria-hidden className="text-[9px] px-1.5 py-0">
+              <Icon name="warning" size={10} strokeWidth={2} />
+              {t('crm.pipelineCardOverdueBadge', 'Overdue')}
+            </Badge>
+          </div>
+        )}
 
         {/* Territory badge */}
         {opp.territoryName && (
