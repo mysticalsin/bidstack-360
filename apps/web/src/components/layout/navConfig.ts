@@ -67,6 +67,7 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: 'building',
     items: [
       { to: '/accounts', label: 'Accounts', labelKey: 'nav.accounts', icon: 'building' },
+      { to: '/kam', label: 'Key Account Mgmt', labelKey: 'nav.kam', icon: 'target' },
       { to: '/key-accounts', label: 'Key Accounts', labelKey: 'nav.keyAccounts', icon: 'star' },
       { to: '/top-accounts', label: 'Top Accounts', labelKey: 'nav.topAccounts', icon: 'trophy' },
       { to: '/companies', label: 'Companies', labelKey: 'nav.companies', icon: 'list' },

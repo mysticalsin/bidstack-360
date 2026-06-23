@@ -16,7 +16,7 @@ import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
 import { prefetchRoute } from '@/lib/prefetch';
 
-import { ADMIN_SETTINGS, MEMBER_SETTINGS, NAV_SECTIONS, type NavItem } from './navConfig';
+import { ADMIN_SETTINGS, MEMBER_SETTINGS, NAV_SECTIONS, type NavItem, type NavSection } from './navConfig';
 
 export function MobileNav() {
   const open = useUiStore((s) => s.mobileNavOpen);
@@ -91,11 +91,7 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
       {/* Scrollable nav */}
       <nav aria-label="Primary navigation" className="flex-1 overflow-y-auto px-2 py-2">
         {NAV_SECTIONS.map((section) => (
-          <NavGroup key={section.key} title={t(section.titleKey, section.title)}>
-            {section.items.map((item) => (
-              <MobileNavItem key={item.to} item={item} badges={badges} onNavigate={onClose} />
-            ))}
-          </NavGroup>
+          <MobileNavSection key={section.key} section={section} badges={badges} onNavigate={onClose} />
         ))}
 
         {favorites.length > 0 && (
@@ -131,6 +127,45 @@ function NavGroup({ title, children }: { title: string; children: React.ReactNod
         {title}
       </div>
       {children}
+    </div>
+  );
+}
+
+// Collapsible primary section (accordion, mirrors the desktop sidebar):
+// collapsed by default unless it holds the active route; the user's tap is
+// persisted. Keeps the mobile drawer tidy and reachable without long scrolls.
+function MobileNavSection({
+  section,
+  badges,
+  onNavigate,
+}: {
+  section: NavSection;
+  badges: { openBids: number; overdueTasks: number };
+  onNavigate: () => void;
+}) {
+  const location = useLocation();
+  const { t } = useTranslation('common');
+  const override = useUiStore((s) => s.collapsedSections[section.key]);
+  const setSectionCollapsed = useUiStore((s) => s.setSectionCollapsed);
+  const isActive = section.items.some(
+    (it) => location.pathname === it.to || location.pathname.startsWith(`${it.to}/`),
+  );
+  const collapsed = override === undefined ? !isActive : override;
+  return (
+    <div className="py-1">
+      <button
+        type="button"
+        onClick={() => setSectionCollapsed(section.key, !collapsed)}
+        aria-expanded={!collapsed}
+        className="flex min-h-9 w-full items-center justify-between px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]"
+      >
+        <span>{t(section.titleKey, section.title)}</span>
+        <Icon name="chevron-down" size={12} className={cn('transition-transform', collapsed && '-rotate-90')} ariaHidden />
+      </button>
+      {!collapsed &&
+        section.items.map((item) => (
+          <MobileNavItem key={item.to} item={item} badges={badges} onNavigate={onNavigate} />
+        ))}
     </div>
   );
 }

@@ -63,6 +63,8 @@ interface UiStore extends PersistedState {
   toggleSidebar: () => void;
   setSidebarCollapsed: (v: boolean) => void;
   toggleSection: (key: string) => void;
+  /** Explicit set (accordion override) — true = collapsed, false = expanded. */
+  setSectionCollapsed: (key: string, collapsed: boolean) => void;
   mobileNavOpen: boolean;
   setMobileNavOpen: (v: boolean) => void;
   toggleMobileNav: () => void;
@@ -88,6 +90,11 @@ export const useUiStore = create<UiStore>((set, get) => ({
   toggleSection: (key) => {
     const current = get().collapsedSections;
     const next = { ...current, [key]: !current[key] };
+    writeLater({ sidebarCollapsed: get().sidebarCollapsed, collapsedSections: next });
+    set({ collapsedSections: next });
+  },
+  setSectionCollapsed: (key, collapsed) => {
+    const next = { ...get().collapsedSections, [key]: collapsed };
     writeLater({ sidebarCollapsed: get().sidebarCollapsed, collapsedSections: next });
     set({ collapsedSections: next });
   },

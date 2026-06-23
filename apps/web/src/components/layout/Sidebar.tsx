@@ -181,10 +181,18 @@ function SidebarSection({
   badges: Badges;
   collapsed: boolean;
 }) {
-  const sectionCollapsed = useUiStore((s) => Boolean(s.collapsedSections[section.key]));
-  const toggleSection = useUiStore((s) => s.toggleSection);
+  const location = useLocation();
+  const override = useUiStore((s) => s.collapsedSections[section.key]);
+  const setSectionCollapsed = useUiStore((s) => s.setSectionCollapsed);
   const { t } = useTranslation('common');
   const sectionTitle = t(section.titleKey, section.title);
+  // Accordion: a section is collapsed by default unless it holds the active
+  // route — so only one section's items show at once and the rail never needs
+  // an internal scroll. An explicit user toggle (override) wins and persists.
+  const isActiveSection = section.items.some(
+    (it) => location.pathname === it.to || location.pathname.startsWith(`${it.to}/`),
+  );
+  const sectionCollapsed = override === undefined ? !isActiveSection : override;
 
   if (collapsed) {
     if (section.key === 'home') {
@@ -253,7 +261,7 @@ function SidebarSection({
       <button
         type="button"
         className="sb-group-title sb-group-toggle"
-        onClick={() => toggleSection(section.key)}
+        onClick={() => setSectionCollapsed(section.key, !sectionCollapsed)}
         aria-expanded={!sectionCollapsed}
         aria-controls={bodyId}
       >
