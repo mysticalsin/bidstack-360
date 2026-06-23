@@ -30,6 +30,7 @@ import { kamInitiativeRoutes } from './routes/kam-initiatives.js';
 import { kamTaskRoutes } from './routes/kam-tasks.js';
 import { kamSessionRoutes } from './routes/kam-sessions.js';
 import { kamDraftRoutes } from './routes/kam-drafts.js';
+import { kamHandoffRoutes } from './routes/kam-handoffs.js';
 import { notesRoutes } from './routes/notes.js';
 import { opportunityContactsRoutes } from './routes/opportunity-contacts.js';
 import { erpRoutes } from './routes/erp-integration.js';
@@ -157,6 +158,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(kamTaskRoutes, { prefix: '/api/v1' });
   await server.register(kamSessionRoutes, { prefix: '/api/v1' });
   await server.register(kamDraftRoutes, { prefix: '/api/v1' });
+  await server.register(kamHandoffRoutes, { prefix: '/api/v1' });
   await server.register(orgSettingsRoutes, { prefix: '/api/v1' });
   await server.register(searchRoutes, { prefix: '/api/v1' });
   await server.register(auditLogsRoutes, { prefix: '/api/v1' });
