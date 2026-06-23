@@ -118,9 +118,13 @@ export const KamSessionDraftDetail = z.object({
 });
 export type KamSessionDraftDetail = z.infer<typeof KamSessionDraftDetail>;
 
+export const KamSessionDraftList = z.object({ items: z.array(KamSessionDraftDetail) });
+export type KamSessionDraftList = z.infer<typeof KamSessionDraftList>;
+
 /** Result of approving a draft — the canonical rows it committed. */
 export const KamDraftApproveResult = z.object({
   sessionId: z.string().uuid(),
   createdInitiativeIds: z.array(z.string().uuid()),
   createdTaskIds: z.array(z.string().uuid()),
 });
+export type KamDraftApproveResult = z.infer<typeof KamDraftApproveResult>;

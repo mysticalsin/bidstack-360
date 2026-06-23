@@ -34,6 +34,7 @@ import {
   SalesToolkitsPage,
   SectorViewPage,
   CrossSellPage,
+  KamAccountPage,
   KeyAccountsPage,
   LeadDetailPage,
   LeadsPage,
@@ -190,6 +191,14 @@ export function AppRoutes() {
             element={
               <RequireAuth>
                 <KeyAccountsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/kam"
+            element={
+              <RequireAuth>
+                <KamAccountPage />
               </RequireAuth>
             }
           />

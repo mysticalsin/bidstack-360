@@ -31,6 +31,8 @@ export const SerumMissionControlPage = lazy(() =>
 export const AccountsPage = lazy(() =>
   import('@/pages/AccountsPage').then((m) => ({ default: m.AccountsPage })),
 );
+// KAM cockpit (default export)
+export const KamAccountPage = lazy(() => import('@/pages/kam/KamAccountPage'));
 export const CompaniesPage = lazy(() =>
   import('@/pages/CompaniesPage').then((m) => ({ default: m.CompaniesPage })),
 );

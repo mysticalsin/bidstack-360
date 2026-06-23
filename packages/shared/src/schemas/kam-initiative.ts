@@ -90,3 +90,4 @@ export const KamInitiativeList = z.object({
   items: z.array(KamInitiativeDetail),
   nextCursor: z.string().nullable(),
 });
+export type KamInitiativeList = z.infer<typeof KamInitiativeList>;

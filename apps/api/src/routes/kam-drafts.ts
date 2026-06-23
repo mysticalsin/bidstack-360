@@ -21,6 +21,7 @@ import {
   KamNoteDraft,
   KamSessionDraftCreate,
   KamSessionDraftDetail,
+  KamSessionDraftList,
   KamSessionDraftPatch,
   KamTaskDraftItem,
 } from '@bidstack/shared';
@@ -113,6 +114,35 @@ export const kamDraftRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: { params: z.object({ id: z.string().uuid() }), response: { 200: KamSessionDraftDetail } },
     },
     async (req) => toDraftDetail(await loadDraftOr404(req, req.params.id)),
+  );
+
+  // ── List drafts for an account (review queue) ────────────────────────────
+  server.get(
+    '/kam/drafts',
+    {
+      preHandler: server.requirePermission('kam:read'),
+      schema: {
+        querystring: z.object({
+          companyId: z.string().uuid(),
+          status: z.enum(['pending', 'approved', 'rejected']).optional(),
+        }),
+        response: { 200: KamSessionDraftList },
+      },
+    },
+    async (req) => {
+      await assertCompanyVisible(server, req, req.query.companyId);
+      const rows = await prisma.kamSessionDraft.findMany({
+        where: {
+          orgId: req.auth.orgId,
+          companyId: req.query.companyId,
+          deletedAt: null,
+          ...(req.query.status ? { status: req.query.status } : {}),
+        },
+        orderBy: [{ createdAt: 'desc' }],
+        take: 100,
+      });
+      return { items: rows.map(toDraftDetail) };
+    },
   );
 
   // ── Edit a pending draft ─────────────────────────────────────────────────
