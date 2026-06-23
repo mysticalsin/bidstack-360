@@ -180,6 +180,16 @@ describe('RBAC_MATRIX', () => {
     expect(perms).not.toContain('opportunities:write');
   });
 
+  it('KAM is writable by account-owning roles and readable by Read-Only', () => {
+    // KAM front layer (initiatives/sessions/tasks). Owners are presales- OR
+    // manager-driven, so both Account Executive and Sales Manager get write.
+    expect(RBAC_MATRIX['Admin']).toContain('kam:write');
+    expect(RBAC_MATRIX['Sales Manager']).toContain('kam:write');
+    expect(RBAC_MATRIX['Account Executive']).toContain('kam:write');
+    expect(RBAC_MATRIX['Read-Only']).toContain('kam:read');
+    expect(RBAC_MATRIX['Read-Only']).not.toContain('kam:write');
+  });
+
   it('Sales Manager has all read permissions', () => {
     const perms = RBAC_MATRIX['Sales Manager'];
     const readPerms = perms.filter((p) => p.endsWith(':read'));
@@ -233,10 +243,13 @@ describe('requirePermission — allow matrix', () => {
     { role: 'Sales Manager', perm: 'leads:write' },
     { role: 'Sales Manager', perm: 'territories:write' },
     { role: 'Account Executive', perm: 'proposals:write' },
+    { role: 'Account Executive', perm: 'kam:write' },
+    { role: 'Sales Manager', perm: 'kam:write' },
     { role: 'SDR', perm: 'leads:write' },
     { role: 'Customer Success', perm: 'service-desk:write' },
     { role: 'Customer Success', perm: 'accounts:read' },
     { role: 'Read-Only', perm: 'leads:read' },
+    { role: 'Read-Only', perm: 'kam:read' },
   ];
 
   it.each(ALLOW_CASES)('$role is allowed $perm', async ({ role, perm }) => {
@@ -255,6 +268,7 @@ describe('requirePermission — deny matrix', () => {
     { role: 'SDR', perm: 'opportunities:write', reason: 'SDR should not write opportunities' },
     { role: 'SDR', perm: 'invoices:read', reason: 'SDR has no invoice access' },
     { role: 'Read-Only', perm: 'leads:write', reason: 'Read-Only has no write access' },
+    { role: 'Read-Only', perm: 'kam:write', reason: 'Read-Only cannot write KAM' },
     { role: 'Read-Only', perm: 'mcp:read', reason: 'Read-Only has no MCP access' },
     {
       role: 'Customer Success',

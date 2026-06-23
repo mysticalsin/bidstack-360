@@ -198,6 +198,14 @@ model Org {
   serumConfigVersions          SerumConfigVersion[]
   serumConnectorConnectionTests SerumConnectorConnectionTest[]
 
+  // KAM (Key Account Management) front layer
+  kamConsultants    KamConsultant[]
+  kamSessions       KamSession[]
+  kamInitiatives    KamInitiative[]
+  kamSessionDrafts  KamSessionDraft[]
+  kamHandoffs       KamHandoff[]
+  kamProspections   KamProspection[]
+
   @@index([deletedAt])
   @@map("orgs")
 }
@@ -305,6 +313,11 @@ model Company {
   keyAccountSince   DateTime?   @map("key_account_since") @db.Timestamptz(6)
   keyAccountOwnerId String?     @map("key_account_owner_id") @db.Uuid
   keyAccountNotes   String?     @map("key_account_notes")
+  // KAM front layer — account lifecycle status, operating model
+  // (Spain=presales_driven, CH=manager_driven), and the director sponsor.
+  kamStatus         KamAccountStatus @default(identified) @map("kam_status")
+  kamOwnerModel     KamOwnerModel?   @map("kam_owner_model")
+  directorSponsorId String?          @map("director_sponsor_id") @db.Uuid
   topAccountRank    Int?        @map("top_account_rank")
   parentId          String?     @map("parent_id") @db.Uuid
   createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -331,6 +344,15 @@ model Company {
   npsSurveys             NpsSurvey[]
   churnSignals           ChurnSignal[]
   expansionOpportunities ExpansionOpportunity[]
+
+  // KAM front layer (all FK to this Company as the canonical KAM account)
+  kamConsultants    KamConsultant[]
+  kamSessions       KamSession[]
+  kamInitiatives    KamInitiative[]
+  kamSessionDrafts  KamSessionDraft[]
+  kamHandoffs       KamHandoff[]
+  kamProspections   KamProspection[]
+  kamTasks          Task[]            @relation("CompanyKamTasks")
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -593,11 +615,20 @@ model Task {
   dueDate    DateTime?  @map("due_date") @db.Date
   status     TaskStatus @default(open)
   assigneeId String?    @map("assignee_id") @db.Uuid
+  // KAM front layer — Initiative-scoped tasks (the per-account to-do list OM
+  // lacks). accountId denormalizes the owning Company for the per-account
+  // roll-up without an initiative join. `type` = prospection | follow_up |
+  // proposal_prep | internal | other.
+  initiativeId String?  @map("initiative_id") @db.Uuid
+  accountId    String?  @map("account_id") @db.Uuid
+  type         String?
   createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  org         Org          @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  opportunity Opportunity? @relation(fields: [oppId], references: [id], onDelete: Cascade)
-  assignee    User?        @relation(fields: [assigneeId], references: [id])
+  org         Org            @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  opportunity Opportunity?   @relation(fields: [oppId], references: [id], onDelete: Cascade)
+  assignee    User?          @relation(fields: [assigneeId], references: [id])
+  initiative  KamInitiative? @relation(fields: [initiativeId], references: [id], onDelete: Cascade)
+  account     Company?       @relation("CompanyKamTasks", fields: [accountId], references: [id], onDelete: SetNull)
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -605,6 +636,8 @@ model Task {
   @@index([orgId, status, dueDate], map: "tasks_org_status_due_idx")
   @@index([orgId, oppId], map: "tasks_org_opp_idx")
   @@index([orgId, assigneeId], map: "tasks_org_assignee_idx")
+  @@index([orgId, initiativeId], map: "tasks_org_initiative_idx")
+  @@index([orgId, accountId, status, dueDate], map: "tasks_org_account_status_due_idx")
   @@index([deletedAt])
   @@map("tasks")
 }
@@ -5017,6 +5050,258 @@ model ProjectReference {
   @@index([orgId, accountKey], map: "project_references_org_account_idx")
   @@index([deletedAt])
   @@map("project_references")
+}
+
+// ─── KAM (Key Account Management) front layer ────────────────────────────────
+// Initiative→Lead→Opportunity→Dropped state machine that FEEDS the existing
+// Opportunity pipeline (do NOT rebuild OM). All KAM entities FK to Company.id
+// (the canonical KAM account key). Human-in-the-loop: AI-organized notes and
+// AI-extracted tasks land in KamSessionDraft and ONLY a human approve commits
+// to live data — nothing here auto-commits. See docs/KAM-PLAN.md.
+
+enum InitiativeStage {
+  initiative
+  lead
+  opportunity
+  dropped
+
+  @@map("initiative_stage")
+}
+
+enum KamAccountStatus {
+  identified
+  kickoff
+  mapped
+  active
+  paused
+  closed
+
+  @@map("kam_account_status")
+}
+
+enum KamOwnerModel {
+  presales_driven
+  manager_driven
+
+  @@map("kam_owner_model")
+}
+
+enum KamSessionSource {
+  manual_paste
+  manual_upload
+  sharepoint_pull
+  call_recording
+  dust_push
+
+  @@map("kam_session_source")
+}
+
+enum KamDraftStatus {
+  pending
+  approved
+  rejected
+
+  @@map("kam_draft_status")
+}
+
+enum KamHandoffStatus {
+  draft
+  exported
+  confirmed
+
+  @@map("kam_handoff_status")
+}
+
+// A consultant mapped to a KAM account, with department + the "switched-on"
+// engagement flag that drives workshop session selection (5-step KAM method
+// step 3). PII: email is HMAC-hashed via the field-encryption middleware.
+model KamConsultant {
+  id              String    @id @default(uuid()) @db.Uuid
+  orgId           String    @map("org_id") @db.Uuid
+  companyId       String    @map("company_id") @db.Uuid
+  name            String
+  department      String?
+  switchedOn      Boolean   @default(false) @map("switched_on")
+  engagementNotes String?   @map("engagement_notes")
+  contactId       String?   @map("contact_id") @db.Uuid
+  email           String?   @db.Citext
+  emailHash       String?   @map("email_hash") @db.VarChar(64)
+  aiOptOut        Boolean   @default(false) @map("ai_opt_out")
+  createdById     String?   @map("created_by_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, companyId, switchedOn], map: "kam_consultants_org_company_switched_idx")
+  @@index([orgId, emailHash], map: "kam_consultants_org_email_hash_idx")
+  @@index([deletedAt])
+  @@map("kam_consultants")
+}
+
+// A workshop / meeting session per KAM account: raw transcript + the
+// AI-organized note (held as a draft until a human approves). Reuses the
+// CallSession transcript-column shape. transcriptText/attendees are plaintext
+// PII at rest (access-scoped + audited); see docs/solutions/kam-pii.md.
+model KamSession {
+  id                   String           @id @default(uuid()) @db.Uuid
+  orgId                String           @map("org_id") @db.Uuid
+  companyId            String           @map("company_id") @db.Uuid
+  title                String?
+  heldAt               DateTime         @map("held_at") @db.Timestamptz(6)
+  sourceType           KamSessionSource @map("source_type")
+  sourceRef            String?          @map("source_ref")
+  attendees            String[]         @default([])
+  consultantIds        String[]         @default([]) @map("consultant_ids")
+  transcriptText       String?          @map("transcript_text")
+  transcriptStructured Json?            @map("transcript_structured")
+  aiNote               Json?            @map("ai_note")
+  aiNoteStatus         KamDraftStatus   @default(pending) @map("ai_note_status")
+  committedAt          DateTime?        @map("committed_at") @db.Timestamptz(6)
+  createdById          String?          @map("created_by_id") @db.Uuid
+  createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt            DateTime?        @map("deleted_at") @db.Timestamptz(6)
+
+  org         Org               @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company     Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  initiatives KamInitiative[]
+  drafts      KamSessionDraft[]
+
+  @@index([orgId, companyId, heldAt(sort: Desc)], map: "kam_sessions_org_company_held_idx")
+  @@index([deletedAt])
+  @@map("kam_sessions")
+}
+
+// The KAM core entity: an unqualified workshop idea that flows
+// Initiative→Lead→Opportunity→Dropped. Reaching `opportunity` mints a real
+// Opportunity (convertedToOpportunityId) + a KamHandoff, in one transaction.
+model KamInitiative {
+  id                       String          @id @default(uuid()) @db.Uuid
+  orgId                    String          @map("org_id") @db.Uuid
+  companyId                String          @map("company_id") @db.Uuid
+  sessionId                String?         @map("session_id") @db.Uuid
+  title                    String
+  description              String?
+  stage                    InitiativeStage @default(initiative)
+  ownerId                  String?         @map("owner_id") @db.Uuid
+  priority                 LeadPriority    @default(medium)
+  estimatedValueMicros     BigInt?         @map("estimated_value_micros")
+  lastActivityAt           DateTime        @default(now()) @map("last_activity_at") @db.Timestamptz(6)
+  droppedReason            String?         @map("dropped_reason")
+  convertedToOpportunityId String?         @map("converted_to_opportunity_id") @db.Uuid
+  createdById              String?         @map("created_by_id") @db.Uuid
+  createdAt                DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt                DateTime?       @map("deleted_at") @db.Timestamptz(6)
+
+  org     Org         @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  session KamSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  tasks   Task[]
+  handoff KamHandoff?
+
+  @@index([orgId, companyId, stage], map: "kam_initiatives_org_company_stage_idx")
+  @@index([orgId, stage, lastActivityAt], map: "kam_initiatives_org_stage_activity_idx")
+  @@index([orgId, ownerId], map: "kam_initiatives_org_owner_idx")
+  @@index([convertedToOpportunityId])
+  @@index([deletedAt])
+  @@map("kam_initiatives")
+}
+
+// Human-gate staging: one row per transcript-processing run. AI output lands
+// here; a human edits + approves and ONLY then are Initiatives/Tasks/notes
+// committed. Approve is guarded by a pending count-check inside the commit tx.
+model KamSessionDraft {
+  id               String         @id @default(uuid()) @db.Uuid
+  orgId            String         @map("org_id") @db.Uuid
+  companyId        String         @map("company_id") @db.Uuid
+  sessionId        String         @map("session_id") @db.Uuid
+  status           KamDraftStatus @default(pending)
+  source           String         @default("manual")
+  noteDraft        Json           @default("{}") @map("note_draft")
+  taskDrafts       Json           @default("[]") @map("task_drafts")
+  initiativeDrafts Json           @default("[]") @map("initiative_drafts")
+  lowConfidence    Json           @default("[]") @map("low_confidence")
+  confidenceBps    Int?           @map("confidence_bps")
+  warnings         Json           @default("[]")
+  createdById      String?        @map("created_by_id") @db.Uuid
+  reviewedById     String?        @map("reviewed_by_id") @db.Uuid
+  reviewedAt       DateTime?      @map("reviewed_at") @db.Timestamptz(6)
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt        DateTime?      @map("deleted_at") @db.Timestamptz(6)
+
+  org     Org        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  session KamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, companyId, status], map: "kam_session_drafts_org_company_status_idx")
+  @@index([orgId, sessionId], map: "kam_session_drafts_org_session_idx")
+  @@index([deletedAt])
+  @@map("kam_session_drafts")
+}
+
+// The interface to ABC's Opportunity-Management section. Created atomically
+// when an Initiative reaches `opportunity`. exportPayload is the structured
+// ABC-OM export (manual download now; live API later). One per initiative.
+model KamHandoff {
+  id            String           @id @default(uuid()) @db.Uuid
+  orgId         String           @map("org_id") @db.Uuid
+  companyId     String           @map("company_id") @db.Uuid
+  initiativeId  String           @unique @map("initiative_id") @db.Uuid
+  opportunityId String?          @map("opportunity_id") @db.Uuid
+  status        KamHandoffStatus @default(draft)
+  targetSystem  String           @default("abc_om") @map("target_system")
+  exportPayload Json             @default("{}") @map("export_payload")
+  externalRef   String?          @map("external_ref")
+  exportedAt    DateTime?        @map("exported_at") @db.Timestamptz(6)
+  exportedById  String?          @map("exported_by_id") @db.Uuid
+  createdById   String?          @map("created_by_id") @db.Uuid
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt     DateTime?        @map("deleted_at") @db.Timestamptz(6)
+
+  org        Org           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company    Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  initiative KamInitiative @relation(fields: [initiativeId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, companyId], map: "kam_handoffs_org_company_idx")
+  @@index([orgId, status], map: "kam_handoffs_org_status_idx")
+  @@index([deletedAt])
+  @@map("kam_handoffs")
+}
+
+// Read-MIRROR of prospection actions from ABC (the system of record). NOT a
+// prospection tracker — populated by the ABC connector or manual import for
+// KPI roll-ups. Stale/absent rows are reconciled (soft-deleted) and excluded
+// from KPIs. Manual rows have a null external_id (keyed by id).
+model KamProspection {
+  id                 String    @id @default(uuid()) @db.Uuid
+  orgId              String    @map("org_id") @db.Uuid
+  companyId          String?   @map("company_id") @db.Uuid
+  ownerId            String?   @map("owner_id") @db.Uuid
+  externalId         String?   @map("external_id")
+  actionType         String    @map("action_type")
+  occurredAt         DateTime  @map("occurred_at") @db.Timestamptz(6)
+  linkedTaskId       String?   @map("linked_task_id") @db.Uuid
+  linkedInitiativeId String?   @map("linked_initiative_id") @db.Uuid
+  source             String    @default("abc")
+  syncBatchId        String?   @map("sync_batch_id")
+  syncedAt           DateTime  @default(now()) @map("synced_at") @db.Timestamptz(6)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  org     Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@unique([orgId, source, externalId], map: "kam_prospections_org_source_external_key")
+  @@index([orgId, companyId], map: "kam_prospections_org_company_idx")
+  @@index([orgId, ownerId], map: "kam_prospections_org_owner_idx")
+  @@index([deletedAt])
+  @@map("kam_prospections")
 }
 
 // ─── Notifications (in-app notification center) ──────────────────────────────

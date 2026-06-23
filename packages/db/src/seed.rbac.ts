@@ -67,6 +67,16 @@ const PERMISSION_SEEDS = [
   permission('files:write', 'Manage files', 'Upload, finalize, and manage file attachments.'),
   permission('integrations:read', 'Read integrations', 'View integration configuration.'),
   permission('integrations:write', 'Manage integrations', 'Configure external integrations.'),
+  permission(
+    'kam:read',
+    'Read KAM',
+    'View key-account initiatives, sessions, consultants, tasks, and KPIs.',
+  ),
+  permission(
+    'kam:write',
+    'Manage KAM',
+    'Create/update KAM initiatives, sessions, consultants, tasks, and approve transcript drafts.',
+  ),
   permission('leads:read', 'Read leads', 'View lead records.'),
   permission('leads:write', 'Manage leads', 'Create and update lead records.'),
   permission('mcp:read', 'Use MCP read tools', 'Call read-only MCP tools.'),
@@ -107,7 +117,7 @@ const PERMISSION_SEEDS = [
   permission('workflows:write', 'Manage workflows', 'Create, update, and run workflow automation.'),
 ] as const;
 
-const ALL_PERMISSION_KEYS = PERMISSION_SEEDS.map((p) => p.key);
+export const ALL_PERMISSION_KEYS = PERMISSION_SEEDS.map((p) => p.key);
 const READ_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter((key) => key.endsWith(':read'));
 
 // ─── Role definitions ─────────────────────────────────────────────────────────
@@ -120,6 +130,7 @@ const ROLE_SEEDS = [
       'activities',
       'companies',
       'contacts',
+      'kam',
       'leads',
       'opportunities',
       'proposals',
@@ -127,7 +138,7 @@ const ROLE_SEEDS = [
       'tags',
       'tasks',
     ),
-    ...writeKeys('accounts', 'activities', 'contacts', 'leads', 'opportunities', 'tags', 'tasks'),
+    ...writeKeys('accounts', 'activities', 'contacts', 'kam', 'leads', 'opportunities', 'tags', 'tasks'),
   ]),
   role(
     'Presales',
@@ -141,13 +152,14 @@ const ROLE_SEEDS = [
         'contacts',
         'documents',
         'files',
+        'kam',
         'opportunities',
         'proposals',
         'reports',
         'tags',
         'tasks',
       ),
-      ...writeKeys('activities', 'bid-scores', 'documents', 'files', 'proposals', 'tags', 'tasks'),
+      ...writeKeys('activities', 'bid-scores', 'documents', 'files', 'kam', 'proposals', 'tags', 'tasks'),
     ],
   ),
   // Quote-to-cash modules were removed with the sales/invoicing vertical;
@@ -160,6 +172,7 @@ const ROLE_SEEDS = [
     ...writeKeys(
       'activities',
       'bid-scores',
+      'kam',
       'leads',
       'opportunities',
       'reports',
@@ -207,6 +220,7 @@ const ROLE_SEEDS = [
         'accounts',
         'activities',
         'contacts',
+        'kam',
         'leads',
         'opportunities',
         'reports',
@@ -226,6 +240,7 @@ const ROLE_SEEDS = [
         'activities',
         'companies',
         'contacts',
+        'kam',
         'leads',
         'opportunities',
         'proposals',
@@ -237,6 +252,7 @@ const ROLE_SEEDS = [
         'accounts',
         'activities',
         'contacts',
+        'kam',
         'leads',
         'opportunities',
         'proposals',
@@ -258,6 +274,7 @@ const ROLE_SEEDS = [
         'activities',
         'companies',
         'contacts',
+        'kam',
         'opportunities',
         'reports',
         'service-desk',

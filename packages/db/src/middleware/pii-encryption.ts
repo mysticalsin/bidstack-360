@@ -70,6 +70,15 @@ const PII_MAP: Record<string, ModelPiiConfig> = {
     fields: [{ name: 'email', type: 'email' }],
     // No hash column for User — auth lookup goes via clerkUser, not email
   },
+  // KAM consultant email is encrypted + hashed like Contact/Lead. NOTE:
+  // KamSession.transcriptText and KamSession.attendees[] are intentionally NOT
+  // encrypted here (free text / string[] are outside this middleware's scalar
+  // scope); they are plaintext PII at rest, access-scoped + audited, and the
+  // transcript is the AI input by design. See docs/solutions/kam-pii.md.
+  kamconsultant: {
+    fields: [{ name: 'email', type: 'email' }],
+    hashField: { source: 'email', hashColumn: 'emailHash' },
+  },
 };
 
 // ----- Write-side helpers ---------------------------------------------------

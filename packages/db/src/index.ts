@@ -123,6 +123,14 @@ export type {
   ReleaseScore,
   Lead,
   TenantExport,
+  SavedView,
+  SavedViewEntity,
+  KamConsultant,
+  KamSession,
+  KamInitiative,
+  KamSessionDraft,
+  KamHandoff,
+  KamProspection,
 } from '../generated/client/index.js';
 
 // `Prisma` is exported as a value because we need its runtime classes
@@ -143,6 +151,12 @@ export {
   LeadPriority,
   IntegrationProvider,
   EmailProvider,
+  InitiativeStage,
+  KamAccountStatus,
+  KamOwnerModel,
+  KamSessionSource,
+  KamDraftStatus,
+  KamHandoffStatus,
 } from '../generated/client/index.js';
 
 // Curated multi-tenant demo seeding — shared by the `db:seed:demo` CLI and the
