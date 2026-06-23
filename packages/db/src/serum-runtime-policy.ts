@@ -115,6 +115,9 @@ const MCP_TOOL_SCOPES: Record<string, ToolScope> = {
   kam_ingest_transcript: 'kam',
   kam_propose_session_draft: 'kam',
   kam_update_task_status: 'kam',
+  kam_get_kpis: 'read',
+  kam_read_prospections: 'read',
+  kam_log_prospection: 'kam',
 };
 
 function asJsonObject(value: unknown): Record<string, unknown> {

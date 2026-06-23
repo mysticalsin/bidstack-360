@@ -11,6 +11,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { prisma } from '@bidstack/db';
 
 import { canReadAccount } from '../lib/account-access.js';
+import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 
 /** Load a company in the caller's org AND confirm it's within their access scope. */
 export async function assertCompanyVisible(
@@ -43,4 +44,22 @@ export async function assertUserInOrg(
     select: { id: true },
   });
   if (!user) throw server.httpErrors.badRequest('User must belong to your organization');
+}
+
+/**
+ * Company ids the caller may see for cross-account KPI roll-ups, honoring the
+ * UserGroup access scope (B4). Returns null when the caller is unrestricted
+ * (→ no company filter / all accounts). Bounded.
+ */
+export async function accessibleCompanyIds(
+  req: FastifyRequest,
+): Promise<string[] | null> {
+  const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
+  if (scope.unrestricted) return null;
+  const companies = await prisma.company.findMany({
+    where: applyCompanyScope({ orgId: req.auth.orgId, deletedAt: null }, scope),
+    select: { id: true },
+    take: 1000,
+  });
+  return companies.map((c) => c.id);
 }

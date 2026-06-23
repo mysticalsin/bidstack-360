@@ -249,3 +249,109 @@ export const kamUpdateTaskStatus: Tool<typeof UpdateTaskStatusInput> = {
     return { id: updated.id, status: updated.status };
   },
 };
+
+// ─── KPIs + prospection (S6) ──────────────────────────────────────────────
+
+const GetKpisInput = z.object({ companyId: z.string().uuid() });
+
+export const kamGetKpis: Tool<typeof GetKpisInput> = {
+  description: "Per-account KAM KPIs: initiatives by stage, open/done tasks, prospection count, stale-initiative count.",
+  input: GetKpisInput,
+  inputJsonSchema: {
+    type: 'object',
+    required: ['companyId'],
+    properties: { companyId: { type: 'string', format: 'uuid' } },
+    additionalProperties: false,
+  },
+  handler: async (args, ctx) => {
+    const company = await prisma.company.findFirst({
+      where: { id: args.companyId, orgId: ctx.orgId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!company) throw new Error('Account not found');
+    const threshold = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+    const [stageGroups, openTasks, doneTasks, prospectionCount, staleCount] = await Promise.all([
+      prisma.kamInitiative.groupBy({ by: ['stage'], where: { orgId: ctx.orgId, companyId: args.companyId, deletedAt: null }, _count: { _all: true } }),
+      prisma.task.count({ where: { orgId: ctx.orgId, accountId: args.companyId, deletedAt: null, status: { not: 'done' } } }),
+      prisma.task.count({ where: { orgId: ctx.orgId, accountId: args.companyId, deletedAt: null, status: 'done' } }),
+      prisma.kamProspection.count({ where: { orgId: ctx.orgId, companyId: args.companyId, deletedAt: null } }),
+      prisma.kamInitiative.count({ where: { orgId: ctx.orgId, companyId: args.companyId, deletedAt: null, stage: { in: ['initiative', 'lead'] }, lastActivityAt: { lt: threshold } } }),
+    ]);
+    const byStage = { initiative: 0, lead: 0, opportunity: 0, dropped: 0 };
+    for (const g of stageGroups) byStage[g.stage] = g._count._all;
+    return { companyId: args.companyId, initiativesByStage: byStage, openTasks, doneTasks, prospectionCount, staleInitiativeCount: staleCount };
+  },
+};
+
+const ReadProspectionsInput = z.object({
+  companyId: z.string().uuid(),
+  limit: z.number().int().min(1).max(200).default(100),
+});
+
+export const kamReadProspections: Tool<typeof ReadProspectionsInput> = {
+  description: 'Read prospection actions (the director KPI) mirrored from ABC for an account.',
+  input: ReadProspectionsInput,
+  inputJsonSchema: {
+    type: 'object',
+    required: ['companyId'],
+    properties: { companyId: { type: 'string', format: 'uuid' }, limit: { type: 'integer', minimum: 1, maximum: 200 } },
+    additionalProperties: false,
+  },
+  handler: async (args, ctx) => {
+    const rows = await prisma.kamProspection.findMany({
+      where: { orgId: ctx.orgId, companyId: args.companyId, deletedAt: null },
+      orderBy: { occurredAt: 'desc' },
+      take: args.limit,
+      select: { id: true, actionType: true, occurredAt: true, ownerId: true, source: true, externalId: true },
+    });
+    return { prospections: rows.map((r) => ({ ...r, occurredAt: r.occurredAt.toISOString() })) };
+  },
+};
+
+const LogProspectionInput = z.object({
+  companyId: z.string().uuid(),
+  ownerId: z.string().uuid().optional(),
+  actionType: z.string().min(1).max(100),
+  occurredAt: z.string().datetime().optional(),
+});
+
+export const kamLogProspection: Tool<typeof LogProspectionInput> = {
+  description:
+    'Log a prospection action into the mirror (source=manual), pending sync to ABC (the system of record). Does NOT write to ABC directly.',
+  input: LogProspectionInput,
+  inputJsonSchema: {
+    type: 'object',
+    required: ['companyId', 'actionType'],
+    properties: {
+      companyId: { type: 'string', format: 'uuid' },
+      ownerId: { type: 'string', format: 'uuid' },
+      actionType: { type: 'string', minLength: 1, maxLength: 100 },
+      occurredAt: { type: 'string', format: 'date-time' },
+    },
+    additionalProperties: false,
+  },
+  handler: async (args, ctx) => {
+    const company = await prisma.company.findFirst({
+      where: { id: args.companyId, orgId: ctx.orgId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!company) throw new Error('Account not found');
+    if (args.ownerId) {
+      const owner = await prisma.user.findFirst({ where: { id: args.ownerId, orgId: ctx.orgId, deletedAt: null }, select: { id: true } });
+      if (!owner) throw new Error('Owner not found');
+    }
+    const created = await prisma.kamProspection.create({
+      data: {
+        orgId: ctx.orgId,
+        companyId: args.companyId,
+        ownerId: args.ownerId ?? null,
+        actionType: args.actionType,
+        occurredAt: args.occurredAt ? new Date(args.occurredAt) : new Date(),
+        source: 'manual',
+        syncedAt: new Date(),
+      },
+      select: { id: true },
+    });
+    return { id: created.id, source: 'manual', note: 'Logged to mirror — pending sync to ABC (system of record).' };
+  },
+};

@@ -34,6 +34,9 @@ import {
   kamIngestTranscript,
   kamProposeSessionDraft,
   kamUpdateTaskStatus,
+  kamGetKpis,
+  kamReadProspections,
+  kamLogProspection,
 } from './kam-tools.js';
 
 export interface Tool<I extends z.ZodTypeAny = z.ZodTypeAny, O = unknown> {
@@ -85,6 +88,9 @@ export const tools = {
   kam_ingest_transcript: kamIngestTranscript,
   kam_propose_session_draft: kamProposeSessionDraft,
   kam_update_task_status: kamUpdateTaskStatus,
+  kam_get_kpis: kamGetKpis,
+  kam_read_prospections: kamReadProspections,
+  kam_log_prospection: kamLogProspection,
 } as const;
 
 export type ToolName = keyof typeof tools;
@@ -125,6 +131,9 @@ export const toolScopes = {
   kam_ingest_transcript: 'kam',
   kam_propose_session_draft: 'kam',
   kam_update_task_status: 'kam',
+  kam_get_kpis: 'read',
+  kam_read_prospections: 'read',
+  kam_log_prospection: 'kam',
 } satisfies Record<ToolName, ToolScope>;
 
 export function requiredScopeForTool(name: ToolName): ToolScope {
