@@ -9,7 +9,7 @@ import { z } from 'zod';
 
 import { prisma, type Prisma, type LeadPriority, type LeadStatus } from '@bidstack/db';
 import { pushLeadToDust } from '../lib/dust-push.js';
-import { isUniqueViolation, mintNextCode } from './opportunities.helpers.js';
+import { mintOpportunityTx, withOpportunityCodeRetry } from '../services/opportunities/mint.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import { dispatchWorkflowEvent } from '../queues/workflow-dispatch.js';
 import {
@@ -293,51 +293,17 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
           },
         });
 
-        // 2. Create Opportunity
-        const code = await mintNextCode(tx, req.auth.orgId);
-        let pipelineStageId: string | undefined;
-        let stageKey = 's1_lead';
-        if (body.pipelineStageId) {
-          const ps = await tx.pipelineStage.findFirst({
-            where: { id: body.pipelineStageId, orgId: req.auth.orgId, deletedAt: null },
-            select: { key: true },
-          });
-          if (ps) {
-            pipelineStageId = body.pipelineStageId;
-            stageKey = ps.key;
-          }
-        } else if (body.stage) {
-          // ConvertLeadDialog sends the legacy stage key — resolve it to the
-          // org's pipeline stage so the chosen stage is actually persisted.
-          stageKey = body.stage;
-          const ps = await tx.pipelineStage.findFirst({
-            where: { key: body.stage, orgId: req.auth.orgId, deletedAt: null },
-            select: { id: true },
-          });
-          if (ps) pipelineStageId = ps.id;
-        } else {
-          const defaultStage = await tx.pipelineStage.findFirst({
-            where: { orgId: req.auth.orgId, deletedAt: null },
-            orderBy: { orderIndex: 'asc' },
-            select: { id: true, key: true },
-          });
-          if (defaultStage) {
-            pipelineStageId = defaultStage.id;
-            stageKey = defaultStage.key;
-          }
-        }
-        const opp = await tx.opportunity.create({
-          data: {
-            orgId: req.auth.orgId,
-            code,
-            customer: lead.companyName,
-            name: body.opportunityName ?? `${lead.companyName} — ${lead.title ?? 'Opportunity'}`,
-            stage: stageKey as 's1_lead',
-            pipelineStageId,
-            valueMicros: BigInt(Math.round(body.opportunityValueMicros ?? 0)),
-            probability: 20,
-            ownerId: lead.ownerId,
-          },
+        // 2. Create Opportunity via the shared mint primitive (code mint +
+        //    stage resolution). companyId stays unset here, preserving the
+        //    legacy lead-convert behavior. See services/opportunities/mint.ts.
+        const opp = await mintOpportunityTx(tx, {
+          orgId: req.auth.orgId,
+          customer: lead.companyName,
+          name: body.opportunityName ?? `${lead.companyName} — ${lead.title ?? 'Opportunity'}`,
+          valueMicros: BigInt(Math.round(body.opportunityValueMicros ?? 0)),
+          ownerId: lead.ownerId,
+          pipelineStageId: body.pipelineStageId,
+          stageKey: body.stage,
         });
 
         // 3. Mark lead as converted. The status guard makes this flip the
@@ -372,13 +338,7 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
           return { leadId: lead.id, opportunityId: opp.id, contactId: contact.id };
         });
 
-      for (let attempt = 0; ; attempt++) {
-        try {
-          return await runConvert();
-        } catch (err) {
-          if (!isUniqueViolation(err) || attempt >= 4) throw err;
-        }
-      }
+      return withOpportunityCodeRetry(runConvert);
     },
   );
 

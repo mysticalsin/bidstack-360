@@ -47,3 +47,4 @@ export * from './contract-agreement.js';
 export * from './win-loss.js';
 export * from './tenant-export.js';
 export * from './erasure.js';
+export * from './kam-initiative.js';
