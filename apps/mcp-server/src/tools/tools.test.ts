@@ -10,9 +10,9 @@ const describeDb = hasDb ? describe : describe.skip;
 const prisma = new PrismaClient();
 
 describe('MCP tool scopes', () => {
-  it('declares a read/write scope for every registered tool', () => {
+  it('declares a read/write/kam scope for every registered tool', () => {
     for (const name of Object.keys(tools) as ToolName[]) {
-      expect(toolScopes[name]).toMatch(/^(read|write)$/);
+      expect(toolScopes[name]).toMatch(/^(read|write|kam)$/);
     }
   });
 
@@ -22,6 +22,19 @@ describe('MCP tool scopes', () => {
     expect(requiredScopeForTool('crm_enrich_company')).toBe('write');
     expect(requiredScopeForTool('opportunities.list')).toBe('read');
     expect(requiredScopeForTool('proposal.draft')).toBe('read');
+  });
+
+  it('KAM staging-write tools use the dedicated `kam` scope, not `write`', () => {
+    // The crux: a KAM agent key holds `kam` (not `write`), so it CANNOT call the
+    // canonical-write tools. These must therefore be `kam`, and reads `read`.
+    expect(requiredScopeForTool('kam_ingest_transcript')).toBe('kam');
+    expect(requiredScopeForTool('kam_propose_session_draft')).toBe('kam');
+    expect(requiredScopeForTool('kam_update_task_status')).toBe('kam');
+    expect(requiredScopeForTool('kam_list_accounts')).toBe('read');
+    expect(requiredScopeForTool('kam_list_initiatives')).toBe('read');
+    // Canonical-write tools stay `write` — `kam` must not satisfy them.
+    expect(requiredScopeForTool('notes.create')).toBe('write');
+    expect(requiredScopeForTool('leads.create')).toBe('write');
   });
 });
 

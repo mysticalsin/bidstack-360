@@ -60,7 +60,7 @@ type ActiveConfigRow = {
   configJson: unknown;
 };
 
-type ToolScope = 'read' | 'write';
+type ToolScope = 'read' | 'write' | 'kam';
 type DirectAgentProvider = DirectAgentProviderId;
 
 type ModelRouterRuntimePolicy = Omit<SerumRuntimeModelRouterPolicyDto, 'providerConfigured'>;
@@ -110,6 +110,11 @@ const MCP_TOOL_SCOPES: Record<string, ToolScope> = {
   crm_list_activities: 'read',
   crm_create_activity: 'write',
   crm_generate_insights: 'read',
+  kam_list_accounts: 'read',
+  kam_list_initiatives: 'read',
+  kam_ingest_transcript: 'kam',
+  kam_propose_session_draft: 'kam',
+  kam_update_task_status: 'kam',
 };
 
 function asJsonObject(value: unknown): Record<string, unknown> {

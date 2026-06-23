@@ -28,6 +28,13 @@ import {
   crmCreateActivity,
   crmGenerateInsights,
 } from './crm-tools.js';
+import {
+  kamListAccounts,
+  kamListInitiatives,
+  kamIngestTranscript,
+  kamProposeSessionDraft,
+  kamUpdateTaskStatus,
+} from './kam-tools.js';
 
 export interface Tool<I extends z.ZodTypeAny = z.ZodTypeAny, O = unknown> {
   description: string;
@@ -71,11 +78,21 @@ export const tools = {
   crm_list_activities: crmListActivities,
   crm_create_activity: crmCreateActivity,
   crm_generate_insights: crmGenerateInsights,
+  // KAM front layer. Write tools use the dedicated `kam` scope (see ToolScope)
+  // so a KAM agent key cannot reach the canonical-write tools above.
+  kam_list_accounts: kamListAccounts,
+  kam_list_initiatives: kamListInitiatives,
+  kam_ingest_transcript: kamIngestTranscript,
+  kam_propose_session_draft: kamProposeSessionDraft,
+  kam_update_task_status: kamUpdateTaskStatus,
 } as const;
 
 export type ToolName = keyof typeof tools;
 
-export type ToolScope = 'read' | 'write';
+// `kam` is a dedicated staging scope: it grants KAM ingest/propose/status-update
+// WITHOUT granting `write` (which canonical-mutating tools require). A Dust KAM
+// agent key holds ['read','kam'] and therefore cannot call leads.create etc.
+export type ToolScope = 'read' | 'write' | 'kam';
 
 export const toolScopes = {
   'opportunities.list': 'read',
@@ -103,6 +120,11 @@ export const toolScopes = {
   crm_list_activities: 'read',
   crm_create_activity: 'write',
   crm_generate_insights: 'read',
+  kam_list_accounts: 'read',
+  kam_list_initiatives: 'read',
+  kam_ingest_transcript: 'kam',
+  kam_propose_session_draft: 'kam',
+  kam_update_task_status: 'kam',
 } satisfies Record<ToolName, ToolScope>;
 
 export function requiredScopeForTool(name: ToolName): ToolScope {
