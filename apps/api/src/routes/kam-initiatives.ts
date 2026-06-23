@@ -23,7 +23,10 @@ import {
   type InitiativeStageValue,
 } from '@bidstack/shared';
 
-import { canReadAccount } from '../lib/account-access.js';
+import {
+  assertCompanyVisible as assertCompanyVisibleShared,
+  assertUserInOrg as assertUserInOrgShared,
+} from './kam-access.js';
 import { mintOpportunityTx, withOpportunityCodeRetry } from '../services/opportunities/mint.js';
 
 type InitiativeRow = Prisma.KamInitiativeGetPayload<{ include: { handoff: { select: { id: true } } } }>;
@@ -49,34 +52,12 @@ function toDetail(row: InitiativeRow): z.infer<typeof KamInitiativeDetail> {
 }
 
 export const kamInitiativeRoutes: FastifyPluginAsyncZod = async (server) => {
-  // ── Guards (B3 FK-graft + B4 access-scope) ──────────────────────────────
-  /** Load a company in the caller's org AND verify it's in their access scope. */
-  async function assertCompanyVisible(
-    req: FastifyRequest,
-    companyId: string,
-  ): Promise<{ id: string; name: string }> {
-    const company = await prisma.company.findFirst({
-      where: { id: companyId, orgId: req.auth.orgId, deletedAt: null },
-      select: { id: true, name: true },
-    });
-    if (!company) throw server.httpErrors.notFound('Account not found');
-    const access = await canReadAccount({
-      orgId: req.auth.orgId,
-      userId: req.auth.userId,
-      companyId,
-    });
-    if (!access.allowed) throw server.httpErrors.forbidden('Account not in your access scope');
-    return company;
-  }
+  // ── Guards (B3 FK-graft + B4 access-scope) — single impl in kam-access.ts ──
+  const assertCompanyVisible = (req: FastifyRequest, companyId: string) =>
+    assertCompanyVisibleShared(server, req, companyId);
+  const assertUserInOrg = (req: FastifyRequest, userId: string) =>
+    assertUserInOrgShared(server, req, userId);
 
-  /** Reject an ownerId / sessionId that belongs to another tenant. */
-  async function assertUserInOrg(req: FastifyRequest, userId: string): Promise<void> {
-    const user = await prisma.user.findFirst({
-      where: { id: userId, orgId: req.auth.orgId, deletedAt: null },
-      select: { id: true },
-    });
-    if (!user) throw server.httpErrors.badRequest('Owner must belong to your organization');
-  }
   async function assertSessionInCompany(
     req: FastifyRequest,
     sessionId: string,

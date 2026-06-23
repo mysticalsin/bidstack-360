@@ -48,3 +48,4 @@ export * from './win-loss.js';
 export * from './tenant-export.js';
 export * from './erasure.js';
 export * from './kam-initiative.js';
+export * from './kam-task.js';
