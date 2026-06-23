@@ -4,6 +4,33 @@ Append-only sprint log. Every sprint ends with a commit + a checkpoint here.
 
 ---
 
+## 2026-06-23 — KAM (Key Account Management) front layer — full build
+
+**Branch:** `feat/prod-hardening-mantu` · **Mode:** `/goal /loop` autonomous, multi-model (Claude build + 5-lens red-team; Codex cross-model deferred — credit-limited).
+
+**What:** built the structured layer between an account workshop and a qualified opportunity — Initiative→Lead→Opportunity→Dropped state machine feeding (not rebuilding) the existing Opportunity pipeline, transcript→note+todo human-gated staging, Dust MCP, KPI roll-ups, and the ABC-OM handoff. Plus a separate nav fix.
+
+**Process:** recon (7-agent reality map → corrected "Supabase" to Prisma/Postgres, found the mature pipeline to NOT rebuild) → technical brief (`docs/KAM-PLAN.md`) → 5-lens adversarial red-team (`docs/KAM-PLAN-REVIEW-LOG.md`, 8 blockers + 9 majors, all adopted) → 9 green-gated slices.
+
+**Shipped (9 commits, all live-verified on the dev DB):**
+- **S0** schema (6 models: KamConsultant/Session/Initiative/SessionDraft/Handoff/Prospection + 6 enums; Company + Task alters), idempotent migration, RBAC 3-source lockstep + drift test, shared `normalizeAccountName`, KAM PII map.
+- **S1** Initiative + locked state machine + atomic OM mint+handoff; extracted shared `mintOpportunityTx` (leads route migrated onto it, parity preserved).
+- **S2** Initiative-scoped tasks + per-account to-do roll-up + `lastActivityAt` blind-bump; shared FK-graft + access-scope guards (`kam-access.ts`).
+- **S3** sessions + transcript→note+todo human-gate (approve = only commit path; api-role forbidden; atomic + idempotent).
+- **S4** Handoff export to ABC's OM section (structured payload; confirm records the OM id).
+- **S5** Dust MCP tools on a dedicated `kam` scope (staging-write only — cannot reach canonical-write tools).
+- **S6** prospection read-mirror + KPI roll-ups (account/owner/country-VP) + staleness.
+- **Frontend** KAM cockpit (`/kam`): KPI strip, Initiative board, per-account to-do, human-gate draft review.
+- **Nav** accordion fix (Tony-approved before/after) — collapses inactive sections, kills the internal scroll; one KAM entry under Accounts.
+
+**Red-team blockers fixed (B1-B8):** inline-convert extracted; single-tx optimistic-guard mint (no double-mint); cross-tenant FK-graft + in-tenant access-scope on every endpoint/tool; account-identity keyed on Company.id; PII mechanism; never-auto-commit closed within KAM; RBAC/SERUM/regen chain wired.
+
+**Verified (DoD = run it, not write it):** api KAM suite 72/72 · db 35/35 · mcp 24/24 · leads parity 10/10 · `pnpm -r typecheck`/`lint` + web build green · **live browser walk** of the full lifecycle (transcript→pending draft→human approve→commit→board/to-do/KPI; Initiative→Lead→Opportunity mints Opportunity+Handoff) with UI↔Postgres cross-check, zero console errors, nav accordion + no-scroll confirmed. Full report: `docs/KAM-QA-REPORT.md`.
+
+**Operator-gated (before prod):** `db:migrate`/`db:generate`/`db:seed` on prod; publish SERUM `kam_*` allowlist + live Dust smoke; re-run Codex cross-model plan pass (~Jun 28). **Deferred:** pre-existing non-KAM auto-commit hardening (AiInsight enum, import-meeting, dust-poll); staleness notification cron; live SharePoint/ABC connectors (built as interfaces).
+
+---
+
 ## 2026-06-22 — Production-Hardening Waves 1–2 (audit-driven, multi-agent)
 
 **Branch:** `feat/prod-hardening-mantu` · **Mode:** `/goal /audit /plan /loop` autopilot, enterprise-grade for 100k users.
