@@ -49,3 +49,4 @@ export * from './tenant-export.js';
 export * from './erasure.js';
 export * from './kam-initiative.js';
 export * from './kam-task.js';
+export * from './kam-session.js';
