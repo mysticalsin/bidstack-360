@@ -12,7 +12,7 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 import {
-  KamProspectionDetail,
+  type KamProspectionDetail,
   KamProspectionImportBody,
   KamProspectionImportResult,
   KamProspectionList,

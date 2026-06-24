@@ -16,7 +16,7 @@ import { z } from 'zod';
 import { prisma, type Prisma } from '@bidstack/db';
 import {
   KamDraftApproveResult,
-  KamDraftContent,
+  type KamDraftContent,
   KamInitiativeDraftItem,
   KamNoteDraft,
   KamSessionDraftCreate,
