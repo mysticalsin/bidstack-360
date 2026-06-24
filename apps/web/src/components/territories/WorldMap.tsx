@@ -224,7 +224,7 @@ const COUNTRY_CENTROIDS: Record<string, [number, number]> = {
 };
 
 const REGIONAL_PRESETS = [
-  { label: 'Global', coordinates: [10, 35] as [number, number], zoom: 1 },
+  { label: 'Global', coordinates: [0, 10] as [number, number], zoom: 1 },
   { label: 'N. America', coordinates: [-100, 45] as [number, number], zoom: 2.2 },
   { label: 'Europe', coordinates: [15, 50] as [number, number], zoom: 3.5 },
   { label: 'Asia Pac', coordinates: [115, 15] as [number, number], zoom: 2.2 },
@@ -253,7 +253,7 @@ export const WorldMap = memo(function WorldMap({
     y: number;
   } | null>(null);
 
-  const [position, setPosition] = useState({ coordinates: [10, 35] as [number, number], zoom: 1 });
+  const [position, setPosition] = useState({ coordinates: [0, 10] as [number, number], zoom: 1 });
   const [hoveredLegendIndex, setHoveredLegendIndex] = useState<number | null>(null);
 
   const handleZoomIn = useCallback(() => {
@@ -271,7 +271,7 @@ export const WorldMap = memo(function WorldMap({
   }, []);
 
   const handleReset = useCallback(() => {
-    setPosition({ coordinates: [10, 35], zoom: 1 });
+    setPosition({ coordinates: [0, 10], zoom: 1 });
   }, []);
 
   const byNumeric = useMemo(() => {
@@ -315,10 +315,11 @@ export const WorldMap = memo(function WorldMap({
   const interpolateBrand = useCallback(
     (t: number) => {
       if (theme === 'dark') {
-        // Dark mode: deep contrastive slate-indigo (low value) → bright neon violet-purple (high value)
-        const h = 230 + t * 25; // 230 → 255
-        const s = 25 + t * 65; // 25% → 90%
-        const l = 20 + t * 45; // 20% → 65%
+        // Dark mode: muted indigo (low) → vivid brand violet (high). Higher
+        // lightness/sat floor so low-value countries still read against #0b0d12.
+        const h = 244 + t * 16; // 244 → 260
+        const s = 55 + t * 35; // 55% → 90%
+        const l = 34 + t * 31; // 34% → 65%
         return `hsl(${h} ${s}% ${l}%)`;
       } else {
         // Light mode: soft sky blue (low value) → rich brand blue (high value)
@@ -370,8 +371,10 @@ export const WorldMap = memo(function WorldMap({
         }
       `}</style>
       <ComposableMap
-        projection="geoMercator"
-        projectionConfig={{ scale: 140 }}
+        projection="geoEqualEarth"
+        projectionConfig={{ scale: 200, center: [0, 10] }}
+        width={1000}
+        height={480}
         style={{ width: '100%', height: '100%' }}
       >
         <defs>
