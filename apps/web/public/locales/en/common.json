@@ -44,7 +44,19 @@
     "agents": "Dust Agents",
     "search": "Search",
     "references": "Reference Library",
-    "settingsPage": "Settings"
+    "settingsPage": "Settings",
+    "home": "Home",
+    "bidsRfp": "Bids & RFP",
+    "quickStart": "Quick Start",
+    "salesToolkits": "Sales Toolkits",
+    "keyAccounts": "Key Accounts",
+    "topAccounts": "Top Accounts",
+    "sectorView": "Sector View",
+    "crossSell": "Cross-sell",
+    "agentStudio": "Agent Studio",
+    "calendar": "Calendar",
+    "customObjects": "Custom Objects",
+    "analyticsReports": "Analytics & Reports"
   },
   "crumbs": {
     "portfolio": "Portfolio",
@@ -113,7 +125,10 @@
     "deleted": "Deleted",
     "copied": "Copied to clipboard",
     "genericError": "Something went wrong. Please try again.",
-    "networkError": "Network error. Check your connection."
+    "networkError": "Network error. Check your connection.",
+    "regionLabel": "Notifications",
+    "clearAll": "Clear all ({{count}})",
+    "dismiss": "Dismiss"
   },
   "validation": {
     "required": "This field is required",
@@ -140,9 +155,15 @@
     "dustSynced": "synced {{when}}"
   },
   "pages": {
-    "dashboard": { "title": "Dashboard" },
-    "opportunities": { "title": "Opportunities" },
-    "contacts": { "title": "Contacts" },
+    "dashboard": {
+      "title": "Dashboard"
+    },
+    "opportunities": {
+      "title": "Opportunities"
+    },
+    "contacts": {
+      "title": "Contacts"
+    },
     "rfpHub": {
       "title": "Bid response hub",
       "subtitle": "Qualify, draft, score, and submit — the whole RFP workflow in one place.",
@@ -230,7 +251,9 @@
         "title": "No leads yet",
         "message": "Create your first lead to start tracking prospects."
       },
-      "error": { "title": "Failed to load leads" },
+      "error": {
+        "title": "Failed to load leads"
+      },
       "view": {
         "list": "List",
         "kanban": "Kanban",
@@ -259,5 +282,105 @@
         "leadRot": "Lead rot rules"
       }
     }
+  },
+  "topbar": {
+    "skipToContent": "Skip to content",
+    "switchToLight": "Switch to light mode",
+    "switchToDark": "Switch to dark mode",
+    "help": "Help & shortcuts",
+    "helpAria": "Help and keyboard shortcuts",
+    "productTour": "Take the product tour",
+    "signOut": "Sign out",
+    "portfolio": "Portfolio",
+    "detail": "Detail"
+  },
+  "appRoutes": {
+    "notFoundTitle": "Page not found",
+    "notFoundMessage": "The page you are looking for does not exist.",
+    "goToDashboard": "Go to Dashboard"
+  },
+  "select": {
+    "placeholder": "—",
+    "noOptions": "No options"
+  },
+  "lookupFieldPicker": {
+    "placeholder": "Search…",
+    "clearSelection": "Clear selection",
+    "searching": "Searching…",
+    "noResults": "No results.",
+    "typeToSearch": "Type to search…"
+  },
+  "confirm": {
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "save": "Save"
+  },
+  "avatar": {
+    "statusOnline": "Online",
+    "statusOffline": "Offline"
+  },
+  "helpDrawer": {
+    "title": "Keyboard shortcuts",
+    "closeAria": "Close shortcuts",
+    "groupGlobal": "Global",
+    "groupNavigation": "Navigation",
+    "groupRecords": "Records",
+    "openCommandPalette": "Open command palette",
+    "quickAddMenu": "Quick-add menu",
+    "openThisDrawer": "Open this drawer",
+    "closeCurrentDialog": "Close current dialog",
+    "goToDashboard": "Go to Dashboard",
+    "goToOpportunities": "Go to Opportunities",
+    "goToPipeline": "Go to Pipeline",
+    "goToContacts": "Go to Contacts",
+    "goToTasks": "Go to Tasks",
+    "goToReports": "Go to Reports",
+    "goToAccounts": "Go to Accounts",
+    "goToSettings": "Go to Settings",
+    "goToSearch": "Go to Search",
+    "moveSelectionInLists": "Move selection in lists",
+    "openRecord": "Open record",
+    "editSelectedRecord": "Edit selected record",
+    "deleteWithConfirmation": "Delete with confirmation",
+    "footer": "Most shortcuts work everywhere except inside text fields. Press ? any time to reopen this drawer."
+  },
+  "breadcrumbs": {
+    "dashboard": "Dashboard",
+    "accounts": "Accounts",
+    "opportunities": "Opportunities",
+    "pipeline": "Pipeline",
+    "contacts": "Contacts",
+    "tasks": "Tasks",
+    "reports": "Reports",
+    "integrations": "Integrations",
+    "settings": "Settings",
+    "auditLog": "Audit log",
+    "login": "Sign in",
+    "ariaLabel": "Breadcrumb"
+  },
+  "progressRing": {
+    "ariaLabelPercentComplete": "{{percent}}% complete"
+  },
+  "sortableHeader": {
+    "ariaLabel": "Sort by {{label}}. Current sort: {{current}}. Activate to sort {{next}}."
+  },
+  "upgradeBanner": {
+    "actionLabel": "Upgrade"
+  },
+  "showMore": {
+    "moreLabel": "Show more",
+    "lessLabel": "Show less"
+  },
+  "bulkActionBar": {
+    "regionLabel": "Bulk actions",
+    "selectedCount": "{{count}} selected",
+    "exportSelected": "Export selected",
+    "deleting": "Deleting…",
+    "deleteSelected": "Delete selected",
+    "clear": "Clear"
+  },
+  "dialog": {
+    "closeAriaLabel": "Close"
   }
 }
