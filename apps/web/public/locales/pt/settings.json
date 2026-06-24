@@ -534,6 +534,8 @@
   "settingsOverview": {
     "tileWorkspaceTitle": "Governança do espaço de trabalho",
     "tileWorkspaceDetail": "{{users}} usuários / {{roles}} funções",
+    "tileSerumTitle": "SERUM Control Plane",
+    "tileSerumDetail": "Agent, model, document, approval, and policy readiness",
     "tileDataModelTitle": "Modelo de dados",
     "tileDataModelDetail": "{{stages}} estágios / {{fields}} campos de empresa",
     "tileAutomationTitle": "Biblioteca de automação",
