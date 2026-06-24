@@ -70,8 +70,8 @@ function providerUrls(domain: string): string[] {
   return urls;
 }
 
-async function fetchLogo(domain: string): Promise<{ buf: Buffer; contentType: string } | null> {
-  for (const url of providerUrls(domain)) {
+async function fetchFirstImage(urls: string[]): Promise<{ buf: Buffer; contentType: string } | null> {
+  for (const url of urls) {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
     try {
@@ -99,11 +99,32 @@ export const companyLogoRoutes: FastifyPluginAsyncZod = async (server) => {
     '/logo',
     {
       config: { public: true },
-      schema: { querystring: z.object({ domain: z.string().min(1).max(255) }) },
+      schema: {
+        querystring: z
+          .object({
+            domain: z.string().min(1).max(255).optional(),
+            // `tech` = a Simple Icons slug for tech-stack brand glyphs.
+            tech: z.string().min(1).max(64).optional(),
+          })
+          .refine((q) => Boolean(q.domain) !== Boolean(q.tech), {
+            message: 'Provide exactly one of domain or tech',
+          }),
+      },
     },
     async (req, reply) => {
-      const domain = resolveDomain(req.query.domain, null);
-      if (!domain) return reply.code(404).send();
+      let cacheKey: string;
+      let urls: string[];
+      if (req.query.tech) {
+        const slug = req.query.tech.toLowerCase();
+        if (!/^[a-z0-9-]+$/.test(slug)) return reply.code(400).send(); // no SSRF via the slug
+        cacheKey = `tech:${slug}`;
+        urls = [`https://cdn.simpleicons.org/${slug}`]; // fixed host, brand-colored SVG
+      } else {
+        const domain = resolveDomain(req.query.domain ?? null, null);
+        if (!domain) return reply.code(404).send();
+        cacheKey = domain;
+        urls = providerUrls(domain);
+      }
 
       const serve = (hit: NonNullable<Hit>) =>
         reply
@@ -111,13 +132,13 @@ export const companyLogoRoutes: FastifyPluginAsyncZod = async (server) => {
           .header('cache-control', 'public, max-age=604800, immutable')
           .send(hit.buf);
 
-      const cached = cacheGet(domain);
+      const cached = cacheGet(cacheKey);
       if (cached !== undefined) {
         return cached ? serve(cached) : reply.code(404).send();
       }
-      const fetched = await fetchLogo(domain);
+      const fetched = await fetchFirstImage(urls);
       const hit: Hit = fetched ? { ...fetched, ts: Date.now() } : null;
-      cacheSet(domain, hit);
+      cacheSet(cacheKey, hit);
       return hit ? serve(hit) : reply.code(404).send();
     },
   );
