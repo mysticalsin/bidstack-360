@@ -2,6 +2,7 @@ import { useState, forwardRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { HoverCard } from '@/components/ui/HoverCard';
+import { buildApiUrl } from '@/lib/api';
 import type { CrmLogo } from '@bidstack/shared';
 
 import { displayableLogoUrl } from './logoUrlSafety';
@@ -39,7 +40,10 @@ export const CompanyLogo = forwardRef<HTMLSpanElement, CompanyLogoProps>(functio
   // domain, so no-domain companies don't fire 404s. Falls through to logo.url /
   // initials on miss.
   if (normalizedDomain && !isReservedDomain(normalizedDomain)) {
-    sources.push(`/api/v1/logo?domain=${encodeURIComponent(normalizedDomain)}`);
+    // buildApiUrl prefixes VITE_API_URL so the <img> reaches the API on the
+    // split-origin demo (Vercel SPA → Railway API); a bare /api path would hit
+    // the SPA's catch-all rewrite and return index.html (broken image).
+    sources.push(buildApiUrl(`/api/v1/logo?domain=${encodeURIComponent(normalizedDomain)}`));
   }
   if (logoUrl && !isReservedDomain(normalizedDomain)) {
     sources.push(logoUrl);

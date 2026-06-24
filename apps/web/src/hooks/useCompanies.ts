@@ -13,6 +13,15 @@ interface CompaniesParams {
 
 type CompaniesPayload = { items: Company[]; nextCursor?: string };
 
+// A company create/update/tier change must refresh every account surface that
+// derives from it — the list, key/top accounts, and the CRM dashboard/cockpit.
+function invalidateAccountSurfaces(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: ['companies'] });
+  void qc.invalidateQueries({ queryKey: ['key-accounts'] });
+  void qc.invalidateQueries({ queryKey: ['top-accounts'] });
+  void qc.invalidateQueries({ queryKey: ['crm-dashboard'] });
+}
+
 export function useCompany(id: string | undefined) {
   return useQuery({
     queryKey: ['company', id],
@@ -33,6 +42,9 @@ export function useCompanies(params: CompaniesParams = {}) {
       const path = `/api/companies${usp.toString() ? `?${usp.toString()}` : ''}`;
       return api<CompaniesPayload>(path, { signal });
     },
+    // Live: reflect edits/designations immediately, not the global 2-min cache.
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 }
 
@@ -41,7 +53,7 @@ export function useCreateCompany() {
   return useMutation({
     mutationFn: (input: CompanyCreate) =>
       api<Company>('/api/companies', { method: 'POST', body: input }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['companies'] }),
+    onSuccess: () => invalidateAccountSurfaces(qc),
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : 'Could not create company'),
   });
@@ -53,7 +65,7 @@ export function useUpdateCompany() {
     mutationFn: ({ id, patch }: { id: string; patch: CompanyPatch }) =>
       api<Company>(`/api/companies/${id}`, { method: 'PATCH', body: patch }),
     onSuccess: (_data, variables) => {
-      void qc.invalidateQueries({ queryKey: ['companies'] });
+      invalidateAccountSurfaces(qc);
       void qc.invalidateQueries({ queryKey: ['company', variables.id] });
     },
     onError: (err) =>

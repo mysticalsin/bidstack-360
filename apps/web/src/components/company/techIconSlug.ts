@@ -8,6 +8,7 @@
  * (Azure, M365, Dynamics, Power BI…), AWS, Salesforce, Oracle — those (and any
  * unknown name) fall straight to TechLogo's deterministic monogram.
  */
+import { buildApiUrl } from '@/lib/api';
 
 /** Normalized tech name → verified Simple Icons slug. Keyed by normalizeToSlug(). */
 const KNOWN_SLUGS: Record<string, string> = {
@@ -61,8 +62,9 @@ export function techIconSlug(name: string): string | null {
   return KNOWN_SLUGS[normalizeToSlug(name)] ?? null;
 }
 
-/** Same-origin proxy URL for a tech name's logo, or null. */
+/** Proxy URL for a tech name's logo, or null. Prefixes the API base so the
+ *  <img> reaches the API on the split-origin demo (Vercel SPA → Railway API). */
 export function techLogoUrl(name: string): string | null {
   const slug = techIconSlug(name);
-  return slug ? `/api/v1/logo?tech=${encodeURIComponent(slug)}` : null;
+  return slug ? buildApiUrl(`/api/v1/logo?tech=${encodeURIComponent(slug)}`) : null;
 }

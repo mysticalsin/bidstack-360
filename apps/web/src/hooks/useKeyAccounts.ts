@@ -42,6 +42,9 @@ export function useKeyAccounts(filters?: KeyAccountFilters) {
       if (filters?.cursor) params.set('cursor', filters.cursor);
       return api(`/api/accounts/key?${params.toString()}`, { signal });
     },
+    // Live: a just-designated key account must appear, not the 2-min cache.
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 }
 
@@ -49,5 +52,7 @@ export function useAccountIndustries() {
   return useQuery<{ items: string[] }>({
     queryKey: ['account-industries'],
     queryFn: async () => api('/api/accounts/industries'),
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 }
