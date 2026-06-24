@@ -294,12 +294,15 @@
     "subtitle": "{{count}} personnes dans l'unité de décision.",
     "actions": {
       "importCsv": {
+        "label": "Importer CSV",
         "aria": "Importer des contacts depuis un CSV"
       },
       "exportCsv": {
+        "label": "Exporter CSV",
         "aria": "Exporter tous les contacts visibles au format CSV"
       },
       "newContact": {
+        "label": "Nouveau contact",
         "aria": "Créer un nouveau contact"
       },
       "delete": "Supprimer",
@@ -452,7 +455,8 @@
     },
     "grid": {
       "regionLabel": "Cartes de comptes"
-    }
+    },
+    "paginationLabel": "accounts"
   },
   "publicSign": {
     "announceWelcome": "Étape 1 : Examiner le document",
@@ -2038,6 +2042,12 @@
     "kpiRevenue": "Revenu",
     "kpiWeightedRevenue": "RP",
     "kpiOpen": "Ouvertes",
+    "kpiOpenCount": "Open",
+    "kpiOpenPipeline": "Open pipeline",
+    "kpiWeightedRevenuePage": "WR (page)",
+    "kpiOpportunitiesPage": "Opportunities (page)",
+    "kpiRevenuePage": "Revenue (page)",
+    "kpiOpenPage": "Open (page)",
     "kpiRegionLabel": "Résumé des KPI des opportunités",
     "title": "Opportunités",
     "resultsFor": "résultats pour",
@@ -2665,7 +2675,9 @@
       "missingFieldsTitle": "Champs manquants",
       "missingFieldsBody": "La description et les deux unités sont requises.",
       "logged": "Action de vente croisée enregistrée",
-      "saveError": "Impossible d'enregistrer"
+      "saveError": "Impossible d'enregistrer",
+      "statusAdvanced": "Status: {{status}}",
+      "statusError": "Could not update status"
     },
     "form": {
       "descriptionPlaceholder": "Que faut-il faire ?",
@@ -3860,5 +3872,36 @@
     "title": "Fichiers",
     "emptyTitle": "Choisissez un compte",
     "emptyMessage": "Ouvrez un compte depuis /accounts pour joindre des propositions, des accords de confidentialité et des architectures de référence."
+  },
+  "serum": {
+    "eyebrow": "Self-Evolving Revenue Understanding Mesh",
+    "title": "SERUM Mission Control",
+    "subtitle": "A source-backed control plane for agents, documents, model routing, approvals, and observability.",
+    "updatedAt": "Updated {{time}}",
+    "moduleMapEyebrow": "Live module map",
+    "moduleMapTitle": "Control-plane readiness",
+    "agentStudioLink": "Agent Studio",
+    "eventFeedEyebrow": "Event feed",
+    "eventFeedTitle": "Durable SERUM events",
+    "eventFeedEmptyTitle": "No SERUM event ledger yet",
+    "eventFeedEmptyDetail": "The current build reads existing Crew, RFP, document, provider, queue, and audit signals. A future append-only SERUM event table should power live replay before autonomous loops are exposed.",
+    "guardrailsTitle": "Guardrails",
+    "loopSourcesLabel": "Loop sources",
+    "loopSourcesDetail": "{{count}} active loops from Crew runs and RFP orchestrations.",
+    "documentSourcesLabel": "Document sources",
+    "documentSourcesDetail": "{{processed}} successful extractions today; {{failed}} failed job signals across queues, documents, and RFP loops.",
+    "modelSourcesLabel": "Model sources",
+    "modelSourcesDetail": "{{calls}} AI invocation audit rows today with {{tokens}} tokens.",
+    "providerHealthTitle": "Provider health",
+    "noLatencyRecorded": "No latency recorded",
+    "latencyMs": "{{ms}} ms",
+    "providerEmptyTitle": "No provider heartbeat rows",
+    "providerEmptyDetail": "Provider credentials may still exist, but no health checks have been written for this org.",
+    "queueHealthTitle": "Queue health",
+    "queueCounts": "{{waiting}} waiting / {{active}} active / {{failed}} failed / {{completed}} completed",
+    "queueEmptyTitle": "No queue snapshots",
+    "queueEmptyDetail": "Queue monitor rows have not been recorded yet for this org.",
+    "backendSignalsEyebrow": "Backend signals",
+    "backendSignalsTitle": "Signal availability"
   }
 }
