@@ -12,6 +12,8 @@ import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useSalesToolkits } from '@/hooks/useSalesToolkits';
 
+import { ToolkitStoreSection } from './salesToolkits/ToolkitStoreSection';
+
 export default function SalesToolkitsPage() {
   const { t } = useTranslation('crm');
   const [sector, setSector] = useState('');
@@ -33,8 +35,21 @@ export default function SalesToolkitsPage() {
           <div className="page-sub">
             {t(
               'salesToolkits.pageSubtitle',
-              'Industry playbooks and courses from Mantu Academy — pulled live, filtered by sector.',
+              'Stored sales collateral plus live Mantu Academy courses — managed here, readable by the MCP.',
             )}
+          </div>
+        </div>
+      </div>
+
+      <ToolkitStoreSection />
+
+      <div className="page-head" style={{ marginTop: 8 }}>
+        <div>
+          <h2 className="page-title" style={{ fontSize: '1.05rem' }}>
+            {t('salesToolkits.coursesHeading', 'Mantu Academy courses')}
+          </h2>
+          <div className="page-sub">
+            {t('salesToolkits.coursesSub', 'Industry playbooks pulled live from the LMS, filtered by sector.')}
           </div>
         </div>
       </div>
