@@ -15,11 +15,17 @@ import type {
 
 const KAM = '/api/kam';
 
+// The cockpit is an operational surface — its read queues (initiatives, the
+// human-gate drafts fed by external Dust agents, to-dos, KPIs) must reflect
+// current server state on every visit, NOT the app's 2-min persisted cache.
+const LIVE = { staleTime: 0, refetchOnMount: 'always' } as const;
+
 // ─── Initiatives + state machine ──────────────────────────────────────────
 export function useKamInitiatives(companyId: string | undefined) {
   return useQuery({
     queryKey: ['kam-initiatives', companyId],
     enabled: Boolean(companyId),
+    ...LIVE,
     queryFn: ({ signal }) =>
       api<KamInitiativeList>(`${KAM}/initiatives?companyId=${companyId}`, { signal }),
   });
@@ -44,6 +50,7 @@ export function useKamAccountTodos(companyId: string | undefined) {
   return useQuery({
     queryKey: ['kam-todos', companyId],
     enabled: Boolean(companyId),
+    ...LIVE,
     queryFn: ({ signal }) => api<KamAccountTodos>(`${KAM}/accounts/${companyId}/todos`, { signal }),
   });
 }
@@ -52,6 +59,7 @@ export function useKamAccountKpi(companyId: string | undefined) {
   return useQuery({
     queryKey: ['kam-account-kpi', companyId],
     enabled: Boolean(companyId),
+    ...LIVE,
     queryFn: ({ signal }) => api<KamAccountKpi>(`${KAM}/reports/account/${companyId}`, { signal }),
   });
 }
@@ -61,6 +69,7 @@ export function useKamDrafts(companyId: string | undefined, status?: 'pending' |
   return useQuery({
     queryKey: ['kam-drafts', companyId, status],
     enabled: Boolean(companyId),
+    ...LIVE,
     queryFn: ({ signal }) => {
       const qs = new URLSearchParams({ companyId: companyId! });
       if (status) qs.set('status', status);

@@ -16,7 +16,10 @@ export function useKamAccounts() {
   return useQuery({
     queryKey: ['kam-accounts'],
     queryFn: ({ signal }) => api<KamAccountList>(`${KAM}/accounts`, { signal }),
-    staleTime: 30_000,
+    // Live: the cockpit must reflect current key accounts on every visit, not
+    // the app's 2-min persisted cache (e.g. a just-designated account).
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 }
 
