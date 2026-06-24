@@ -20,6 +20,8 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
 
+import { isSyntheticAccountName } from './accountsPage/testDataFilter';
+
 import { StrategicSignalInsight } from './accountsPage/StrategicSignalInsight';
 import { keyAccountSignal } from './accountsPage/strategicSignals';
 
@@ -50,9 +52,13 @@ export function KeyAccountsPage() {
     limit: KEY_ACCOUNTS_SIGNAL_SIZE,
   });
 
-  const items = useMemo(() => accounts.data?.items ?? [], [accounts.data?.items]);
+  // Hide synthetic E2E/fixture accounts from the customer-facing view.
+  const items = useMemo(
+    () => (accounts.data?.items ?? []).filter((a) => !isSyntheticAccountName(a.name)),
+    [accounts.data?.items],
+  );
   const signalItems = useMemo(
-    () => signalAccounts.data?.items ?? items,
+    () => (signalAccounts.data?.items ?? items).filter((a) => !isSyntheticAccountName(a.name)),
     [items, signalAccounts.data?.items],
   );
   const unclassifiedIndustry = t('keyAccounts.unclassifiedIndustry', 'Unclassified');
@@ -304,6 +310,12 @@ export function KeyAccountsPage() {
             'keyAccounts.emptyMessage',
             'Flag strategically important companies as Key Accounts from the Companies page.',
           )}
+          action={
+            <Link to="/companies" className="btn btn-primary">
+              <Icon name="building" size={14} />
+              {t('keyAccounts.emptyCta', 'Browse companies')}
+            </Link>
+          }
         />
       ) : (
         <>

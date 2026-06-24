@@ -18,13 +18,16 @@ import { CompanyLogo } from '@/components/company/CompanyLogo';
 import { TopAccountBadge } from '@/components/company/AccountTierBadges';
 import { useTopAccounts } from '@/hooks/useTopAccounts';
 import { springSoft } from '@/lib/motion';
+import { isSyntheticAccountName } from '@/pages/accountsPage/testDataFilter';
 
 // ─── TopAccountsCard ─────────────────────────────────────────────────────────
 
 export function TopAccountsCard() {
   const { t } = useTranslation('crm');
   const accounts = useTopAccounts({ limit: 5 });
-  const items = (accounts.data?.items ?? []).slice(0, 5);
+  const items = (accounts.data?.items ?? [])
+    .filter((a) => !isSyntheticAccountName(a.name))
+    .slice(0, 5);
   const source = accounts.data?.source ?? 'auto';
 
   return (

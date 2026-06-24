@@ -95,7 +95,10 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
       </div>
 
       {/* Scrollable nav */}
-      <nav aria-label="Primary navigation" className="flex-1 overflow-y-auto px-2 py-2">
+      <nav
+        aria-label="Primary navigation"
+        className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-2 py-2"
+      >
         {sections.map((section) => (
           <MobileNavSection key={section.key} section={section} badges={badges} onNavigate={onClose} />
         ))}

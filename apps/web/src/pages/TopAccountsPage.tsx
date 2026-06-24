@@ -20,6 +20,7 @@ import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
 
 import { StrategicSignalInsight } from './accountsPage/StrategicSignalInsight';
 import { topAccountSignal } from './accountsPage/strategicSignals';
+import { isSyntheticAccountName } from './accountsPage/testDataFilter';
 
 export function TopAccountsPage() {
   const { t } = useTranslation('crm');
@@ -35,7 +36,10 @@ export function TopAccountsPage() {
     limit: 20,
   });
 
-  const items = useMemo(() => accounts.data?.items ?? [], [accounts.data?.items]);
+  const items = useMemo(
+    () => (accounts.data?.items ?? []).filter((a) => !isSyntheticAccountName(a.name)),
+    [accounts.data?.items],
+  );
   const source = accounts.data?.source ?? 'auto';
   const accountError = accounts.error instanceof Error ? accounts.error.message : undefined;
   const industryError = industries.error instanceof Error ? industries.error.message : undefined;
@@ -298,6 +302,12 @@ export function TopAccountsPage() {
         <EmptyState
           title={t('topAccounts.emptyTitle', 'No account data yet')}
           message={t('topAccounts.emptyMessage', 'Add opportunities with values to see top accounts ranked by pipeline.')}
+          action={
+            <Link to="/companies" className="btn btn-primary">
+              <Icon name="building" size={14} />
+              {t('topAccounts.emptyCta', 'Browse companies')}
+            </Link>
+          }
         />
       ) : (
         <motion.div layout className="space-y-3">

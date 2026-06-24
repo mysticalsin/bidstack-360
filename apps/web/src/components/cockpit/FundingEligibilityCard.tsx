@@ -5,6 +5,7 @@
  * on the account cockpit so the funding signal reads directly off the evidence.
  */
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
@@ -16,6 +17,7 @@ import type { AccountCockpitSnapshot } from '@bidstack/shared';
 import { deriveFundingPrograms } from './fundingEligibility';
 
 export function FundingEligibilityCard({ cockpit }: { cockpit: AccountCockpitSnapshot }) {
+  const { t } = useTranslation('crm');
   const companyKey = cockpit.company.name;
   const ts = useCompanyTechnicalStack(companyKey);
   // Mirror TechStackCard: prefer a saved/curated stack, else the cockpit snapshot.
@@ -27,12 +29,18 @@ export function FundingEligibilityCard({ cockpit }: { cockpit: AccountCockpitSna
 
   return (
     <Card>
-      <SectionHeader title="Funding eligibility" caption="Vendor co-funding signals from the technical stack" />
+      <SectionHeader
+        title={t('fundingEligibility.title', 'Funding eligibility')}
+        caption={t('fundingEligibility.caption', 'Vendor co-funding signals from the technical stack')}
+      />
       <div className="px-5 pb-5">
         {programs.length === 0 ? (
           <EmptyState
-            title="No co-funding signal yet"
-            message="No Microsoft, AWS, or Google footprint detected in the current stack."
+            title={t('fundingEligibility.emptyTitle', 'No co-funding signal yet')}
+            message={t(
+              'fundingEligibility.emptyMessage',
+              'No Microsoft, AWS, or Google footprint detected in the current stack.',
+            )}
           />
         ) : (
           <ul className="space-y-3">
@@ -47,14 +55,14 @@ export function FundingEligibilityCard({ cockpit }: { cockpit: AccountCockpitSna
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={p.primary ? 'jade' : 'blue'}>{p.name}</Badge>
-                  {p.primary && <Badge tone="jade">Recommended</Badge>}
+                  {p.primary && <Badge tone="jade">{t('fundingEligibility.recommended', 'Recommended')}</Badge>}
                   <span className="text-sm font-semibold text-[var(--fg-primary)]">{p.fullName}</span>
                   <span className="text-xs text-[var(--fg-tertiary)]">· {p.funder}</span>
                 </div>
                 <p className="mt-1 text-xs text-[var(--fg-secondary)]">{p.blurb}</p>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--fg-tertiary)]">
-                    Detected
+                    {t('fundingEligibility.detected', 'Detected')}
                   </span>
                   {p.matched.map((name) => (
                     <span

@@ -110,7 +110,7 @@ export function Sidebar() {
             pinned; only this list scrolls when every group is expanded, so the
             hamburger/collapse toggle never scrolls out of reach. min-h-0 lets a
             flex child actually overflow instead of growing the whole sidebar. */}
-        <div className="sb-scroll flex-1 min-h-0 overflow-y-auto">
+        <div className="sb-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain">
         {sections.map((section) => (
           <SidebarSection
             key={section.key}
