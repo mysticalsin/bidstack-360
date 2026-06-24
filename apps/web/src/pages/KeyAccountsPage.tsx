@@ -321,7 +321,7 @@ export function KeyAccountsPage() {
                 >
                   <Card>
                     <div className="flex items-start gap-4 p-5">
-                      <CompanyLogo domain={account.domain} name={account.name} size={48} />
+                      <CompanyLogo domain={account.domain} companyId={account.id} name={account.name} size={48} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <Link

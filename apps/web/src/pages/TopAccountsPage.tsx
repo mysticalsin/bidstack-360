@@ -327,7 +327,7 @@ export function TopAccountsPage() {
                     {index + 1}
                   </div>
 
-                  <CompanyLogo domain={account.domain} name={account.name} size={40} />
+                  <CompanyLogo domain={account.domain} companyId={account.id} name={account.name} size={40} />
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">

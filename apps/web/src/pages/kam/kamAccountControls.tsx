@@ -43,7 +43,7 @@ export function KamAccountHero({ account, onSwitch }: { account: KamAccount; onS
         <span className="absolute inset-y-0 left-0 w-[2px] bg-[var(--brand-primary)]" aria-hidden />
       )}
       <div className="flex items-center gap-4 p-5">
-        <CompanyLogo name={account.name} size={56} />
+        <CompanyLogo name={account.name} companyId={account.id} domain={account.domain} size={56} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="truncate text-lg font-semibold text-[var(--fg-primary)]">{account.name}</h2>
@@ -108,7 +108,7 @@ export function KamAccountSwitcher({
                   }}
                   className="flex min-h-11 w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
                 >
-                  <CompanyLogo name={a.name} size={28} />
+                  <CompanyLogo name={a.name} companyId={a.id} domain={a.domain} size={28} />
                   <span className="min-w-0 flex-1 truncate text-sm text-[var(--fg-primary)]">{a.name}</span>
                   <Badge tone={STATUS_TONE[a.kamStatus]}>{a.kamStatus}</Badge>
                   {a.id === activeId && <Icon name="check" size={16} className="text-[var(--brand-primary)]" ariaHidden />}
@@ -206,7 +206,7 @@ export function KamDesignateDialog({
                       }}
                       className="flex min-h-11 w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
                     >
-                      <CompanyLogo name={c.name} size={28} />
+                      <CompanyLogo name={c.name} companyId={c.id} domain={c.domain} size={28} />
                       <span className="min-w-0 flex-1 truncate text-sm text-[var(--fg-primary)]">{c.name}</span>
                       {c.countryCode && <Badge tone="gray">{c.countryCode}</Badge>}
                     </button>

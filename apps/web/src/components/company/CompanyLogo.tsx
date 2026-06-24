@@ -4,12 +4,17 @@ import { useTranslation } from 'react-i18next';
 import { HoverCard } from '@/components/ui/HoverCard';
 import type { CrmLogo } from '@bidstack/shared';
 
+import { displayableLogoUrl } from './logoUrlSafety';
+
 interface CompanyLogoProps {
   name: string;
-  /** CRM-resolved logo (External CRM / Brandfetch / Logo.dev / favicon). Preferred. */
+  /** CRM-resolved logo. Same-origin/proxied assets render; raw third-party URLs fall back. */
   logo?: CrmLogo | null;
-  /** Bare domain (no protocol) - used to request the website favicon fallback. */
+  /** Bare domain (no protocol). Gates the same-origin logo proxy + attribution. */
   domain?: string | null;
+  /** When set with a real domain, pulls the live logo via the same-origin proxy
+   *  (/companies/:id/logo → logo.dev/Clearbit), falling back to initials. */
+  companyId?: string | null;
   size?: number;
   className?: string;
   /** When provided, wraps the logo in a HoverCard that reveals a data brief. */
@@ -19,11 +24,8 @@ interface CompanyLogoProps {
 }
 
 // Logo source chain:
-//   1. CRM-resolved high-confidence logo (External CRM / Brandfetch / Logo.dev)
-//   2. Small favicon fallback for compact table/sidebar uses
-//   3. Initials fallback (always works)
-// Large favicons are often pale generic tiles, so card/hero logos prefer
-// strong initials unless an actual brand asset has been resolved.
+//   1. Same-origin/proxied CRM logo assets
+//   2. Initials fallback (always works, no third-party runtime request)
 export const CompanyLogo = forwardRef<HTMLSpanElement, CompanyLogoProps>(function CompanyLogo(
   { name, logo, domain, size = 36, className, brief, priority = false },
   ref,
@@ -31,22 +33,16 @@ export const CompanyLogo = forwardRef<HTMLSpanElement, CompanyLogoProps>(functio
   const { t } = useTranslation('crm');
   const sources: string[] = [];
   const normalizedDomain = normalizeDomain(domain);
-  const shouldUseCompactFavicon =
-    size <= 64 && normalizedDomain !== null && !isReservedDomain(normalizedDomain);
+  const logoUrl = displayableLogoUrl(logo?.url);
 
-  if (logo?.url && logo.source !== 'favicon') {
-    sources.push(logo.url);
+  // Live logo via the same-origin domain proxy — only for a real (non-reserved)
+  // domain, so no-domain companies don't fire 404s. Falls through to logo.url /
+  // initials on miss.
+  if (normalizedDomain && !isReservedDomain(normalizedDomain)) {
+    sources.push(`/api/v1/logo?domain=${encodeURIComponent(normalizedDomain)}`);
   }
-  if (normalizedDomain && shouldUseCompactFavicon) {
-    sources.push(`https://www.google.com/s2/favicons?domain=${normalizedDomain}&sz=${size * 2}`);
-  }
-  if (
-    logo?.url &&
-    logo.source === 'favicon' &&
-    shouldUseCompactFavicon &&
-    !logo.url.endsWith('/favicon.ico')
-  ) {
-    sources.push(logo.url);
+  if (logoUrl && !isReservedDomain(normalizedDomain)) {
+    sources.push(logoUrl);
   }
 
   const [sourceIdx, setSourceIdx] = useState(0);
@@ -116,7 +112,8 @@ function normalizeDomain(domain: string | null | undefined): string | null {
   return host?.trim().toLowerCase() || null;
 }
 
-function isReservedDomain(domain: string): boolean {
+function isReservedDomain(domain: string | null): boolean {
+  if (!domain) return false;
   return (
     domain.endsWith('.example') ||
     domain.endsWith('.invalid') ||

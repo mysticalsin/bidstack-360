@@ -89,7 +89,7 @@ export function TopAccountsCard() {
                 <span className="w-5 shrink-0 text-center text-xs font-bold text-[var(--fg-tertiary)]">
                   {account.topAccountRank ?? i + 1}
                 </span>
-                <CompanyLogo name={account.name} domain={account.domain} size={36} />
+                <CompanyLogo name={account.name} companyId={account.id} domain={account.domain} size={36} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="truncate text-sm font-medium text-[var(--fg-primary)]">

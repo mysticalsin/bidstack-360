@@ -16,8 +16,6 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { prisma } from '@bidstack/db';
-
 const TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 3500;
 const MAX_CACHE = 500;
@@ -93,19 +91,18 @@ async function fetchLogo(domain: string): Promise<{ buf: Buffer; contentType: st
 }
 
 export const companyLogoRoutes: FastifyPluginAsyncZod = async (server) => {
+  // Domain-based so it works for ANY account surface (Company-table rows, CRM
+  // dashboard/enrichment rows) — they all carry a domain. <img> can't send a
+  // token, so it's public; the domain is validated + only fixed providers are
+  // fetched (no SSRF). Reserved/dev/invalid domains → 404 → initials.
   server.get(
-    '/companies/:companyId/logo',
+    '/logo',
     {
-      config: { public: true }, // logos are public brand assets; <img> can't send a token
-      schema: { params: z.object({ companyId: z.string().uuid() }) },
+      config: { public: true },
+      schema: { querystring: z.object({ domain: z.string().min(1).max(255) }) },
     },
     async (req, reply) => {
-      // Public: look up by id only (no org scope) — exposes nothing but a logo.
-      const company = await prisma.company.findUnique({
-        where: { id: req.params.companyId },
-        select: { domain: true, website: true, deletedAt: true },
-      });
-      const domain = company && !company.deletedAt ? resolveDomain(company.domain, company.website) : null;
+      const domain = resolveDomain(req.query.domain, null);
       if (!domain) return reply.code(404).send();
 
       const serve = (hit: NonNullable<Hit>) =>

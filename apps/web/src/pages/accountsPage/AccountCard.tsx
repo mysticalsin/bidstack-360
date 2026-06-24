@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { CompanyLogo } from '@/components/company/CompanyLogo';
+import { displayableLogoUrl } from '@/components/company/logoUrlSafety';
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
@@ -34,6 +35,7 @@ export const AccountCard = memo(function AccountCard({
   const { company, openDeals, pipelineMicros, totalDeals, health } = row;
   const sources = sourcePillsFor(company);
   const techPills = techStackPillsFor(company);
+  const imageUrl = displayableLogoUrl(company.imageUrl);
   return (
     <motion.div
       layout
@@ -55,9 +57,9 @@ export const AccountCard = memo(function AccountCard({
             name: company.name,
           })}
         >
-          {company.imageUrl ? (
+          {imageUrl ? (
             <img
-              src={company.imageUrl}
+              src={imageUrl}
               alt=""
               loading="lazy"
               decoding="async"
@@ -67,6 +69,7 @@ export const AccountCard = memo(function AccountCard({
           <div className="account-card-head">
             <CompanyLogo
               name={company.name}
+              companyId={company.id}
               logo={company.logo}
               domain={company.domain}
               size={52}
