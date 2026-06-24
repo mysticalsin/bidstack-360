@@ -33,7 +33,13 @@
     "weightedPipeline": "Weighted pipeline",
     "winRate": "Win rate",
     "averageDealSize": "Average deal size",
-    "newThisWeek": "New this week"
+    "newThisWeek": "New this week",
+    "deltaPeriodDefault": "vs last period",
+    "loadingAriaLabel": "Loading KPI",
+    "valueAriaLabel": "{{title}}: {{value}}",
+    "trendUpAriaLabel": "Up",
+    "trendDownAriaLabel": "Down",
+    "trendFlatAriaLabel": "Flat"
   },
   "fields": {
     "name": "Name",
@@ -47,7 +53,25 @@
     "updatedAt": "Updated",
     "dueDate": "Due date",
     "status": "Status",
-    "priority": "Priority"
+    "priority": "Priority",
+    "heading": "Fields",
+    "addFieldButton": "+ Add field",
+    "systemFieldsLabel": "System fields:",
+    "errorKeyLabelRequired": "Field key and label are required.",
+    "errorAddFailed": "Failed to add field",
+    "fieldKeyLabel": "Field key",
+    "fieldKeyPlaceholder": "e.g. budget",
+    "labelLabel": "Label",
+    "labelPlaceholder": "e.g. Budget",
+    "typeLabel": "Type",
+    "requiredCheckbox": "Required",
+    "cancelButton": "Cancel",
+    "addingButton": "Adding…",
+    "addButton": "Add",
+    "loading": "Loading fields…",
+    "loadError": "Could not load fields. Please retry.",
+    "empty": "No custom fields yet. Use \"Add field\" above to create your first one.",
+    "requiredBadge": "Required"
   },
   "detail": {
     "opportunity": "Opportunity detail",
@@ -66,5 +90,3775 @@
     "leads": "No leads yet",
     "companies": "No companies yet",
     "ctaCreate": "Create your first {{entity}}"
+  },
+  "opportunities": {
+    "toast": {
+      "movedOne": "Moved {{count}} opportunity",
+      "movedMany": "Moved {{count}} opportunities",
+      "updatesFailedOne": "{{count}} update failed",
+      "updatesFailedMany": "{{count}} updates failed",
+      "updatesFailedDescription": "The successful moves were committed; try again for the rest.",
+      "deletedOne": "Deleted {{count}} opportunity",
+      "deletedMany": "Deleted {{count}} opportunities",
+      "deletesFailedOne": "{{count}} delete failed",
+      "deletesFailedMany": "{{count}} deletes failed",
+      "exportComplete": "Export complete",
+      "exportFailed": "Export failed",
+      "exportFailedDescription": "Try again in a moment."
+    },
+    "confirmDelete": {
+      "titleOne": "Delete {{count}} opportunity?",
+      "titleMany": "Delete {{count}} opportunities?",
+      "description": "This cannot be undone from the UI — the audit log records each delete.",
+      "confirmLabel": "Delete"
+    },
+    "liveRegion": {
+      "matchingOne": "{{count}} opportunity matching \"{{search}}\"",
+      "matchingMany": "{{count}} opportunities matching \"{{search}}\"",
+      "inStageOne": "{{count}} opportunity in selected stage",
+      "inStageMany": "{{count}} opportunities in selected stage",
+      "totalOne": "{{count}} opportunity",
+      "totalMany": "{{count}} opportunities"
+    },
+    "error": {
+      "title": "Couldn't load opportunities",
+      "message": "Try again in a moment."
+    },
+    "empty": {
+      "title": "No opportunities yet",
+      "message": "Create your first opportunity to start tracking bids."
+    },
+    "caption": {
+      "matching": "Opportunities matching \"{{search}}\"",
+      "all": "All opportunities, sorted by most recent activity. Cells are inline-editable."
+    },
+    "pagerLabel": "opportunities"
+  },
+  "leads": {
+    "title": "Leads",
+    "actions": {
+      "exportCsv": "Export CSV",
+      "newLead": "New lead"
+    },
+    "search": {
+      "label": "Search leads",
+      "placeholder": "Search leads..."
+    },
+    "filter": {
+      "status": "Filter leads by status",
+      "priority": "Filter leads by priority"
+    },
+    "statusOption": {
+      "all": "All statuses",
+      "new": "New",
+      "contacted": "Contacted",
+      "qualified": "Qualified",
+      "nurture": "Nurture",
+      "disqualified": "Disqualified",
+      "converted": "Converted"
+    },
+    "priorityOption": {
+      "all": "All priorities",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "critical": "Critical"
+    },
+    "summary": {
+      "label": "Lead list summary"
+    },
+    "stats": {
+      "filtered": {
+        "label": "Filtered leads",
+        "detail": "current view"
+      },
+      "highPriority": {
+        "label": "High priority",
+        "detail": "high or critical"
+      },
+      "pipelineReady": {
+        "label": "Pipeline-ready",
+        "detail": "qualified or converted"
+      },
+      "avgScore": {
+        "label": "Avg score",
+        "detail": "fit score"
+      }
+    },
+    "liveRegion": {
+      "count": "{{count}} lead",
+      "matching": " matching \"{{query}}\""
+    },
+    "error": {
+      "title": "Failed to load leads",
+      "message": "Something went wrong",
+      "retry": "Retry"
+    },
+    "empty": {
+      "title": "No leads yet",
+      "message": "Create your first lead to start tracking prospects."
+    },
+    "table": {
+      "selectAll": "Select all",
+      "deselectAll": "Deselect all",
+      "name": "Name",
+      "company": "Company",
+      "status": "Status",
+      "priority": "Priority",
+      "score": "Score",
+      "source": "Source",
+      "owner": "Owner",
+      "actions": "Actions"
+    },
+    "pager": {
+      "label": "leads"
+    },
+    "csv": {
+      "name": "Name",
+      "company": "Company",
+      "title": "Title",
+      "email": "Email",
+      "status": "Status",
+      "priority": "Priority",
+      "score": "Score",
+      "scoreRange": "Score (0-10000)",
+      "source": "Source",
+      "created": "Created"
+    },
+    "toast": {
+      "nothingToExport": "Nothing to export",
+      "exported": "Exported {{count}} lead",
+      "deleted": "Deleted {{count}} lead",
+      "deleteFailed": "{{count}} deletion failed",
+      "leadDeleted": "Lead deleted",
+      "deleteOneFailed": "Failed to delete lead"
+    },
+    "bulkDelete": {
+      "title": "Delete {{count}} lead?",
+      "description": "This action cannot be undone.",
+      "confirm": "Delete"
+    },
+    "deleteOne": {
+      "title": "Delete lead?",
+      "description": "This will permanently remove {{name}} from your leads.",
+      "confirm": "Delete"
+    }
+  },
+  "tasks": {
+    "title": "Tasks",
+    "subtitle": "{{count}} active follow-ups.",
+    "actions": {
+      "exportCsv": "Export CSV"
+    },
+    "filters": {
+      "groupLabel": "Filter tasks",
+      "all": "All",
+      "today": "Today",
+      "overdue": "Overdue"
+    },
+    "status": {
+      "open": "Open",
+      "in_progress": "In progress",
+      "blocked": "Blocked",
+      "done": "Done"
+    },
+    "view": {
+      "list": "List",
+      "listLabel": "List view",
+      "calendar": "Calendar",
+      "calendarLabel": "Calendar view"
+    },
+    "sort": {
+      "label": "Sort by",
+      "ariaLabel": "Sort tasks",
+      "recent": "Recent",
+      "dueDate": "Due date",
+      "status": "Status"
+    },
+    "error": {
+      "title": "Could not load tasks",
+      "generic": "Something went wrong"
+    },
+    "empty": {
+      "title": "No tasks yet",
+      "filteredTitle": "No tasks match this filter",
+      "message": "Create a follow-up to get started."
+    },
+    "reorder": {
+      "announce": "Moved {{title}} to position {{position}} of {{total}}."
+    },
+    "srCount": "{{count}} task"
+  },
+  "contacts": {
+    "title": "Contacts",
+    "subtitle": "{{count}} people in the decision unit.",
+    "actions": {
+      "importCsv": {
+        "aria": "Import contacts from CSV"
+      },
+      "exportCsv": {
+        "aria": "Export all visible contacts as CSV"
+      },
+      "newContact": {
+        "aria": "Create a new contact"
+      },
+      "delete": "Delete",
+      "undo": "Undo"
+    },
+    "search": {
+      "placeholder": "Search by name, customer, email, role…",
+      "aria": "Search contacts",
+      "clear": {
+        "aria": "Clear search"
+      }
+    },
+    "pager": {
+      "label": "contacts"
+    },
+    "column": {
+      "name": "Name",
+      "role": "Role",
+      "customer": "Customer",
+      "email": "Email",
+      "phone": "Phone",
+      "influence": "Influence",
+      "sentiment": "Sentiment",
+      "createdAt": "Created at"
+    },
+    "bulkDelete": {
+      "confirm": {
+        "title": "Delete {{count}} contacts?",
+        "description": "They will be removed from any linked bids. The audit log records each deletion."
+      }
+    },
+    "delete": {
+      "confirm": {
+        "title": "Delete {{name}}?",
+        "description": "This also removes them from any linked bids. The audit log keeps a record."
+      }
+    },
+    "toast": {
+      "restoredCount": "Restored {{count}} contacts",
+      "deletedCount": "Deleted {{count}} contacts",
+      "deleteFailedCount": {
+        "description": "The successful deletions were committed; try again for the remainder."
+      },
+      "nothingToExport": "Nothing to export",
+      "exportedCount": "Exported {{count}} contacts",
+      "restored": "Restored {{name}}",
+      "couldNotRestore": "Could not restore",
+      "deleted": "Deleted {{name}}",
+      "deleteFailed": "Delete failed",
+      "serverRejected": "The server rejected the request."
+    },
+    "undo": {
+      "deletedCount": "Deleted {{count}} contacts",
+      "deleted": "Deleted {{name}}"
+    },
+    "linkedTitle": "Linked contacts",
+    "countCaption": "{{count}} contacts",
+    "linkAction": "+ Link contact",
+    "selectPlaceholder": "Select a contact…",
+    "cancel": "Cancel",
+    "emptyTitle": "No linked contacts",
+    "emptyMessage": "Link contacts to track who is involved in this deal.",
+    "primaryBadge": "Primary",
+    "noEmail": "no email",
+    "unsetPrimary": "Unset primary",
+    "setPrimary": "Set as primary",
+    "unlinkConfirm": "Unlink {{name}}?",
+    "remove": "Remove"
+  },
+  "accounts": {
+    "title": "Accounts",
+    "error": {
+      "title": "Couldn't load accounts",
+      "message": "The dashboard endpoint did not respond."
+    },
+    "empty": {
+      "title": "No accounts yet",
+      "filtered": "No accounts match your filters"
+    },
+    "summary": {
+      "companyCount_one": "{{count}} company",
+      "companyCount_other": "{{count}} companies",
+      "openDeals": "{{count}} open deals",
+      "weightedPipeline": "{{amount}} weighted pipeline"
+    },
+    "sync": {
+      "result": "{{enriched}} enriched / {{cached}} cached",
+      "buttonTitle": "Sync top ERP sale.order customers into verified BidStack accounts",
+      "inProgress": "Syncing...",
+      "button": "Sync ERP accounts",
+      "errorTitle": "ERP account sync failed",
+      "errorDescription": "The latest ERP customer pull could not complete.",
+      "alertFallback": "The last sync could not pull the top 20 ERP customers.",
+      "retry": "Retry sync"
+    },
+    "actions": {
+      "newAccount": "New account",
+      "retry": "Retry"
+    },
+    "stats": {
+      "regionLabel": "Account source coverage",
+      "accounts": {
+        "label": "Accounts",
+        "detail": "portfolio"
+      },
+      "openDeals": {
+        "label": "Open deals",
+        "detail": "External CRM pipeline"
+      },
+      "weightedPipeline": {
+        "label": "Weighted pipeline",
+        "detail": "bid and presales"
+      },
+      "logoCoverage": {
+        "label": "Logo coverage",
+        "detail": "brand assets"
+      },
+      "enrichedProfiles": {
+        "label": "Enriched profiles",
+        "detail": "verified data cache"
+      },
+      "sourcesHealthy": {
+        "label": "Sources healthy",
+        "detail": "API mesh"
+      }
+    },
+    "filters": {
+      "regionLabel": "Filters",
+      "search": {
+        "label": "Search",
+        "placeholder": "Search by name or domain…"
+      },
+      "industry": {
+        "label": "Industry",
+        "all": "All industries"
+      },
+      "sort": {
+        "label": "Sort",
+        "pipeline": "Sort: pipeline value",
+        "name": "Sort: name",
+        "health": "Sort: health",
+        "industry": "Sort: industry"
+      }
+    },
+    "liveRegion": {
+      "count_one": "{{count}} account",
+      "count_other": "{{count}} accounts",
+      "matching_one": "{{count}} account matching \"{{query}}\"",
+      "matching_other": "{{count}} accounts matching \"{{query}}\""
+    },
+    "grid": {
+      "regionLabel": "Account cards"
+    }
+  },
+  "publicSign": {
+    "announceWelcome": "Step 1: Review document",
+    "announceSign": "Step 2: Sign",
+    "announceSubmit": "Step 3: Review and submit",
+    "announceConfirm": "Signature submitted successfully",
+    "errorDrawOrType": "Please draw or type your signature before continuing.",
+    "errorTypeName": "Please type your name to create a signature.",
+    "errorAcceptTerms": "You must accept the terms to proceed.",
+    "errorSignatureMissing": "Signature is missing. Please go back and sign again.",
+    "signerFallback": "Signer",
+    "errorSubmitFailed": "Submission failed. Please try again.",
+    "skipToMain": "Skip to main content",
+    "brandSecureSignature": "Secure Signature",
+    "mainAriaLabel": "Document signing",
+    "footerLegalNote": "Your signature is legally binding. This page contains no tracking technologies.",
+    "stepReview": "Review",
+    "stepSign": "Sign",
+    "stepSubmit": "Submit",
+    "stepDone": "Done",
+    "progressAriaLabel": "Progress",
+    "welcomeHeading": "You have a document to sign",
+    "welcomeRequestedOn": "has requested your signature on",
+    "expiresLabel": "Expires:",
+    "documentPreviewLabel": "Document preview",
+    "documentIframeTitle": "Document to sign",
+    "documentPreviewUnavailable": "Document preview not available — you will sign below.",
+    "reviewAndSignButton": "Review and sign",
+    "signHeading": "Add your signature",
+    "signSubtitle": "Draw your signature or type your name.",
+    "signatureModeAriaLabel": "Signature mode",
+    "modeDraw": "Draw",
+    "modeTypeName": "Type name",
+    "fullNameLabel": "Full name",
+    "fullNamePlaceholder": "Your full name",
+    "signaturePreviewAriaLabel": "Signature preview: {{name}}",
+    "back": "Back",
+    "continue": "Continue",
+    "submitHeading": "Review and submit",
+    "submitLegalIntro": "By submitting, you legally sign",
+    "termsAgreement": "I agree that this electronic signature is legally binding and represents my intent to sign this document. I have had the opportunity to review its contents.",
+    "submitting": "Submitting…",
+    "submitSignatureButton": "Submit signature",
+    "confirmHeading": "Signature submitted",
+    "confirmNotified": "{{senderName}} has been notified. A copy of the signed document will be sent to your email address.",
+    "downloadSignedCopy": "Download signed copy",
+    "printedLabel": "Printed:",
+    "loadingAriaLabel": "Loading document",
+    "errorLinkInvalidShort": "This signing link is invalid or has expired.",
+    "errorLinkExpiredDetail": "This signing link has expired. Please contact the sender to resend the request.",
+    "errorLinkInvalidDetail": "This signing link is invalid or has expired. Please contact the sender to resend the request.",
+    "errorLinkExpiredTitle": "Link expired",
+    "errorLinkInvalidTitle": "Invalid signing link"
+  },
+  "worldMap": {
+    "preset": {
+      "global": "Global",
+      "northAmerica": "N. America",
+      "europe": "Europe",
+      "asiaPacific": "Asia Pac",
+      "latinAmerica": "L. America",
+      "middleEastAfrica": "ME & Africa"
+    },
+    "zoomIn": "Zoom In",
+    "zoomOut": "Zoom Out",
+    "resetView": "Reset View",
+    "legend": {
+      "pipeline": "Pipeline"
+    },
+    "tooltip": {
+      "opportunityCount": "{{count}} opps",
+      "opportunityCount_one": "{{count}} opp",
+      "avgProbability": "Avg probability {{probability}}%"
+    }
+  },
+  "territoryPanels": {
+    "countryDetailTitleWithCode": "{{countryCode}} Detail",
+    "countryDetailTitle": "Country Detail",
+    "clickCountryHint": "Click a country on the map",
+    "clear": "Clear",
+    "opportunities": "Opportunities",
+    "pipeline": "Pipeline",
+    "globalPipelineShare": "Global Pipeline Share",
+    "assignedTerritories": "Assigned Territories",
+    "noTerritoriesAssigned": "No territories assigned",
+    "accountOwners": "Account Owners",
+    "noActiveOwners": "No active owners",
+    "noCountrySelected": "No Country Selected",
+    "noCountrySelectedHint": "Click any active territory on the interactive map above to load metrics.",
+    "territories": "Territories",
+    "countTotal": "{{count}} total",
+    "failedToLoad": "Failed to load",
+    "retry": "Retry",
+    "noTerritories": "No territories",
+    "noTerritoriesHint": "Create your first territory to get started.",
+    "active": "Active",
+    "inactive": "Inactive",
+    "global": "Global",
+    "countryCountSummary": "{{count}} countries ({{preview}})",
+    "allCountries": "All Countries",
+    "unassigned": "Unassigned",
+    "edit": "Edit",
+    "delete": "Delete",
+    "leadRoutingRules": "Lead Routing Rules",
+    "noRoutingRules": "No routing rules",
+    "noRoutingRulesHint": "Create your first rule to auto-assign leads.",
+    "assignUser": "User",
+    "assignTerritory": "Territory",
+    "assignRoundRobin": "Round Robin ({{count}})",
+    "assignNone": "None",
+    "priority": "Priority {{priority}}"
+  },
+  "agentStudio": {
+    "eyebrow": "Bids & RFP",
+    "title": "Agent Studio",
+    "subtitle": "Role-based AI agents that answer each step of an RFP.",
+    "subtitleAdmin": "Author them here.",
+    "subtitleMember": "Run a crew and review the result.",
+    "loading": "Loading…",
+    "loadStandardAgents": "Load standard agents",
+    "toastStandardLoaded": "Standard agents + RFP crew loaded",
+    "toastStandardLoadError": "Could not load the standard agents",
+    "agentsHeading": "Agents",
+    "cancel": "Cancel",
+    "newAgent": "New agent",
+    "agentsLoadErrorTitle": "Couldn’t load agents",
+    "pleaseRetry": "Please retry.",
+    "retry": "Retry",
+    "agentsEmptyTitle": "No agents yet",
+    "agentsEmptyAdmin": "Load the standard legal / finance / marketing / sales agents to get started, or create your own.",
+    "agentsEmptyMember": "An admin hasn’t set up any agents yet.",
+    "badgeStandard": "STANDARD",
+    "badgeCustom": "CUSTOM",
+    "deleteAgentConfirmTitle": "Delete {{role}}?",
+    "deleteAgentConfirmDescription": "This removes the agent from every crew that uses it. This cannot be undone.",
+    "delete": "Delete",
+    "deleteAgentAriaLabel": "Delete {{role}}",
+    "toastAgentDeleted": "Agent deleted",
+    "toastAgentDeleteError": "Could not delete the agent",
+    "agentKeyPlaceholder": "Key (e.g. security_lead)",
+    "agentKeyAriaLabel": "Agent key",
+    "rolePlaceholder": "Role (e.g. Security Lead)",
+    "roleAriaLabel": "Role",
+    "goalPlaceholder": "Goal — what this agent is responsible for",
+    "goalAriaLabel": "Goal",
+    "backstoryPlaceholder": "Backstory — the expertise + voice that shapes its answers",
+    "backstoryAriaLabel": "Backstory",
+    "createAgentError": "Failed to create agent.",
+    "creating": "Creating…",
+    "createAgent": "Create agent",
+    "crewsHeading": "Crews",
+    "crewsSubtitle": "A crew runs its agents over your RFP, step by step.",
+    "crewsLoadErrorTitle": "Couldn’t load crews",
+    "crewsEmptyTitle": "No crews yet",
+    "crewsEmptyMessage": "Once agents exist, an admin can assemble them into a crew. The standard set ships with a ready-to-run RFP Response Crew.",
+    "stepCount": "{{count}} step",
+    "close": "Close",
+    "run": "Run",
+    "rfpPlaceholder": "Paste the RFP text here…",
+    "rfpAriaLabel": "RFP text",
+    "starting": "Starting…",
+    "runCrew": "Run crew",
+    "runStartError": "Failed to start the run.",
+    "toastRunStartError": "Could not start the run",
+    "statusLabel": "Status:",
+    "runAnother": "Run another",
+    "runStatusError": "Couldn’t load the run status — reconnecting…",
+    "runFailed": "The run failed.",
+    "fallback": "fallback",
+    "finalResponsePartial": "Final response (some steps used a fallback)",
+    "finalResponse": "Final response"
+  },
+  "contractAgreements": {
+    "regionLabel": "Contractual agreements",
+    "title": "Contractual agreements",
+    "caption": "MSAs & framework agreements, coverage, rebates, and rate-review schedule",
+    "loadErrorTitle": "Could not load contractual agreements",
+    "tryAgainShortly": "Try again shortly.",
+    "empty": "No MSAs or framework agreements recorded for this account yet.",
+    "noCountriesSet": "No countries set",
+    "rebateSuffix": " · rebate {{pct}}%",
+    "rateReviewSuffix": " · rate review {{schedule}}",
+    "nextReviewSuffix": " (next {{date}})",
+    "expiresSuffix": " · expires {{date}}",
+    "viewDocument": "View document",
+    "tableRole": "Role",
+    "tableRate": "Rate",
+    "toastExtractApplied": "Extracted fields applied — review before saving",
+    "toastMissingReferenceTitle": "Missing reference",
+    "toastMissingReferenceDesc": "A contract reference is required.",
+    "toastAgreementRecorded": "Agreement recorded",
+    "toastCouldNotSave": "Could not save",
+    "addAgreement": "Add agreement",
+    "fieldAgreementType": "Agreement type",
+    "placeholderReference": "Reference (e.g. MSA-2026-001)",
+    "fieldReference": "Contract reference",
+    "placeholderCountries": "Countries (FR, DE, ES)",
+    "fieldCountries": "Countries covered",
+    "placeholderRebate": "Global rebate %",
+    "fieldRebate": "Global rebate percent",
+    "fieldRateReviewSchedule": "Rate review schedule",
+    "scheduleAnnual": "Annual rate review",
+    "scheduleBiannual": "Biannual rate review",
+    "scheduleQuarterly": "Quarterly rate review",
+    "scheduleAdhoc": "Ad-hoc rate review",
+    "fieldExpiryDate": "Expiry date",
+    "placeholderCurrency": "Currency (EUR)",
+    "fieldCurrency": "Currency",
+    "sourceDocument": "Source document",
+    "removeAttachedDocument": "Remove attached document",
+    "remove": "remove",
+    "toastExtractStartFailed": "Could not start extraction",
+    "starting": "Starting…",
+    "extractFields": "Extract fields from document",
+    "applyExtractedFields": "Apply extracted fields (review before saving)",
+    "extractionFailedWithReason": "Extraction failed: {{reason}}. Enter fields manually.",
+    "extractionFailed": "Extraction failed. Enter fields manually.",
+    "extracting": "Extracting… (OCR + parsing)",
+    "uploading": "Uploading…",
+    "attachDocument": "Attach MSA / rate-card document (PDF, image)",
+    "toastUploadFailed": "Upload failed",
+    "rateCard": "Rate card",
+    "placeholderRoleProfile": "Role / profile",
+    "rateLineRole": "Rate line {{n}} role",
+    "placeholderRate": "Rate",
+    "rateLineRate": "Rate line {{n}} rate",
+    "rateLineUnit": "Rate line {{n}} unit",
+    "removeRateLine": "Remove rate line {{n}}",
+    "addRateLine": "+ Add rate line",
+    "saving": "Saving…",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "calls": {
+    "heading": "Calls",
+    "count": {
+      "one": "{{count}} call",
+      "other": "{{count}} calls"
+    },
+    "error": {
+      "title": "Failed to load calls",
+      "fallback": "Something went wrong"
+    },
+    "empty": {
+      "title": "No calls found",
+      "message": "Try adjusting your filters, or start a call from a Contact or Deal page."
+    },
+    "loadMore": {
+      "loading": "Loading…",
+      "label": "Load more"
+    },
+    "filter": {
+      "groupAria": "Filter calls",
+      "entityAria": "Filter by entity type",
+      "providerAria": "Filter by provider",
+      "statusAria": "Filter by status",
+      "dateAria": "Filter by date range",
+      "entity": {
+        "all": "All types",
+        "deal": "Deal",
+        "contact": "Contact",
+        "opportunity": "Opportunity",
+        "lead": "Lead"
+      },
+      "provider": {
+        "all": "All providers",
+        "zoom": "Zoom",
+        "teams": "Teams",
+        "googleMeet": "Google Meet",
+        "twilioVoice": "Twilio Voice"
+      },
+      "status": {
+        "all": "All statuses",
+        "scheduled": "Scheduled",
+        "live": "Live",
+        "completed": "Completed",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
+      },
+      "date": {
+        "all": "All time",
+        "week": "This week",
+        "month": "This month"
+      }
+    },
+    "table": {
+      "aria": "Calls list",
+      "provider": "Provider",
+      "entity": "Entity",
+      "scheduled": "Scheduled",
+      "duration": "Duration",
+      "sentiment": "Sentiment",
+      "status": "Status"
+    },
+    "row": {
+      "aria": "{{icon}} {{provider}} call — {{status}}"
+    },
+    "detail": {
+      "title": "Call detail",
+      "recordingAria": "Call recording"
+    }
+  },
+  "customObjectsAdmin": {
+    "title": "Custom Objects",
+    "subtitle": "Define new entity types for your organisation — Projects, Vendors, Assets, and more.",
+    "newObjectButton": "New Object",
+    "loadingLabel": "Loading custom objects",
+    "errorLoad": "Failed to load custom objects. Please refresh.",
+    "emptyTitle": "No custom objects yet",
+    "emptyDescription": "Click \"New Object\" to define your first custom entity type.",
+    "recordCount": "{{count}} records",
+    "deleteItemLabel": "Delete {{label}}",
+    "modalTitle": "New Custom Object",
+    "fieldSingularLabel": "Singular label",
+    "fieldSingularPlaceholder": "e.g. Project",
+    "fieldPluralLabel": "Plural label",
+    "fieldPluralPlaceholder": "e.g. Projects",
+    "fieldKeyLabel": "API key",
+    "fieldKeyAuto": "(auto)",
+    "fieldKeyPlaceholder": "e.g. project",
+    "fieldKeyHint": "Lowercase letters, digits, _ or - only. Immutable after creation.",
+    "fieldDescriptionLabel": "Description",
+    "fieldColorLegend": "Color",
+    "selectColorLabel": "Select color {{color}}",
+    "cancelButton": "Cancel",
+    "creatingButton": "Creating…",
+    "createButton": "Create",
+    "errorRequiredFields": "Key, singular label, and plural label are required.",
+    "errorKeyFormat": "Key must start with a letter and contain only lowercase letters, digits, _ or -",
+    "toastCreated": "Custom object created",
+    "errorCreateFailed": "Failed to create",
+    "deleteConfirmTitle": "Delete Custom Object?",
+    "deleteConfirmDescription": "This will permanently delete the object definition and all records belonging to it. This action cannot be undone.",
+    "deleteConfirmLabel": "Delete",
+    "toastDeleteFailedTitle": "Delete failed"
+  },
+  "smsComposer": {
+    "title": "Send SMS",
+    "recipientLabel": "To: {{name}}",
+    "optedOutLabel": "Opted out:",
+    "optedOutMessage": "This number has requested to stop receiving SMS. Sending is blocked (TCPA compliance).",
+    "phoneLabel": "To (E.164 format)",
+    "phoneFormatHint": "Use E.164 format: +12025550100",
+    "messageLabel": "Message",
+    "charCountMultipart": "{{chars}} chars · {{segments}} segments ({{remaining}} left in segment)",
+    "charCountSingle": "{{count}}/{{limit}}",
+    "messagePlaceholder": "Type your message…",
+    "segmentPreview": "This message will be sent as {{count}} segments (billed per segment by Twilio).",
+    "successMessage": "SMS sent successfully!",
+    "cancel": "Cancel",
+    "checking": "Checking…",
+    "sending": "Sending…",
+    "sent": "Sent!",
+    "send": "Send SMS",
+    "errorInvalidE164": "Phone number must be in E.164 format (e.g. +12025550100)",
+    "errorEmptyBody": "Message body cannot be empty",
+    "errorOptedOut": "This number has opted out of SMS. Cannot send.",
+    "errorSendFailed": "Failed to send SMS. Please try again."
+  },
+  "contactTable": {
+    "announceFiltered": "Showing {{count}} of {{total}} contacts matching {{search}}.",
+    "announceTotal": "Showing {{count}} contacts.",
+    "errorTitle": "Could not load contacts",
+    "tryAgain": "Try again",
+    "emptyFilteredTitle": "No matches",
+    "emptyTitle": "No contacts yet",
+    "emptyFilteredMessage": "Nothing matched \"{{search}}\".",
+    "emptyMessage": "Add the first decision-maker to start mapping the buying group.",
+    "clearSearch": "Clear search",
+    "addFirstContact": "Add first contact",
+    "deselectAll": "Deselect all contacts",
+    "selectAll": "Select all contacts",
+    "colName": "Name",
+    "colRole": "Role",
+    "colCustomer": "Customer",
+    "colContact": "Contact",
+    "colInfluence": "Influence",
+    "colSentiment": "Sentiment",
+    "colActions": "Actions",
+    "deselectRow": "Deselect {{name}}",
+    "selectRow": "Select {{name}}",
+    "editRoleLabel": "Edit role for {{name}}",
+    "addRolePlaceholder": "Add role…",
+    "editInfluenceLabel": "Edit influence for {{name}}",
+    "editSentimentLabel": "Edit sentiment for {{name}}",
+    "editRowLabel": "Edit {{name}}",
+    "editAction": "Edit",
+    "deleteRowLabel": "Delete {{name}}",
+    "deleteAction": "Delete"
+  },
+  "companies": {
+    "title": "Companies",
+    "subtitleOne": "{{count}} company visible.",
+    "subtitleMany": "{{count}} companies visible.",
+    "newCompany": "New company",
+    "summaryAriaLabel": "Company list summary",
+    "stats": {
+      "visibleLabel": "Visible companies",
+      "visibleDetail": "current view",
+      "domainLabel": "Domain coverage",
+      "domainDetail": "ready for data verification",
+      "industriesLabel": "Industries",
+      "industriesDetail": "classified profiles",
+      "countriesLabel": "Countries",
+      "countriesDetail": "market coverage"
+    },
+    "searchPlaceholder": "Search by name or domain…",
+    "searchAriaLabel": "Search companies",
+    "resultsCountOne": "{{count}} result for \"{{term}}\"",
+    "resultsCountMany": "{{count}} results for \"{{term}}\"",
+    "showingLatest": "Showing latest 50 companies",
+    "clear": "Clear",
+    "error": {
+      "title": "Failed to load companies",
+      "fallback": "Something went wrong"
+    },
+    "empty": {
+      "searchTitle": "No companies match your search",
+      "title": "No companies found",
+      "searchMessage": "Nothing matched \"{{term}}\". Try a company name or domain.",
+      "message": "Create the first company to start building your account list.",
+      "clearSearch": "Clear search",
+      "addCompany": "Add company"
+    },
+    "toast": {
+      "nothingToExport": "Nothing to export",
+      "exportedOne": "Exported {{count}} company",
+      "exportedMany": "Exported {{count}} companies",
+      "deletedOne": "Deleted {{count}} company",
+      "deletedMany": "Deleted {{count}} companies",
+      "deleteFailedOne": "{{count}} deletion failed",
+      "deleteFailedMany": "{{count}} deletions failed"
+    },
+    "confirmDelete": {
+      "titleOne": "Delete {{count}} company?",
+      "titleMany": "Delete {{count}} companies?",
+      "description": "This action cannot be undone.",
+      "confirmLabel": "Delete"
+    },
+    "table": {
+      "selectAll": "Select all",
+      "deselectAll": "Deselect all",
+      "company": "Company",
+      "domain": "Domain",
+      "industry": "Industry",
+      "employees": "Employees",
+      "country": "Country",
+      "actions": "Actions"
+    }
+  },
+  "opportunityTabs": {
+    "sectionsAriaLabel": "Opportunity sections",
+    "tabDecisionUnit": "Decision unit",
+    "tabContacts": "Contacts",
+    "tabTasks": "Tasks",
+    "tabDocuments": "Documents",
+    "tabCalls": "Calls",
+    "tabActivity": "Activity",
+    "decisionUnitErrorTitle": "Couldn't load decision-unit contacts",
+    "errorMessage": "Please try again.",
+    "retry": "Retry",
+    "decisionUnitEmptyTitle": "No decision-unit members yet",
+    "decisionUnitEmptyMessage": "Add a contact from the Contacts page or sync from Dust.",
+    "decisionUnitTitle": "Decision unit",
+    "stakeholdersCount": "{{count}} stakeholders",
+    "dustBadge": "Dust",
+    "influenceAriaLabel": "Influence {{value}} out of 5",
+    "tasksEmptyTitle": "No tasks yet",
+    "tasksEmptyMessage": "Create a follow-up to keep this bid moving.",
+    "tasksTitle": "Tasks",
+    "tasksActiveCount": "{{count}} active",
+    "taskDue": "Due {{date}}",
+    "callsErrorTitle": "Couldn't load calls",
+    "callsEmptyTitle": "No calls yet",
+    "callsEmptyMessage": "Scheduled and completed calls for this opportunity show up here.",
+    "callsTitle": "Calls",
+    "callsCount": "{{count}} call",
+    "callScheduledAt": "Scheduled {{date}}",
+    "callDurationMinutes": "{{count}} min",
+    "documentsEmptyTitle": "No documents attached",
+    "documentsEmptyMessage": "Upload an RFP, SoW, or proposal draft.",
+    "documentsTitle": "Documents",
+    "documentsCount": "{{count}} files",
+    "documentUnknownSize": "unknown size",
+    "activityEmptyTitle": "No activity yet",
+    "activityEmptyMessage": "Stage moves, Dust webhooks, and notes will appear here.",
+    "activityTitle": "Activity"
+  },
+  "callTimeline": {
+    "sentimentPositive": "Positive",
+    "sentimentNeutral": "Neutral",
+    "sentimentNegative": "Negative",
+    "sentimentScoreTitle": "Sentiment score: {{pct}}%",
+    "noActionItems": "No action items.",
+    "actionItemsAriaLabel": "Action items",
+    "markItemComplete": "Mark \"{{item}}\" as complete",
+    "loadError": "Failed to load call details.",
+    "recordingSectionAriaLabel": "Call recording",
+    "recordingLabel": "Recording",
+    "recordingAudioAriaLabel": "Call recording audio",
+    "summarySectionAriaLabel": "Call summary",
+    "summaryLabel": "AI Summary",
+    "actionItemsSectionAriaLabel": "Action items from this call",
+    "actionItemsLabel": "Action Items",
+    "viewTranscript": "View transcript",
+    "analysing": "Analysing…",
+    "reExtractInsights": "Re-extract insights",
+    "cardAriaLabel": "{{provider}} call — {{status}}",
+    "emptyState": "No calls recorded yet.",
+    "historyAriaLabel": "Call history",
+    "loadingMore": "Loading…",
+    "loadMore": "Load more calls"
+  },
+  "smartCompany": {
+    "source": {
+      "domainSignal": "Domain signal",
+      "logoPreview": "Logo preview",
+      "openDataReady": "Open data ready",
+      "nameSignal": "Name signal"
+    },
+    "autofill": {
+      "legalProfile": "Legal profile",
+      "domain": "Domain",
+      "website": "Website",
+      "logo": "Logo",
+      "sourceReceipts": "Source receipts",
+      "value": {
+        "verified": "verified",
+        "queued": "queued",
+        "waiting": "waiting",
+        "needed": "needed",
+        "ready": "ready",
+        "preview": "preview",
+        "fallback": "fallback",
+        "live": "{{count}} live"
+      },
+      "mapLabel": "Autofill readiness map"
+    },
+    "error": {
+      "nameRequired": "Add a company name or domain first."
+    },
+    "trigger": {
+      "newAccount": "New account"
+    },
+    "dialog": {
+      "title": "Add company",
+      "description": "Prefill the account from verified sources, logo providers, and the verified data cache."
+    },
+    "preview": {
+      "companyFallback": "Company",
+      "namePlaceholder": "Company preview",
+      "domainPrompt": "Add a domain for logo and registry matching",
+      "confidence": "Confidence"
+    },
+    "field": {
+      "companyOrDomain": "Company or domain",
+      "companyOrDomainPlaceholder": "Mantu or mantu.com",
+      "domain": "Domain",
+      "domainPlaceholder": "company.com",
+      "website": "Website",
+      "websitePlaceholder": "https://company.com/"
+    },
+    "intel": {
+      "existingAccount": "Existing account",
+      "newData": "New data",
+      "resolving": "Resolving profile..."
+    },
+    "alternatives": {
+      "select": "Select {{name}}"
+    },
+    "action": {
+      "cancel": "Cancel",
+      "openCockpit": "Open cockpit",
+      "enriching": "Enriching...",
+      "createEnriched": "Create enriched account"
+    }
+  },
+  "leadDetail": {
+    "toastSaved": "Saved",
+    "toastSaveFailed": "Save failed",
+    "errorTitle": "Couldn't load lead",
+    "errorMessage": "The lead may have been deleted.",
+    "notFoundTitle": "Lead not found",
+    "notFoundMessage": "The lead may have been deleted or you may not have access to it.",
+    "goBack": "Go back",
+    "toastStatusUpdated": "Status updated",
+    "toastPriorityUpdated": "Priority updated",
+    "toastConverted": "Lead converted successfully",
+    "toastConvertFailed": "Failed to convert lead",
+    "deleteConfirmTitle": "Delete lead?",
+    "deleteConfirmDescription": "This will permanently remove {{firstName}} {{lastName}} from your leads.",
+    "deleteConfirmLabel": "Delete",
+    "toastDeleted": "Lead deleted",
+    "breadcrumbAriaLabel": "Breadcrumb",
+    "breadcrumbLeads": "Leads",
+    "convertAction": "Convert to opportunity",
+    "convertUnavailable": "Convert lead unavailable",
+    "deleteAction": "Delete",
+    "convertedBannerPrefix": "This lead was converted to",
+    "convertedBannerLink": "converted opportunity",
+    "statusScoringHeading": "Status & scoring",
+    "labelStatus": "Status",
+    "labelPriority": "Priority",
+    "labelScore": "Score",
+    "labelSource": "Source",
+    "bantHeading": "BANT qualification",
+    "labelBudget": "Budget",
+    "placeholderBudget": "e.g. €500K",
+    "labelAuthority": "Authority",
+    "placeholderAuthority": "Decision maker",
+    "labelNeed": "Need",
+    "placeholderNeed": "What problem are they trying to solve?",
+    "labelTimeline": "Timeline",
+    "placeholderTimeline": "e.g. Q2 2026",
+    "labelNotes": "Notes",
+    "placeholderNotes": "Add notes about this lead…",
+    "metaCreated": "Created {{date}}",
+    "metaUpdated": "Updated {{date}}",
+    "metaOwner": "Owner: {{name}}",
+    "liveCollaboration": "Live collaboration"
+  },
+  "dashboard": {
+    "srHeading": "Dashboard",
+    "cockpitErrorTitle": "Couldn't load the account cockpit",
+    "cockpitErrorMessage": "The dashboard endpoint did not respond.",
+    "retry": "Retry",
+    "backToAccounts": "Back to accounts",
+    "liveRefreshFailed": "Warning: Live refresh failed, showing the last verified snapshot.",
+    "portfolioIntelTitle": "Portfolio sales intelligence",
+    "portfolioIntelSubtitle": "Pipeline, risks, contacts, and records for this account.",
+    "accountCockpitAria": "Account cockpit",
+    "cockpitDetailsAria": "Cockpit details"
+  },
+  "leadKanban": {
+    "moveSuccess": "Moved to {{status}}",
+    "moveError": "Could not move lead",
+    "boardAriaLabel": "Lead pipeline kanban",
+    "column": {
+      "new": "New",
+      "contacted": "Contacted",
+      "qualified": "Qualified",
+      "nurture": "Nurture",
+      "disqualified": "Disqualified",
+      "converted": "Converted"
+    },
+    "columnAriaLabel": "{{label}} column with {{count}} leads",
+    "emptyColumn": "No leads",
+    "columnLeadsAriaLabel": "{{label}} leads",
+    "cardAriaLabel": "{{firstName}} {{lastName}}, {{company}}, in {{status}}. Use the left and right arrow keys to move between columns.",
+    "daysInStage": "{{count}}d in stage",
+    "rotBadgeAriaLabel": "Rotting: {{count}} days past threshold. Open recovery plays.",
+    "rotBadgeLabel": "Rot · +{{count}}d",
+    "recoveryMenuAriaLabel": "Suggested recovery plays",
+    "recoveryHeading": "Suggested recovery",
+    "recoveryLoading": "Thinking…",
+    "recoveryEmpty": "No suggestions.",
+    "play": {
+      "sendReengagementEmail": "Send re-engagement email",
+      "scheduleCall": "Schedule a call",
+      "addToNurture": "Add to nurture cadence",
+      "markLost": "Mark as lost"
+    }
+  },
+  "csvImport": {
+    "error": {
+      "noDataRows": "That file has no data rows.",
+      "tooManyRows": "That file has {{count}} rows — the limit is {{limit}}.",
+      "unreadable": "Could not read that file. Make sure it is a UTF-8 CSV."
+    },
+    "upload": {
+      "entityLabel": "What are you importing?",
+      "chooseFile": "Choose a CSV file",
+      "maxRows": "Up to {{rows}} rows"
+    },
+    "map": {
+      "summary": "{{rows}} rows. Match each column to a field, or leave it as Don’t import.",
+      "colCsvColumn": "CSV column",
+      "colSample": "Sample",
+      "colMapsTo": "Maps to",
+      "mapColumnAria": "Map column {{header}}",
+      "dontImport": "Don’t import",
+      "dedupLabel": "If a record already exists",
+      "dedupUpdate": "Update it with the new values",
+      "dedupSkip": "Skip the row",
+      "dedupDuplicate": "Always create a new record",
+      "requiredMissing": "Map a column to: {{fields}}.",
+      "startError": "Could not start the import. Check your mappings and try again.",
+      "startOver": "Start over",
+      "starting": "Starting…",
+      "importRows": "Import {{rows}} rows"
+    },
+    "stepHeader": {
+      "upload": "Upload",
+      "map": "Map columns",
+      "run": "Import"
+    },
+    "progress": {
+      "starting": "Starting import…",
+      "statusComplete": "Import complete",
+      "statusImporting": "Importing…",
+      "statusCancelled": "Import cancelled",
+      "statusFailed": "Import failed",
+      "errorRows": "{{formattedCount}} rows could not be imported.",
+      "downloadErrors": "Download error report (CSV)",
+      "importAnother": "Import another file"
+    }
+  },
+  "territories": {
+    "pageTitle": "Territories",
+    "pageSubtitle": "Global opportunity footprint, territory coverage, and lead routing.",
+    "totalsBadge": "{{opportunities}} opps across {{countries}} countries",
+    "newRuleButton": "New rule",
+    "newTerritoryButton": "New territory",
+    "kpiTotalPipeline": "Total Pipeline",
+    "kpiCountriesActive": "Countries Active",
+    "kpiOpportunities": "Opportunities",
+    "kpiAvgProbability": "Avg Probability",
+    "sectionTitleRegion": "Global Opportunity Map",
+    "sectionTitleIndustry": "Opportunities by Industry",
+    "sectionTitleAccount": "Opportunities by Account",
+    "sectionCaptionRegion": "Heat intensity = total pipeline value. Click a country for details.",
+    "sectionCaptionSegment": "Ranked by total pipeline value across all opportunities.",
+    "breakdownTablistLabel": "Breakdown dimension",
+    "tabRegion": "Region",
+    "tabIndustry": "Industry",
+    "tabAccount": "Account",
+    "mapErrorTitle": "Failed to load map data",
+    "retryButton": "Retry",
+    "mapEmptyTitle": "No geographic data",
+    "mapEmptyMessage": "Opportunities need a country or territory assignment to appear on the map.",
+    "deleteTerritoryConfirmTitle": "Delete \"{{name}}\"?",
+    "deleteTerritoryConfirmDescription": "This territory will be deactivated.",
+    "deleteRuleConfirmTitle": "Delete \"{{name}}\"?",
+    "deleteRuleConfirmDescription": "This routing rule will be deactivated."
+  },
+  "pipeline": {
+    "heading": "Open pipeline",
+    "subtitle": "Drag a card between columns, or focus a card and use ← / → to move stages.",
+    "stageFilterLabel": "Stage",
+    "stageFilterAriaLabel": "Filter pipeline by stage",
+    "stageFilterAllOption": "All",
+    "updatingIndicator": "Updating…",
+    "liveRegionCountOne": "{{count}} opportunity",
+    "liveRegionCountOther": "{{count}} opportunities",
+    "kpiTotalPipeline": "Total pipeline",
+    "kpiOpenValue": "Open value",
+    "kpiWinRate": "Win rate",
+    "winRateNoClosedBids": "No closed bids",
+    "kpiActiveDeals": "Active deals",
+    "errorTitle": "Could not load pipeline",
+    "errorMessage": "Please try again.",
+    "errorReloadButton": "Reload",
+    "emptyTitle": "No opportunities yet",
+    "emptyMessage": "Create an opportunity to start building your pipeline.",
+    "emptyGoToOpportunitiesButton": "Go to Opportunities",
+    "movedToStageToast": "Moved to {{stage}}",
+    "movedOpportunityToast": "Moved \"{{name}}\" to {{stage}}",
+    "moveErrorToastTitle": "Could not move opportunity",
+    "moveErrorToastDescription": "The server rejected the request.",
+    "openOpportunitiesLabel": "Open opportunities",
+    "openCount_one": "{{count}} open opportunity",
+    "openCount_other": "{{count}} open opportunities",
+    "emptyStageValue": "No stage value yet",
+    "chartAriaLabel": "Pipeline stage value distribution"
+  },
+  "auditLogTable": {
+    "evidenceStreamTitle": "Evidence stream",
+    "evidenceStreamSummary": "Showing {{count}} filtered events from {{total}} loaded records.",
+    "newer": "Newer",
+    "page": "Page {{page}}",
+    "older": "Older",
+    "emptyTitle": "No matching evidence",
+    "emptyDescription": "Adjust the category, record type or search terms to widen the audit trail.",
+    "tableRegionLabel": "Audit evidence table",
+    "tableCaption": "Audit log entries, newest first",
+    "columnEvent": "Event",
+    "columnActor": "Actor",
+    "columnTarget": "Target",
+    "columnTime": "Time",
+    "columnDetails": "Details",
+    "riskBadge": "Risk {{risk}}",
+    "moreFields": "+{{count}} more",
+    "systemGenerated": "System generated",
+    "targetTypeSystem": "system",
+    "targetIdLabel": "Target id {{id}}",
+    "noRecordReference": "No record reference",
+    "open": "Open",
+    "copyId": "Copy ID",
+    "hide": "Hide",
+    "inspect": "Inspect",
+    "hideDiffLabel": "Hide diff payload for {{action}} by {{actor}}",
+    "inspectDiffLabel": "Inspect diff payload for {{action}} by {{actor}}",
+    "diffPayloadLabel": "Diff payload for {{action}}",
+    "changeSummary": "Change summary",
+    "noStructuredDiff": "No structured diff was captured for this event. Use the raw payload when forensic detail is required.",
+    "rawPayloadTitle": "Raw evidence payload",
+    "copyJson": "Copy JSON",
+    "immutable": "Immutable"
+  },
+  "taskRow": {
+    "toast": {
+      "markedDone": "Marked \"{{title}}\" done",
+      "updateFailedTitle": "Could not update task",
+      "serverRejected": "The server rejected the request.",
+      "snoozed": "Snoozed \"{{title}}\" to {{label}}",
+      "snoozeFailedTitle": "Snooze failed"
+    },
+    "snooze": {
+      "tomorrow": "Tomorrow",
+      "inThreeDays": "In 3 days",
+      "nextWeek": "Next week",
+      "button": "Snooze…",
+      "presets": "Snooze presets"
+    },
+    "reorderTask": "Reorder task",
+    "dragToReorder": "Drag to reorder",
+    "moveUp": "Move {{title}} up",
+    "up": "Up",
+    "moveDown": "Move {{title}} down",
+    "down": "Down",
+    "due": "Due {{date}}",
+    "warning": "warning",
+    "overdue": "Overdue: {{count}}d late",
+    "dueIn": "in {{count}}d",
+    "snoozeTask": "Snooze {{title}}",
+    "statusAction": "Status: {{status}}. Activate to change to {{next}}.",
+    "statusTitle": "Activate to change status to {{next}}"
+  },
+  "collaborativeRichTextEditor": {
+    "editingAnnouncementOne": "{{names}} is editing",
+    "editingAnnouncementOther": "{{names}} are editing",
+    "loading": "Loading…",
+    "statusLive": "Live",
+    "statusConnecting": "Connecting…",
+    "statusOffline": "Offline",
+    "statusError": "Error"
+  },
+  "notes": {
+    "panelTitle": "Notes",
+    "addButton": "+ Add",
+    "noAccountTitle": "Select an account to view notes",
+    "noAccountMessage": "Notes are attached to a customer account.",
+    "loadErrorTitle": "Couldn't load notes",
+    "unknownError": "Unknown error",
+    "emptyTitle": "No notes yet",
+    "emptyMessage": "Capture a meeting summary or context.",
+    "deleteConfirmTitle": "Delete this note?",
+    "deleteConfirmDescription": "The note will be removed from this account. The audit log keeps a record of the deletion.",
+    "deleteConfirmLabel": "Delete",
+    "deleteSuccess": "Note deleted",
+    "deleteErrorTitle": "Delete failed",
+    "serverRejected": "The server rejected the request.",
+    "pinnedBadge": "Pinned",
+    "unknownAuthor": "Unknown",
+    "unpinAriaLabel": "Unpin note",
+    "pinAriaLabel": "Pin note",
+    "unpinTitle": "Unpin",
+    "pinTitle": "Pin",
+    "unpinAction": "Unpin",
+    "pinAction": "Pin",
+    "editAriaLabel": "Edit note",
+    "editTitle": "Edit",
+    "editAction": "Edit",
+    "deleteAriaLabel": "Delete note",
+    "deleteTitle": "Delete",
+    "deleteAction": "Delete",
+    "titleRequired": "Title is required",
+    "saveFailed": "Save failed",
+    "titlePlaceholder": "Title",
+    "titleAriaLabel": "Note title",
+    "bodyPlaceholder": "Markdown supports **bold** and *italic*",
+    "bodyAriaLabel": "Note body",
+    "cancelAction": "Cancel",
+    "savingAction": "Saving…",
+    "saveAction": "Save",
+    "addNoteAction": "Add note"
+  },
+  "usePaletteItems": {
+    "recentlyVisited": "Recently visited"
+  },
+  "routingRule": {
+    "nameLabel": "Name",
+    "namePlaceholder": "e.g., Enterprise US leads",
+    "priorityLabel": "Priority",
+    "countryFilterLabel": "Country filter",
+    "industryFilterLabel": "Industry filter",
+    "industryFilterPlaceholder": "technology",
+    "minValueLabel": "Min value (micros)",
+    "assignmentLabel": "Assignment",
+    "assignTypeUser": "User",
+    "assignTypeTerritory": "Territory",
+    "assignTypeRoundRobin": "Round robin",
+    "assignToUserLabel": "Assign to user",
+    "selectUserOption": "Select a user",
+    "assignToTerritoryLabel": "Assign to territory",
+    "selectTerritoryOption": "Select a territory",
+    "roundRobinTeamLabel": "Round-robin team members",
+    "noUsersAvailable": "No users available",
+    "roundRobinHint": "Select one or more team members. The system will cycle through this team.",
+    "activeLabel": "Active",
+    "cancelButton": "Cancel",
+    "saveChangesButton": "Save changes",
+    "createRuleButton": "Create rule",
+    "editDialogTitle": "Edit routing rule",
+    "newDialogTitle": "New routing rule"
+  },
+  "roles": {
+    "access": {
+      "readWrite": "read and write",
+      "readOnly": "read only",
+      "none": "no access"
+    },
+    "cell": {
+      "readWriteTitle": "Read + Write",
+      "readOnlyTitle": "Read only",
+      "noAccessTitle": "No access"
+    },
+    "legend": {
+      "label": "Legend",
+      "readWrite": "Read & Write",
+      "readOnly": "Read only",
+      "noAccess": "No access"
+    },
+    "tabs": {
+      "matrix": "System Roles Matrix",
+      "custom": "Custom Roles"
+    },
+    "header": {
+      "title": "Roles & Permissions",
+      "subtitle": "Default permission matrix for system roles. Admins can create custom roles below."
+    },
+    "tablist": {
+      "label": "Roles views"
+    },
+    "table": {
+      "label": "Permission matrix for system roles",
+      "resourceHeader": "Resource"
+    },
+    "card": {
+      "systemBadge": "System",
+      "readCount": "{{count}} read",
+      "writeCount": "{{count}} write",
+      "fullAccess": "Full access",
+      "noWriteAccess": "No write access",
+      "leadFocused": "Lead-focused",
+      "postSale": "Post-sale",
+      "pipelineOwner": "Pipeline owner",
+      "teamLead": "Team lead"
+    }
+  },
+  "orgDashboard": {
+    "greetingMorning": "Good morning",
+    "greetingAfternoon": "Good afternoon",
+    "greetingEvening": "Good evening",
+    "pageTitle": "Workspace Command Center",
+    "pageSubtitle": "{{companies}} companies · {{openDeals}} open deals · {{pipeline}} pipeline",
+    "allAccounts": "All accounts",
+    "opportunities": "Opportunities",
+    "errorTitle": "Could not load dashboard",
+    "errorMessage": "The workspace summary endpoint did not respond.",
+    "retry": "Retry",
+    "metricsAriaLabel": "Workspace metrics",
+    "cockpitAriaLabel": "Workspace cockpit",
+    "detailsAriaLabel": "Workspace details",
+    "statAccountsLabel": "Accounts",
+    "statAccountsDetail": "portfolio",
+    "statContactsLabel": "Contacts",
+    "statContactsDetail": "people",
+    "statOpenDealsLabel": "Open Deals",
+    "statOpenDealsDetail": "pipeline",
+    "statPipelineLabel": "Pipeline",
+    "statPipelineDetail": "weighted",
+    "statOverdueLabel": "Overdue",
+    "statOverdueDetail": "tasks",
+    "kpiCompaniesLabel": "Companies",
+    "kpiCompaniesDetail": "in portfolio",
+    "kpiContactsLabel": "Contacts",
+    "kpiContactsDetail": "decision makers",
+    "kpiLeadsLabel": "Leads",
+    "kpiLeadsDetail": "in funnel",
+    "kpiOpportunitiesLabel": "Opportunities",
+    "kpiOpportunitiesDetail": "total bids",
+    "kpiOpenPipelineLabel": "Open Pipeline",
+    "kpiOpenPipelineDetail": "active deals",
+    "kpiTasksLabel": "Tasks",
+    "kpiTasksDetail": "follow-ups",
+    "signalAccounts": "Accounts",
+    "signalContacts": "Contacts",
+    "signalLeads": "Leads",
+    "signalOpportunities": "Opportunities",
+    "signalOpenDeals": "Open deals",
+    "signalOpen": "Open",
+    "signalWon": "Won",
+    "signalLost": "Lost",
+    "signalActive": "Active",
+    "signalOverdue": "Overdue",
+    "overdueTasks": "Overdue tasks"
+  },
+  "calendar": {
+    "previousWeek": "Previous week",
+    "today": "Today",
+    "nextWeek": "Next week",
+    "filterGroup": "Calendar filter",
+    "providerAll": "All",
+    "providerGoogle": "Google",
+    "providerMicrosoft": "Microsoft",
+    "newEvent": "+ New event",
+    "loading": "Loading calendar…",
+    "loadError": "Failed to load calendar events.",
+    "dayMon": "Mon",
+    "dayTue": "Tue",
+    "dayWed": "Wed",
+    "dayThu": "Thu",
+    "dayFri": "Fri",
+    "daySat": "Sat",
+    "daySun": "Sun",
+    "slotLabel": "New event {{date}} at {{time}}",
+    "syncConflict": "Sync conflict",
+    "createError": "Could not create the event. Try again."
+  },
+  "contactCsvImport": {
+    "triggerButton": "Paste CSV",
+    "dialogTitle": "Import contacts from CSV",
+    "dialogDescription": "Paste a tab- or comma-separated block. First row must be a header — supported columns:",
+    "textareaLabel": "CSV contact rows",
+    "guidancePrefix": "Include headers for at least",
+    "guidanceAnd": "and",
+    "guidanceOptional": "Optional headers are",
+    "invalidRowsError": "{{count}} row need fixes before import. Check missing required fields, email format, and sentiment values.",
+    "tableStatusHeader": "status",
+    "rowStatusOk": "ok",
+    "rowStatusIssues": "{{count}} issue",
+    "showingFirstRows": "Showing first 20 of {{count}} rows.",
+    "footerImporting": "Importing {{done}} of {{total}}…",
+    "footerReady": "{{ready}}/{{total}} ready to import",
+    "footerAwaiting": "Awaiting paste",
+    "cancelButton": "Cancel",
+    "importButtonImporting": "Importing {{done}} / {{total}}…",
+    "importButton": "Import {{label}}",
+    "toastImported": "Imported {{count}} contact",
+    "toastFailed": "{{count}} import failed",
+    "toastFailedDescription": "The successful rows were committed. Review and retry the rest."
+  },
+  "bidNoBid": {
+    "title": "Bid/No-Bid Decision Matrix",
+    "overrideBadge": "Override on record",
+    "subtitle": "Score each criterion to get an AI-powered go/no-go recommendation.",
+    "criteriaRated": "{{rated}}/{{total}} criteria rated.",
+    "aiCalibrate": {
+      "aria": "AI calibrate scores",
+      "pending": "Calibrating…",
+      "label": "AI Calibrate"
+    },
+    "defend": {
+      "aria": "Defend score with AI",
+      "pending": "Analyzing…",
+      "label": "Defend Score"
+    },
+    "save": {
+      "aria": "Save bid score",
+      "pending": "Saving…",
+      "label": "Save Score"
+    },
+    "error": {
+      "saveScore": "Could not save the score. Try again.",
+      "aiCalibrate": "AI calibration failed. Try again.",
+      "defend": "Could not generate the score defense. Try again."
+    },
+    "opportunity": {
+      "label": "Opportunity",
+      "aria": "Select opportunity",
+      "loading": "Loading opportunities…",
+      "loadError": "Could not load opportunities",
+      "placeholder": "— Select an opportunity —",
+      "loadFailed": "Opportunities failed to load. Refresh to try again.",
+      "hint": "Select an opportunity to enable saving and AI calibration."
+    },
+    "defensePanel": {
+      "title": "AI Score Defense"
+    },
+    "notes": {
+      "title": "Decision Notes",
+      "placeholder": "Add rationale, key concerns, or conditions for bidding…",
+      "aria": "Bid decision notes"
+    }
+  },
+  "opportunityDetail": {
+    "stageS1Lead": "S1 Lead",
+    "stageS1Ongoing": "S1 Ongoing",
+    "stageS2Sent": "S2 Sent",
+    "stageS3TechnicalIteration": "S3 Technical Iteration",
+    "stageS4Negotiation": "S4 Negotiation",
+    "stageClosedWon": "Closed won",
+    "stageClosedLost": "Closed lost",
+    "commandCreateTaskLabel": "Create task for {{name}}",
+    "commandCreateTaskHint": "Add a to-do linked to this opportunity",
+    "commandBriefingLabel": "Open AI briefing for {{name}}",
+    "commandBriefingHint": "Generate a Dust AI briefing document",
+    "errorTitle": "Couldn't load this opportunity",
+    "notFoundTitle": "Opportunity not found",
+    "notFoundMessage": "The opportunity may have been deleted or you may not have access to it.",
+    "goBack": "Go back",
+    "breadcrumbAriaLabel": "Breadcrumb",
+    "breadcrumbOpportunities": "Opportunities",
+    "editNameLabel": "Edit opportunity name",
+    "nameRequired": "Name is required",
+    "editCustomerLabel": "Edit customer name",
+    "customerRequired": "Customer is required",
+    "editIndustryLabel": "Edit industry",
+    "industryPlaceholder": "Industry",
+    "addTaskButton": "+ Task",
+    "rfpPipelineButton": "RFP Pipeline",
+    "reviewDefaultTopic": "Go/No-Go review — {{name}}",
+    "scheduleReviewButton": "Schedule review",
+    "askDustButton": "Ask Dust",
+    "changeStageLabel": "Change stage",
+    "editValueLabel": "Edit deal value (EUR)",
+    "editProbabilityLabel": "Edit probability",
+    "likely": "likely",
+    "editDueDateLabel": "Edit due date",
+    "liveCollaborationLabel": "Live collaboration"
+  },
+  "callSummary": {
+    "meddicEmpty": "No MEDDIC signals extracted. Transcript may be too short or not yet processed.",
+    "meddicTableLabel": "MEDDIC signal table",
+    "colDimension": "Dimension",
+    "colExtractedSignal": "Extracted signal",
+    "colConfidence": "Confidence",
+    "dimension": {
+      "MEDDIC_METRIC": "Metrics",
+      "MEDDIC_ECONOMIC_BUYER": "Economic Buyer",
+      "MEDDIC_DECISION_CRITERIA": "Decision Criteria",
+      "MEDDIC_DECISION_PROCESS": "Decision Process",
+      "MEDDIC_IDENTIFY_PAIN": "Identified Pain",
+      "MEDDIC_CHAMPION": "Champion"
+    },
+    "dealSuggestionsLabel": "Suggested deal updates",
+    "dealSuggestionsHeading": "Suggested deal updates",
+    "dealSuggestionsNote": "These are AI suggestions only. Review before applying to the deal.",
+    "talkRatioLabel": "Talk ratio",
+    "talkRatioHeading": "Talk Ratio",
+    "speakerTalkRatio": "{{speaker}} talk ratio",
+    "loadingLabel": "Loading call summary",
+    "loadError": "Failed to load call summary.",
+    "aiSummaryLabel": "AI summary",
+    "summaryHeading": "Summary",
+    "actionItemsLabel": "Action items",
+    "actionItemsHeading": "Action Items",
+    "meddicSignalsLabel": "MEDDIC signals",
+    "meddicSignalsHeading": "MEDDIC Signals",
+    "analysisNotRun": "AI analysis has not run yet.",
+    "transcriptUnavailable": "Transcript not available. Insights will be extracted after the recording is processed.",
+    "analysing": "Analysing…",
+    "extractInsights": "Extract insights now",
+    "reAnalysing": "Re-analysing…",
+    "reExtractInsights": "Re-extract insights"
+  },
+  "commandPalette": {
+    "title": "Command palette",
+    "searchPlaceholder": "Search accounts, contacts, tasks, opportunities…",
+    "searchAriaLabel": "Search across the workspace",
+    "searching": "Searching…",
+    "noMatches": "No matches."
+  },
+  "inlineEdit": {
+    "editLabel": "Edit",
+    "mustBeNumber": "Must be a number"
+  },
+  "callTranscript": {
+    "emptyNotAvailable": "Transcript not yet available.",
+    "sectionLabel": "Call transcript",
+    "searchLabel": "Search transcript",
+    "searchPlaceholder": "Search transcript…",
+    "downloadAriaLabel": "Download transcript as text file",
+    "downloadButton": "Download",
+    "resultCountOne": "{{count}} match for \"{{term}}\"",
+    "resultCountOther": "{{count}} matches for \"{{term}}\"",
+    "segmentsLabel": "Transcript segments",
+    "noSegmentsMatch": "No segments match your search.",
+    "seekTo": "Seek to {{time}}"
+  },
+  "forecastList": {
+    "sectionTitle": "Forecast Details",
+    "sectionCaption": "{{count}} forecast groups",
+    "errorTitle": "Failed to load forecasts",
+    "retry": "Retry",
+    "emptyTitle": "No forecasts found",
+    "emptyMessage": "Try changing the period filter or create your first forecast.",
+    "newForecast": "New Forecast",
+    "tableLabel": "Revenue forecasts",
+    "columnOwner": "Owner",
+    "columnPeriod": "Period",
+    "columnPipeline": "Pipeline",
+    "columnBestCase": "Best Case",
+    "columnCommit": "Commit",
+    "columnClosed": "Closed",
+    "columnTotal": "Total",
+    "unassigned": "Unassigned",
+    "cellLabel": "{{category}} for {{period}}",
+    "cellEditLabel": "Edit {{category}} for {{period}}",
+    "deleteLabel": "Delete forecasts for {{period}}",
+    "totalLabel": "Total:"
+  },
+  "customObjectList": {
+    "createErrorFallback": "Failed to create record",
+    "notFound": "Custom object \"{{objectKey}}\" not found.",
+    "manageLink": "Manage custom objects",
+    "totalCount": "{{count}} total",
+    "newRecordButton": "New {{label}}",
+    "loadError": "Failed to load records.",
+    "emptyTitle": "No {{label}} yet",
+    "emptyDescription": "Click \"New {{label}}\" to create your first record.",
+    "columnRecord": "Record",
+    "columnUpdated": "Updated",
+    "paginationLabel": "Pagination",
+    "previous": "← Previous",
+    "pageOf": "Page {{page}} of {{totalPages}}",
+    "next": "Next →",
+    "newRecordTitle": "New {{label}}",
+    "nameLabel": "Name",
+    "cancel": "Cancel",
+    "creating": "Creating…",
+    "create": "Create"
+  },
+  "widgetRenderer": {
+    "chartRenderError": "Chart render error",
+    "retry": "Retry",
+    "configure": "Configure",
+    "duplicate": "Duplicate",
+    "exportCsv": "Export CSV",
+    "delete": "Delete"
+  },
+  "intelTabs": {
+    "solutionsEmptyTitle": "No solutions yet",
+    "solutionsEmptyMessage": "Upload documents and run extraction to review suggested solutions.",
+    "highConfidenceBadge": "High confidence",
+    "sourceLabel": "From: {{source}}",
+    "deleteAriaLabel": "Delete {{name}}",
+    "productsEmptyTitle": "No products yet",
+    "productsEmptyMessage": "Upload documents and run extraction to review suggested products.",
+    "extractionsEmptyTitle": "No documents",
+    "extractionsEmptyMessage": "Upload files to this account to begin extraction.",
+    "extractingButton": "Extracting…",
+    "reExtractButton": "Re-extract",
+    "extractButton": "Extract",
+    "extractionSummary": "{{solutionCount}} solutions, {{productCount}} products found"
+  },
+  "customFieldValues": {
+    "heading": "Custom Fields",
+    "definedCount": "{{count}} defined",
+    "reset": "Reset",
+    "save": "Save",
+    "saving": "Saving…",
+    "toastSaved": "Custom fields saved",
+    "toastSaveFailed": "Failed to save custom fields",
+    "selectNone": "—"
+  },
+  "createOpportunity": {
+    "triggerButton": "+ New opportunity",
+    "dialogTitle": "New opportunity",
+    "dialogDescription": "Add a bid to your pipeline. You can refine intel after Dust data verification runs.",
+    "customerLabel": "Customer",
+    "customerPlaceholder": "Search companies…",
+    "nameLabel": "Opportunity name",
+    "namePlaceholder": "Acme — IT Modernization",
+    "stageLabel": "Stage",
+    "industryLabel": "Industry",
+    "valueLabel": "Value (EUR)",
+    "probabilityLabel": "Probability %",
+    "dueDateLabel": "Due date",
+    "countryLabel": "Country",
+    "cancel": "Cancel",
+    "submitting": "Creating…",
+    "submit": "Create opportunity"
+  },
+  "companyDetail": {
+    "error": {
+      "title": "Couldn't load company",
+      "message": "The company may have been deleted."
+    },
+    "notFound": {
+      "title": "Company not found",
+      "message": "The company may have been deleted or you may not have access to it.",
+      "goBack": "Go back"
+    },
+    "field": {
+      "companyName": "Company name",
+      "industry": "Industry",
+      "domain": "Domain"
+    },
+    "meta": {
+      "employees": "{{count}} employees",
+      "taxId": "Tax ID: {{taxId}}",
+      "parent": "Parent:"
+    },
+    "action": {
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "save": "Save",
+      "edit": "Edit"
+    },
+    "tabs": {
+      "label": "Company sections"
+    },
+    "tab": {
+      "contacts": "Contacts ({{count}})",
+      "opportunities": "Opportunities ({{count}})",
+      "cases": "Cases ({{count}})",
+      "notes": "Notes ({{count}})",
+      "hierarchy": "Hierarchy"
+    }
+  },
+  "currencySelector": {
+    "statusUpdating": "Updating live rates",
+    "statusCached": "Using cached rates",
+    "tooltipRatesUnavailable": "Rates unavailable: {{error}}",
+    "tooltipCurrency": "Currency: {{name}}",
+    "triggerAriaLabel": "Select currency, current: {{currency}}",
+    "triggerLabel": "Currency",
+    "listboxAriaLabel": "Select currency",
+    "displayCurrencyLabel": "Display currency",
+    "autoButtonTitle": "Auto selects currency from your browser location, then timezone",
+    "autoButton": "Auto",
+    "statusLiveRates": "Live rates",
+    "statusRatesUpdated": "Rates updated {{date}}"
+  },
+  "contact": {
+    "newContactTrigger": "+ New contact",
+    "editTitle": "Edit {{name}}",
+    "newTitle": "New contact",
+    "editDescription": "Patch updates the record and writes an audit entry.",
+    "newDescription": "Add a person to the decision unit.",
+    "errorRequired": "Customer and name are required",
+    "errorSaveFailed": "Save failed",
+    "fieldCustomer": "Customer / account",
+    "fieldName": "Name",
+    "fieldRole": "Role",
+    "rolePlaceholder": "e.g. CTO, Director of Infrastructure",
+    "fieldEmail": "Email",
+    "fieldPhone": "Phone",
+    "fieldInfluence": "Influence (1–5)",
+    "fieldSentiment": "Sentiment",
+    "sentiment": {
+      "hot": "Hot",
+      "warm": "Warm",
+      "neutral": "Neutral",
+      "cold": "Cold"
+    },
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "saveChanges": "Save changes",
+    "createContact": "Create contact"
+  },
+  "references": {
+    "heading": "Reference Library",
+    "subtitle": "Proof that wins bids — the right case study and testimonial for every proposal.",
+    "newButton": "New reference",
+    "searchPlaceholder": "Search references...",
+    "searchAriaLabel": "Search references",
+    "filterIndustryAriaLabel": "Filter by industry",
+    "allIndustries": "All industries",
+    "filterTagAriaLabel": "Filter by tag",
+    "allTags": "All tags",
+    "resultCount": "{{count}} references",
+    "errorTitle": "Could not load references",
+    "errorMessage": "Please try again in a moment.",
+    "emptyTitle": "No references yet",
+    "emptyMessage": "Add customer references to build your proposal library.",
+    "emptyAction": "Add reference",
+    "lastUsed": "Last used: {{date}}",
+    "deleteAriaLabel": "Delete reference: {{title}}",
+    "recording": "Recording...",
+    "useReference": "Use reference",
+    "toast": {
+      "created": "Reference added",
+      "createError": "Could not create reference",
+      "deleted": "Reference deleted",
+      "deleteError": "Could not delete reference"
+    },
+    "deleteConfirm": {
+      "title": "Delete reference?",
+      "description": "\"{{title}}\" will be removed from your library. This can't be undone.",
+      "confirmLabel": "Delete"
+    }
+  },
+  "callButton": {
+    "providerZoom": "Start Zoom",
+    "providerTeams": "Start Teams",
+    "providerGoogleMeet": "Start Google Meet",
+    "providerTwilio": "Call via Twilio",
+    "phoneDialAriaLabel": "Enter phone number",
+    "phoneLabel": "Phone number (E.164)",
+    "phonePlaceholder": "+1 555 000 0000",
+    "phoneInputAriaLabel": "E.164 phone number",
+    "dialling": "Dialling…",
+    "dial": "Dial",
+    "cancel": "Cancel",
+    "starting": "Starting…",
+    "startCall": "Start Call",
+    "menuAriaLabel": "Choose call provider"
+  },
+  "customObjectDetail": {
+    "saveFailed": "Save failed",
+    "deleteConfirmTitle": "Delete {{label}}?",
+    "recordFallback": "record",
+    "deleteConfirmDescription": "{{recordKey}} will be soft-deleted. It can be restored via the API.",
+    "thisRecordFallback": "This record",
+    "deleteConfirmLabel": "Delete",
+    "deleteFailedTitle": "Delete failed",
+    "deleteFailedDescription": "Delete failed",
+    "recordNotFound": "Record not found.",
+    "backToPlural": "Back to {{plural}}",
+    "breadcrumbAriaLabel": "Breadcrumb",
+    "deleteButton": "Delete",
+    "fieldValuesHeading": "Field values",
+    "editFieldAriaLabel": "Edit {{field}}",
+    "saving": "…",
+    "save": "Save",
+    "cancel": "Cancel",
+    "editFieldValueAriaLabel": "Edit {{field}}: {{value}}",
+    "emptyFields": "No fields defined yet. Add fields in the",
+    "objectEditorLink": "object editor",
+    "emptyFieldsPeriod": ".",
+    "createdAt": "Created {{time}}",
+    "updatedAt": "Updated {{time}}",
+    "deletedAt": "Deleted {{time}}"
+  },
+  "predictiveAdmin": {
+    "modelTableLoadingLabel": "Loading models...",
+    "modelTableEmpty": "No {{entityType}} models trained yet. Click \"Retrain Now\" to train the first model.",
+    "modelTableCaption": "{{entityType}} predictive model history",
+    "colVersion": "Version",
+    "colAccuracyMetrics": "Accuracy Metrics",
+    "colSamples": "Samples",
+    "colTrained": "Trained",
+    "colActive": "Active",
+    "metricAuc": "AUC",
+    "metricF1": "F1",
+    "metricPrecision": "Prec",
+    "metricRecall": "Rec",
+    "activeModelLabel": "Active model",
+    "inactiveModelLabel": "Inactive",
+    "sectionHeading": "{{entityType}} Scoring Model",
+    "sectionSubtitle": "Logistic regression · per-org · retrained weekly",
+    "retrainButtonLabel": "Retrain {{entityType}} model now",
+    "retrainPending": "Queuing…",
+    "retrainButton": "Retrain Now",
+    "retrainError": "Retrain failed. Please try again.",
+    "pageTitle": "Predictive Scoring",
+    "pageSubtitle": "ML-based lead and opportunity scoring — trained on your org's closed deal history. Models are automatically retrained every Sunday at 02:00 UTC.",
+    "dataPrivacyLabel": "Data privacy:",
+    "dataPrivacyBody": "Model artifacts contain only learned weights — no raw deal data, names, or emails. Each org trains its own isolated model. Scores are cached for 1 hour in Redis and invalidated on record updates."
+  },
+  "scoreFactors": {
+    "featureLabel": {
+      "dealValue": "Deal Value",
+      "pipelineStage": "Pipeline Stage",
+      "daysInStage": "Days in Stage",
+      "dealAge": "Deal Age",
+      "daysToClose": "Days to Close",
+      "contactCount": "Contact Count",
+      "meetingsHeld": "Meetings Held",
+      "emailsExchanged": "Emails Exchanged",
+      "lastActivity": "Last Activity",
+      "ownerWinRate90d": "Owner Win Rate (90d)",
+      "qualificationScore": "Qualification Score",
+      "contactSeniority": "Contact Seniority",
+      "engagement30d": "Engagement (30d)",
+      "emailDomain": "Email Domain",
+      "companySize": "Company Size",
+      "activityRecency": "Activity Recency",
+      "budget": "Budget",
+      "authority": "Authority",
+      "need": "Need",
+      "timeline": "Timeline"
+    },
+    "contributionAria": "Contribution: {{value}}",
+    "loadingAria": "Loading score factors",
+    "tableCaption": "Score contributing factors",
+    "tableHeaderFactor": "Factor",
+    "tableHeaderContribution": "Contribution",
+    "title": "ML Score Analysis",
+    "chartAria": "Top {{count}} factors influencing the {{label}}",
+    "footer": "Model v{{modelVersion}} · Logistic regression · Updated hourly",
+    "labelLeadScore": "Lead Score",
+    "labelWinProbability": "Win Probability"
+  },
+  "files": {
+    "cardLabel": "Files",
+    "heading": "Files",
+    "attachmentCount": "{{count}} attachment(s)",
+    "uploading": "Uploading…",
+    "upload": "Upload",
+    "dropzoneLabel": "Drag files here to upload",
+    "dropPrompt": "Drop files or click to browse",
+    "acceptedFormats": "PDF, DOCX, XLSX, images — up to 50 MB",
+    "unsupportedType": "Unsupported file type: {{type}}",
+    "unknownType": "unknown",
+    "loadErrorTitle": "Couldn't load files",
+    "unknownError": "Unknown error",
+    "emptyTitle": "No files yet",
+    "emptyMessage": "Upload to attach documents to this account.",
+    "deleteTitle": "Delete file?",
+    "deleteDescription": "This permanently removes \"{{name}}\". This cannot be undone.",
+    "cancel": "Cancel",
+    "deleting": "Deleting…",
+    "delete": "Delete",
+    "downloadTitle": "Download {{name}}",
+    "unknownUploader": "unknown",
+    "deleteAria": "Delete {{name}}"
+  },
+  "analyticsDashboard": {
+    "confirmRemoveWidget": "Remove this widget?",
+    "title": "Analytics",
+    "switchDashboardAria": "Switch dashboard",
+    "selectDashboard": "Select dashboard",
+    "manageDashboards": "Manage dashboards",
+    "reportsLink": "Reports",
+    "newReportLink": "New report",
+    "addWidget": "Add widget",
+    "noDashboardsTitle": "No dashboards",
+    "noDashboardsMessage": "Create your first dashboard to start visualising your data.",
+    "createDashboard": "Create dashboard",
+    "loadWidgetsError": "Failed to load widgets",
+    "emptyDashboardTitle": "Empty dashboard",
+    "emptyDashboardMessage": "Add your first widget to start visualising data."
+  },
+  "pageHead": {
+    "companyProfileIncomplete": "Company profile incomplete",
+    "dashboardSubtitle": "Today: {{date}} - {{company}} cockpit",
+    "dashboardTitle": "Dashboard",
+    "accountStatusSummaryLabel": "Account status summary",
+    "attributionConfidence": "{{percent}}% attribution confidence",
+    "refreshed": "Refreshed {{time}}",
+    "externalFreshness": "External {{freshness}} - {{time}}",
+    "externalNotSynced": "External source not synced",
+    "opportunityLinked": "Opportunity linked",
+    "noOpportunityLinked": "No opportunity linked",
+    "removeFromFavorites": "Remove from favorites",
+    "addToFavorites": "Add to favorites",
+    "starred": "Starred",
+    "star": "Star",
+    "enrichTitle": "Refresh available data sources",
+    "enriching": "Enriching…",
+    "enrichNow": "Enrich now",
+    "printTitle": "Print the cockpit as a one-page brief",
+    "print": "Print",
+    "generateBriefTitle": "Generate brief for {{name}}",
+    "generateBrief": "Generate brief",
+    "createOpportunityTitle": "Create an opportunity for {{name}}",
+    "createOpportunity": "Create opportunity",
+    "briefIndustry": "Industry",
+    "briefHeadcount": "Headcount",
+    "briefDomain": "Domain",
+    "briefLegalName": "Legal name",
+    "briefFounded": "Founded",
+    "briefConfidence": "Confidence: {{percent}}%"
+  },
+  "publicBooking": {
+    "errorNotFound": "Booking page not found",
+    "errorAvailabilityFailed": "Availability failed",
+    "errorUnavailable": "Booking page unavailable",
+    "errorSlotTaken": "That time is no longer available.",
+    "errorBookingFailed": "Booking failed",
+    "notFoundTitle": "Booking page not found",
+    "notFoundBody": "This scheduling link is invalid or no longer accepting meetings.",
+    "eyebrow": "BidStack scheduling",
+    "loadingTitle": "Loading booking page",
+    "confirmedTitle": "Booking confirmed",
+    "confirmedBody": "You're booked. A confirmation email is on its way.",
+    "calendarAriaLabel": "Choose a booking date",
+    "chooseDayHeading": "Choose a day",
+    "availableTimesHeading": "Available times",
+    "slotAriaLabel": "Available slot {{slot}}",
+    "noSlots": "No available slots on this day. Try another date.",
+    "selectedLabel": "Selected:",
+    "nameLabel": "Name",
+    "emailLabel": "Email",
+    "confirmButton": "Confirm booking"
+  },
+  "oppToolbar": {
+    "kpiOpportunities": "Opportunities",
+    "kpiRevenue": "Revenue",
+    "kpiWeightedRevenue": "WR",
+    "kpiOpen": "Open",
+    "kpiRegionLabel": "Opportunities KPI summary",
+    "title": "Opportunities",
+    "resultsFor": "results for",
+    "clear": "clear",
+    "stageOpportunities": "{{stage}} opportunities",
+    "clearFilter": "clear filter",
+    "bidsInFlight": "{{count}} bids in flight · click any cell to edit inline.",
+    "exportingLabel": "Exporting opportunities…",
+    "exportLabel": "Export visible opportunities as CSV",
+    "exporting": "Exporting…",
+    "exportCsv": "Export CSV",
+    "stageFilterGroupLabel": "Filter opportunities by stage",
+    "stageAll": "All",
+    "bulkActionsLabel": "Bulk actions",
+    "selectedCount": "{{count}} selected",
+    "moveSelectionLabel": "Move selection to stage",
+    "moveToStage": "Move to stage…",
+    "deleteSelected": "Delete selected",
+    "clearSelection": "Clear"
+  },
+  "newLead": {
+    "toastNameRequired": "First and last name are required",
+    "toastCreateFailed": "Failed to create lead",
+    "breadcrumbLabel": "Breadcrumb",
+    "breadcrumbLeads": "Leads",
+    "breadcrumbCurrent": "New lead",
+    "heading": "New lead",
+    "subtitle": "Add a new prospect to your pipeline.",
+    "labelFirstName": "First name",
+    "labelLastName": "Last name",
+    "labelEmail": "Email",
+    "labelPhone": "Phone",
+    "labelCompany": "Company",
+    "labelTitle": "Title",
+    "labelSource": "Source",
+    "sourceWebsite": "Website",
+    "sourceReferral": "Referral",
+    "sourceEvent": "Event",
+    "sourceColdOutreach": "Cold outreach",
+    "sourcePartner": "Partner",
+    "sourceSocial": "Social",
+    "sourceOther": "Other",
+    "labelPriority": "Priority",
+    "priorityLow": "Low",
+    "priorityMedium": "Medium",
+    "priorityHigh": "High",
+    "priorityCritical": "Critical",
+    "labelScore": "Score",
+    "submitPending": "Creating…",
+    "submit": "Create lead",
+    "cancel": "Cancel"
+  },
+  "topAccounts": {
+    "heading": "Top accounts",
+    "badgeCurated": "Curated — Amaris global top 10",
+    "badgeAuto": "Auto-ranked by pipeline value",
+    "subtitleCurated": "The global top 10, hand-picked and ordered by admins in Settings.",
+    "subtitleAuto": "Highest-value accounts ranked by total pipeline and revenue.",
+    "searchLabel": "Search top accounts",
+    "searchPlaceholder": "Search top accounts...",
+    "industryLabel": "Filter top accounts by industry",
+    "industriesUnavailable": "Industries unavailable",
+    "allIndustries": "All industries",
+    "industryLoadError": "Could not load industry filters.",
+    "retry": "Retry",
+    "resultCount": "{{count}} account",
+    "errorTitle": "Couldn't load top accounts",
+    "errorMessage": "Couldn't load top accounts.",
+    "emptyTitle": "No account data yet",
+    "emptyMessage": "Add opportunities with values to see top accounts ranked by pipeline.",
+    "totalPipeline": "total pipeline",
+    "won": "won",
+    "openDeals": "{{count}} open deals",
+    "contacts": "{{count}} contacts",
+    "sourceCurated": "Curated top 10",
+    "sourceAuto": "Auto-ranked",
+    "viewAll": "View all",
+    "empty": "No ranked accounts yet — add opportunity values or curate the Top 10 in Settings.",
+    "portfolioAccount": "Portfolio account"
+  },
+  "forecasts": {
+    "title": "Revenue Forecasts",
+    "subtitle": "Will the bids we're piloting hit the number? Pipeline, best case, commit, and closed by period.",
+    "newForecast": "New Forecast",
+    "periodFilterLabel": "Period filter",
+    "periodMonthly": "Monthly",
+    "periodQuarterly": "Quarterly",
+    "periodYearly": "Yearly",
+    "totalsLabel": "Forecast totals for the selected period",
+    "totalCommit": "Commit",
+    "totalBestCase": "Best case",
+    "totalPipeline": "Pipeline",
+    "totalClosed": "Closed",
+    "toastUpdated": "Forecast updated",
+    "toastUpdateFailed": "Failed to update forecast",
+    "toastCreated": "Forecast created",
+    "toastCreateFailed": "Failed to create forecast",
+    "toastDeleted": "Forecasts deleted",
+    "toastDeleteFailed": "Failed to delete forecasts",
+    "deleteConfirmTitle": "Delete forecasts for {{period}}?",
+    "deleteConfirmDescription": "This will remove all category forecasts for this period and owner.",
+    "unknownError": "Unknown error"
+  },
+  "cartesianCharts": {
+    "lineChartAriaLabel": "Line chart",
+    "barChartAriaLabel": "Bar chart",
+    "areaChartAriaLabel": "Area chart",
+    "funnelChartAriaLabel": "Funnel chart",
+    "scatterChartAriaLabel": "Scatter chart"
+  },
+  "commandCenter": {
+    "region": {
+      "ariaLabel": "BidStack command center"
+    },
+    "kicker": "BidStack command center",
+    "actions": {
+      "ariaLabel": "Account decision signals"
+    },
+    "badge": {
+      "ready": "{{count}}% ready",
+      "stackSignals": "{{count}} stack signals"
+    },
+    "signal": {
+      "readiness": {
+        "label": "Bid readiness estimate",
+        "detailReady": "ready for exec review",
+        "detailFocus": "needs presales focus"
+      },
+      "source": {
+        "label": "Source coverage",
+        "detail": "{{count}} attributed source"
+      },
+      "decision": {
+        "label": "Decision coverage"
+      },
+      "risk": {
+        "label": "Open risk load",
+        "valueHigh": "{{count}} high",
+        "valueOpen": "{{count}} open",
+        "detailEscalate": "escalate before proposal",
+        "detailManageable": "manageable with owner follow-up"
+      }
+    },
+    "nextMove": {
+      "unblock": "Unblock {{label}} before the bid gate.",
+      "escalateWithOwner": "Escalate {{title}} with {{owner}} before proposal approval.",
+      "escalate": "Escalate {{title}} before proposal approval.",
+      "champion": "Use {{name}} as champion for the next presales milestone.",
+      "refreshSources": "Refresh data verification to strengthen legal, logo, market, and account-source proof.",
+      "advance": "Advance the next proposal step with available account context and owner alignment."
+    },
+    "committee": {
+      "champions": "{{count}} champion mapped",
+      "buyers": "{{count}} buyer mapped",
+      "stakeholders": "{{count}} stakeholder mapped",
+      "empty": "map buyer and champion"
+    },
+    "footer": {
+      "primarySignal": {
+        "label": "Primary commercial signal",
+        "pending": "Pipeline pending"
+      },
+      "weightedValue": {
+        "label": "Weighted account value",
+        "notVerified": "Not verified"
+      },
+      "ownerMap": {
+        "label": "Decision owner map",
+        "contacts": "{{count}} contacts mapped"
+      }
+    }
+  },
+  "contactDetail": {
+    "errorTitle": "Couldn't load contact",
+    "errorMessage": "The contact may have been deleted.",
+    "notFoundTitle": "Contact not found",
+    "notFoundMessage": "The contact may have been deleted or you may not have access to it.",
+    "backToContacts": "Back to contacts",
+    "breadcrumbLabel": "Breadcrumb",
+    "contacts": "Contacts",
+    "noRole": "No role",
+    "influence": "Influence: {{value}}/5",
+    "added": "Added",
+    "opportunitiesTitle": "Opportunities",
+    "relatedCount": "{{count}} related",
+    "noOpportunities": "No opportunities for {{customer}}.",
+    "tasksTitle": "Tasks",
+    "noTasks": "No related tasks.",
+    "dueDate": "Due {{date}}",
+    "noDueDate": "No due date",
+    "notesTitle": "Notes",
+    "noNotes": "No notes for this account.",
+    "unknownAuthor": "Unknown",
+    "liveCollaboration": "Live collaboration"
+  },
+  "keyAccounts": {
+    "title": "Strategic Accounts",
+    "subtitle": "Regional strategic accounts owned for pipeline, coverage, and executive follow-through — distinct from the curated global Top 10.",
+    "searchLabel": "Search key accounts",
+    "searchPlaceholder": "Search key accounts...",
+    "industryFilterLabel": "Filter key accounts by industry",
+    "industriesUnavailable": "Industries unavailable",
+    "allIndustries": "All industries",
+    "industryFilterError": "Could not load industry filters.",
+    "retry": "Retry",
+    "resultCount_one": "{{count}} account",
+    "resultCount_other": "{{count}} accounts",
+    "statKeyAccounts": "Key accounts",
+    "statTotalPipeline": "Total pipeline",
+    "statOpenDeals": "Open deals",
+    "statContacts": "Contacts",
+    "errorTitle": "Couldn't load key accounts",
+    "errorMessage": "The key accounts endpoint did not respond.",
+    "emptyTitle": "No key accounts yet",
+    "emptyMessage": "Flag strategically important companies as Key Accounts from the Companies page.",
+    "metricPipeline": "pipeline",
+    "metricOpenDeals": "open deals",
+    "metricContacts": "contacts"
+  },
+  "companyTabs": {
+    "contacts": {
+      "emptyTitle": "No contacts yet",
+      "emptyMessage": "Add contacts from the Contacts page.",
+      "colName": "Name",
+      "colRole": "Role",
+      "colEmail": "Email",
+      "colPhone": "Phone"
+    },
+    "opportunities": {
+      "emptyTitle": "No opportunities yet",
+      "emptyMessage": "Create opportunities linked to this company.",
+      "colCode": "Code",
+      "colName": "Name",
+      "colStage": "Stage",
+      "colValue": "Value",
+      "colProbability": "Probability"
+    },
+    "cases": {
+      "emptyTitle": "No open cases",
+      "emptyMessage": "All clear — no active support cases.",
+      "colNumber": "Number",
+      "colSubject": "Subject",
+      "colStatus": "Status",
+      "colPriority": "Priority"
+    },
+    "notes": {
+      "emptyTitle": "No notes yet",
+      "emptyMessage": "Notes linked to this company will appear here.",
+      "byAuthor": "by {{author}}"
+    },
+    "hierarchy": {
+      "directChildren": "Direct Children",
+      "errorTitle": "Couldn't load hierarchy",
+      "errorMessage": "Unable to fetch account hierarchy."
+    }
+  },
+  "oppInlineEditCells": {
+    "unknownStage": "Unknown",
+    "stageTriggerAria": "Stage: {{stage}}. Click to change.",
+    "numberTriggerAria": "{{value}}. Click to edit.",
+    "dateTriggerAria": "Due {{date}}. Click to edit."
+  },
+  "liveDataMesh": {
+    "availabilityAvailable": "{{count}} available",
+    "availabilityConnected": "{{enabled}}/{{total}} connected",
+    "regionLabel": "Connected data sources",
+    "titleAvailable": "Available data sources",
+    "titleConnected": "Connected data sources",
+    "captionAvailable": "Sources available after credentials or connector setup",
+    "captionConnected": "Configured APIs, widgets, and verified data feeds",
+    "kicker": "Source availability",
+    "publicSources": "public sources",
+    "connectorStatus": "Connector status",
+    "signalsLabel": "Available source signals",
+    "loading": "Checking configured sources...",
+    "error": "Connector registry loaded; source check returned an error.",
+    "empty": "No public signal returned for this account yet.",
+    "connectorAria": "{{name}} is {{status}}"
+  },
+  "serviceDesk": {
+    "title": "Service Desk",
+    "searchPlaceholder": "Search cases…",
+    "searchAriaLabel": "Search cases",
+    "exportCsv": "Export CSV",
+    "filterByStatusAriaLabel": "Filter by status",
+    "filterByPriorityAriaLabel": "Filter by priority",
+    "statusOption": {
+      "all": "All",
+      "new": "New",
+      "open": "Open",
+      "waitingCustomer": "Waiting customer",
+      "waitingInternal": "Waiting internal",
+      "resolved": "Resolved",
+      "closed": "Closed",
+      "escalated": "Escalated"
+    },
+    "priorityOption": {
+      "all": "All",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "critical": "Critical"
+    },
+    "csv": {
+      "caseNumber": "Case #",
+      "subject": "Subject",
+      "status": "Status",
+      "priority": "Priority",
+      "owner": "Owner",
+      "source": "Source",
+      "satisfaction": "Satisfaction",
+      "created": "Created",
+      "resolved": "Resolved"
+    },
+    "error": {
+      "title": "Failed to load cases"
+    },
+    "retry": "Retry",
+    "empty": {
+      "title": "No cases yet",
+      "message": "Service cases will appear here."
+    },
+    "column": {
+      "subject": "Subject",
+      "status": "Status",
+      "priority": "Priority",
+      "owner": "Owner",
+      "source": "Source"
+    },
+    "resultCount": {
+      "one": "{{count}} case",
+      "other": "{{count}} cases"
+    },
+    "resultMatching": " matching \"{{search}}\""
+  },
+  "widgetConfig": {
+    "title": "Configure Widget",
+    "closeAriaLabel": "Close",
+    "titleLabel": "Title",
+    "titlePlaceholder": "Widget title",
+    "dataSourceLabel": "Data source (report)",
+    "dataSourceNone": "— None (static demo) —",
+    "chartTypeLabel": "Chart type",
+    "type": {
+      "kpi": {
+        "label": "KPI Card",
+        "description": "Single metric with trend"
+      },
+      "line": {
+        "label": "Line Chart",
+        "description": "Trend over time"
+      },
+      "bar": {
+        "label": "Bar Chart",
+        "description": "Compare categories"
+      },
+      "area": {
+        "label": "Area Chart",
+        "description": "Volume over time"
+      },
+      "pie": {
+        "label": "Pie Chart",
+        "description": "Distribution (≤6 slices)"
+      },
+      "donut": {
+        "label": "Donut Chart",
+        "description": "Distribution with center value"
+      },
+      "funnel": {
+        "label": "Funnel",
+        "description": "Pipeline stage drop-off"
+      },
+      "gauge": {
+        "label": "Gauge",
+        "description": "Progress toward target"
+      },
+      "table": {
+        "label": "Table",
+        "description": "Tabular data grid"
+      },
+      "scatter": {
+        "label": "Scatter",
+        "description": "Correlation between two metrics"
+      },
+      "radar": {
+        "label": "Radar",
+        "description": "Multi-dimensional comparison"
+      },
+      "heatmap": {
+        "label": "Heatmap",
+        "description": "Activity density over time"
+      }
+    },
+    "xAxisLabel": "X-axis field",
+    "yAxisLabel": "Y-axis field",
+    "cancel": "Cancel",
+    "save": "Save widget"
+  },
+  "auditLogInsights": {
+    "activityCadenceTitle": "Activity cadence",
+    "activityCadenceSubtitle": "Real event volume from the currently loaded evidence page.",
+    "attentionEventsBadge": "{{percent}}% attention events",
+    "eventVolumeChartLabel": "Audit event volume chart",
+    "bucketTooltip": "{{label}}: {{count}} events",
+    "forensicWatchlistTitle": "Forensic watchlist",
+    "forensicWatchlistSubtitle": "Fast triage from the loaded evidence set.",
+    "topActorLabel": "Top actor",
+    "hottestTargetLabel": "Hottest target",
+    "reviewQueueLabel": "Review queue",
+    "noneValue": "None",
+    "eventsCount": "{{count}} events",
+    "noLoadedEvents": "No loaded events",
+    "attentionEventsValue": "{{count}} attention events",
+    "reviewQueueDetail": "{{destructive}} destructive, {{security}} security/API",
+    "evidenceQualityTitle": "Evidence quality",
+    "evidenceQualitySubtitle": "Coverage signals that make audits defensible.",
+    "scoreOutOf": "{{score}}/100",
+    "structuredDiffsLabel": "Structured diffs",
+    "eventsRatioDetail": "{{count}}/{{total}} events",
+    "targetReferencesLabel": "Target references",
+    "linkedRatioDetail": "{{count}}/{{total}} linked",
+    "actorAttributionLabel": "Actor attribution",
+    "attributedRatioDetail": "{{count}}/{{total}} attributed",
+    "healthRowProgressLabel": "{{label}}: {{value}}%"
+  },
+  "scheduleReview": {
+    "errorPickDateTime": "Pick a date and time",
+    "toastScheduledTitle": "Review scheduled",
+    "toastScheduledWithLink": "Meeting link added to the Calls tab.",
+    "toastScheduledNoLink": "Added to the Calls tab.",
+    "errorServerRejected": "The server rejected the request.",
+    "errorProviderUnreachable": "Couldn't reach {{provider}}. Connect it in Settings → Integrations, or pick another provider.",
+    "triggerButton": "Schedule review",
+    "dialogTitle": "Schedule a review",
+    "dialogDescription": "Create a Go/No-Go or RFP review meeting on a connected calendar.",
+    "fieldTopic": "Topic",
+    "placeholderTopic": "Go/No-Go review",
+    "fieldProvider": "Provider",
+    "fieldDuration": "Duration (min)",
+    "fieldStart": "Start",
+    "fieldAttendees": "Attendees (comma-separated emails)",
+    "cancel": "Cancel",
+    "submitting": "Scheduling…",
+    "submit": "Schedule"
+  },
+  "search": {
+    "heading": "Search",
+    "form": {
+      "ariaLabel": "Workspace search"
+    },
+    "input": {
+      "placeholder": "Search across opportunities, contacts, companies, tasks, notes, and orders…",
+      "ariaLabel": "Search workspace"
+    },
+    "tab": {
+      "all": "All",
+      "opportunity": "Opportunities",
+      "lead": "Leads",
+      "contact": "Contacts",
+      "company": "Companies",
+      "task": "Tasks",
+      "note": "Notes"
+    },
+    "type": {
+      "opportunity": "Opportunity",
+      "lead": "Lead",
+      "contact": "Contact",
+      "company": "Company",
+      "task": "Task",
+      "note": "Note"
+    },
+    "results": {
+      "ariaLabel": "Search results",
+      "countOne": "{{count}} result",
+      "countOther": "{{count}} results"
+    },
+    "error": {
+      "title": "Search failed",
+      "message": "Something went wrong"
+    },
+    "empty": {
+      "title": "No results found",
+      "message": "We couldn't find anything matching \"{{query}}\". Try different keywords or check your spelling."
+    },
+    "guidance": {
+      "ariaLabel": "Search guidance",
+      "title": "Search across your workspace",
+      "message": "Type a keyword above to find opportunities, contacts, companies, tasks, notes, and sales orders."
+    }
+  },
+  "createWebhook": {
+    "adminOnlyBadge": "Admin only",
+    "editTitle": "Edit webhook subscription",
+    "createTitle": "New webhook subscription",
+    "subtitle": "Use a production HTTPS endpoint. BidStack signs every delivery with HMAC-SHA256.",
+    "closeAriaLabel": "Close",
+    "endpointUrlLabel": "Endpoint URL",
+    "endpointUrlPlaceholder": "https://your-app.com/webhooks/bidstack",
+    "endpointUrlHelp": "HTTPS is required. Localhost, private IPs, and internal hostnames are rejected.",
+    "eventsLabel": "Events",
+    "eventsHelp": "Choose only the events your receiver actually handles.",
+    "selectAll": "Select all",
+    "clear": "Clear",
+    "securityContractTitle": "Security contract",
+    "securityReturn2xx": "Return a 2xx status within 10 seconds.",
+    "securityVerifyHeader": "Verify the X-BidStack-Signature header.",
+    "securityRejectOld": "Reject signatures older than 5 minutes.",
+    "securityAsync": "Process heavy work asynchronously after acknowledging.",
+    "selectedEventsLabel": "Selected events",
+    "selectedNone": "Pick at least one event.",
+    "selectedOne": "One event will be delivered.",
+    "selectedMany": "{{count}} events will be delivered.",
+    "cancel": "Cancel",
+    "saving": "Saving...",
+    "creating": "Creating...",
+    "saveSubscription": "Save subscription",
+    "createSubscription": "Create subscription"
+  },
+  "governanceLog": {
+    "regionLabel": "Governance meetings",
+    "title": "Governance log",
+    "caption": "Comitology — committees, C-level reviews, BRM, SAR",
+    "errorTitle": "Could not load governance log",
+    "errorMessage": "Try again shortly.",
+    "empty": "No governance meetings recorded for this account yet.",
+    "advanceStatusLabel": "Advance status of {{description}}",
+    "dateRequired": "Date required",
+    "meetingRecorded": "Meeting recorded",
+    "couldNotSave": "Could not save",
+    "addMeeting": "Add meeting",
+    "meetingTypeLabel": "Meeting type",
+    "meetingDateLabel": "Meeting date",
+    "participantsPlaceholder": "Participants (comma-separated)",
+    "outcomesPlaceholder": "Outcomes / decisions",
+    "saving": "Saving…",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "polarCharts": {
+    "pieChartAriaLabel": "Pie chart",
+    "columnName": "Name",
+    "columnValue": "Value",
+    "donutChartAriaLabel": "Donut chart",
+    "radarChartAriaLabel": "Radar chart"
+  },
+  "quickAddMenu": {
+    "title": "Create",
+    "option": {
+      "opportunity": {
+        "label": "New opportunity",
+        "description": "Add a bid to the pipeline."
+      },
+      "task": {
+        "label": "New task",
+        "description": "Create a follow-up, optionally linked to an opp."
+      },
+      "contact": {
+        "label": "New contact",
+        "description": "Add a decision-maker."
+      },
+      "note": {
+        "label": "New note",
+        "description": "Drop a thought on the current account."
+      }
+    }
+  },
+  "dashboardsList": {
+    "errorTitle": "Failed to load dashboards",
+    "heading": "Dashboards",
+    "countOne": "{{count}} dashboard",
+    "countOther": "{{count}} dashboards",
+    "newButton": "New dashboard",
+    "namePlaceholder": "Dashboard name…",
+    "creating": "Creating…",
+    "create": "Create",
+    "cancel": "Cancel",
+    "emptyTitle": "No dashboards yet",
+    "emptyMessage": "Create your first dashboard to start tracking what matters.",
+    "openAria": "Open dashboard: {{name}}",
+    "sharedAria": "Shared",
+    "privateAria": "Private",
+    "deleteConfirm": "Delete \"{{name}}\"?",
+    "deleteAria": "Delete dashboard {{name}}"
+  },
+  "relations": {
+    "errorKeyLabelRequired": "Relation key and label are required.",
+    "errorAddFailed": "Failed to add relation",
+    "heading": "Relations",
+    "addButton": "+ Add relation",
+    "fieldKeyLabel": "Relation key",
+    "fieldKeyPlaceholder": "e.g. primary_contact",
+    "fieldLabelLabel": "Label",
+    "fieldLabelPlaceholder": "e.g. Primary Contact",
+    "fieldEntityLabel": "Related entity",
+    "fieldEntityPlaceholder": "e.g. contact, opportunity",
+    "fieldCardinalityLabel": "Cardinality",
+    "cancelButton": "Cancel",
+    "submitButtonPending": "Adding…",
+    "submitButton": "Add",
+    "emptyState": "No relations defined yet."
+  },
+  "chartContainer": {
+    "emptyMessage": "No data available for this time period.",
+    "refresh": "Refresh",
+    "regionLabel": "Chart",
+    "actionsLabel": "Chart actions",
+    "loadingLabel": "Loading chart"
+  },
+  "crossSell": {
+    "regionLabel": "Cross-sell actions",
+    "title": "Cross-sell actions",
+    "caption": "Cross-country / cross-team sales actions on this account",
+    "errorTitle": "Could not load cross-sell actions",
+    "errorRetry": "Try again shortly.",
+    "empty": "No cross-sell actions logged for this account yet.",
+    "advanceStatusLabel": "Advance status of {{description}}",
+    "advanceStatusHint": "Click to advance status",
+    "status": {
+      "open": "Open",
+      "inProgress": "In progress",
+      "done": "Done"
+    },
+    "logAction": "Log action",
+    "toast": {
+      "missingFieldsTitle": "Missing fields",
+      "missingFieldsBody": "Description and both units are required.",
+      "logged": "Cross-sell action logged",
+      "saveError": "Could not save"
+    },
+    "form": {
+      "descriptionPlaceholder": "What needs to happen?",
+      "requestingUnitPlaceholder": "Requesting country/team",
+      "assignedUnitPlaceholder": "Assigned country/team",
+      "assigneeLabel": "Assignee",
+      "unassigned": "Unassigned",
+      "dueDateLabel": "Due date",
+      "saving": "Saving…",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "subtitle": "Cross-country and cross-team sales actions on shared accounts. Owned by pre-sales.",
+    "filterGroupLabel": "Filter by status",
+    "filterAll": "All",
+    "filterOpen": "Open",
+    "filterInProgress": "In progress",
+    "filterDone": "Done",
+    "errorMessage": "Try again shortly.",
+    "emptyTitle": "No cross-sell actions",
+    "emptyMessage": "Log cross-team actions from any account's cockpit — they appear here for the whole org.",
+    "colAccount": "Account",
+    "colAction": "Action",
+    "colRoute": "Route",
+    "colAssignee": "Assignee",
+    "colDue": "Due",
+    "colStatus": "Status",
+    "updateFailed": "Update failed",
+    "advanceStatusAria": "Advance status of {{description}}",
+    "updating": "updating…"
+  },
+  "auditLogFilters": {
+    "chipSearch": "Search: {{value}}",
+    "chipRange": "Range: {{value}}",
+    "chipTarget": "Target: {{value}}",
+    "chipCategory": "Category: {{value}}",
+    "barAriaLabel": "Audit log filters",
+    "searchLabel": "Search current audit page",
+    "searchPlaceholder": "Search current page by action, actor, target or diff...",
+    "dateRangeLabel": "Date range",
+    "targetTypeLabel": "Target type",
+    "exportVisible": "Export visible",
+    "copyViewLink": "Copy view link",
+    "refreshing": "Refreshing",
+    "refresh": "Refresh",
+    "categoryFiltersAriaLabel": "Audit event category filters",
+    "activeView": "Active view",
+    "clearFilters": "Clear filters"
+  },
+  "createTask": {
+    "errorTitleRequired": "Title is required",
+    "errorSaveFailed": "Save failed",
+    "triggerButton": "+ New task",
+    "dialogTitle": "New task",
+    "dialogDescription": "Create a follow-up — optionally linked to an opportunity.",
+    "fieldTitle": "Title",
+    "fieldOpportunity": "Opportunity",
+    "opportunityNone": "— None —",
+    "fieldStatus": "Status",
+    "statusOpen": "Open",
+    "statusInProgress": "In progress",
+    "statusBlocked": "Blocked",
+    "statusDone": "Done",
+    "fieldDueDate": "Due date",
+    "cancelButton": "Cancel",
+    "savingButton": "Saving…",
+    "submitButton": "Create task"
+  },
+  "oppWinProbabilityBadge": {
+    "loading": "Loading probability...",
+    "labelLikely": "Likely",
+    "labelPossible": "Possible",
+    "labelAtRisk": "At risk",
+    "featureDealValue": "Deal Value",
+    "featureOwnerWinRate": "Owner Win Rate",
+    "featurePipelineStage": "Pipeline Stage",
+    "featureQualificationScore": "Qualification Score",
+    "factorsAriaLabel": "Win probability factors",
+    "popoverTitle": "Win probability: {{prob}}%",
+    "keyFactors": "Key factors",
+    "badgeAriaLabel": "Win probability: {{prob}}% — {{label}}"
+  },
+  "intelCards": {
+    "dataFreshness": "Intel refreshed {{date}} · Sources: Crunchbase, LinkedIn, EU register",
+    "financial": {
+      "title": "Financial health",
+      "private": "Private",
+      "marketCap": "Market cap",
+      "revenueTtm": "Revenue (TTM)",
+      "growth": "Growth",
+      "ebitdaMargin": "EBITDA margin",
+      "creditRating": "Credit rating",
+      "headcount": "Headcount"
+    },
+    "winPrediction": {
+      "title": "Win prediction",
+      "empty": "No prediction available.",
+      "modelCaption": "Model {{version}}",
+      "probability": "probability"
+    },
+    "triggers": {
+      "title": "Buying triggers",
+      "caption": "Weighted signals",
+      "unknownSource": "unknown",
+      "weightAria": "Weight {{weight}}/10",
+      "empty": "No triggers detected yet."
+    },
+    "competitors": {
+      "title": "Competitor landscape",
+      "empty": "No competitors mapped."
+    },
+    "news": {
+      "title": "Recent news",
+      "empty": "No news pulled."
+    }
+  },
+  "serviceCaseDetail": {
+    "errorTitle": "Failed to load case",
+    "errorMessage": "Something went wrong",
+    "notFoundTitle": "Case not found",
+    "notFoundMessage": "This case may have been deleted.",
+    "noteAddedToast": "Note added to case",
+    "noteErrorToast": "Could not save note",
+    "ownerLabel": "Owner: {{name}}",
+    "priorityLabel": "Priority: {{priority}}",
+    "sourceLabel": "Source: {{source}}",
+    "slaLabel": "SLA: {{date}}",
+    "markStatusButton": "Mark {{status}}",
+    "descriptionHeading": "Description",
+    "noDescription": "No description provided.",
+    "addNoteLabel": "Add note",
+    "notePlaceholder": "Write an internal note…",
+    "savingButton": "Saving…",
+    "saveNoteButton": "Save note",
+    "detailsHeading": "Details",
+    "createdLabel": "Created",
+    "updatedLabel": "Updated",
+    "resolvedLabel": "Resolved",
+    "closedLabel": "Closed"
+  },
+  "tagPicker": {
+    "addTag": "Tag",
+    "popoverLabel": "Tag picker",
+    "searchPlaceholder": "Search or create…",
+    "existingTagsLabel": "Existing tags",
+    "createNamed": "+ Create “{{name}}”",
+    "aiSuggestions": "AI suggestions",
+    "suggestThinking": "Thinking…",
+    "suggestAction": "Suggest"
+  },
+  "workflows": {
+    "toastCreated": "Workflow created",
+    "toastCreateError": "Could not create workflow",
+    "toastPaused": "Workflow paused",
+    "toastActivated": "Workflow activated",
+    "toastUpdateError": "Could not update workflow",
+    "toastRunSuccess": "Workflow ran successfully",
+    "toastRunFailed": "Workflow run {{status}}{{detail}}",
+    "toastRunError": "Could not run workflow",
+    "deleteConfirmTitle": "Delete workflow?",
+    "deleteConfirmDescription": "\"{{name}}\" will be removed. This can't be undone.",
+    "deleteConfirmLabel": "Delete",
+    "toastDeleted": "Workflow deleted",
+    "toastDeleteError": "Could not delete workflow",
+    "pageTitle": "Workflows",
+    "activeOnly": "Active only",
+    "newWorkflow": "New workflow",
+    "countOne": "{{count}} workflow",
+    "countOther": "{{count}} workflows",
+    "activeOnlySuffix": " · active only",
+    "errorTitle": "Failed to load workflows",
+    "retry": "Retry",
+    "emptyTitle": "No workflows yet",
+    "emptyMessage": "Automate your pre-sales workflows.",
+    "statusActive": "Active",
+    "statusInactive": "Inactive",
+    "runCount": "{{count}} runs",
+    "lastRun": "Last run {{date}}",
+    "statusPaused": "Paused",
+    "running": "Running…",
+    "run": "Run",
+    "deleteAriaLabel": "Delete workflow: {{name}}"
+  },
+  "topbarNotifications": {
+    "tooltipUnread": "{{count}} unread notification",
+    "tooltipTitle": "Notifications",
+    "bellAriaUnread": "Notifications, {{count}} unread",
+    "bellAria": "Notifications",
+    "trayAria": "Notifications",
+    "heading": "Notifications",
+    "markAllRead": "Mark all read",
+    "errorMessage": "Could not load notifications",
+    "loading": "Loading…",
+    "empty": "You’re all caught up"
+  },
+  "createEvent": {
+    "modalLabel": "Create calendar event",
+    "heading": "New event",
+    "titleLabel": "Title",
+    "titlePlaceholder": "Event title",
+    "dateLabel": "Date",
+    "calendarLabel": "Calendar",
+    "providerGoogle": "Google",
+    "providerMicrosoft": "Microsoft",
+    "startLabel": "Start",
+    "endLabel": "End",
+    "locationLabel": "Location (optional)",
+    "locationPlaceholder": "Room, Zoom link, address…",
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "submit": "Create event"
+  },
+  "leadScoreBadge": {
+    "labelHot": "Hot",
+    "labelWarm": "Warm",
+    "labelCold": "Cold",
+    "loading": "Loading score...",
+    "badgeAriaLabel": "Lead score: {{score}} out of 100 — {{label}}",
+    "popoverAriaLabel": "Score factors",
+    "popoverHeading": "Top scoring factors",
+    "popoverFooter": "Score {{score}}/100 · ML model"
+  },
+  "winLossReasons": {
+    "regionLabel": "Win/loss reasons",
+    "title": "Win / loss reasons",
+    "caption": "Why deals close — and the pattern across the org",
+    "errorTitle": "Could not load win/loss patterns",
+    "errorMessage": "Try again shortly.",
+    "recordedCount": "{{won}} won · {{lost}} lost recorded",
+    "patternBadge": "Pattern",
+    "mostLossesCitePrefix": "Most losses cite ",
+    "noReasonsYet": "No loss reasons recorded yet — capture a few to surface patterns.",
+    "toastPickDeal": "Pick a closed deal first",
+    "toastRecorded": "Reason recorded",
+    "toastSaveError": "Could not save",
+    "formHeading": "Record a reason",
+    "closedDealLabel": "Closed deal",
+    "selectClosedDeal": "Select a closed deal…",
+    "reasonLabel": "Reason",
+    "competitorPlaceholder": "Competitor (optional)",
+    "competitorLabel": "Competitor",
+    "notePlaceholder": "Note (optional)",
+    "noteLabel": "Note",
+    "saving": "Saving…",
+    "submit": "Record reason"
+  },
+  "accountIntel": {
+    "title": "Account Intelligence",
+    "caption": "Solutions, products & document extractions",
+    "tablistLabel": "Account intelligence views",
+    "tabSolutions": "Solutions ({{count}})",
+    "tabProducts": "Products ({{count}})",
+    "tabExtractions": "Extractions ({{count}})",
+    "loadFailed": "Failed to load",
+    "extractQueued": "Extraction queued — intelligence will appear shortly",
+    "extractFailed": "Extraction failed",
+    "unknownError": "Unknown error"
+  },
+  "newWorkflow": {
+    "triggerRecordCreated": "When a record is created",
+    "triggerRecordUpdated": "When a record is updated",
+    "triggerStageChanged": "When a stage changes",
+    "triggerSchedule": "On a schedule",
+    "triggerWebhookReceived": "When a webhook is received",
+    "triggerManual": "Manually / on demand",
+    "actionSendEmail": "Send email",
+    "actionSendSlack": "Send Slack message",
+    "actionCreateTask": "Create task",
+    "actionUpdateField": "Update field",
+    "actionCallWebhook": "Call webhook",
+    "actionAssignOwner": "Assign owner",
+    "actionRunDustAgent": "Run Dust agent",
+    "actionCreateNotification": "Create notification",
+    "nameRequiredError": "A workflow name is required.",
+    "dialogTitle": "New workflow",
+    "dialogDescription": "Pick a trigger and the actions to run when it fires. You can fine-tune each step after the workflow exists.",
+    "nameLabel": "Workflow name",
+    "namePlaceholder": "Notify owner when a deal reaches Negotiation",
+    "triggerLabel": "Trigger",
+    "actionsLabel": "Actions",
+    "actionSelectAriaLabel": "Action {{number}}",
+    "removeActionAriaLabel": "Remove action {{number}}",
+    "addAction": "Add action",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "What this workflow does and when it should run…",
+    "cancel": "Cancel",
+    "creating": "Creating…",
+    "submit": "Create workflow"
+  },
+  "territory": {
+    "fieldName": "Name",
+    "namePlaceholder": "e.g., DACH Enterprise",
+    "fieldRegion": "Region",
+    "regionPlaceholder": "e.g., Europe",
+    "fieldCountryCodes": "Country codes",
+    "countryCodesPlaceholder": "DE, AT, CH",
+    "countryCodesHint": "Comma-separated ISO-3166 alpha-2 codes.",
+    "fieldPostalCodes": "Postal codes",
+    "postalCodesPlaceholder": "Optional",
+    "postalCodesHint": "Comma-separated postal codes for fine-grained routing.",
+    "fieldOwner": "Owner",
+    "ownerPlaceholder": "Select an owner",
+    "fieldActive": "Active",
+    "cancel": "Cancel",
+    "saveChanges": "Save changes",
+    "create": "Create territory",
+    "editTitle": "Edit territory",
+    "newTitle": "New territory"
+  },
+  "meetingPrep": {
+    "ariaLabel": "AI Meeting Prep",
+    "title": "✦ AI Meeting Prep",
+    "preparing": "Preparing…",
+    "generateButton": "Generate brief",
+    "generatingAriaLabel": "Generating meeting brief…",
+    "errorCapReached": "Daily AI limit reached. Try again tomorrow.",
+    "errorGeneric": "Failed to prepare brief. Please try again.",
+    "sectionAttendees": "Attendees",
+    "sectionOpenDeals": "Open Deals",
+    "sectionTalkingPoints": "Talking Points",
+    "sectionSuggestedQuestions": "Suggested Questions",
+    "sectionRecentInteractions": "Recent Interactions",
+    "cost": "Cost: ${{amount}}",
+    "emptyState": "Generate an AI-powered brief covering attendees, open deals, talking points, and suggested questions for this meeting."
+  },
+  "intake": {
+    "title": "Intake",
+    "subtitle": "Receive documents, extract intelligence, review, and publish to account profiles.",
+    "toastExtractionComplete": "Extraction complete",
+    "toastSelectDocument": "Select at least one document",
+    "toastExtractionFailed": "Extraction failed"
+  },
+  "healthScore": {
+    "regionLabel": "Account signal coverage",
+    "title": "Signal coverage",
+    "signalsScored": "{{count}} account signals scored",
+    "gaugeLabel": "Account signal coverage {{score}} out of 100",
+    "coverage": "Coverage",
+    "strongestBand": "Strongest coverage band",
+    "noSignal": "No signal",
+    "healthBands": "Health bands",
+    "whatDrivesScore": "What drives this score",
+    "scoreFactors": "Score factors",
+    "nextLabel": "Next: ",
+    "band": {
+      "strong": "Strong",
+      "good": "Good",
+      "needsAttention": "Needs attention",
+      "critical": "Critical"
+    }
+  },
+  "objectSettingsForm": {
+    "updateFailed": "Update failed",
+    "heading": "Object Settings",
+    "saved": "Saved.",
+    "singularLabel": "Singular label",
+    "pluralLabel": "Plural label",
+    "description": "Description",
+    "color": "Color",
+    "selectColor": "Select color {{color}}",
+    "apiKeyLabel": "API key:",
+    "apiKeyImmutable": "(immutable)",
+    "saving": "Saving…",
+    "saveChanges": "Save changes"
+  },
+  "contactContextMenu": {
+    "copySuccess": "Copied {{label}}",
+    "copyError": "Copy failed",
+    "menuAriaLabel": "Actions for {{name}}",
+    "editContact": "Edit contact",
+    "emailLabel": "email",
+    "copyEmail": "Copy email",
+    "phoneLabel": "phone",
+    "copyPhone": "Copy phone",
+    "deleteContact": "Delete contact"
+  },
+  "dataTrust": {
+    "regionLabel": "Data trust and attribution",
+    "title": "Data trust",
+    "caption": "Key fields include available source attribution",
+    "attributionConfidence": "Attribution confidence",
+    "attributedSources": "{{count}} attributed sources",
+    "checkLegalIdentity": "Legal identity",
+    "checkLogo": "Logo",
+    "checkFreshness": "Freshness",
+    "valueAttributed": "Attributed",
+    "valuePending": "Pending",
+    "sourceReceipts": "Source receipts",
+    "emptySources": "Run data verification to attach registry, logo, and market data sources.",
+    "logoSourceLogoDev": "Logo.dev",
+    "logoSourceOfficial": "Official",
+    "logoSourceBrandfetch": "Brandfetch",
+    "logoSourceWikimedia": "Wikimedia",
+    "logoSourceFavicon": "Favicon",
+    "logoSourceManual": "Manual",
+    "logoSourceInitials": "Initials"
+  },
+  "topbarSearch": {
+    "label": "Search opportunities, contacts, tasks",
+    "placeholder": "Search or jump to…",
+    "recentSearchesAriaLabel": "Recent searches",
+    "recentHeading": "Recent",
+    "clear": "Clear"
+  },
+  "newReference": {
+    "titleRequired": "A reference title is required.",
+    "dialogTitle": "New reference",
+    "dialogDescription": "Capture a reusable customer reference — case study, testimonial, or win story — for proposals and bids.",
+    "titleLabel": "Title",
+    "titlePlaceholder": "Acme Corp — 40% faster onboarding",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "What was delivered, the outcome, and why it's quotable…",
+    "industryLabel": "Industry",
+    "industryPlaceholder": "Software",
+    "dealValueLabel": "Deal value",
+    "dealValuePlaceholder": "250000",
+    "contactNameLabel": "Contact name",
+    "contactNamePlaceholder": "Jane Doe",
+    "contactEmailLabel": "Contact email",
+    "contactEmailPlaceholder": "jane@acme.com",
+    "documentUrlLabel": "Document URL",
+    "tagsLabel": "Tags",
+    "tagsHelper": "Comma-separated",
+    "tagsPlaceholder": "case-study, enterprise, emea",
+    "cancel": "Cancel",
+    "creating": "Creating…",
+    "create": "Create reference"
+  },
+  "bidScore": {
+    "title": "Bid/No-Bid Score",
+    "criteriaBreakdownLabel": "Criteria breakdown",
+    "criterionPoints": "{{points}}/{{weight}} pts",
+    "categoryScoresLabel": "Category scores",
+    "recBid": "Bid",
+    "recNoBid": "No-Bid",
+    "recConditionalBid": "Conditional Bid",
+    "loadError": "Could not load the bid score. Refresh to try again.",
+    "overallScore": "overall score",
+    "overridden": "Overridden",
+    "detailsButton": "Details",
+    "emptyState": "No bid evaluation score has been recorded for this opportunity yet.",
+    "evaluateButton": "Evaluate Now"
+  },
+  "salesToolkits": {
+    "pageTitle": "Sales Toolkits",
+    "pageSubtitle": "Industry playbooks and courses from Mantu Academy — pulled live, filtered by sector.",
+    "errorTitle": "Mantu Academy is unreachable",
+    "errorMessage": "The LMS did not respond. Try again shortly.",
+    "emptyFilteredTitle": "No courses tagged \"{{sector}}\"",
+    "emptyTitle": "No courses published yet",
+    "emptyMessage": "Courses appear here as soon as Mantu Academy publishes them with sector tags.",
+    "resultCount": "{{count}} course",
+    "resultCountInSector": "{{count}} course in {{sector}}",
+    "filterGroupLabel": "Filter by sector",
+    "allSectors": "All sectors",
+    "openInAcademy": "Open in Mantu Academy",
+    "sampleDataLabel": "Sample data.",
+    "sampleDataIntro": "These are illustrative toolkits. Set",
+    "sampleDataOutro": "+ credentials to pull live courses from Mantu Academy."
+  },
+  "reviewStep": {
+    "toastRemoved": "Removed \"{{name}}\"",
+    "toastRemoveFailed": "Failed to remove \"{{name}}\"",
+    "heading": "Review extracted data",
+    "refresh": "Refresh",
+    "loading": "Loading…",
+    "groupSolutions": "Solutions",
+    "groupProducts": "Products",
+    "back": "← Back",
+    "publish": "Publish →",
+    "groupHeading": "{{title}} ({{count}})",
+    "empty": "No {{label}} extracted.",
+    "removeAria": "Remove {{name}}"
+  },
+  "kpiRow": {
+    "workspaceMetricsAriaLabel": "Workspace metrics",
+    "noLiveSignalTitle": "No live signal yet"
+  },
+  "taskDetail": {
+    "errorTitle": "Failed to load task",
+    "errorMessage": "Something went wrong",
+    "notFoundTitle": "Task not found",
+    "notFoundMessage": "This task may have been deleted.",
+    "titleAriaLabel": "Task title",
+    "opportunityLink": "Opportunity",
+    "assignedTo": "Assigned to {{assignee}}",
+    "due": "Due {{date}}",
+    "noDate": "no date",
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "statusLabel": "Status",
+    "statusAriaLabel": "Status",
+    "statusOpen": "Open",
+    "statusInProgress": "In Progress",
+    "statusBlocked": "Blocked",
+    "statusDone": "Done",
+    "idLabel": "ID",
+    "createdLabel": "Created"
+  },
+  "auditLogHero": {
+    "badge": "Governance console",
+    "eyebrow": "Read-only evidence trail",
+    "title": "Audit Log",
+    "subtitle": "Review security, agent, workflow and data mutations with enough context to explain who changed what, when it happened and where to investigate next.",
+    "refreshing": "Refreshing evidence...",
+    "visibleOnPage": "{{count}} visible on page {{page}}",
+    "refreshedSuffix": "refreshed {{time}}",
+    "metric": {
+      "eventsLoaded": {
+        "label": "Events loaded",
+        "helper": "Current server page"
+      },
+      "security": {
+        "label": "Security/API",
+        "helper": "Keys, MCP, auth, webhooks"
+      },
+      "destructive": {
+        "label": "Destructive",
+        "helper": "Deletes, revokes, cancels"
+      },
+      "dataChanges": {
+        "label": "Data changes",
+        "helper": "Revenue record edits"
+      },
+      "latestEvent": {
+        "label": "Latest event",
+        "none": "None",
+        "noEvents": "No events in range"
+      }
+    }
+  },
+  "taskCalendar": {
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "weekdaySun": "Sun",
+    "weekdayMon": "Mon",
+    "weekdayTue": "Tue",
+    "weekdayWed": "Wed",
+    "weekdayThu": "Thu",
+    "weekdayFri": "Fri",
+    "weekdaySat": "Sat"
+  },
+  "recentActivity": {
+    "heading": "Recent activity",
+    "latestUpdates": "Latest updates",
+    "empty": "No recent activity",
+    "viewAll": "View all {{count}} activities →"
+  },
+  "extractStep": {
+    "heading": "Run extraction",
+    "processingCount": "Processing {{count}} documents…",
+    "intro": "Dust agents will parse {{count}} documents and extract solutions, products, capabilities, and pricing.",
+    "back": "← Back",
+    "queuing": "Queuing…",
+    "runButton": "Run extraction",
+    "status": {
+      "queued": "Queued",
+      "pending": "Pending",
+      "running": "Running",
+      "done": "Completed",
+      "completed": "Completed",
+      "error": "Error",
+      "failed": "Failed"
+    }
+  },
+  "companyLogo": {
+    "ariaLabel": "{{name}} logo"
+  },
+  "ai-feedback": {
+    "thanks": "Thanks for your feedback!",
+    "aria-rate-response": "Rate this AI response",
+    "was-this-helpful": "Was this helpful?",
+    "aria-rating": "Rating",
+    "aria-star-rating": "{{count}} star",
+    "comment-placeholder": "Optional comment…",
+    "aria-comment": "Feedback comment",
+    "submitting": "Sending…",
+    "submit": "Submit feedback",
+    "error": "Failed to submit feedback. Please try again."
+  },
+  "contactQuickLook": {
+    "title": "Quick Look",
+    "fieldCustomer": "Customer",
+    "fieldEmail": "Email",
+    "fieldPhone": "Phone",
+    "fieldInfluence": "Influence",
+    "fieldSentiment": "Sentiment",
+    "footerPress": "Press",
+    "footerOr": "or",
+    "footerToClose": "to close",
+    "readOnly": "Read-only"
+  },
+  "opportunityAccountIntel": {
+    "title": "Account intel",
+    "errorTitle": "Failed to load",
+    "emptyTitle": "No intelligence yet",
+    "emptyMessage": "Upload documents in the account cockpit to extract solutions & products.",
+    "caption": "{{solutionCount}} solutions · {{productCount}} products",
+    "solutionsHeading": "Solutions",
+    "productsHeading": "Products",
+    "moreSolutions": "+{{count}} more",
+    "moreProducts": "+{{count}} more"
+  },
+  "account": {
+    "openCockpitAria": "Open {{name}} customer cockpit",
+    "unknownIndustry": "Unknown industry",
+    "dataSourcesAria": "{{name}} data sources",
+    "openDeals": "Open deals",
+    "pipeline": "Pipeline",
+    "totalDeals": "Total deals",
+    "employees": "Employees",
+    "confidence": "Confidence",
+    "openAccountCockpit": "Open account cockpit"
+  },
+  "openIssues": {
+    "regionLabel": "Open issues by severity",
+    "title": "Open issues",
+    "captionAllClear": "All clear",
+    "captionItemsToAction": "{{count}} item{{plural}} to action",
+    "bucketsLabel": "Severity buckets",
+    "severityCritical": "Critical",
+    "severityHigh": "High",
+    "severityMedium": "Medium",
+    "severityLow": "Low",
+    "emptyTitle": "No open issues",
+    "emptyMessage": "Everything is green here.",
+    "unassigned": "Unassigned",
+    "dueSuffix": " - due {{dueDate}}",
+    "noOwner": "No owner"
+  },
+  "deliveryHistory": {
+    "heading": "Delivery history",
+    "showingRecent": "Showing 50 most recent",
+    "errorTitle": "Failed to load",
+    "errorMessage": "Could not load delivery history.",
+    "empty": "No deliveries recorded yet.",
+    "columnEvent": "Event",
+    "columnStatus": "Status",
+    "columnDuration": "Duration",
+    "columnAttempt": "Attempt",
+    "columnTime": "Time",
+    "statusTimeout": "timeout",
+    "hideError": "Hide error",
+    "showError": "Show error"
+  },
+  "activityTimeline": {
+    "regionLabel": "Recent activity",
+    "title": "Recent activity",
+    "itemCount": "Last {{count}} items",
+    "emptyTitle": "Nothing yet",
+    "emptyMessage": "Tasks, emails, and Dust runs for this account will appear here."
+  },
+  "routeAnnouncer": {
+    "nowOn": "Now on {{title}}",
+    "accountDetail": "Account: {{name}}",
+    "opportunityDetail": "Opportunity detail",
+    "contactDetail": "Contact detail",
+    "leadDetail": "Lead detail",
+    "companyDetail": "Company detail",
+    "taskDetail": "Task detail",
+    "serviceDeskCaseDetail": "Service desk case detail",
+    "routeFallback": "Page",
+    "routeDashboard": "Dashboard",
+    "routeAccounts": "Accounts",
+    "routeKeyAccounts": "Key Accounts",
+    "routeTopAccounts": "Top Accounts",
+    "routeCompanies": "Companies",
+    "routeReferenceLibrary": "Reference Library",
+    "routeOpportunities": "Opportunities",
+    "routePipeline": "Pipeline",
+    "routeBidDecisionMatrix": "Bid Decision Matrix",
+    "routeLeads": "Leads",
+    "routeContacts": "Contacts",
+    "routeTasks": "Tasks",
+    "routeTerritories": "Territories",
+    "routeServiceDesk": "Service Desk",
+    "routeWorkflows": "Workflows",
+    "routeDocumentIntake": "Document Intake",
+    "routeReports": "Reports",
+    "routeAnalytics": "Analytics",
+    "routeDashboards": "Dashboards",
+    "routeSearch": "Search",
+    "routeIntegrations": "Integrations",
+    "routeAuditLog": "Audit Log",
+    "routeSettings": "Settings",
+    "routeLogin": "Sign in"
+  },
+  "sectorView": {
+    "title": "Sector view",
+    "subtitle": "Where Amaris is active by industry — accounts, countries, and FTE volume from ABC.",
+    "errorTitle": "Could not load the sector view",
+    "errorMessage": "The sector endpoint did not respond.",
+    "emptyTitle": "No sector data yet",
+    "emptyMessage": "Accounts gain a sector when ABC classification (or external enrichment) fills their industry.",
+    "qualityWarningHeading": "Sector data quality is low.",
+    "qualityWarningDetail": "{{classified}} of {{total}} accounts carry an ABC sector classification — treat these splits as directional until ABC coverage improves.",
+    "accountCountOne": "{{count}} account",
+    "accountCountOther": "{{count}} accounts",
+    "fteValue": "{{value}} FTE",
+    "fteUnknown": "FTE unknown",
+    "fteUnknownTooltip": "No account in this sector has a known headcount",
+    "countriesBadge": "{{count}} countries",
+    "tableCountry": "Country",
+    "tableAccounts": "Accounts",
+    "tableFteVolume": "FTE volume",
+    "unknownCountry": "Unknown"
+  },
+  "opportunitiesTableHead": {
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "columnCode": "Code",
+    "columnOpportunity": "Opportunity",
+    "columnTerritory": "Territory",
+    "columnStage": "Stage",
+    "columnValue": "Value",
+    "columnProbability": "Probability",
+    "columnDue": "Due"
+  },
+  "territorySegmentBreakdown": {
+    "nounIndustry": "industry",
+    "nounAccount": "account",
+    "nounCountry": "country",
+    "emptyIndustry": "Opportunities need an industry to appear here.",
+    "emptyAccount": "Opportunities need a linked account to appear here.",
+    "emptyCountry": "Opportunities need a country to appear here.",
+    "errorTitle": "Failed to load {{noun}} breakdown",
+    "errorMessage": "The server rejected the request.",
+    "retry": "Retry",
+    "emptyTitle": "No data yet",
+    "oppCountOne": "{{count}} opp",
+    "oppCountOther": "{{count}} opps",
+    "avgProbability": "{{percent}}% avg probability",
+    "overflowOne": "+ {{count}} more {{noun}} not shown",
+    "overflowIndustryOther": "+ {{count}} more {{noun}} segments not shown",
+    "overflowOther": "+ {{count}} more {{noun}}s not shown"
+  },
+  "convertLead": {
+    "title": "Convert lead",
+    "description": "This will create a new opportunity and contact from this lead.",
+    "opportunityNameLabel": "Opportunity name",
+    "opportunityNamePlaceholderWithCompany": "{{companyName}} — Opportunity",
+    "opportunityNamePlaceholder": "Opportunity name",
+    "valueLabel": "Value (EUR)",
+    "stageLabel": "Stage",
+    "stageDiscovery": "Discovery",
+    "stageQualified": "Qualified",
+    "stageProposal": "Proposal",
+    "stageNegotiation": "Negotiation",
+    "stageClosedWon": "Closed won",
+    "stageClosedLost": "Closed lost",
+    "converting": "Converting…",
+    "submit": "Convert lead",
+    "cancel": "Cancel"
+  },
+  "bidStack360Logo": {
+    "title": "BidStack 360",
+    "tagline": "BID PILOTING PLATFORM"
+  },
+  "leadRow": {
+    "statusNew": "New",
+    "statusContacted": "Contacted",
+    "statusQualified": "Qualified",
+    "statusNurture": "Nurture",
+    "statusDisqualified": "Disqualified",
+    "statusConverted": "Converted",
+    "priorityLow": "Low",
+    "priorityMedium": "Medium",
+    "priorityHigh": "High",
+    "priorityCritical": "Critical",
+    "deselectLead": "Deselect {{name}}",
+    "selectLead": "Select {{name}}",
+    "editStatusLabel": "Edit status for {{name}}",
+    "editPriorityLabel": "Edit priority for {{name}}",
+    "deleteLead": "Delete {{name}}",
+    "delete": "Delete"
+  },
+  "companyRow": {
+    "selectCompany": "Select {{name}}",
+    "deselectCompany": "Deselect {{name}}",
+    "view": "View",
+    "delete": "Delete",
+    "deleteConfirmTitle": "Delete {{name}}?",
+    "deleteConfirmDescription": "This action cannot be undone.",
+    "deleteConfirmLabel": "Delete"
+  },
+  "infoSearchLeads": {
+    "regionLabel": "InfoSearch lead intel",
+    "title": "InfoSearch leads",
+    "captionPreview": "Sample lead intel — connect InfoSearch (INFOSEARCH_ENABLED) for live call lists",
+    "captionLive": "Call lists and lead intel for this account — pulled live from InfoSearch",
+    "errorTitle": "InfoSearch is unreachable",
+    "errorMessage": "Lead intel could not be loaded.",
+    "empty": "No InfoSearch leads matched this account.",
+    "emailAction": "Email",
+    "callAction": "Call"
+  },
+  "displayCharts": {
+    "heatmapAriaLabel": "Heatmap",
+    "noRows": "No rows to display.",
+    "tableAriaLabel": "Data table"
+  },
+  "newCompany": {
+    "nameRequiredError": "Company name is required.",
+    "title": "New company",
+    "description": "Create the account profile first. You can enrich firmographics and contacts after the record exists.",
+    "nameLabel": "Company name",
+    "namePlaceholder": "Acme Inc.",
+    "domainLabel": "Domain",
+    "domainPlaceholder": "acme.com",
+    "countryCodeLabel": "Country code",
+    "countryCodePlaceholder": "CA",
+    "industryLabel": "Industry",
+    "industryPlaceholder": "Software",
+    "cancelButton": "Cancel",
+    "creatingButton": "Creating…",
+    "createButton": "Create company"
+  },
+  "salesFunnel": {
+    "title": "Sales funnel",
+    "viewPipeline": "View pipeline",
+    "stageLeads": "Leads",
+    "stageOpportunities": "Opportunities",
+    "stageOpenDeals": "Open Deals",
+    "stagePipeline": "Pipeline"
+  },
+  "customObjectEditor": {
+    "loadError": {
+      "title": "Couldn't load object definitions",
+      "message": "The server did not respond."
+    },
+    "retry": "Retry",
+    "notFound": "Object not found.",
+    "backToList": "Back to list",
+    "breadcrumbLabel": "Breadcrumb",
+    "customObjects": "Custom Objects",
+    "viewRecords": "View {{labelPlural}} →"
+  },
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "description": "We're sorry, but an unexpected error has occurred.",
+    "reloadButton": "Reload page",
+    "clearDataButton": "Clear app data & reload"
+  },
+  "newForecast": {
+    "title": "New Forecast",
+    "description": "Enter amounts for each category.",
+    "periodLabel": "Period",
+    "periodPlaceholder": "e.g. 2026-05, 2026-Q2, or 2026",
+    "ownerLabel": "Owner",
+    "ownerPlaceholder": "Select owner…",
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "save": "Save Forecast"
+  },
+  "webVitalsHud": {
+    "regionLabel": "Dev metrics HUD",
+    "title": "DEV HUD",
+    "hideButtonLabel": "Hide dev HUD",
+    "fetchMutLabel": "fetch / mut"
+  },
+  "settings": {
+    "pageTitle": "Settings",
+    "pageSubtitle": "Manage your account, workspace controls, data model, and developer access.",
+    "sectionOverview": "Overview",
+    "sectionProfile": "Profile",
+    "sectionAppearance": "Appearance & Language",
+    "sectionLanguage": "Language",
+    "sectionNotifications": "Notifications",
+    "sectionSecurity": "Profile & Security",
+    "sectionWorkspace": "Workspace",
+    "sectionCrm": "Data configuration",
+    "sectionDataImport": "Data import",
+    "sectionTopAccounts": "Top accounts",
+    "sectionGroups": "Access groups",
+    "sectionOpportunityFilters": "Opportunity filters",
+    "sectionRfpAnalytics": "RFP Analytics",
+    "sectionIntegrations": "Integrations",
+    "sectionWebhooks": "Webhooks",
+    "sectionAuditLog": "Audit log",
+    "sectionDeveloper": "Developer access"
+  },
+  "override": {
+    "title": "Score is below the bid threshold",
+    "description": "This evaluation computes {{totalScore}}/100 — {{verdict}}. Save it as-is, or override the recommendation to proceed with the bid. Overrides require a justification and are logged for director/VP review.",
+    "justificationLabel": "Override justification",
+    "justificationPlaceholder": "Why are we bidding despite the score? Strategic account, market entry, mandated framework…",
+    "hintReady": "{{count}} characters — ready to submit.",
+    "hintMore": "Minimum {{min}} characters ({{remaining}} more needed).",
+    "followAriaLabel": "Save score and follow the recommendation",
+    "followButton": "Save & follow recommendation",
+    "overrideAriaLabel": "Override the recommendation and proceed with the bid",
+    "saving": "Saving…",
+    "overrideButton": "Override & proceed with bid"
+  },
+  "kpiSidebar": {
+    "title": "Platform status",
+    "caption": "Latest available BidStack metrics",
+    "releaseScore": "Release score",
+    "providersHealthy": "Providers healthy",
+    "queueBacklog": "Queue backlog",
+    "overdueTasks": "Overdue tasks"
+  },
+  "inlineTaskAdd": {
+    "toastAddedTitle": "Task added",
+    "toastErrorTitle": "Could not add task",
+    "toastErrorDescription": "The server rejected the request.",
+    "titlePlaceholder": "Add a quick task — Enter to save",
+    "titleAriaLabel": "Quick-add task title",
+    "dueDateAriaLabel": "Optional due date",
+    "submitButton": "Add"
+  },
+  "recentOpportunities": {
+    "accountTitle": "Account opportunities",
+    "recentTitle": "Recent opportunities",
+    "accountCaption": "Open opportunities linked to {{accountName}}",
+    "recentCaption": "Latest portfolio activity across all customers",
+    "openPipeline": "Open pipeline",
+    "viewAll": "View all",
+    "emptyAccountTitle": "No opportunities for this account yet",
+    "emptyTitle": "No opportunities yet",
+    "emptyAccountMessage": "Create an opportunity from the account header to start a bid workspace."
+  },
+  "spotlightRefs": {
+    "regionLabel": "Spotlight references",
+    "sectionTitle": "Project references",
+    "sectionCaption": "Validated Spotlight Ref references for this account",
+    "errorTitle": "Could not load references",
+    "errorMessage": "Try again shortly.",
+    "emptyTitle": "No references yet",
+    "emptyMessage": "Validated references arrive from Spotlight Ref once a consultant submits and a manager approves them.",
+    "statusDraft": "Draft",
+    "statusManagerReview": "Awaiting validation",
+    "statusValidated": "Validated",
+    "statusDispatched": "Dispatched",
+    "toastValidatedTitle": "Reference validated",
+    "toastValidationFailedTitle": "Validation failed",
+    "validateButton": "Validate"
+  },
+  "cockpitCustomizeMenu": {
+    "groupMain": "Main column",
+    "groupSide": "Sidebar",
+    "triggerLabel": "Customize",
+    "hiddenCount": "({{count}} hidden)",
+    "menuAriaLabel": "Customize cockpit blocks",
+    "showBlocks": "Show blocks",
+    "reset": "Reset"
+  },
+  "insightsBar": {
+    "heading": "Priority signals",
+    "overdueTasks": "{{count}} tasks overdue",
+    "stalledOpps": "{{count}} opportunities stalled",
+    "newLeads": "{{count}} new leads this week",
+    "pipelineValue": "€{{value}}M pipeline value"
+  },
+  "importOpportunities": {
+    "trigger": "Import",
+    "dialog": {
+      "title": "Import Opportunities",
+      "description": "Paste a JSON array of opportunities. Codes are auto-minted if omitted."
+    },
+    "cancel": "Cancel",
+    "submit": "Import",
+    "submitLoading": "Importing…",
+    "toast": {
+      "invalidJson": "Invalid JSON",
+      "successOne": "Imported {{count}} opportunity",
+      "successOther": "Imported {{count}} opportunities",
+      "rowsFailedOne": "{{count}} row failed",
+      "rowsFailedOther": "{{count}} rows failed",
+      "failed": "Import failed",
+      "unknownError": "Unknown error"
+    }
+  },
+  "winRate": {
+    "heading": "Win rate",
+    "emptyNoClosedBids": "No closed bids",
+    "wonCount": "{{count}} won",
+    "lostCount": "{{count}} lost"
+  },
+  "businessSnapshot": {
+    "title": "Business snapshot",
+    "caption": "Health: {{band}} - score {{score}}/100",
+    "region": {
+      "ariaLabel": "Business snapshot"
+    },
+    "row": {
+      "legalName": "Legal name",
+      "founded": "Founded",
+      "headquarters": "Headquarters",
+      "annualRevenue": "Annual revenue",
+      "employees": "Employees",
+      "intentTopics": "Intent topics",
+      "hiringMovement": "Hiring movement",
+      "leadershipChanges": "Leadership changes",
+      "externalSync": "External sync",
+      "sourceReceipts": "Source receipts",
+      "lastRefreshed": "Last refreshed",
+      "confidence": "Confidence"
+    },
+    "value": {
+      "notVerified": "Not verified",
+      "notSynced": "Not synced",
+      "hiringSummary": "{{trend}} ({{count}} signals)",
+      "leadershipSummary": "{{count}} C-level signals",
+      "sourceCount_one": "{{count}} source",
+      "sourceCount_other": "{{count}} sources"
+    }
+  },
+  "savedViewsBar": {
+    "namePromptTitle": "Name this view",
+    "namePromptPlaceholder": "e.g. \"My overdue today\"",
+    "namePromptConfirm": "Save View",
+    "savedToast": "Saved view \"{{name}}\"",
+    "recallAriaLabel": "Recall saved view",
+    "selectPlaceholder": "Saved views…",
+    "saveViewButton": "Save view",
+    "removeConfirmTitle": "Remove saved view?",
+    "removeConfirmDescription": "This removes \"{{name}}\" from your task shortcuts.",
+    "removeConfirmButton": "Remove",
+    "removeButtonTitle": "Remove most-recent saved view"
+  },
+  "collaborativeNotes": {
+    "heading": "Live collaboration",
+    "realTimeBadge": "· real-time",
+    "loadingEditor": "Loading editor",
+    "placeholder": "Start writing collaborative notes…"
+  },
+  "tagChip": {
+    "tagLabel": "{{name}}, tag",
+    "removeTag": "Remove tag {{name}}"
+  },
+  "scoreSummaryStrip": {
+    "overallBidScoreLabel": "Overall bid score: {{score}}%",
+    "rateCriteriaToBegin": "Rate criteria to begin",
+    "weightedScoreSummary": "Weighted score across {{count}} decision factors"
+  },
+  "accountNewsSignal": {
+    "title": "News & signals",
+    "caption": "Recent public-web news about this account — a free activity signal, not internal project data.",
+    "badgeFreeOpenWeb": "Free · Open web",
+    "errorTitle": "Could not load news",
+    "errorMessage": "The open-web news feed didn't respond. This is a best-effort free signal.",
+    "retry": "Retry",
+    "emptyTitle": "No recent news",
+    "emptyMessage": "No public-web headlines matched this account name in the last while.",
+    "badgeExternal": "External",
+    "sourceNote": "Source: Google News · verify before treating as a Mantu fact."
+  },
+  "googleSignInButton": {
+    "label": "Sign in with Google",
+    "ariaLabel": "Sign in with Google"
+  },
+  "sidebarCards": {
+    "quickActionsHeading": "Quick actions",
+    "action": {
+      "newLead": "New lead",
+      "openTasks": "Open tasks",
+      "contacts": "Contacts",
+      "companies": "Companies"
+    },
+    "quickLinksHeading": "Quick links",
+    "link": {
+      "pipeline": "Pipeline",
+      "reports": "Reports",
+      "tasks": "Tasks",
+      "settings": "Settings"
+    }
+  },
+  "briefing": {
+    "title": "Brief: {{label}}",
+    "description": "Executive summary generated by Dust (stubbed locally without DUST_API_KEY).",
+    "errorTitle": "Couldn't generate brief",
+    "errorUnknown": "Unknown error",
+    "contentAriaLabel": "Brief content",
+    "modelMeta": "Model {{model}} · {{tokens}} tokens",
+    "copy": "Copy",
+    "regenerate": "Regenerate"
+  },
+  "forecastChart": {
+    "title": "Forecast Breakdown",
+    "caption": "Stacked by category across periods"
+  },
+  "techStack": {
+    "regionLabel": "Technical Stack Overview",
+    "title": "Technical Stack Overview",
+    "caption": "From discovery & verification",
+    "emptyTitle": "No stack data yet",
+    "emptyMessage": "Enrich this account to discover its stack."
+  },
+  "keyContacts": {
+    "title": "Key contacts",
+    "noTitleOrEmail": "n/a"
+  },
+  "pipelineByStageMini": {
+    "heading": "Pipeline by stage"
+  },
+  "microsoftSignInButton": {
+    "label": "Sign in with Microsoft"
+  },
+  "customObjectNavItem": {
+    "recordCountLabel": "{{count}} records"
+  },
+  "alert": {
+    "ofTotal": "of {{total}}"
+  },
+  "pipelineByStage": {
+    "regionLabel": "Portfolio pipeline by stage",
+    "title": "Portfolio pipeline",
+    "caption": "All-account pipeline by stage"
+  },
+  "accountDashboardWidgets": {
+    "railAriaLabel": "CRM integration status",
+    "railLabel": "Integration activity",
+    "railCaption": "ERP, External CRM, verified data connectors"
+  },
+  "oppIndustryBreakdown": {
+    "title": "Pipeline by industry",
+    "sectorCount": "{{count}} sector"
+  },
+  "revenueEvolution": {
+    "regionLabel": "Revenue evolution",
+    "title": "Revenue evolution",
+    "caption": "Won-deal revenue with this client by month",
+    "srSummary": "{{count}} months of won-deal revenue. Peak {{period}}.",
+    "barsListLabel": "Won-deal revenue by month",
+    "barLabel": "{{period}}: {{amount}}"
+  },
+  "winLoss": {
+    "regionLabel": "Win / loss",
+    "title": "Win / loss",
+    "caption": "Decided deals on this account",
+    "winRateLabel": "win rate",
+    "wonCount": "{{count}} won",
+    "lostCount": "{{count}} lost",
+    "barLabel": "{{won}} won, {{lost}} lost — {{rate}}% win rate",
+    "wonValue": "{{value}} in won deals"
+  },
+  "pipelineViewSwitch": {
+    "ariaLabel": "Opportunity view",
+    "list": "List",
+    "board": "Board"
+  },
+  "accountHierarchyTree": {
+    "heading": "Account Hierarchy"
+  },
+  "keyboardShortcutsHelp": {
+    "title": "Keyboard shortcuts",
+    "description": "Press the key combination to navigate quickly.",
+    "commandPalette": "Command palette",
+    "helpPanel": "This help panel",
+    "goToDashboard": "Go to Dashboard",
+    "goToOpportunities": "Go to Opportunities",
+    "goToPipeline": "Go to Pipeline",
+    "goToContacts": "Go to Contacts",
+    "goToTasks": "Go to Tasks",
+    "goToReports": "Go to Reports",
+    "goToSettings": "Go to Settings",
+    "closeDialog": "Close any dialog/palette"
+  },
+  "leadStatusBadge": {
+    "statusNew": "New",
+    "statusContacted": "Contacted",
+    "statusQualified": "Qualified",
+    "statusNurture": "Nurture",
+    "statusDisqualified": "Disqualified",
+    "statusConverted": "Converted",
+    "priorityLow": "Low",
+    "priorityMedium": "Medium",
+    "priorityHigh": "High",
+    "priorityCritical": "Critical"
+  },
+  "publishStep": {
+    "heading": "Published",
+    "summary": "{{solutionCount}} solution{{solutionSuffix}} and {{productCount}} product{{productSuffix}} are now live on the account cockpit.",
+    "backButton": "← Review",
+    "startNewButton": "Start new intake"
+  },
+  "offlineIndicator": {
+    "statusLabel": "Offline",
+    "retryMessage": "— saves will retry when you reconnect"
+  },
+  "accountTierBadges": {
+    "top": "Top",
+    "topRanked": "Top #{{rank}}",
+    "key": "Key"
+  },
+  "stubAuthBypass": {
+    "devModeSkipToDashboard": "Dev Mode — Skip to Dashboard"
+  },
+  "upsellFiles": {
+    "title": "Files",
+    "emptyTitle": "Pick an account",
+    "emptyMessage": "Open an account from /accounts to attach proposals, NDAs, and reference architectures."
   }
 }
