@@ -1,0 +1,34 @@
+# Keep `railway up` uploads lean. The Docker build (apps/api|worker Dockerfile)
+# runs `pnpm install` + builds, so node_modules/.git aren't needed — but KEEP all
+# workspace package.json + source so the monorepo resolves.
+
+# Heavy non-source siblings
+BIDCRM-design/
+scratch_skills/
+scratch_img/
+.tmp/
+.audit-screens/
+.planning/
+handoff/
+.corepack/
+.claude/
+.codex/
+.git/
+.vercel/
+
+# Dependencies + build outputs (reinstalled/rebuilt in the image)
+node_modules/
+**/node_modules/
+**/dist/
+**/build/
+**/.turbo/
+**/.vite/
+**/coverage/
+**/playwright-report/
+**/test-results/
+*.tsbuildinfo
+deploy-evidence/
+
+# Working artifacts
+walteur-kit/
+_relay/
