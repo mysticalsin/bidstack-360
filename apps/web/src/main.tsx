@@ -75,6 +75,22 @@ window.addEventListener('error', (event) => {
   Sentry.captureException(event.error);
 });
 
+// A redeploy invalidates the hashed chunk filenames an open tab still references
+// (the demo "resets periodically"). vite:preloadError fires when a lazy import()
+// 404s — reload once to pull the fresh index.html + chunk graph. The
+// sessionStorage guard prevents a reload loop when the chunk is missing for a
+// non-deploy reason (genuinely offline). This is the fix for "the app breaks /
+// caches stale when left open too long".
+window.addEventListener('vite:preloadError', (event) => {
+  const KEY = 'bidstack:chunk-reload-at';
+  const last = Number(sessionStorage.getItem(KEY) ?? 0);
+  if (Date.now() - last > 10_000) {
+    sessionStorage.setItem(KEY, String(Date.now()));
+    event.preventDefault();
+    window.location.reload();
+  }
+});
+
 const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 const authMode = import.meta.env.VITE_AUTH_MODE;
 

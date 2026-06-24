@@ -33,6 +33,13 @@ function FallbackComponent({ error, componentStack }: FallbackProps) {
   }
 
   const errorMessage = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  // A lazy-chunk import that fails post-mount (a redeploy invalidated the old
+  // hashed filenames) lands here. Offer a clean reload — not a scary crash.
+  const isChunkError =
+    error instanceof Error &&
+    /Failed to fetch dynamically imported module|ChunkLoadError|error loading dynamically imported|Importing a module script failed/i.test(
+      error.message,
+    );
 
   return (
     <div
@@ -58,12 +65,19 @@ function FallbackComponent({ error, componentStack }: FallbackProps) {
             </svg>
           </div>
           <h1 className="text-lg font-semibold text-fg-primary">
-            {t('errorBoundary.title', 'Something went wrong')}
+            {isChunkError
+              ? t('errorBoundary.staleVersionTitle', 'A new version is available')
+              : t('errorBoundary.title', 'Something went wrong')}
           </h1>
         </div>
 
         <p className="mb-4 text-sm text-fg-secondary">
-          {t('errorBoundary.description', "We're sorry, but an unexpected error has occurred.")}
+          {isChunkError
+            ? t(
+                'errorBoundary.staleVersionDescription',
+                'The app updated in the background. Reload to get the latest version.',
+              )
+            : t('errorBoundary.description', "We're sorry, but an unexpected error has occurred.")}
         </p>
 
         {IS_DEV && (
@@ -83,13 +97,15 @@ function FallbackComponent({ error, componentStack }: FallbackProps) {
           >
             {t('errorBoundary.reloadButton', 'Reload page')}
           </button>
-          <button
-            type="button"
-            onClick={handleClear}
-            className="inline-flex items-center justify-center rounded-lg border border-border-default bg-surface-card px-4 py-2.5 text-sm font-medium text-fg-secondary transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-          >
-            {t('errorBoundary.clearDataButton', 'Clear app data & reload')}
-          </button>
+          {!isChunkError && (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="inline-flex items-center justify-center rounded-lg border border-border-default bg-surface-card px-4 py-2.5 text-sm font-medium text-fg-secondary transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+            >
+              {t('errorBoundary.clearDataButton', 'Clear app data & reload')}
+            </button>
+          )}
         </div>
       </div>
     </div>
