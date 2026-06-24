@@ -206,8 +206,42 @@ model Org {
   kamHandoffs       KamHandoff[]
   kamProspections   KamProspection[]
 
+  // Sales toolkits — stored collateral (decks/templates/battle-cards), SharePoint-sourced or manual
+  salesToolkits     SalesToolkit[]
+
   @@index([deletedAt])
   @@map("orgs")
+}
+
+/// Sales toolkit asset — a stored piece of sales collateral (deck, template,
+/// battle-card, case study). Lives in BidStack (normally kept in SharePoint);
+/// readable by the MCP. `externalId` dedups SharePoint (Graph driveItem) imports.
+model SalesToolkit {
+  id          String    @id @default(uuid()) @db.Uuid
+  orgId       String    @map("org_id") @db.Uuid
+  title       String    @db.VarChar(300)
+  description String?
+  /// deck | template | battlecard | casestudy | playbook | other
+  category    String    @default("other") @db.VarChar(40)
+  sectorTags  String[]  @map("sector_tags")
+  /// SharePoint or external link to the asset
+  url         String?   @db.VarChar(2000)
+  /// manual | sharepoint | lms
+  source      String    @default("manual") @db.VarChar(20)
+  /// SharePoint Graph driveItem id (sync dedup); null for manual entries
+  externalId  String?   @map("external_id") @db.VarChar(255)
+  addedById   String?   @map("added_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, source, externalId], map: "sales_toolkits_org_source_external_key")
+  @@index([orgId])
+  @@index([orgId, source])
+  @@index([deletedAt])
+  @@map("sales_toolkits")
 }
 
 model User {
