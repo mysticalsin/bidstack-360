@@ -15,6 +15,7 @@ import { toast } from '@/components/ui/Toast';
 import {
   useCreateToolkit,
   useDeleteToolkit,
+  useImportSharePoint,
   useSalesToolkitStore,
   useUpdateToolkit,
 } from '@/hooks/useSalesToolkitStore';
@@ -47,6 +48,16 @@ export function ToolkitStoreSection() {
   const create = useCreateToolkit();
   const update = useUpdateToolkit();
   const remove = useDeleteToolkit();
+  const importSp = useImportSharePoint();
+
+  const runImport = () =>
+    importSp.mutate(undefined, {
+      onSuccess: (r) =>
+        r.configured
+          ? toast.success(`Imported ${r.imported} toolkit${r.imported === 1 ? '' : 's'} from SharePoint`)
+          : toast.info('SharePoint isn’t connected yet — add the connector credentials to enable import.'),
+      onError: () => toast.error('SharePoint import failed'),
+    });
 
   const items = store.data?.items ?? [];
   const counts = useMemo(() => {
@@ -108,10 +119,16 @@ export function ToolkitStoreSection() {
             Stored sales collateral — decks, templates, battle-cards. Readable by the MCP.
           </p>
         </div>
-        <Button variant="primary" onClick={() => setDraft(draft ? null : { ...EMPTY_DRAFT })}>
-          <Icon name="plus" size={14} ariaHidden />
-          {draft ? 'Close' : 'Add toolkit'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" disabled={importSp.isPending} onClick={runImport}>
+            <Icon name="download" size={14} ariaHidden />
+            {importSp.isPending ? 'Importing…' : 'Import from SharePoint'}
+          </Button>
+          <Button variant="primary" onClick={() => setDraft(draft ? null : { ...EMPTY_DRAFT })}>
+            <Icon name="plus" size={14} ariaHidden />
+            {draft ? 'Close' : 'Add toolkit'}
+          </Button>
+        </div>
       </div>
 
       {draft ? (

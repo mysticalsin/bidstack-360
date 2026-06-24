@@ -59,3 +59,15 @@ export function useDeleteToolkit() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: KEY }),
   });
 }
+
+/** Import toolkit files from the configured SharePoint library (Microsoft Graph). */
+export function useImportSharePoint() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api<{ configured: boolean; imported: number }>('/api/sales-toolkits/store/import-sharepoint', {
+        method: 'POST',
+      }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: KEY }),
+  });
+}

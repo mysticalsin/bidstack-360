@@ -19,6 +19,7 @@ import { leadsUpdate } from './leads-update.js';
 import { leadsConvert } from './leads-convert.js';
 import { notesList } from './notes-list.js';
 import { notesCreate } from './notes-create.js';
+import { salesToolkitsList } from './sales-toolkits-list.js';
 import {
   crmSearchCompanies,
   crmCreateDeal,
@@ -73,6 +74,7 @@ export const tools = {
   'leads.convert': leadsConvert,
   'notes.list': notesList,
   'notes.create': notesCreate,
+  sales_toolkits_list: salesToolkitsList,
   // Canonical CRM surface consumed by Dust (DustCrmToolName enum)
   crm_search_companies: crmSearchCompanies,
   crm_create_deal: crmCreateDeal,
@@ -119,6 +121,7 @@ export const toolScopes = {
   'leads.convert': 'write',
   'notes.list': 'read',
   'notes.create': 'write',
+  sales_toolkits_list: 'read',
   crm_search_companies: 'read',
   crm_create_deal: 'write',
   crm_update_deal: 'write',

@@ -12,6 +12,7 @@ import { prisma } from '@bidstack/db';
 import { SalesToolkit, SalesToolkitCreate, SalesToolkitList, SalesToolkitPatch } from '@bidstack/shared';
 
 import { fetchLmsCourses, lmsConfigured, LmsError, sampleLmsCourses } from '../lib/lms-360learning.js';
+import { fetchSharePointToolkits, SharePointError, sharePointConfigured } from '../lib/sharepoint-graph.js';
 
 const SalesToolkitsResponse = z.object({
   enabled: z.boolean(),
@@ -218,6 +219,64 @@ export const salesToolkitsRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (res.count === 0) throw server.httpErrors.notFound('Toolkit not found');
       return reply.code(204).send();
+    },
+  );
+
+  // ── 3. Import from SharePoint (Microsoft Graph, env-gated) ──────────────────
+  // Upserts drive files by externalId so re-running doesn't duplicate. Returns
+  // configured:false (not an error) when the connector isn't set up → the UI
+  // shows a connect prompt.
+  server.post(
+    '/sales-toolkits/store/import-sharepoint',
+    {
+      preHandler: server.requirePermission('documents:write'),
+      schema: { response: { 200: z.object({ configured: z.boolean(), imported: z.number() }) } },
+    },
+    async (req) => {
+      if (!sharePointConfigured()) return { configured: false, imported: 0 };
+      let toolkits;
+      try {
+        toolkits = await fetchSharePointToolkits();
+      } catch (err) {
+        if (err instanceof SharePointError) {
+          req.log.warn({ err }, 'sharepoint import failed');
+          throw server.httpErrors.badGateway('SharePoint is unreachable right now');
+        }
+        throw err;
+      }
+      for (const tk of toolkits) {
+        await prisma.salesToolkit.upsert({
+          where: {
+            orgId_source_externalId: {
+              orgId: req.auth.orgId,
+              source: 'sharepoint',
+              externalId: tk.externalId,
+            },
+          },
+          create: {
+            orgId: req.auth.orgId,
+            title: tk.title,
+            description: tk.description,
+            category: 'other',
+            sectorTags: [],
+            url: tk.url,
+            source: 'sharepoint',
+            externalId: tk.externalId,
+            addedById: req.auth.userId,
+          },
+          update: { title: tk.title, url: tk.url },
+        });
+      }
+      await prisma.auditLog.create({
+        data: {
+          orgId: req.auth.orgId,
+          userId: req.auth.userId,
+          action: 'sales_toolkit.import_sharepoint',
+          targetType: 'sales_toolkit',
+          targetId: req.auth.orgId,
+        },
+      });
+      return { configured: true, imported: toolkits.length };
     },
   );
 };
