@@ -11,7 +11,11 @@ export function useAppModules() {
   return useQuery({
     queryKey: KEY,
     queryFn: ({ signal }) => api<AppModules>('/api/org-settings/app-modules', { signal }),
-    staleTime: 60_000,
+    // Module flags gate whole nav sections + the /workspace embed — must reflect
+    // the current org config on every load (admin change, another device, reload),
+    // not the app's persisted cache. Mutations also setQueryData for instant feel.
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 }
 
