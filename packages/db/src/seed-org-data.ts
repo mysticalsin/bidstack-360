@@ -90,6 +90,9 @@ interface CompanySpec {
   country: string;
   employeeCount: number;
   revenueBillions: number; // EUR, approximate
+  tier?: 'key' | 'top';
+  topAccountRank?: number;
+  keyAccountNotes?: string;
 }
 
 const COMPANIES: CompanySpec[] = [
@@ -100,6 +103,9 @@ const COMPANIES: CompanySpec[] = [
     country: 'DE',
     employeeCount: 311_000,
     revenueBillions: 78,
+    tier: 'key',
+    topAccountRank: 1,
+    keyAccountNotes: 'Strategic ERP modernization account — exec sponsor engaged.',
   },
   {
     name: 'IKEA',
@@ -116,6 +122,9 @@ const COMPANIES: CompanySpec[] = [
     country: 'FR',
     employeeCount: 91_000,
     revenueBillions: 43,
+    tier: 'key',
+    topAccountRank: 3,
+    keyAccountNotes: 'Patient-data platform — regulated, high-touch delivery.',
   },
   {
     name: 'HSBC',
@@ -124,6 +133,9 @@ const COMPANIES: CompanySpec[] = [
     country: 'GB',
     employeeCount: 220_000,
     revenueBillions: 60,
+    tier: 'key',
+    topAccountRank: 2,
+    keyAccountNotes: 'Cybersecurity transformation — multi-region rollout.',
   },
   {
     name: 'Stellantis',
@@ -576,10 +588,17 @@ async function seedUsers(
   return { byInitials, visitorId: visitor.id };
 }
 
-/** Company rows back the /accounts + /companies pages (employee count, logo…). */
-async function seedCompanies(prisma: SeedClient, orgId: string): Promise<void> {
+/** Company rows back the /accounts + /companies pages (employee count, logo…).
+ *  Returns name→id so opps/contacts can link by companyId (→ real pipeline). */
+async function seedCompanies(
+  prisma: SeedClient,
+  orgId: string,
+  visitorId: string,
+): Promise<Map<string, string>> {
+  const byName = new Map<string, string>();
   for (const c of COMPANIES) {
-    await prisma.company.create({
+    const isKey = c.tier === 'key';
+    const company = await prisma.company.create({
       data: {
         orgId,
         name: c.name,
@@ -589,13 +608,22 @@ async function seedCompanies(prisma: SeedClient, orgId: string): Promise<void> {
         employeeCount: c.employeeCount,
         countryCode: c.country,
         website: `https://${c.domain}/`,
-        logoUrl: `https://logo.clearbit.com/${c.domain}`,
+        // Logos resolve via the same-origin /api/v1/logo?domain= proxy
+        // (logo.dev/DuckDuckGo) — no stale Clearbit URL.
+        logoUrl: null,
+        tier: isKey ? 'key' : 'standard',
+        topAccountRank: c.topAccountRank ?? null,
+        keyAccountSince: isKey ? new Date() : null,
+        keyAccountOwnerId: isKey ? visitorId : null,
+        keyAccountNotes: c.keyAccountNotes ?? null,
         source: 'verified_data',
         confidence: 0.72,
         enrichedAt: new Date(),
       },
     });
+    byName.set(c.name, company.id);
   }
+  return byName;
 }
 
 /** CompanyEnrichment rows back the CRM cockpit + are the target a live
@@ -610,7 +638,7 @@ async function seedCompanyEnrichments(prisma: SeedClient, orgId: string): Promis
         tradeName: c.name,
         domain: c.domain,
         website: `https://${c.domain}/`,
-        logoUrl: `https://logo.clearbit.com/${c.domain}`,
+        logoUrl: null,
         logoSource: 'manual',
         registryIds: {},
         formerNames: [],
@@ -637,6 +665,7 @@ async function seedOpps(
   prisma: SeedClient,
   orgId: string,
   byInitials: Map<string, string>,
+  companyByName: Map<string, string>,
 ): Promise<Map<string, string>> {
   const oppByCode = new Map<string, string>();
   for (const o of OPPS) {
@@ -645,6 +674,9 @@ async function seedOpps(
         orgId,
         code: o.code,
         customer: o.customer,
+        // Link to the Company row so /accounts, key/top accounts, and the
+        // cockpit roll up real pipeline (the aggregation groups by companyId).
+        companyId: companyByName.get(o.customer) ?? null,
         name: o.name,
         stage: o.stage,
         valueMicros: eur(o.value),
@@ -685,12 +717,18 @@ async function seedProposals(
   }
 }
 
-async function seedContacts(prisma: SeedClient, orgId: string, ns: string): Promise<void> {
+async function seedContacts(
+  prisma: SeedClient,
+  orgId: string,
+  ns: string,
+  companyByName: Map<string, string>,
+): Promise<void> {
   for (const c of CONTACTS) {
     await prisma.contact.create({
       data: {
         orgId,
         customer: c.customer,
+        companyId: companyByName.get(c.customer) ?? null,
         name: c.name,
         role: c.role,
         email: `${c.emailLocal}.${ns}@example.com`,
@@ -768,12 +806,12 @@ export async function seedOrgData(
     if (id) await grantRole(prisma, orgId, id, t.roleName);
   }
 
-  await seedCompanies(prisma, orgId);
+  const companyByName = await seedCompanies(prisma, orgId, visitorId);
   await seedCompanyEnrichments(prisma, orgId);
 
-  const oppByCode = await seedOpps(prisma, orgId, byInitials);
+  const oppByCode = await seedOpps(prisma, orgId, byInitials, companyByName);
   await seedProposals(prisma, orgId, byInitials, oppByCode, visitorId);
-  await seedContacts(prisma, orgId, opts.namespace);
+  await seedContacts(prisma, orgId, opts.namespace, companyByName);
   await seedLeads(prisma, orgId, byInitials, opts.namespace);
   await seedTasks(prisma, orgId, byInitials, oppByCode);
 }
