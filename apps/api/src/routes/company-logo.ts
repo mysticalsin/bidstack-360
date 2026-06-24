@@ -1,0 +1,127 @@
+/**
+ * company-logo.ts — same-origin company-logo proxy.
+ *
+ * The frontend's logo <img> can't send a Bearer token, and CompanyLogo only
+ * renders SAME-ORIGIN images (logoUrlSafety), so raw third-party logo URLs never
+ * display. This PUBLIC endpoint resolves a company's domain server-side, fetches
+ * its logo from a provider (logo.dev when a token is configured, else Clearbit —
+ * key-free; both 404 for unknown domains → the UI falls back to initials), and
+ * streams the bytes same-origin with long cache headers.
+ *
+ * Security: logos are public brand assets, so this is intentionally public
+ * (config.public). It only fetches from a FIXED provider host using the
+ * company's stored domain as a parameter — no user-supplied URL — so there is no
+ * SSRF surface. Reserved/dev domains are rejected.
+ */
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
+import { z } from 'zod';
+
+import { prisma } from '@bidstack/db';
+
+const TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const FETCH_TIMEOUT_MS = 3500;
+const MAX_CACHE = 500;
+const MIN_IMAGE_BYTES = 128;
+
+type Hit = { buf: Buffer; contentType: string; ts: number } | null; // null = negative cache
+const cache = new Map<string, Hit>();
+
+function cacheGet(key: string): Hit | undefined {
+  const v = cache.get(key);
+  if (v === undefined) return undefined;
+  if (v && Date.now() - v.ts > TTL_MS) {
+    cache.delete(key);
+    return undefined;
+  }
+  return v;
+}
+function cacheSet(key: string, v: Hit): void {
+  if (cache.size >= MAX_CACHE) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+  cache.set(key, v);
+}
+
+/** Bare, public, non-reserved hostname or null. */
+function resolveDomain(domain: string | null, website: string | null): string | null {
+  let host = (domain ?? '').trim().toLowerCase();
+  if (!host && website) {
+    try {
+      host = new URL(website).hostname.toLowerCase();
+    } catch {
+      host = '';
+    }
+  }
+  host = host.replace(/^www\./, '');
+  if (!host || !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(host)) return null; // must look like a real hostname
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) return null; // no IPs
+  if (/\.(example|invalid|localhost|test|local)$/.test(host) || host === 'localhost') return null;
+  return host;
+}
+
+function providerUrls(domain: string): string[] {
+  const token = process.env.LOGO_DEV_TOKEN?.trim();
+  const urls: string[] = [];
+  // logo.dev (token) = best quality full logos. Brandfetch if a token is set.
+  if (token) urls.push(`https://img.logo.dev/${domain}?token=${encodeURIComponent(token)}&size=128&format=png`);
+  const bf = process.env.BRANDFETCH_LOGO_TOKEN?.trim();
+  if (bf) urls.push(`https://cdn.brandfetch.io/${domain}/w/128/h/128?c=${encodeURIComponent(bf)}`);
+  // DuckDuckGo icon service — key-free, reliable, returns the real brand favicon.
+  urls.push(`https://icons.duckduckgo.com/ip3/${domain}.ico`);
+  return urls;
+}
+
+async function fetchLogo(domain: string): Promise<{ buf: Buffer; contentType: string } | null> {
+  for (const url of providerUrls(domain)) {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
+    try {
+      const res = await fetch(url, { signal: ctl.signal, redirect: 'follow' });
+      const ct = res.headers.get('content-type') ?? '';
+      if (res.ok && ct.startsWith('image/')) {
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (buf.byteLength >= MIN_IMAGE_BYTES) return { buf, contentType: ct };
+      }
+    } catch {
+      /* try next provider */
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  return null;
+}
+
+export const companyLogoRoutes: FastifyPluginAsyncZod = async (server) => {
+  server.get(
+    '/companies/:companyId/logo',
+    {
+      config: { public: true }, // logos are public brand assets; <img> can't send a token
+      schema: { params: z.object({ companyId: z.string().uuid() }) },
+    },
+    async (req, reply) => {
+      // Public: look up by id only (no org scope) — exposes nothing but a logo.
+      const company = await prisma.company.findUnique({
+        where: { id: req.params.companyId },
+        select: { domain: true, website: true, deletedAt: true },
+      });
+      const domain = company && !company.deletedAt ? resolveDomain(company.domain, company.website) : null;
+      if (!domain) return reply.code(404).send();
+
+      const serve = (hit: NonNullable<Hit>) =>
+        reply
+          .header('content-type', hit.contentType)
+          .header('cache-control', 'public, max-age=604800, immutable')
+          .send(hit.buf);
+
+      const cached = cacheGet(domain);
+      if (cached !== undefined) {
+        return cached ? serve(cached) : reply.code(404).send();
+      }
+      const fetched = await fetchLogo(domain);
+      const hit: Hit = fetched ? { ...fetched, ts: Date.now() } : null;
+      cacheSet(domain, hit);
+      return hit ? serve(hit) : reply.code(404).send();
+    },
+  );
+};

@@ -23,6 +23,7 @@ export const KamAccount = z.object({
   id: z.string().uuid(),
   name: z.string(),
   logoUrl: z.string().nullable(),
+  domain: z.string().nullable(),
   countryCode: z.string().nullable(),
   industry: z.string().nullable(),
   kamStatus: z.enum(KAM_ACCOUNT_STATUSES),
@@ -40,6 +41,7 @@ export const KamAccountCandidate = z.object({
   id: z.string().uuid(),
   name: z.string(),
   logoUrl: z.string().nullable(),
+  domain: z.string().nullable(),
   industry: z.string().nullable(),
   countryCode: z.string().nullable(),
 });
