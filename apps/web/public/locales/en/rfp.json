@@ -125,5 +125,108 @@
     "emptyTitle": "No competitor findings yet",
     "emptyMessage": "Pick a competitor and run research. We only surface claims we can link to a public source — including real federal award pricing from USASpending.",
     "error": "Couldn't load competitor findings."
+  },
+  "proposalDetail": {
+    "loadingAriaLabel": "Loading proposal",
+    "errorTitle": "Failed to load proposal",
+    "errorRetry": "Please try again in a moment.",
+    "backToProposals": "Back to Proposals",
+    "notFound": "Proposal not found.",
+    "backToProposalsAriaLabel": "Back to proposals",
+    "version": "v{{version}}",
+    "due": "Due {{date}}",
+    "requiredBadge": "Required",
+    "aiDraftedBadge": "AI Drafted",
+    "wordCount": "{{count}} words",
+    "draftingSectionAriaLabel": "Drafting {{title}}…",
+    "aiDraftSectionAriaLabel": "AI Draft for {{title}}",
+    "drafting": "Drafting…",
+    "aiDraft": "AI Draft",
+    "editSectionAriaLabel": "Edit {{title}} section",
+    "editContentAriaLabel": "Edit content for {{title}}",
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "save": "Save",
+    "emptyContent": "No content yet. Use AI Draft to generate a first version."
+  },
+  "proposals": {
+    "title": "Proposals",
+    "subtitle": "RFP workspace — draft, review, and submit winning proposals.",
+    "newProposal": "New Proposal",
+    "createProposal": "Create Proposal",
+    "nameLabel": "Proposal name",
+    "namePlaceholder": "Proposal name…",
+    "creating": "Creating…",
+    "create": "Create",
+    "cancel": "Cancel",
+    "createError": "Failed to create proposal.",
+    "filterByStatus": "Filter by status",
+    "resultCount": "{{count}} proposals",
+    "loading": "Loading proposals",
+    "loadError": "Failed to load proposals",
+    "loadErrorRetry": "Please try again in a moment.",
+    "emptyTitle": "No proposals yet.",
+    "emptyMessage": "Create your first proposal to get started.",
+    "viewProposal": "View proposal: {{name}}",
+    "version": "v{{version}}",
+    "due": "Due {{date}}"
+  },
+  "rfpCrew": {
+    "statusWaiting": "Waiting",
+    "statusWorking": "Working",
+    "statusDone": "Done",
+    "statusOverseeing": "Overseeing",
+    "viewRoleDetailsAria": "{{role}} — view role details",
+    "moveToStageAria": "Move {{role}} to another stage. Use left and right arrow keys."
+  },
+  "proposalStatusChip": {
+    "label": {
+      "draft": "Draft",
+      "review": "In review",
+      "approved": "Approved",
+      "submitted": "Submitted",
+      "won": "Won",
+      "lost": "Lost"
+    }
+  },
+  "sectionEditor": {
+    "ariaLabelEditSection": "Edit section: {{title}}",
+    "statusReviewed": "✓ Reviewed",
+    "statusNotReviewed": "Not yet reviewed",
+    "saving": "Saving…",
+    "saveAndMarkReviewed": "Save & Mark Reviewed"
+  },
+  "rfpStatusChip": {
+    "stageIdle": "Idle",
+    "stageQueued": "Queued",
+    "stageExtracting": "Extracting",
+    "stageStoryMatching": "Matching Stories",
+    "stageSectionDrafting": "Drafting",
+    "stageComplianceFill": "Compliance",
+    "stageLegalScan": "Review Crew",
+    "stageQaReview": "QA Review",
+    "stageAwaitingApproval": "Awaiting Approval",
+    "stageApproved": "Approved",
+    "stageCompleted": "Completed",
+    "stageFailed": "Failed",
+    "stageRejected": "Rejected",
+    "stageTimeout": "Timed Out",
+    "ariaPipelineStatus": "Pipeline status: {{status}}"
+  },
+  "requirementRow": {
+    "pageRefAria": "Found on page {{page}}",
+    "confidenceAria": "AI confidence: {{percent}}%",
+    "confidenceLabel": "{{percent}}% confidence"
+  },
+  "adminRfp": {
+    "eyebrow": "Admin",
+    "title": "RFP Analytics",
+    "subtitle": "Every RFP across the organisation, its value, and the per-owner breakdown.",
+    "viewAllProposals": "View all proposals"
+  },
+  "aiDisclosureBadge": {
+    "ariaLabel": "This content was generated with AI assistance",
+    "title": "AI-assisted draft — review before sending",
+    "label": "AI-assisted draft"
   }
 }
