@@ -63,5 +63,199 @@
     "calls": "Calls",
     "emails": "Emails",
     "meetings": "Meetings"
+  },
+  "reportBuilder": {
+    "toast": {
+      "previewFailed": "Preview failed",
+      "nameRequired": "Name your report before saving.",
+      "updated": "Report updated",
+      "created": "Report created",
+      "saveFailed": "Could not save"
+    },
+    "backToReports": "Back to reports",
+    "title": {
+      "edit": "Edit report",
+      "new": "New report"
+    },
+    "subtitle": "Compose a query, preview it live, then save.",
+    "saveButton": {
+      "saving": "Saving…",
+      "saveChanges": "Save changes",
+      "create": "Create report"
+    },
+    "details": {
+      "title": "Report details",
+      "nameLabel": "Name",
+      "namePlaceholder": "e.g. Won deals by month",
+      "nameAria": "Report name",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Optional",
+      "descriptionAria": "Report description",
+      "dataSourceLabel": "Data source",
+      "dataSourceAria": "Report entity"
+    },
+    "filters": {
+      "title": "Filters",
+      "caption": "Limit which records are included."
+    },
+    "measures": {
+      "title": "Measures",
+      "caption": "Aggregate values (leave empty to list rows)."
+    },
+    "groupBy": {
+      "title": "Group by",
+      "caption": "Break measures down by dimension."
+    },
+    "sortLimit": {
+      "title": "Sort & limit",
+      "rowLimitLabel": "Row limit",
+      "rowLimitAria": "Row limit"
+    },
+    "visualization": {
+      "title": "Visualization",
+      "chartTypeAria": "Chart type"
+    },
+    "preview": {
+      "running": "Running…",
+      "run": "Run preview"
+    },
+    "sort": {
+      "label": "Sort",
+      "fieldAria": "Sort field",
+      "pickColumn": "Pick column…",
+      "directionAria": "Sort direction",
+      "ascending": "Ascending",
+      "descending": "Descending",
+      "removeAria": "Remove sort",
+      "add": "+ Add sort"
+    },
+    "error": {
+      "notFoundTitle": "Report not found",
+      "notFoundMessage": "It may have been deleted."
+    }
+  },
+  "filterBuilder": {
+    "valueAriaLabel": "Filter value",
+    "pickOption": "— Pick —",
+    "dateValueAriaLabel": "Filter date value",
+    "numericValueAriaLabel": "Filter numeric value",
+    "valuePlaceholder": "Value",
+    "fieldPlaceholder": "Field…",
+    "operatorAriaLabel": "Operator",
+    "removeConditionAriaLabel": "Remove condition",
+    "toggleLogicAriaLabel": "Toggle logic — currently {{logic}}",
+    "noConditions": "No conditions yet",
+    "conditionCount": "{{count}} condition",
+    "removeGroupAriaLabel": "Remove group",
+    "addCondition": "Condition",
+    "addGroup": "Group"
+  },
+  "reports": {
+    "heading": "Reports",
+    "subtitle": "Analytics across pipeline, leads, service desk, and tasks.",
+    "tab": {
+      "pipeline": "Pipeline",
+      "leads": "Leads",
+      "service-desk": "Service Desk",
+      "tasks": "Tasks"
+    },
+    "tabAriaLabel": "{{label}} report tab",
+    "error": {
+      "title": "Could not load report"
+    },
+    "byStatus": "By status",
+    "pipeline": {
+      "byStage": "Pipeline by stage",
+      "weighted": "Weighted pipeline",
+      "totalOpen": "Total open",
+      "closedThisQuarter": "Closed this quarter"
+    },
+    "leads": {
+      "total": "Total leads",
+      "converted": "Converted",
+      "conversionRate": "Conversion rate",
+      "avgScore": "Avg score",
+      "bySource": "By source"
+    },
+    "serviceDesk": {
+      "totalCases": "Total cases",
+      "open": "Open",
+      "resolvedThisMonth": "Resolved this month",
+      "avgSatisfaction": "Avg satisfaction",
+      "byPriority": "By priority"
+    },
+    "tasks": {
+      "total": "Total tasks",
+      "completed": "Completed",
+      "overdue": "Overdue",
+      "completionRate": "Completion rate"
+    }
+  },
+  "reportsList": {
+    "errorTitle": "Failed to load reports",
+    "heading": "Reports",
+    "savedCount": "{{count}} saved reports",
+    "newReport": "New report",
+    "searchPlaceholder": "Search reports…",
+    "searchAriaLabel": "Search reports",
+    "resultsCountMatching": "{{count}} reports matching \"{{search}}\"",
+    "resultsCount": "{{count}} reports",
+    "emptyTitle": "No reports found",
+    "emptySearchMessage": "Try a different search.",
+    "emptyMessage": "Create your first analytical report.",
+    "tableAriaLabel": "Reports",
+    "columnName": "Name",
+    "columnEntity": "Entity",
+    "columnLastRun": "Last run",
+    "columnSchedule": "Schedule",
+    "columnActions": "Actions",
+    "runAriaLabel": "Run report {{name}}",
+    "editAriaLabel": "Edit report {{name}}",
+    "duplicateAriaLabel": "Duplicate report {{name}}",
+    "deleteConfirm": "Delete \"{{name}}\"?",
+    "deleteAriaLabel": "Delete report {{name}}"
+  },
+  "fieldPicker": {
+    "placeholder": "Pick a field…",
+    "listboxLabel": "Field options",
+    "searchPlaceholder": "Search fields…",
+    "empty": "No fields found."
+  },
+  "reportPreview": {
+    "title": "Live preview",
+    "rowCountOne": "{{count}} row",
+    "rowCountOther": "{{count}} rows",
+    "emptyMessage": "No rows match this query yet.",
+    "chartAriaLabel": "Report preview",
+    "rowsAriaLabel": "Report preview rows",
+    "runPrompt": "Build your query, then run a preview to see results here.",
+    "chartShapeMismatch": "This chart type doesn't fit the current query shape. The table below shows the raw rows.",
+    "queryFailed": "Query failed"
+  },
+  "aggregatePicker": {
+    "functionCount": "Count",
+    "functionCountDistinct": "Count distinct",
+    "functionSum": "Sum",
+    "functionAverage": "Average",
+    "functionMin": "Min",
+    "functionMax": "Max",
+    "functionAriaLabel": "Aggregate function",
+    "fieldPlaceholder": "Pick field…",
+    "aliasPlaceholder": "Alias (optional)",
+    "aliasAriaLabel": "Aggregate alias",
+    "removeAriaLabel": "Remove aggregate",
+    "addButton": "+ Add aggregate"
+  },
+  "groupByPicker": {
+    "fieldPlaceholder": "Pick field…",
+    "timeBucketLabel": "Time bucket",
+    "noTimeBucket": "No time bucket",
+    "timeBucketDay": "Day",
+    "timeBucketWeek": "Week",
+    "timeBucketMonth": "Month",
+    "timeBucketQuarter": "Quarter",
+    "timeBucketYear": "Year",
+    "removeField": "Remove group-by field",
+    "addGroupBy": "+ Add group by"
   }
 }
