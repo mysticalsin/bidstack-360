@@ -39,6 +39,40 @@
 
 ---
 
+## 1a. Repo-wide regression gates (full-suite QA pass, 2026-06-23)
+
+Ran the entire monorepo — not just KAM — to prove the cross-cutting changes
+(shared schemas, the leads-route `mintOpportunityTx` migration, `serum-runtime-policy`
+scope type, `server.routes`) caused no regression anywhere:
+
+| Gate | Result |
+|---|---|
+| `pnpm -r typecheck` | PASS — all 11 packages, 0 errors |
+| `pnpm -r lint` | PASS — 0 errors (2 KAM type-import warnings fixed; 3 pre-existing web warnings untouched) |
+| `pnpm -r build` | PASS — all packages built |
+| `apps/api` tests | **779 passed / 2 skipped** (115 files) — leads-convert migration: no regression |
+| `apps/web` tests | 407 passed (72 files) |
+| `apps/worker` tests | 326 passed (39 files) — see finding below |
+| shared 136 · db 35 · mcp-server 54 · dust 8 · odoo 8 · memos 8 · marketing 3 | all PASS |
+
+**Pre-existing failure found + fixed (unrelated to KAM):** `serum-connector-egress`
+deny-path test threw `RangeError: Invalid time value` — its BullMQ job mock omitted
+`timestamp`, so `webhook-delivery.ts:181`'s stable-timestamp fallback
+(`new Date(job.timestamp).toISOString()`) threw. Real BullMQ jobs always carry
+`timestamp`; fixed the mock (test-only, no prod change — commit `4e1384ff`). The
+worker egress code does not import any KAM-changed module; this was not a KAM
+regression, surfaced by running the full suite.
+
+## 1b. Verification gaps (honest — not blockers, recommend follow-up)
+- **In-tenant access-scope (B4) deny path is not exercised by an automated test.**
+  Every KAM company-scoped route calls `assertCompanyVisible` → `canReadAccount`,
+  and cross-account reports apply `accessibleCompanyIds` — the same proven M7
+  control used by notes/files/account-intel. But the integration tests run as the
+  unrestricted stub admin, so they prove allow, not deny for a scoped UserGroup.
+  Cross-tenant (B3, different org) IS tested (404). Recommend a scoped-user test.
+- **Mobile nav accordion** verified by code + typecheck + web tests; desktop
+  accordion verified live in-browser. A live mobile-viewport drawer pass is a nice-to-have.
+
 ## 2. Discrepancies found + resolved during QA
 1. **Query-guard 400s** on the to-do / reports / prospection endpoints — takeless (or take>1000) `findMany` tripped the unbounded-query guard. **Resolved:** bounded every KAM `findMany` to ≤1000 (re-tested green).
 2. **RBAC 403 on first live writes** — the dev DB's roles predated the new `kam:*` permissions. **Resolved:** re-seeded RBAC (`pnpm db:seed`; permissions 47→49). Surfaced the matching prod step below.
