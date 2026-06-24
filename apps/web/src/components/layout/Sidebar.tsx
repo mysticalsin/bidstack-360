@@ -14,10 +14,12 @@ import { useAccountHistory, type AccountEntry } from '@/stores/accountHistory';
 import { useIsAdmin } from '@/lib/auth';
 import { useUiStore } from '@/stores/ui';
 import { api } from '@/lib/api';
+import { useAppModules } from '@/hooks/useAppModules';
 import {
   ADMIN_SETTINGS,
   MEMBER_SETTINGS,
   NAV_SECTIONS,
+  isNavItemVisible,
   type NavItem,
   type NavSection,
 } from './navConfig';
@@ -33,6 +35,14 @@ export function Sidebar() {
   const toggle = useUiStore((s) => s.toggleSidebar);
   const isAdmin = useIsAdmin();
   const { t } = useTranslation('common');
+  const { data: appModules } = useAppModules();
+
+  // Hide module-gated items (agent-studio, Collaborate) unless enabled in
+  // Settings → Modules; drop a section that ends up empty after filtering.
+  const sections = NAV_SECTIONS.map((s) => ({
+    ...s,
+    items: s.items.filter((it) => isNavItemVisible(it, appModules)),
+  })).filter((s) => s.items.length > 0);
 
   const dustQuery = useQuery({
     queryKey: ['dust:status'],
@@ -101,7 +111,7 @@ export function Sidebar() {
             hamburger/collapse toggle never scrolls out of reach. min-h-0 lets a
             flex child actually overflow instead of growing the whole sidebar. */}
         <div className="sb-scroll flex-1 min-h-0 overflow-y-auto">
-        {NAV_SECTIONS.map((section) => (
+        {sections.map((section) => (
           <SidebarSection
             key={section.key}
             section={section}

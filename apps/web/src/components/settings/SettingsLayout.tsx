@@ -19,6 +19,7 @@ export type SettingsSection =
   | 'groups'
   | 'opportunity-filters'
   | 'rfp-analytics'
+  | 'modules'
   | 'integrations'
   | 'webhooks'
   | 'audit-log'
@@ -57,6 +58,7 @@ const GROUPS: Group[] = [
       { id: 'groups', label: 'Access groups', icon: 'contacts', admin: true },
       { id: 'opportunity-filters', label: 'Opportunity filters', icon: 'sliders', admin: true },
       { id: 'rfp-analytics', label: 'RFP Analytics', icon: 'trophy', admin: true },
+      { id: 'modules', label: 'Modules', icon: 'package', admin: true },
     ],
   },
   {

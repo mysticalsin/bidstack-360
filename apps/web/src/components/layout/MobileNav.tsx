@@ -16,7 +16,8 @@ import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
 import { prefetchRoute } from '@/lib/prefetch';
 
-import { ADMIN_SETTINGS, MEMBER_SETTINGS, NAV_SECTIONS, type NavItem, type NavSection } from './navConfig';
+import { useAppModules } from '@/hooks/useAppModules';
+import { ADMIN_SETTINGS, MEMBER_SETTINGS, NAV_SECTIONS, isNavItemVisible, type NavItem, type NavSection } from './navConfig';
 
 export function MobileNav() {
   const open = useUiStore((s) => s.mobileNavOpen);
@@ -65,6 +66,11 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
   const overdueTasks = taskSummary.data?.overdue ?? 0;
 
   const badges = { openBids, overdueTasks };
+  const { data: appModules } = useAppModules();
+  const sections = NAV_SECTIONS.map((s) => ({
+    ...s,
+    items: s.items.filter((it) => isNavItemVisible(it, appModules)),
+  })).filter((s) => s.items.length > 0);
 
   return (
     <div className="flex h-full flex-col">
@@ -90,7 +96,7 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
 
       {/* Scrollable nav */}
       <nav aria-label="Primary navigation" className="flex-1 overflow-y-auto px-2 py-2">
-        {NAV_SECTIONS.map((section) => (
+        {sections.map((section) => (
           <MobileNavSection key={section.key} section={section} badges={badges} onNavigate={onClose} />
         ))}
 

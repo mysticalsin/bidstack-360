@@ -19,6 +19,7 @@ import { RfpAnalyticsSection } from '@/components/settings/RfpAnalyticsSection';
 import { AccessGroupsSection } from '@/components/settings/AccessGroupsSection';
 import { OpportunityFiltersSection } from '@/components/settings/OpportunityFiltersSection';
 import { SerumControlPlaneSection } from '@/components/settings/SerumControlPlaneSection';
+import { ModulesSection } from '@/components/settings/ModulesSection';
 
 // Each entry maps a section code to its [i18n key suffix, English default].
 // The English default is passed to t() so the UI never shows a raw key.
@@ -37,6 +38,7 @@ const SECTION_TITLES: Record<SettingsSection, [string, string]> = {
   groups: ['sectionGroups', 'Access groups'],
   'opportunity-filters': ['sectionOpportunityFilters', 'Opportunity filters'],
   'rfp-analytics': ['sectionRfpAnalytics', 'RFP Analytics'],
+  modules: ['sectionModules', 'Modules'],
   integrations: ['sectionIntegrations', 'Integrations'],
   webhooks: ['sectionWebhooks', 'Webhooks'],
   'audit-log': ['sectionAuditLog', 'Audit log'],
@@ -80,6 +82,7 @@ export function SettingsPage() {
     groups: <AccessGroupsSection />,
     'opportunity-filters': <OpportunityFiltersSection />,
     'rfp-analytics': <RfpAnalyticsSection />,
+    modules: <ModulesSection />,
     integrations: <IntegrationsSection />,
     webhooks: <WebhooksSection />,
     'audit-log': <AuditLogSection />,

@@ -2452,6 +2452,10 @@ model OrgSettings {
   /// Adjustable in Settings without a code change; consumed by the future ABC
   /// sync connector at ingestion time. {} = no filtering.
   opportunityFilterRules Json      @default("{}") @map("opportunity_filter_rules")
+  /// Per-org module toggles (AppModules shape in shared). Admin-managed in
+  /// Settings. e.g. { agentStudioEnabled, appflowyEnabled, appflowyUrl }. {} =
+  /// defaults (agent-studio hidden, Workspace off).
+  appModules             Json      @default("{}") @map("app_modules")
   updatedAt              DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt              DateTime? @map("deleted_at") @db.Timestamptz(6)
 

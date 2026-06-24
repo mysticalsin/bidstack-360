@@ -52,3 +52,4 @@ export * from './kam-task.js';
 export * from './kam-session.js';
 export * from './kam-handoff.js';
 export * from './kam-report.js';
+export * from './app-modules.js';
