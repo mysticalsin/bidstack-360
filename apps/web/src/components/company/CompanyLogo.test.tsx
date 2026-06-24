@@ -15,31 +15,35 @@ vi.mock('react-i18next', () => ({
 afterEach(cleanup);
 
 describe('CompanyLogo', () => {
-  it('falls back to initials for third-party logo URLs', () => {
+  // WHY: a real domain resolves the live logo through the same-origin proxy
+  // (primary source) — even over a raw third-party logo.url, which CSP/privacy
+  // would block anyway.
+  it('uses the same-origin domain proxy as the primary source for a real domain', () => {
+    render(<CompanyLogo name="Mantu" logo={logo('https://third-party.example/x.svg')} domain="mantu.com" />);
+    const img = document.querySelector('img');
+    expect(img?.getAttribute('src')).toBe('/api/v1/logo?domain=mantu.com');
+  });
+
+  // WHY: with no real domain to proxy, a same-origin/proxied logo.url still
+  // renders (the displayableLogoUrl gate allows same-origin assets).
+  it('falls back to a same-origin logo.url when there is no proxyable domain', () => {
+    render(<CompanyLogo name="Mantu" logo={logo('/api/v1/assets/logos/mantu.png')} domain={null} />);
+    const img = document.querySelector('img');
+    expect(img?.getAttribute('src')).toBe('/api/v1/assets/logos/mantu.png');
+  });
+
+  // WHY: raw third-party URLs are rejected (no proxy + gate fails) → initials,
+  // never a cross-origin request.
+  it('falls back to initials for a third-party logo URL with no usable domain', () => {
     render(
       <CompanyLogo
         name="Mantu"
         logo={logo('https://commons.wikimedia.org/wiki/Special:Redirect/file/Mantu.svg')}
-        domain="mantu.com"
+        domain={null}
       />,
     );
-
     expect(screen.getByText('MA')).toBeDefined();
     expect(document.querySelector('img')).toBeNull();
-  });
-
-  it('renders same-origin/proxied logo assets', () => {
-    render(
-      <CompanyLogo
-        name="Mantu"
-        logo={logo('/api/v1/assets/logos/mantu.png')}
-        domain="mantu.com"
-      />,
-    );
-
-    const img = document.querySelector('img');
-    expect(img).toBeDefined();
-    expect(img?.getAttribute('src')).toBe('/api/v1/assets/logos/mantu.png');
   });
 });
 
