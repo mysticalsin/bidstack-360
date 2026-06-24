@@ -3415,6 +3415,9 @@ model ZapierApp {
   @@unique([orgId], map: "zapier_apps_org_key")
   @@index([orgId])
   @@index([deletedAt])
+  // Hot auth path: every Zapier request looks up by apiKeyHash (zapier.ts) —
+  // index it to avoid a sequential scan (audit backlog #26).
+  @@index([apiKeyHash])
   @@map("zapier_apps")
 }
 
