@@ -45,6 +45,7 @@ vi.mock('@/components/cockpit', () => ({
   RevenueEvolutionCard: () => <div data-testid="revenue-card" />,
   WinLossCard: () => <div data-testid="winloss-card" />,
   TechStackCard: () => <div data-testid="tech-card" />,
+  FundingEligibilityCard: () => <div data-testid="funding-card" />,
   UpsellFilesCard: () => <div data-testid="upsell-files" />,
 }));
 
