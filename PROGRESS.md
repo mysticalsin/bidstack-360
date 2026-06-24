@@ -4,6 +4,19 @@ Append-only sprint log. Every sprint ends with a commit + a checkpoint here.
 
 ---
 
+## 2026-06-23 — Modules toggle + AppFlowy embed + KAM premium account UX
+
+Three follow-on features on `feat/prod-hardening-mantu`.
+
+- **Agent Studio → admin toggle (hidden by default)** + **AppFlowy "Collaborate" embed** (`c8d3310a`): per-org `OrgSettings.appModules` (migration applied to dev DB) + `GET/PUT /org-settings/app-modules` (admin) + Settings → **Modules** tab. Nav items gate on the flags (`isNavItemVisible`); agent-studio is now hidden until enabled. `/workspace` iframes a configured AppFlowy URL (sandboxed) or shows a setup state.
+- **KAM premium designate + switch UX** (`a2929116`): swarm-designed (PM + UI/UX + senior dev). Replaced the dropdown with a search-first switcher, a designate dialog (typeahead → owner-model pre-filled by country → designate), an account hero, and a bespoke zero-state. "Key account" = `kamStatus != 'identified'`; write-once `keyAccountSince`; access-scope + FK-graft + IDOR guards + audit. Backend 5/5 live; full flow browser-verified.
+
+**AppFlowy is an embed scaffold, not data-integrated** (push-back recorded). Operator must deploy AppFlowy + set `frame-ancestors` + the URL; Clerk↔GoTrue SSO is separate; AGPL-3.0 + data-governance need legal/PO sign-off. See `docs/solutions/appflowy-workspace.md`.
+
+**Fully tested:** full-repo `pnpm -r typecheck/lint/build` green; `pnpm -r test` green — api 786/2-skip, web 407, worker 326, shared 136, mcp 54, db 35, +others (~1,775 tests). Browser-verified all three live (designate→hero; agent-studio hidden→toggle-on→appears; Settings Modules save). Dev DB reverted to defaults after testing.
+
+---
+
 ## 2026-06-23 — KAM (Key Account Management) front layer — full build
 
 **Branch:** `feat/prod-hardening-mantu` · **Mode:** `/goal /loop` autonomous, multi-model (Claude build + 5-lens red-team; Codex cross-model deferred — credit-limited).
