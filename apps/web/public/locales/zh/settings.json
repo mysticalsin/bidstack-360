@@ -534,6 +534,8 @@
   "settingsOverview": {
     "tileWorkspaceTitle": "工作区治理",
     "tileWorkspaceDetail": "{{users}} 个用户 / {{roles}} 个角色",
+    "tileSerumTitle": "SERUM Control Plane",
+    "tileSerumDetail": "Agent, model, document, approval, and policy readiness",
     "tileDataModelTitle": "数据模型",
     "tileDataModelDetail": "{{stages}} 个阶段 / {{fields}} 个公司字段",
     "tileAutomationTitle": "自动化库",
