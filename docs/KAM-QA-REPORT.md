@@ -63,15 +63,14 @@ deny-path test threw `RangeError: Invalid time value` — its BullMQ job mock om
 worker egress code does not import any KAM-changed module; this was not a KAM
 regression, surfaced by running the full suite.
 
-## 1b. Verification gaps (honest — not blockers, recommend follow-up)
-- **In-tenant access-scope (B4) deny path is not exercised by an automated test.**
-  Every KAM company-scoped route calls `assertCompanyVisible` → `canReadAccount`,
-  and cross-account reports apply `accessibleCompanyIds` — the same proven M7
-  control used by notes/files/account-intel. But the integration tests run as the
-  unrestricted stub admin, so they prove allow, not deny for a scoped UserGroup.
-  Cross-tenant (B3, different org) IS tested (404). Recommend a scoped-user test.
-- **Mobile nav accordion** verified by code + typecheck + web tests; desktop
-  accordion verified live in-browser. A live mobile-viewport drawer pass is a nice-to-have.
+## 1b. Verification gaps
+- **In-tenant access-scope (B4) — CLOSED.** Added `kam-access.integration.test.ts`
+  (2/2 live): a country-scoped (FR-only) user reads an in-scope FR account but is
+  403 on an out-of-scope DE account across initiatives, the per-account to-do, and
+  the KPI roll-up. Cross-tenant (B3, different org) also tested (404).
+- **Mobile nav accordion** (minor, remaining): verified by code + typecheck + web
+  tests; the desktop accordion is verified live in-browser. A live mobile-viewport
+  drawer pass is a nice-to-have, not a blocker.
 
 ## 2. Discrepancies found + resolved during QA
 1. **Query-guard 400s** on the to-do / reports / prospection endpoints — takeless (or take>1000) `findMany` tripped the unbounded-query guard. **Resolved:** bounded every KAM `findMany` to ≤1000 (re-tested green).
