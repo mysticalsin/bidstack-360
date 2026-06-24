@@ -90,6 +90,7 @@ export async function serializeCompanyDetail(
   const customFieldValues = await prisma.customFieldValue.findMany({
     where: { orgId: c.orgId, entityType: 'company', entityId: c.id },
     select: { id: true, definitionId: true, value: true },
+    take: 100, // query-guard requires a bound; matches contacts/opps/leads
   });
 
   return {
