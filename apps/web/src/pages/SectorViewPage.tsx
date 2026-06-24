@@ -12,7 +12,14 @@ import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { WorldMap } from '@/components/territories/WorldMap';
 import { useSectorView, type SectorAccount, type SectorRow } from '@/hooks/useSectorView';
+import {
+  useTerritoryAnalytics,
+  useTerritorySegments,
+  type TerritorySegment,
+} from '@/hooks/useTerritories';
+import { formatMoneyMicros } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
 
 import { StrategicSignalInsight } from './accountsPage/StrategicSignalInsight';
@@ -25,6 +32,10 @@ export default function SectorViewPage() {
   const reducedMotion = useReducedMotion();
   const [selectedSectorName, setSelectedSectorName] = useState<string | null>(null);
   const [country, setCountry] = useState<string | null>(null);
+  const [mapMode, setMapMode] = useState<'country' | 'industry'>('country');
+  const [mapCountry, setMapCountry] = useState<string | null>(null);
+  const analytics = useTerritoryAnalytics();
+  const industrySegments = useTerritorySegments('industry');
 
   const sectors = view.data?.sectors ?? [];
   const selectedSector =
@@ -143,6 +154,86 @@ export default function SectorViewPage() {
               }
             />
           </section>
+
+          <Card className="overflow-hidden p-0">
+            <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] p-4">
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
+                  {t('sectorView.geoEyebrow', 'Global opportunity map')}
+                </p>
+                <h2 className="text-base font-semibold text-[var(--fg-primary)]">
+                  {mapMode === 'country'
+                    ? t('sectorView.geoCountryTitle', 'Pipeline by country')
+                    : t('sectorView.geoIndustryTitle', 'Pipeline by industry')}
+                </h2>
+              </div>
+              <div
+                role="tablist"
+                aria-label={t('sectorView.geoModeLabel', 'Map dimension')}
+                className="inline-flex rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-0.5"
+              >
+                {(['country', 'industry'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    role="tab"
+                    aria-selected={mapMode === mode}
+                    onClick={() => setMapMode(mode)}
+                    className={`min-h-9 rounded-md px-3 text-xs font-semibold transition-colors ${
+                      mapMode === mode
+                        ? 'bg-[var(--brand-primary)] text-white'
+                        : 'text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]'
+                    }`}
+                  >
+                    {mode === 'country'
+                      ? t('sectorView.geoModeCountry', 'By country')
+                      : t('sectorView.geoModeIndustry', 'By industry')}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {mapMode === 'country' ? (
+              <div className="h-[440px]">
+                {analytics.isLoading ? (
+                  <div className="p-4">
+                    <LoadingSkeleton rows={6} />
+                  </div>
+                ) : analytics.isError ? (
+                  <ErrorState
+                    title={t('sectorView.geoErrorTitle', 'Could not load the map')}
+                    message={analytics.error?.message ?? t('sectorView.geoErrorMessage', 'The analytics endpoint did not respond.')}
+                  />
+                ) : (analytics.data?.items.length ?? 0) === 0 ? (
+                  <EmptyState
+                    title={t('sectorView.geoEmptyTitle', 'No geographic data')}
+                    message={t('sectorView.geoEmptyMessage', 'Opportunities need a country to appear on the map.')}
+                  />
+                ) : (
+                  <WorldMap
+                    data={analytics.data?.items ?? []}
+                    selectedCountryCode={mapCountry}
+                    onCountryClick={(item) =>
+                      setMapCountry((c) => (c === item.countryCode ? null : item.countryCode))
+                    }
+                    className="!rounded-none !border-0 !border-t-0"
+                  />
+                )}
+              </div>
+            ) : (
+              <div className="p-4">
+                {industrySegments.isLoading ? (
+                  <LoadingSkeleton rows={6} />
+                ) : industrySegments.isError ? (
+                  <ErrorState
+                    title={t('sectorView.geoErrorTitle', 'Could not load the map')}
+                    message={industrySegments.error?.message ?? t('sectorView.geoErrorMessage', 'The analytics endpoint did not respond.')}
+                  />
+                ) : (
+                  <IndustryBars items={industrySegments.data?.items ?? []} />
+                )}
+              </div>
+            )}
+          </Card>
 
           <section className="sector-experience-grid">
             <Card className="sector-radar-panel">
@@ -275,6 +366,43 @@ function SectorMetric({
       <span>{label}</span>
       <strong>{value}</strong>
       <small>{detail}</small>
+    </div>
+  );
+}
+
+function IndustryBars({ items }: { items: TerritorySegment[] }) {
+  const { t } = useTranslation('crm');
+  if (items.length === 0) {
+    return (
+      <EmptyState
+        title={t('sectorView.geoIndustryEmptyTitle', 'No industry pipeline yet')}
+        message={t('sectorView.geoIndustryEmptyMessage', 'Opportunities gain an industry from their account classification.')}
+      />
+    );
+  }
+  const sorted = [...items].sort((a, b) => b.totalValueMicros - a.totalValueMicros);
+  const max = Math.max(1, ...sorted.map((s) => s.totalValueMicros));
+  return (
+    <div className="space-y-2.5">
+      {sorted.map((seg) => (
+        <div key={seg.key}>
+          <div className="mb-1 flex items-baseline justify-between gap-3 text-sm">
+            <span className="truncate font-medium text-[var(--fg-primary)]">{titleCase(seg.label)}</span>
+            <span className="shrink-0 tabular-nums text-xs text-[var(--fg-tertiary)]">
+              {t('sectorView.geoIndustryMeta', '{{count}} opps · {{value}}', {
+                count: seg.opportunityCount,
+                value: formatMoneyMicros(seg.totalValueMicros, 'EUR'),
+              })}
+            </span>
+          </div>
+          <div className="h-2.5 overflow-hidden rounded-full bg-[var(--surface-sunken)]">
+            <span
+              className="block h-full rounded-full bg-[var(--brand-primary)] transition-[width] duration-500"
+              style={{ width: `${Math.max(3, Math.round((seg.totalValueMicros / max) * 100))}%` }}
+            />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
