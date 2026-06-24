@@ -7,32 +7,43 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
-import { useCompany, useUpdateCompany, useCompanyHierarchy } from '@/hooks/useCompanies';
+import { useCompany, useCompanyHierarchy } from '@/hooks/useCompanies';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
+import { CompanyLogo } from '@/components/company/CompanyLogo';
+import { CompanyTechStackSection } from '@/components/company/CompanyTechStackSection';
 
-import {
-  ContactTab,
-  OpportunityTab,
-  CasesTab,
-  NotesTab,
-  HierarchyTab,
-} from './companyDetail/CompanyTabs';
+import { CompanyDetailsForm } from './companyDetail/CompanyDetailsForm';
+import { ContactTab, OpportunityTab, CasesTab, NotesTab, HierarchyTab } from './companyDetail/CompanyTabs';
 
 type TabKey = 'contacts' | 'opportunities' | 'cases' | 'notes' | 'hierarchy';
+type View = 'overview' | 'details';
+
+const VIEW_KEY = 'companyDetailView';
+function initialView(): View {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'details' ? 'details' : 'overview';
+  } catch {
+    return 'overview';
+  }
+}
 
 export function CompanyDetailPage() {
   const { t } = useTranslation('crm');
   const { id } = useParams<{ id: string }>();
   const company = useCompany(id);
-  const update = useUpdateCompany();
   const hierarchy = useCompanyHierarchy(id);
   const [tab, setTab] = useState<TabKey>('contacts');
   const tabId = (key: TabKey) => `company-tab-${key}`;
   const panelId = (key: TabKey) => `company-panel-${key}`;
-  const [editing, setEditing] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [editIndustry, setEditIndustry] = useState('');
-  const [editDomain, setEditDomain] = useState('');
+  const [view, setViewState] = useState<View>(initialView);
+  const setView = (v: View) => {
+    setViewState(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      /* private mode — non-persistent is fine */
+    }
+  };
 
   if (company.isLoading) {
     return <DetailPageSkeleton tabs columns={2} cards={2} />;
@@ -68,65 +79,56 @@ export function CompanyDetailPage() {
 
   const c = company.data;
 
-  const startEdit = () => {
-    setEditName(c.name);
-    setEditIndustry(c.industry ?? '');
-    setEditDomain(c.domain ?? '');
-    setEditing(true);
-  };
-
-  const saveEdit = () => {
-    const patch: { name?: string; industry?: string | null; domain?: string | null } = {};
-    if (editName !== c.name) patch.name = editName;
-    if (editIndustry !== (c.industry ?? '')) patch.industry = editIndustry || null;
-    if (editDomain !== (c.domain ?? '')) patch.domain = editDomain || null;
-    if (Object.keys(patch).length > 0) {
-      update.mutate({ id: c.id, patch });
-    }
-    setEditing(false);
-  };
-
   return (
     <div className="space-y-6">
-      <header className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            {c.logoUrl ? (
-              <img
-                src={c.logoUrl}
-                alt=""
-                width={40}
-                height={40}
-                decoding="async"
-                className="h-10 w-10 rounded-lg object-contain bg-white"
-              />
-            ) : (
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--surface-sunken)] text-lg font-bold text-[var(--fg-tertiary)]">
-                {c.name.charAt(0)}
-              </div>
+      <header className="flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <CompanyLogo name={c.name} companyId={c.id} domain={c.domain} size={48} />
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-[var(--fg-primary)]">{c.name}</h1>
+            {c.legalName && c.legalName !== c.name && (
+              <p className="text-sm text-[var(--fg-secondary)]">{c.legalName}</p>
             )}
-            <div>
-              {editing ? (
-                <input
-                  className="input text-xl font-bold"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  aria-label={t('companyDetail.field.companyName', 'Company name')}
-                  autoFocus
-                />
-              ) : (
-                <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
-                  {c.name}
-                </h1>
-              )}
-              {c.legalName && c.legalName !== c.name && (
-                <p className="text-sm text-[var(--fg-secondary)]">{c.legalName}</p>
-              )}
-            </div>
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-[var(--fg-secondary)]">
-            {c.industry && !editing && <Badge tone="gray">{c.industry}</Badge>}
-            {c.domain && !editing && (
+        </div>
+        <div
+          role="radiogroup"
+          aria-label={t('companyDetail.viewToggle.label', 'Account view')}
+          className="inline-flex shrink-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-0.5"
+        >
+          {(
+            [
+              ['overview', t('companyDetail.viewToggle.overview', 'Overview'), 'eye'],
+              ['details', t('companyDetail.viewToggle.details', 'Edit details'), 'pencil'],
+            ] as const
+          ).map(([v, label, icon]) => (
+            <button
+              key={v}
+              role="radio"
+              aria-checked={view === v}
+              onClick={() => setView(v)}
+              className={`inline-flex min-h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] ${
+                view === v
+                  ? 'bg-[var(--brand-primary)] text-white'
+                  : 'text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]'
+              }`}
+            >
+              <Icon name={icon} size={14} ariaHidden /> {label}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      {view === 'details' ? (
+        <>
+          <CompanyDetailsForm company={c} onDone={() => setView('overview')} />
+          <CustomFieldValuesSection entityType="company" entityId={id!} />
+        </>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-2 text-sm text-[var(--fg-secondary)]">
+            {c.industry && <Badge tone="gray">{c.industry}</Badge>}
+            {c.domain && (
               <a
                 href={`https://${c.domain}`}
                 target="_blank"
@@ -138,15 +140,9 @@ export function CompanyDetailPage() {
             )}
             {c.countryCode && <span>{c.countryCode}</span>}
             {c.employeeCount && (
-              <span>
-                {t('companyDetail.meta.employees', '{{count}} employees', {
-                  count: c.employeeCount,
-                })}
-              </span>
+              <span>{t('companyDetail.meta.employees', '{{count}} employees', { count: c.employeeCount })}</span>
             )}
-            {c.taxId && (
-              <span>{t('companyDetail.meta.taxId', 'Tax ID: {{taxId}}', { taxId: c.taxId })}</span>
-            )}
+            {c.taxId && <span>{t('companyDetail.meta.taxId', 'Tax ID: {{taxId}}', { taxId: c.taxId })}</span>}
             {c.parent && (
               <span className="flex items-center gap-1">
                 <Icon name="git-branch" size={12} />
@@ -160,139 +156,100 @@ export function CompanyDetailPage() {
               </span>
             )}
           </div>
-          {editing && (
-            <div className="mt-2 flex gap-3">
-              <input
-                className="input text-sm"
-                aria-label={t('companyDetail.field.industry', 'Industry')}
-                placeholder={t('companyDetail.field.industry', 'Industry')}
-                value={editIndustry}
-                onChange={(e) => setEditIndustry(e.target.value)}
-              />
-              <input
-                className="input text-sm"
-                aria-label={t('companyDetail.field.domain', 'Domain')}
-                placeholder={t('companyDetail.field.domain', 'Domain')}
-                value={editDomain}
-                onChange={(e) => setEditDomain(e.target.value)}
-              />
+
+          <CompanyTechStackSection companyName={c.name} />
+
+          <div
+            className="flex gap-2 border-b border-[var(--border-subtle)]"
+            role="tablist"
+            aria-label={t('companyDetail.tabs.label', 'Company sections')}
+          >
+            {(
+              [
+                {
+                  key: 'contacts',
+                  label: t('companyDetail.tab.contacts', 'Contacts ({{count}})', { count: c.contacts.length }),
+                },
+                {
+                  key: 'opportunities',
+                  label: t('companyDetail.tab.opportunities', 'Opportunities ({{count}})', {
+                    count: c.opportunities.length,
+                  }),
+                },
+                {
+                  key: 'cases',
+                  label: t('companyDetail.tab.cases', 'Cases ({{count}})', { count: c.openCases.length }),
+                },
+                {
+                  key: 'notes',
+                  label: t('companyDetail.tab.notes', 'Notes ({{count}})', { count: c.notes.length }),
+                },
+                { key: 'hierarchy', label: t('companyDetail.tab.hierarchy', 'Hierarchy') },
+              ] as { key: TabKey; label: string }[]
+            ).map((tabItem) => (
+              <button
+                key={tabItem.key}
+                role="tab"
+                aria-selected={tab === tabItem.key}
+                aria-controls={panelId(tabItem.key)}
+                id={tabId(tabItem.key)}
+                tabIndex={tab === tabItem.key ? 0 : -1}
+                onClick={() => setTab(tabItem.key)}
+                onKeyDown={(e) => {
+                  const keys = ['contacts', 'opportunities', 'cases', 'notes', 'hierarchy'] as const;
+                  const idx = keys.indexOf(tabItem.key);
+                  if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    const next = keys[(idx + 1) % keys.length] as TabKey;
+                    setTab(next);
+                    document.getElementById(tabId(next))?.focus();
+                  } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    const prev = keys[(idx - 1 + keys.length) % keys.length] as TabKey;
+                    setTab(prev);
+                    document.getElementById(tabId(prev))?.focus();
+                  }
+                }}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] rounded-t-md ${
+                  tab === tabItem.key
+                    ? 'border-[var(--brand-primary)] text-[var(--brand-primary)]'
+                    : 'border-transparent text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]'
+                }`}
+              >
+                {tabItem.label}
+              </button>
+            ))}
+          </div>
+
+          {tab === 'contacts' && (
+            <div role="tabpanel" id={panelId('contacts')} aria-labelledby={tabId('contacts')}>
+              <ContactTab contacts={c.contacts} />
             </div>
           )}
-        </div>
-        <div className="flex items-center gap-2">
-          {editing ? (
-            <>
-              <Button variant="secondary" size="sm" onClick={() => setEditing(false)}>
-                {t('companyDetail.action.cancel', 'Cancel')}
-              </Button>
-              <Button size="sm" onClick={saveEdit} disabled={update.isPending}>
-                {update.isPending
-                  ? t('companyDetail.action.saving', 'Saving…')
-                  : t('companyDetail.action.save', 'Save')}
-              </Button>
-            </>
-          ) : (
-            <Button variant="secondary" size="sm" onClick={startEdit}>
-              <Icon name="edit" size={14} />
-              {t('companyDetail.action.edit', 'Edit')}
-            </Button>
+          {tab === 'opportunities' && (
+            <div role="tabpanel" id={panelId('opportunities')} aria-labelledby={tabId('opportunities')}>
+              <OpportunityTab opportunities={c.opportunities} />
+            </div>
           )}
-        </div>
-      </header>
+          {tab === 'cases' && (
+            <div role="tabpanel" id={panelId('cases')} aria-labelledby={tabId('cases')}>
+              <CasesTab cases={c.openCases} />
+            </div>
+          )}
+          {tab === 'notes' && (
+            <div role="tabpanel" id={panelId('notes')} aria-labelledby={tabId('notes')}>
+              <NotesTab notes={c.notes} />
+            </div>
+          )}
+          {tab === 'hierarchy' && (
+            <div role="tabpanel" id={panelId('hierarchy')} aria-labelledby={tabId('hierarchy')}>
+              <HierarchyTab hierarchy={hierarchy} childrenList={c.children} companyId={c.id} />
+            </div>
+          )}
 
-      <div
-        className="flex gap-2 border-b border-[var(--border-subtle)]"
-        role="tablist"
-        aria-label={t('companyDetail.tabs.label', 'Company sections')}
-      >
-        {(
-          [
-            {
-              key: 'contacts',
-              label: t('companyDetail.tab.contacts', 'Contacts ({{count}})', {
-                count: c.contacts.length,
-              }),
-            },
-            {
-              key: 'opportunities',
-              label: t('companyDetail.tab.opportunities', 'Opportunities ({{count}})', {
-                count: c.opportunities.length,
-              }),
-            },
-            {
-              key: 'cases',
-              label: t('companyDetail.tab.cases', 'Cases ({{count}})', {
-                count: c.openCases.length,
-              }),
-            },
-            {
-              key: 'notes',
-              label: t('companyDetail.tab.notes', 'Notes ({{count}})', { count: c.notes.length }),
-            },
-            { key: 'hierarchy', label: t('companyDetail.tab.hierarchy', 'Hierarchy') },
-          ] as { key: TabKey; label: string }[]
-        ).map((tabItem) => (
-          <button
-            key={tabItem.key}
-            role="tab"
-            aria-selected={tab === tabItem.key}
-            aria-controls={panelId(tabItem.key)}
-            id={tabId(tabItem.key)}
-            tabIndex={tab === tabItem.key ? 0 : -1}
-            onClick={() => setTab(tabItem.key)}
-            onKeyDown={(e) => {
-              const keys = ['contacts', 'opportunities', 'cases', 'notes', 'hierarchy'] as const;
-              const idx = keys.indexOf(tabItem.key);
-              if (e.key === 'ArrowRight') {
-                e.preventDefault();
-                const next = keys[(idx + 1) % keys.length] as TabKey;
-                setTab(next);
-                document.getElementById(tabId(next))?.focus();
-              } else if (e.key === 'ArrowLeft') {
-                e.preventDefault();
-                const prev = keys[(idx - 1 + keys.length) % keys.length] as TabKey;
-                setTab(prev);
-                document.getElementById(tabId(prev))?.focus();
-              }
-            }}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] rounded-t-md ${
-              tab === tabItem.key
-                ? 'border-[var(--brand-primary)] text-[var(--brand-primary)]'
-                : 'border-transparent text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]'
-            }`}
-          >
-            {tabItem.label}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'contacts' && (
-        <div role="tabpanel" id={panelId('contacts')} aria-labelledby={tabId('contacts')}>
-          <ContactTab contacts={c.contacts} />
-        </div>
+          <CustomFieldValuesSection entityType="company" entityId={id!} />
+        </>
       )}
-      {tab === 'opportunities' && (
-        <div role="tabpanel" id={panelId('opportunities')} aria-labelledby={tabId('opportunities')}>
-          <OpportunityTab opportunities={c.opportunities} />
-        </div>
-      )}
-      {tab === 'cases' && (
-        <div role="tabpanel" id={panelId('cases')} aria-labelledby={tabId('cases')}>
-          <CasesTab cases={c.openCases} />
-        </div>
-      )}
-      {tab === 'notes' && (
-        <div role="tabpanel" id={panelId('notes')} aria-labelledby={tabId('notes')}>
-          <NotesTab notes={c.notes} />
-        </div>
-      )}
-      {tab === 'hierarchy' && (
-        <div role="tabpanel" id={panelId('hierarchy')} aria-labelledby={tabId('hierarchy')}>
-          <HierarchyTab hierarchy={hierarchy} childrenList={c.children} companyId={c.id} />
-        </div>
-      )}
-
-      <CustomFieldValuesSection entityType="company" entityId={id!} />
     </div>
   );
 }
