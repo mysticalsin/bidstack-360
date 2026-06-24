@@ -180,6 +180,9 @@ describe('worker connector SERUM egress gates', () => {
       {
         id: 'job-1',
         attemptsMade: 0,
+        // BullMQ always stamps job.timestamp; the mock must too, else the stable
+        // timestamp fallback (new Date(job.timestamp)) throws "Invalid time value".
+        timestamp: new Date('2026-06-17T14:00:00.000Z').getTime(),
         data: {
           subscriptionId,
           event: 'lead.created',
