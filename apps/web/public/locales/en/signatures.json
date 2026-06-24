@@ -53,5 +53,101 @@
     "cancel": "Cancel request",
     "viewCertificate": "View certificate",
     "confirmCancel": "Cancel this signature request? Signers will be notified."
+  },
+  "signaturePad": {
+    "modeTablistLabel": "Signature method",
+    "modeDraw": "Draw",
+    "modeType": "Type",
+    "drawPlaceholder": "Sign here",
+    "canvasLabel": "Signature drawing area. Use mouse or touch to draw your signature.",
+    "typedNameLabel": "Type your full name",
+    "typedNamePlaceholder": "Your Name",
+    "clearButtonLabel": "Clear signature",
+    "clearButton": "Clear",
+    "undoButtonLabel": "Undo last stroke",
+    "undoButton": "Undo"
+  },
+  "sendForSignature": {
+    "stepsNavLabel": "Sending steps",
+    "step": {
+      "template": "Template",
+      "recipients": "Recipients",
+      "reviewSend": "Review & Send"
+    },
+    "dialogTitle": "Send for Signature",
+    "successTitle": "Signature request sent!",
+    "successMessage": "Recipients will receive an email to sign the document.",
+    "doneButton": "Done"
+  },
+  "recipientStatusTimeline": {
+    "eventLabel": {
+      "sent": "Sent",
+      "delivered": "Delivered",
+      "viewed": "Opened",
+      "signed": "Signed",
+      "declined": "Declined",
+      "voided": "Voided"
+    },
+    "recipientEventsAriaLabel": "Events for {{name}}",
+    "noEventsYet": "No events yet"
+  },
+  "recipientsStep": {
+    "listAriaLabel": "Recipients",
+    "nameLabel": "Name",
+    "namePlaceholder": "Jane Smith",
+    "emailLabel": "Email",
+    "emailPlaceholder": "jane@example.com",
+    "roleLabel": "Role",
+    "roleSigner": "Signer",
+    "roleCc": "CC",
+    "removeRecipientAriaLabel": "Remove recipient {{recipient}}",
+    "addRecipient": "+ Add recipient",
+    "back": "Back",
+    "nextReview": "Next: Review"
+  },
+  "signatureGuide": {
+    "title": "Signature verification",
+    "introBefore": "Every delivery includes an",
+    "introAfter": "header. Verify it before trusting the payload. Format:",
+    "languageTablistLabel": "Signature verification language",
+    "copyCodeLabel": "Copy code",
+    "replayBefore": "Reject events where",
+    "replayAfter": "seconds to prevent replay attacks. Always use a timing-safe comparison."
+  },
+  "templateStep": {
+    "kindFilterLabel": "Template type",
+    "allTypesOption": "All types",
+    "documentTemplateLabel": "Document template",
+    "selectTemplatePlaceholder": "Select a template…",
+    "templateVariablesHeading": "Template variables",
+    "nextButton": "Next: Recipients"
+  },
+  "reviewStep": {
+    "previewTitle": "Document preview",
+    "messageLabel": "Message to recipients (optional)",
+    "messagePlaceholder": "Please review and sign the attached document…",
+    "recipientsHeading": "Recipients ({{count}})",
+    "recipientSummaryAria": "Recipient summary",
+    "back": "Back",
+    "sending": "Sending…",
+    "send": "Send for Signature"
+  },
+  "documentPreviewIframe": {
+    "regionAriaLabel": "Document preview",
+    "emptyMessage": "No document preview available",
+    "errorMessage": "Unable to load document preview.",
+    "openInNewTab": "Open document in new tab",
+    "regionAriaLabelTitled": "Document preview: {{title}}",
+    "loading": "Loading document…",
+    "iframeAriaLabel": "Preview of {{title}}"
+  },
+  "signatureStatusBadge": {
+    "statusDraft": "Draft",
+    "statusSent": "Sent",
+    "statusViewed": "Viewed",
+    "statusSigned": "Signed",
+    "statusDeclined": "Declined",
+    "statusVoided": "Voided",
+    "statusExpired": "Expired"
   }
 }
