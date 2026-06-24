@@ -35,6 +35,20 @@ const KNOWN_SLUGS: Record<string, string> = {
   react: 'react',
   postgresql: 'postgresql',
   postgres: 'postgresql',
+  // Enterprise brands Simple Icons dropped (trademark) but Devicon carries —
+  // the proxy chains SI → Devicon, so these resolve to a real logo.
+  aws: 'amazonwebservices',
+  amazonwebservices: 'amazonwebservices',
+  azure: 'azure',
+  microsoftazure: 'azure',
+  salesforce: 'salesforce',
+  salesforcecommercecloud: 'salesforce',
+  oracle: 'oracle',
+  oraclecloud: 'oracle',
+  oraclenetsuite: 'oracle',
+  dotnet: 'dotnetcore',
+  dotnetcore: 'dotnetcore',
+  net: 'dotnetcore',
 };
 
 /** Lowercase, strip everything but [a-z0-9]. */

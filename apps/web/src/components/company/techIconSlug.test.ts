@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { normalizeToSlug, techIconSlug, techLogoUrl } from './techIconSlug';
 
 describe('techIconSlug', () => {
-  // WHY: we only emit slugs Simple Icons verifiably carries, so the proxy never
-  // 404s and the <img> never breaks.
-  it('returns verified slugs for brands Simple Icons carries', () => {
+  // WHY: we only emit keys a source (Simple Icons or Devicon) verifiably carries,
+  // so the proxy resolves a real logo and the <img> never breaks.
+  it('returns verified keys for Simple Icons brands', () => {
     expect(techIconSlug('GitHub')).toBe('github');
     expect(techIconSlug('Google Cloud')).toBe('googlecloud');
     expect(techIconSlug('Snowflake')).toBe('snowflake');
@@ -13,14 +13,21 @@ describe('techIconSlug', () => {
     expect(techIconSlug('VMware')).toBe('vmware');
   });
 
-  // WHY: brands Simple Icons dropped (Microsoft/AWS/Salesforce/Oracle) must
-  // return null → monogram, NOT a slug that would 404.
-  it('returns null for brands Simple Icons does not carry', () => {
-    expect(techIconSlug('AWS')).toBeNull();
+  // WHY: enterprise brands Simple Icons dropped still resolve — via Devicon —
+  // through the proxy's source chain.
+  it('returns Devicon keys for the brands Simple Icons dropped', () => {
+    expect(techIconSlug('AWS')).toBe('amazonwebservices');
+    expect(techIconSlug('Azure')).toBe('azure');
+    expect(techIconSlug('Microsoft Azure')).toBe('azure');
+    expect(techIconSlug('Salesforce')).toBe('salesforce');
+    expect(techIconSlug('Oracle')).toBe('oracle');
+  });
+
+  // WHY: brands no source carries (Microsoft 365, Power BI…) return null →
+  // monogram, never a slug that would 404.
+  it('returns null when no source carries the brand', () => {
     expect(techIconSlug('Microsoft 365')).toBeNull();
-    expect(techIconSlug('Azure')).toBeNull();
     expect(techIconSlug('Power BI')).toBeNull();
-    expect(techIconSlug('Salesforce')).toBeNull();
     expect(techIconSlug('')).toBeNull();
   });
 
@@ -32,6 +39,7 @@ describe('techIconSlug', () => {
 
   it('builds a same-origin proxy URL only for known brands', () => {
     expect(techLogoUrl('GitHub')).toBe('/api/v1/logo?tech=github');
-    expect(techLogoUrl('AWS')).toBeNull();
+    expect(techLogoUrl('AWS')).toBe('/api/v1/logo?tech=amazonwebservices');
+    expect(techLogoUrl('Microsoft 365')).toBeNull();
   });
 });

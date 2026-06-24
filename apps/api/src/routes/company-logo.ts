@@ -118,7 +118,18 @@ export const companyLogoRoutes: FastifyPluginAsyncZod = async (server) => {
         const slug = req.query.tech.toLowerCase();
         if (!/^[a-z0-9-]+$/.test(slug)) return reply.code(400).send(); // no SSRF via the slug
         cacheKey = `tech:${slug}`;
-        urls = [`https://cdn.simpleicons.org/${slug}`]; // fixed host, brand-colored SVG
+        // Two fixed sources: Simple Icons (clean brand glyphs) then Devicon, which
+        // carries the enterprise brands Simple Icons dropped for trademark reasons
+        // (AWS, Azure, Salesforce, Oracle…). First image wins; else 404 → monogram.
+        const dev = (variant: string) =>
+          `https://cdn.jsdelivr.net/gh/devicons/devicon/icons/${slug}/${slug}-${variant}.svg`;
+        urls = [
+          `https://cdn.simpleicons.org/${slug}`,
+          dev('original'),
+          dev('original-wordmark'),
+          dev('plain'),
+          dev('plain-wordmark'),
+        ];
       } else {
         const domain = resolveDomain(req.query.domain ?? null, null);
         if (!domain) return reply.code(404).send();
