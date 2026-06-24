@@ -2,45 +2,49 @@
  * techIconSlug — map a tech-stack item name to a Simple Icons slug for the
  * same-origin tech-logo proxy (`/api/v1/logo?tech=<slug>`). Pure + deterministic.
  *
- * Known multi-word / renamed brands get an explicit alias (Simple Icons slugs
- * differ from display names); everything else falls back to a normalized slug.
- * A miss (or a brand Simple Icons doesn't carry) → 404 → TechLogo's monogram.
+ * IMPORTANT: we request a logo ONLY for slugs Simple Icons is verified to carry,
+ * so the proxy never 404s and the <img> never breaks (no console noise). Simple
+ * Icons has dropped many enterprise brands for trademark reasons — Microsoft
+ * (Azure, M365, Dynamics, Power BI…), AWS, Salesforce, Oracle — those (and any
+ * unknown name) fall straight to TechLogo's deterministic monogram.
  */
-const ALIASES: Record<string, string> = {
-  aws: 'amazonwebservices',
-  'amazon web services': 'amazonwebservices',
-  azure: 'microsoftazure',
-  'microsoft azure': 'microsoftazure',
-  'google cloud': 'googlecloud',
-  'google cloud platform': 'googlecloud',
+
+/** Normalized tech name → verified Simple Icons slug. Keyed by normalizeToSlug(). */
+const KNOWN_SLUGS: Record<string, string> = {
+  googlecloud: 'googlecloud',
   gcp: 'googlecloud',
-  'oracle cloud': 'oracle',
-  'oracle netsuite': 'oracle',
-  netsuite: 'oracle',
-  'power bi': 'powerbi',
-  'microsoft dynamics': 'dynamics365',
-  dynamics: 'dynamics365',
-  'microsoft 365': 'microsoft365',
-  'office 365': 'microsoft365',
-  'google workspace': 'googleworkspace',
-  'g suite': 'googleworkspace',
-  'adobe experience manager': 'adobe',
-  aem: 'adobe',
-  'salesforce commerce cloud': 'salesforce',
+  cloudflare: 'cloudflare',
+  snowflake: 'snowflake',
+  databricks: 'databricks',
+  looker: 'looker',
+  hubspot: 'hubspot',
+  sap: 'sap',
+  okta: 'okta',
+  splunk: 'splunk',
+  anthropic: 'anthropic',
+  github: 'github',
+  gitlab: 'gitlab',
+  kubernetes: 'kubernetes',
+  k8s: 'kubernetes',
+  docker: 'docker',
+  terraform: 'terraform',
+  datadog: 'datadog',
+  jira: 'jira',
+  shopify: 'shopify',
+  vmware: 'vmware',
+  react: 'react',
+  postgresql: 'postgresql',
+  postgres: 'postgresql',
 };
 
-/** Lowercase, strip everything but [a-z0-9] — matches the proxy's slug guard. */
+/** Lowercase, strip everything but [a-z0-9]. */
 export function normalizeToSlug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
 
-/** Simple Icons slug for a tech name, or null when it can't form a valid slug. */
+/** Verified Simple Icons slug for a tech name, or null (→ monogram fallback). */
 export function techIconSlug(name: string): string | null {
-  const key = name.trim().toLowerCase();
-  if (!key) return null;
-  if (ALIASES[key]) return ALIASES[key];
-  const slug = normalizeToSlug(key);
-  return slug.length >= 2 ? slug : null;
+  return KNOWN_SLUGS[normalizeToSlug(name)] ?? null;
 }
 
 /** Same-origin proxy URL for a tech name's logo, or null. */

@@ -21,6 +21,7 @@ import {
   RevenueEvolutionCard,
   WinLossCard,
   TechStackCard,
+  FundingEligibilityCard,
   UpsellFilesCard,
 } from '@/components/cockpit';
 import { OrgDashboard } from '@/components/dashboard/OrgDashboard';
@@ -221,6 +222,12 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
           {show('techStack') && (
             <Reveal>
               <TechStackCard cockpit={cockpit} />
+            </Reveal>
+          )}
+
+          {show('techStack') && (
+            <Reveal delay={0.04}>
+              <FundingEligibilityCard cockpit={cockpit} />
             </Reveal>
           )}
 

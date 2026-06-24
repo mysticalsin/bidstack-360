@@ -18,4 +18,5 @@ export { PageHead } from './PageHead';
 export { PipelineByStageCard } from './PipelineByStageCard';
 export { RecentOpportunitiesCard } from './RecentOpportunitiesCard';
 export { TechStackCard } from './TechStackCard';
+export { FundingEligibilityCard } from './FundingEligibilityCard';
 export { UpsellFilesCard } from './UpsellFilesCard';
