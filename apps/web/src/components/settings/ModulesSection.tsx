@@ -50,6 +50,8 @@ export function ModulesSection() {
     agentStudioEnabled: draft.agentStudioEnabled ?? data?.agentStudioEnabled ?? false,
     appflowyEnabled: draft.appflowyEnabled ?? data?.appflowyEnabled ?? false,
     appflowyUrl: draft.appflowyUrl !== undefined ? draft.appflowyUrl : (data?.appflowyUrl ?? null),
+    // SERUM is toggled in its own section; preserve the current value here.
+    serumEnabled: draft.serumEnabled ?? data?.serumEnabled ?? false,
   };
   const set = <K extends keyof AppModulesUpdate>(k: K, v: AppModulesUpdate[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));

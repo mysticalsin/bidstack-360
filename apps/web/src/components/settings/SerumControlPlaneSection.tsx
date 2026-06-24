@@ -25,10 +25,12 @@ import {
 } from '@/components/serum/SerumGlass';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { Input } from '@/components/ui/Input';
 import { toast } from '@/components/ui/Toast';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { useAppModules, useUpdateAppModules } from '@/hooks/useAppModules';
 import {
   useApproveSerumConfigVersion,
   usePublishSerumConfigVersion,
@@ -535,6 +537,8 @@ function sectionSummary(section: SerumConfigSection, t: TFunction): string {
 export function SerumControlPlaneSection() {
   const { t } = useTranslation('crm');
   const status = useSerumStatus();
+  const appModules = useAppModules();
+  const updateModules = useUpdateAppModules();
   const [selectedSectionId, setSelectedSectionId] = useState(GENERAL_SECTION_ID);
   const selectedSection = findSection(selectedSectionId);
 
@@ -542,9 +546,61 @@ export function SerumControlPlaneSection() {
     void status.refetch();
   };
 
-  if (status.isLoading) return <LoadingSkeleton rows={7} />;
+  const serumOn = Boolean(appModules.data?.serumEnabled);
+  // Master on/off — rendered in every state so an admin can always reach it,
+  // even when SERUM status fails to load. Deployment env SERUM_ENABLED stays the
+  // runtime kill-switch for connectors/gateway; this is the org-level switch.
+  const masterToggle = (
+    <Card>
+      <div className="flex items-center justify-between gap-4 p-4">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
+            {t('serum.master.title', 'SERUM Control Plane')}
+          </h3>
+          <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
+            {serumOn
+              ? t('serum.master.on', 'Enabled — SERUM Mission Control + operations are available to this workspace.')
+              : t(
+                  'serum.master.off',
+                  'Disabled — turn on to expose SERUM Mission Control. Runtime connectors also require SERUM_ENABLED at the deployment level.',
+                )}
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={serumOn}
+          aria-label={t('serum.master.toggle', 'Enable SERUM Control Plane')}
+          disabled={appModules.isLoading || updateModules.isPending}
+          onClick={() => updateModules.mutate({ serumEnabled: !serumOn })}
+          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] ${
+            serumOn ? 'bg-[var(--brand-primary)]' : 'border border-[var(--border-default)] bg-[var(--surface-sunken)]'
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+              serumOn ? 'translate-x-6' : 'translate-x-1'
+            }`}
+          />
+        </button>
+      </div>
+    </Card>
+  );
+
+  if (status.isLoading)
+    return (
+      <div className="space-y-5">
+        {masterToggle}
+        <LoadingSkeleton rows={7} />
+      </div>
+    );
   if (status.isError || !status.data) {
-    return <SerumErrorState error={status.error} onRetry={() => void status.refetch()} />;
+    return (
+      <div className="space-y-5">
+        {masterToggle}
+        <SerumErrorState error={status.error} onRetry={() => void status.refetch()} />
+      </div>
+    );
   }
 
   const snapshot = status.data;
@@ -552,6 +608,7 @@ export function SerumControlPlaneSection() {
 
   return (
     <div className="space-y-5">
+      {masterToggle}
       <SerumPanel className="p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>

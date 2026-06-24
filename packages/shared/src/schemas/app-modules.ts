@@ -13,6 +13,10 @@ export const AppModules = z.object({
   agentStudioEnabled: z.boolean().default(false),
   appflowyEnabled: z.boolean().default(false),
   appflowyUrl: z.string().url().max(2000).nullable().default(null),
+  // serumEnabled: admin on/off for the SERUM Control Plane (Mission Control nav +
+  // operational surface). The deployment env SERUM_ENABLED remains the runtime
+  // master kill-switch for connectors/gateway; this is the org-level admin switch.
+  serumEnabled: z.boolean().default(false),
 });
 export type AppModules = z.infer<typeof AppModules>;
 
@@ -23,4 +27,5 @@ export const APP_MODULES_DEFAULT: AppModules = {
   agentStudioEnabled: false,
   appflowyEnabled: false,
   appflowyUrl: null,
+  serumEnabled: false,
 };

@@ -16,7 +16,7 @@ import type { IconName } from '@/components/ui/Icon';
 export type NavBadgeKey = 'openBids' | 'overdueTasks';
 
 /** Admin-toggled module a nav item belongs to (hidden until enabled in Settings). */
-export type NavFeatureKey = 'agentStudio' | 'appflowy';
+export type NavFeatureKey = 'agentStudio' | 'appflowy' | 'serum';
 
 export interface NavItem {
   to: string;
@@ -106,7 +106,7 @@ export const NAV_SECTIONS: NavSection[] = [
       // RFP Response Hub (a read-only roll-up) folded into Proposals — the
       // actual work surface. /rfp-response now redirects there.
       { to: '/proposals', label: 'Proposals', labelKey: 'nav.proposals', icon: 'receipt' },
-      { to: '/serum', label: 'SERUM Mission Control', labelKey: 'nav.serumMissionControl', icon: 'sparkle' },
+      { to: '/serum', label: 'SERUM Mission Control', labelKey: 'nav.serumMissionControl', icon: 'sparkle', featureKey: 'serum' },
       { to: '/agent-studio', label: 'Agent Studio', labelKey: 'nav.agentStudio', icon: 'sparkle', featureKey: 'agentStudio' },
     ],
   },
@@ -139,6 +139,7 @@ export const NAV_SECTIONS: NavSection[] = [
 export interface NavModuleFlags {
   agentStudioEnabled?: boolean;
   appflowyEnabled?: boolean;
+  serumEnabled?: boolean;
 }
 
 /** A nav item is visible if it has no featureKey, or its module is enabled.
@@ -148,6 +149,7 @@ export function isNavItemVisible(item: NavItem, flags: NavModuleFlags | undefine
   if (!flags) return false;
   if (item.featureKey === 'agentStudio') return Boolean(flags.agentStudioEnabled);
   if (item.featureKey === 'appflowy') return Boolean(flags.appflowyEnabled);
+  if (item.featureKey === 'serum') return Boolean(flags.serumEnabled);
   return true;
 }
 
