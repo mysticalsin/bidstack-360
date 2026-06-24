@@ -32,9 +32,13 @@
     }
   },
   "quickStart": {
-    "title": "Quick start",
-    "subtitle": "Complete these steps to get the most out of BidStack 360°",
-    "progress": "{{done}} of {{total}} steps completed",
+    "title": "Quick Start",
+    "subtitle": "Get from zero to piloting your first bid.",
+    "progress": {
+      "count": "{{completed}} of {{total}} complete",
+      "percent": "{{percent}}%",
+      "ariaLabel": "Onboarding progress"
+    },
     "steps": {
       "createOpportunity": {
         "label": "Create an opportunity",
@@ -59,7 +63,46 @@
     },
     "completed": "Quick start complete!",
     "completedBody": "You now know the essentials of BidStack 360°. Good luck with your bids.",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "tourButton": "Take the 2-minute product tour",
+    "items": {
+      "profile": {
+        "label": "Complete your profile",
+        "description": "Add your name, photo, and timezone so teammates can find you."
+      },
+      "template": {
+        "label": "Pick a template pipeline",
+        "description": "Choose B2B SaaS, Agency, Enterprise, or Inside Sales as a starting point."
+      },
+      "firstLead": {
+        "label": "Add your first lead",
+        "description": "Capture inbound interest and let BidStack score it automatically."
+      },
+      "firstActivity": {
+        "label": "Log your first activity",
+        "description": "Record a call, email, or note against any contact."
+      },
+      "firstBidNoBid": {
+        "label": "Run your first bid/no-bid",
+        "description": "Score an opportunity on fit, value, and win probability before you commit."
+      },
+      "firstRfp": {
+        "label": "Start your first RFP response",
+        "description": "Spin up a structured response and let the agents draft the first pass."
+      },
+      "firstDeal": {
+        "label": "Create your first deal",
+        "description": "Convert a lead or add a deal directly to the pipeline."
+      },
+      "inviteTeam": {
+        "label": "Invite your team",
+        "description": "Collaboration works best with the whole team in one place."
+      }
+    },
+    "complete": {
+      "title": "You're all set!",
+      "message": "Your workspace is ready to pilot bids."
+    }
   },
   "templates": {
     "title": "Templates",
@@ -73,5 +116,37 @@
     "banner": "You are viewing demonstration data.",
     "clear": "Clear demo data",
     "confirmClear": "Delete all demonstration data? This action cannot be undone."
+  },
+  "tourStep": {
+    "dialogAriaLabel": "Tour step {{current}} of {{total}}: {{title}}",
+    "stepCounter": "{{current}} of {{total}}",
+    "skipTour": "Skip tour",
+    "back": "Back",
+    "ctaFinish": "Invite your team",
+    "ctaNext": "Next"
+  },
+  "templatePicker": {
+    "title": "Choose a starter pipeline",
+    "subtitle": "Each template sets up a pipeline with stages and a handful of sample records so you can explore right away. You can remove the sample data any time.",
+    "loadErrorTitle": "Couldn't load templates",
+    "tryAgain": "Please try again.",
+    "stageCount": "{{count}} stages",
+    "cancel": "Cancel",
+    "installing": "Installing…",
+    "install": "Install pipeline",
+    "toastInstalledTitle": "Pipeline installed",
+    "toastInstalledDescription": "{{stages}} stages, {{deals}} sample deals, {{leads}} leads.",
+    "toastConflictTitle": "A pipeline is already installed",
+    "toastConflictDescription": "Remove the existing sample data first, or start from your live pipeline.",
+    "toastErrorTitle": "Could not install template"
+  },
+  "sampleDataBanner": {
+    "title": "Sample data is on",
+    "description": "Demo records are visible in this workspace. Hide this notice, or remove the sample records entirely before executive or client demos.",
+    "hide": "Hide",
+    "remove": "Remove sample data",
+    "removing": "Removing…",
+    "removedToast": "Sample data removed",
+    "removeErrorToast": "Could not remove sample data"
   }
 }
