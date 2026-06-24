@@ -51,5 +51,479 @@
     "connectFailed": "Connection failed. Check your credentials.",
     "syncFailed": "Sync failed.",
     "disconnectFailed": "Disconnect failed."
+  },
+  "agentProviderCredentials": {
+    "toast": {
+      "activeSet": "{{label}} is now the active model",
+      "activeCleared": "Active model cleared",
+      "activeSetDescription": "Every AI step uses this provider until you switch again — no redeploy.",
+      "switchFailedTitle": "Could not switch provider",
+      "serverRejected": "The server rejected the request.",
+      "testAliveTitle": "{{label}} is alive",
+      "testAliveDescription": "{{model}} responded in {{latencyMs}} ms.",
+      "testNoResponseTitle": "{{label}} did not respond",
+      "testNoResponseDescription": "No response from the provider.",
+      "testFailedTitle": "Test failed",
+      "savedTitle": "{{label}} saved",
+      "savedDescription": "Provider status and Agent Studio readiness were refreshed.",
+      "removedTitle": "{{label}} credentials removed",
+      "removeFailedTitle": "Remove failed"
+    },
+    "error": {
+      "apiKeyRequired": "API key is required for this provider.",
+      "claudeModelRequired": "Claude requires a model, for example claude-sonnet-4-5.",
+      "saveFailed": "Could not save provider credentials."
+    },
+    "remove": {
+      "confirmTitle": "Remove {{label}} credentials?",
+      "confirmDescription": "Agents will fall back to platform env credentials if available. Existing agent definitions stay intact.",
+      "confirmLabel": "Remove"
+    },
+    "header": {
+      "title": "Model providers",
+      "caption": "Stay vendor-independent: store org-owned keys for GPT, Claude, Kimi, NVIDIA NIM, or local Gemma, then pick the active one. Switching the active provider takes effect on the next AI step — no redeploy. Keys are encrypted at rest and never shown again.",
+      "addProvider": "Add provider"
+    },
+    "errorState": {
+      "title": "Could not load provider keys",
+      "message": "Provider readiness still uses server env fallback, but saved org keys could not be loaded.",
+      "retry": "Retry"
+    },
+    "emptyState": {
+      "title": "No provider list returned",
+      "message": "The API should always return the supported direct providers."
+    },
+    "summary": {
+      "savedCountOne": "{{count}} org provider saved",
+      "savedCountOther": "{{count}} org providers saved",
+      "activeBadge": "Active · {{label}}",
+      "noActiveBadge": "No active provider — using platform default",
+      "fallbackNote": "Platform env providers remain available as fallback when configured."
+    },
+    "row": {
+      "activeBadge": "Active",
+      "orgKeySaved": "Org key saved",
+      "noOrgKey": "No org key",
+      "activeDescription": "Drives every AI step for this tenant right now.",
+      "readyDescription": "Saved and ready — set it active to route AI through it.",
+      "fallbackDescription": "Uses platform env fallback if configured.",
+      "edit": "Edit",
+      "connect": "Connect",
+      "remove": "Remove",
+      "inUse": "In use",
+      "setActive": "Set active",
+      "testing": "Testing…",
+      "test": "Test",
+      "testAlive": "Alive · {{latencyMs}} ms",
+      "testFailed": "Failed · {{error}}",
+      "testNoResponse": "no response"
+    },
+    "detail": {
+      "model": "Model",
+      "endpoint": "Endpoint",
+      "key": "Key",
+      "keyOptional": "Optional",
+      "keyNotSaved": "Not saved",
+      "updated": "Updated",
+      "updatedNever": "Never"
+    },
+    "dialog": {
+      "updateTitle": "Update {{label}}",
+      "addTitle": "Add model provider",
+      "description": "The API key is encrypted before storage and never returned to the browser. Leave the key blank when editing to keep the saved key.",
+      "providerLabel": "Provider",
+      "apiKeyLabelOptional": "API key (optional)",
+      "apiKeyLabel": "API key",
+      "apiKeyPlaceholderKeep": "Leave blank to keep the saved key",
+      "apiKeyPlaceholderOptional": "Optional for local runtimes",
+      "apiKeyPlaceholder": "Paste provider key",
+      "modelLabel": "Model",
+      "baseUrlLabel": "Base URL",
+      "baseUrlHintLocal": "Localhost is accepted only in local development. Production requires public https.",
+      "baseUrlHint": "Must be a public https endpoint.",
+      "cancel": "Cancel",
+      "saving": "Saving...",
+      "save": "Save provider"
+    }
+  },
+  "connectors": {
+    "category": {
+      "company": "Company data",
+      "market": "Market & open data",
+      "procurement": "Procurement & tenders",
+      "logo": "Logos & branding",
+      "people": "People & contacts",
+      "ai": "AI & agents"
+    },
+    "header": {
+      "title": "Connectors catalog",
+      "caption": "External data sources BidStack can reach. Open feeds run without keys; licensed feeds need credentials.",
+      "sourcesBadge": "{{count}} sources"
+    },
+    "error": {
+      "title": "Could not load connectors",
+      "retry": "Try again"
+    },
+    "stat": {
+      "totalSources": "Total sources",
+      "healthy": "Healthy",
+      "needsKey": "Needs key",
+      "degradedDown": "Degraded/down",
+      "catalogBadge": "catalog"
+    },
+    "filter": {
+      "groupLabel": "Filter connectors by category",
+      "all": "All"
+    },
+    "empty": {
+      "title": "No connectors in this category"
+    },
+    "row": {
+      "checkedAt": "Checked {{time}}",
+      "docsLink": "Docs ↗",
+      "disconnecting": "Disconnecting...",
+      "disconnect": "Disconnect",
+      "connecting": "Connecting...",
+      "connect": "Connect",
+      "requiresKey": "requires key",
+      "open": "open"
+    },
+    "status": {
+      "healthy": "healthy",
+      "degraded": "degraded",
+      "down": "down",
+      "disabled": "disabled"
+    }
+  },
+  "erpConnector": {
+    "title": "ERP MCP",
+    "caption": "set ERP_MCP_URL + ERP_DB to enable",
+    "status": {
+      "error": "error",
+      "checking": "checking",
+      "notConfigured": "not configured",
+      "live": "live",
+      "unreachable": "unreachable"
+    },
+    "error": {
+      "title": "Couldn't reach the ERP status endpoint",
+      "message": "This is a connection problem, not a missing configuration. Please retry.",
+      "retry": "Retry"
+    },
+    "notConfigured": {
+      "set": "Set",
+      "andOptionally": "and optionally",
+      "tail": "to reach the ERP MCP sidecar. Until then, BidStack uses local verified data and verified data connectors."
+    },
+    "stat": {
+      "endpoint": "Endpoint",
+      "database": "Database",
+      "mcpTools": "MCP tools",
+      "status": "Status"
+    },
+    "value": {
+      "na": "n/a",
+      "reachable": "reachable",
+      "unreachable": "unreachable"
+    },
+    "kit": {
+      "title": "ERP bid operating kit",
+      "subtitle": "Partner, opportunity, quote, activity, document, and handoff patterns adapted for BidStack presales.",
+      "badge": {
+        "sidecar": "sidecar",
+        "fixSidecar": "fix sidecar",
+        "local": "local"
+      }
+    },
+    "autocomplete": {
+      "title": "Partner autocomplete",
+      "subtitle": "ERP-style legal entity lookup with BidStack fallback.",
+      "ariaLabel": "Company autocomplete query",
+      "placeholder": "Name, domain, VAT, or DUNS",
+      "check": "Check",
+      "empty": "No company suggestions yet. Add ERP MCP credentials or verify this account in BidStack."
+    },
+    "item": {
+      "vat": "VAT {{value}}",
+      "duns": "DUNS {{value}}",
+      "noRegistryKeys": "No registry keys yet"
+    }
+  },
+  "connectionCommandCenter": {
+    "path": {
+      "dust": {
+        "title": "Dust agent bridge",
+        "eyebrow": "Agent actions",
+        "summary": "Give Dust a server-side CRM toolbelt with MCP plus REST sync."
+      },
+      "mcp": {
+        "title": "MCP server",
+        "eyebrow": "Custom tools",
+        "summary": "Register BidStack as an MCP server for Dust, Claude Desktop, or internal agents."
+      },
+      "rest": {
+        "title": "REST API",
+        "eyebrow": "Bi-directional data",
+        "summary": "Use typed API keys for ETL jobs, client portals, and enterprise automation."
+      },
+      "webhooks": {
+        "title": "Webhooks",
+        "eyebrow": "Realtime events",
+        "summary": "Subscribe external systems to deal, bid, proposal, invoice, and agent events."
+      }
+    },
+    "readyLabel": "ready",
+    "needsSetupLabel": "needs setup",
+    "error": {
+      "title": "Could not load setup guide",
+      "message": "The integration contract endpoint did not respond.",
+      "retry": "Retry setup guide"
+    },
+    "readiness": {
+      "dustCredentials": {
+        "label": "Dust credentials",
+        "ready": "Ready",
+        "needsKey": "Needs key"
+      },
+      "dustAgents": {
+        "label": "Dust agents",
+        "found": "{{count}} found",
+        "disabled": "Disabled"
+      },
+      "mcpEndpoint": {
+        "label": "MCP endpoint",
+        "publicUrlSet": "Public URL set",
+        "localFallback": "Local fallback"
+      },
+      "dustDataSource": {
+        "label": "Dust data source",
+        "ready": "Ready",
+        "missing": "Missing"
+      }
+    },
+    "title": "Connection command center",
+    "generatedAt": "Generated {{time}}",
+    "subtitle": "Pick a path, create the right key, copy the exact endpoint, and connect the external system with least-privilege scopes.",
+    "keyVault": "Key vault",
+    "webhookHub": "Webhook hub",
+    "tablistLabel": "Integration setup paths"
+  },
+  "dustCredentials": {
+    "sectionTitle": "Dust credentials",
+    "sectionCaption": "Connect your Dust workspace once — crew agents, RFP drafting, compliance and document intelligence all use it automatically.",
+    "removeButton": "Remove",
+    "updateKeysButton": "Update keys",
+    "connectButton": "Connect Dust",
+    "dialogUpdateTitle": "Update Dust credentials",
+    "dialogConnectTitle": "Connect Dust",
+    "dialogDescription": "We validate the keys against Dust before saving. The API key is encrypted at rest and never shown again.",
+    "fieldApiKeyLabel": "API key",
+    "fieldApiKeyHint": "From Dust → Settings → API Keys.",
+    "fieldWorkspaceIdLabel": "Workspace ID",
+    "fieldDataSourceIdLabel": "Data source ID",
+    "fieldDataSourceIdPlaceholder": "Optional — enables document sync",
+    "fieldBaseUrlLabel": "Base URL",
+    "fieldBaseUrlPlaceholder": "Optional — defaults to https://dust.tt/api",
+    "cancelButton": "Cancel",
+    "validatingButton": "Validating…",
+    "validateSaveButton": "Validate & save",
+    "errorBothRequired": "API key and workspace ID are both required.",
+    "errorCouldNotSave": "Could not save the credentials.",
+    "toastConnectedTitle": "Dust connected",
+    "toastConnectedDescription": "Credentials validated and saved. AI features now use your workspace.",
+    "confirmRemoveTitle": "Remove Dust credentials?",
+    "confirmRemoveDescription": "AI features will fall back to the platform default (if one is set) or pause until new keys are added.",
+    "confirmRemoveLabel": "Remove",
+    "toastRemovedTitle": "Dust credentials removed",
+    "toastRemoveFailedTitle": "Remove failed",
+    "errorServerRejected": "The server rejected the request.",
+    "loadErrorTitle": "Could not load Dust credentials",
+    "loadErrorMessage": "Please try again.",
+    "retryButton": "Retry",
+    "emptyTitle": "Dust isn't connected yet",
+    "emptyMessageAdmin": "Add your Dust API key and workspace ID to turn on AI drafting, compliance and crew agents.",
+    "emptyMessageNonAdmin": "Ask an admin to connect your Dust workspace to enable AI features.",
+    "badgePlatformDefault": "Platform default",
+    "badgeConnected": "Connected",
+    "platformKeyNote": "Running on the platform's shared Dust key. Add your own above to use your workspace.",
+    "detailWorkspaceId": "Workspace ID",
+    "detailDataSourceId": "Data source ID",
+    "detailBaseUrl": "Base URL",
+    "detailAgentOverrides": "Agent overrides",
+    "agentOverridesConfigured": "{{count}} configured",
+    "agentOverridesDefaults": "Using defaults"
+  },
+  "dataQuality": {
+    "title": "Data quality",
+    "caption": {
+      "generated": "Report generated {{time}} · {{count}} issue",
+      "idle": "Detects duplicate companies, stale data, missing owners, and bad domains."
+    },
+    "error": {
+      "title": "Could not load data quality report",
+      "retry": "Try again"
+    },
+    "emptyScan": {
+      "title": "No data quality scan",
+      "message": "Run the data quality scan to see duplicate domains, stale records, missing owners, invalid domains, and logo coverage."
+    },
+    "stat": {
+      "qualityScore": "Quality score",
+      "highSeverity": "High severity",
+      "mediumSeverity": "Medium severity",
+      "totalIssues": "Total issues",
+      "badge": "data"
+    },
+    "noIssues": {
+      "title": "No data quality issues",
+      "message": "No duplicate domains, stale data, missing owners, invalid domains, or missing logos were detected in this scan."
+    },
+    "issue": {
+      "company": "Company: {{name}}"
+    },
+    "kind": {
+      "duplicateCompany": "Duplicate company",
+      "staleData": "Stale data",
+      "missingOwner": "Missing owner",
+      "invalidDomain": "Invalid domain",
+      "missingLogo": "Missing logo"
+    },
+    "severity": {
+      "high": "high",
+      "medium": "medium",
+      "low": "low"
+    }
+  },
+  "connectionTester": {
+    "title": "Connection tester",
+    "caption": "Probe an endpoint from the API service before saving it. Secrets and bearer tokens are never sent.",
+    "status": {
+      "reachable": "reachable",
+      "needsAttention": "needs attention",
+      "ready": "ready to test"
+    },
+    "probeOption": {
+      "mcp": {
+        "label": "MCP",
+        "description": "Agent tool endpoints"
+      },
+      "rest": {
+        "label": "REST API",
+        "description": "Data sync endpoints"
+      },
+      "webhook": {
+        "label": "Webhook",
+        "description": "Event receivers"
+      }
+    },
+    "endpointUrlLabel": "Endpoint URL",
+    "placeholder": {
+      "loading": "Loading setup contract..."
+    },
+    "useDefault": "Use default",
+    "testing": "Testing...",
+    "testEndpoint": "Test endpoint",
+    "hint": {
+      "noSecrets": {
+        "title": "No secrets sent",
+        "body": "The API probes reachability only. It strips query strings, fragments, usernames, and passwords."
+      },
+      "ssrf": {
+        "title": "SSRF guarded",
+        "body": "Private networks and internal hosts are blocked outside local development before any request is made."
+      },
+      "timeout": {
+        "title": "Fast timeout",
+        "body": "The probe stops after 5 seconds and records a scoped audit event for administrator traceability."
+      }
+    },
+    "toast": {
+      "missingUrl": "Add an endpoint URL first",
+      "reachedTitle": "Endpoint reached",
+      "warningTitle": "Probe completed with a warning",
+      "probeFailed": "Endpoint probe failed.",
+      "blockedTitle": "Probe blocked"
+    }
+  },
+  "integrationHero": {
+    "eyebrowBadge": "Integration fabric",
+    "eyebrowChannels": "MCP, REST, webhooks, Dust",
+    "title": "Integrations",
+    "subtitle": "Connect agents, APIs, ERP systems and event streams with clear setup paths, scoped credentials and live health checks that fit the rest of the platform.",
+    "posture": {
+      "refreshing": "Refreshing integration posture..."
+    },
+    "actions": {
+      "createApiKey": "Create API key",
+      "addWebhook": "Add webhook"
+    },
+    "metrics": {
+      "readyPaths": {
+        "label": "Ready paths",
+        "helperCurrent": "Current view",
+        "helperOverview": "Overview tab"
+      },
+      "dustAgents": {
+        "label": "Dust agents"
+      },
+      "webhookEvents": {
+        "label": "Webhook events",
+        "helperNeedReview": "{{count}} need review",
+        "helperNoErrors": "No event errors loaded"
+      },
+      "activeMcpTools": {
+        "label": "Active MCP tools",
+        "helper": "Dust-facing crm_* tools"
+      },
+      "controlPlane": {
+        "label": "Control plane",
+        "helper": "Least-privilege setup"
+      }
+    }
+  },
+  "integrationAtoms": {
+    "copyEndpoint": "Copy endpoint",
+    "copySnippet": "Copy snippet",
+    "alreadyCopied": "Already copied",
+    "copiedToClipboard": "Copied to clipboard",
+    "copyFailedTitle": "Copy failed",
+    "copyFailedDescription": "Clipboard access was not available.",
+    "copied": "Copied",
+    "copy": "Copy",
+    "httpStatus": "HTTP {{status}}",
+    "noResponse": "No response",
+    "latencyMs": "{{latency}}ms"
+  },
+  "dustAgents": {
+    "title": "Dust agents",
+    "caption": "Workspace agents available for account data verification workflows",
+    "statusDegraded": "degraded",
+    "statusConfigured": "configured",
+    "statusDisabled": "disabled",
+    "notConfigured": "Add Dust credentials to list available workspace agents.",
+    "empty": "Dust is configured, but no accessible agents were returned for this workspace.",
+    "badgeAgent": "agent"
+  },
+  "connectionRunway": {
+    "sectionLabel": "Integration setup workflow",
+    "stepBadge": "Step {{number}}",
+    "steps": {
+      "pickSurface": {
+        "title": "Pick the surface",
+        "body": "Choose MCP for agents, REST for sync, webhooks for events, or connectors for ERP."
+      },
+      "scopeAccess": {
+        "title": "Scope access",
+        "body": "Create read/write keys only for the exact workflow and keep secrets server-side."
+      },
+      "probeBeforeSave": {
+        "title": "Probe before save",
+        "body": "Run a safe reachability check with SSRF protection and no bearer tokens sent."
+      },
+      "monitorEvidence": {
+        "title": "Monitor evidence",
+        "body": "Review provider health and webhook events without leaving the integration hub."
+      }
+    }
   }
 }
