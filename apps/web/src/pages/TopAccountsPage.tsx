@@ -342,7 +342,8 @@ export function TopAccountsPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Link
-                        to={`/companies/${account.id}`}
+                        to={`/accounts/${encodeURIComponent(account.id)}`}
+                        aria-label={t('topAccounts.openCockpitAria', 'Open {{name}} customer cockpit', { name: account.name })}
                         className="font-semibold text-[var(--fg-primary)] hover:text-[var(--brand-primary)] truncate"
                       >
                         {account.name}
