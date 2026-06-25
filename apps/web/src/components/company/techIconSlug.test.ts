@@ -23,9 +23,10 @@ describe('techIconSlug', () => {
     expect(techIconSlug('Oracle')).toBe('oracle');
   });
 
-  // WHY: brands no source carries (Microsoft 365, Power BI…) return null →
-  // monogram, never a slug that would 404.
-  it('returns null when no source carries the brand', () => {
+  // WHY: techIconSlug is icon-set ONLY — brands no icon set carries (Microsoft
+  // 365, Power BI…) return null here. techLogoUrl resolves those via the curated
+  // brand-domain favicon instead; only truly unknown names fall to the monogram.
+  it('returns null from techIconSlug when no icon set carries the brand', () => {
     expect(techIconSlug('Microsoft 365')).toBeNull();
     expect(techIconSlug('Power BI')).toBeNull();
     expect(techIconSlug('')).toBeNull();
@@ -37,9 +38,20 @@ describe('techIconSlug', () => {
     expect(techIconSlug('K8s')).toBe('kubernetes');
   });
 
-  it('builds a same-origin proxy URL only for known brands', () => {
+  it('builds a same-origin proxy URL: icon for icon-set brands, favicon for curated domains', () => {
+    // Tier 1 — icon-set slugs.
     expect(techLogoUrl('GitHub')).toBe('/api/v1/logo?tech=github');
     expect(techLogoUrl('AWS')).toBe('/api/v1/logo?tech=amazonwebservices');
-    expect(techLogoUrl('Microsoft 365')).toBeNull();
+    expect(techLogoUrl('Slack')).toBe('/api/v1/logo?tech=slack');
+    expect(techLogoUrl('Windows')).toBe('/api/v1/logo?tech=windows11');
+    expect(techLogoUrl('Cisco Meraki')).toBe('/api/v1/logo?tech=cisco');
+    expect(techLogoUrl('Palo Alto Networks')).toBe('/api/v1/logo?tech=paloaltonetworks');
+    // Tier 2 — curated brand-domain favicon (no icon-set logo exists).
+    expect(techLogoUrl('Microsoft 365')).toBe('/api/v1/logo?domain=microsoft.com');
+    expect(techLogoUrl('CrowdStrike')).toBe('/api/v1/logo?domain=crowdstrike.com');
+    expect(techLogoUrl('ServiceNow')).toBe('/api/v1/logo?domain=servicenow.com');
+    expect(techLogoUrl('Workday')).toBe('/api/v1/logo?domain=workday.com');
+    // Truly unknown → null → monogram.
+    expect(techLogoUrl('Acme Internal Tool')).toBeNull();
   });
 });
