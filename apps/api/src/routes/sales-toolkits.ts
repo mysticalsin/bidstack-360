@@ -218,7 +218,7 @@ export const salesToolkitsRoutes: FastifyPluginAsyncZod = async (server) => {
         data: { deletedAt: new Date() },
       });
       if (res.count === 0) throw server.httpErrors.notFound('Toolkit not found');
-      return reply.code(204).send();
+      return reply.code(204).send(null);
     },
   );
 
