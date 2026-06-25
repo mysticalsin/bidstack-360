@@ -13,7 +13,6 @@ import {
   KeyContactsCard,
   KpiRow,
   KpiSidebar,
-  LiveDataMeshCard,
   OpenIssuesCard,
   PageHead,
   PipelineByStageCard,
@@ -328,11 +327,6 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
           {show('dataTrust') && (
             <Reveal delay={0.08}>
               <DataTrustCard cockpit={cockpit} />
-            </Reveal>
-          )}
-          {show('liveDataMesh') && (
-            <Reveal delay={0.12}>
-              <LiveDataMeshCard cockpit={cockpit} />
             </Reveal>
           )}
           {show('keyContacts') && (
