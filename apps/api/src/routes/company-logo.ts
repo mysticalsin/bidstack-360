@@ -65,7 +65,10 @@ function providerUrls(domain: string): string[] {
   if (token) urls.push(`https://img.logo.dev/${domain}?token=${encodeURIComponent(token)}&size=128&format=png`);
   const bf = process.env.BRANDFETCH_LOGO_TOKEN?.trim();
   if (bf) urls.push(`https://cdn.brandfetch.io/${domain}/w/128/h/128?c=${encodeURIComponent(bf)}`);
-  // DuckDuckGo icon service — key-free, reliable, returns the real brand favicon.
+  // Google favicon service — key-free, returns up to 128px (crisper than DDG's
+  // 16-32px .ico). Preferred key-free source when no logo.dev/Brandfetch token.
+  urls.push(`https://www.google.com/s2/favicons?domain=${domain}&sz=128`);
+  // DuckDuckGo icon service — key-free fallback.
   urls.push(`https://icons.duckduckgo.com/ip3/${domain}.ico`);
   return urls;
 }
