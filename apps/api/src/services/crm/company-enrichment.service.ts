@@ -401,6 +401,7 @@ export function buildCompanies(
     sourceAttribution: unknown;
     updatedAt: Date;
   }>,
+  companyRows: Array<{ id: string; name: string; domain: string | null; logoUrl: string | null }> = [],
 ) {
   const byName = new Map<string, z.infer<typeof CrmCompany>>();
   for (const enrichment of enrichments) {
@@ -438,6 +439,23 @@ export function buildCompanies(
       ],
       updatedAt: opportunity.updatedAt.toISOString(),
     });
+  }
+
+  // Authoritative Company-table overrides: stamp the real id (so the cockpit
+  // resolves by it via findSelectedCompany) and let manual domain/logo win over
+  // guessed values. Override-only — we do not surface empty Company rows that
+  // have no opportunity/enrichment footprint.
+  for (const row of companyRows) {
+    const existing = byName.get(normalizeName(row.name));
+    if (!existing) continue;
+    existing.id = row.id;
+    if (row.domain) existing.domain = row.domain;
+    const logoDomain = row.domain ?? existing.domain;
+    if (row.logoUrl) {
+      existing.logo = logoFor(existing.name, row.logoUrl, 'official_website');
+    } else if (logoDomain) {
+      existing.logo = logoFor(existing.name, logoUrlFor(existing.name, logoDomain), 'favicon');
+    }
   }
 
   if (!byName.has('mantu')) byName.set('mantu', fallbackCompany('Mantu'));

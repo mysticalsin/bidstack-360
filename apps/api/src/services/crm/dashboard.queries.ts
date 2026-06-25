@@ -258,9 +258,33 @@ export async function resolveCockpitCompany(
     select: ENRICHMENT_SELECT,
   });
   if (enrichment) return buildCompanies([], [enrichment])[0] ?? null;
-  // A UUID that isn't an enrichment can't be an opportunity-only company — those
-  // are keyed by normalized name, not a UUID.
-  if (isUuid) return null;
+  if (isUuid) {
+    // A UUID that isn't an enrichment may be a Company-table row (manual / key /
+    // top account). Resolve it so the cockpit doesn't 404; merge its by-name
+    // enrichment for richer fields, then stamp the authoritative id/domain.
+    const company = await prisma.company.findFirst({
+      where: { orgId, deletedAt: null, id: companyId },
+      select: { id: true, name: true, domain: true, logoUrl: true },
+    });
+    if (!company) return null;
+    const byNameEnrichment = await prisma.companyEnrichment.findFirst({
+      where: { orgId, deletedAt: null, normalizedName: normalizeName(company.name) },
+      select: ENRICHMENT_SELECT,
+    });
+    const list = byNameEnrichment
+      ? buildCompanies([], [byNameEnrichment], [company])
+      : buildCompanies(
+          [{ customer: company.name, industry: null, logoUrl: company.logoUrl, updatedAt: new Date() }],
+          [],
+          [company],
+        );
+    const resolved = list[0];
+    if (resolved) {
+      resolved.id = company.id;
+      if (company.domain) resolved.domain = company.domain;
+    }
+    return resolved ?? null;
+  }
   // Opportunity-only company: no normalized column to index on, so match within
   // a bounded set of distinct customers (kept under the dev query-guard's 1000
   // cap; ~5x the old 200 window).

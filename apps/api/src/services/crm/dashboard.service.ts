@@ -89,6 +89,7 @@ export async function buildDashboardSnapshot(
     providerRows,
     queueRows,
     releaseScoreRow,
+    companyRows,
   ] = await Promise.all([
     prisma.opportunity.findMany({
       where: opportunityWhere,
@@ -292,6 +293,13 @@ export async function buildDashboardSnapshot(
       },
       orderBy: { scoredAt: 'desc' },
     }),
+    // Authoritative Company rows — domain/logo/id override the opp/enrichment-
+    // derived companies so manual edits win and the cockpit resolves by real id.
+    prisma.company.findMany({
+      where: { orgId, deletedAt: null },
+      select: { id: true, name: true, domain: true, logoUrl: true },
+      take: 500,
+    }),
   ]);
 
   const visibleCompanyKeys =
@@ -302,7 +310,7 @@ export async function buildDashboardSnapshot(
     scope && !scope.unrestricted
       ? new Set(opportunities.map((opportunity) => opportunity.id))
       : null;
-  const companies = buildCompanies(opportunities, enrichments).filter(
+  const companies = buildCompanies(opportunities, enrichments, companyRows).filter(
     (company) => !visibleCompanyKeys || visibleCompanyKeys.has(normalizeName(company.name)),
   );
   const deals = opportunities.map((opportunity) => serializeDeal(opportunity));
