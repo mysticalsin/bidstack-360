@@ -171,6 +171,10 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
           },
     },
   ];
+  // Collapse the wall of "Not verified" rows into one summary line so a sparse
+  // account doesn't render a dozen empty fields — verified data stays prominent.
+  const verifiedRows = rows.filter((row) => row.source.state !== 'missing');
+  const missingRows = rows.filter((row) => row.source.state === 'missing');
   return (
     <Card role="region" aria-label={t('businessSnapshot.region.ariaLabel', 'Business snapshot')}>
       <SectionHeader
@@ -182,7 +186,7 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
       />
       <div style={{ padding: '14px 18px 18px' }}>
         <dl className="kvlist">
-          {rows.map((row, index) => (
+          {verifiedRows.map((row, index) => (
             <motion.div
               key={row.label}
               className="kv"
@@ -204,6 +208,29 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
               </dd>
             </motion.div>
           ))}
+          {missingRows.length > 0 ? (
+            <motion.div
+              key="__not-enriched"
+              className="kv"
+              initial={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 6 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ ...springSoft, delay: reducedMotion ? 0 : verifiedRows.length * 0.032 }}
+            >
+              <dt>{t('businessSnapshot.row.notEnriched', 'Not yet enriched')}</dt>
+              <dd>
+                <span className="kv-value">{missingRows.map((row) => row.label).join(' · ')}</span>
+                <SourceBadge
+                  label={t('businessSnapshot.source.missingLabel', 'Missing')}
+                  state="missing"
+                  hint={t(
+                    'businessSnapshot.source.collapsedHint',
+                    'These fields have no source attached yet. Run enrichment to populate them.',
+                  )}
+                  className="kv-source"
+                />
+              </dd>
+            </motion.div>
+          ) : null}
         </dl>
       </div>
     </Card>
