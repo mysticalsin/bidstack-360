@@ -82,12 +82,25 @@ export default function SectorViewPage() {
 
       {view.isLoading ? (
         <LoadingSkeleton rows={6} />
-      ) : view.isError ? (
+      ) : view.isError && !view.data ? (
+        // Hard error only when there is NO data to show. A background refetch
+        // (refetchOnWindowFocus / reconnect after idle) that fails while we
+        // still hold the last good data must NOT wipe the view — that case is
+        // handled by the non-blocking stale banner in the content branch below.
         <ErrorState
           title={t('sectorView.errorTitle', 'Could not load the sector view')}
           message={
             view.error?.message ??
             t('sectorView.errorMessage', 'The sector endpoint did not respond.')
+          }
+          action={
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => void view.refetch()}
+            >
+              {t('sectorView.retry', 'Retry')}
+            </button>
           }
         />
       ) : !view.data || view.data.sectors.length === 0 ? (
@@ -100,6 +113,31 @@ export default function SectorViewPage() {
         />
       ) : (
         <>
+          {view.isError ? (
+            // We have valid data but the latest refresh failed (e.g. focus
+            // refetch after idle). Keep the view; offer a manual retry instead
+            // of replacing everything with an error wall.
+            <div role="status" className="sector-quality-banner">
+              <Icon name="warning" size={16} aria-hidden />
+              <div>
+                <strong>
+                  {t('sectorView.staleHeading', 'Showing the last loaded sector view.')}
+                </strong>{' '}
+                {t(
+                  'sectorView.staleDetail',
+                  'We could not refresh sector data just now — it will retry automatically.',
+                )}{' '}
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => void view.refetch()}
+                >
+                  {t('sectorView.retry', 'Retry')}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           {view.data.dataQualityWarning ? (
             <div
               role="status"
