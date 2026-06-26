@@ -250,6 +250,7 @@
   --danger-tint: rgba(251, 113, 133, 0.16);
   --info: #818cf8;
   --info-tint: rgba(129, 140, 248, 0.16);
+  --info-strong: #a5b0ff; /* dark-mode --info-strong: lighter for small text on dark tints (var() can't fall back when the light token is globally defined) */
 
   /* Semantic aliases — dark mode equivalents */
   --fg-error: #fb7185; /* = --danger dark */

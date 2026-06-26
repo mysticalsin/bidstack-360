@@ -103,7 +103,7 @@ export default function SectorViewPage() {
             </button>
           }
         />
-      ) : !view.data || view.data.sectors.length === 0 ? (
+      ) : !view.isError && (!view.data || view.data.sectors.length === 0) ? (
         <EmptyState
           title={t('sectorView.emptyTitle', 'No sector data yet')}
           message={t(

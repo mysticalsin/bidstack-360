@@ -107,10 +107,10 @@ async function recordAndNotify(report: DueReport, log: pino.Logger): Promise<voi
       orgId: report.orgId,
       reportId: report.id,
       status: 'pending',
-      // Seam note lives in `result` (run metadata), NOT `error`: status 'pending'
-      // already marks "not executed yet", and a non-null `error` would make a
-      // healthy queued run read as failed in the runs UI.
-      result: { note: PENDING_EXECUTION_NOTE },
+      // No `error` AND no `result`: a non-null `error` would make a healthy
+      // queued run read as failed, and `result` is a typed row-array contract
+      // (z.array) — a note object there 500s the run-detail/export serializer.
+      // `status: 'pending'` is the marker; the seam note rides the notification.
     },
   });
 
