@@ -35,6 +35,32 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 <!-- New entries appended at the top of this section. -->
 
+### 2026-06-26 PROCESS: Treated an errored `rg` (exit 2) as "no matches" and reported a finding dismissed
+- **What went wrong:** During a code review I ran `rg -n "5173" --glob '!**/node_modules/**' .` to check whether a Vite dev-port change (5173→38081) broke anything. The command exited 2 (error) and printed nothing, so I told the user the port concern was "dismissed — zero references." A review agent then found `5173` hardcoded in `apps/api/src/lib/cors-origins.ts:1` and defaulted in `apps/api/src/env.ts:19`. Re-running with `grep` confirmed the agent: the references were real.
+- **Root cause:** `rg` returned exit code 2 (it aborted on unreadable paths — the `.claude/worktrees/agent-*` symlinks), which is distinct from exit 1 (clean, no matches). Empty stdout from an *errored* search was misread as an authoritative "no matches," producing a false-negative conclusion stated to the user.
+- **Prevention rule:** Treat search exit codes explicitly. Exit 0 = matches, 1 = no matches, **2 = error → the result is NOT "empty," it is unknown.** Never conclude "zero references" from a search unless it exited 0/1 cleanly. Prefer the Grep tool (ripgrep with sane defaults) over raw `rg .` over the repo root; when shelling out, scope the path (e.g. `apps packages`) to avoid symlink/permission aborts, and check `$?` before trusting empty output.
+- **Files affected:** none (review-only false negative; corrected before any code relied on it). The real divergence was fixed by adding `38081` to `DEV_WEB_PORTS` in `apps/api/src/lib/cors-origins.ts`.
+
+---
+
+### 2026-06-23 UX: Auto-start product tour blocked primary account actions
+- **What went wrong:** The onboarding store auto-started the product tour during hydration, so a tour backdrop could intercept first-run clicks such as `New account` on `/accounts`.
+- **Root cause:** First-run engagement logic was treated as harmless UI state, but it changed pointer and focus behavior on core CRM pages.
+- **Prevention rule:** Tours, coach marks, and walkthroughs must be opt-in from an explicit trigger or scoped to a non-blocking surface. Browser smoke tests must click primary actions with fresh persisted UI state.
+- **Files affected:** `apps/web/src/stores/onboarding.ts`, `apps/web/src/stores/onboarding.test.ts`, `docs/solutions/opt-in-product-tour.md`.
+
+### 2026-06-23 UX/PERF: Third-party brand assets caused noisy console and offline brittleness
+- **What went wrong:** Dashboard/account screens loaded Google Fonts, Google favicon URLs, and remote logo images at runtime. Blocked networks produced console errors and failed resources on otherwise healthy pages.
+- **Root cause:** Decorative brand enrichment was allowed to make third-party browser requests instead of using same-origin/proxied assets or deterministic local fallbacks.
+- **Prevention rule:** CRM shell, account cards, tech badges, and cockpit headers must render without third-party runtime asset fetches. Unknown logos should degrade to accessible local initials/monograms, and tests must reject remote favicon synthesis.
+- **Files affected:** `apps/web/index.html`, `apps/web/src/index.css`, `apps/web/src/components/company/logoUrlSafety.ts`, `apps/web/src/components/company/CompanyLogo.tsx`, `apps/web/src/components/company/TechLogo.tsx`, `docs/solutions/offline-safe-brand-assets.md`.
+
+### 2026-06-23 INFRA: Web-only dev server made API proxy return dashboard 500s
+- **What went wrong:** The Vite web server was running on port 38081, but no API process was listening on the proxy target `localhost:4000`. Dashboard calls through `/api/v1/...` returned Vite proxy 500s, surfacing as "Could not load dashboard" even though the dashboard route tests passed.
+- **Root cause:** Local verification used the web dev server without the API dev server. The browser saw same-origin `/api` failures from the proxy layer, not an application route regression.
+- **Prevention rule:** When investigating dashboard 500s in local dev, check both halves first: `netstat -ano | findstr ":38081"` and `netstat -ano | findstr ":4000"`, then verify `/api/v1/crm/summary`, `/api/v1/reports/pipeline`, and `/api/v1/crm/dashboard` through the web origin. Prefer root `pnpm dev` or start `pnpm dev:api` alongside `pnpm dev:web`.
+- **Files affected:** Runtime process state; no source fix required.
+
 ### 2026-06-22 SECURITY: PII field-encryption silently skipped on bulk `createMany` (fail-open)
 - **What went wrong:** The Prisma PII-encryption middleware only handled `args.data` as a single object. `createMany` passes `data` as an array, so `extractOrgId` returned null and the middleware silently skipped encryption — email/phone would persist as plaintext (emailHash null) the moment `PII_FIELD_ENCRYPTION` flipped on. Live call sites: notes.service (AI-extracted meeting contacts) + onboarding.service.
 - **Root cause:** A security control that FAILS OPEN when its input-shape assumption is violated. The orgId-extraction helper assumed the single-row write shape; the array shape (`createMany`, `updateMany`-with-array) was never handled or guarded.

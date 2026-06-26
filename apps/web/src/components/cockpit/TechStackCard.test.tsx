@@ -2,6 +2,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import type { ComponentProps, ElementType, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { toast } from '@/components/ui/Toast';
+
 import { TechStackCard } from './TechStackCard';
 import type {
   AccountCockpitSnapshot,
@@ -13,6 +15,7 @@ import type {
 const hookMocks = vi.hoisted(() => ({
   technicalStackState: undefined as TechnicalStackState | undefined,
   saveStack: vi.fn(),
+  saveStackPending: false,
   refreshStack: vi.fn(),
   acceptSuggestion: vi.fn(),
   dismissSuggestion: vi.fn(),
@@ -45,7 +48,7 @@ vi.mock('@/hooks/useCompanyTechnicalStack', () => ({
   }),
   useSaveCompanyTechnicalStack: () => ({
     mutateAsync: hookMocks.saveStack,
-    isPending: false,
+    isPending: hookMocks.saveStackPending,
   }),
   useRefreshCompanyTechnicalStack: () => ({
     mutateAsync: hookMocks.refreshStack,
@@ -96,6 +99,7 @@ vi.mock('framer-motion', async () => {
 
 beforeEach(() => {
   hookMocks.technicalStackState = undefined;
+  hookMocks.saveStackPending = false;
   hookMocks.saveStack.mockResolvedValue({});
   hookMocks.refreshStack.mockResolvedValue({
     state: {
@@ -198,6 +202,34 @@ describe('TechStackCard provenance', () => {
         },
       ]);
     });
+  });
+
+  it('surfaces an error toast and keeps the editor open when a save fails', async () => {
+    // WHY: a swallowed save error would silently drop the user's draft. Must fail
+    // if the catch is removed (no toast) or if the editor closes on failure.
+    hookMocks.saveStack.mockRejectedValueOnce(new Error('network down'));
+    render(<TechStackCard cockpit={cockpit()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit technical stack' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save technical stack' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    // Editor stays open (draft preserved) — Save is still on screen.
+    expect(screen.getByRole('button', { name: 'Save technical stack' })).toBeTruthy();
+  });
+
+  it('disables Save while a save mutation is pending', () => {
+    // WHY: leaving Save enabled mid-flight allows a double-submit. Must fail if
+    // `disabled={saveStack.isPending}` is dropped from the Save button.
+    hookMocks.saveStackPending = true;
+    render(<TechStackCard cockpit={cockpit()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit technical stack' }));
+
+    const save = screen.getByRole('button', {
+      name: 'Save technical stack',
+    }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
   });
 
   it('seeds edit mode from the visible cockpit stack when no override exists yet', () => {
@@ -1575,6 +1607,145 @@ describe('TechStackCard provenance', () => {
         },
       ]);
     });
+  });
+
+  it('accepts only trusted provider technologies before saving', async () => {
+    hookMocks.technicalStackState = {
+      companyKey: 'acme-north',
+      manualStack: cockpit().technicalStack,
+      providerStack: [
+        ...cockpit().technicalStack,
+        {
+          label: 'Cloud',
+          items: [{ name: 'AWS', source: 'enrichment:apollo', confidence: 0.82 }],
+        },
+        {
+          label: 'ERP',
+          items: [{ name: 'SAP', source: 'enrichment:seamless', confidence: 0.9 }],
+        },
+        {
+          label: 'Commerce',
+          items: [
+            { name: 'Shopify', source: 'enrichment:open_data:website', confidence: 0.88 },
+          ],
+        },
+      ],
+      effectiveStack: cockpit().technicalStack,
+      suggestions: [
+        {
+          id: 'cloud:aws',
+          label: 'Cloud',
+          item: { name: 'AWS', source: 'enrichment:apollo', confidence: 0.82 },
+          providerUpdatedAt: '2026-06-16T12:00:00.000Z',
+        },
+        {
+          id: 'erp:sap',
+          label: 'ERP',
+          item: { name: 'SAP', source: 'enrichment:seamless', confidence: 0.9 },
+          providerUpdatedAt: '2026-06-16T12:00:00.000Z',
+        },
+        {
+          id: 'commerce:shopify',
+          label: 'Commerce',
+          item: { name: 'Shopify', source: 'enrichment:open_data:website', confidence: 0.88 },
+          providerUpdatedAt: '2026-06-16T12:00:00.000Z',
+        },
+      ],
+      updatedAt: null,
+    };
+    render(<TechStackCard cockpit={cockpit()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit technical stack' }));
+    const ribbon = screen.getByLabelText('Trusted source suggestions');
+    expect(within(ribbon).getByText('Trusted evidence ready')).toBeTruthy();
+    expect(within(ribbon).getByText('Seamless')).toBeTruthy();
+    expect(within(ribbon).getByText('Open data')).toBeTruthy();
+    expect(within(ribbon).queryByText('Apollo')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Accept trusted source suggestions' }));
+    const staged = screen.getByLabelText('Recently staged stack entries');
+    expect(within(staged).getByText('SAP')).toBeTruthy();
+    expect(within(staged).getByText('Shopify')).toBeTruthy();
+    expect(within(staged).queryByText('AWS')).toBeNull();
+
+    const proof = screen.getByLabelText('Accepted source-backed draft');
+    expect(proof.textContent).toContain('1Seamless');
+    expect(proof.textContent).toContain('1Open data');
+    fireEvent.click(screen.getByRole('button', { name: 'Save technical stack' }));
+
+    await waitFor(() => {
+      expect(hookMocks.saveStack).toHaveBeenCalledWith([
+        {
+          label: 'Cloud',
+          items: [
+            { name: 'Azure', source: 'manual', confidence: 1 },
+            { name: 'Snowflake', source: 'manual', confidence: 1 },
+          ],
+        },
+        {
+          label: 'ERP',
+          items: [{ name: 'SAP', source: 'manual:accepted:enrichment:seamless', confidence: 1 }],
+        },
+        {
+          label: 'Commerce',
+          items: [
+            {
+              name: 'Shopify',
+              source: 'manual:accepted:enrichment:open_data:website',
+              confidence: 1,
+            },
+          ],
+        },
+      ]);
+    });
+  });
+
+  it('filters valid open-data source suggestions as their own review lane', () => {
+    hookMocks.technicalStackState = {
+      companyKey: 'acme-north',
+      manualStack: cockpit().technicalStack,
+      providerStack: [
+        ...cockpit().technicalStack,
+        {
+          label: 'Commerce',
+          items: [
+            { name: 'Shopify', source: 'enrichment:open_data:website', confidence: 0.88 },
+          ],
+        },
+        {
+          label: 'ITSM',
+          items: [{ name: 'ServiceNow', source: 'enrichment:tech_stack_mcp', confidence: 0.86 }],
+        },
+      ],
+      effectiveStack: cockpit().technicalStack,
+      suggestions: [
+        {
+          id: 'commerce:shopify',
+          label: 'Commerce',
+          item: { name: 'Shopify', source: 'enrichment:open_data:website', confidence: 0.88 },
+          providerUpdatedAt: '2026-06-16T12:00:00.000Z',
+        },
+        {
+          id: 'itsm:servicenow',
+          label: 'ITSM',
+          item: { name: 'ServiceNow', source: 'enrichment:tech_stack_mcp', confidence: 0.86 },
+          providerUpdatedAt: '2026-06-16T12:00:00.000Z',
+        },
+      ],
+      updatedAt: null,
+    };
+
+    render(<TechStackCard cockpit={cockpit()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit technical stack' }));
+    const scorecards = screen.getByLabelText('Source review scorecards');
+    expect(
+      within(scorecards).getByRole('button', { name: 'Review Open data source scorecard' }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Review Open data source suggestions' }));
+
+    expect(screen.getByRole('button', { name: 'Add Shopify from Open data' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Add ServiceNow from Tech Intel' })).toBeNull();
   });
 
   it('filters provider suggestions and accepts the reviewed source slice', async () => {

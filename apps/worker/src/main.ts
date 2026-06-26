@@ -31,6 +31,9 @@ import { startCompetitorResearch } from './queues/competitor-research.js';
 // Workflow automation — trigger dispatch (record_created / stage_changed) + schedule cron
 import { startWorkflowDispatchWorker } from './queues/workflow-dispatch.js';
 import { startWorkflowScheduleWorker } from './queues/workflow-schedule.js';
+// Bid-deadline alerts (7/3/1 days) + scheduled analytics reports — repeatable scans
+import { startBidDeadlineAlerts } from './queues/bid-deadline-alerts.js';
+import { startScheduledReports } from './queues/scheduled-reports.js';
 // Wave 9 — RFP Automation Engine workers
 import { startRfpOrchestrator, startRfpOrchestrationReaper } from './queues/rfp-orchestrator.js';
 import { startRfpRequirementExtract } from './queues/rfp-requirement-extract.js';
@@ -123,6 +126,9 @@ await Promise.all([
   // Workflow automation engine — reuses the webhook-delivery producer queue.
   startWorkflowDispatchWorker(connection, log, workers, queues, webhookDeliveryQueue),
   startWorkflowScheduleWorker(connection, log, workers, queues, webhookDeliveryQueue),
+  // Bid-deadline alerts + scheduled analytics reports (repeatable, org-scoped scans)
+  startBidDeadlineAlerts(connection, log, workers, queues),
+  startScheduledReports(connection, log, workers, queues),
   // Wave 9 — RFP Automation Engine
   startRfpOrchestrator(connection, log, workers, queues),
   startRfpOrchestrationReaper(connection, log, workers, queues),

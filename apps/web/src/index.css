@@ -86,6 +86,7 @@
   --danger-tint: #fbe5e8;
   --info: #6e59ff;
   --info-tint: #ece8ff;
+  --info-strong: #5e47ec; /* darker --info for text on tints; ≈5.2:1 on the brand tint, ≈5.9:1 on white (AA) */
 
   /* Semantic aliases — components use these instead of duplicating semantic names */
   --fg-error: #b82032; /* = --danger; 6.38:1 on white ✅ */
@@ -420,9 +421,13 @@
   --font-mono:
     ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, 'Cascadia Code', monospace;
 
-  /* Login page fonts — scoped, do not override global font-sans/font-display */
-  --font-heading: "'Instrument Serif'", serif;
-  --font-body: "'Barlow'", sans-serif;
+  /* Login page fonts — scoped, self-contained, do not override global font-sans/font-display */
+  --font-heading:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI Variable Display', system-ui,
+    sans-serif;
+  --font-body:
+    system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI Variable', 'Segoe UI',
+    Helvetica, Arial, sans-serif;
 
   --radius-sm: 8px;
   --radius-md: 12px;

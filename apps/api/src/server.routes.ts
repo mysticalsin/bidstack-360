@@ -68,6 +68,7 @@ import { workflowRoutes } from './routes/workflows.js';
 import { tagRoutes } from './routes/tags.js';
 import { emailTemplateRoutes } from './routes/email-templates.js';
 import { leadRotRoutes } from './routes/lead-rot.js';
+import { savedViewsRoutes } from './routes/saved-views.js';
 import { pluginRoutes } from './routes/plugins.js';
 import { usersRoutes } from './routes/users.js';
 import { webhookSubscriptionsRoutes } from './routes/webhook-subscriptions.js';
@@ -210,6 +211,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(tagRoutes, { prefix: '/api/v1' });
   await server.register(emailTemplateRoutes, { prefix: '/api/v1' });
   await server.register(leadRotRoutes, { prefix: '/api/v1' });
+  await server.register(savedViewsRoutes, { prefix: '/api/v1' });
   await server.register(pluginRoutes, { prefix: '/api/v1' });
   await server.register(usersRoutes, { prefix: '/api/v1' });
   await server.register(webhookSubscriptionsRoutes, { prefix: '/api/v1' });

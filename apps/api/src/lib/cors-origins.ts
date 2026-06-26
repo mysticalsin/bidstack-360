@@ -1,4 +1,7 @@
-const DEV_WEB_PORTS = ['5173', '5174', '4173', '4174'];
+// Dev/preview web origins allowed for CORS in non-prod. 38081 is the Vite dev
+// server port (apps/web/vite.config.ts) — keep in sync when that port changes,
+// or direct (non-proxied) browser→API calls and local OAuth callbacks break.
+const DEV_WEB_PORTS = ['5173', '5174', '4173', '4174', '38081'];
 const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
 const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 

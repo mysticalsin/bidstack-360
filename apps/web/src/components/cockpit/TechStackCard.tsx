@@ -103,6 +103,7 @@ const SOURCE_REVIEW_VISIBLE_LIMIT = 8;
 const QUEUED_SOURCE_REFRESH_INTERVAL_MS = 5_000;
 const QUEUED_SOURCE_REFRESH_MAX_POLLS = 12;
 const MAX_STACK_IMPORT_FILES = 3;
+const TRUSTED_SOURCE_CONFIDENCE = 0.85;
 
 // Memoized: the cockpit prop is a stable reference per-query, and this card
 // pure-renders from it unless its own persisted stack state changes.
@@ -376,7 +377,7 @@ type SourceRailItem = {
 };
 
 type ProviderReviewBreakdownItem = {
-  id: 'apollo' | 'seamless' | 'tech_intel' | 'other';
+  id: 'apollo' | 'seamless' | 'tech_intel' | 'open_data' | 'other';
   label: string;
   count: number;
 };
@@ -766,6 +767,10 @@ function TechStackEditor({
     () => filteredSourceSuggestions.slice(0, SOURCE_REVIEW_VISIBLE_LIMIT),
     [filteredSourceSuggestions],
   );
+  const trustedFilteredSourceSuggestions = useMemo(
+    () => filteredSourceSuggestions.filter(isTrustedSourceSuggestion),
+    [filteredSourceSuggestions],
+  );
   const hiddenSourceSuggestionCount = Math.max(
     0,
     filteredSourceSuggestions.length - visibleSourceSuggestions.length,
@@ -910,14 +915,14 @@ function TechStackEditor({
     onNewVendorChange('');
   };
 
-  const addFilteredSourceSuggestions = () => {
-    if (filteredSourceSuggestions.length === 0) return;
-    const stagedItems = filteredSourceSuggestions.map((suggestion) => ({
+  const stageSourceSuggestions = (sourceItems: TechnicalStackSuggestion[]) => {
+    if (sourceItems.length === 0) return;
+    const stagedItems = sourceItems.map((suggestion) => ({
       name: suggestion.item.name,
       category: suggestion.label,
       sourceLabel: sourceLabelForTechItem(suggestion.item),
     }));
-    const next = filteredSourceSuggestions.reduce(
+    const next = sourceItems.reduce(
       (stack, suggestion) =>
         addManualItem(stack, suggestion.label, suggestion.item.name, {
           source: `manual:accepted:${suggestion.item.source}`,
@@ -928,6 +933,9 @@ function TechStackEditor({
     onDraftChange(next);
     setLastStagedItems(stagedItems);
   };
+  const addFilteredSourceSuggestions = () => stageSourceSuggestions(filteredSourceSuggestions);
+  const addTrustedSourceSuggestions = () =>
+    stageSourceSuggestions(trustedFilteredSourceSuggestions);
   const sourceAcceptLabel =
     activeSourceReviewFilter === 'all'
       ? t('techStack.acceptAllSources', 'Accept all')
@@ -1340,6 +1348,10 @@ function TechStackEditor({
               ) : null}
             </div>
           </div>
+          <TrustedSourceRibbon
+            suggestions={trustedFilteredSourceSuggestions}
+            onAcceptTrusted={addTrustedSourceSuggestions}
+          />
           {sourceSuggestions.length > 0 ? (
             <div
               className="tech-editor-source-scorecards"
@@ -2128,6 +2140,75 @@ function TechStackIntakeReviewPanel({
   );
 }
 
+function TrustedSourceRibbon({
+  suggestions,
+  onAcceptTrusted,
+}: {
+  suggestions: TechnicalStackSuggestion[];
+  onAcceptTrusted: () => void;
+}) {
+  const { t } = useTranslation('crm');
+  if (suggestions.length === 0) return null;
+
+  const providerSummary = buildProviderReviewSummaries(suggestions);
+  const averageConfidence = Math.round(
+    suggestions.reduce((total, suggestion) => total + suggestion.item.confidence, 0) /
+      suggestions.length *
+      100,
+  );
+
+  return (
+    <div
+      className="tech-editor-trusted-ribbon"
+      aria-label={t('techStack.trustedSourceRibbonAria', 'Trusted source suggestions')}
+    >
+      <div className="tech-editor-trusted-main">
+        <Icon name="check" size={15} ariaHidden />
+        <div>
+          <span>{t('techStack.trustedSourceRibbonTitle', 'Trusted evidence ready')}</span>
+          <small>
+            {t(
+              'techStack.trustedSourceRibbonBody',
+              '{{count}} at {{threshold}}%+ confidence from provider sources.',
+              {
+                count: suggestions.length,
+                threshold: Math.round(TRUSTED_SOURCE_CONFIDENCE * 100),
+              },
+            )}
+          </small>
+        </div>
+      </div>
+      <div
+        className="tech-editor-trusted-breakdown"
+        aria-label={t('techStack.trustedSourceBreakdownAria', 'Trusted source breakdown')}
+      >
+        <span>
+          <strong>{averageConfidence}%</strong>
+          {t('techStack.trustedSourceAverage', ' avg')}
+        </span>
+        {providerSummary.map((item) => (
+          <span key={item.id} data-provider={item.id}>
+            <strong>{item.count}</strong>
+            {item.label}
+          </span>
+        ))}
+      </div>
+      <button
+        type="button"
+        className="tech-editor-inline-command trusted"
+        aria-label={t(
+          'techStack.acceptTrustedSourcesAria',
+          'Accept trusted source suggestions',
+        )}
+        onClick={onAcceptTrusted}
+      >
+        <Icon name="check" size={13} ariaHidden />
+        <span>{t('techStack.acceptTrustedSources', 'Accept trusted')}</span>
+      </button>
+    </div>
+  );
+}
+
 function TechEditorProviderPanel({
   providerSources,
   providerStack,
@@ -2778,6 +2859,13 @@ function buildProviderReviewSummaries(
       topVendor: '',
       topConfidence: -1,
     },
+    open_data: {
+      label: 'Open data',
+      count: 0,
+      confidenceTotal: 0,
+      topVendor: '',
+      topConfidence: -1,
+    },
     other: { label: 'Other', count: 0, confidenceTotal: 0, topVendor: '', topConfidence: -1 },
   };
 
@@ -2809,7 +2897,12 @@ function providerIdForTechSource(source: string): ProviderReviewBreakdownItem['i
   if (normalized.includes('apollo')) return 'apollo';
   if (normalized.includes('seamless')) return 'seamless';
   if (normalized.includes('tech_stack_mcp')) return 'tech_intel';
+  if (isOpenDataProviderSource(source)) return 'open_data';
   return 'other';
+}
+
+function isTrustedSourceSuggestion(suggestion: TechnicalStackSuggestion): boolean {
+  return suggestion.item.confidence >= TRUSTED_SOURCE_CONFIDENCE;
 }
 
 function buildIntakeReviewItems(
@@ -2895,7 +2988,8 @@ function acceptedSourceProviderRank(providerId: ProviderReviewBreakdownItem['id'
   if (providerId === 'apollo') return 0;
   if (providerId === 'seamless') return 1;
   if (providerId === 'tech_intel') return 2;
-  return 3;
+  if (providerId === 'open_data') return 3;
+  return 4;
 }
 
 function acceptedSourceLabelForItem(item: TechnicalStackItemType): string {
@@ -2916,6 +3010,7 @@ function sourceReviewFilterForProviderId(
     providerId === 'apollo' ||
     providerId === 'seamless' ||
     providerId === 'tech_intel' ||
+    providerId === 'open_data' ||
     providerId === 'other'
   ) {
     return providerId;
@@ -3010,6 +3105,7 @@ function buildSourceSummary({
   const techIntelCount = items.filter((item) =>
     item.source.toLowerCase().includes('tech_stack_mcp'),
   ).length;
+  const openDataCount = items.filter((item) => isOpenDataProviderSource(item.source)).length;
   const meetingCount = items.filter((item) => item.source.toLowerCase().includes('meeting')).length;
   const otherCount = items.filter((item) => isOtherProviderSource(item.source)).length;
   const otherSuggestionCount = suggestions.filter(
@@ -3058,8 +3154,8 @@ function buildSourceSummary({
       ).length,
     }),
     providerSourceRailItem({
-      fallbackCount: 0,
-      fallbackLabel: 'Profile',
+      fallbackCount: openDataCount,
+      fallbackLabel: openDataCount > 0 ? `${openDataCount} found` : 'Profile',
       id: 'open_data',
       label: 'Open data',
       provider: providerById.get('open_data'),
@@ -3210,12 +3306,14 @@ function sourceLabelForTechItem(item: TechnicalStackItemType): string {
     if (source.includes('apollo')) return 'Accepted Apollo';
     if (source.includes('seamless')) return 'Accepted Seamless';
     if (source.includes('tech_stack_mcp')) return `Accepted ${techIntelSourceLabelForSource(source)}`;
+    if (isOpenDataProviderSource(source)) return 'Accepted Open data';
     return `Accepted ${fallbackSourceLabelForSource(item.source)}`;
   }
   if (source.includes('manual')) return 'Manual';
   if (source.includes('apollo')) return 'Apollo';
   if (source.includes('seamless')) return 'Seamless';
   if (source.includes('tech_stack_mcp')) return techIntelSourceLabelForSource(source);
+  if (isOpenDataProviderSource(source)) return 'Open data';
   if (source.includes('meeting')) return 'Meeting';
   if (source.includes('om')) return 'OM';
   if (source.includes('default')) return 'Template';
@@ -3250,10 +3348,24 @@ function isOtherProviderSource(source: string): boolean {
   if (normalized.includes('apollo')) return false;
   if (normalized.includes('seamless')) return false;
   if (normalized.includes('tech_stack_mcp')) return false;
+  if (isOpenDataProviderSource(normalized)) return false;
   if (normalized.includes('meeting')) return false;
   if (normalized.includes('default')) return false;
   if (normalized.includes('om')) return false;
   return true;
+}
+
+function isOpenDataProviderSource(source: string): boolean {
+  const normalized = source.toLowerCase();
+  return (
+    normalized.includes('open_data') ||
+    normalized.includes('open-company') ||
+    normalized.includes('open_company') ||
+    normalized.includes('wikidata') ||
+    normalized.includes('website') ||
+    normalized.includes('public_profile') ||
+    normalized.includes('favicon')
+  );
 }
 
 function techIntelSourceLabelForSource(source: string): string {
@@ -3345,7 +3457,12 @@ function providerRowsFromReviewBreakdown(
       id: provider.id,
       label: provider.label,
       status: 'synced' as const,
-      transport: provider.id === 'tech_intel' ? ('mcp' as const) : ('queue' as const),
+      transport:
+        provider.id === 'tech_intel'
+          ? ('mcp' as const)
+          : provider.id === 'open_data'
+            ? ('open_data' as const)
+            : ('queue' as const),
       message: `${provider.label} has ${reviewCount} provider-detected ${
         reviewCount === 1 ? 'technology' : 'technologies'
       } waiting for review.`,

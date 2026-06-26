@@ -12,6 +12,8 @@ describe('cors origin allowlist', () => {
     expect(origins).toContain('http://127.0.0.1:5173');
     expect(origins).toContain('http://[::1]:5173');
     expect(origins).toContain('http://localhost:4174');
+    // 38081 is the Vite dev port — must be allowed so direct browser→API calls work.
+    expect(origins).toContain('http://localhost:38081');
   });
 
   it('does not add loopback origins in production', () => {
