@@ -31,13 +31,14 @@ export function daysUntilDue(dueDate: Date, now: Date): number {
 /**
  * The thresholds an opportunity has CROSSED as of `now`: every threshold whose
  * window the deadline now falls inside (daysUntil <= threshold) and that is not
- * already past (daysUntil >= 0).
+ * already past (daysUntil >= 0). Ordered widest-first, so the nearest is last
+ * (`.at(-1)`).
  *
- * WHY "all crossed", not just the nearest: a freshly-created opp due in 2 days,
- * or one the scan first sees late, must still receive the 3d alert it skipped
- * past — each threshold dedupes independently, so emitting the whole crossed set
- * is safe and ensures no boundary is silently missed. An already-overdue opp
- * (daysUntil < 0) returns none: there is no future deadline left to warn about.
+ * NOTE: the worker does NOT emit this whole set. `nearestCrossedThreshold` picks
+ * only the nearest crossed bucket (see its doc) so an opp first seen deep inside
+ * the window gets one accurate alert, not 7d+3d+1d at once. Tradeoff: with no
+ * backfill, worker downtime spanning a boundary skips that boundary by design.
+ * An already-overdue opp (daysUntil < 0) returns none.
  */
 export function thresholdsFor(daysUntil: number): DeadlineThresholdDay[] {
   if (daysUntil < 0) return [];

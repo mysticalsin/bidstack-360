@@ -102,6 +102,25 @@ describe('SectorViewPage load resilience', () => {
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the stale banner + Retry (not a confirmed-empty state) when a refetch fails over an empty result', () => {
+    // WHY: a successful empty load followed by a failed background refetch must
+    // not read as a confirmed-empty portfolio — that hides the transient failure
+    // and strips the Retry. isError-with-empty-data falls through to the banner.
+    const refetch = vi.fn();
+    mockView({
+      data: { ...RESPONSE, sectors: [] },
+      isLoading: false,
+      isError: true,
+      error: new Error('refetch failed over empty'),
+      refetch,
+    });
+    renderPage();
+
+    expect(screen.queryByText('No sector data yet')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
   it('shows the error wall with a retry only when there is no data at all', () => {
     const refetch = vi.fn();
     mockView({
